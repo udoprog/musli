@@ -1,0 +1,14 @@
+error: #[musli(default)] variant must be empty
+ --> tests/ui/illegal_fallback_variant_error.rs:7:13
+  |
+7 |       Variant {
+  |  _____________^
+8 | |         field: u32,
+9 | |     }
+  | |_____^
+
+error: #[musli(default)] only one fallback variant is supported
+  --> tests/ui/illegal_fallback_variant_error.rs:18:5
+   |
+18 |     Fallback2,
+   |     ^^^^^^^^^

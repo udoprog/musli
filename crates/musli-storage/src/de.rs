@@ -3,7 +3,6 @@ use core::marker;
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::de::{
     Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, SequenceDecoder, StructDecoder,
-    VariantDecoder,
 };
 use musli::error::Error;
 use musli_binary_common::reader::Reader;
@@ -366,7 +365,7 @@ where
 {
     type Error = R::Error;
     type First<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
-    type Second<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
+    type Second = StorageDecoder<'a, R, I, L>;
 
     #[inline]
     fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -374,31 +373,12 @@ where
     }
 
     #[inline]
-    fn decode_second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn decode_second(self) -> Result<Self::Second, Self::Error> {
         Ok(StorageDecoder::new(self.reader))
     }
 
     #[inline]
-    fn skip_second(&mut self) -> Result<bool, Self::Error> {
+    fn skip_second(self) -> Result<bool, Self::Error> {
         Ok(false)
-    }
-}
-
-impl<'de, 'a, R, I, L> VariantDecoder<'de> for StorageDecoder<'a, R, I, L>
-where
-    R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = R::Error;
-    type VariantTag<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
-    type VariantValue = Self;
-
-    fn decode_variant_tag(&mut self) -> Result<Self::VariantTag<'_>, Self::Error> {
-        Ok(StorageDecoder::new(self.reader))
-    }
-
-    fn decode_variant_value(self) -> Result<Self::VariantValue, Self::Error> {
-        Ok(self)
     }
 }

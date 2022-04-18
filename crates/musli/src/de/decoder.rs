@@ -101,42 +101,20 @@ pub trait PairDecoder<'de> {
         Self: 'this;
 
     /// The decoder to use for a tuple field value.
-    type Second<'this>: Decoder<'de, Error = Self::Error>
-    where
-        Self: 'this;
+    type Second: Decoder<'de, Error = Self::Error>;
 
     /// Decoder for the next index.
     fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error>;
 
     /// Decoder for the next value.
-    fn decode_second(&mut self) -> Result<Self::Second<'_>, Self::Error>;
+    fn decode_second(self) -> Result<Self::Second, Self::Error>;
 
     /// Indicate that the second element is not compatible with the current
     /// struct and skip it.
     ///
     /// Returns a boolean indicating if the second value was successfully
     /// skipped.
-    fn skip_second(&mut self) -> Result<bool, Self::Error>;
-}
-
-/// Trait governing how to decode a variant.
-pub trait VariantDecoder<'de> {
-    /// Error type.
-    type Error: Error;
-
-    /// The decoder to use for a variant tag.
-    type VariantTag<'this>: Decoder<'de, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// The decoder to use for a variant value.
-    type VariantValue: Decoder<'de, Error = Self::Error>;
-
-    /// Decoder for the next tag.
-    fn decode_variant_tag(&mut self) -> Result<Self::VariantTag<'_>, Self::Error>;
-
-    /// Decoder for the next value.
-    fn decode_variant_value(self) -> Result<Self::VariantValue, Self::Error>;
+    fn skip_second(self) -> Result<bool, Self::Error>;
 }
 
 /// Trait governing the implementation of a decoder.
@@ -163,7 +141,7 @@ pub trait Decoder<'de>: Sized {
     type Tuple: StructDecoder<'de, Error = Self::Error>;
 
     /// Decode a variant.
-    type Variant: VariantDecoder<'de, Error = Self::Error>;
+    type Variant: PairDecoder<'de, Error = Self::Error>;
 
     /// Decode a unit, or something that is empty.
     fn decode_unit(self) -> Result<(), Self::Error>;

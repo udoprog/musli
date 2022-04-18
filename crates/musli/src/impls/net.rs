@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
-use crate::de::{Decode, Decoder, PackDecoder, VariantDecoder};
+use crate::de::{Decode, Decoder, PackDecoder, PairDecoder};
 use crate::en::{Encode, Encoder, PackEncoder, VariantEncoder};
 use crate::error::Error;
 
@@ -74,11 +74,10 @@ impl<'de> Decode<'de> for IpAddr {
         D: Decoder<'de>,
     {
         let mut variant = decoder.decode_variant()?;
-        let tag_decoder = variant.decode_variant_tag()?;
 
-        Ok(match usize::decode(tag_decoder)? {
-            0 => Self::V4(Ipv4Addr::decode(variant.decode_variant_value()?)?),
-            1 => Self::V6(Ipv6Addr::decode(variant.decode_variant_value()?)?),
+        Ok(match variant.decode_first().and_then(usize::decode)? {
+            0 => Self::V4(variant.decode_second().and_then(Ipv4Addr::decode)?),
+            1 => Self::V6(variant.decode_second().and_then(Ipv6Addr::decode)?),
             index => {
                 return Err(<D::Error as Error>::unsupported_variant("IpAddr", index));
             }
@@ -172,19 +171,10 @@ impl<'de> Decode<'de> for SocketAddr {
         D: Decoder<'de>,
     {
         let mut variant = decoder.decode_variant()?;
-        let tag_decoder = variant.decode_variant_tag()?;
 
-        Ok(match usize::decode(tag_decoder)? {
-            0 => Self::V4(
-                variant
-                    .decode_variant_value()
-                    .and_then(SocketAddrV4::decode)?,
-            ),
-            1 => Self::V6(
-                variant
-                    .decode_variant_value()
-                    .and_then(SocketAddrV6::decode)?,
-            ),
+        Ok(match variant.decode_first().and_then(usize::decode)? {
+            0 => Self::V4(variant.decode_second().and_then(SocketAddrV4::decode)?),
+            1 => Self::V6(variant.decode_second().and_then(SocketAddrV6::decode)?),
             index => {
                 return Err(<D::Error as Error>::unsupported_variant(
                     "SocketAddr",

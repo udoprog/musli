@@ -174,7 +174,29 @@
 //!   field. It will cause that field to define how that variant is encoded or
 //!   decoded transparently without being treated as a field.
 //!
+//! * `#[musli(default)]` defines the variant that will be used in case no other
+//!   variant matches. Only one such variant can be defined.
+//!
+//!   ```
+//!   use musli::{Encode, Decode};
+//!
+//!   #[derive(Debug, PartialEq, Eq, Encode, Decode)]
+//!   enum Animal {
+//!       #[musli(tag = "cat")]
+//!       Cat,
+//!       #[musli(tag = "dog")]
+//!       Dog,
+//!       #[musli(default)]
+//!       Unknown,
+//!   }
+//!   ```
+//!
 //! ## Field attributes
+//!
+//! * `#[musli(tag = ...)]` allows for renaming a field from its default value.
+//!   Its default tag value is the offset of the field as its declared in its
+//!   container or variant (default or `#[musli(field = "index")]`) or the name
+//!   of the field if `#[musli(field = "name")]` is used.
 //!
 //! * `#[musli(with = <path>)]` specifies the path to a module to use instead of
 //!   the fields default [Encode] or [Decode] implementations.
@@ -234,10 +256,6 @@
 //!   }
 //!   # }
 //!   ```
-//!
-//! * `#[musli(tag = ...)]` allows for renaming a field from its default value.
-//!   Its default tag value is the offset of the field as its declared in its
-//!   container or variant.
 //!
 //! * `#[musli(default)]` constructs the field using [Default::default] in case
 //!   it's not available. This is only used when a field is missing during

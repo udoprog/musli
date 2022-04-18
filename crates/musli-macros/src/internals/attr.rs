@@ -101,10 +101,12 @@ pub(crate) struct FieldAttr {
 pub(crate) struct VariantAttr {
     /// `#[musli(tag_type)]`.
     pub(crate) tag_type: Option<(Span, syn::Type)>,
-    /// Rename a field to the given literal.
+    /// Rename a field to the given expression.
     pub(crate) rename: Option<(Span, syn::Expr)>,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
     pub(crate) packing: Option<(Span, Packing)>,
+    /// `#[musli(default)]`.
+    pub(crate) default: Option<Span>,
 }
 
 impl VariantAttr {
@@ -370,6 +372,10 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 // parse #[musli(packed)]
                 Attribute::Path(path) if path == PACKED => {
                     attr.set_packing(cx, path.span(), Packing::Packed);
+                }
+                // parse #[musli(default)]
+                Attribute::Path(path) if path == DEFAULT => {
+                    attr.default = Some(path.span());
                 }
                 meta => {
                     cx.error_span(meta.span(), format!("unsupported #[{}] attribute", ATTR));

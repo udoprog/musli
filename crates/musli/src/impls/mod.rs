@@ -14,7 +14,7 @@ use core::sync::atomic::{
 };
 use core::{fmt, marker};
 
-use crate::de::{Decode, Decoder, VariantDecoder};
+use crate::de::{Decode, Decoder, PairDecoder};
 use crate::en::{Encode, Encoder, VariantEncoder};
 use crate::error::Error;
 
@@ -357,9 +357,9 @@ where
     {
         let mut variant = decoder.decode_variant()?;
 
-        match variant.decode_variant_tag().and_then(usize::decode)? {
-            0 => variant.decode_variant_value().and_then(T::decode).map(Ok),
-            1 => variant.decode_variant_value().and_then(U::decode).map(Err),
+        match variant.decode_first().and_then(usize::decode)? {
+            0 => variant.decode_second().and_then(T::decode).map(Ok),
+            1 => variant.decode_second().and_then(U::decode).map(Err),
             tag => Err(D::Error::unsupported_variant("Result", tag)),
         }
     }

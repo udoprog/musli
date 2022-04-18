@@ -9,19 +9,18 @@ use crate::internals::{Ctxt, Needs, NeedsKind};
 struct Tokens {
     decode_t: TokenStream,
     decoder_t: TokenStream,
+    decoder_var: syn::Ident,
     default_t: TokenStream,
     encode_t: TokenStream,
     encoder_t: TokenStream,
-    error_t: TokenStream,
-    pack_encoder_t: TokenStream,
-    struct_decoder_t: TokenStream,
-    pair_encoder_t: TokenStream,
-    pair_decoder_t: TokenStream,
-    pack_decoder_t: TokenStream,
-    variant_decoder_t: TokenStream,
-    variant_encoder_t: TokenStream,
-    decoder_var: syn::Ident,
     encoder_var: syn::Ident,
+    error_t: TokenStream,
+    pack_decoder_t: TokenStream,
+    pack_encoder_t: TokenStream,
+    pair_decoder_t: TokenStream,
+    pair_encoder_t: TokenStream,
+    struct_decoder_t: TokenStream,
+    variant_encoder_t: TokenStream,
 }
 
 pub(crate) struct Expander<'a> {
@@ -46,19 +45,18 @@ impl<'a> Expander<'a> {
             tokens: Tokens {
                 decode_t: quote!(#prefix::de::Decode),
                 decoder_t: quote!(#prefix::de::Decoder),
+                decoder_var: syn::Ident::new("decoder", input.ident.span()),
                 default_t: quote!(::core::default::Default::default()),
                 encode_t: quote!(#prefix::en::Encode),
                 encoder_t: quote!(#prefix::en::Encoder),
-                error_t: quote!(#prefix::error::Error),
-                pack_encoder_t: quote!(#prefix::en::PackEncoder),
-                struct_decoder_t: quote!(#prefix::de::StructDecoder),
-                pair_encoder_t: quote!(#prefix::en::PairEncoder),
-                pair_decoder_t: quote!(#prefix::de::PairDecoder),
-                pack_decoder_t: quote!(#prefix::de::PackDecoder),
-                variant_decoder_t: quote!(#prefix::de::VariantDecoder),
-                variant_encoder_t: quote!(#prefix::en::VariantEncoder),
-                decoder_var: syn::Ident::new("decoder", input.ident.span()),
                 encoder_var: syn::Ident::new("encoder", input.ident.span()),
+                error_t: quote!(#prefix::error::Error),
+                pack_decoder_t: quote!(#prefix::de::PackDecoder),
+                pack_encoder_t: quote!(#prefix::en::PackEncoder),
+                pair_decoder_t: quote!(#prefix::de::PairDecoder),
+                pair_encoder_t: quote!(#prefix::en::PairEncoder),
+                struct_decoder_t: quote!(#prefix::de::StructDecoder),
+                variant_encoder_t: quote!(#prefix::en::VariantEncoder),
             },
         }
     }
@@ -470,7 +468,7 @@ impl<'a> Expander<'a> {
         let error_t = &self.tokens.error_t;
         let type_ident = &self.input.ident;
         let type_name = &self.type_name;
-        let variant_decoder_t = &self.tokens.variant_decoder_t;
+        let pair_decoder_t = &self.tokens.pair_decoder_t;
         let decode_t = &self.tokens.decode_t;
         let variant_tag = syn::Ident::new("variant_tag", self.input.ident.span());
 
@@ -497,10 +495,40 @@ impl<'a> Expander<'a> {
 
         let type_packing = self.type_attr.packing();
 
-        for (variant_index, variant) in data.variants.iter().enumerate() {
+        let mut fallback = None;
+        // Keep track of variant index manually since fallback variants do not
+        // count.
+        let mut variant_index = 0;
+
+        for variant in data.variants.iter() {
             let span = variant.span();
 
             let variant_attr = attr::variant_attrs(&self.cx, &variant.attrs);
+
+            if variant_attr.default.is_some() {
+                if !variant.fields.is_empty() {
+                    self.cx.error_span(
+                        variant.fields.span(),
+                        format!("#[{}({})] variant must be empty", ATTR, DEFAULT),
+                    );
+                    continue;
+                }
+
+                if fallback.is_some() {
+                    self.cx.error_span(
+                        variant.ident.span(),
+                        format!(
+                            "#[{}({})] only one fallback variant is supported",
+                            ATTR, DEFAULT
+                        ),
+                    );
+                    continue;
+                }
+
+                fallback = Some(&variant.ident);
+                continue;
+            }
+
             let variant_name = syn::LitStr::new(&variant.ident.to_string(), variant.ident.span());
 
             let mut path = syn::Path::from(syn::Ident::new("Self", type_ident.span()));
@@ -531,9 +559,12 @@ impl<'a> Expander<'a> {
 
             variants.push(quote! {
                 #tag => {
+                    let #decoder_var = #pair_decoder_t::decode_second(variant)?;
                     #output
                 }
             });
+
+            variant_index += 1;
         }
 
         let tag_type = self
@@ -542,16 +573,33 @@ impl<'a> Expander<'a> {
             .as_ref()
             .map(|(_, ty)| quote!(: #ty));
 
+        let fallback = match fallback {
+            Some(ident) => {
+                quote! {
+                    if !#pair_decoder_t::skip_second(variant)? {
+                        return Err(<D::Error as #error_t>::unsupported_variant(#type_name, tag));
+                    }
+
+                    Self::#ident {}
+                }
+            }
+            None => quote! {
+                return Err(<D::Error as #error_t>::unsupported_variant(#type_name, tag));
+            },
+        };
+
         Some(quote! {{
             let mut variant = #decoder_t::decode_variant(#decoder_var)?;
-            let tag_decoder = #variant_decoder_t::decode_variant_tag(&mut variant)?;
-            let #variant_tag #tag_type = #decode_t::decode(tag_decoder)?;
-            let #decoder_var = #variant_decoder_t::decode_variant_value(variant)?;
+
+            let #variant_tag #tag_type = {
+                let tag_decoder = #pair_decoder_t::decode_first(&mut variant)?;
+                #decode_t::decode(tag_decoder)?
+            };
 
             Ok(match variant_tag {
                 #(#variants,)*
                 tag => {
-                    return Err(<D::Error as #error_t>::unsupported_variant(#type_name, tag));
+                    #fallback
                 }
             })
         }})
@@ -856,7 +904,7 @@ impl<'a> Expander<'a> {
 
             patterns.push(quote! {
                 #tag => {
-                    let #decoder_var = #pair_decoder_t::decode_second(&mut #decoder_var)?;
+                    let #decoder_var = #pair_decoder_t::decode_second(#decoder_var)?;
                     #decode;
                 }
             });
@@ -910,7 +958,7 @@ impl<'a> Expander<'a> {
         }};
 
         let skip_field = quote! {
-            #pair_decoder_t::skip_second(&mut #decoder_var)?
+            #pair_decoder_t::skip_second(#decoder_var)?
         };
 
         let unsupported = match variant_tag {

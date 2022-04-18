@@ -4,7 +4,6 @@ use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use crate::types::TypeTag;
 use musli::de::{
     Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, SequenceDecoder, StructDecoder,
-    VariantDecoder,
 };
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
@@ -495,7 +494,7 @@ where
 {
     type Error = R::Error;
     type First<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
-    type Second<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
+    type Second = Self;
 
     #[inline]
     fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -503,12 +502,12 @@ where
     }
 
     #[inline]
-    fn decode_second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
-        Ok(WireDecoder::new(self.reader))
+    fn decode_second(self) -> Result<Self::Second, Self::Error> {
+        Ok(self)
     }
 
     #[inline]
-    fn skip_second(&mut self) -> Result<bool, Self::Error> {
+    fn skip_second(mut self) -> Result<bool, Self::Error> {
         self.skip_any()?;
         Ok(true)
     }
@@ -539,25 +538,6 @@ where
 
         self.remaining -= 1;
         Ok(Some(WireDecoder::new(self.decoder.reader)))
-    }
-}
-
-impl<'de, 'a, R, I, L> VariantDecoder<'de> for WireDecoder<'a, R, I, L>
-where
-    R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = R::Error;
-    type VariantTag<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
-    type VariantValue = Self;
-
-    fn decode_variant_tag(&mut self) -> Result<Self::VariantTag<'_>, Self::Error> {
-        Ok(WireDecoder::new(self.reader))
-    }
-
-    fn decode_variant_value(self) -> Result<Self::VariantValue, Self::Error> {
-        Ok(self)
     }
 }
 
