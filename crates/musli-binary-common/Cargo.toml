@@ -1,6 +1,6 @@
 [package]
 name = "musli-binary-common"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2021"
 readme = "README.md"
 license = "MIT/Apache-2.0"
@@ -18,7 +18,7 @@ default = ["std"]
 std = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.4" }
+musli = { path = "../musli", version = "0.0.5" }
 
 [dev-dependencies]
 rand = "0.8.5"

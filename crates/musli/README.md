@@ -15,17 +15,41 @@ We make the following assumptions:
 
 * Anything being deserialized must be fully held in memory and able to hand
   out contiguous slices of it. This allows users of musli to perform
-  zero-copy deserialization for certain types.
+  zero-copy deserialization for bytes-oriented types.
 
 * Decoding is biased to assume strings are encoded verbatim in the format
-  used so that references to strings can always be used.
+  used so that references to strings can always be used. That means strings
+  have to be UTF-8. A format that deviates from this will have to rely on
+  runtime errors.
 
 I've chosen to internally use the term "encoding", "encode", and "decode"
 because it's common terminology when talking about binary formats. It's also
 distinct from [serde]'s use of "serialization" allowing for the ease of
 using both libraries side by side if desired.
 
-[serde]: https://serde.rs
+<br>
+
+### Design
+
+Müsli is designed with similar principles as [serde]. Relying on Rust's
+powerful trait system to generate code which can largely be optimized away.
+The end result should be very similar to a handwritten encoder / decoder.
+
+The central components of the framework are the [Encode] and [Decode]
+derives. They are thoroughly documented in the [derives] module.
+
+<br>
+
+### Usage
+
+Add the following to your `Cargo.toml`:
+
+```toml
+musli = "0.0.5"
+musli-wire = "0.0.5"
+```
+
+<br>
 
 ### Formats
 
@@ -33,6 +57,42 @@ Formats are currently distinguished by supporting various degrees of
 *upgrade stability*. A fully upgrade stable encoding format must tolerate
 that one model can add fields that an older version of the model should be
 capable of ignoring.
+
+Partial upgrade stability can still be useful as is the case of the
+*musli-storage* format below, because reading from storage only requires
+decoding to be upgrade stable. So if correctly managed with
+`#[musli(default)]` this will never result in any readers seeing unknown
+fields.
+
+The available formats and their capabilities are:
+
+| | reorder? | missing? | unknown? |
+|-|-----------------|-----------------|--------------------|
+| [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ |
+| [musli-storage]                    | ✔ | ✔ | ✗ |
+| [musli-wire]                       | ✔ | ✔ | ✔ |
+
+`recorder?` determines whether fields must occur in exactly the order in
+which they are specified. So reordering fields in such a struct would cause
+an error. This is only suitable for byte-oriented IPC where data models are
+strictly synchronized.
+
+`missing?` determines if the reader can handle missing fields, as
+exemplified above. This is suitable for on-disk storage.
+
+`unknown?` determines if the format can skip over unknown fields. This is
+suitable for network communication.
+
+For every feature you drop, the format becomes more compact and efficient.
+`musli-storage` `#[musli(packed)]` for example is roughly as compact and
+efficient as [bincode] while [musli-wire] is comparable to something like
+[protobuf]*.
+
+<br>
+
+## Examples
+
+The following is an example of *full upgrade stability* using [musli-wire]:
 
 ```rust
 use musli::{Encode, Decode};
@@ -61,11 +121,8 @@ assert_eq!(version1, Version1 {
 });
 ```
 
-Partial upgrade stability can still be useful as is the case of the
-*musli-storage* format below, because reading from storage only requires
-decoding to be upgrade stable. So if correctly managed with
-`#[musli(default)]` this will never result in any readers seeing unknown
-fields.
+The following is an example of *partial upgrade stability* using
+[musli-storage]:
 
 ```rust
 use musli::{Encode, Decode};
@@ -89,69 +146,7 @@ assert_eq!(version2, Version2 {
 });
 ```
 
-The available formats and their capabilities are:
-
-| | reorder? | missing? | unknown? |
-|-|-----------------|-----------------|--------------------|
-| [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ |
-| [musli-storage]                    | ✔ | ✔ | ✗ |
-| [musli-wire]                       | ✔ | ✔ | ✔ |
-
-`recorder?` determines whether fields must occur in exactly the order in
-which they are specified. So reordering fields in such a struct would cause
-an error. This is only suitable for byte-oriented IPC where data models are
-strictly synchronized.
-
-`missing?` determines if the reader can handle missing fields, as
-exemplified above. This is suitable for on-disk storage.
-
-`unknown?` determines if the format can skip over unknown fields. This is
-suitable for network communication.
-
-For every feature you drop, the format becomes more compact and efficient.
-`musli-storage` `#[musli(packed)]` for example is as compact and efficient
-as [bincode] while [musli-wire] is comparable to something like [protobuf]*.
-
-### Usage
-
-Add it to your `Cargo.toml`:
-
-```toml
-musli = "0.0.4"
-musli-wire = "0.0.4"
-```
-
-### The `Encode` and `Decode` derives
-
-See the [derives] module for documentation on how to use the [Encode] and
-[Decode] derives.
-
-## Examples
-
-Basic example which uses the [default encoding format]:
-
-```rust
-use musli::{Encode, Decode};
-
-#[derive(Debug, PartialEq, Encode, Decode)]
-struct Struct<'a> {
-    name: &'a str,
-    age: u32,
-}
-
-let mut out = Vec::new();
-
-let expected = Struct {
-    name: "Aristotle",
-    age: 61,
-};
-
-musli_wire::encode(&mut out, &expected)?;
-let actual = musli_wire::decode(&out[..])?;
-
-assert_eq!(expected, actual);
-```
-
+[serde]: https://serde.rs
 [GATs]: https://github.com/rust-lang/rust/issues/44265
 [protobuf]: https://developers.google.com/protocol-buffers
 [bincode]: https://docs.rs/bincode
