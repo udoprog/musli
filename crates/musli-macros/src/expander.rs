@@ -128,7 +128,7 @@ impl<'a> Expander<'a> {
     }
 
     fn transparent_diagnostics(&self, span: Span, fields: &syn::Fields) {
-        if fields.len() == 0 {
+        if fields.is_empty() {
             self.cx.error_span(
                 span,
                 format!(
@@ -305,7 +305,7 @@ impl<'a> Expander<'a> {
 
         let encode = match packing {
             Packing::Transparent => {
-                self.encode_transparent(self.input.ident.span(), &fields, needs)?
+                self.encode_transparent(self.input.ident.span(), fields, needs)?
             }
             Packing::Tagged => {
                 needs.mark_used();
@@ -610,7 +610,9 @@ impl<'a> Expander<'a> {
 
         let encoder_var = &self.tokens.encoder_var;
         let variant_attr = attr::variant_attrs(&self.cx, &variant.attrs);
-        let packing = variant_attr.packing().unwrap_or(self.type_attr.packing());
+        let packing = variant_attr
+            .packing()
+            .unwrap_or_else(|| self.type_attr.packing());
 
         let (mut encode, patterns) = match packing {
             Packing::Tagged => {
@@ -1117,11 +1119,11 @@ enum FieldKind {
 }
 
 impl FieldKind {
-    fn new<'a>(
-        fields: &'a syn::Fields,
+    fn new(
+        fields: &syn::Fields,
     ) -> Option<(
         Self,
-        impl Iterator<Item = &'a syn::Field> + ExactSizeIterator,
+        impl Iterator<Item = &'_ syn::Field> + ExactSizeIterator,
     )> {
         match fields {
             syn::Fields::Named(named) => Some((Self::Struct, named.named.iter())),
@@ -1135,9 +1137,9 @@ impl FieldKind {
 fn rename_lit(rename: &attr::Rename) -> syn::Lit {
     match rename.as_lit() {
         syn::Lit::Int(int) if int.suffix().is_empty() => {
-            syn::LitInt::new(&format!("{}usize", int.to_string()), int.span()).into()
+            syn::LitInt::new(&format!("{}usize", int), int.span()).into()
         }
-        lit => lit.clone(),
+        lit => lit,
     }
 }
 

@@ -19,7 +19,7 @@ pub struct FixedBytes<const N: usize> {
 
 impl<const N: usize> FixedBytes<N> {
     /// Construct a new fixed bytes array storage.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             // SAFETY: MaybeUnint::uninit_array is not stable.
             data: unsafe { MaybeUninit::<[MaybeUninit<u8>; N]>::uninit().assume_init() },

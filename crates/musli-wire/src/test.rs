@@ -5,15 +5,15 @@ use core::fmt::Debug;
 use musli::{Decode, Encode};
 
 /// Roundtrip encode the given value.
-pub fn rt<T>(value: T) -> Result<T>
+pub fn rt<T>(expected: T) -> Result<T>
 where
     T: Debug + PartialEq + for<'de> Decode<'de> + Encode,
 {
-    let out = crate::to_vec(&value)?;
+    let out = crate::to_vec(&expected)?;
     let mut buf = &out[..];
     let value: T = crate::decode(&mut buf)?;
     assert!(buf.is_empty());
-    assert_eq!(value, value);
+    assert_eq!(value, expected);
     Ok(value)
 }
 

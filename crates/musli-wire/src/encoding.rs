@@ -200,7 +200,7 @@ where
         W: Writer,
         T: ?Sized + Encode,
     {
-        T::encode(&value, WireEncoder::<_, I, L>::new(&mut writer))
+        T::encode(value, WireEncoder::<_, I, L>::new(&mut writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using
@@ -212,7 +212,7 @@ where
         T: ?Sized + Encode,
     {
         let mut writer = musli_binary_common::io::wrap(write);
-        T::encode(&value, WireEncoder::<_, I, L>::new(&mut writer))
+        T::encode(value, WireEncoder::<_, I, L>::new(&mut writer))
     }
 
     /// Encode the given value to a [Vec] using [WireEncoder] with the current
@@ -223,7 +223,7 @@ where
         T: ?Sized + Encode,
     {
         let mut data = Vec::new();
-        T::encode(&value, WireEncoder::<_, I, L>::new(&mut data))?;
+        T::encode(value, WireEncoder::<_, I, L>::new(&mut data))?;
         Ok(data)
     }
 
@@ -236,7 +236,7 @@ where
         T: ?Sized + Encode,
     {
         let mut bytes = FixedBytes::new();
-        T::encode(&value, WireEncoder::<_, I, L>::new(&mut bytes))?;
+        T::encode(value, WireEncoder::<_, I, L>::new(&mut bytes))?;
         Ok(bytes)
     }
 
