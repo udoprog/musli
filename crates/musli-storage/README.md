@@ -55,8 +55,8 @@ assert_eq!(version2, Version2 {
 
 ## Configuring
 
-To tweak the behavior of the wire format you can use the [StorageEncoding]
-type:
+To tweak the behavior of the storage format you can use the
+[StorageEncoding] type:
 
 ```rust
 use musli_storage::StorageEncoding;
@@ -85,8 +85,9 @@ let actual = CONFIG.decode(&out[..])?;
 assert_eq!(expected, actual);
 ```
 
-[Müsli]: https://docs.rs/musli
 [default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
+[musli-wire]: https://docs.rs/musli-wire
+[Müsli]: https://docs.rs/musli
 [StorageEncoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
 
 License: MIT/Apache-2.0

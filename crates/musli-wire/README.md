@@ -47,8 +47,8 @@ assert_eq!(version1, Version1 {
 
 ## Configuring
 
-To configure the behavior of the [simple] format you can use the
-[WireEncoding] type:
+To configure the behavior of the wire format you can use the [WireEncoding]
+type:
 
 ```rust
 use musli_wire::WireEncoding;

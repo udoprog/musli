@@ -45,8 +45,8 @@ derives. They are thoroughly documented in the [derives] module.
 Add the following to your `Cargo.toml`:
 
 ```toml
-musli = "0.0.8"
-musli-wire = "0.0.8"
+musli = "0.0.9"
+musli-wire = "0.0.9"
 ```
 
 <br>
@@ -146,15 +146,15 @@ assert_eq!(version2, Version2 {
 });
 ```
 
-[serde]: https://serde.rs
-[GATs]: https://github.com/rust-lang/rust/issues/44265
-[protobuf]: https://developers.google.com/protocol-buffers
 [bincode]: https://docs.rs/bincode
 [Decode]: Decode
 [derives]: derives
 [Encode]: Encode
+[GATs]: https://github.com/rust-lang/rust/issues/44265
 [json-serde-value]: https://docs.rs/serde_json/latest/serde_json/enum.Value.html
 [musli-storage]: https://docs.rs/musli-storage
-[musli-wire]: https://docs.rs/musli-storage
+[musli-wire]: https://docs.rs/musli-wire
+[protobuf]: https://developers.google.com/protocol-buffers
+[serde]: https://serde.rs
 
 License: MIT/Apache-2.0
