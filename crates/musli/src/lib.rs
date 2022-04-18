@@ -1,0 +1,185 @@
+//! [<img alt="github" src="https://img.shields.io/badge/github-udoprog/musli?style=for-the-badge&logo=github" height="20">](https://github.com/udoprog/musli)
+//! [<img alt="crates.io" src="https://img.shields.io/crates/v/musli.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/musli)
+//! [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-musli?style=for-the-badge&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/musli)
+//! [<img alt="build status" src="https://img.shields.io/github/workflow/status/udoprog/musli/CI/main?style=for-the-badge" height="20">](https://github.com/udoprog/musli/actions?query=branch%3Amain)
+//!
+//! # Müsli
+//!
+//! Müsli is a flexible and generic binary serialization framework.
+//!
+//! **Müsli currently depends on [GATs] and is nightly-only**
+//!
+//! We make the following assumptions:
+//!
+//! * Anything being deserialized must be fully held in memory and able to hand
+//!   out contiguous slices of it. This allows users of musli to perform
+//!   zero-copy deserialization for certain types.
+//!
+//! * Decoding is biased to assume strings are encoded verbatim in the format
+//!   used so that references to strings can always be used.
+//!
+//! I've chosen to internally use the term "encoding", "encode", and "decode"
+//! because it's common terminology when talking about binary formats. It's also
+//! distinct from [serde]'s use of "serialization" allowing for the ease of
+//! using both libraries side by side if desired.
+//!
+//! [serde]: https://serde.rs
+//!
+//! ## Formats
+//!
+//! Formats are currently distinguish by supporting various degrees of *upgrade
+//! stability*. A fully upgrade stable serialization format must tolerate that
+//! one model can add fields that an older version of the model should be
+//! capable of ignoring.
+//!
+//! ```rust
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Debug, PartialEq, Encode, Decode)]
+//! struct Version1 {
+//!     name: String,
+//! }
+//!
+//! #[derive(Debug, PartialEq, Encode, Decode)]
+//! struct Version2 {
+//!     name: String,
+//!     #[musli(default)]
+//!     age: Option<u32>,
+//! }
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let version2 = musli_wire::to_vec(&Version2 {
+//!     name: String::from("Aristotle"),
+//!     age: Some(62),
+//! })?;
+//!
+//! let version1: Version1 = musli_wire::decode(&version2[..])?;
+//!
+//! assert_eq!(version1, Version1 {
+//!     name: String::from("Aristotle"),
+//! });
+//! # Ok(()) }
+//! ```
+//!
+//! Partial upgrade stability can still be useful as is the case of the
+//! *musli-storage* format below, because reading from storage only requires
+//! decoding to be upgrade stable. So if correctly managed with
+//! `#[musli(default)]` this will never result in any readers seeing unknown
+//! fields.
+//!
+//! ```rust
+//! use musli::{Encode, Decode};
+//!
+//! # #[derive(Debug, PartialEq, Encode, Decode)]
+//! # struct Version1 { name: String }
+//! # #[derive(Debug, PartialEq, Encode, Decode)]
+//! # struct Version2 { name: String, #[musli(default)] age: Option<u32> }
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let version2 = musli_storage::to_vec(&Version2 {
+//!     name: String::from("Aristotle"),
+//!     age: Some(62),
+//! })?;
+//!
+//! assert!(musli_storage::decode::<_, Version1>(&version2[..]).is_err());
+//!
+//! let version1 = musli_storage::to_vec(&Version1 {
+//!     name: String::from("Aristotle"),
+//! })?;
+//!
+//! let version2: Version2 = musli_storage::decode(&version1[..])?;
+//!
+//! assert_eq!(version2, Version2 {
+//!     name: String::from("Aristotle"),
+//!     age: None,
+//! });
+//! # Ok(()) }
+//! ```
+//!
+//! The available formats and their capabilities are:
+//!
+//! | | reorder? | missing? | unknown? |
+//! |-|-----------------|-----------------|--------------------|
+//! | [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ |
+//! | [musli-storage]                    | ✔ | ✔ | ✗ |
+//! | [musli-wire]                       | ✔ | ✔ | ✔ |
+//!
+//! `recorder?` determines whether fields must occur in exactly the order in
+//! which they are specified. So reordering fields in such a struct would cause
+//! an error. This is only suitable for byte-oriented IPC where data models are
+//! strictly synchronized.
+//!
+//! `missing?` determines if the reader can handle missing fields, as
+//! exemplified above. This is suitable for on-disk storage.
+//!
+//! `unknown?` determines if the format can skip over unknown fields. This is
+//! suitable for network communication.
+//!
+//! For every feature you drop, the format becomes more compact and efficient.
+//! `musli-storage` `#[musli(packed)]` for example is as compact and efficient
+//! as [bincode] while [musli-wire] is comparable to something like [protobuf]*.
+//!
+//! ## Usage
+//!
+//! Add it to your `Cargo.toml`:
+//!
+//! ```toml
+//! musli = "0.0.1"
+//! musli-wire = "0.0.1"
+//! ```
+//!
+//! ## The `Encode` and `Decode` derives
+//!
+//! See the [derives] module for documentation on how to use the [Encode] and
+//! [Decode] derives.
+//!
+//! # Examples
+//!
+//! Basic example which uses the [default encoding format]:
+//!
+//! ```rust
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Debug, PartialEq, Encode, Decode)]
+//! struct Struct<'a> {
+//!     name: &'a str,
+//!     age: u32,
+//! }
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut out = Vec::new();
+//!
+//! let expected = Struct {
+//!     name: "Aristotle",
+//!     age: 61,
+//! };
+//!
+//! musli_wire::encode(&mut out, &expected)?;
+//! let actual = musli_wire::decode(&out[..])?;
+//!
+//! assert_eq!(expected, actual);
+//! # Ok(()) }
+//! ```
+//!
+//! [GATs]: https://github.com/rust-lang/rust/issues/44265
+//! [protobuf]: https://developers.google.com/protocol-buffers
+//! [bincode]: https://docs.rs/bincode
+//! [Decode]: Decode
+//! [derives]: derives
+//! [Encode]: Encode
+//! [json-serde-value]: https://docs.rs/serde_json/latest/serde_json/enum.Value.html
+//! [musli-storage]: https://docs.rs/musli-storage
+//! [musli-wire]: https://docs.rs/musli-storage
+
+#![feature(generic_associated_types)]
+#![deny(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+pub mod de;
+pub mod derives;
+pub mod en;
+pub mod error;
+mod impls;
+mod internal;
+
+pub use self::de::{Decode, Decoder};
+pub use self::en::{Encode, Encoder};

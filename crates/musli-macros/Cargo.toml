@@ -1,0 +1,23 @@
+[package]
+name = "musli-macros"
+version = "0.0.1"
+edition = "2021"
+readme = "README.md"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/udoprog/musli"
+homepage = "https://github.com/udoprog/musli"
+documentation = "https://docs.rs/musli"
+description = """
+Macros for Müsli.
+"""
+keywords = ["serialization", "no_std"]
+categories = ["encoding"]
+
+[lib]
+proc-macro = true
+path = "src/lib.rs"
+
+[dependencies]
+proc-macro2 = "1.0.37"
+quote = "1.0.18"
+syn = "1.0.91"

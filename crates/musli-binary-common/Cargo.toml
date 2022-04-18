@@ -1,0 +1,25 @@
+[package]
+name = "musli-binary-common"
+version = "0.0.1"
+edition = "2021"
+readme = "README.md"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/udoprog/musli"
+homepage = "https://github.com/udoprog/musli"
+documentation = "https://docs.rs/musli"
+description = """
+Common utilities for Müsli.
+"""
+keywords = ["serialization", "no_std"]
+categories = ["encoding"]
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+musli = { path = "../musli", version = "0.0.1" }
+
+[dev-dependencies]
+rand = "0.8.5"
+anyhow = "1.0.56"

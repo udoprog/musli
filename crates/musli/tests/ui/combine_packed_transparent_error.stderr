@@ -1,0 +1,5 @@
+error: #[musli(transparent)] cannot be combined with #[musli(packed)]
+ --> tests/ui/combine_packed_transparent_error.rs:4:17
+  |
+4 | #[musli(packed, transparent)]
+  |                 ^^^^^^^^^^^

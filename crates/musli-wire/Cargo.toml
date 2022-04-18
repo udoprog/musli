@@ -1,0 +1,25 @@
+[package]
+name = "musli-wire"
+version = "0.0.1"
+edition = "2021"
+readme = "README.md"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/udoprog/musli"
+homepage = "https://github.com/udoprog/musli"
+documentation = "https://docs.rs/musli"
+description = """
+Fully upgrade stable format for Müsli suitable for network communication.
+"""
+keywords = ["serialization", "no_std"]
+categories = ["encoding"]
+
+[features]
+default = ["std"]
+std = ["musli-binary-common/std"]
+test = ["anyhow"]
+
+[dependencies]
+musli = { path = "../musli", version = "0.0.1" }
+musli-binary-common = { path = "../musli-binary-common", version = "0.0.1" }
+
+anyhow = { version = "1.0.56", optional = true }

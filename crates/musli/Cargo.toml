@@ -1,0 +1,28 @@
+[package]
+name = "musli"
+version = "0.0.1"
+edition = "2021"
+license = "MIT/Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/udoprog/musli"
+homepage = "https://github.com/udoprog/musli"
+documentation = "https://docs.rs/musli"
+description = """
+Müsli is a flexible and generic binary serialization framework.
+"""
+keywords = ["serialization", "no_std"]
+categories = ["encoding"]
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+musli-macros = { path = "../musli-macros", version = "0.0.1" }
+
+[dev-dependencies]
+anyhow = "1.0.56"
+musli-wire = { path = "../musli-wire", features = ["test"] }
+musli-storage = { path = "../musli-storage", features = ["test"] }
+
+trybuild = "1.0.59"
