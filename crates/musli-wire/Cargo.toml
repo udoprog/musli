@@ -1,6 +1,6 @@
 [package]
 name = "musli-wire"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 readme = "README.md"
 license = "MIT/Apache-2.0"
@@ -19,7 +19,7 @@ std = ["musli-binary-common/std"]
 test = ["anyhow"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.1" }
-musli-binary-common = { path = "../musli-binary-common", version = "0.0.1" }
+musli = { path = "../musli", version = "0.0.2" }
+musli-binary-common = { path = "../musli-binary-common", version = "0.0.2" }
 
 anyhow = { version = "1.0.56", optional = true }

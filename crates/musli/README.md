@@ -117,8 +117,8 @@ as [bincode] while [musli-wire] is comparable to something like [protobuf]*.
 Add it to your `Cargo.toml`:
 
 ```toml
-musli = "0.0.1"
-musli-wire = "0.0.1"
+musli = "0.0.2"
+musli-wire = "0.0.2"
 ```
 
 ### The `Encode` and `Decode` derives
