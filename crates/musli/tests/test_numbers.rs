@@ -10,17 +10,17 @@ struct StructWithNumbers {
 }
 
 #[test]
-fn test_signed_unpacked() -> Result<(), Box<dyn std::error::Error>> {
+fn test_signed_unpacked() {
     let out = musli_wire::test::rt(StructWithNumbers {
         a: -1,
         b: 1,
         c: -3,
         d: 3,
-    })?;
+    });
 
-    let out = musli_wire::to_vec(&out)?;
+    let out = musli_wire::to_vec(&out).expect("failed to encode");
 
-    let unpacked: Unpacked = musli_storage::decode(&out[..])?;
+    let unpacked: Unpacked = musli_storage::decode(&out[..]).expect("failed to decode");
 
     assert_eq! {
         unpacked,
@@ -50,6 +50,4 @@ fn test_signed_unpacked() -> Result<(), Box<dyn std::error::Error>> {
         d_tag: Typed<u8>,
         d: Typed<u8>,
     }
-
-    Ok(())
 }

@@ -1,4 +1,4 @@
-use core::marker;
+use core::{fmt, marker};
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use crate::types::TypeTag;
@@ -8,7 +8,7 @@ use musli::de::{
 };
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
-use musli_binary_common::reader::Reader;
+use musli_binary_common::reader::{Reader, WithPosition};
 
 /// A very simple decoder.
 pub struct WireDecoder<'de, R, I, L>
@@ -16,7 +16,7 @@ where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
-    reader: &'de mut R,
+    reader: &'de mut WithPosition<R>,
     _marker: marker::PhantomData<(I, L)>,
 }
 
@@ -27,7 +27,7 @@ where
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(reader: &'de mut R) -> Self {
+    pub(crate) fn new(reader: &'de mut WithPosition<R>) -> Self {
         Self {
             reader,
             _marker: marker::PhantomData,
@@ -163,7 +163,10 @@ where
     #[inline]
     fn decode_bytes(self) -> Result<&'de [u8], Self::Error> {
         if self.reader.read_byte()? != TypeTag::Prefixed as u8 {
-            return Err(Self::Error::custom("expected Prefixed"));
+            return Err(Self::Error::collect_from_display(Expected(
+                TypeTag::Prefixed,
+                self.reader.pos(),
+            )));
         }
 
         let len = L::decode_usize(&mut *self.reader)?;
@@ -285,7 +288,10 @@ where
         let b = self.reader.read_byte()?;
 
         if b & TypeTag::OptionNone as u8 != TypeTag::OptionNone as u8 {
-            return Err(Self::Error::custom("expected OPTION"));
+            return Err(Self::Error::collect_from_display(Expected(
+                TypeTag::OptionSome,
+                self.reader.pos(),
+            )));
         }
 
         Ok(if b == TypeTag::OptionSome as u8 {
@@ -298,7 +304,10 @@ where
     #[inline]
     fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
         if self.reader.read_byte()? != TypeTag::Sequence as u8 {
-            return Err(Self::Error::custom("expected Sequence"));
+            return Err(Self::Error::collect_from_display(Expected(
+                TypeTag::Sequence,
+                self.reader.pos(),
+            )));
         }
 
         RemainingSimpleDecoder::new(self)
@@ -307,7 +316,10 @@ where
     #[inline]
     fn decode_map(self) -> Result<Self::Map, Self::Error> {
         if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
-            return Err(Self::Error::custom("expected PairSequence"));
+            return Err(Self::Error::collect_from_display(Expected(
+                TypeTag::PairSequence,
+                self.reader.pos(),
+            )));
         }
 
         RemainingSimpleDecoder::new(self)
@@ -316,7 +328,10 @@ where
     #[inline]
     fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
-            return Err(Self::Error::custom("expected PairSequence"));
+            return Err(Self::Error::collect_from_display(Expected(
+                TypeTag::PairSequence,
+                self.reader.pos(),
+            )));
         }
 
         RemainingSimpleDecoder::new(self)
@@ -325,7 +340,10 @@ where
     #[inline]
     fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
         if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
-            return Err(Self::Error::custom("expected PairSequence"));
+            return Err(Self::Error::collect_from_display(Expected(
+                TypeTag::PairSequence,
+                self.reader.pos(),
+            )));
         }
 
         RemainingSimpleDecoder::new(self)
@@ -334,7 +352,10 @@ where
     #[inline]
     fn decode_unit_struct(mut self) -> Result<(), Self::Error> {
         if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
-            return Err(Self::Error::custom("expected PairSequence"));
+            return Err(Self::Error::collect_from_display(Expected(
+                TypeTag::PairSequence,
+                self.reader.pos(),
+            )));
         }
 
         let len = L::decode_usize(&mut *self.reader)?;
@@ -351,7 +372,10 @@ where
     #[inline]
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
         if self.reader.read_byte()? != TypeTag::Pair as u8 {
-            return Err(Self::Error::custom("expected Pair"));
+            return Err(Self::Error::collect_from_display(Expected(
+                TypeTag::Pair,
+                self.reader.pos(),
+            )));
         }
 
         Ok(self)
@@ -589,5 +613,17 @@ where
 
     fn decode_variant_value(self) -> Result<Self::VariantValue, Self::Error> {
         Ok(self)
+    }
+}
+
+struct Expected(TypeTag, Option<usize>);
+
+impl fmt::Display for Expected {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(pos) = self.1 {
+            write!(f, "Expected {:?} (at {})", self.0, pos)
+        } else {
+            write!(f, "Expected {:?}", self.0)
+        }
     }
 }

@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
-use crate::internals::attr::{self, AttributeValue, FieldAttr, Packing, Tag, TypeAttr};
+use crate::internals::attr::{self, FieldAttr, Packing, Tag, TypeAttr};
 use crate::internals::symbol::*;
 use crate::internals::{Ctxt, Needs, NeedsKind};
 
@@ -1078,13 +1078,13 @@ impl<'a> Expander<'a> {
     /// Expand the variant tag depending on the given tag configuration.
     fn expand_variant_tag(
         &self,
-        rename: Option<&(Span, AttributeValue)>,
+        rename: Option<&(Span, syn::Expr)>,
         tag: Tag,
         index: usize,
         ident: &syn::Ident,
     ) -> Option<syn::Expr> {
         let lit = match (rename, tag) {
-            (Some((_, value)), _) => return self.rename_lit(value),
+            (Some((_, value)), _) => return Some(self.rename_lit(value)),
             (None, Tag::Index) => usize_int(index, ident.span()).into(),
             (None, Tag::Name) => syn::LitStr::new(&ident.to_string(), ident.span()).into(),
         };
@@ -1098,13 +1098,13 @@ impl<'a> Expander<'a> {
     /// Match out the field tag depending on the given tag configuration.
     fn expand_field_tag(
         &self,
-        rename: Option<&(Span, AttributeValue)>,
+        rename: Option<&(Span, syn::Expr)>,
         tag: Tag,
         index: usize,
         field: &syn::Field,
     ) -> Option<syn::Expr> {
         let lit = match (rename, tag, &field.ident) {
-            (Some((_, rename)), _, _) => return self.rename_lit(rename),
+            (Some((_, rename)), _, _) => return Some(self.rename_lit(rename)),
             (None, Tag::Index, _) => usize_int(index, field.span()).into(),
             (None, Tag::Name, None) => {
                 self.cx.error_spanned_by(
@@ -1128,25 +1128,16 @@ impl<'a> Expander<'a> {
     }
 
     /// Process rename literal to ensure it's always typed.
-    fn rename_lit(&self, value: &AttributeValue) -> Option<syn::Expr> {
-        match value.as_lit() {
-            Some(syn::Lit::Int(int)) if int.suffix().is_empty() => {
-                Some(syn::Expr::Lit(syn::ExprLit {
-                    attrs: Vec::new(),
-                    lit: syn::LitInt::new(&format!("{}usize", int), int.span()).into(),
-                }))
-            }
-            _ => match value.as_expr() {
-                Some(expr) => Some(expr),
-                None => {
-                    self.cx.error_span(
-                        value.span(),
-                        format!("#[{}({} = \"name\")] must be a value expression", ATTR, TAG),
-                    );
-
-                    None
-                }
-            },
+    fn rename_lit(&self, expr: &syn::Expr) -> syn::Expr {
+        match expr {
+            syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Int(int),
+                ..
+            }) if int.suffix().is_empty() => syn::Expr::Lit(syn::ExprLit {
+                attrs: Vec::new(),
+                lit: syn::LitInt::new(&format!("{}usize", int), int.span()).into(),
+            }),
+            expr => expr.clone(),
         }
     }
 }

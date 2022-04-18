@@ -16,6 +16,9 @@ pub trait Reader<'de> {
     /// Error type raised by the current reader.
     type Error: Error;
 
+    /// The position of the reader.
+    fn pos(&self) -> Option<usize>;
+
     /// Skip over the given number of bytes.
     fn skip(&mut self, n: usize) -> Result<(), Self::Error>;
 
@@ -43,6 +46,17 @@ pub trait Reader<'de> {
         let mut output = [0u8; N];
         output.copy_from_slice(self.read_bytes(N)?);
         Ok(output)
+    }
+
+    /// Keep an accurate record of the position within the reader.
+    fn with_position(self) -> WithPosition<Self>
+    where
+        Self: Sized,
+    {
+        WithPosition {
+            pos: 0,
+            reader: self,
+        }
     }
 }
 
@@ -81,6 +95,11 @@ impl std::error::Error for SliceReaderError {}
 
 impl<'de> Reader<'de> for &'de [u8] {
     type Error = SliceReaderError;
+
+    #[inline]
+    fn pos(&self) -> Option<usize> {
+        None
+    }
 
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
@@ -124,27 +143,87 @@ where
     type Error = R::Error;
 
     #[inline]
+    fn pos(&self) -> Option<usize> {
+        (**self).pos()
+    }
+
+    #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
-        (*self).skip(n)
+        (**self).skip(n)
     }
 
     #[inline]
     fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
-        (*self).read_bytes(n)
+        (**self).read_bytes(n)
     }
 
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        (*self).read(buf)
+        (**self).read(buf)
     }
 
     #[inline]
     fn read_byte(&mut self) -> Result<u8, Self::Error> {
-        (*self).read_byte()
+        (**self).read_byte()
     }
 
     #[inline]
     fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
-        (*self).read_array()
+        (**self).read_array()
+    }
+}
+
+/// Keep a record of the current position.
+///
+/// Constructed through [Reader::with_position].
+pub struct WithPosition<R> {
+    pos: usize,
+    reader: R,
+}
+
+impl<'de, R> Reader<'de> for WithPosition<R>
+where
+    R: Reader<'de>,
+{
+    type Error = R::Error;
+
+    #[inline]
+    fn pos(&self) -> Option<usize> {
+        Some(self.pos)
+    }
+
+    #[inline]
+    fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
+        self.reader.skip(n)?;
+        self.pos += n;
+        Ok(())
+    }
+
+    #[inline]
+    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
+        let bytes = self.reader.read_bytes(n)?;
+        self.pos += bytes.len();
+        Ok(bytes)
+    }
+
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        self.reader.read(buf)?;
+        self.pos += buf.len();
+        Ok(())
+    }
+
+    #[inline]
+    fn read_byte(&mut self) -> Result<u8, Self::Error> {
+        let b = self.reader.read_byte()?;
+        self.pos += 1;
+        Ok(b)
+    }
+
+    #[inline]
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
+        let array = self.reader.read_array()?;
+        self.pos += N;
+        Ok(array)
     }
 }

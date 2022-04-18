@@ -1,4 +1,3 @@
-use anyhow::Result;
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -32,25 +31,23 @@ struct TransparentEnumUnpacked {
 }
 
 #[test]
-fn test_transparent_struct() -> Result<()> {
+fn test_transparent_struct() {
     musli_wire::test::rt(TransparentStruct {
         string: String::from("Hello"),
-    })?;
+    });
     let string = musli_wire::test::transcode::<_, String>(TransparentStruct {
         string: String::from("Hello"),
-    })?;
+    });
     assert_eq!(string, "Hello");
 
-    musli_wire::test::rt(TransparentTuple(String::from("Hello")))?;
-    let string = musli_wire::test::transcode::<_, String>(TransparentTuple(String::from("Hello")))?;
+    musli_wire::test::rt(TransparentTuple(String::from("Hello")));
+    let string = musli_wire::test::transcode::<_, String>(TransparentTuple(String::from("Hello")));
     assert_eq!(string, "Hello");
-
-    Ok(())
 }
 
 #[test]
-fn test_transparent_enum() -> Result<()> {
-    musli_wire::test::rt(TransparentEnum::Transparent(42))?;
+fn test_transparent_enum() {
+    musli_wire::test::rt(TransparentEnum::Transparent(42));
 
     /*
     let unpacked = musli_wire::test::transcode::<_, TransparentEnumUnpacked>(
@@ -68,6 +65,4 @@ fn test_transparent_enum() -> Result<()> {
         }
     );
     */
-
-    Ok(())
 }

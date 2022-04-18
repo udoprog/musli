@@ -92,7 +92,7 @@ pub(crate) struct FieldAttr {
     /// Method to check if we want to skip encoding.
     pub(crate) skip_encoding_if: Option<(Span, syn::Path)>,
     /// Rename a field to the given literal.
-    pub(crate) rename: Option<(Span, AttributeValue)>,
+    pub(crate) rename: Option<(Span, syn::Expr)>,
     /// Use a default value for the field if it's not available.
     pub(crate) default: Option<Span>,
 }
@@ -102,7 +102,7 @@ pub(crate) struct VariantAttr {
     /// `#[musli(tag_type)]`.
     pub(crate) tag_type: Option<(Span, syn::Type)>,
     /// Rename a field to the given literal.
-    pub(crate) rename: Option<(Span, AttributeValue)>,
+    pub(crate) rename: Option<(Span, syn::Expr)>,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
     pub(crate) packing: Option<(Span, Packing)>,
 }
@@ -200,7 +200,11 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
     let mut attr = TypeAttr::default();
 
     for a in attrs {
-        for attribute in parse_musli_attrs(cx, a).into_iter().flatten() {
+        for attribute in parse_musli_attrs::<TypeAttributes>(cx, a)
+            .map(|a| a.attributes)
+            .into_iter()
+            .flatten()
+        {
             match attribute {
                 // parse #[musli(tag_type = <type>)]
                 Attribute::KeyValue(path, value) if path == TAG_TYPE => {
@@ -263,11 +267,15 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
     let mut attr = FieldAttr::default();
 
     for a in attrs {
-        for attribute in parse_musli_attrs(cx, a).into_iter().flatten() {
+        for attribute in parse_musli_attrs::<FieldAttributes>(cx, a)
+            .map(|a| a.attributes)
+            .into_iter()
+            .flatten()
+        {
             match attribute {
                 // parse #[musli(with = <path>)]
                 Attribute::KeyValue(path, value) if path == WITH => {
-                    if let Some(path) = parse_value_path(cx, WITH, value) {
+                    if let Some(path) = value_as_path(cx, WITH, value) {
                         let mut encode_path = path.clone();
 
                         encode_path
@@ -287,18 +295,20 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
                 }
                 // parse #[musli(skip_encoding_if)]
                 Attribute::KeyValue(path, expr) if path == SKIP_ENCODING_IF => {
-                    if let Some(path) = parse_value_path(cx, SKIP_ENCODING_IF, expr) {
+                    if let Some(path) = value_as_path(cx, SKIP_ENCODING_IF, expr) {
                         attr.set_skip_encoding_if(cx, path.span(), path.clone());
                     }
                 }
                 // parse #[musli(tag = <expr>)]
-                Attribute::KeyValue(path, expr) if path == TAG => {
+                Attribute::KeyValue(path, value) if path == TAG => {
                     let span = path.span();
 
-                    if let Some((span, _)) = &attr.rename {
-                        cx.error_span(*span, "conflicting attribute");
-                    } else {
-                        attr.rename = Some((span, expr));
+                    if let Some(expr) = value_as_expr(cx, TAG, value) {
+                        if let Some((span, _)) = &attr.rename {
+                            cx.error_span(*span, "conflicting attribute");
+                        } else {
+                            attr.rename = Some((span, expr));
+                        }
                     }
                 }
                 // parse #[musli(default)]
@@ -327,7 +337,11 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
     let mut attr = VariantAttr::default();
 
     for a in attrs {
-        for m in parse_musli_attrs(cx, a).into_iter().flatten() {
+        for m in parse_musli_attrs::<VariantAttributes>(cx, a)
+            .map(|a| a.attributes)
+            .into_iter()
+            .flatten()
+        {
             match m {
                 // parse #[musli(tag_type = <type>)]
                 Attribute::KeyValue(path, value) if path == TAG_TYPE => {
@@ -336,22 +350,15 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                     }
                 }
                 // parse #[musli(tag = <expr>)]
-                Attribute::KeyValue(path, expr) if path == TAG => {
+                Attribute::KeyValue(path, value) if path == TAG => {
                     let span = path.span();
 
-                    if let Some((span, _)) = &attr.rename {
-                        cx.error_span(*span, "conflicting attribute");
-                    } else {
-                        attr.rename = Some((span, expr));
-                    }
-                }
-                Attribute::KeyValue(path, expr) if path == NAME => {
-                    let span = path.span();
-
-                    if let Some((span, _)) = &attr.rename {
-                        cx.error_span(*span, "conflicting attribute");
-                    } else {
-                        attr.rename = Some((span, expr));
+                    if let Some(expr) = value_as_expr(cx, TAG, value) {
+                        if let Some((span, _)) = &attr.rename {
+                            cx.error_span(*span, "conflicting attribute");
+                        } else {
+                            attr.rename = Some((span, expr));
+                        }
                     }
                 }
                 // parse #[musli(transparent)]
@@ -373,9 +380,23 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 }
 
 /// Get expression path.
-fn parse_value_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Path> {
+fn value_as_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Path> {
     match value {
         AttributeValue::Path(path) => Some(path),
+        _ => {
+            cx.error_span(
+                value.span(),
+                format!("#[{} = ...] should be a simple path", attr),
+            );
+            None
+        }
+    }
+}
+
+/// Get expression from value.
+fn value_as_expr<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Expr> {
+    match value {
+        AttributeValue::Expr(expr) => Some(expr),
         _ => {
             cx.error_span(
                 value.span(),
@@ -389,10 +410,7 @@ fn parse_value_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Optio
 /// Get expression as string.
 fn parse_value_string(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::LitStr> {
     match value {
-        AttributeValue::Expr(syn::Expr::Lit(syn::ExprLit {
-            attrs,
-            lit: syn::Lit::Str(string),
-        })) if attrs.is_empty() => Some(string),
+        AttributeValue::Lit(syn::Lit::Str(string)) => Some(string),
         expr => {
             cx.error_span(expr.span(), format!("#[{} = ...] should be a string", attr));
             None
@@ -404,9 +422,6 @@ fn parse_value_string(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<
 fn value_as_type(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Type> {
     match value {
         AttributeValue::Type(ty) => Some(ty),
-        // NB: we need to coerce paths into types since they are parsed before
-        // AttributeValue::Path.
-        AttributeValue::Path(path) => Some(syn::Type::Path(syn::TypePath { qself: None, path })),
         expr => {
             cx.error_span(expr.span(), format!("#[{} = ...] should be a type", attr));
             None
@@ -415,12 +430,15 @@ fn value_as_type(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::
 }
 
 /// Parse musli attributes.
-fn parse_musli_attrs(cx: &Ctxt, attr: &syn::Attribute) -> Option<Vec<Attribute>> {
+fn parse_musli_attrs<T>(cx: &Ctxt, attr: &syn::Attribute) -> Option<T>
+where
+    T: Parse,
+{
     if attr.path != ATTR {
         return None;
     }
 
-    let attributes: Attributes = match syn::parse2(attr.tokens.clone()) {
+    let attributes: T = match syn::parse2(attr.tokens.clone()) {
         Ok(attributes) => attributes,
         Err(e) => {
             cx.syn_error(e);
@@ -428,7 +446,7 @@ fn parse_musli_attrs(cx: &Ctxt, attr: &syn::Attribute) -> Option<Vec<Attribute>>
         }
     };
 
-    Some(attributes.attributes)
+    Some(attributes)
 }
 
 /// The flexible value of an attribute.
@@ -439,31 +457,8 @@ pub enum AttributeValue {
     Type(syn::Type),
     /// A literal value.
     Expr(syn::Expr),
-}
-
-impl AttributeValue {
-    /// Coerce into a literal value.
-    pub(crate) fn as_lit(&self) -> Option<syn::Lit> {
-        match self {
-            AttributeValue::Expr(syn::Expr::Lit(lit)) if lit.attrs.is_empty() => {
-                Some(lit.lit.clone())
-            }
-            _ => None,
-        }
-    }
-
-    /// Coerce into an expression.
-    pub(crate) fn as_expr(&self) -> Option<syn::Expr> {
-        match self {
-            AttributeValue::Path(path) => Some(syn::Expr::Path(syn::ExprPath {
-                attrs: Vec::new(),
-                qself: None,
-                path: path.clone(),
-            })),
-            AttributeValue::Expr(expr) => Some(expr.clone()),
-            AttributeValue::Type(..) => None,
-        }
-    }
+    /// A literal value.
+    Lit(syn::Lit),
 }
 
 impl Spanned for AttributeValue {
@@ -472,6 +467,7 @@ impl Spanned for AttributeValue {
             AttributeValue::Path(value) => value.span(),
             AttributeValue::Type(value) => value.span(),
             AttributeValue::Expr(value) => value.span(),
+            AttributeValue::Lit(value) => value.span(),
         }
     }
 }
@@ -490,12 +486,12 @@ impl Spanned for Attribute {
     }
 }
 
-struct Attributes {
+struct TypeAttributes {
     _parens: syn::token::Paren,
     attributes: Vec<Attribute>,
 }
 
-impl Parse for Attributes {
+impl Parse for TypeAttributes {
     fn parse(input: parse::ParseStream) -> syn::Result<Self> {
         let mut attributes = Vec::new();
 
@@ -505,33 +501,118 @@ impl Parse for Attributes {
         while !content.is_empty() {
             let path: syn::Path = content.parse()?;
 
-            if content.parse::<Option<syn::Token![=]>>()?.is_some() {
-                if content.fork().parse::<syn::Path>().is_ok() {
-                    attributes.push(Attribute::KeyValue(
-                        path,
-                        AttributeValue::Path(content.parse()?),
-                    ));
-                } else if content.fork().parse::<syn::Type>().is_ok() {
-                    attributes.push(Attribute::KeyValue(
-                        path,
-                        AttributeValue::Type(content.parse()?),
-                    ));
-                } else {
-                    attributes.push(Attribute::KeyValue(
-                        path,
-                        AttributeValue::Expr(content.parse()?),
-                    ));
-                }
+            if let Some(..) = content.parse::<Option<syn::Token![=]>>()? {
+                let value = match &path {
+                    // parse #[musli(tag_type = <type>)]
+                    path if path == TAG_TYPE => AttributeValue::Type(content.parse()?),
+                    // parse #[musli(variant = "..")]
+                    path if path == VARIANT => AttributeValue::Lit(content.parse()?),
+                    // parse #[musli(field_tag = "..")]
+                    path if path == FIELD => AttributeValue::Lit(content.parse()?),
+                    path => {
+                        return Err(syn::Error::new(path.span(), "unsupported attribute"));
+                    }
+                };
+
+                attributes.push(Attribute::KeyValue(path, value));
             } else {
                 attributes.push(Attribute::Path(path));
             }
 
-            if !content.parse::<Option<syn::Token![,]>>()?.is_some() {
+            if content.parse::<Option<syn::Token![,]>>()?.is_none() {
                 break;
             }
         }
 
-        Ok(Attributes {
+        Ok(Self {
+            _parens: parens,
+            attributes,
+        })
+    }
+}
+
+struct VariantAttributes {
+    _parens: syn::token::Paren,
+    attributes: Vec<Attribute>,
+}
+
+impl Parse for VariantAttributes {
+    fn parse(input: parse::ParseStream) -> syn::Result<Self> {
+        let mut attributes = Vec::new();
+
+        let content;
+        let parens = syn::parenthesized!(content in input);
+
+        while !content.is_empty() {
+            let path: syn::Path = content.parse()?;
+
+            if let Some(..) = content.parse::<Option<syn::Token![=]>>()? {
+                let value = match &path {
+                    // parse #[musli(tag_type = <type>)]
+                    path if path == TAG_TYPE => AttributeValue::Type(content.parse()?),
+                    // parse #[musli(tag = <expr>)]
+                    path if path == TAG => AttributeValue::Expr(content.parse()?),
+                    path => {
+                        return Err(syn::Error::new(path.span(), "unsupported attribute"));
+                    }
+                };
+
+                attributes.push(Attribute::KeyValue(path, value));
+            } else {
+                attributes.push(Attribute::Path(path));
+            }
+
+            if content.parse::<Option<syn::Token![,]>>()?.is_none() {
+                break;
+            }
+        }
+
+        Ok(Self {
+            _parens: parens,
+            attributes,
+        })
+    }
+}
+
+struct FieldAttributes {
+    _parens: syn::token::Paren,
+    attributes: Vec<Attribute>,
+}
+
+impl Parse for FieldAttributes {
+    fn parse(input: parse::ParseStream) -> syn::Result<Self> {
+        let mut attributes = Vec::new();
+
+        let content;
+        let parens = syn::parenthesized!(content in input);
+
+        while !content.is_empty() {
+            let path: syn::Path = content.parse()?;
+
+            if let Some(..) = content.parse::<Option<syn::Token![=]>>()? {
+                let value = match &path {
+                    // parse #[musli(with)]
+                    path if path == WITH => AttributeValue::Path(content.parse()?),
+                    // parse #[musli(skip_encoding_if)]
+                    path if path == SKIP_ENCODING_IF => AttributeValue::Path(content.parse()?),
+                    // parse #[musli(tag = <expr>)]
+                    path if path == TAG => AttributeValue::Expr(content.parse()?),
+                    path => {
+                        return Err(syn::Error::new(path.span(), "unsupported attribute"));
+                    }
+                };
+
+                attributes.push(Attribute::KeyValue(path, value));
+            } else {
+                attributes.push(Attribute::Path(path));
+            }
+
+            if content.parse::<Option<syn::Token![,]>>()?.is_none() {
+                break;
+            }
+        }
+
+        Ok(Self {
             _parens: parens,
             attributes,
         })

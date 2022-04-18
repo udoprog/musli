@@ -15,7 +15,7 @@ use core::sync::atomic::{
 };
 
 use crate::de::{Decode, Decoder, VariantDecoder};
-use crate::en::{Encode, Encoder, SequenceEncoder, VariantEncoder};
+use crate::en::{Encode, Encoder, VariantEncoder};
 use crate::error::Error;
 
 impl Encode for () {
@@ -240,23 +240,12 @@ impl<'de> Decode<'de> for &'de str {
     }
 }
 
-impl<T> Encode for [T]
-where
-    T: Encode,
-{
-    #[inline]
+impl Encode for [u8] {
     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
-        let mut seq = encoder.encode_sequence(self.len())?;
-
-        for value in self {
-            let encoder = seq.encode_next()?;
-            T::encode(value, encoder)?;
-        }
-
-        seq.finish()
+        encoder.encode_bytes(self)
     }
 }
 

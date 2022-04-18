@@ -70,6 +70,18 @@ where
     }
 
     #[inline]
+    fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<(), Self::Error> {
+        let len = vectors.into_iter().map(|v| v.len()).sum();
+        L::encode_usize(&mut self.writer, len)?;
+
+        for bytes in vectors {
+            self.writer.write_bytes(bytes)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
     fn encode_str(mut self, string: &str) -> Result<(), Self::Error> {
         L::encode_usize(&mut self.writer, string.len())?;
         self.writer.write_bytes(string.as_bytes())?;

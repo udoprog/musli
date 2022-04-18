@@ -47,14 +47,14 @@ pub struct SimpleStructEnum {
 pub struct SimpleStructToEmpty;
 
 #[test]
-fn test_simple_struct_compat() -> Result<(), Box<dyn std::error::Error>> {
+fn test_simple_struct_compat() {
     let to = musli_wire::test::transcode::<_, SimpleStructTo>(SimpleStructFrom {
         field: String::from("Aristotle"),
         interior: 42,
         option: Some(108),
         other: OTHER,
         other_enum: ENUM1,
-    })?;
+    });
 
     assert_eq!(
         to,
@@ -62,12 +62,10 @@ fn test_simple_struct_compat() -> Result<(), Box<dyn std::error::Error>> {
             field: String::from("Aristotle"),
         }
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_simple_struct_to_enum_compat() -> Result<(), Box<dyn std::error::Error>> {
+fn test_simple_struct_to_enum_compat() {
     for expected in [ENUM1, ENUM2, ENUM3] {
         let to = musli_wire::test::transcode::<_, SimpleStructEnum>(SimpleStructFrom {
             field: String::from("Aristotle"),
@@ -75,24 +73,21 @@ fn test_simple_struct_to_enum_compat() -> Result<(), Box<dyn std::error::Error>>
             option: Some(108),
             other: OTHER,
             other_enum: expected,
-        })?;
+        });
 
         assert_eq!(to.value, expected);
     }
-
-    Ok(())
 }
 
 #[test]
-fn test_simple_struct_compat_to_empty() -> Result<(), Box<dyn std::error::Error>> {
+fn test_simple_struct_compat_to_empty() {
     let to = musli_wire::test::transcode::<_, SimpleStructToEmpty>(SimpleStructFrom {
         field: String::from("Aristotle"),
         interior: 42,
         option: Some(108),
         other: OTHER,
         other_enum: ENUM1,
-    })?;
+    });
 
     assert_eq!(to, SimpleStructToEmpty);
-    Ok(())
 }

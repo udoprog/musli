@@ -9,7 +9,6 @@ pub const WITH: Symbol = Symbol("with");
 pub const FIELD: Symbol = Symbol("field");
 pub const VARIANT: Symbol = Symbol("variant");
 pub const TAG: Symbol = Symbol("tag");
-pub const NAME: Symbol = Symbol("name");
 pub const DEFAULT: Symbol = Symbol("default");
 pub const SKIP_ENCODING_IF: Symbol = Symbol("skip_encoding_if");
 pub const PACKED: Symbol = Symbol("packed");

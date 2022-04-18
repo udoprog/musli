@@ -17,18 +17,19 @@ pub struct Indexed {
 }
 
 #[test]
-fn struct_named_fields() -> Result<(), Box<dyn std::error::Error>> {
+fn struct_named_fields() {
     musli_wire::test::rt(Named {
         string: String::from("foo"),
         number: 42,
-    })?;
+    });
 
     let out = musli_wire::to_vec(&Named {
         string: String::from("foo"),
         number: 42,
-    })?;
+    })
+    .expect("failed to encode");
 
-    let unpacked: Unpacked = musli_storage::decode(&out[..])?;
+    let unpacked: Unpacked = musli_storage::decode(&out[..]).expect("failed to decode");
 
     assert_eq!(
         unpacked,
@@ -50,23 +51,22 @@ fn struct_named_fields() -> Result<(), Box<dyn std::error::Error>> {
         field2_name: Typed<String>,
         field2_value: Typed<u32>,
     }
-
-    Ok(())
 }
 
 #[test]
-fn struct_indexed_fields() -> Result<(), Box<dyn std::error::Error>> {
+fn struct_indexed_fields() {
     musli_wire::test::rt(Indexed {
         string: String::from("foo"),
         number: 42,
-    })?;
+    });
 
     let out = musli_wire::to_vec(&Indexed {
         string: String::from("foo"),
         number: 42,
-    })?;
+    })
+    .expect("failed to encode");
 
-    let unpacked: Unpacked = musli_storage::decode(&out[..])?;
+    let unpacked: Unpacked = musli_storage::decode(&out[..]).expect("failed to decode");
 
     assert_eq!(
         unpacked,
@@ -88,6 +88,4 @@ fn struct_indexed_fields() -> Result<(), Box<dyn std::error::Error>> {
         field2_index: Typed<u8>,
         field2_value: Typed<u32>,
     }
-
-    Ok(())
 }

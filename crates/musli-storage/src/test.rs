@@ -5,6 +5,7 @@ use core::fmt::Debug;
 use musli::{Decode, Encode};
 
 /// Roundtrip encode the given value.
+#[inline(never)]
 pub fn rt<T>(expected: T) -> Result<T>
 where
     T: Debug + PartialEq + for<'de> Decode<'de> + Encode,
@@ -18,6 +19,7 @@ where
 }
 
 /// Encode a type as one and decode as another.
+#[inline(never)]
 pub fn transcode<T, O>(value: T) -> Result<O>
 where
     T: Debug + PartialEq + Encode,

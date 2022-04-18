@@ -41,27 +41,30 @@ where
 }
 
 /// Roundtrip encode the given value.
-pub fn rt<T>(expected: T) -> Result<T>
+#[inline(never)]
+pub fn rt<T>(expected: T) -> T
 where
     T: Debug + PartialEq + for<'de> Decode<'de> + Encode,
 {
-    let out = crate::to_vec(&expected)?;
+    let out = crate::to_vec(&expected).expect("failed to encode");
     let mut buf = &out[..];
-    let value: T = crate::decode(&mut buf)?;
-    assert!(buf.is_empty());
-    assert_eq!(value, expected);
-    Ok(value)
+    dbg!(buf);
+    let value: T = crate::decode(&mut buf).expect("failed to decode");
+    assert!(buf.is_empty(), "deserialized buffer should be empty");
+    assert_eq!(value, expected, "roundtrip does not match");
+    value
 }
 
 /// Encode a type as one and decode as another.
-pub fn transcode<T, O>(value: T) -> Result<O>
+#[inline(never)]
+pub fn transcode<T, O>(value: T) -> O
 where
     T: Debug + PartialEq + Encode,
     O: for<'de> Decode<'de>,
 {
-    let out = crate::to_vec(&value)?;
+    let out = crate::to_vec(&value).expect("failed to encode");
     let mut buf = &out[..];
-    let value: O = crate::decode(&mut buf)?;
+    let value: O = crate::decode(&mut buf).expect("failed to decode");
     assert!(buf.is_empty());
-    Ok(value)
+    value
 }

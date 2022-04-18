@@ -183,6 +183,9 @@ pub trait Encoder: Sized {
     /// Encode a sequence of bytes who's length is included in the payload.
     fn encode_bytes(self, bytes: &[u8]) -> Result<(), Self::Error>;
 
+    /// Encode the given slice of bytes in sequence, with one following another.
+    fn encode_bytes_vectored(self, vectors: &[&[u8]]) -> Result<(), Self::Error>;
+
     /// Encode a string who's length is included in the payload.
     fn encode_str(self, string: &str) -> Result<(), Self::Error>;
 

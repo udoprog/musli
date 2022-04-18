@@ -242,11 +242,12 @@ where
 
     /// Decode the given type from the given `reader` using [WireEncoder] with the
     /// current settings.
-    pub fn decode<'de, R, T>(self, mut reader: R) -> Result<T, R::Error>
+    pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
         T: Decode<'de>,
     {
+        let mut reader = reader.with_position();
         T::decode(WireDecoder::<_, I, L>::new(&mut reader))
     }
 }

@@ -174,6 +174,7 @@
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod compat;
 pub mod de;
 pub mod derives;
 pub mod en;

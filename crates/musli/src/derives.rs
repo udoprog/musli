@@ -35,7 +35,7 @@
 //!   #[derive(Encode, Decode)]
 //!   #[musli(variant = "name")]
 //!   enum Enum {
-//!       #[musli(name = "Other")]
+//!       #[musli(tag = "Other")]
 //!       Something {
 //!           /* variant body */
 //!       }
@@ -69,7 +69,32 @@
 //! ## Container attributes
 //!
 //! * `#[musli(tag_type = ..)]` indicates which type the `#[musli(tag = ..)]`
-//!   attribute on fields or variants should have.
+//!   attribute on fields or variants should have. Tags can be inferred, but
+//!   specifying this field ensures that all tags have a well-defined type.
+//!
+//!   ```
+//!   use musli::{Encode, Decode};
+//!
+//!   #[derive(Debug, PartialEq, Eq, Encode, Decode)]
+//!   #[musli(transparent)]
+//!   struct CustomTag<'a>(&'a [u8]);
+//!
+//!   #[derive(Encode, Decode)]
+//!   #[musli(tag_type = CustomTag)]
+//!   struct Struct {
+//!       #[musli(tag = CustomTag(b"name in bytes"))]
+//!       name: String,
+//!   }
+//!
+//!   #[derive(Encode, Decode)]
+//!   #[musli(tag_type = CustomTag)]
+//!   enum EnumWithCustomTag {
+//!       #[musli(tag = CustomTag(b"variant one"))]
+//!       Variant1 {
+//!           /* .. */
+//!       },
+//!   }
+//!   ```
 //!
 //! * `#[musli(field = "...")]` decides which form of field tag is used for
 //!   `#[musli(tagged)]` containers. It can take either `"name"` or `"index"`.
@@ -124,20 +149,24 @@
 //!   in its container enum.
 //!
 //! * `#[musli(tag_type = ..)]` indicates which type the `#[musli(tag = ..)]`
-//!   attribute on fields in the current variant should have.
+//!   attribute on fields in the current variant should have. Tags can be
+//!   inferred, but specifying this field ensures that all tags have a
+//!   well-defined type.
 //!
 //!   ```
 //!   use musli::{Encode, Decode};
 //!
-//!   #[derive(Encode, Decode)]
+//!   #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 //!   #[musli(transparent)]
 //!   struct CustomTag<'a>(&'a [u8]);
 //!
 //!   #[derive(Encode, Decode)]
-//!   #[musli(tag_type = CustomTag)]
-//!   struct Struct {
-//!       #[musli(tag = CustomTag(r"name in bytes"))]
-//!       name: String,
+//!   enum Enum {
+//!       #[musli(tag_type = CustomTag)]
+//!       Variant {
+//!           #[musli(tag = CustomTag(b"name in bytes"))]
+//!           name: String,
+//!       }
 //!   }
 //!   ```
 //!
