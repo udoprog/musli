@@ -159,8 +159,8 @@ macro_rules! implement_io {
     };
 }
 
-implement_io!(i16, u16, FIXED16, read_u16, write_u16);
-implement_io!(i32, u32, FIXED32, read_u32, write_u32);
-implement_io!(i64, u64, FIXED64, read_u64, write_u64);
-implement_io!(i128, u128, FIXED128, read_u128, write_u128);
-implement!(isize, usize, FIXED32);
+implement_io!(i16, u16, Fixed16, read_u16, write_u16);
+implement_io!(i32, u32, Fixed32, read_u32, write_u32);
+implement_io!(i64, u64, Fixed64, read_u64, write_u64);
+implement_io!(i128, u128, Fixed128, read_u128, write_u128);
+implement!(isize, usize, Fixed32);

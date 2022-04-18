@@ -15,3 +15,5 @@ Please refer to <https://docs.rs/musli> for documentation.
 [Müsli]: <https://docs.rs/musli>
 [Reader]: https://docs.rs/musli-binary-common/latest/musli-binary-common/reader/trait.Reader.html
 [Writer]: https://docs.rs/musli-binary-common/latest/musli-binary-common/writer/trait.Writer.html
+
+License: MIT/Apache-2.0

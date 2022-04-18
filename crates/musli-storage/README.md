@@ -88,3 +88,5 @@ assert_eq!(expected, actual);
 [Müsli]: https://docs.rs/musli
 [default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
 [StorageEncoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
+
+License: MIT/Apache-2.0

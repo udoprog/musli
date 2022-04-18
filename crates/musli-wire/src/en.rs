@@ -1,9 +1,7 @@
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use crate::types::{
-    FIXED8, FIXED8_NEXT, OPTION_NONE, OPTION_SOME, PAIR, PAIR_SEQUENCE, PREFIXED, SEQUENCE,
-};
+use crate::types::TypeTag;
 use musli::en::{
     Encoder, MapEncoder, PackEncoder, SequenceEncoder, StructEncoder, TupleEncoder, VariantEncoder,
 };
@@ -67,7 +65,7 @@ where
 
     #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.writer.write_byte(PREFIXED)?;
+        self.writer.write_byte(TypeTag::Prefixed as u8)?;
         L::encode_usize(&mut self.writer, bytes.len())?;
         self.writer.write_bytes(bytes)?;
         Ok(())
@@ -75,7 +73,7 @@ where
 
     #[inline]
     fn encode_str(mut self, string: &str) -> Result<(), Self::Error> {
-        self.writer.write_byte(PREFIXED)?;
+        self.writer.write_byte(TypeTag::Prefixed as u8)?;
         L::encode_usize(&mut self.writer, string.len())?;
         self.writer.write_bytes(string.as_bytes())?;
         Ok(())
@@ -93,7 +91,8 @@ where
 
     #[inline]
     fn encode_bool(self, value: bool) -> Result<(), Self::Error> {
-        self.writer.write_byte(if value { 1 } else { 0 } | FIXED8)
+        self.writer
+            .write_byte(if value { 1 } else { 0 } | TypeTag::Fixed8 as u8)
     }
 
     #[inline]
@@ -103,10 +102,10 @@ where
 
     #[inline]
     fn encode_u8(self, value: u8) -> Result<(), Self::Error> {
-        if value < !FIXED8 {
-            self.writer.write_byte(FIXED8 | value)?;
+        if value < !(TypeTag::Fixed8 as u8) {
+            self.writer.write_byte(TypeTag::Fixed8 as u8 | value)?;
         } else {
-            self.writer.write_byte(FIXED8_NEXT)?;
+            self.writer.write_byte(TypeTag::Fixed8Next as u8)?;
             self.writer.write_byte(value)?;
         }
 
@@ -170,54 +169,54 @@ where
 
     #[inline]
     fn encode_some(self) -> Result<Self::Some, Self::Error> {
-        self.writer.write_byte(OPTION_SOME)?;
+        self.writer.write_byte(TypeTag::OptionSome as u8)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_none(self) -> Result<(), Self::Error> {
-        self.writer.write_byte(OPTION_NONE)?;
+        self.writer.write_byte(TypeTag::OptionNone as u8)?;
         Ok(())
     }
 
     #[inline]
     fn encode_sequence(self, len: usize) -> Result<Self::Sequence, Self::Error> {
-        self.writer.write_byte(SEQUENCE)?;
+        self.writer.write_byte(TypeTag::Sequence as u8)?;
         L::encode_usize(&mut *self.writer, len)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_map(self, len: usize) -> Result<Self::Map, Self::Error> {
-        self.writer.write_byte(PAIR_SEQUENCE)?;
+        self.writer.write_byte(TypeTag::PairSequence as u8)?;
         L::encode_usize(&mut *self.writer, len)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_struct(self, fields: usize) -> Result<Self::Struct, Self::Error> {
-        self.writer.write_byte(PAIR_SEQUENCE)?;
+        self.writer.write_byte(TypeTag::PairSequence as u8)?;
         L::encode_usize(&mut *self.writer, fields)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_tuple(self, len: usize) -> Result<Self::Tuple, Self::Error> {
-        self.writer.write_byte(PAIR_SEQUENCE)?;
+        self.writer.write_byte(TypeTag::PairSequence as u8)?;
         L::encode_usize(&mut *self.writer, len)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_unit_struct(self) -> Result<(), Self::Error> {
-        self.writer.write_byte(PAIR_SEQUENCE)?;
+        self.writer.write_byte(TypeTag::PairSequence as u8)?;
         L::encode_usize(&mut *self.writer, 0)?;
         Ok(())
     }
 
     #[inline]
     fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
-        self.writer.write_byte(PAIR)?;
+        self.writer.write_byte(TypeTag::Pair as u8)?;
         Ok(self)
     }
 }

@@ -87,3 +87,5 @@ The types available are defined in the [types] module.
 [Müsli]: https://docs.rs/musli
 [default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.WireEncoding.html
 [WireEncoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.WireEncoding.html
+
+License: MIT/Apache-2.0

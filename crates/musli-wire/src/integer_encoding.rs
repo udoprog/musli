@@ -3,7 +3,7 @@ use core::hash::Hash;
 use core::marker;
 
 use crate::traits::Typed;
-use crate::types::CONTINUATION;
+use crate::types::TypeTag;
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
 use musli_binary_common::int::zigzag as zig;
@@ -87,7 +87,7 @@ impl IntegerEncoding for Variable {
         W: Writer,
         T: Unsigned,
     {
-        writer.write_byte(CONTINUATION)?;
+        writer.write_byte(TypeTag::Continuation as u8)?;
         c::encode(writer, value)
     }
 
@@ -97,8 +97,8 @@ impl IntegerEncoding for Variable {
         R: Reader<'de>,
         T: Unsigned,
     {
-        if reader.read_byte()? != CONTINUATION {
-            return Err(R::Error::custom("expected CONTINUATION"));
+        if reader.read_byte()? != TypeTag::Continuation as u8 {
+            return Err(R::Error::custom("expected Continuation"));
         }
 
         c::decode(reader)
@@ -110,7 +110,7 @@ impl IntegerEncoding for Variable {
         W: Writer,
         T: Signed,
     {
-        writer.write_byte(CONTINUATION)?;
+        writer.write_byte(TypeTag::Continuation as u8)?;
         c::encode(writer, zig::encode(value))
     }
 
@@ -121,8 +121,8 @@ impl IntegerEncoding for Variable {
         T: Signed,
         T::Unsigned: Unsigned<Signed = T>,
     {
-        if reader.read_byte()? != CONTINUATION {
-            return Err(R::Error::custom("expected CONTINUATION"));
+        if reader.read_byte()? != TypeTag::Continuation as u8 {
+            return Err(R::Error::custom("expected Continuation"));
         }
 
         let value: T::Unsigned = c::decode(reader)?;
@@ -144,7 +144,7 @@ impl UsizeEncoding for Variable {
     where
         W: Writer,
     {
-        writer.write_byte(CONTINUATION)?;
+        writer.write_byte(TypeTag::Continuation as u8)?;
         c::encode(writer, value)
     }
 
@@ -161,8 +161,8 @@ impl UsizeEncoding for Variable {
     where
         R: Reader<'de>,
     {
-        if reader.read_byte()? != CONTINUATION {
-            return Err(R::Error::custom("expected CONTINUATION"));
+        if reader.read_byte()? != TypeTag::Continuation as u8 {
+            return Err(R::Error::custom("expected Continuation"));
         }
 
         c::decode(reader)
@@ -187,7 +187,7 @@ where
         W: Writer,
         T: ByteOrderIo + Typed,
     {
-        writer.write_byte(T::TYPE_FLAG)?;
+        writer.write_byte(T::TYPE_FLAG as u8)?;
         value.write_bytes::<_, B>(writer)
     }
 
@@ -197,7 +197,7 @@ where
         R: Reader<'de>,
         T: ByteOrderIo + Typed,
     {
-        if reader.read_byte()? != T::TYPE_FLAG {
+        if reader.read_byte()? != T::TYPE_FLAG as u8 {
             return Err(R::Error::custom("expected fixed integer"));
         }
 
@@ -211,7 +211,7 @@ where
         T: Signed,
         T::Unsigned: ByteOrderIo + Typed,
     {
-        writer.write_byte(T::Unsigned::TYPE_FLAG)?;
+        writer.write_byte(T::Unsigned::TYPE_FLAG as u8)?;
         value.unsigned().write_bytes::<_, B>(writer)
     }
 
@@ -222,7 +222,7 @@ where
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T> + Typed,
     {
-        if reader.read_byte()? != T::Unsigned::TYPE_FLAG {
+        if reader.read_byte()? != T::Unsigned::TYPE_FLAG as u8 {
             return Err(R::Error::custom("expected fixed integer"));
         }
 
@@ -260,7 +260,7 @@ where
     where
         W: Writer,
     {
-        writer.write_byte(L::TYPE_FLAG)?;
+        writer.write_byte(L::TYPE_FLAG as u8)?;
         let value: L = value.try_into().map_err(W::Error::custom)?;
         value.write_bytes::<_, B>(writer)
     }
@@ -278,7 +278,7 @@ where
     where
         R: Reader<'de>,
     {
-        if reader.read_byte()? != L::TYPE_FLAG {
+        if reader.read_byte()? != L::TYPE_FLAG as u8 {
             return Err(R::Error::custom("expected fixed integer"));
         }
 

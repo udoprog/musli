@@ -1,10 +1,7 @@
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use crate::types::{
-    CONTINUATION, FIXED128, FIXED16, FIXED32, FIXED64, FIXED8, FIXED8_NEXT, OPTION_NONE,
-    OPTION_SOME, PAIR, PAIR_SEQUENCE, PREFIXED, SEQUENCE,
-};
+use crate::types::TypeTag;
 use musli::de::{
     Decoder, MapDecoder, MapEntryDecoder, PackDecoder, SequenceDecoder, StructDecoder,
     StructFieldDecoder, TupleDecoder, TupleFieldDecoder, VariantDecoder,
@@ -50,8 +47,8 @@ where
 
         // Special case: MSB is set indicating that the rest of the bits are the
         // payload.
-        if b & FIXED8 == FIXED8 {
-            if b == FIXED8_NEXT {
+        if b & TypeTag::Fixed8 as u8 == TypeTag::Fixed8 as u8 {
+            if b == TypeTag::Fixed8Next as u8 {
                 self.reader.skip(1)?;
             }
 
@@ -59,10 +56,10 @@ where
         }
 
         match b {
-            CONTINUATION => {
+            TypeTag::CONTINUATION_BYTE => {
                 let _ = c::decode::<_, u128>(&mut *self.reader)?;
             }
-            SEQUENCE => {
+            TypeTag::SEQUENCE_BYTE => {
                 let len = L::decode_usize(&mut *self.reader)?;
 
                 // Skip over all values in the sequence.
@@ -70,7 +67,7 @@ where
                     self.skip_any()?;
                 }
             }
-            PAIR_SEQUENCE => {
+            TypeTag::PAIR_SEQUENCE_BYTE => {
                 let len = L::decode_usize(&mut *self.reader)?;
 
                 for _ in 0..len {
@@ -80,34 +77,37 @@ where
                     self.skip_any()?;
                 }
             }
-            PAIR => {
+            TypeTag::PAIR_BYTE => {
                 self.skip_any()?;
                 self.skip_any()?;
             }
-            PREFIXED => {
+            TypeTag::PREFIXED_BYTE => {
                 let len = L::decode_usize(&mut *self.reader)?;
                 self.reader.skip(len)?;
             }
-            FIXED16 => {
+            TypeTag::FIXED16_BYTE => {
                 self.reader.skip(2)?;
             }
-            FIXED32 => {
+            TypeTag::FIXED32_BYTE => {
                 self.reader.skip(4)?;
             }
-            FIXED64 => {
+            TypeTag::FIXED64_BYTE => {
                 self.reader.skip(8)?;
             }
-            FIXED128 => {
+            TypeTag::FIXED128_BYTE => {
                 self.reader.skip(16)?;
             }
-            OPTION_NONE => {
+            TypeTag::OPTION_NONE_BYTE => {
                 // Nothing follows this tag.
             }
-            OPTION_SOME => {
+            TypeTag::OPTION_SOME_BYTE => {
                 self.skip_any()?;
             }
             other => {
-                return Err(R::Error::custom(format!("unexpected type {:08b}", other)));
+                return Err(R::Error::custom(format!(
+                    "unexpected type tag {:08b}",
+                    other
+                )));
             }
         }
 
@@ -162,8 +162,8 @@ where
 
     #[inline]
     fn decode_bytes(self) -> Result<&'de [u8], Self::Error> {
-        if self.reader.read_byte()? != PREFIXED {
-            return Err(Self::Error::custom("expected PREFIXED"));
+        if self.reader.read_byte()? != TypeTag::Prefixed as u8 {
+            return Err(Self::Error::custom("expected Prefixed"));
         }
 
         let len = L::decode_usize(&mut *self.reader)?;
@@ -202,10 +202,10 @@ where
     fn decode_u8(self) -> Result<u8, Self::Error> {
         let b = self.reader.read_byte()?;
 
-        Ok(if b == FIXED8_NEXT {
+        Ok(if b == TypeTag::Fixed8Next as u8 {
             self.reader.read_byte()?
         } else {
-            b & !FIXED8
+            b & !(TypeTag::Fixed8 as u8)
         })
     }
 
@@ -284,17 +284,21 @@ where
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
         let b = self.reader.read_byte()?;
 
-        if b & OPTION_NONE != OPTION_NONE {
+        if b & TypeTag::OptionNone as u8 != TypeTag::OptionNone as u8 {
             return Err(Self::Error::custom("expected OPTION"));
         }
 
-        Ok(if b == OPTION_SOME { Some(self) } else { None })
+        Ok(if b == TypeTag::OptionSome as u8 {
+            Some(self)
+        } else {
+            None
+        })
     }
 
     #[inline]
     fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
-        if self.reader.read_byte()? != SEQUENCE {
-            return Err(Self::Error::custom("expected SEQUENCE"));
+        if self.reader.read_byte()? != TypeTag::Sequence as u8 {
+            return Err(Self::Error::custom("expected Sequence"));
         }
 
         RemainingSimpleDecoder::new(self)
@@ -302,8 +306,8 @@ where
 
     #[inline]
     fn decode_map(self) -> Result<Self::Map, Self::Error> {
-        if self.reader.read_byte()? != PAIR_SEQUENCE {
-            return Err(Self::Error::custom("expected MAP"));
+        if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
+            return Err(Self::Error::custom("expected PairSequence"));
         }
 
         RemainingSimpleDecoder::new(self)
@@ -311,8 +315,8 @@ where
 
     #[inline]
     fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
-        if self.reader.read_byte()? != PAIR_SEQUENCE {
-            return Err(Self::Error::custom("expected MAP"));
+        if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
+            return Err(Self::Error::custom("expected PairSequence"));
         }
 
         RemainingSimpleDecoder::new(self)
@@ -320,8 +324,8 @@ where
 
     #[inline]
     fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
-        if self.reader.read_byte()? != PAIR_SEQUENCE {
-            return Err(Self::Error::custom("expected MAP"));
+        if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
+            return Err(Self::Error::custom("expected PairSequence"));
         }
 
         RemainingSimpleDecoder::new(self)
@@ -329,8 +333,8 @@ where
 
     #[inline]
     fn decode_unit_struct(mut self) -> Result<(), Self::Error> {
-        if self.reader.read_byte()? != PAIR_SEQUENCE {
-            return Err(Self::Error::custom("expected MAP"));
+        if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
+            return Err(Self::Error::custom("expected PairSequence"));
         }
 
         let len = L::decode_usize(&mut *self.reader)?;
@@ -346,8 +350,8 @@ where
 
     #[inline]
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
-        if self.reader.read_byte()? != PAIR {
-            return Err(Self::Error::custom("expected VARIANT"));
+        if self.reader.read_byte()? != TypeTag::Pair as u8 {
+            return Err(Self::Error::custom("expected Pair"));
         }
 
         Ok(self)

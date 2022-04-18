@@ -10,3 +10,5 @@ This crate provides the macros used in [Müsli].
 Please refer to <https://docs.rs/musli> for documentation.
 
 [Müsli]: <https://docs.rs/musli>
+
+License: MIT/Apache-2.0

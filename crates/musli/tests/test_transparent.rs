@@ -61,9 +61,9 @@ fn test_transparent_enum() -> Result<()> {
         unpacked,
         TransparentEnumUnpacked {
             type_tag: musli_wire::types::VARIANT,
-            variant_tag_type: musli_wire::types::CONTINUATION,
+            variant_tag_type: musli_wire::types::Continuation,
             variant_tag: 1,
-            value_type: musli_wire::types::CONTINUATION,
+            value_type: musli_wire::types::Continuation,
             value: 42,
         }
     );

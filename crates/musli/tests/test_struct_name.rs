@@ -1,4 +1,6 @@
 use musli::{Decode, Encode};
+use musli_wire::test::Typed;
+use musli_wire::types::TypeTag;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(field = "name")]
@@ -8,30 +10,10 @@ pub struct Named {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(packed)]
-pub struct NamedUnpacked {
-    field_count: u8,
-    field1_name: String,
-    field1_value: String,
-    field2_name: String,
-    field2_value: u32,
-}
-
-#[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(field = "index")]
 pub struct Indexed {
     string: String,
     number: u32,
-}
-
-#[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(packed)]
-pub struct IndexedUnpacked {
-    field_count: u8,
-    field1_index: u8,
-    field1_value: String,
-    field2_index: u8,
-    field2_value: u32,
 }
 
 #[test]
@@ -46,22 +28,29 @@ fn struct_named_fields() -> Result<(), Box<dyn std::error::Error>> {
         number: 42,
     })?;
 
-    /*
-    let unpacked: NamedUnpacked = musli_wire::decode(&out[..])?;
+    let unpacked: Unpacked = musli_storage::decode(&out[..])?;
 
     assert_eq!(
         unpacked,
-        NamedUnpacked {
-            field_count: 2,
-            field1_name: String::from("string"),
-            field1_value: String::from("foo"),
-            field2_name: String::from("number"),
-            field2_value: 42,
+        Unpacked {
+            field_count: Typed::new(TypeTag::PairSequence, 2),
+            field1_name: Typed::new(TypeTag::Prefixed, String::from("string")),
+            field1_value: Typed::new(TypeTag::Prefixed, String::from("foo")),
+            field2_name: Typed::new(TypeTag::Prefixed, String::from("number")),
+            field2_value: Typed::new(TypeTag::Continuation, 42),
         }
     );
 
-    musli_wire::test::rt(unpacked)?;
-    */
+    #[derive(Debug, PartialEq, Decode)]
+    #[musli(packed)]
+    pub struct Unpacked {
+        field_count: Typed<u8>,
+        field1_name: Typed<String>,
+        field1_value: Typed<String>,
+        field2_name: Typed<String>,
+        field2_value: Typed<u32>,
+    }
+
     Ok(())
 }
 
@@ -77,21 +66,28 @@ fn struct_indexed_fields() -> Result<(), Box<dyn std::error::Error>> {
         number: 42,
     })?;
 
-    /*
-    let unpacked: IndexedUnpacked = musli_wire::decode(&out[..])?;
+    let unpacked: Unpacked = musli_storage::decode(&out[..])?;
 
     assert_eq!(
         unpacked,
-        IndexedUnpacked {
-            field_count: 2,
-            field1_index: 0,
-            field1_value: String::from("foo"),
-            field2_index: 1,
-            field2_value: 42,
+        Unpacked {
+            field_count: Typed::new(TypeTag::PairSequence, 2),
+            field1_index: Typed::new(TypeTag::Continuation, 0),
+            field1_value: Typed::new(TypeTag::Prefixed, String::from("foo")),
+            field2_index: Typed::new(TypeTag::Continuation, 1),
+            field2_value: Typed::new(TypeTag::Continuation, 42),
         }
     );
 
-    musli_wire::test::rt(unpacked)?;
-    */
+    #[derive(Debug, PartialEq, Decode)]
+    #[musli(packed)]
+    pub struct Unpacked {
+        field_count: Typed<u8>,
+        field1_index: Typed<u8>,
+        field1_value: Typed<String>,
+        field2_index: Typed<u8>,
+        field2_value: Typed<u32>,
+    }
+
     Ok(())
 }
