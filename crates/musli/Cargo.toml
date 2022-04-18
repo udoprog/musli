@@ -1,6 +1,6 @@
 [package]
 name = "musli"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 license = "MIT/Apache-2.0"
 readme = "README.md"
@@ -18,7 +18,7 @@ default = ["std"]
 std = []
 
 [dependencies]
-musli-macros = { path = "../musli-macros", version = "0.0.3" }
+musli-macros = { path = "../musli-macros", version = "0.0.4" }
 
 [dev-dependencies]
 anyhow = "1.0.56"

@@ -123,8 +123,8 @@
 //! Add it to your `Cargo.toml`:
 //!
 //! ```toml
-//! musli = "0.0.3"
-//! musli-wire = "0.0.3"
+//! musli = "0.0.4"
+//! musli-wire = "0.0.4"
 //! ```
 //!
 //! ## The `Encode` and `Decode` derives
