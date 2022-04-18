@@ -79,7 +79,7 @@ pub trait StructDecoder<'de> {
     type Error: Error;
 
     /// The decoder to use for a key.
-    type Field<'this>: StructFieldDecoder<'de, Error = Self::Error>
+    type Field<'this>: PairDecoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
@@ -91,76 +91,32 @@ pub trait StructDecoder<'de> {
 }
 
 /// Trait governing how to decode a field.
-pub trait StructFieldDecoder<'de> {
-    /// Error type.
-    type Error: Error;
-
-    /// The decoder to use for a field name.
-    type FieldTag<'this>: Decoder<'de, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// The decoder to use for a field value.
-    type FieldValue<'this>: Decoder<'de, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Decode for the name of the field.
-    fn decode_field_tag(&mut self) -> Result<Self::FieldTag<'_>, Self::Error>;
-
-    /// Decoder for the value of the field.
-    fn decode_field_value(&mut self) -> Result<Self::FieldValue<'_>, Self::Error>;
-
-    /// Indicate that the identified tag doesn't exist and should be skipped.
-    ///
-    /// The returned boolean indicates whether the field was sucessfully
-    /// skipped.
-    fn skip_field_value(&mut self) -> Result<bool, Self::Error>;
-}
-
-/// Trait governing how to decode a map.
-pub trait TupleDecoder<'de> {
-    /// Error type.
-    type Error: Error;
-
-    /// The decoder to use for a field.
-    type Field<'this>: TupleFieldDecoder<'de, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Get a size hint of known remaining elements.
-    fn size_hint(&self) -> Option<usize>;
-
-    /// Decode the next key. This returns `Ok(None)` where there are no more elements to decode.
-    fn decode_field(&mut self) -> Result<Option<Self::Field<'_>>, Self::Error>;
-}
-
-/// Trait governing how to decode a field.
-pub trait TupleFieldDecoder<'de> {
+pub trait PairDecoder<'de> {
     /// Error type.
     type Error: Error;
 
     /// The decoder to use for a tuple field index.
-    type FieldTag<'this>: Decoder<'de, Error = Self::Error>
+    type First<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
     /// The decoder to use for a tuple field value.
-    type FieldValue<'this>: Decoder<'de, Error = Self::Error>
+    type Second<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
     /// Decoder for the next index.
-    fn decode_field_tag(&mut self) -> Result<Self::FieldTag<'_>, Self::Error>;
+    fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error>;
 
     /// Decoder for the next value.
-    fn decode_field_value(&mut self) -> Result<Self::FieldValue<'_>, Self::Error>;
+    fn decode_second(&mut self) -> Result<Self::Second<'_>, Self::Error>;
 
-    /// Indicate that the identified tag doesn't exist and should be skipped.
+    /// Indicate that the second element is not compatible with the current
+    /// struct and skip it.
     ///
-    /// The returned boolean indicates whether the field was sucessfully
+    /// Returns a boolean indicating if the second value was successfully
     /// skipped.
-    fn skip_field_value(&mut self) -> Result<bool, Self::Error>;
+    fn skip_second(&mut self) -> Result<bool, Self::Error>;
 }
 
 /// Trait governing how to decode a variant.
@@ -204,7 +160,7 @@ pub trait Decoder<'de>: Sized {
     type Struct: StructDecoder<'de, Error = Self::Error>;
 
     /// Decoder returned to decode a tuple struct.
-    type Tuple: TupleDecoder<'de, Error = Self::Error>;
+    type Tuple: StructDecoder<'de, Error = Self::Error>;
 
     /// Decode a variant.
     type Variant: VariantDecoder<'de, Error = Self::Error>;

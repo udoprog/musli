@@ -4,7 +4,6 @@ mod alloc;
 mod net;
 mod tuples;
 
-use core::marker;
 use core::num::{
     NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize, NonZeroU128,
     NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, Wrapping,
@@ -13,6 +12,7 @@ use core::sync::atomic::{
     AtomicBool, AtomicI16, AtomicI32, AtomicI64, AtomicI8, AtomicIsize, AtomicU16, AtomicU32,
     AtomicU64, AtomicU8, AtomicUsize,
 };
+use core::{fmt, marker};
 
 use crate::de::{Decode, Decoder, VariantDecoder};
 use crate::en::{Encode, Encoder, VariantEncoder};
@@ -99,9 +99,14 @@ macro_rules! non_zero {
             where
                 D: Decoder<'de>,
             {
-                match Self::new(Decode::decode(decoder)?) {
+                let value = Decode::decode(decoder)?;
+
+                match Self::new(value) {
                     Some(value) => Ok(value),
-                    None => Err(D::Error::invalid_value(stringify!($ty))),
+                    None => Err(D::Error::collect_from_display(NonZeroUnsupportedValue {
+                        type_name: stringify!($ty),
+                        value,
+                    })),
                 }
             }
         }
@@ -120,6 +125,24 @@ non_zero!(NonZeroU32);
 non_zero!(NonZeroU64);
 non_zero!(NonZeroU8);
 non_zero!(NonZeroUsize);
+
+struct NonZeroUnsupportedValue<T> {
+    type_name: &'static str,
+    value: T,
+}
+
+impl<T> fmt::Display for NonZeroUnsupportedValue<T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: unsupported non-zero value `{}`",
+            self.type_name, self.value
+        )
+    }
+}
 
 impl<const N: usize> Encode for [u8; N] {
     #[inline]

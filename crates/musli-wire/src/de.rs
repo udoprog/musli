@@ -3,8 +3,8 @@ use core::{fmt, marker};
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use crate::types::TypeTag;
 use musli::de::{
-    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, SequenceDecoder, StructDecoder,
-    StructFieldDecoder, TupleDecoder, TupleFieldDecoder, VariantDecoder,
+    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, SequenceDecoder, StructDecoder,
+    VariantDecoder,
 };
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
@@ -487,6 +487,33 @@ where
     }
 }
 
+impl<'a, 'de, R, I, L> PairDecoder<'de> for WireDecoder<'a, R, I, L>
+where
+    R: Reader<'de>,
+    I: IntegerEncoding,
+    L: UsizeEncoding,
+{
+    type Error = R::Error;
+    type First<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
+    type Second<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
+
+    #[inline]
+    fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+        Ok(WireDecoder::new(self.reader))
+    }
+
+    #[inline]
+    fn decode_second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+        Ok(WireDecoder::new(self.reader))
+    }
+
+    #[inline]
+    fn skip_second(&mut self) -> Result<bool, Self::Error> {
+        self.skip_any()?;
+        Ok(true)
+    }
+}
+
 impl<'a, 'de, R, I, L> StructDecoder<'de> for RemainingSimpleDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
@@ -512,88 +539,6 @@ where
 
         self.remaining -= 1;
         Ok(Some(WireDecoder::new(self.decoder.reader)))
-    }
-}
-
-impl<'a, 'de, R, I, L> StructFieldDecoder<'de> for WireDecoder<'a, R, I, L>
-where
-    R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = R::Error;
-    type FieldTag<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
-    type FieldValue<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
-
-    #[inline]
-    fn decode_field_tag(&mut self) -> Result<Self::FieldTag<'_>, Self::Error> {
-        Ok(WireDecoder::new(self.reader))
-    }
-
-    #[inline]
-    fn decode_field_value(&mut self) -> Result<Self::FieldValue<'_>, Self::Error> {
-        Ok(WireDecoder::new(self.reader))
-    }
-
-    #[inline]
-    fn skip_field_value(&mut self) -> Result<bool, Self::Error> {
-        self.skip_any()?;
-        Ok(true)
-    }
-}
-
-impl<'a, 'de, R, I, L> TupleDecoder<'de> for RemainingSimpleDecoder<'a, R, I, L>
-where
-    R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = R::Error;
-
-    type Field<'this> = WireDecoder<'this, R, I, L>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
-    }
-
-    #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::Field<'_>>, Self::Error> {
-        if self.remaining == 0 {
-            return Ok(None);
-        }
-
-        self.remaining -= 1;
-        Ok(Some(WireDecoder::new(self.decoder.reader)))
-    }
-}
-
-impl<'a, 'de, R, I, L> TupleFieldDecoder<'de> for WireDecoder<'a, R, I, L>
-where
-    R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = R::Error;
-    type FieldTag<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
-    type FieldValue<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
-
-    #[inline]
-    fn decode_field_tag(&mut self) -> Result<Self::FieldTag<'_>, Self::Error> {
-        Ok(WireDecoder::new(self.reader))
-    }
-
-    #[inline]
-    fn decode_field_value(&mut self) -> Result<Self::FieldValue<'_>, Self::Error> {
-        Ok(WireDecoder::new(self.reader))
-    }
-
-    #[inline]
-    fn skip_field_value(&mut self) -> Result<bool, Self::Error> {
-        self.skip_any()?;
-        Ok(false)
     }
 }
 

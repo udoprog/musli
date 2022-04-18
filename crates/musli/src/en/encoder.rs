@@ -45,78 +45,28 @@ pub trait SequenceEncoder {
     fn finish(self) -> Result<(), Self::Error>;
 }
 
-/// Trait governing how to encode a map.
-pub trait MapEncoder {
+/// Trait governing how to encode a sequence of pairs.
+pub trait PairEncoder {
     /// The error raised by a map encoder.
     type Error: Error;
 
     /// The encoder returned when advancing the map encoder to encode the key.
-    type Key<'this>: Encoder<Error = Self::Error>
+    type First<'this>: Encoder<Error = Self::Error>
     where
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type Value<'this>: Encoder<Error = Self::Error>
+    type Second<'this>: Encoder<Error = Self::Error>
     where
         Self: 'this;
 
-    /// Prepare encoding of the next entry.
-    fn encode_key(&mut self) -> Result<Self::Key<'_>, Self::Error>;
+    /// Encode the first element in a pair.
+    fn encode_first(&mut self) -> Result<Self::First<'_>, Self::Error>;
 
-    /// Prepare encoding of the next value.
-    fn encode_value(&mut self) -> Result<Self::Value<'_>, Self::Error>;
+    /// Encode the second element in the pair.
+    fn encode_second(&mut self) -> Result<Self::Second<'_>, Self::Error>;
 
-    /// Finish encoding the map.
-    fn finish(self) -> Result<(), Self::Error>;
-}
-
-/// Trait governing how to encode a tuple.
-pub trait TupleEncoder {
-    /// The error raised by a tuple encoder.
-    type Error: Error;
-
-    /// Encoder used for encoding the tag of a tuple.
-    type FieldTag<'this>: Encoder<Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Encoder used for encoding the value of a tuple.
-    type FieldValue<'this>: Encoder<Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Return encoder for the tag of a tuple.
-    fn encode_field_tag(&mut self) -> Result<Self::FieldTag<'_>, Self::Error>;
-
-    /// Return encoder for the value of a tuple.
-    fn encode_field_value(&mut self) -> Result<Self::FieldValue<'_>, Self::Error>;
-
-    /// Finish encoding the tuple.
-    fn finish(self) -> Result<(), Self::Error>;
-}
-
-/// Trait governing how to encode a struct.
-pub trait StructEncoder {
-    /// The error raised by a map encoder.
-    type Error: Error;
-
-    /// The encoder returned when advancing the map encoder to encode the key.
-    type FieldTag<'this>: Encoder<Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// The encoder returned when advancing the map encoder to encode the value.
-    type FieldValue<'this>: Encoder<Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Prepare encoding of the next field.
-    fn encode_field_tag(&mut self) -> Result<Self::FieldTag<'_>, Self::Error>;
-
-    /// Prepare encoding of the next value.
-    fn encode_field_value(&mut self) -> Result<Self::FieldValue<'_>, Self::Error>;
-
-    /// Finish encoding the map.
+    /// Finish encoding the sequence of pairs.
     fn finish(self) -> Result<(), Self::Error>;
 }
 
@@ -155,13 +105,13 @@ pub trait Encoder: Sized {
     type Sequence: SequenceEncoder<Error = Self::Error>;
 
     /// The type of a map encoder.
-    type Map: MapEncoder<Error = Self::Error>;
+    type Map: PairEncoder<Error = Self::Error>;
 
     /// Encoder that can encode a struct.
-    type Struct: StructEncoder<Error = Self::Error>;
+    type Struct: PairEncoder<Error = Self::Error>;
 
     /// Encoder that can encode a tuple struct.
-    type Tuple: TupleEncoder<Error = Self::Error>;
+    type Tuple: PairEncoder<Error = Self::Error>;
 
     /// Encoder for a unit variant.
     type Variant: VariantEncoder<Error = Self::Error>;

@@ -2,9 +2,7 @@ use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use crate::types::TypeTag;
-use musli::en::{
-    Encoder, MapEncoder, PackEncoder, SequenceEncoder, StructEncoder, TupleEncoder, VariantEncoder,
-};
+use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
 use musli_binary_common::writer::Writer;
 
 /// A very simple encoder.
@@ -273,75 +271,23 @@ where
     }
 }
 
-impl<'a, W, I, L> MapEncoder for WireEncoder<'a, W, I, L>
+impl<'a, W, I, L> PairEncoder for WireEncoder<'a, W, I, L>
 where
     W: Writer,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = W::Error;
-    type Key<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
-    type Value<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
+    type First<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
+    type Second<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
 
     #[inline]
-    fn encode_key(&mut self) -> Result<Self::Key<'_>, Self::Error> {
+    fn encode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         Ok(WireEncoder::new(self.writer))
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::Value<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer))
-    }
-
-    #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-impl<'a, W, I, L> StructEncoder for WireEncoder<'a, W, I, L>
-where
-    W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = W::Error;
-    type FieldTag<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
-    type FieldValue<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
-
-    #[inline]
-    fn encode_field_tag(&mut self) -> Result<Self::FieldTag<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer))
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::FieldValue<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer))
-    }
-
-    #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-impl<'a, W, I, L> TupleEncoder for WireEncoder<'a, W, I, L>
-where
-    W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = W::Error;
-    type FieldTag<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
-    type FieldValue<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
-
-    #[inline]
-    fn encode_field_tag(&mut self) -> Result<Self::FieldTag<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer))
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::FieldValue<'_>, Self::Error> {
+    fn encode_second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
         Ok(WireEncoder::new(self.writer))
     }
 

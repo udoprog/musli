@@ -21,8 +21,8 @@ mod decoder;
 
 pub use self::decode::Decode;
 pub use self::decoder::{
-    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, SequenceDecoder, StructDecoder,
-    StructFieldDecoder, TupleDecoder, TupleFieldDecoder, VariantDecoder,
+    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, SequenceDecoder, StructDecoder,
+    VariantDecoder,
 };
 
 /// An owned decoder.

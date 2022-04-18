@@ -37,34 +37,42 @@ pub trait Error: Sized {
         Self::collect_from_display(UnsupportedVariant { type_name, tag })
     }
 
-    /// Missing a field of the given tag.
-    #[inline]
-    fn missing_field<T>(type_name: &'static str, tag: T) -> Self
-    where
-        T: fmt::Debug,
-    {
-        Self::collect_from_display(MissingField { type_name, tag })
-    }
-
     /// Encountered an unsupported number tag.
     #[inline]
-    fn unsupported_tag<T>(type_name: &'static str, tag: T) -> Self
+    fn unsupported_field<T>(type_name: &'static str, tag: T) -> Self
     where
         T: fmt::Debug,
     {
-        Self::collect_from_display(UnsupportedTag { type_name, tag })
+        Self::collect_from_display(UnsupportedField { type_name, tag })
     }
 
-    /// Invalid value.
+    /// Encountered an unsupported variant field.
     #[inline]
-    fn invalid_value(type_name: &'static str) -> Self {
-        Self::collect_from_display(InvalidValue { type_name })
+    fn unsupported_variant_field<V, T>(type_name: &'static str, variant: V, tag: T) -> Self
+    where
+        V: fmt::Debug,
+        T: fmt::Debug,
+    {
+        Self::collect_from_display(UnsupportedVariantField {
+            type_name,
+            variant,
+            tag,
+        })
     }
 
     /// Found an unexpected field.
     #[inline]
     fn unexpected_field(type_name: &'static str) -> Self {
         Self::collect_from_display(UnexpectedField { type_name })
+    }
+
+    /// The value for the given tag could not be collected.
+    #[inline]
+    fn expected_tag<T>(type_name: &'static str, tag: T) -> Self
+    where
+        T: fmt::Debug,
+    {
+        Self::collect_from_display(ExpectedTag { type_name, tag })
     }
 }
 
@@ -109,12 +117,12 @@ where
     }
 }
 
-struct MissingField<T> {
+struct ExpectedTag<T> {
     type_name: &'static str,
     tag: T,
 }
 
-impl<T> fmt::Display for MissingField<T>
+impl<T> fmt::Display for ExpectedTag<T>
 where
     T: fmt::Debug,
 {
@@ -123,29 +131,49 @@ where
     }
 }
 
-struct UnsupportedTag<T> {
+struct UnsupportedField<T> {
     type_name: &'static str,
     tag: T,
 }
 
-impl<T> fmt::Display for UnsupportedTag<T>
+impl<T> fmt::Display for UnsupportedField<T>
 where
     T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: unsupported tag {:?}", self.type_name, self.tag)
+        write!(f, "{}: unsupported field {:?}", self.type_name, self.tag)
     }
 }
 
-struct InvalidValue {
+struct UnsupportedVariantField<V, T> {
     type_name: &'static str,
+    variant: V,
+    tag: T,
 }
 
-impl fmt::Display for InvalidValue {
+impl<V, T> fmt::Display for UnsupportedVariantField<V, T>
+where
+    V: fmt::Debug,
+    T: fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}: trying to construct from invalid value",
+            "{}: unsupported field {:?} in variant {:?}",
+            self.type_name, self.tag, self.variant
+        )
+    }
+}
+
+struct UnsupportedValue {
+    type_name: &'static str,
+}
+
+impl fmt::Display for UnsupportedValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: trying to construct from unsupported value",
             self.type_name
         )
     }

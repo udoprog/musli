@@ -15,11 +15,8 @@ struct Tokens {
     error_t: TokenStream,
     pack_encoder_t: TokenStream,
     struct_decoder_t: TokenStream,
-    struct_encoder_t: TokenStream,
-    struct_field_decoder_t: TokenStream,
-    tuple_decoder_t: TokenStream,
-    tuple_encoder_t: TokenStream,
-    tuple_field_decoder_t: TokenStream,
+    pair_encoder_t: TokenStream,
+    pair_decoder_t: TokenStream,
     pack_decoder_t: TokenStream,
     variant_decoder_t: TokenStream,
     variant_encoder_t: TokenStream,
@@ -55,11 +52,8 @@ impl<'a> Expander<'a> {
                 error_t: quote!(#prefix::error::Error),
                 pack_encoder_t: quote!(#prefix::en::PackEncoder),
                 struct_decoder_t: quote!(#prefix::de::StructDecoder),
-                struct_encoder_t: quote!(#prefix::en::StructEncoder),
-                struct_field_decoder_t: quote!(#prefix::de::StructFieldDecoder),
-                tuple_decoder_t: quote!(#prefix::de::TupleDecoder),
-                tuple_encoder_t: quote!(#prefix::en::TupleEncoder),
-                tuple_field_decoder_t: quote!(#prefix::de::TupleFieldDecoder),
+                pair_encoder_t: quote!(#prefix::en::PairEncoder),
+                pair_decoder_t: quote!(#prefix::de::PairDecoder),
                 pack_decoder_t: quote!(#prefix::de::PackDecoder),
                 variant_decoder_t: quote!(#prefix::de::VariantDecoder),
                 variant_encoder_t: quote!(#prefix::en::VariantEncoder),
@@ -278,28 +272,25 @@ impl<'a> Expander<'a> {
         let encoder_var = &self.tokens.encoder_var;
         let packing = self.type_attr.packing();
 
-        if let Some((field_kind, fields)) = FieldKind::new(fields) {
-            for (index, field) in fields.enumerate() {
-                needs.mark_used();
+        for (index, field) in fields.iter().enumerate() {
+            needs.mark_used();
 
-                let field_attr = attr::field_attrs(&self.cx, &field.attrs);
+            let field_attr = attr::field_attrs(&self.cx, &field.attrs);
 
-                let access = match &field.ident {
-                    Some(ident) => quote!(&self.#ident),
-                    None => {
-                        let n = field_int(index, field.span());
-                        quote!(&self.#n)
-                    }
-                };
-
-                let (encoder, skip) =
-                    self.encode_field(index, field, &field_attr, &access, field_kind, packing)?;
-                encoders.push(encoder);
-
-                if let Some((decl, test)) = skip {
-                    decls.push(decl);
-                    field_tests.push(test);
+            let access = match &field.ident {
+                Some(ident) => quote!(&self.#ident),
+                None => {
+                    let n = field_int(index, field.span());
+                    quote!(&self.#n)
                 }
+            };
+
+            let (encoder, skip) = self.encode_field(index, field, &field_attr, &access, packing)?;
+            encoders.push(encoder);
+
+            if let Some((decl, test)) = skip {
+                decls.push(decl);
+                field_tests.push(test);
             }
         }
 
@@ -460,7 +451,7 @@ impl<'a> Expander<'a> {
         let body = match self.type_attr.packing() {
             Packing::Tagged => {
                 needs.mark_used();
-                self.decode_tagged(&self.type_name, tag_type, path, &data.fields)?
+                self.decode_tagged(&self.type_name, tag_type, path, &data.fields, None)?
             }
             Packing::Packed => self.decode_untagged(path, &data.fields, needs)?,
             Packing::Transparent => self.decode_transparent(span, path, &data.fields, needs)?,
@@ -481,6 +472,7 @@ impl<'a> Expander<'a> {
         let type_name = &self.type_name;
         let variant_decoder_t = &self.tokens.variant_decoder_t;
         let decode_t = &self.tokens.decode_t;
+        let variant_tag = syn::Ident::new("variant_tag", self.input.ident.span());
 
         if let Some((span, Packing::Packed)) = self.type_attr.packing {
             self.cx.error_span(
@@ -517,9 +509,13 @@ impl<'a> Expander<'a> {
             let tag_type = variant_attr.tag_type.as_ref();
 
             let output = match variant_attr.packing().unwrap_or(type_packing) {
-                Packing::Tagged => {
-                    self.decode_tagged(&variant_name, tag_type, path, &variant.fields)?
-                }
+                Packing::Tagged => self.decode_tagged(
+                    &variant_name,
+                    tag_type,
+                    path,
+                    &variant.fields,
+                    Some(&variant_tag),
+                )?,
                 Packing::Packed => self.decode_untagged(path, &variant.fields, needs)?,
                 Packing::Transparent => {
                     self.decode_transparent(span, path, &variant.fields, needs)?
@@ -549,10 +545,10 @@ impl<'a> Expander<'a> {
         Some(quote! {{
             let mut variant = #decoder_t::decode_variant(#decoder_var)?;
             let tag_decoder = #variant_decoder_t::decode_variant_tag(&mut variant)?;
-            let tag #tag_type = #decode_t::decode(tag_decoder)?;
+            let #variant_tag #tag_type = #decode_t::decode(tag_decoder)?;
             let #decoder_var = #variant_decoder_t::decode_variant_value(variant)?;
 
-            Ok(match tag {
+            Ok(match variant_tag {
                 #(#variants,)*
                 tag => {
                     return Err(<D::Error as #error_t>::unsupported_variant(#type_name, tag));
@@ -577,10 +573,10 @@ impl<'a> Expander<'a> {
                     #encoder_t::encode_struct(#encoder_var, #fields)?
                 };
 
-                let struct_encoder_t = &self.tokens.struct_encoder_t;
+                let pair_encoder_t = &self.tokens.pair_encoder_t;
 
                 let finish = Some(quote! {
-                    #struct_encoder_t::finish(#encoder_var)?;
+                    #pair_encoder_t::finish(#encoder_var)?;
                 });
 
                 Some((setup, finish))
@@ -592,10 +588,10 @@ impl<'a> Expander<'a> {
                     #encoder_t::encode_tuple(#encoder_var, #fields)?
                 };
 
-                let tuple_encoder_t = &self.tokens.tuple_encoder_t;
+                let pair_encoder_t = &self.tokens.pair_encoder_t;
 
                 let finish = Some(quote! {
-                    #tuple_encoder_t::finish(#encoder_var)?;
+                    #pair_encoder_t::finish(#encoder_var)?;
                 });
 
                 Some((setup, finish))
@@ -694,33 +690,30 @@ impl<'a> Expander<'a> {
         let mut patterns = Vec::with_capacity(fields.len());
         let mut field_tests = Vec::with_capacity(fields.len());
 
-        if let Some((field_kind, fields)) = FieldKind::new(fields) {
-            for (index, field) in fields.enumerate() {
-                needs.mark_used();
+        for (index, field) in fields.iter().enumerate() {
+            needs.mark_used();
 
-                let field_attr = attr::field_attrs(&self.cx, &field.attrs);
+            let field_attr = attr::field_attrs(&self.cx, &field.attrs);
 
-                let access = match &field.ident {
-                    Some(ident) => {
-                        patterns.push(quote!(#ident));
-                        quote!(#ident)
-                    }
-                    None => {
-                        let index = field_int(index, field.span());
-                        let var = syn::Ident::new(&format!("v{}", index), field.span());
-                        patterns.push(quote!(#index: #var));
-                        quote!(#var)
-                    }
-                };
-
-                let (encoder, skip) =
-                    self.encode_field(index, field, &field_attr, &access, field_kind, tagged)?;
-                encoders.push(encoder);
-
-                if let Some((decl, test)) = skip {
-                    decls.push(decl);
-                    field_tests.push(test);
+            let access = match &field.ident {
+                Some(ident) => {
+                    patterns.push(quote!(#ident));
+                    quote!(#ident)
                 }
+                None => {
+                    let index = field_int(index, field.span());
+                    let var = syn::Ident::new(&format!("v{}", index), field.span());
+                    patterns.push(quote!(#index: #var));
+                    quote!(#var)
+                }
+            };
+
+            let (encoder, skip) = self.encode_field(index, field, &field_attr, &access, tagged)?;
+            encoders.push(encoder);
+
+            if let Some((decl, test)) = skip {
+                decls.push(decl);
+                field_tests.push(test);
             }
         }
 
@@ -756,7 +749,6 @@ impl<'a> Expander<'a> {
         field: &syn::Field,
         field_attr: &FieldAttr,
         access: &TokenStream,
-        field_kind: FieldKind,
         tagged: Packing,
     ) -> Option<(TokenStream, Option<(TokenStream, syn::Ident)>)> {
         let encoder_var = &self.tokens.encoder_var;
@@ -773,30 +765,14 @@ impl<'a> Expander<'a> {
                     field,
                 )?;
 
-                match field_kind {
-                    FieldKind::Struct => {
-                        let struct_encoder_t = &self.tokens.struct_encoder_t;
+                let pair_encoder_t = &self.tokens.pair_encoder_t;
 
-                        quote_spanned! {
-                            span => {
-                                let field_encoder = #struct_encoder_t::encode_field_tag(&mut #encoder_var)?;
-                                #encode_t::encode(&#tag, field_encoder)?;
-                                let value_encoder = #struct_encoder_t::encode_field_value(&mut #encoder_var)?;
-                                #encode_path(#access, value_encoder)?;
-                            }
-                        }
-                    }
-                    FieldKind::Tuple => {
-                        let tuple_encoder_t = &self.tokens.tuple_encoder_t;
-
-                        quote_spanned! {
-                            span => {
-                                let tag_encoder = #tuple_encoder_t::encode_field_tag(&mut #encoder_var)?;
-                                #encode_t::encode(&#tag, tag_encoder)?;
-                                let value_encoder = #tuple_encoder_t::encode_field_value(&mut #encoder_var)?;
-                                #encode_path(#access, value_encoder)?;
-                            }
-                        }
+                quote_spanned! {
+                    span => {
+                        let field_encoder = #pair_encoder_t::encode_first(&mut #encoder_var)?;
+                        #encode_t::encode(&#tag, field_encoder)?;
+                        let value_encoder = #pair_encoder_t::encode_second(&mut #encoder_var)?;
+                        #encode_path(#access, value_encoder)?;
                     }
                 }
             }
@@ -838,6 +814,7 @@ impl<'a> Expander<'a> {
         tag_type: Option<&(Span, syn::Type)>,
         path: syn::Path,
         fields: &syn::Fields,
+        variant_tag: Option<&syn::Ident>,
     ) -> Option<TokenStream> {
         let decode_t = &self.tokens.decode_t;
         let decoder_t = &self.tokens.decoder_t;
@@ -875,26 +852,11 @@ impl<'a> Expander<'a> {
             decls.push(quote_spanned!(span => let mut #var = None;));
             let decode = quote_spanned!(span => #var = Some(#decode_path(#decoder_var)?));
 
-            let prefix = match field_kind {
-                FieldKind::Struct => {
-                    let struct_field_decoder_t = &self.tokens.struct_field_decoder_t;
-
-                    Some(quote! {
-                        let #decoder_var = #struct_field_decoder_t::decode_field_value(&mut #decoder_var)?;
-                    })
-                }
-                FieldKind::Tuple => {
-                    let tuple_field_decoder_t = &self.tokens.tuple_field_decoder_t;
-
-                    Some(quote! {
-                        let #decoder_var = #tuple_field_decoder_t::decode_field_value(&mut #decoder_var)?;
-                    })
-                }
-            };
+            let pair_decoder_t = &self.tokens.pair_decoder_t;
 
             patterns.push(quote! {
                 #tag => {
-                    #prefix
+                    let #decoder_var = #pair_decoder_t::decode_second(&mut #decoder_var)?;
                     #decode;
                 }
             });
@@ -910,7 +872,7 @@ impl<'a> Expander<'a> {
             let fallback = if let Some(span) = field_attr.default {
                 quote_spanned!(span => #default_t)
             } else {
-                quote!(return Err(<D::Error as #error_t>::missing_field(#type_name, #tag)))
+                quote!(return Err(<D::Error as #error_t>::expected_tag(#type_name, #tag)))
             };
 
             assigns.push(quote!(#field: match #var {
@@ -934,84 +896,65 @@ impl<'a> Expander<'a> {
                 quote!(#struct_decoder_t::decode_field)
             }
             FieldKind::Tuple => {
-                let tuple_decoder_t = &self.tokens.tuple_decoder_t;
-                quote!(#tuple_decoder_t::decode_field)
+                let struct_decoder_t = &self.tokens.struct_decoder_t;
+                quote!(#struct_decoder_t::decode_field)
             }
         };
 
-        let (decode_tag, skip_field) = match field_kind {
-            FieldKind::Struct => {
-                let struct_field_decoder_t = &self.tokens.struct_field_decoder_t;
-                let decode_t = &self.tokens.decode_t;
+        let pair_decoder_t = &self.tokens.pair_decoder_t;
+        let decode_t = &self.tokens.decode_t;
 
-                let decode_tag = quote! {{
-                    let name_decoder = #struct_field_decoder_t::decode_field_tag(&mut #decoder_var)?;
-                    #decode_t::decode(name_decoder)?
-                }};
+        let decode_tag = quote! {{
+            let index_decoder = #pair_decoder_t::decode_first(&mut #decoder_var)?;
+            #decode_t::decode(index_decoder)?
+        }};
 
-                let skip_field = quote! {
-                    #struct_field_decoder_t::skip_field_value(&mut #decoder_var)?
-                };
+        let skip_field = quote! {
+            #pair_decoder_t::skip_second(&mut #decoder_var)?
+        };
 
-                (decode_tag, skip_field)
-            }
-            FieldKind::Tuple => {
-                let tuple_field_decoder_t = &self.tokens.tuple_field_decoder_t;
-                let decode_t = &self.tokens.decode_t;
-
-                let decode_tag = quote! {{
-                    let index_decoder = #tuple_field_decoder_t::decode_field_tag(&mut #decoder_var)?;
-                    #decode_t::decode(index_decoder)?
-                }};
-
-                let skip_field = quote! {
-                    #tuple_field_decoder_t::skip_field_value(&mut #decoder_var)?
-                };
-
-                (decode_tag, skip_field)
-            }
+        let unsupported = match variant_tag {
+            Some(variant_tag) => quote! {
+                <D::Error as #error_t>::unsupported_variant_field(#type_name, #variant_tag, tag)
+            },
+            None => quote! {
+                <D::Error as #error_t>::unsupported_field(#type_name, tag)
+            },
         };
 
         let tag_type = tag_type.as_ref().map(|(_, ty)| quote!(: #ty));
 
-        if patterns.is_empty() {
-            return Some(quote! {
-                let mut #decoder_var = #declare;
-
-                while let Some(mut #decoder_var) = #decode_next(&mut #decoder_var)? {
-                    let tag #tag_type = #decode_tag;
-
-                    if !#skip_field {
-                        return Err(<D::Error as #error_t>::unsupported_tag(#type_name, tag));
-                    }
+        let body = if patterns.is_empty() {
+            quote! {
+                if !#skip_field {
+                    return Err(#unsupported);
                 }
+            }
+        } else {
+            quote! {
+                match tag {
+                    #(#patterns,)*
+                    tag => {
+                        if !#skip_field {
+                            return Err(#unsupported);
+                        }
+                    },
+                }
+            }
+        };
 
-                #path {}
-            });
-        }
-
-        return Some(quote! {
+        Some(quote! {
             #(#decls;)*
 
             let mut #decoder_var = #declare;
 
             while let Some(mut #decoder_var) = #decode_next(&mut #decoder_var)? {
                 let tag #tag_type = #decode_tag;
-
-                match tag {
-                    #(#patterns,)*
-                    tag => {
-                        if !#skip_field {
-                            return Err(<D::Error as #error_t>::unsupported_tag(#type_name, tag));
-                        }
-                    },
-                }
+                #body
             }
 
-            #path {
-                #(#assigns),*
-            }
-        });
+            #path { #(#assigns),* }
+        })
     }
 
     /// Decode something packed.

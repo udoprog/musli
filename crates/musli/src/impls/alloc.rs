@@ -4,7 +4,7 @@ use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
 
 use crate::de::{Decode, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder};
-use crate::en::{Encode, Encoder, MapEncoder, SequenceEncoder};
+use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
 use crate::error::Error;
 use crate::internal::size_hint;
 
@@ -149,9 +149,9 @@ macro_rules! map {
                 let mut map = encoder.encode_map(self.len())?;
 
                 for (k, v) in self {
-                    let entry = map.encode_key()?;
+                    let entry = map.encode_first()?;
                     Encode::encode(k, entry)?;
-                    let value = map.encode_value()?;
+                    let value = map.encode_second()?;
                     Encode::encode(v, value)?;
                 }
 
