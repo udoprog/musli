@@ -3,7 +3,6 @@ use std::fmt::Debug;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use musli::{Decode, Encode};
-use musli_wire::{Fixed, FixedLength, WireEncoding};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
@@ -31,7 +30,7 @@ struct BigStruct {
     map: HashMap<u32, u32>,
 }
 
-fn generate_big_struct() -> BigStruct {
+fn generate_large_struct() -> BigStruct {
     use rand::prelude::*;
 
     let mut rng = StdRng::seed_from_u64(123412327832);
@@ -139,42 +138,83 @@ where
     value
 }
 
-const ENCODING: WireEncoding<Fixed, FixedLength> = WireEncoding::new()
-    .with_fixed_integers()
-    .with_fixed_lengths();
+const WIRE_ENCODING: musli_wire::WireEncoding<musli_wire::Fixed, musli_wire::FixedLength> =
+    musli_wire::WireEncoding::new()
+        .with_fixed_integers()
+        .with_fixed_lengths();
 
-fn musli_rt<T>(expected: &T) -> T
+fn musli_wire_rt<T>(expected: &T) -> T
 where
     T: Encode + for<'de> Decode<'de>,
 {
-    let data = ENCODING.to_vec(expected).unwrap();
-    let value: T = ENCODING.decode(&data[..]).unwrap();
+    // NB: bincode uses a 128-byte pre-allocated vector.
+    let mut data = Vec::with_capacity(128);
+    WIRE_ENCODING.encode(&mut data, expected).unwrap();
+    let value: T = WIRE_ENCODING.decode(&data[..]).unwrap();
     value
 }
 
-fn musli_enc<T>(expected: &T) -> Vec<u8>
+fn musli_wire_enc<T>(expected: &T) -> Vec<u8>
 where
     T: Encode,
 {
-    ENCODING.to_vec(expected).unwrap()
+    // NB: bincode uses a 128-byte pre-allocated vector.
+    let mut data = Vec::with_capacity(128);
+    WIRE_ENCODING.encode(&mut data, expected).unwrap();
+    data
 }
 
-fn musli_dec<'de, T>(data: &'de [u8]) -> T
+fn musli_wire_dec<'de, T>(data: &'de [u8]) -> T
 where
     T: Decode<'de>,
 {
-    ENCODING.decode(data).unwrap()
+    WIRE_ENCODING.decode(data).unwrap()
+}
+
+const STORAGE_ENCODING: musli_storage::StorageEncoding<
+    musli_storage::Fixed,
+    musli_storage::FixedLength,
+> = musli_storage::StorageEncoding::new()
+    .with_fixed_integers()
+    .with_fixed_lengths();
+
+fn musli_storage_rt<T>(expected: &T) -> T
+where
+    T: Encode + for<'de> Decode<'de>,
+{
+    // NB: bincode uses a 128-byte pre-allocated vector.
+    let mut data = Vec::with_capacity(128);
+    STORAGE_ENCODING.encode(&mut data, expected).unwrap();
+    let value: T = STORAGE_ENCODING.decode(&data[..]).unwrap();
+    value
+}
+
+fn musli_storage_enc<T>(expected: &T) -> Vec<u8>
+where
+    T: Encode,
+{
+    // NB: bincode uses a 128-byte pre-allocated vector.
+    let mut data = Vec::with_capacity(128);
+    STORAGE_ENCODING.encode(&mut data, expected).unwrap();
+    data
+}
+
+fn musli_storage_dec<'de, T>(data: &'de [u8]) -> T
+where
+    T: Decode<'de>,
+{
+    STORAGE_ENCODING.decode(data).unwrap()
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
     let small_struct = SmallStruct { x: 32.0, y: 64.0 };
-    let big_struct = generate_big_struct();
+    let large_struct = generate_large_struct();
 
     macro_rules! benches {
         ($group:literal, $encode_fn:ident, $decode_fn:ident, $roundtrip_fn:ident) => {{
             let mut group = c.benchmark_group($group);
 
-            let small_data = $encode_fn(&big_struct);
+            let small_data = $encode_fn(&large_struct);
 
             group.bench_function("roundtrip-small", |b| {
                 b.iter(|| $roundtrip_fn(&small_struct))
@@ -184,19 +224,27 @@ fn criterion_benchmark(c: &mut Criterion) {
                 b.iter(|| $decode_fn::<SmallStruct>(&small_data))
             });
 
-            let big_data = $encode_fn(&big_struct);
+            let large_data = $encode_fn(&large_struct);
 
-            group.bench_function("roundtrip-big", |b| b.iter(|| $roundtrip_fn(&big_struct)));
-            group.bench_function("encode-big", |b| b.iter(|| $encode_fn(&big_struct)));
-            group.bench_function("decode-big", |b| {
-                b.iter(|| $decode_fn::<BigStruct>(&big_data))
+            group.bench_function("roundtrip-large", |b| {
+                b.iter(|| $roundtrip_fn(&large_struct))
+            });
+            group.bench_function("encode-large", |b| b.iter(|| $encode_fn(&large_struct)));
+            group.bench_function("decode-large", |b| {
+                b.iter(|| $decode_fn::<BigStruct>(&large_data))
             });
         }};
     }
 
     // benches!("rmp-serde", rmp_enc, rmp_dec, rmp_rt);
     benches!("bincode-serde", bin_enc, bin_dec, bin_rt);
-    benches!("musli", musli_enc, musli_dec, musli_rt);
+    benches!(
+        "musli-storage",
+        musli_storage_enc,
+        musli_storage_dec,
+        musli_storage_rt
+    );
+    benches!("musli-wire", musli_wire_enc, musli_wire_dec, musli_wire_rt);
     benches!("json", json_enc, json_dec, json_rt);
 }
 

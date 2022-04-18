@@ -13,17 +13,38 @@
 //!
 //! * Anything being deserialized must be fully held in memory and able to hand
 //!   out contiguous slices of it. This allows users of musli to perform
-//!   zero-copy deserialization for certain types.
+//!   zero-copy deserialization for bytes-oriented types.
 //!
 //! * Decoding is biased to assume strings are encoded verbatim in the format
-//!   used so that references to strings can always be used.
+//!   used so that references to strings can always be used. That means strings
+//!   have to be UTF-8. A format that deviates from this will have to rely on
+//!   runtime errors.
 //!
-//! I've chosen to internally use the term "encoding", "encode", and "decode"
-//! because it's common terminology when talking about binary formats. It's also
-//! distinct from [serde]'s use of "serialization" allowing for the ease of
-//! using both libraries side by side if desired.
+//! > I've chosen to internally use the term "encoding", "encode", and "decode"
+//! > because it's common terminology when talking about binary formats. It's
+//! > also distinct from [serde]'s use of "serialization" allowing for the ease
+//! > of using both libraries side by side if desired.
 //!
-//! [serde]: https://serde.rs
+//! <br>
+//!
+//! ## Design
+//!
+//! Müsli is designed with similar principles as [serde]. Relying on Rust's
+//! powerful trait system to generate code which can largely be optimized away.
+//!
+//! The central components of the framework are the [Encode] and [Decode]
+//! derives. They are thoroughly documented in the [derives] module.
+//!
+//! <br>
+//!
+//! ## Usage
+//!
+//! Add it to your `Cargo.toml`:
+//!
+//! ```toml
+//! musli = "0.0.4"
+//! musli-wire = "0.0.4"
+//! ```
 //!
 //! ## Formats
 //!
@@ -118,19 +139,7 @@
 //! `musli-storage` `#[musli(packed)]` for example is as compact and efficient
 //! as [bincode] while [musli-wire] is comparable to something like [protobuf]*.
 //!
-//! ## Usage
-//!
-//! Add it to your `Cargo.toml`:
-//!
-//! ```toml
-//! musli = "0.0.4"
-//! musli-wire = "0.0.4"
-//! ```
-//!
-//! ## The `Encode` and `Decode` derives
-//!
-//! See the [derives] module for documentation on how to use the [Encode] and
-//! [Decode] derives.
+//! <br>
 //!
 //! # Examples
 //!
@@ -156,10 +165,11 @@
 //! musli_wire::encode(&mut out, &expected)?;
 //! let actual = musli_wire::decode(&out[..])?;
 //!
-//! assert_eq!(expected, actual);
+//! assert_eq!(actual, expected);
 //! # Ok(()) }
 //! ```
 //!
+//! [serde]: https://serde.rs
 //! [GATs]: https://github.com/rust-lang/rust/issues/44265
 //! [protobuf]: https://developers.google.com/protocol-buffers
 //! [bincode]: https://docs.rs/bincode

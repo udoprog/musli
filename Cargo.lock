@@ -343,6 +343,7 @@ dependencies = [
  "bincode",
  "criterion",
  "musli",
+ "musli-storage",
  "musli-wire",
  "rand",
  "rmp-serde",

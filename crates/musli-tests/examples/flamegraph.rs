@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use criterion::black_box;
 use musli::{Decode, Encode};
-use musli_wire::{Fixed, FixedLength, WireEncoding};
+use musli_storage::{Fixed, FixedLength, StorageEncoding};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
@@ -31,7 +31,7 @@ struct BigStruct {
     map: HashMap<u32, u32>,
 }
 
-fn generate_big_struct() -> BigStruct {
+fn generate_large_struct() -> BigStruct {
     use rand::prelude::*;
 
     let mut rng = StdRng::seed_from_u64(123412327832);
@@ -83,7 +83,7 @@ where
     bincode::deserialize(data).unwrap()
 }
 
-const ENCODING: WireEncoding<Fixed, FixedLength> = WireEncoding::new()
+const ENCODING: StorageEncoding<Fixed, FixedLength> = StorageEncoding::new()
     .with_fixed_integers()
     .with_fixed_lengths();
 
@@ -92,7 +92,10 @@ fn encode_musli<T>(expected: &T) -> Vec<u8>
 where
     T: Encode,
 {
-    ENCODING.to_vec(expected).unwrap()
+    // NB: bincode uses a 128-byte preallocated buffer.
+    let mut data = Vec::with_capacity(128);
+    ENCODING.encode(&mut data, expected).unwrap();
+    data
 }
 
 #[inline(never)]
@@ -120,16 +123,16 @@ fn main() {
 
     let mut it = std::env::args().skip(1);
 
-    let big_struct = generate_big_struct();
+    let large_struct = generate_large_struct();
 
     match it.next().as_deref() {
         Some("bincode") => {
             println!("bincode");
-            test!(big_struct, encode_bincode, decode_bincode, 1_000_000);
+            test!(large_struct, encode_bincode, decode_bincode, 1_000_000);
         }
         _ => {
             println!("musli");
-            test!(big_struct, encode_musli, decode_musli, 1_000_000);
+            test!(large_struct, encode_musli, decode_musli, 1_000_000);
         }
     }
 }
