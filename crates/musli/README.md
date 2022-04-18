@@ -45,8 +45,8 @@ derives. They are thoroughly documented in the [derives] module.
 Add the following to your `Cargo.toml`:
 
 ```toml
-musli = "0.0.7"
-musli-wire = "0.0.7"
+musli = "0.0.8"
+musli-wire = "0.0.8"
 ```
 
 <br>
