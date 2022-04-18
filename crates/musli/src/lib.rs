@@ -27,10 +27,10 @@
 //!
 //! ## Formats
 //!
-//! Formats are currently distinguish by supporting various degrees of *upgrade
-//! stability*. A fully upgrade stable serialization format must tolerate that
-//! one model can add fields that an older version of the model should be
-//! capable of ignoring.
+//! Formats are currently distinguished by supporting various degrees of
+//! *upgrade stability*. A fully upgrade stable serialization format must
+//! tolerate that one model can add fields that an older version of the model
+//! should be capable of ignoring.
 //!
 //! ```rust
 //! use musli::{Encode, Decode};
