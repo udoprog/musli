@@ -3,7 +3,7 @@ use musli::{Decode, Encode};
 #[derive(Debug, PartialEq, Decode, Encode)]
 pub struct SkipSerialize {
     before: u32,
-    #[musli(skip_encoding_if = "Option::is_none")]
+    #[musli(skip_encoding_if = Option::is_none)]
     skipped: Option<u32>,
     after: u32,
 }
@@ -12,7 +12,7 @@ pub struct SkipSerialize {
 #[musli(packed)]
 pub struct SkipSerializeUntagged {
     before: u32,
-    #[musli(skip_encoding_if = "Option::is_none")]
+    #[musli(skip_encoding_if = Option::is_none)]
     skipped: Option<u32>,
     after: u32,
 }

@@ -44,7 +44,7 @@
 //!
 //! * *Field attributes* are attributes which apply to each individual field
 //!   either in a `struct` or an `enum` variant. Like the uses of
-//!   `#[musli(name)]` here:
+//!   `#[musli(tag)]` here:
 //!
 //!   ```
 //!   use musli::{Encode, Decode};
@@ -52,7 +52,7 @@
 //!   #[derive(Encode, Decode)]
 //!   #[musli(field = "name")]
 //!   struct Struct {
-//!       #[musli(name = "other")]
+//!       #[musli(tag = "other")]
 //!       something: String,
 //!   }
 //!
@@ -60,7 +60,7 @@
 //!   #[musli(field = "name")]
 //!   enum Enum {
 //!       Variant {
-//!           #[musli(name = "other")]
+//!           #[musli(tag = "other")]
 //!           something: String,
 //!       }
 //!   }
@@ -68,29 +68,8 @@
 //!
 //! ## Container attributes
 //!
-//! * `#[musli(with = "...")]` specifies the path to a module to use instead of
-//!   the fields default [Encode] or [Decode] implementations.
-//!
-//!   It expects the following functions to be defined, assuming the type of the
-//!   field is `Field`.
-//!
-//!   `encode` for encoding the field, which should match the following
-//!   signature:
-//!
-//!   ```rust,ignore
-//!   fn encode<E>(field: &Field, encoder: E) -> Result<(), E::Error>
-//!   where
-//!      E: Encoder;
-//!   ```
-//!
-//!   `encode` for decoding the field, which should match the following
-//!   signature:
-//!
-//!   ```rust,ignore
-//!   fn decode<'de, D>(mut decoder: D) -> Result<Field, D::Error>
-//!   where
-//!       D: Decoder<'de>;
-//!   ```
+//! * `#[musli(tag_type = ..)]` indicates which type the `#[musli(tag = ..)]`
+//!   attribute on fields or variants should have.
 //!
 //! * `#[musli(field = "...")]` decides which form of field tag is used for
 //!   `#[musli(tagged)]` containers. It can take either `"name"` or `"index"`.
@@ -141,11 +120,26 @@
 //! ## Variant attributes
 //!
 //! * `#[musli(tag = ...)]` allows for renaming a variant from its default
-//!   integer value. Its default tag value is the offset of the variant as its
-//!   declared in its container enum.
+//!   tag. Its default tag value is the offset of the variant as its declared
+//!   in its container enum.
 //!
-//! * `#[musli(name = ...)]` allows for renaming a variant from its default
-//!   string value. Its default name is the stringified name of the variant.
+//! * `#[musli(tag_type = ..)]` indicates which type the `#[musli(tag = ..)]`
+//!   attribute on fields in the current variant should have.
+//!
+//!   ```
+//!   use musli::{Encode, Decode};
+//!
+//!   #[derive(Encode, Decode)]
+//!   #[musli(transparent)]
+//!   struct CustomTag<'a>(&'a [u8]);
+//!
+//!   #[derive(Encode, Decode)]
+//!   #[musli(tag_type = CustomTag)]
+//!   struct Struct {
+//!       #[musli(tag = CustomTag(r"name in bytes"))]
+//!       name: String,
+//!   }
+//!   ```
 //!
 //! * `#[musli(transparent)]` can only be used on variants which have a single
 //!   field. It will cause that field to define how that variant is encoded or
@@ -153,12 +147,33 @@
 //!
 //! ## Field attributes
 //!
-//! * `#[musli(tag = ...)]` allows for renaming a field from its default integer
-//!   value. Its default tag value is the offset of the field as its declared in
-//!   its container or variant.
+//! * `#[musli(with = "...")]` specifies the path to a module to use instead of
+//!   the fields default [Encode] or [Decode] implementations.
 //!
-//! * `#[musli(name = ...)]` allows for renaming a field from its default string
-//!   value. Its default name is the stringified name of the field.
+//!   It expects the following functions to be defined, assuming the type of the
+//!   field is `Field`.
+//!
+//!   `encode` for encoding the field, which should match the following
+//!   signature:
+//!
+//!   ```rust,ignore
+//!   fn encode<E>(field: &Field, encoder: E) -> Result<(), E::Error>
+//!   where
+//!      E: Encoder;
+//!   ```
+//!
+//!   `encode` for decoding the field, which should match the following
+//!   signature:
+//!
+//!   ```rust,ignore
+//!   fn decode<'de, D>(mut decoder: D) -> Result<Field, D::Error>
+//!   where
+//!       D: Decoder<'de>;
+//!   ```
+//!
+//! * `#[musli(tag = ...)]` allows for renaming a field from its default value.
+//!   Its default tag value is the offset of the field as its declared in its
+//!   container or variant.
 //!
 //! * `#[musli(default)]` constructs the field using [Default::default] in case
 //!   it's not available. This is only used for decoding.

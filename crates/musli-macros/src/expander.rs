@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
-use crate::internals::attr::{self, FieldAttr, Packing, Tag, TypeAttr};
+use crate::internals::attr::{self, AttributeValue, FieldAttr, Packing, Tag, TypeAttr};
 use crate::internals::symbol::*;
 use crate::internals::{Ctxt, Needs, NeedsKind};
 
@@ -455,11 +455,12 @@ impl<'a> Expander<'a> {
         needs: &mut Needs,
     ) -> Option<TokenStream> {
         let path = syn::Path::from(syn::Ident::new("Self", self.input.ident.span()));
+        let tag_type = self.type_attr.tag_type.as_ref();
 
         let body = match self.type_attr.packing() {
             Packing::Tagged => {
                 needs.mark_used();
-                self.decode_tagged(&self.type_name, path, &data.fields)?
+                self.decode_tagged(&self.type_name, tag_type, path, &data.fields)?
             }
             Packing::Packed => self.decode_untagged(path, &data.fields, needs)?,
             Packing::Transparent => self.decode_transparent(span, path, &data.fields, needs)?,
@@ -513,8 +514,12 @@ impl<'a> Expander<'a> {
             let mut path = syn::Path::from(syn::Ident::new("Self", type_ident.span()));
             path.segments.push(variant.ident.clone().into());
 
+            let tag_type = variant_attr.tag_type.as_ref();
+
             let output = match variant_attr.packing().unwrap_or(type_packing) {
-                Packing::Tagged => self.decode_tagged(&variant_name, path, &variant.fields)?,
+                Packing::Tagged => {
+                    self.decode_tagged(&variant_name, tag_type, path, &variant.fields)?
+                }
                 Packing::Packed => self.decode_untagged(path, &variant.fields, needs)?,
                 Packing::Transparent => {
                     self.decode_transparent(span, path, &variant.fields, needs)?
@@ -535,10 +540,16 @@ impl<'a> Expander<'a> {
             });
         }
 
+        let tag_type = self
+            .type_attr
+            .tag_type
+            .as_ref()
+            .map(|(_, ty)| quote!(: #ty));
+
         Some(quote! {{
             let mut variant = #decoder_t::decode_variant(#decoder_var)?;
             let tag_decoder = #variant_decoder_t::decode_variant_tag(&mut variant)?;
-            let tag = #decode_t::decode(tag_decoder)?;
+            let tag #tag_type = #decode_t::decode(tag_decoder)?;
             let #decoder_var = #variant_decoder_t::decode_variant_value(variant)?;
 
             Ok(match tag {
@@ -824,6 +835,7 @@ impl<'a> Expander<'a> {
     fn decode_tagged(
         &self,
         type_name: &syn::LitStr,
+        tag_type: Option<&(Span, syn::Type)>,
         path: syn::Path,
         fields: &syn::Fields,
     ) -> Option<TokenStream> {
@@ -960,12 +972,14 @@ impl<'a> Expander<'a> {
             }
         };
 
+        let tag_type = tag_type.as_ref().map(|(_, ty)| quote!(: #ty));
+
         if patterns.is_empty() {
             return Some(quote! {
                 let mut #decoder_var = #declare;
 
                 while let Some(mut #decoder_var) = #decode_next(&mut #decoder_var)? {
-                    let tag = #decode_tag;
+                    let tag #tag_type = #decode_tag;
 
                     if !#skip_field {
                         return Err(<D::Error as #error_t>::unsupported_tag(#type_name, tag));
@@ -982,7 +996,9 @@ impl<'a> Expander<'a> {
             let mut #decoder_var = #declare;
 
             while let Some(mut #decoder_var) = #decode_next(&mut #decoder_var)? {
-                match #decode_tag {
+                let tag #tag_type = #decode_tag;
+
+                match tag {
                     #(#patterns,)*
                     tag => {
                         if !#skip_field {
@@ -1062,29 +1078,34 @@ impl<'a> Expander<'a> {
     /// Expand the variant tag depending on the given tag configuration.
     fn expand_variant_tag(
         &self,
-        rename: Option<&(Span, attr::Rename)>,
+        rename: Option<&(Span, AttributeValue)>,
         tag: Tag,
         index: usize,
         ident: &syn::Ident,
-    ) -> syn::Lit {
-        match (rename, tag) {
-            (Some((_, rename)), _) => rename_lit(rename),
+    ) -> Option<syn::Expr> {
+        let lit = match (rename, tag) {
+            (Some((_, value)), _) => return self.rename_lit(value),
             (None, Tag::Index) => usize_int(index, ident.span()).into(),
             (None, Tag::Name) => syn::LitStr::new(&ident.to_string(), ident.span()).into(),
-        }
+        };
+
+        Some(syn::Expr::Lit(syn::ExprLit {
+            attrs: Vec::new(),
+            lit,
+        }))
     }
 
     /// Match out the field tag depending on the given tag configuration.
     fn expand_field_tag(
         &self,
-        rename: Option<&(Span, attr::Rename)>,
+        rename: Option<&(Span, AttributeValue)>,
         tag: Tag,
         index: usize,
         field: &syn::Field,
-    ) -> Option<syn::Lit> {
-        match (rename, tag, &field.ident) {
-            (Some((_, rename)), _, _) => Some(rename_lit(rename)),
-            (None, Tag::Index, _) => Some(usize_int(index, field.span()).into()),
+    ) -> Option<syn::Expr> {
+        let lit = match (rename, tag, &field.ident) {
+            (Some((_, rename)), _, _) => return self.rename_lit(rename),
+            (None, Tag::Index, _) => usize_int(index, field.span()).into(),
             (None, Tag::Name, None) => {
                 self.cx.error_spanned_by(
                     field,
@@ -1093,11 +1114,39 @@ impl<'a> Expander<'a> {
                         ATTR, TAG
                     ),
                 );
-                None
+                return None;
             }
             (None, Tag::Name, Some(ident)) => {
-                Some(syn::LitStr::new(&ident.to_string(), ident.span()).into())
+                syn::LitStr::new(&ident.to_string(), ident.span()).into()
             }
+        };
+
+        Some(syn::Expr::Lit(syn::ExprLit {
+            attrs: Vec::new(),
+            lit,
+        }))
+    }
+
+    /// Process rename literal to ensure it's always typed.
+    fn rename_lit(&self, value: &AttributeValue) -> Option<syn::Expr> {
+        match value.as_lit() {
+            Some(syn::Lit::Int(int)) if int.suffix().is_empty() => {
+                Some(syn::Expr::Lit(syn::ExprLit {
+                    attrs: Vec::new(),
+                    lit: syn::LitInt::new(&format!("{}usize", int), int.span()).into(),
+                }))
+            }
+            _ => match value.as_expr() {
+                Some(expr) => Some(expr),
+                None => {
+                    self.cx.error_span(
+                        value.span(),
+                        format!("#[{}({} = \"name\")] must be a value expression", ATTR, TAG),
+                    );
+
+                    None
+                }
+            },
         }
     }
 }
@@ -1130,16 +1179,6 @@ impl FieldKind {
             syn::Fields::Unnamed(unnamed) => Some((Self::Tuple, unnamed.unnamed.iter())),
             syn::Fields::Unit => None,
         }
-    }
-}
-
-/// Process rename literal to ensure it's always typed.
-fn rename_lit(rename: &attr::Rename) -> syn::Lit {
-    match rename.as_lit() {
-        syn::Lit::Int(int) if int.suffix().is_empty() => {
-            syn::LitInt::new(&format!("{}usize", int), int.span()).into()
-        }
-        lit => lit,
     }
 }
 

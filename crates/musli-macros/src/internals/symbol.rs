@@ -14,6 +14,7 @@ pub const DEFAULT: Symbol = Symbol("default");
 pub const SKIP_ENCODING_IF: Symbol = Symbol("skip_encoding_if");
 pub const PACKED: Symbol = Symbol("packed");
 pub const TRANSPARENT: Symbol = Symbol("transparent");
+pub const TAG_TYPE: Symbol = Symbol("tag_type");
 
 impl PartialEq<Symbol> for Ident {
     fn eq(&self, word: &Symbol) -> bool {

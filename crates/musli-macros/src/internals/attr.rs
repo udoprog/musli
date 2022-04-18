@@ -8,8 +8,6 @@ use syn::parse;
 use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Ident;
-use syn::Meta::*;
-use syn::NestedMeta::*;
 
 /// The kind of tag to use.
 #[derive(Debug, Clone, Copy)]
@@ -48,23 +46,10 @@ impl Default for Packing {
     }
 }
 
-/// A rename into either a tag or a name.
-pub(crate) enum Rename {
-    Tag(syn::LitInt),
-    Name(syn::LitStr),
-}
-
-impl Rename {
-    pub(crate) fn as_lit(&self) -> syn::Lit {
-        match self {
-            Rename::Tag(tag) => syn::Lit::Int(tag.clone()),
-            Rename::Name(name) => syn::Lit::Str(name.clone()),
-        }
-    }
-}
-
 #[derive(Default)]
 pub(crate) struct TypeAttr {
+    /// `#[musli(tag_type)]`.
+    pub(crate) tag_type: Option<(Span, syn::Type)>,
     /// `#[musli(variant_tag)]`.
     pub(crate) variant_tag: Tag,
     /// `#[musli(field_tag)]`.
@@ -101,21 +86,23 @@ impl TypeAttr {
 #[derive(Default)]
 pub(crate) struct FieldAttr {
     /// Module to use when decoding.
-    pub(crate) encode_path: Option<(Span, syn::ExprPath)>,
+    pub(crate) encode_path: Option<(Span, syn::Path)>,
     /// Path to use when decoding.
-    pub(crate) decode_path: Option<(Span, syn::ExprPath)>,
+    pub(crate) decode_path: Option<(Span, syn::Path)>,
     /// Method to check if we want to skip encoding.
-    pub(crate) skip_encoding_if: Option<(Span, syn::ExprPath)>,
+    pub(crate) skip_encoding_if: Option<(Span, syn::Path)>,
     /// Rename a field to the given literal.
-    pub(crate) rename: Option<(Span, Rename)>,
+    pub(crate) rename: Option<(Span, AttributeValue)>,
     /// Use a default value for the field if it's not available.
     pub(crate) default: Option<Span>,
 }
 
 #[derive(Default)]
 pub(crate) struct VariantAttr {
+    /// `#[musli(tag_type)]`.
+    pub(crate) tag_type: Option<(Span, syn::Type)>,
     /// Rename a field to the given literal.
-    pub(crate) rename: Option<(Span, Rename)>,
+    pub(crate) rename: Option<(Span, AttributeValue)>,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
     pub(crate) packing: Option<(Span, Packing)>,
 }
@@ -170,12 +157,12 @@ impl FieldAttr {
     }
 
     /// Get skip encoding if.
-    pub(crate) fn skip_encoding_if(&self) -> Option<(Span, &syn::ExprPath)> {
+    pub(crate) fn skip_encoding_if(&self) -> Option<(Span, &syn::Path)> {
         let (span, path) = self.skip_encoding_if.as_ref()?;
         Some((*span, path))
     }
 
-    fn set_encode_path(&mut self, cx: &Ctxt, span: Span, encode_path: syn::ExprPath) {
+    fn set_encode_path(&mut self, cx: &Ctxt, span: Span, encode_path: syn::Path) {
         if self.encode_path.is_some() {
             cx.error_spanned_by(
                 encode_path,
@@ -186,7 +173,7 @@ impl FieldAttr {
         }
     }
 
-    fn set_decode_path(&mut self, cx: &Ctxt, span: Span, decode_path: syn::ExprPath) {
+    fn set_decode_path(&mut self, cx: &Ctxt, span: Span, decode_path: syn::Path) {
         if self.decode_path.is_some() {
             cx.error_spanned_by(
                 decode_path,
@@ -197,7 +184,7 @@ impl FieldAttr {
         }
     }
 
-    fn set_skip_encoding_if(&mut self, cx: &Ctxt, span: Span, skip_encoding_if: syn::ExprPath) {
+    fn set_skip_encoding_if(&mut self, cx: &Ctxt, span: Span, skip_encoding_if: syn::Path) {
         if self.skip_encoding_if.is_some() {
             cx.error_spanned_by(
                 skip_encoding_if,
@@ -213,11 +200,17 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
     let mut attr = TypeAttr::default();
 
     for a in attrs {
-        for m in get_jobs_attrs(cx, a).into_iter().flatten() {
-            match &m {
-                // parse #[musli(variant_tag)]
-                Meta(NameValue(m)) if m.path == VARIANT => {
-                    if let Ok(tag) = get_lit_str(cx, VARIANT, &m.lit) {
+        for attribute in parse_musli_attrs(cx, a).into_iter().flatten() {
+            match attribute {
+                // parse #[musli(tag_type = <type>)]
+                Attribute::KeyValue(path, value) if path == TAG_TYPE => {
+                    if let Some(ty) = value_as_type(cx, TAG_TYPE, value) {
+                        attr.tag_type = Some((path.span(), ty));
+                    }
+                }
+                // parse #[musli(variant_tag = "..")]
+                Attribute::KeyValue(path, expr) if path == VARIANT => {
+                    if let Some(tag) = parse_value_string(cx, VARIANT, expr) {
                         attr.variant_tag = match tag.value().as_str() {
                             "index" => Tag::Index,
                             "name" => Tag::Name,
@@ -231,9 +224,9 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                         };
                     }
                 }
-                // parse #[musli(field_tag)]
-                Meta(NameValue(m)) if m.path == FIELD => {
-                    if let Ok(tag) = get_lit_str(cx, FIELD, &m.lit) {
+                // parse #[musli(field_tag = "..")]
+                Attribute::KeyValue(path, expr) if path == FIELD => {
+                    if let Some(tag) = parse_value_string(cx, FIELD, expr) {
                         attr.field_tag = match tag.value().as_str() {
                             "index" => Tag::Index,
                             "name" => Tag::Name,
@@ -248,15 +241,15 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                     }
                 }
                 // parse #[musli(packed)]
-                Meta(Path(path)) if path == PACKED => {
-                    attr.set_packing(cx, m.span(), Packing::Packed);
+                Attribute::Path(path) if path == PACKED => {
+                    attr.set_packing(cx, path.span(), Packing::Packed);
                 }
                 // parse #[musli(flatten)]
-                Meta(Path(path)) if path == TRANSPARENT => {
-                    attr.set_packing(cx, m.span(), Packing::Transparent);
+                Attribute::Path(path) if path == TRANSPARENT => {
+                    attr.set_packing(cx, path.span(), Packing::Transparent);
                 }
                 meta => {
-                    cx.error_spanned_by(meta, format!("unsupported #[{}] attribute", ATTR));
+                    cx.error_span(meta.span(), format!("unsupported #[{}] attribute", ATTR));
                 }
             }
         }
@@ -270,69 +263,57 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
     let mut attr = FieldAttr::default();
 
     for a in attrs {
-        for m in get_jobs_attrs(cx, a).into_iter().flatten() {
-            match &m {
-                // parse #[musli(with)]
-                Meta(NameValue(m)) if m.path == WITH => {
-                    if let Ok(path) = parse_lit_into_expr_path(cx, WITH, &m.lit) {
+        for attribute in parse_musli_attrs(cx, a).into_iter().flatten() {
+            match attribute {
+                // parse #[musli(with = <path>)]
+                Attribute::KeyValue(path, value) if path == WITH => {
+                    if let Some(path) = parse_value_path(cx, WITH, value) {
                         let mut encode_path = path.clone();
 
                         encode_path
-                            .path
                             .segments
                             .push(Ident::new("encode", Span::call_site()).into());
 
-                        attr.set_encode_path(cx, m.lit.span(), encode_path);
+                        attr.set_encode_path(cx, path.span(), encode_path);
 
                         let mut decode_path = path.clone();
 
                         decode_path
-                            .path
                             .segments
                             .push(Ident::new("decode", Span::call_site()).into());
 
-                        attr.set_decode_path(cx, m.lit.span(), decode_path);
+                        attr.set_decode_path(cx, path.span(), decode_path);
                     }
                 }
                 // parse #[musli(skip_encoding_if)]
-                Meta(NameValue(m)) if m.path == SKIP_ENCODING_IF => {
-                    if let Ok(path) = parse_lit_into_expr_path(cx, SKIP_ENCODING_IF, &m.lit) {
-                        attr.set_skip_encoding_if(cx, m.lit.span(), path);
+                Attribute::KeyValue(path, expr) if path == SKIP_ENCODING_IF => {
+                    if let Some(path) = parse_value_path(cx, SKIP_ENCODING_IF, expr) {
+                        attr.set_skip_encoding_if(cx, path.span(), path.clone());
                     }
                 }
-                // parse #[musli(tag)]
-                Meta(NameValue(m)) if m.path == TAG => {
-                    let span = m.span();
+                // parse #[musli(tag = <expr>)]
+                Attribute::KeyValue(path, expr) if path == TAG => {
+                    let span = path.span();
 
                     if let Some((span, _)) = &attr.rename {
                         cx.error_span(*span, "conflicting attribute");
-                    } else if let Ok(string) = get_lit_int(cx, TAG, &m.lit) {
-                        attr.rename = Some((span, Rename::Tag(string.clone())));
-                    }
-                }
-                // parse #[musli(name)]
-                Meta(NameValue(m)) if m.path == NAME => {
-                    let span = m.span();
-
-                    if let Some((span, _)) = &attr.rename {
-                        cx.error_span(*span, "conflicting attribute");
-                    } else if let Ok(string) = get_lit_str(cx, NAME, &m.lit) {
-                        attr.rename = Some((span, Rename::Name(string.clone())));
+                    } else {
+                        attr.rename = Some((span, expr));
                     }
                 }
                 // parse #[musli(default)]
-                Meta(Path(path)) if path == DEFAULT => {
+                Attribute::Path(path) if path == DEFAULT => {
                     if let Some(span) = attr.default {
                         cx.error_span(
                             span,
                             format!("#[{}({})] was previously defined here", ATTR, DEFAULT),
                         );
                     } else {
-                        attr.default = Some(m.span());
+                        attr.default = Some(path.span());
                     }
                 }
                 meta => {
-                    cx.error_spanned_by(meta, format!("unsupported #[{}] attribute", ATTR));
+                    cx.error_span(meta.span(), format!("unsupported #[{}] attribute", ATTR));
                 }
             }
         }
@@ -346,38 +327,43 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
     let mut attr = VariantAttr::default();
 
     for a in attrs {
-        for m in get_jobs_attrs(cx, a).into_iter().flatten() {
-            match &m {
-                // parse #[musli(tag)]
-                Meta(NameValue(m)) if m.path == TAG => {
-                    let span = m.span();
+        for m in parse_musli_attrs(cx, a).into_iter().flatten() {
+            match m {
+                // parse #[musli(tag_type = <type>)]
+                Attribute::KeyValue(path, value) if path == TAG_TYPE => {
+                    if let Some(ty) = value_as_type(cx, TAG_TYPE, value) {
+                        attr.tag_type = Some((path.span(), ty));
+                    }
+                }
+                // parse #[musli(tag = <expr>)]
+                Attribute::KeyValue(path, expr) if path == TAG => {
+                    let span = path.span();
 
                     if let Some((span, _)) = &attr.rename {
                         cx.error_span(*span, "conflicting attribute");
-                    } else if let Ok(string) = get_lit_int(cx, TAG, &m.lit) {
-                        attr.rename = Some((span, Rename::Tag(string.clone())));
+                    } else {
+                        attr.rename = Some((span, expr));
                     }
                 }
-                // parse #[musli(name)]
-                Meta(NameValue(m)) if m.path == NAME => {
-                    let span = m.span();
+                Attribute::KeyValue(path, expr) if path == NAME => {
+                    let span = path.span();
 
                     if let Some((span, _)) = &attr.rename {
                         cx.error_span(*span, "conflicting attribute");
-                    } else if let Ok(string) = get_lit_str(cx, NAME, &m.lit) {
-                        attr.rename = Some((span, Rename::Name(string.clone())));
+                    } else {
+                        attr.rename = Some((span, expr));
                     }
                 }
-                // parse #[musli(flatten)]
-                Meta(Path(path)) if path == TRANSPARENT => {
-                    attr.set_packing(cx, m.span(), Packing::Transparent);
+                // parse #[musli(transparent)]
+                Attribute::Path(path) if path == TRANSPARENT => {
+                    attr.set_packing(cx, path.span(), Packing::Transparent);
                 }
                 // parse #[musli(packed)]
-                Meta(Path(path)) if path == PACKED => {
-                    attr.set_packing(cx, m.span(), Packing::Packed);
+                Attribute::Path(path) if path == PACKED => {
+                    attr.set_packing(cx, path.span(), Packing::Packed);
                 }
                 meta => {
-                    cx.error_spanned_by(meta, format!("unsupported #[{}] attribute", ATTR));
+                    cx.error_span(meta.span(), format!("unsupported #[{}] attribute", ATTR));
                 }
             }
         }
@@ -386,96 +372,168 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
     attr
 }
 
-fn get_lit_int<'a>(cx: &Ctxt, attr_name: Symbol, lit: &'a syn::Lit) -> Result<&'a syn::LitInt, ()> {
-    get_lit_int2(cx, attr_name, attr_name, lit)
-}
-
-fn get_lit_int2<'a>(
-    cx: &Ctxt,
-    attr_name: Symbol,
-    meta_item_name: Symbol,
-    lit: &'a syn::Lit,
-) -> Result<&'a syn::LitInt, ()> {
-    if let syn::Lit::Int(lit) = lit {
-        Ok(lit)
-    } else {
-        cx.error_spanned_by(
-            lit,
-            format!(
-                "expected {} {} attribute to be an integer: `{} = \"...\"`",
-                ATTR, attr_name, meta_item_name
-            ),
-        );
-        Err(())
+/// Get expression path.
+fn parse_value_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Path> {
+    match value {
+        AttributeValue::Path(path) => Some(path),
+        _ => {
+            cx.error_span(
+                value.span(),
+                format!("#[{} = ...] should be a simple path", attr),
+            );
+            None
+        }
     }
 }
 
-fn get_lit_str<'a>(cx: &Ctxt, attr_name: Symbol, lit: &'a syn::Lit) -> Result<&'a syn::LitStr, ()> {
-    get_lit_str2(cx, attr_name, attr_name, lit)
-}
-
-fn get_lit_str2<'a>(
-    cx: &Ctxt,
-    attr_name: Symbol,
-    meta_item_name: Symbol,
-    lit: &'a syn::Lit,
-) -> Result<&'a syn::LitStr, ()> {
-    if let syn::Lit::Str(lit) = lit {
-        Ok(lit)
-    } else {
-        cx.error_spanned_by(
-            lit,
-            format!(
-                "expected musli {} attribute to be a string: `{} = \"...\"`",
-                attr_name, meta_item_name
-            ),
-        );
-        Err(())
+/// Get expression as string.
+fn parse_value_string(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::LitStr> {
+    match value {
+        AttributeValue::Expr(syn::Expr::Lit(syn::ExprLit {
+            attrs,
+            lit: syn::Lit::Str(string),
+        })) if attrs.is_empty() => Some(string),
+        expr => {
+            cx.error_span(expr.span(), format!("#[{} = ...] should be a string", attr));
+            None
+        }
     }
 }
 
-fn parse_lit_into_expr_path(
-    cx: &Ctxt,
-    attr_name: Symbol,
-    lit: &syn::Lit,
-) -> Result<syn::ExprPath, ()> {
-    let string = get_lit_str(cx, attr_name, lit)?;
-    parse_lit_str(string).map_err(|_| {
-        cx.error_spanned_by(lit, format!("failed to parse path: {:?}", string.value()));
-    })
-}
-
-fn parse_lit_str<T>(s: &syn::LitStr) -> parse::Result<T>
-where
-    T: Parse,
-{
-    let tokens = spanned_tokens(s)?;
-    syn::parse2(tokens)
-}
-
-fn spanned_tokens(s: &syn::LitStr) -> parse::Result<TokenStream> {
-    let stream = syn::parse_str(&s.value())?;
-    Ok(crate::internals::respan::respan(stream, s.span()))
+/// Get expression as a type.
+fn value_as_type(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Type> {
+    match value {
+        AttributeValue::Type(ty) => Some(ty),
+        // NB: we need to coerce paths into types since they are parsed before
+        // AttributeValue::Path.
+        AttributeValue::Path(path) => Some(syn::Type::Path(syn::TypePath { qself: None, path })),
+        expr => {
+            cx.error_span(expr.span(), format!("#[{} = ...] should be a type", attr));
+            None
+        }
+    }
 }
 
 /// Parse musli attributes.
-pub(crate) fn get_jobs_attrs(
-    cx: &Ctxt,
-    attr: &syn::Attribute,
-) -> Option<impl Iterator<Item = syn::NestedMeta>> {
+fn parse_musli_attrs(cx: &Ctxt, attr: &syn::Attribute) -> Option<Vec<Attribute>> {
     if attr.path != ATTR {
         return None;
     }
 
-    match attr.parse_meta() {
-        Ok(List(meta)) => Some(meta.nested.into_iter()),
-        Ok(other) => {
-            cx.error_spanned_by(other, "expected #[musli(...)]");
-            None
+    let attributes: Attributes = match syn::parse2(attr.tokens.clone()) {
+        Ok(attributes) => attributes,
+        Err(e) => {
+            cx.syn_error(e);
+            return None;
         }
-        Err(err) => {
-            cx.syn_error(err);
-            None
+    };
+
+    Some(attributes.attributes)
+}
+
+/// The flexible value of an attribute.
+pub enum AttributeValue {
+    /// A path.
+    Path(syn::Path),
+    /// A type.
+    Type(syn::Type),
+    /// A literal value.
+    Expr(syn::Expr),
+}
+
+impl AttributeValue {
+    /// Coerce into a literal value.
+    pub(crate) fn as_lit(&self) -> Option<syn::Lit> {
+        match self {
+            AttributeValue::Expr(syn::Expr::Lit(lit)) if lit.attrs.is_empty() => {
+                Some(lit.lit.clone())
+            }
+            _ => None,
         }
+    }
+
+    /// Coerce into an expression.
+    pub(crate) fn as_expr(&self) -> Option<syn::Expr> {
+        match self {
+            AttributeValue::Path(path) => Some(syn::Expr::Path(syn::ExprPath {
+                attrs: Vec::new(),
+                qself: None,
+                path: path.clone(),
+            })),
+            AttributeValue::Expr(expr) => Some(expr.clone()),
+            AttributeValue::Type(..) => None,
+        }
+    }
+}
+
+impl Spanned for AttributeValue {
+    fn span(&self) -> Span {
+        match self {
+            AttributeValue::Path(value) => value.span(),
+            AttributeValue::Type(value) => value.span(),
+            AttributeValue::Expr(value) => value.span(),
+        }
+    }
+}
+
+enum Attribute {
+    Path(syn::Path),
+    KeyValue(syn::Path, AttributeValue),
+}
+
+impl Spanned for Attribute {
+    fn span(&self) -> Span {
+        match self {
+            Attribute::Path(path) => path.span(),
+            Attribute::KeyValue(path, _) => path.span(),
+        }
+    }
+}
+
+struct Attributes {
+    _parens: syn::token::Paren,
+    attributes: Vec<Attribute>,
+}
+
+impl Parse for Attributes {
+    fn parse(input: parse::ParseStream) -> syn::Result<Self> {
+        let mut attributes = Vec::new();
+
+        let content;
+        let parens = syn::parenthesized!(content in input);
+
+        while !content.is_empty() {
+            let path: syn::Path = content.parse()?;
+
+            if content.parse::<Option<syn::Token![=]>>()?.is_some() {
+                if content.fork().parse::<syn::Path>().is_ok() {
+                    attributes.push(Attribute::KeyValue(
+                        path,
+                        AttributeValue::Path(content.parse()?),
+                    ));
+                } else if content.fork().parse::<syn::Type>().is_ok() {
+                    attributes.push(Attribute::KeyValue(
+                        path,
+                        AttributeValue::Type(content.parse()?),
+                    ));
+                } else {
+                    attributes.push(Attribute::KeyValue(
+                        path,
+                        AttributeValue::Expr(content.parse()?),
+                    ));
+                }
+            } else {
+                attributes.push(Attribute::Path(path));
+            }
+
+            if !content.parse::<Option<syn::Token![,]>>()?.is_some() {
+                break;
+            }
+        }
+
+        Ok(Attributes {
+            _parens: parens,
+            attributes,
+        })
     }
 }
