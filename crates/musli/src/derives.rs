@@ -115,8 +115,8 @@
 //!   decoded transparently without being treated as a field.
 //!
 //! * `#[musli(packed)]` this attribute will disable all *tagging* and the
-//!   structure will simply be serialized with one field following another in
-//!   the order in which they are defined.
+//!   structure will simply be encoded with one field following another in the
+//!   order in which they are defined.
 //!
 //!   A caveat of *packed* structures is that they cannot be safely versioned
 //!   and the two systems communicating through them need to be using strictly
@@ -176,7 +176,7 @@
 //!
 //! ## Field attributes
 //!
-//! * `#[musli(with = "...")]` specifies the path to a module to use instead of
+//! * `#[musli(with = <path>)]` specifies the path to a module to use instead of
 //!   the fields default [Encode] or [Decode] implementations.
 //!
 //!   It expects the following functions to be defined, assuming the type of the
@@ -195,9 +195,44 @@
 //!   signature:
 //!
 //!   ```rust,ignore
-//!   fn decode<'de, D>(mut decoder: D) -> Result<Field, D::Error>
+//!   fn decode<'de, D>(decoder: D) -> Result<Field, D::Error>
 //!   where
 //!       D: Decoder<'de>;
+//!   ```
+//!
+//!   ```
+//!   # mod types {
+//!   use musli::{Encode, Decode};
+//!
+//!   pub struct CustomUuid(u128);
+//!
+//!   #[derive(Encode, Decode)]
+//!   struct Struct {
+//!       #[musli(with = self::custom_uuid)]
+//!       name: CustomUuid,
+//!   }
+//!
+//!   mod custom_uuid {
+//!       use musli::en::{Encode, Encoder};
+//!       use musli::de::{Decode, Decoder};
+//!
+//!       use super::CustomUuid;
+//!
+//!       pub fn encode<E>(uuid: &CustomUuid, encoder: E) -> Result<(), E::Error>
+//!       where
+//!           E: Encoder
+//!       {
+//!           uuid.0.encode(encoder)
+//!       }
+//!
+//!       pub fn decode<'de, D>(decoder: D) -> Result<CustomUuid, D::Error>
+//!       where
+//!           D: Decoder<'de>
+//!       {
+//!           Ok(CustomUuid(u128::decode(decoder)?))
+//!       }
+//!   }
+//!   # }
 //!   ```
 //!
 //! * `#[musli(tag = ...)]` allows for renaming a field from its default value.
@@ -205,29 +240,34 @@
 //!   container or variant.
 //!
 //! * `#[musli(default)]` constructs the field using [Default::default] in case
-//!   it's not available. This is only used for decoding.
+//!   it's not available. This is only used when a field is missing during
+//!   decoding.
 //!
 //!   ```
 //!   use musli::{Encode, Decode};
 //!
 //!   #[derive(Encode, Decode)]
-//!   struct Struct {
-//!       name: String,
-//!   }
-//!
-//!   #[derive(Debug, PartialEq, Encode, Decode)]
-//!   struct StructWithOption {
+//!   struct Person {
 //!       name: String,
 //!       #[musli(default)]
 //!       age: Option<u32>,
 //!   }
-//!
-//!   # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!   # Ok(()) }
 //!   ```
 //!
-//! * `#[musli(skip_encoding_if = "...")]` adds a condition to skip encoding a
-//!   field entirely if the condition is true.
+//! * `#[musli(skip_encoding_if = <path>)]` adds a condition to skip encoding a
+//!   field entirely if the condition is true. This is very commonly used to
+//!   skip over encoding `Option<T>` fields.
+//!
+//!   ```
+//!   use musli::{Encode, Decode};
+//!
+//!   #[derive(Encode, Decode)]
+//!   struct Person {
+//!       name: String,
+//!       #[musli(skip_encoding_if = Option::is_none)]
+//!       age: Option<u32>,
+//!   }
+//!   ```
 //!
 //! [Encode]: crate::Encode
 //! [Decode]: crate::Decode

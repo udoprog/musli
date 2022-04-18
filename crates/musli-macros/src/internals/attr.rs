@@ -86,11 +86,11 @@ impl TypeAttr {
 #[derive(Default)]
 pub(crate) struct FieldAttr {
     /// Module to use when decoding.
-    pub(crate) encode_path: Option<(Span, syn::Path)>,
+    pub(crate) encode_path: Option<(Span, syn::ExprPath)>,
     /// Path to use when decoding.
-    pub(crate) decode_path: Option<(Span, syn::Path)>,
+    pub(crate) decode_path: Option<(Span, syn::ExprPath)>,
     /// Method to check if we want to skip encoding.
-    pub(crate) skip_encoding_if: Option<(Span, syn::Path)>,
+    pub(crate) skip_encoding_if: Option<(Span, syn::ExprPath)>,
     /// Rename a field to the given literal.
     pub(crate) rename: Option<(Span, syn::Expr)>,
     /// Use a default value for the field if it's not available.
@@ -157,12 +157,12 @@ impl FieldAttr {
     }
 
     /// Get skip encoding if.
-    pub(crate) fn skip_encoding_if(&self) -> Option<(Span, &syn::Path)> {
+    pub(crate) fn skip_encoding_if(&self) -> Option<(Span, &syn::ExprPath)> {
         let (span, path) = self.skip_encoding_if.as_ref()?;
         Some((*span, path))
     }
 
-    fn set_encode_path(&mut self, cx: &Ctxt, span: Span, encode_path: syn::Path) {
+    fn set_encode_path(&mut self, cx: &Ctxt, span: Span, encode_path: syn::ExprPath) {
         if self.encode_path.is_some() {
             cx.error_spanned_by(
                 encode_path,
@@ -173,7 +173,7 @@ impl FieldAttr {
         }
     }
 
-    fn set_decode_path(&mut self, cx: &Ctxt, span: Span, decode_path: syn::Path) {
+    fn set_decode_path(&mut self, cx: &Ctxt, span: Span, decode_path: syn::ExprPath) {
         if self.decode_path.is_some() {
             cx.error_spanned_by(
                 decode_path,
@@ -184,7 +184,7 @@ impl FieldAttr {
         }
     }
 
-    fn set_skip_encoding_if(&mut self, cx: &Ctxt, span: Span, skip_encoding_if: syn::Path) {
+    fn set_skip_encoding_if(&mut self, cx: &Ctxt, span: Span, skip_encoding_if: syn::ExprPath) {
         if self.skip_encoding_if.is_some() {
             cx.error_spanned_by(
                 skip_encoding_if,
@@ -279,6 +279,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
                         let mut encode_path = path.clone();
 
                         encode_path
+                            .path
                             .segments
                             .push(Ident::new("encode", Span::call_site()).into());
 
@@ -287,6 +288,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
                         let mut decode_path = path.clone();
 
                         decode_path
+                            .path
                             .segments
                             .push(Ident::new("decode", Span::call_site()).into());
 
@@ -380,7 +382,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 }
 
 /// Get expression path.
-fn value_as_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Path> {
+fn value_as_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::ExprPath> {
     match value {
         AttributeValue::Path(path) => Some(path),
         _ => {
@@ -452,7 +454,7 @@ where
 /// The flexible value of an attribute.
 pub enum AttributeValue {
     /// A path.
-    Path(syn::Path),
+    Path(syn::ExprPath),
     /// A type.
     Type(syn::Type),
     /// A literal value.
