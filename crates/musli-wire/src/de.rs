@@ -390,10 +390,12 @@ where
     type Error = R::Error;
     type Decoder<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
 
+    #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         Ok(WireDecoder::new(self.reader))
     }
 
+    #[inline]
     fn finish(self) -> Result<(), Self::Error> {
         Ok(())
     }

@@ -233,10 +233,12 @@ where
     type Error = R::Error;
     type Decoder<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
 
+    #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         Ok(StorageDecoder::new(self.reader))
     }
 
+    #[inline]
     fn finish(self) -> Result<(), Self::Error> {
         Ok(())
     }

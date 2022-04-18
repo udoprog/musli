@@ -224,10 +224,12 @@ where
     type Error = W::Error;
     type Encoder<'this> = StorageEncoder<'this, W, I, L> where Self: 'this;
 
+    #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(StorageEncoder::new(self.writer))
     }
 
+    #[inline]
     fn finish(self) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -290,10 +292,12 @@ where
     type VariantTag<'this> = StorageEncoder<'this, W, I, L> where Self: 'this;
     type VariantValue = Self;
 
+    #[inline]
     fn encode_variant_tag(&mut self) -> Result<Self::VariantTag<'_>, Self::Error> {
         Ok(StorageEncoder::new(self.writer))
     }
 
+    #[inline]
     fn encode_variant_value(self) -> Result<Self::VariantValue, Self::Error> {
         Ok(self)
     }
