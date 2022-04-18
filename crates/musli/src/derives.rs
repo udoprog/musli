@@ -68,8 +68,8 @@
 //!
 //! ## Container attributes
 //!
-//! * `#[musli(tag_type = ..)]` indicates which type the `#[musli(tag = ..)]`
-//!   attribute on fields or variants should have. Tags can be inferred, but
+//! * `#[musli(tag_type = ..)]` indicates which type any contained `#[musli(tag
+//!   = ..)]` attributes should have. Tags can usually be inferred, but
 //!   specifying this field ensures that all tags have a well-defined type.
 //!
 //!   ```
@@ -202,9 +202,18 @@
 //!
 //! ## Variant attributes
 //!
-//! * `#[musli(tag = ...)]` allows for renaming a variant from its default tag.
-//!   Its default tag is determined by `#[musli(variant)]` which defaults to
-//!   `#[musli(default_variant_tag = "index")]`.
+//! * `#[musli(tag = ..)]` allows for renaming a variant from its default value.
+//!   It can take any value (including complex ones) that can be serialized with
+//!   the current encoding, such as:
+//!
+//!   * `#[musli(tag = 1)]`
+//!   * `#[musli(tag = "Hello World")]`
+//!   * `#[musli(tag = b"box\0")]`
+//!   * `#[musli(tag = SomeStruct { field: 42 })]` (if `SomeStruct` implements
+//!     `Encode` and `Decode` as appropriate).
+//!
+//!   If the type of the tag is ambiguous it can be explicitly specified through
+//!   the `#[musli(tag_type)]` container attribute (see above).
 //!
 //! * `#[musli(default_field_tag = "..")]` determines how the default tag for a
 //!   field in the current variant is determined. This overrides the tagging
@@ -236,10 +245,12 @@
 //!   field. It will cause that field to define how that variant is encoded or
 //!   decoded transparently without being treated as a field.
 //!
-//! * `#[musli(tag_type = ..)]` indicates which type the `#[musli(tag = ..)]`
-//!   attribute on fields in the current variant should have. Tags can be
-//!   inferred, but specifying this field ensures that all tags have a
-//!   well-defined type.
+//! * `#[musli(tag_type = ..)]` indicates which type any contained `#[musli(tag
+//!   = ..)]` attributes should have. Tags can usually be inferred, but
+//!   specifying this field ensures that all tags have a well-defined type.
+//!
+//!   This attribute takes priority over the one with the same name on the
+//!   container.
 //!
 //!   ```
 //!   use musli::{Encode, Decode};
@@ -249,6 +260,7 @@
 //!   struct CustomTag<'a>(&'a [u8]);
 //!
 //!   #[derive(Encode, Decode)]
+//!   #[musli(tag_type = usize)]
 //!   enum Enum {
 //!       #[musli(tag_type = CustomTag)]
 //!       Variant {
@@ -277,10 +289,18 @@
 //!
 //! ## Field attributes
 //!
-//! * `#[musli(tag = ...)]` allows for renaming a field from its default value.
-//!   Its default tag value is the offset of the field as its declared in its
-//!   container or variant (default or `#[musli(default_field_tag = "index")]`) or the name
-//!   of the field if `#[musli(default_field_tag = "name")]` is used.
+//! * `#[musli(tag = ..)]` allows for renaming a field from its default value.
+//!   It can take any value (including complex ones) that can be serialized with
+//!   the current encoding, such as:
+//!
+//!   * `#[musli(tag = 1)]`
+//!   * `#[musli(tag = "Hello World")]`
+//!   * `#[musli(tag = b"box\0")]`
+//!   * `#[musli(tag = SomeStruct { field: 42 })]` (if `SomeStruct` implements
+//!     `Encode` and `Decode` as appropriate).
+//!
+//!   If the type of the tag is ambiguous it can be explicitly specified through
+//!   the `#[musli(tag_type)]` variant or container attributes (see above).
 //!
 //! * `#[musli(with = <path>)]` specifies the path to a module to use instead of
 //!   the fields default [Encode] or [Decode] implementations.
