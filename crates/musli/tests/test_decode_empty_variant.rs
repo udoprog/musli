@@ -1,7 +1,7 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(variant = "name")]
+#[musli(default_variant_tag = "name")]
 enum EnumEmptyVariant {
     #[musli(tag = "Other")]
     Something {},

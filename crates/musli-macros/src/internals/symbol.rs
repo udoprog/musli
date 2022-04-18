@@ -6,8 +6,8 @@ pub struct Symbol(&'static str);
 
 pub const ATTR: Symbol = Symbol("musli");
 pub const WITH: Symbol = Symbol("with");
-pub const FIELD: Symbol = Symbol("field");
-pub const VARIANT: Symbol = Symbol("variant");
+pub const DEFAULT_FIELD_TAG: Symbol = Symbol("default_field_tag");
+pub const DEFAULT_VARIANT_TAG: Symbol = Symbol("default_variant_tag");
 pub const TAG: Symbol = Symbol("tag");
 pub const DEFAULT: Symbol = Symbol("default");
 pub const SKIP_ENCODING_IF: Symbol = Symbol("skip_encoding_if");

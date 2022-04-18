@@ -11,12 +11,12 @@ use syn::Ident;
 
 /// The kind of tag to use.
 #[derive(Debug, Clone, Copy)]
-pub enum Tag {
+pub enum DefaultTag {
     Index,
     Name,
 }
 
-impl Default for Tag {
+impl Default for DefaultTag {
     fn default() -> Self {
         Self::Index
     }
@@ -50,10 +50,10 @@ impl Default for Packing {
 pub(crate) struct TypeAttr {
     /// `#[musli(tag_type)]`.
     pub(crate) tag_type: Option<(Span, syn::Type)>,
-    /// `#[musli(variant_tag)]`.
-    pub(crate) variant_tag: Tag,
-    /// `#[musli(field_tag)]`.
-    pub(crate) field_tag: Tag,
+    /// `#[musli(default_variant_tag = "..")]`.
+    pub(crate) default_variant_tag: DefaultTag,
+    /// `#[musli(default_field_tag = "..")]`.
+    pub(crate) default_field_tag: DefaultTag,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
     pub(crate) packing: Option<(Span, Packing)>,
 }
@@ -107,6 +107,8 @@ pub(crate) struct VariantAttr {
     pub(crate) packing: Option<(Span, Packing)>,
     /// `#[musli(default)]`.
     pub(crate) default: Option<Span>,
+    /// `#[musli(default_field_tag = "..")]`.
+    pub(crate) default_field_tag: Option<DefaultTag>,
 }
 
 impl VariantAttr {
@@ -214,12 +216,12 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                         attr.tag_type = Some((path.span(), ty));
                     }
                 }
-                // parse #[musli(variant_tag = "..")]
-                Attribute::KeyValue(path, expr) if path == VARIANT => {
-                    if let Some(tag) = parse_value_string(cx, VARIANT, expr) {
-                        attr.variant_tag = match tag.value().as_str() {
-                            "index" => Tag::Index,
-                            "name" => Tag::Name,
+                // parse #[musli(default_variant_tag = "..")]
+                Attribute::KeyValue(path, expr) if path == DEFAULT_VARIANT_TAG => {
+                    if let Some(tag) = parse_value_string(cx, DEFAULT_VARIANT_TAG, expr) {
+                        attr.default_variant_tag = match tag.value().as_str() {
+                            "index" => DefaultTag::Index,
+                            "name" => DefaultTag::Name,
                             _ => {
                                 cx.error_spanned_by(
                                     tag,
@@ -230,12 +232,12 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                         };
                     }
                 }
-                // parse #[musli(field_tag = "..")]
-                Attribute::KeyValue(path, expr) if path == FIELD => {
-                    if let Some(tag) = parse_value_string(cx, FIELD, expr) {
-                        attr.field_tag = match tag.value().as_str() {
-                            "index" => Tag::Index,
-                            "name" => Tag::Name,
+                // parse #[musli(default_field_tag = "..")]
+                Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_TAG => {
+                    if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_TAG, expr) {
+                        attr.default_field_tag = match tag.value().as_str() {
+                            "index" => DefaultTag::Index,
+                            "name" => DefaultTag::Name,
                             _ => {
                                 cx.error_spanned_by(
                                     tag,
@@ -363,6 +365,22 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                         } else {
                             attr.rename = Some((span, expr));
                         }
+                    }
+                }
+                // parse #[musli(default_field_tag = "..")]
+                Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_TAG => {
+                    if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_TAG, expr) {
+                        attr.default_field_tag = Some(match tag.value().as_str() {
+                            "index" => DefaultTag::Index,
+                            "name" => DefaultTag::Name,
+                            _ => {
+                                cx.error_spanned_by(
+                                    tag,
+                                    format!("illegal #[{}({})] value", ATTR, TAG),
+                                );
+                                continue;
+                            }
+                        });
                     }
                 }
                 // parse #[musli(transparent)]
@@ -513,10 +531,10 @@ impl Parse for TypeAttributes {
                 let value = match &path {
                     // parse #[musli(tag_type = <type>)]
                     path if path == TAG_TYPE => AttributeValue::Type(content.parse()?),
-                    // parse #[musli(variant = "..")]
-                    path if path == VARIANT => AttributeValue::Lit(content.parse()?),
-                    // parse #[musli(field_tag = "..")]
-                    path if path == FIELD => AttributeValue::Lit(content.parse()?),
+                    // parse #[musli(default_variant_tag = "..")]
+                    path if path == DEFAULT_VARIANT_TAG => AttributeValue::Lit(content.parse()?),
+                    // parse #[musli(default_field_tag = "..")]
+                    path if path == DEFAULT_FIELD_TAG => AttributeValue::Lit(content.parse()?),
                     path => {
                         return Err(syn::Error::new(path.span(), "unsupported attribute"));
                     }
@@ -560,6 +578,8 @@ impl Parse for VariantAttributes {
                     path if path == TAG_TYPE => AttributeValue::Type(content.parse()?),
                     // parse #[musli(tag = <expr>)]
                     path if path == TAG => AttributeValue::Expr(content.parse()?),
+                    // parse #[musli(default_field_tag = <expr>)]
+                    path if path == DEFAULT_FIELD_TAG => AttributeValue::Lit(content.parse()?),
                     path => {
                         return Err(syn::Error::new(path.span(), "unsupported attribute"));
                     }

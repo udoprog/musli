@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
-use crate::internals::attr::{self, FieldAttr, Packing, Tag, TypeAttr};
+use crate::internals::attr::{self, DefaultTag, FieldAttr, Packing, TypeAttr};
 use crate::internals::symbol::*;
 use crate::internals::{Ctxt, Needs, NeedsKind};
 
@@ -283,7 +283,15 @@ impl<'a> Expander<'a> {
                 }
             };
 
-            let (encoder, skip) = self.encode_field(index, field, &field_attr, &access, packing)?;
+            let (encoder, skip) = self.encode_field(
+                index,
+                field,
+                &field_attr,
+                &access,
+                packing,
+                self.type_attr.default_field_tag,
+            )?;
+
             encoders.push(encoder);
 
             if let Some((decl, test)) = skip {
@@ -449,7 +457,14 @@ impl<'a> Expander<'a> {
         let body = match self.type_attr.packing() {
             Packing::Tagged => {
                 needs.mark_used();
-                self.decode_tagged(&self.type_name, tag_type, path, &data.fields, None)?
+                self.decode_tagged(
+                    &self.type_name,
+                    tag_type,
+                    path,
+                    &data.fields,
+                    None,
+                    self.type_attr.default_field_tag,
+                )?
             }
             Packing::Packed => self.decode_untagged(path, &data.fields, needs)?,
             Packing::Transparent => self.decode_transparent(span, path, &data.fields, needs)?,
@@ -536,6 +551,10 @@ impl<'a> Expander<'a> {
 
             let tag_type = variant_attr.tag_type.as_ref();
 
+            let default_field_tag = variant_attr
+                .default_field_tag
+                .unwrap_or(self.type_attr.default_field_tag);
+
             let output = match variant_attr.packing().unwrap_or(type_packing) {
                 Packing::Tagged => self.decode_tagged(
                     &variant_name,
@@ -543,6 +562,7 @@ impl<'a> Expander<'a> {
                     path,
                     &variant.fields,
                     Some(&variant_tag),
+                    default_field_tag,
                 )?,
                 Packing::Packed => self.decode_untagged(path, &variant.fields, needs)?,
                 Packing::Transparent => {
@@ -552,7 +572,7 @@ impl<'a> Expander<'a> {
 
             let tag = self.expand_variant_tag(
                 variant_attr.rename.as_ref(),
-                self.type_attr.variant_tag,
+                self.type_attr.default_variant_tag,
                 variant_index,
                 &variant.ident,
             );
@@ -669,10 +689,14 @@ impl<'a> Expander<'a> {
             .packing()
             .unwrap_or_else(|| self.type_attr.packing());
 
+        let default_field_tag = variant_attr
+            .default_field_tag
+            .unwrap_or(self.type_attr.default_field_tag);
+
         let (mut encode, patterns) = match packing {
             Packing::Tagged => {
                 let (encode, patterns, tests) =
-                    self.encode_variant_fields(&variant.fields, needs, packing)?;
+                    self.encode_variant_fields(&variant.fields, needs, packing, default_field_tag)?;
 
                 // Special stuff needed to encode the field if its tagged.
                 let (setup, finish) = self.encode_field_tag(&variant.fields, &tests)?;
@@ -687,7 +711,7 @@ impl<'a> Expander<'a> {
             }
             Packing::Packed => {
                 let (encode, patterns, _) =
-                    self.encode_variant_fields(&variant.fields, needs, packing)?;
+                    self.encode_variant_fields(&variant.fields, needs, packing, default_field_tag)?;
                 (encode, patterns)
             }
             Packing::Transparent => self.transparent_variant(span, &variant.fields, needs)?,
@@ -705,7 +729,7 @@ impl<'a> Expander<'a> {
 
             let tag = self.expand_variant_tag(
                 variant_attr.rename.as_ref(),
-                self.type_attr.variant_tag,
+                self.type_attr.default_variant_tag,
                 variant_index,
                 &variant.ident,
             );
@@ -732,6 +756,7 @@ impl<'a> Expander<'a> {
         fields: &syn::Fields,
         needs: &mut Needs,
         tagged: Packing,
+        default_field_tag: DefaultTag,
     ) -> Option<(TokenStream, Vec<TokenStream>, Vec<syn::Ident>)> {
         let mut decls = Vec::with_capacity(fields.len());
         let mut encoders = Vec::with_capacity(fields.len());
@@ -756,7 +781,14 @@ impl<'a> Expander<'a> {
                 }
             };
 
-            let (encoder, skip) = self.encode_field(index, field, &field_attr, &access, tagged)?;
+            let (encoder, skip) = self.encode_field(
+                index,
+                field,
+                &field_attr,
+                &access,
+                tagged,
+                default_field_tag,
+            )?;
             encoders.push(encoder);
 
             if let Some((decl, test)) = skip {
@@ -798,6 +830,7 @@ impl<'a> Expander<'a> {
         field_attr: &FieldAttr,
         access: &TokenStream,
         tagged: Packing,
+        default_field_tag: DefaultTag,
     ) -> Option<(TokenStream, Option<(TokenStream, syn::Ident)>)> {
         let encoder_var = &self.tokens.encoder_var;
         let encode_t = &self.tokens.encode_t;
@@ -808,7 +841,7 @@ impl<'a> Expander<'a> {
             Packing::Tagged | Packing::Transparent => {
                 let tag = self.expand_field_tag(
                     field_attr.rename.as_ref(),
-                    self.type_attr.field_tag,
+                    default_field_tag,
                     index,
                     field,
                 )?;
@@ -863,6 +896,7 @@ impl<'a> Expander<'a> {
         path: syn::Path,
         fields: &syn::Fields,
         variant_tag: Option<&syn::Ident>,
+        default_field_tag: DefaultTag,
     ) -> Option<TokenStream> {
         let decode_t = &self.tokens.decode_t;
         let decoder_t = &self.tokens.decoder_t;
@@ -888,12 +922,8 @@ impl<'a> Expander<'a> {
         for (index, field) in fields.enumerate() {
             let field_attr = attr::field_attrs(&self.cx, &field.attrs);
 
-            let tag = self.expand_field_tag(
-                field_attr.rename.as_ref(),
-                self.type_attr.field_tag,
-                index,
-                field,
-            )?;
+            let tag =
+                self.expand_field_tag(field_attr.rename.as_ref(), default_field_tag, index, field)?;
 
             let (span, decode_path) = field_attr.decode_path(decode_t, field.span());
             let var = syn::Ident::new(&format!("v{}", index), span);
@@ -1070,14 +1100,14 @@ impl<'a> Expander<'a> {
     fn expand_variant_tag(
         &self,
         rename: Option<&(Span, syn::Expr)>,
-        tag: Tag,
+        tag: DefaultTag,
         index: usize,
         ident: &syn::Ident,
     ) -> Option<syn::Expr> {
         let lit = match (rename, tag) {
             (Some((_, value)), _) => return Some(self.rename_lit(value)),
-            (None, Tag::Index) => usize_int(index, ident.span()).into(),
-            (None, Tag::Name) => syn::LitStr::new(&ident.to_string(), ident.span()).into(),
+            (None, DefaultTag::Index) => usize_int(index, ident.span()).into(),
+            (None, DefaultTag::Name) => syn::LitStr::new(&ident.to_string(), ident.span()).into(),
         };
 
         Some(syn::Expr::Lit(syn::ExprLit {
@@ -1090,14 +1120,14 @@ impl<'a> Expander<'a> {
     fn expand_field_tag(
         &self,
         rename: Option<&(Span, syn::Expr)>,
-        tag: Tag,
+        default_field_tag: DefaultTag,
         index: usize,
         field: &syn::Field,
     ) -> Option<syn::Expr> {
-        let lit = match (rename, tag, &field.ident) {
+        let lit = match (rename, default_field_tag, &field.ident) {
             (Some((_, rename)), _, _) => return Some(self.rename_lit(rename)),
-            (None, Tag::Index, _) => usize_int(index, field.span()).into(),
-            (None, Tag::Name, None) => {
+            (None, DefaultTag::Index, _) => usize_int(index, field.span()).into(),
+            (None, DefaultTag::Name, None) => {
                 self.cx.error_spanned_by(
                     field,
                     format!(
@@ -1107,7 +1137,7 @@ impl<'a> Expander<'a> {
                 );
                 return None;
             }
-            (None, Tag::Name, Some(ident)) => {
+            (None, DefaultTag::Name, Some(ident)) => {
                 syn::LitStr::new(&ident.to_string(), ident.span()).into()
             }
         };

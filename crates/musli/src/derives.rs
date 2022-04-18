@@ -7,8 +7,8 @@
 //! detailed below.
 //!
 //! * *Container attributes* are attributes which apply to the `struct` or
-//!   `enum`. Like the uses of `#[musli(packed)]` and `#[musli(variant =
-//!   "name")]` here:
+//!   `enum`. Like the uses of `#[musli(packed)]` and
+//!   `#[musli(default_variant_tag = "name")]` here:
 //!
 //!   ```
 //!   use musli::{Encode, Decode};
@@ -20,7 +20,7 @@
 //!   }
 //!
 //!   #[derive(Encode, Decode)]
-//!   #[musli(variant = "name")]
+//!   #[musli(default_variant_tag = "name")]
 //!   enum Enum {
 //!       /* the body of the struct */
 //!   }
@@ -33,7 +33,7 @@
 //!   use musli::{Encode, Decode};
 //!
 //!   #[derive(Encode, Decode)]
-//!   #[musli(variant = "name")]
+//!   #[musli(default_variant_tag = "name")]
 //!   enum Enum {
 //!       #[musli(tag = "Other")]
 //!       Something {
@@ -50,14 +50,14 @@
 //!   use musli::{Encode, Decode};
 //!
 //!   #[derive(Encode, Decode)]
-//!   #[musli(field = "name")]
+//!   #[musli(default_field_tag = "name")]
 //!   struct Struct {
 //!       #[musli(tag = "other")]
 //!       something: String,
 //!   }
 //!
 //!   #[derive(Encode, Decode)]
-//!   #[musli(field = "name")]
+//!   #[musli(default_field_tag = "name")]
 //!   enum Enum {
 //!       Variant {
 //!           #[musli(tag = "other")]
@@ -96,23 +96,75 @@
 //!   }
 //!   ```
 //!
-//! * `#[musli(field = "...")]` decides which form of field tag is used for
-//!   `#[musli(tagged)]` containers. It can take either `"name"` or `"index"`.
-//!   For `"name"` the field name encoded as a string will be used. For
-//!   `"index"` its relative index in the struct or tuple
+//! * `#[musli(default_field_tag = "..")]` determines how the default tag for a
+//!   field is determined. It can take either `"name"` or `"index"`.
 //!
-//!   The default value is `#[musli(field = "index")]`.
+//!   `#[musli(default_field_tag = "index")]` will use the index of the field.
+//!   This is the default.
 //!
-//! * `#[musli(variant = "...")]` decides which form of variant tag is used for
-//!   `#[musli(tagged)]` containers. It can take either `"name"` or `"index"`.
-//!   For `"name"` the variant name encoded as a string will be used. For
-//!   `"index"` its relative index in the struct or tuple.
+//!   `#[musli(default_field_tag = "name")]` will use the name of the field.
 //!
-//!   The default value is `#[musli(variant = "index")]`.
+//!   ```
+//!   use musli::{Encode, Decode};
+//!
+//!   #[derive(Encode, Decode)]
+//!   #[musli(default_field_tag = "name")]
+//!   struct Struct {
+//!       field1: u32,
+//!       field2: u32,
+//!   }
+//!
+//!   #[derive(Encode, Decode)]
+//!   #[musli(default_field_tag = "name")]
+//!   enum Enum {
+//!       Variant1 {
+//!           field1: u32,
+//!       },
+//!       Variant2 {
+//!           field1: u32,
+//!       },
+//!   }
+//!   ```
+//!
+//! * `#[musli(default_variant_tag = "..")]` determines how the default tag for
+//!   a variant is determined. It can take either `"name"` or `"index"`.
+//!
+//!   `#[musli(default_variant_tag = "index")]` will use the index of the
+//!   variant. This is the default.
+//!
+//!   `#[musli(default_variant_tag = "name")]` will use the name of the variant.
+//!
+//!   ```
+//!   use musli::{Encode, Decode};
+//!
+//!   #[derive(Encode, Decode)]
+//!   #[musli(default_variant_tag = "name")]
+//!   enum Enum {
+//!       Variant1 {
+//!           field1: u32,
+//!       },
+//!       Variant2 {
+//!           field1: u32,
+//!       },
+//!   }
+//!   ```
 //!
 //! * `#[musli(transparent)]` can only be used on types which have a single
 //!   field. It will cause that field to define how that variant is encoded or
 //!   decoded transparently without being treated as a field.
+//!
+//!   ```
+//!   use musli::{Encode, Decode};
+//!
+//!   #[derive(Encode)]
+//!   #[musli(transparent)]
+//!   struct Struct(u32);
+//!
+//!   # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!   let data = musli_wire::to_vec(&Struct(42))?;
+//!   assert_eq!(data, vec![musli_wire::types::TypeTag::Continuation as u8, 42]);
+//!   # Ok(()) }
+//!   ```
 //!
 //! * `#[musli(packed)]` this attribute will disable all *tagging* and the
 //!   structure will simply be encoded with one field following another in the
@@ -122,31 +174,67 @@
 //!   and the two systems communicating through them need to be using strictly
 //!   synchronized representations.
 //!
-//!   This attribute is useful for performing simple decoding over "raw" bytes.
+//!   This attribute is useful for performing simple decoding over "raw" bytes
+//!   when combined with an encoder which does minimal prefixing and packs
+//!   fields.
 //!
-//! ```
-//! use musli::{Encode, Decode};
+//!   ```
+//!   use musli::{Encode, Decode};
 //!
-//! #[derive(Encode, Decode)]
-//! struct Struct {
-//!     elements: Vec<u32>,
-//! }
+//!   #[derive(Encode)]
+//!   #[musli(packed)]
+//!   struct Struct {
+//!       field1: u32,
+//!       field2: u32,
+//!       field3: u32,
+//!   }
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let st = Struct {
-//!     elements: vec![100, 523],
-//! };
+//!   # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!   let data = musli_storage::to_vec(&Struct {
+//!       field1: 1,
+//!       field2: 2,
+//!       field3: 3,
+//!   })?;
 //!
-//! let mut out = Vec::new();
-//! musli_wire::encode(&mut out, &st)?;
-//! # Ok(()) }
-//! ```
+//!   assert_eq!(data, vec![1, 2, 3]);
+//!   # Ok(()) }
+//!   ```
 //!
 //! ## Variant attributes
 //!
-//! * `#[musli(tag = ...)]` allows for renaming a variant from its default
-//!   tag. Its default tag value is the offset of the variant as its declared
-//!   in its container enum.
+//! * `#[musli(tag = ...)]` allows for renaming a variant from its default tag.
+//!   Its default tag is determined by `#[musli(variant)]` which defaults to
+//!   `#[musli(default_variant_tag = "index")]`.
+//!
+//! * `#[musli(default_field_tag = "..")]` determines how the default tag for a
+//!   field in the current variant is determined. This overrides the tagging
+//!   convention specified on the *container* and can take either `"name"` or
+//!   `"index"`.
+//!
+//!   `#[musli(default_field_tag = "index")]` will use the index of the field.
+//!   This is the default.
+//!
+//!   `#[musli(default_field_tag = "name")]` will use the name of the field.
+//!
+//!   ```
+//!   use musli::{Encode, Decode};
+//!
+//!   #[derive(Encode, Decode)]
+//!   #[musli(default_field_tag = "index")]
+//!   enum Enum {
+//!       #[musli(default_field_tag = "name")]
+//!       Variant {
+//!           field1: u32,
+//!       },
+//!       Variant2 {
+//!           field1: u32,
+//!       },
+//!   }
+//!   ```
+//!
+//! * `#[musli(transparent)]` can only be used on variants which have a single
+//!   field. It will cause that field to define how that variant is encoded or
+//!   decoded transparently without being treated as a field.
 //!
 //! * `#[musli(tag_type = ..)]` indicates which type the `#[musli(tag = ..)]`
 //!   attribute on fields in the current variant should have. Tags can be
@@ -170,10 +258,6 @@
 //!   }
 //!   ```
 //!
-//! * `#[musli(transparent)]` can only be used on variants which have a single
-//!   field. It will cause that field to define how that variant is encoded or
-//!   decoded transparently without being treated as a field.
-//!
 //! * `#[musli(default)]` defines the variant that will be used in case no other
 //!   variant matches. Only one such variant can be defined.
 //!
@@ -195,8 +279,8 @@
 //!
 //! * `#[musli(tag = ...)]` allows for renaming a field from its default value.
 //!   Its default tag value is the offset of the field as its declared in its
-//!   container or variant (default or `#[musli(field = "index")]`) or the name
-//!   of the field if `#[musli(field = "name")]` is used.
+//!   container or variant (default or `#[musli(default_field_tag = "index")]`) or the name
+//!   of the field if `#[musli(default_field_tag = "name")]` is used.
 //!
 //! * `#[musli(with = <path>)]` specifies the path to a module to use instead of
 //!   the fields default [Encode] or [Decode] implementations.

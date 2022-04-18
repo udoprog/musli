@@ -3,14 +3,14 @@ use musli_wire::test::Typed;
 use musli_wire::types::TypeTag;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(field = "name")]
+#[musli(default_field_tag = "name")]
 pub struct Named {
     string: String,
     number: u32,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(field = "index")]
+#[musli(default_field_tag = "index")]
 pub struct Indexed {
     string: String,
     number: u32,
