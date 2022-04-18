@@ -1,12 +1,5 @@
-//! Type that implements a very simple encoding which utilizes length-prefixed
-//! records where appropriate.
-//!
-//! The simple encoding format uses the following principle:
-//! * Anything with variable length is *length prefixed*. The length is encoded
-//!   using a [variable-length encoder][crate::int::continuation].
-//! * A struct / tuple / variant is length-prefixed with the number of elements
-//!   it contains.
-//! * Each tagged record is prefixed with the tag of the record.
+//! Module that defines [StorageEncoding] whith allows for customization of the
+//! encoding format, and the [DEFAULT] encoding configuration.
 
 use core::marker;
 #[cfg(feature = "std")]
@@ -24,13 +17,19 @@ use musli_binary_common::reader::Reader;
 use musli_binary_common::writer::VecWriterError;
 use musli_binary_common::writer::Writer;
 
-/// Default encoding to use.
-const DEFAULT: StorageEncoding<Variable, Variable> = StorageEncoding::new();
-
-/// Encode the given value to the given [Writer] using [StorageEncoder] with default
-/// settings as defined by [StorageEncoding::new].
+/// The default configuration.
 ///
-/// The default configuration uses [Variable] integer encoding.
+/// Uses variable-encoded numerical fields and variable-encoded prefix lengths.
+///
+/// The variable length encoding uses [zigzag] with [continuation] encoding for
+/// numbers.
+///
+/// [zigzag]: musli_binary_common::int::zigzag
+/// [continuation]: musli_binary_common::int::continuation
+pub const DEFAULT: StorageEncoding<Variable, Variable> = StorageEncoding::new();
+
+/// Encode the given value to the given [Writer] using the [DEFAULT]
+/// configuration.
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
 where
     W: Writer,
@@ -39,8 +38,8 @@ where
     DEFAULT.encode(writer, value)
 }
 
-/// Encode the given value to the given [Write][std::io::Write] using
-/// [StorageEncoder] with default settings as defined by [StorageEncoding::new].
+/// Encode the given value to the given [Write][io::Write] using the [DEFAULT]
+/// configuration.
 #[cfg(feature = "std")]
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), io::Error>
 where
@@ -50,8 +49,7 @@ where
     DEFAULT.to_writer(writer, value)
 }
 
-/// Encode the given value to a [Vec] using [StorageEncoder] with default
-/// settings as defined by [StorageEncoding::new].
+/// Encode the given value to a [Vec] using the [DEFAULT] configuration.
 #[cfg(feature = "std")]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, VecWriterError>
 where
@@ -60,8 +58,8 @@ where
     DEFAULT.to_vec(value)
 }
 
-/// Encode the given value to a fixed-size byte storage using [StorageEncoder]
-/// with default settings as defined by [StorageEncoding::new].
+/// Encode the given value to a fixed-size bytes using the [DEFAULT]
+/// configuration.
 pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, FixedBytesWriterError>
 where
     T: ?Sized + Encode,
@@ -69,8 +67,8 @@ where
     DEFAULT.to_fixed_bytes::<N, _>(value)
 }
 
-/// Decode the given type from the given `reader` using [StorageEncoder] with
-/// default settings as defined by [StorageEncoding::new].
+/// Decode the given type `T` from the given [Reader] using the [DEFAULT]
+/// configuration.
 pub fn decode<'de, R, T>(reader: R) -> Result<T, R::Error>
 where
     R: Reader<'de>,
@@ -193,8 +191,8 @@ where
         }
     }
 
-    /// Encode the given value to the given [Writer] using [StorageEncoder] with
-    /// the current settings.
+    /// Encode the given value to the given [Writer] using the current
+    /// configuration.
     pub fn encode<W, T>(self, mut writer: W, value: &T) -> Result<(), W::Error>
     where
         W: Writer,
@@ -203,8 +201,8 @@ where
         T::encode(value, StorageEncoder::<_, I, L>::new(&mut writer))
     }
 
-    /// Encode the given value to the given [Write][io::Write] using
-    /// [StorageEncoder] with the current settings.
+    /// Encode the given value to the given [Write][io::Write] using the current
+    /// configuration.
     #[cfg(feature = "std")]
     pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
     where
@@ -215,8 +213,7 @@ where
         T::encode(value, StorageEncoder::<_, I, L>::new(&mut writer))
     }
 
-    /// Encode the given value to a [Vec] using [StorageEncoder] with the current
-    /// settings.
+    /// Encode the given value to a [Vec] using the current configuration.
     #[cfg(feature = "std")]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, VecWriterError>
     where
@@ -227,7 +224,8 @@ where
         Ok(data)
     }
 
-    /// Encode the given value to a fixed-size bytes storage.
+    /// Encode the given value to a fixed-size bytes using the current
+    /// configuration.
     pub fn to_fixed_bytes<const N: usize, T>(
         self,
         value: &T,
@@ -240,8 +238,8 @@ where
         Ok(bytes)
     }
 
-    /// Decode the given type from the given `reader` using [StorageEncoder] with the
-    /// current settings.
+    /// Decode the given type `T` from the given [Reader] using the current
+    /// configuration.
     pub fn decode<'de, R, T>(self, mut reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,

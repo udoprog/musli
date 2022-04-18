@@ -47,8 +47,8 @@
 //!
 //! # Configuring
 //!
-//! To configure the behavior of the [simple] format you can use the
-//! [WireEncoding] type:
+//! To configure the behavior of the wire format you can use the [WireEncoding]
+//! type:
 //!
 //! ```rust
 //! use musli_wire::WireEncoding;
@@ -96,7 +96,7 @@
 
 mod de;
 mod en;
-mod encoding;
+pub mod encoding;
 mod integer_encoding;
 #[cfg(feature = "test")]
 pub mod test;

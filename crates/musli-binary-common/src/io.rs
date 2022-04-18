@@ -11,8 +11,8 @@ pub struct Wrap<T> {
 
 /// Wrap a type so that it implements [Reader] or [Writer] as appropriate.
 ///
-/// [Reader]: crate::Reader
-/// [Writer]: crate::Writer
+/// [Reader]: crate::reader::Reader
+/// [Writer]: crate::writer::Writer
 pub fn wrap<T>(inner: T) -> Wrap<T> {
     Wrap { inner }
 }

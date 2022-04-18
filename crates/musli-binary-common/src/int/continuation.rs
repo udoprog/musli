@@ -1,5 +1,19 @@
 //! A variable-length 7-bit encoder where each bit indicates if there is a
 //! continuation of the sequence or not.
+//!
+//! ```
+//! use musli_binary_common::int::continuation as c;
+//! use musli_binary_common::fixed_bytes::FixedBytes;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut bytes = FixedBytes::<8>::new();
+//! c::encode(&mut bytes, 5000u32)?;
+//! assert_eq!(bytes.as_bytes(), &[0b1000_1000, 0b0010_0111]);
+//!
+//! let number: u32 = c::decode(bytes.as_bytes())?;
+//! assert_eq!(number, 5000u32);
+//! # Ok(()) }
+//! ```
 
 #![allow(unused)]
 

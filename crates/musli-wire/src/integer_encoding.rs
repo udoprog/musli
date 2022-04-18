@@ -74,8 +74,8 @@ pub trait UsizeEncoding {
         R: Reader<'de>;
 }
 
-/// [IntegerEncoding] and [LengthEncoding] implementation which encodes integers
-/// using zigzag variable length encoding.
+/// Type that indicates that the given numerical type should use variable-length
+/// encoding.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[non_exhaustive]
 pub enum Variable {}
@@ -230,11 +230,15 @@ where
     }
 }
 
-/// A fixed-length [LengthEncoding] which encodes something to a little-endian
-/// encoding.
+/// A fixed-length encoding which encodes numbers to the width of `L` and the
+/// endianness of `B`.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
-pub struct FixedLength<L = u32, B = NetworkEndian> {
+pub struct FixedLength<L = u32, B = NetworkEndian>
+where
+    L: Unsigned,
+    B: ByteOrder,
+{
     _marker: marker::PhantomData<(L, B)>,
 }
 

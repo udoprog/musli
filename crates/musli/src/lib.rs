@@ -152,16 +152,16 @@
 //! # Ok(()) }
 //! ```
 //!
-//! [serde]: https://serde.rs
-//! [GATs]: https://github.com/rust-lang/rust/issues/44265
-//! [protobuf]: https://developers.google.com/protocol-buffers
 //! [bincode]: https://docs.rs/bincode
 //! [Decode]: Decode
 //! [derives]: derives
 //! [Encode]: Encode
+//! [GATs]: https://github.com/rust-lang/rust/issues/44265
 //! [json-serde-value]: https://docs.rs/serde_json/latest/serde_json/enum.Value.html
 //! [musli-storage]: https://docs.rs/musli-storage
-//! [musli-wire]: https://docs.rs/musli-storage
+//! [musli-wire]: https://docs.rs/musli-wire
+//! [protobuf]: https://developers.google.com/protocol-buffers
+//! [serde]: https://serde.rs
 
 #![feature(generic_associated_types)]
 #![deny(missing_docs)]

@@ -10,9 +10,17 @@ use musli_binary_common::reader::Reader;
 use musli_binary_common::writer::Writer;
 
 mod private {
+    use musli_binary_common::int::{ByteOrder, Unsigned};
+
     pub trait Sealed {}
-    impl<B> Sealed for super::Fixed<B> {}
+    impl<B> Sealed for super::Fixed<B> where B: ByteOrder {}
     impl Sealed for super::Variable {}
+    impl<L, B> Sealed for super::FixedLength<L, B>
+    where
+        L: Unsigned,
+        B: ByteOrder,
+    {
+    }
 }
 
 /// Trait which governs how integers are encoded in a binary format.
@@ -50,7 +58,7 @@ pub trait IntegerEncoding:
 
 /// Encoding formats which ensure that variably sized types (like `usize`,
 /// `isize`) are encoded in a format which is platform-neutral.
-pub trait UsizeEncoding {
+pub trait UsizeEncoding: private::Sealed {
     /// Governs how usize lengths are encoded into a [Writer].
     fn encode_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
     where
@@ -72,12 +80,14 @@ pub trait UsizeEncoding {
         R: Reader<'de>;
 }
 
-/// [IntegerEncoding] and [UsizeEncoding] implementation which encodes integers
-/// using zigzag variable length encoding.
+/// Type that indicates that the given numerical type should use variable-length
+/// encoding.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[non_exhaustive]
 pub enum Variable {}
 
+/// [IntegerEncoding] and [UsizeEncoding] implementation which encodes integers
+/// using zigzag variable length encoding.
 impl IntegerEncoding for Variable {
     #[inline]
     fn encode_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
@@ -152,11 +162,14 @@ impl UsizeEncoding for Variable {
     }
 }
 
-/// A fixed-length integer encoding which encodes something to a little-endian
-/// encoding.
+/// A fixed-length integer encoding which encodes something to the specified
+/// endianness `B`.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[non_exhaustive]
-pub struct Fixed<B = NetworkEndian> {
+pub struct Fixed<B = NetworkEndian>
+where
+    B: ByteOrder,
+{
     _marker: marker::PhantomData<B>,
 }
 
@@ -203,11 +216,14 @@ where
     }
 }
 
-/// A fixed-length [UsizeEncoding] which encodes something to a little-endian
-/// encoding.
+/// A fixed-length number encoding used for encoding lengths with the width `L`.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
-pub struct FixedLength<L = u32, B = NetworkEndian> {
+pub struct FixedLength<L = u32, B = NetworkEndian>
+where
+    L: Unsigned,
+    B: ByteOrder,
+{
     _marker: marker::PhantomData<(L, B)>,
 }
 

@@ -55,8 +55,8 @@
 //!
 //! # Configuring
 //!
-//! To tweak the behavior of the wire format you can use the [StorageEncoding]
-//! type:
+//! To tweak the behavior of the storage format you can use the
+//! [StorageEncoding] type:
 //!
 //! ```rust
 //! use musli_storage::StorageEncoding;
@@ -87,8 +87,9 @@
 //! # Ok(()) }
 //! ```
 //!
-//! [Müsli]: https://docs.rs/musli
 //! [default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
+//! [musli-wire]: https://docs.rs/musli-wire
+//! [Müsli]: https://docs.rs/musli
 //! [StorageEncoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
 
 #![feature(generic_associated_types)]
@@ -97,7 +98,7 @@
 
 mod de;
 mod en;
-mod encoding;
+pub mod encoding;
 mod integer_encoding;
 #[cfg(feature = "test")]
 pub mod test;
