@@ -31,11 +31,11 @@
 //! <br>
 //!
 //! ## Design
-//! 
+//!
 //! Müsli is designed with similar principles as [serde]. Relying on Rust's
 //! powerful trait system to generate code which can largely be optimized away.
 //! The end result should be very similar to a handwritten encoding.
-//! 
+//!
 //! The heavy lifting in user code is done through the [Encode] and [Decode]
 //! derives. They are both documented in the [derives] module.
 //!
@@ -51,8 +51,8 @@
 //! Add the following to your `Cargo.toml`:
 //!
 //! ```toml
-//! musli = "0.0.9"
-//! musli-wire = "0.0.9"
+//! musli = "0.0.10"
+//! musli-wire = "0.0.10"
 //! ```
 //!
 //! <br>
