@@ -1,4 +1,82 @@
+use core::fmt;
+
 use crate::error::Error;
+
+struct StringExpected<T>(T);
+
+impl<'de, T> fmt::Display for StringExpected<T>
+where
+    T: StringVisitor<'de>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expected(f)
+    }
+}
+
+/// A visitor for strings.
+pub trait StringVisitor<'de>: Sized {
+    /// The value produced.
+    type Ok;
+    /// The error produced.
+    type Error: Error;
+
+    /// Format an error indicating what was expected.
+    #[inline]
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "expected string")
+    }
+
+    /// Visit a string that is borrowed directly from the source data.
+    #[inline]
+    fn visit_ref(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
+        self.visit(string)
+    }
+
+    /// Visit a string that is provided from the decoder in any manner possible.
+    /// Which might require additional decoding work.
+    #[inline]
+    fn visit(self, _: &str) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::collect_from_display(StringExpected(self)))
+    }
+}
+
+struct BytesExpected<T>(T);
+
+impl<'de, T> fmt::Display for BytesExpected<T>
+where
+    T: BytesVisitor<'de>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expected(f)
+    }
+}
+
+/// A visitor for a byte sequences.
+pub trait BytesVisitor<'de>: Sized {
+    /// The value produced.
+    type Ok;
+    /// The error produced.
+    type Error: Error;
+
+    /// In case we encounter an unexpected value.
+    #[inline]
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "expected bytes")
+    }
+
+    /// Visit bytes that is borrowed directly from the source data.
+    #[inline]
+    fn visit_ref(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+        self.visit(bytes)
+    }
+
+    /// Visit bytes that is provided from the decoder in any manner possible.
+    /// Which might require additional decoding work.
+    #[inline]
+    fn visit(self, _: &[u8]) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::collect_from_display(BytesExpected(self)))
+    }
+}
 
 /// A pack that can construct encoders.
 pub trait PackDecoder<'de> {
@@ -158,10 +236,14 @@ pub trait Decoder<'de>: Sized {
     fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error>;
 
     /// Decode a sequence of bytes whos length is encoded in the payload.
-    fn decode_bytes(self) -> Result<&'de [u8], Self::Error>;
+    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: BytesVisitor<'de, Error = Self::Error>;
 
     /// Decode a string slice from the current decoder.
-    fn decode_str(self) -> Result<&'de str, Self::Error>;
+    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: StringVisitor<'de, Error = Self::Error>;
 
     /// Decode a boolean.
     fn decode_bool(self) -> Result<bool, Self::Error>;

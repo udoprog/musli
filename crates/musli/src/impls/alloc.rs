@@ -2,8 +2,9 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
+use std::marker;
 
-use crate::de::{Decode, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder};
+use crate::de::{Decode, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder, StringVisitor};
 use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
 use crate::error::Error;
 use crate::internal::size_hint;
@@ -24,7 +25,22 @@ impl<'de> Decode<'de> for String {
     where
         D: Decoder<'de>,
     {
-        Ok(<&str>::decode(decoder)?.to_owned())
+        return decoder.decode_string(Visitor(marker::PhantomData));
+
+        struct Visitor<E>(marker::PhantomData<E>);
+
+        impl<'de, E> StringVisitor<'de> for Visitor<E>
+        where
+            E: Error,
+        {
+            type Ok = String;
+            type Error = E;
+
+            #[inline]
+            fn visit(self, string: &str) -> Result<Self::Ok, Self::Error> {
+                Ok(string.to_owned())
+            }
+        }
     }
 }
 
@@ -64,8 +80,27 @@ impl<'de> Decode<'de> for Cow<'de, str> {
     where
         D: Decoder<'de>,
     {
-        let string = <&str>::decode(decoder)?;
-        Ok(Cow::Borrowed(string))
+        return decoder.decode_string(Visitor(marker::PhantomData));
+
+        struct Visitor<E>(marker::PhantomData<E>);
+
+        impl<'de, E> StringVisitor<'de> for Visitor<E>
+        where
+            E: Error,
+        {
+            type Ok = Cow<'de, str>;
+            type Error = E;
+
+            #[inline]
+            fn visit_ref(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
+                Ok(Cow::Borrowed(string))
+            }
+
+            #[inline]
+            fn visit(self, string: &str) -> Result<Self::Ok, Self::Error> {
+                Ok(Cow::Owned(string.to_owned()))
+            }
+        }
     }
 }
 
@@ -221,7 +256,7 @@ impl<'de> Decode<'de> for &'de CStr {
     where
         D: Decoder<'de>,
     {
-        let bytes = decoder.decode_bytes()?;
+        let bytes = <&[u8]>::decode(decoder)?;
         CStr::from_bytes_with_nul(bytes).map_err(D::Error::custom)
     }
 }

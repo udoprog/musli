@@ -180,7 +180,7 @@
 //! 20x faster than bincode (despite doing similarly oversized pre-allocation).
 //! This holds for both the wire and storage format.
 //!
-//! ```
+//! ```text
 //! json/roundtrip-large    time:   [91.263 us 91.756 us 92.239 us]   
 //! cbor/roundtrip-large    time:   [51.289 us 51.696 us 52.215 us]
 //! bincode/roundtrip-large time:   [10.225 us 10.328 us 10.431 us]

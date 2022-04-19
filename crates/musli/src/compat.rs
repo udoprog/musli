@@ -2,8 +2,11 @@
 //! certain kind of value.
 
 use std::collections::VecDeque;
+use std::marker;
 
+use crate::de::BytesVisitor;
 use crate::en::SequenceEncoder;
+use crate::error::Error;
 use crate::{Decode, Encode, Encoder};
 
 /// Ensures that the given value `T` is encoded as a sequence.
@@ -53,16 +56,7 @@ where
 /// We must use a wrapper like this, because we can't provide an implementation
 /// for `Vec<T>` since it would conflict with `Vec<u8>` which is generalized to
 /// encode as a sequence.
-pub struct Bytes<T> {
-    value: T,
-}
-
-impl<T> Bytes<T> {
-    /// Construct a new sequence wrapper.
-    pub const fn new(value: T) -> Self {
-        Self { value }
-    }
-}
+pub struct Bytes<T>(pub T);
 
 impl Encode for Bytes<Vec<u8>> {
     #[inline]
@@ -70,7 +64,7 @@ impl Encode for Bytes<Vec<u8>> {
     where
         E: Encoder,
     {
-        encoder.encode_bytes(self.value.as_slice())
+        encoder.encode_bytes(self.0.as_slice())
     }
 }
 
@@ -80,7 +74,24 @@ impl<'de> Decode<'de> for Bytes<Vec<u8>> {
     where
         D: crate::Decoder<'de>,
     {
-        decoder.decode_bytes().map(|b| b.to_vec()).map(Bytes::new)
+        return decoder
+            .decode_bytes(Visitor(marker::PhantomData))
+            .map(Bytes);
+
+        struct Visitor<E>(marker::PhantomData<E>);
+
+        impl<'de, E> BytesVisitor<'de> for Visitor<E>
+        where
+            E: Error,
+        {
+            type Ok = Vec<u8>;
+            type Error = E;
+
+            #[inline]
+            fn visit(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+                Ok(bytes.to_vec())
+            }
+        }
     }
 }
 
@@ -90,7 +101,7 @@ impl Encode for Bytes<VecDeque<u8>> {
     where
         E: Encoder,
     {
-        let (first, second) = self.value.as_slices();
+        let (first, second) = self.0.as_slices();
         encoder.encode_bytes_vectored(&[first, second])
     }
 }
@@ -101,9 +112,6 @@ impl<'de> Decode<'de> for Bytes<VecDeque<u8>> {
     where
         D: crate::Decoder<'de>,
     {
-        decoder
-            .decode_bytes()
-            .map(|b| VecDeque::from(b.to_vec()))
-            .map(Bytes::new)
+        Bytes::<Vec<u8>>::decode(decoder).map(|Bytes(bytes)| Bytes(VecDeque::from(bytes)))
     }
 }

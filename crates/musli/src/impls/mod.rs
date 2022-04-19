@@ -14,7 +14,7 @@ use core::sync::atomic::{
 };
 use core::{fmt, marker};
 
-use crate::de::{Decode, Decoder, PairDecoder};
+use crate::de::{BytesVisitor, Decode, Decoder, PairDecoder, StringVisitor};
 use crate::en::{Encode, Encoder, VariantEncoder};
 use crate::error::Error;
 
@@ -259,7 +259,27 @@ impl<'de> Decode<'de> for &'de str {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_str()
+        return decoder.decode_string(Visitor(marker::PhantomData));
+
+        struct Visitor<E>(marker::PhantomData<E>);
+
+        impl<'de, E> StringVisitor<'de> for Visitor<E>
+        where
+            E: Error,
+        {
+            type Ok = &'de str;
+            type Error = E;
+
+            #[inline]
+            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "expected exact string reference")
+            }
+
+            #[inline]
+            fn visit_ref(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
+                Ok(string)
+            }
+        }
     }
 }
 
@@ -278,7 +298,27 @@ impl<'de> Decode<'de> for &'de [u8] {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_bytes()
+        return decoder.decode_bytes(Visitor(marker::PhantomData));
+
+        struct Visitor<E>(marker::PhantomData<E>);
+
+        impl<'de, E> BytesVisitor<'de> for Visitor<E>
+        where
+            E: Error,
+        {
+            type Ok = &'de [u8];
+            type Error = E;
+
+            #[inline]
+            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "expected exact bytes reference")
+            }
+
+            #[inline]
+            fn visit_ref(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+                Ok(bytes)
+            }
+        }
     }
 }
 

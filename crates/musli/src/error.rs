@@ -22,6 +22,14 @@ pub trait Error: Sized {
     where
         T: fmt::Display;
 
+    /// The given value was unexpected.
+    fn bad_value<T>(value: T) -> Self
+    where
+        T: fmt::Debug,
+    {
+        Self::collect_from_display(BadValue { value })
+    }
+
     /// Trying to decode an uninhabitable type.
     #[inline]
     fn uninhabitable(type_name: &'static str) -> Self {
@@ -90,6 +98,19 @@ impl Error for std::io::Error {
         T: fmt::Display,
     {
         std::io::Error::new(std::io::ErrorKind::Other, message.to_string())
+    }
+}
+
+struct BadValue<T> {
+    value: T,
+}
+
+impl<T> fmt::Display for BadValue<T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bad value: {:?}", self.value)
     }
 }
 

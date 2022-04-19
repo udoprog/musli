@@ -3,7 +3,8 @@ use core::{fmt, marker};
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use crate::types::TypeTag;
 use musli::de::{
-    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, SequenceDecoder, StructDecoder,
+    BytesVisitor, Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, SequenceDecoder,
+    StringVisitor, StructDecoder,
 };
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
@@ -160,7 +161,10 @@ where
     }
 
     #[inline]
-    fn decode_bytes(self) -> Result<&'de [u8], Self::Error> {
+    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: BytesVisitor<'de, Error = Self::Error>,
+    {
         if self.reader.read_byte()? != TypeTag::Prefixed as u8 {
             return Err(Self::Error::collect_from_display(Expected(
                 TypeTag::Prefixed,
@@ -169,13 +173,38 @@ where
         }
 
         let len = L::decode_usize(&mut *self.reader)?;
-        self.reader.read_bytes(len)
+        let bytes = self.reader.read_bytes(len)?;
+        visitor.visit_ref(bytes)
     }
 
     #[inline]
-    fn decode_str(self) -> Result<&'de str, Self::Error> {
-        let bytes = self.decode_bytes()?;
-        core::str::from_utf8(bytes).map_err(Self::Error::custom)
+    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: StringVisitor<'de, Error = Self::Error>,
+    {
+        return self.decode_bytes(Visitor(visitor));
+
+        struct Visitor<V>(V);
+
+        impl<'de, V> BytesVisitor<'de> for Visitor<V>
+        where
+            V: StringVisitor<'de>,
+        {
+            type Ok = V::Ok;
+            type Error = V::Error;
+
+            #[inline]
+            fn visit_ref(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+                let string = core::str::from_utf8(bytes).map_err(Self::Error::custom)?;
+                self.0.visit_ref(string)
+            }
+
+            #[inline]
+            fn visit(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+                let string = core::str::from_utf8(bytes).map_err(Self::Error::custom)?;
+                self.0.visit(string)
+            }
+        }
     }
 
     #[inline]
