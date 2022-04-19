@@ -14,7 +14,7 @@ use core::sync::atomic::{
 };
 use core::{fmt, marker};
 
-use crate::de::{BytesVisitor, Decode, Decoder, PairDecoder, StringVisitor};
+use crate::de::{Decode, Decoder, PairDecoder, ReferenceVisitor};
 use crate::en::{Encode, Encoder, VariantEncoder};
 use crate::error::Error;
 
@@ -263,10 +263,11 @@ impl<'de> Decode<'de> for &'de str {
 
         struct Visitor<E>(marker::PhantomData<E>);
 
-        impl<'de, E> StringVisitor<'de> for Visitor<E>
+        impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
         where
             E: Error,
         {
+            type Target = str;
             type Ok = &'de str;
             type Error = E;
 
@@ -302,10 +303,11 @@ impl<'de> Decode<'de> for &'de [u8] {
 
         struct Visitor<E>(marker::PhantomData<E>);
 
-        impl<'de, E> BytesVisitor<'de> for Visitor<E>
+        impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
         where
             E: Error,
         {
+            type Target = [u8];
             type Ok = &'de [u8];
             type Error = E;
 

@@ -41,10 +41,10 @@ The end result should be very similar to a handwritten encoding.
 The heavy lifting in user code is done through the [Encode] and [Decode]
 derives. They are both documented in the [derives] module.
 
-Where Müsli differs in approach is that we don't make use of the visitor
-pattern. Instead the encoding interacts with the framework through encoding
-interfaces that describe "what it wants" and leverages GATs to make the API
-efficient and ergonomic.
+Where Müsli differs in approach is that we don't make as heavy use of the
+visitor pattern. Instead the encoding interacts with the framework through
+encoding interfaces that describe "what it wants" and leverages GATs to make
+the API efficient and ergonomic.
 
 <br>
 
@@ -174,7 +174,7 @@ significant. Müsli producing code that's 100x faster than JSON **and** CBOR,
 20x faster than bincode (despite doing similarly oversized pre-allocation).
 This holds for both the wire and storage format.
 
-```rust
+```
 json/roundtrip-large    time:   [91.263 us 91.756 us 92.239 us]
 cbor/roundtrip-large    time:   [51.289 us 51.696 us 52.215 us]
 bincode/roundtrip-large time:   [10.225 us 10.328 us 10.431 us]

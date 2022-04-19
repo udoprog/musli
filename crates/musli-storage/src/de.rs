@@ -1,9 +1,10 @@
+use core::fmt;
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::de::{
-    BytesVisitor, Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, SequenceDecoder,
-    StringVisitor, StructDecoder,
+    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, ReferenceVisitor,
+    SequenceDecoder, StructDecoder,
 };
 use musli::error::Error;
 use musli_binary_common::reader::Reader;
@@ -80,7 +81,7 @@ where
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: BytesVisitor<'de, Error = Self::Error>,
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         let len = L::decode_usize(&mut *self.reader)?;
         let bytes = self.reader.read_bytes(len)?;
@@ -90,18 +91,24 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: StringVisitor<'de, Error = Self::Error>,
+        V: ReferenceVisitor<'de, Target = str, Error = Self::Error>,
     {
         return self.decode_bytes(Visitor(visitor));
 
         struct Visitor<V>(V);
 
-        impl<'de, V> BytesVisitor<'de> for Visitor<V>
+        impl<'de, V> ReferenceVisitor<'de> for Visitor<V>
         where
-            V: StringVisitor<'de>,
+            V: ReferenceVisitor<'de, Target = str>,
         {
+            type Target = [u8];
             type Ok = V::Ok;
             type Error = V::Error;
+
+            #[inline]
+            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.0.expected(f)
+            }
 
             #[inline]
             fn visit_ref(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {

@@ -2,79 +2,54 @@ use core::fmt;
 
 use crate::error::Error;
 
-struct StringExpected<T>(T);
+struct RefVisitorExpected<T>(T);
 
-impl<'de, T> fmt::Display for StringExpected<T>
+impl<'de, T> fmt::Display for RefVisitorExpected<T>
 where
-    T: StringVisitor<'de>,
+    T: ReferenceVisitor<'de>,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.expected(f)
     }
 }
 
-/// A visitor for strings.
-pub trait StringVisitor<'de>: Sized {
+/// A visitor for data where it might be possible to borrow it without copying
+/// from the underlying [Decoder].
+///
+/// A visitor is required with [Decoder::decode_bytes] and
+/// [Decoder::decode_string] because the caller doesn't know if the encoding
+/// format is capable of producing references to the underlying data directly or
+/// if it needs to be processed.
+///
+/// By requiring a visitor we ensure that the caller has to handle both
+/// scenarios, even if one involves erroring. A type like
+/// [Cow][std::borrow::Cow] is an example of a type which can comfortably handle
+/// both.
+pub trait ReferenceVisitor<'de>: Sized {
+    /// The value being visited.
+    type Target: ?Sized;
     /// The value produced.
     type Ok;
     /// The error produced.
     type Error: Error;
 
     /// Format an error indicating what was expected.
-    #[inline]
-    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "expected string")
-    }
+    ///
+    /// Override to be more specific about the type that failed.
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
     /// Visit a string that is borrowed directly from the source data.
     #[inline]
-    fn visit_ref(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, string: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
         self.visit(string)
     }
 
     /// Visit a string that is provided from the decoder in any manner possible.
     /// Which might require additional decoding work.
     #[inline]
-    fn visit(self, _: &str) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::collect_from_display(StringExpected(self)))
-    }
-}
-
-struct BytesExpected<T>(T);
-
-impl<'de, T> fmt::Display for BytesExpected<T>
-where
-    T: BytesVisitor<'de>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expected(f)
-    }
-}
-
-/// A visitor for a byte sequences.
-pub trait BytesVisitor<'de>: Sized {
-    /// The value produced.
-    type Ok;
-    /// The error produced.
-    type Error: Error;
-
-    /// In case we encounter an unexpected value.
-    #[inline]
-    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "expected bytes")
-    }
-
-    /// Visit bytes that is borrowed directly from the source data.
-    #[inline]
-    fn visit_ref(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
-        self.visit(bytes)
-    }
-
-    /// Visit bytes that is provided from the decoder in any manner possible.
-    /// Which might require additional decoding work.
-    #[inline]
-    fn visit(self, _: &[u8]) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::collect_from_display(BytesExpected(self)))
+    fn visit(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::collect_from_display(RefVisitorExpected(self)))
     }
 }
 
@@ -238,12 +213,12 @@ pub trait Decoder<'de>: Sized {
     /// Decode a sequence of bytes whos length is encoded in the payload.
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: BytesVisitor<'de, Error = Self::Error>;
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>;
 
     /// Decode a string slice from the current decoder.
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: StringVisitor<'de, Error = Self::Error>;
+        V: ReferenceVisitor<'de, Target = str, Error = Self::Error>;
 
     /// Decode a boolean.
     fn decode_bool(self) -> Result<bool, Self::Error>;

@@ -1,10 +1,11 @@
 //! Wrapper types which ensures that a given field is encoded or decoded as a
 //! certain kind of value.
 
+use core::fmt;
 use std::collections::VecDeque;
 use std::marker;
 
-use crate::de::BytesVisitor;
+use crate::de::ReferenceVisitor;
 use crate::en::SequenceEncoder;
 use crate::error::Error;
 use crate::{Decode, Encode, Encoder};
@@ -80,12 +81,18 @@ impl<'de> Decode<'de> for Bytes<Vec<u8>> {
 
         struct Visitor<E>(marker::PhantomData<E>);
 
-        impl<'de, E> BytesVisitor<'de> for Visitor<E>
+        impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
         where
             E: Error,
         {
+            type Target = [u8];
             type Ok = Vec<u8>;
             type Error = E;
+
+            #[inline]
+            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "expected bytes")
+            }
 
             #[inline]
             fn visit(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {

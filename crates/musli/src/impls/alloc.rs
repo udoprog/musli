@@ -1,10 +1,11 @@
+use core::fmt;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
 use std::marker;
 
-use crate::de::{Decode, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder, StringVisitor};
+use crate::de::{Decode, Decoder, MapDecoder, MapEntryDecoder, ReferenceVisitor, SequenceDecoder};
 use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
 use crate::error::Error;
 use crate::internal::size_hint;
@@ -29,12 +30,18 @@ impl<'de> Decode<'de> for String {
 
         struct Visitor<E>(marker::PhantomData<E>);
 
-        impl<'de, E> StringVisitor<'de> for Visitor<E>
+        impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
         where
             E: Error,
         {
+            type Target = str;
             type Ok = String;
             type Error = E;
+
+            #[inline]
+            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "expected string")
+            }
 
             #[inline]
             fn visit(self, string: &str) -> Result<Self::Ok, Self::Error> {
@@ -84,12 +91,18 @@ impl<'de> Decode<'de> for Cow<'de, str> {
 
         struct Visitor<E>(marker::PhantomData<E>);
 
-        impl<'de, E> StringVisitor<'de> for Visitor<E>
+        impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
         where
             E: Error,
         {
+            type Target = str;
             type Ok = Cow<'de, str>;
             type Error = E;
+
+            #[inline]
+            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "expected string")
+            }
 
             #[inline]
             fn visit_ref(self, string: &'de str) -> Result<Self::Ok, Self::Error> {

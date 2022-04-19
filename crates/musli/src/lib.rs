@@ -39,10 +39,10 @@
 //! The heavy lifting in user code is done through the [Encode] and [Decode]
 //! derives. They are both documented in the [derives] module.
 //!
-//! Where Müsli differs in approach is that we don't make use of the visitor
-//! pattern. Instead the encoding interacts with the framework through encoding
-//! interfaces that describe "what it wants" and leverages GATs to make the API
-//! efficient and ergonomic.
+//! Where Müsli differs in approach is that we don't make as heavy use of the
+//! visitor pattern. Instead the encoding interacts with the framework through
+//! encoding interfaces that describe "what it wants" and leverages GATs to make
+//! the API efficient and ergonomic.
 //!
 //! <br>
 //!
