@@ -30,6 +30,7 @@ pub const DEFAULT: WireEncoding<Variable, Variable> = WireEncoding::new();
 
 /// Encode the given value to the given [Writer] using the [DEFAULT]
 /// configuration.
+#[inline]
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
 where
     W: Writer,
@@ -41,6 +42,7 @@ where
 /// Encode the given value to the given [Write][io::Write] using the [DEFAULT]
 /// configuration.
 #[cfg(feature = "std")]
+#[inline]
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), io::Error>
 where
     W: io::Write,
@@ -51,6 +53,7 @@ where
 
 /// Encode the given value to a [Vec] using the [DEFAULT] configuration.
 #[cfg(feature = "std")]
+#[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, VecWriterError>
 where
     T: ?Sized + Encode,
@@ -60,6 +63,7 @@ where
 
 /// Encode the given value to a fixed-size bytes using the [DEFAULT]
 /// configuration.
+#[inline]
 pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, FixedBytesWriterError>
 where
     T: ?Sized + Encode,
@@ -69,6 +73,7 @@ where
 
 /// Decode the given type `T` from the given [Reader] using the [DEFAULT]
 /// configuration.
+#[inline]
 pub fn decode<'de, R, T>(reader: R) -> Result<T, R::Error>
 where
     R: Reader<'de>,
@@ -193,6 +198,7 @@ where
 
     /// Encode the given value to the given [Writer] using the current
     /// configuration.
+    #[inline]
     pub fn encode<W, T>(self, mut writer: W, value: &T) -> Result<(), W::Error>
     where
         W: Writer,
@@ -204,6 +210,7 @@ where
     /// Encode the given value to the given [Write][io::Write] using the current
     /// configuration.
     #[cfg(feature = "std")]
+    #[inline]
     pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
     where
         W: io::Write,
@@ -215,6 +222,7 @@ where
 
     /// Encode the given value to a [Vec] using the current configuration.
     #[cfg(feature = "std")]
+    #[inline]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, VecWriterError>
     where
         T: ?Sized + Encode,
@@ -226,6 +234,7 @@ where
 
     /// Encode the given value to a fixed-size bytes using the current
     /// configuration.
+    #[inline]
     pub fn to_fixed_bytes<const N: usize, T>(
         self,
         value: &T,
@@ -240,6 +249,7 @@ where
 
     /// Decode the given type `T` from the given [Reader] using the current
     /// configuration.
+    #[inline]
     pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,

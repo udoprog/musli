@@ -1,2 +1,5 @@
+[profile.release]
+debug = true
+
 [workspace]
 members = ["crates/*"]

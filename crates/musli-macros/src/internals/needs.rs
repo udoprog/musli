@@ -11,7 +11,7 @@ pub(crate) struct Needs {
 impl Default for Needs {
     fn default() -> Self {
         Self {
-            inline: false,
+            inline: true,
             kind: NeedsKind::Unused,
         }
     }

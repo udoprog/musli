@@ -7,6 +7,9 @@
 //!
 //! Müsli is a flexible and generic binary serialization framework.
 //!
+//! The central components of the framework are the [Encode] and [Decode]
+//! derives. They are thoroughly documented in the [derives] module.
+//!
 //! **Müsli currently depends on [GATs] and is nightly-only**
 //!
 //! We make the following assumptions:
@@ -28,13 +31,18 @@
 //! <br>
 //!
 //! ## Design
-//!
+//! 
 //! Müsli is designed with similar principles as [serde]. Relying on Rust's
 //! powerful trait system to generate code which can largely be optimized away.
-//! The end result should be very similar to a handwritten encoder / decoder.
+//! The end result should be very similar to a handwritten encoding.
+//! 
+//! The heavy lifting in user code is done through the [Encode] and [Decode]
+//! derives. They are both documented in the [derives] module.
 //!
-//! The central components of the framework are the [Encode] and [Decode]
-//! derives. They are thoroughly documented in the [derives] module.
+//! Where Müsli differs in approach is that we don't make use of the visitor
+//! pattern. Instead the encoding interacts with the framework through encoding
+//! interfaces that describe "what it wants" and leverages GATs to make the API
+//! efficient and ergonomic.
 //!
 //! <br>
 //!
@@ -151,6 +159,49 @@
 //! });
 //! # Ok(()) }
 //! ```
+//!
+//! <br>
+//!
+//! ## Performance
+//!
+//! > The following are the results of preliminary benchmarking and should be
+//! > taken with a big grain of 🧂.
+//!
+//! Preliminary benchmarking indicates that Müsli roundtrip encodings for large
+//! objects are about 10x faster than using JSON through serde, 5x faster than
+//! `serde_cbor`, and 12% faster than bincode. Note that the JSON comparison
+//! obviously isn't apples-to-apples since the Müsli encoding isn't
+//! self-descriptive, but it's included here to give a general idea of how it
+//! compares. CBOR and bincode on the other hand have *comparable*
+//! configurations.
+//!
+//! For small objects the difference in encoding performance is even more
+//! significant. Müsli producing code that's 100x faster than JSON **and** CBOR,
+//! 20x faster than bincode (despite doing similarly oversized pre-allocation).
+//! This holds for both the wire and storage format.
+//!
+//! ```
+//! json/roundtrip-large    time:   [91.263 us 91.756 us 92.239 us]   
+//! cbor/roundtrip-large    time:   [51.289 us 51.696 us 52.215 us]
+//! bincode/roundtrip-large time:   [10.225 us 10.328 us 10.431 us]
+//! musli-storage/roundtrip-large                                                                             
+//!                         time:   [9.0467 us 9.0881 us 9.1329 us]
+//! musli-wire/roundtrip-large
+//!                         time:   [11.906 us 11.933 us 11.964 us]                              
+//!
+//! cbor/roundtrip-small    time:   [138.40 ns 147.94 ns 158.60 ns]
+//! json/roundtrip-small    time:   [137.06 ns 137.93 ns 139.16 ns]     
+//! bincode/roundtrip-small time:   [16.978 ns 17.425 ns 18.057 ns]
+//! musli-wire/roundtrip-small
+//!                         time:   [1.0177 ns 1.0227 ns 1.0277 ns]
+//! musli-storage/roundtrip-small                                                                             
+//!                         time:   [802.38 ps 803.95 ps 805.65 ps]
+//! ```
+//!
+//! Note that these bencmarks include no "waste", like extra unrecognized
+//! fields. This is an area where Müsli's current encoding indeed is expected to
+//! lag behind since it needs to perform a fair bit of work to walk over
+//! unrecognized data.
 //!
 //! [bincode]: https://docs.rs/bincode
 //! [Decode]: Decode

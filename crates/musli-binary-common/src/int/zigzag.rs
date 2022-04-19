@@ -10,6 +10,7 @@
 use crate::int::{Signed, Unsigned};
 
 /// Encode an integer into zig-zag encoding.
+#[inline]
 pub fn encode<T>(x: T) -> T::Unsigned
 where
     T: Signed,
@@ -18,6 +19,7 @@ where
 }
 
 /// Decode an integer into zig-zag encoding.
+#[inline]
 pub fn decode<T>(x: T) -> T::Signed
 where
     T: Unsigned,

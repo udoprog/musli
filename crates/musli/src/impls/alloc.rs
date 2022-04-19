@@ -9,6 +9,7 @@ use crate::error::Error;
 use crate::internal::size_hint;
 
 impl Encode for String {
+    #[inline]
     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
@@ -18,6 +19,7 @@ impl Encode for String {
 }
 
 impl<'de> Decode<'de> for String {
+    #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -27,6 +29,7 @@ impl<'de> Decode<'de> for String {
 }
 
 impl Encode for Box<str> {
+    #[inline]
     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
@@ -36,6 +39,7 @@ impl Encode for Box<str> {
 }
 
 impl<'de> Decode<'de> for Box<str> {
+    #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -45,6 +49,7 @@ impl<'de> Decode<'de> for Box<str> {
 }
 
 impl Encode for Cow<'_, str> {
+    #[inline]
     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
@@ -54,6 +59,7 @@ impl Encode for Cow<'_, str> {
 }
 
 impl<'de> Decode<'de> for Cow<'de, str> {
+    #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -75,6 +81,7 @@ macro_rules! sequence {
             T: Encode,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
+            #[inline]
             fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder,
@@ -94,6 +101,7 @@ macro_rules! sequence {
             T: Decode<'de> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
+            #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de>,
@@ -142,6 +150,7 @@ macro_rules! map {
             V: Encode,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
+            #[inline]
             fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder,
@@ -165,6 +174,7 @@ macro_rules! map {
             V: Decode<'de>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
+            #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de>,

@@ -29,7 +29,6 @@ const CONT_BYTE: u8 = 0b1000_0000;
 
 /// Decode the given length using variable int encoding.
 #[inline(never)]
-#[cold]
 pub fn decode<'de, R, T>(mut r: R) -> Result<T, R::Error>
 where
     R: Reader<'de>,
@@ -59,7 +58,6 @@ where
 
 /// Encode the given length using variable length encoding.
 #[inline(never)]
-#[cold]
 pub fn encode<W, T>(mut w: W, mut value: T) -> Result<(), W::Error>
 where
     W: Writer,

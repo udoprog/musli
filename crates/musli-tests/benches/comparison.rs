@@ -115,6 +115,29 @@ where
     bincode::deserialize(data).unwrap()
 }
 
+fn cbor_rt<T>(expected: &T) -> T
+where
+    T: Serialize + for<'de> Deserialize<'de>,
+{
+    let data = serde_cbor::to_vec(expected).unwrap();
+    let value: T = serde_cbor::from_slice(&data[..]).unwrap();
+    value
+}
+
+fn cbor_enc<T>(expected: &T) -> Vec<u8>
+where
+    T: Serialize,
+{
+    serde_cbor::to_vec(expected).unwrap()
+}
+
+fn cbor_dec<'de, T>(data: &'de [u8]) -> T
+where
+    T: Deserialize<'de>,
+{
+    serde_cbor::from_slice(data).unwrap()
+}
+
 fn json_enc<T>(value: &T) -> Vec<u8>
 where
     T: Serialize,
@@ -238,6 +261,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     // benches!("rmp-serde", rmp_enc, rmp_dec, rmp_rt);
     benches!("bincode-serde", bin_enc, bin_dec, bin_rt);
+    benches!("cbor-serde", cbor_enc, cbor_dec, cbor_rt);
+    benches!("json", json_enc, json_dec, json_rt);
     benches!(
         "musli-storage",
         musli_storage_enc,
@@ -245,7 +270,6 @@ fn criterion_benchmark(c: &mut Criterion) {
         musli_storage_rt
     );
     benches!("musli-wire", musli_wire_enc, musli_wire_dec, musli_wire_rt);
-    benches!("json", json_enc, json_dec, json_rt);
 }
 
 criterion_group!(benches, criterion_benchmark);

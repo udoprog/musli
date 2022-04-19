@@ -65,66 +65,82 @@ pub trait ByteOrder:
 pub enum LittleEndian {}
 
 impl ByteOrder for LittleEndian {
+    #[inline]
     fn read_u16(bytes: [u8; 2]) -> u16 {
         u16::from_le_bytes(bytes)
     }
 
+    #[inline]
     fn read_u32(bytes: [u8; 4]) -> u32 {
         u32::from_le_bytes(bytes)
     }
 
+    #[inline]
     fn read_u64(bytes: [u8; 8]) -> u64 {
         u64::from_le_bytes(bytes)
     }
 
+    #[inline]
     fn read_u128(bytes: [u8; 16]) -> u128 {
         u128::from_le_bytes(bytes)
     }
 
+    #[inline]
     fn read_i16(bytes: [u8; 2]) -> i16 {
         i16::from_le_bytes(bytes)
     }
 
+    #[inline]
     fn read_i32(bytes: [u8; 4]) -> i32 {
         i32::from_le_bytes(bytes)
     }
 
+    #[inline]
     fn read_i64(bytes: [u8; 8]) -> i64 {
         i64::from_le_bytes(bytes)
     }
 
+    #[inline]
     fn read_i128(bytes: [u8; 16]) -> i128 {
         i128::from_le_bytes(bytes)
     }
 
+    #[inline]
     fn write_u16(value: u16) -> [u8; 2] {
         u16::to_le_bytes(value)
     }
 
+    #[inline]
     fn write_u32(value: u32) -> [u8; 4] {
         u32::to_le_bytes(value)
     }
 
+    #[inline]
     fn write_u64(value: u64) -> [u8; 8] {
         u64::to_le_bytes(value)
     }
 
+    #[inline]
     fn write_u128(value: u128) -> [u8; 16] {
         u128::to_le_bytes(value)
     }
 
+    #[inline]
     fn write_i16(value: i16) -> [u8; 2] {
         i16::to_le_bytes(value)
     }
 
+    #[inline]
     fn write_i32(value: i32) -> [u8; 4] {
         i32::to_le_bytes(value)
     }
 
+    #[inline]
     fn write_i64(value: i64) -> [u8; 8] {
         i64::to_le_bytes(value)
     }
 
+    #[inline]
     fn write_i128(value: i128) -> [u8; 16] {
         i128::to_le_bytes(value)
     }
@@ -135,66 +151,82 @@ impl ByteOrder for LittleEndian {
 pub enum BigEndian {}
 
 impl ByteOrder for BigEndian {
+    #[inline]
     fn read_u16(bytes: [u8; 2]) -> u16 {
         u16::from_be_bytes(bytes)
     }
 
+    #[inline]
     fn read_u32(bytes: [u8; 4]) -> u32 {
         u32::from_be_bytes(bytes)
     }
 
+    #[inline]
     fn read_u64(bytes: [u8; 8]) -> u64 {
         u64::from_be_bytes(bytes)
     }
 
+    #[inline]
     fn read_u128(bytes: [u8; 16]) -> u128 {
         u128::from_be_bytes(bytes)
     }
 
+    #[inline]
     fn read_i16(bytes: [u8; 2]) -> i16 {
         i16::from_be_bytes(bytes)
     }
 
+    #[inline]
     fn read_i32(bytes: [u8; 4]) -> i32 {
         i32::from_be_bytes(bytes)
     }
 
+    #[inline]
     fn read_i64(bytes: [u8; 8]) -> i64 {
         i64::from_be_bytes(bytes)
     }
 
+    #[inline]
     fn read_i128(bytes: [u8; 16]) -> i128 {
         i128::from_be_bytes(bytes)
     }
 
+    #[inline]
     fn write_u16(value: u16) -> [u8; 2] {
         u16::to_be_bytes(value)
     }
 
+    #[inline]
     fn write_u32(value: u32) -> [u8; 4] {
         u32::to_be_bytes(value)
     }
 
+    #[inline]
     fn write_u64(value: u64) -> [u8; 8] {
         u64::to_be_bytes(value)
     }
 
+    #[inline]
     fn write_u128(value: u128) -> [u8; 16] {
         u128::to_be_bytes(value)
     }
 
+    #[inline]
     fn write_i16(value: i16) -> [u8; 2] {
         i16::to_be_bytes(value)
     }
 
+    #[inline]
     fn write_i32(value: i32) -> [u8; 4] {
         i32::to_be_bytes(value)
     }
 
+    #[inline]
     fn write_i64(value: i64) -> [u8; 8] {
         i64::to_be_bytes(value)
     }
 
+    #[inline]
     fn write_i128(value: i128) -> [u8; 16] {
         i128::to_be_bytes(value)
     }

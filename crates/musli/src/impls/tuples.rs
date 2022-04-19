@@ -9,6 +9,7 @@ macro_rules! declare {
 
     ($ty0:ident, $ident0:ident $(,)? $($ty:ident, $ident:ident),*) => {
         impl<$ty0, $($ty),*> Encode for ($ty0, $($ty),*) where $ty0: Encode, $($ty: Encode),* {
+            #[inline]
             fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder
@@ -22,6 +23,7 @@ macro_rules! declare {
         }
 
         impl<'de, $ty0, $($ty,)*> Decode<'de> for ($ty0, $($ty),*) where $ty0: Decode<'de>, $($ty: Decode<'de>),* {
+            #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de>
