@@ -1,79 +1,138 @@
 //! Type flags available for `musli-wire`.
 
+use std::mem;
+
 use musli::{Decode, Decoder};
+
+/// Mark for the empty placeholder.
+pub const EMPTY: Tag = Tag::new(Kind::Mark, 0);
+/// Mark for a present value.
+pub const SOME: Tag = Tag::new(Kind::Mark, 1);
+/// Mark for a continuation sequence.
+pub const CONTINUATION: Tag = Tag::new(Kind::Mark, 2);
+
+/// Data masked into the data type.
+const DATA_MASK: u8 = 0b000_11111;
 
 /// The structure of a type tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum TypeTag {
-    /// unknown type tag.
-    Unknown = 0b0000_0000,
-    /// A single encoded byte. The contents of which is packed in 7 least
-    /// significant bits. If all LSBs are set to 1 (i.e. `0b1111_1111`), the
-    /// next byte is used as the byte of the tag. All other types avoids having
-    /// the MSB set.
-    Fixed8 = 0b1000_0000,
-    /// The subsequent byte is the byte to read.
-    Fixed8Next = 0b1111_1111,
-    /// An empty value.
-    Empty = 0b0111_1110,
-    /// A present optional value.
-    OptionSome = 0b0111_1111,
-    /// Fixed-length 2 bytes.
-    Fixed16 = 0b0001_0010,
-    /// Fixed-length 4 bytes.
-    Fixed32 = 0b0001_0100,
-    /// Fixed-length 8 bytes.
-    Fixed64 = 0b0001_0110,
-    /// Fixed-length 16 bytes.
-    Fixed128 = 0b0001_1000,
-    /// The next integer is using continuation integer encoding.
-    Continuation = 0b0001_1010,
-    /// A length-prefixed byte sequence.
-    Prefixed = 0b0010_0000,
-    /// A length-prefixed sequence of typed values.
-    Sequence = 0b0010_0010,
-    /// A pair of typed values are being encoded.
-    Pair = 0b0100_0000,
+pub enum Kind {
+    /// A single byte.
+    Byte = 0b000_00000,
+    /// A fixed element where the length how many bytes it consists of.
+    Fixed = 0b001_00000,
+    /// A length-prefixed byte sequence. The length bits indicate the length of
+    /// the sequence unless they are all set to 1s.
+    Prefixed = 0b010_00000,
+    /// A length-prefixed sequence of typed values. The length bits indicate the
+    /// length of the sequence unless they are all set to 1s.
+    Sequence = 0b011_00000,
     /// A length-prefixed sequence of typed pairs of values.
-    PairSequence = 0b0010_0100,
+    PairSequence = 0b100_00000,
+    /// A special kind of mark.
+    Mark = 0b101_00000,
+    /// Unknown kind.
+    Unknown0 = 0b110_00000,
+    /// Unknown kind.
+    Unknown1 = 0b111_00000,
 }
 
-impl TypeTag {
-    pub(crate) const FIXED8_BYTE: u8 = TypeTag::Fixed8 as u8;
-    pub(crate) const FIXED16_BYTE: u8 = TypeTag::Fixed16 as u8;
-    pub(crate) const FIXED32_BYTE: u8 = TypeTag::Fixed32 as u8;
-    pub(crate) const FIXED64_BYTE: u8 = TypeTag::Fixed64 as u8;
-    pub(crate) const FIXED128_BYTE: u8 = TypeTag::Fixed128 as u8;
-    pub(crate) const CONTINUATION_BYTE: u8 = TypeTag::Continuation as u8;
-    pub(crate) const PREFIXED_BYTE: u8 = TypeTag::Prefixed as u8;
-    pub(crate) const SEQUENCE_BYTE: u8 = TypeTag::Sequence as u8;
-    pub(crate) const PAIR_BYTE: u8 = TypeTag::Pair as u8;
-    pub(crate) const PAIR_SEQUENCE_BYTE: u8 = TypeTag::PairSequence as u8;
-    pub(crate) const OPTION_SOME_BYTE: u8 = TypeTag::OptionSome as u8;
-    pub(crate) const EMPTY_BYTE: u8 = TypeTag::Empty as u8;
+/// A type tag.
+///
+/// The type of the element is the 3 MSBs, which indicates that it's one of the
+/// specified variants in the [Kind] enumeration.
+///
+/// The remaining 5 bits are the data field, and its use depends on the [Kind]
+/// in question. Usually it's just used to smuggle extra data in case a value is
+/// small (which it usually is).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct Tag {
+    /// The internal representation of the tag.
+    repr: u8,
 }
 
-impl<'de> Decode<'de> for TypeTag {
+impl Tag {
+    /// Construct a new tag.
+    ///
+    /// If `data` is larger or equal to [DATA_MASK] it is considered as empty.
+    #[inline]
+    pub const fn new(kind: Kind, data: u8) -> Self {
+        Self {
+            repr: kind as u8 | if data < DATA_MASK { data } else { DATA_MASK },
+        }
+    }
+
+    /// Access the kind of the tag.
+    #[inline]
+    pub const fn kind(self) -> Kind {
+        // SAFETY: this is safe because we've ensured that all available Kind
+        // variants occupy all available bit patterns.
+        unsafe { mem::transmute(self.repr & !DATA_MASK) }
+    }
+
+    /// Access the data of the tag.
+    #[inline]
+    pub const fn data_raw(self) -> u8 {
+        self.repr & DATA_MASK
+    }
+
+    /// Construct from a byte.
+    #[inline]
+    pub const fn from_byte(repr: u8) -> Self {
+        Self { repr }
+    }
+
+    /// Coerce type flag into a byte.
+    #[inline]
+    pub const fn byte(self) -> u8 {
+        self.repr
+    }
+
+    /// Attempt to construct a type tag with the given length embedded.
+    ///
+    /// Returns a tuple where the boolean indicates if the value was embedded or
+    /// not.
+    #[inline]
+    pub const fn with_len(kind: Kind, len: usize) -> (Self, bool) {
+        if len < DATA_MASK as usize {
+            (Self::new(kind, len as u8), true)
+        } else {
+            (Self::new(kind, DATA_MASK), false)
+        }
+    }
+
+    /// Attempt to construct a type tag with the given length embedded.
+    ///
+    /// Returns a tuple where the boolean indicates if the value was embedded or
+    /// not.
+    #[inline]
+    pub const fn with_byte(kind: Kind, len: u8) -> (Self, bool) {
+        if len < DATA_MASK {
+            (Self::new(kind, len), true)
+        } else {
+            (Self::new(kind, DATA_MASK), false)
+        }
+    }
+
+    /// Get the embedded length as a byte.
+    #[inline]
+    pub const fn data(self) -> Option<u8> {
+        if self.data_raw() == DATA_MASK {
+            None
+        } else {
+            Some(self.data_raw())
+        }
+    }
+}
+
+impl<'de> Decode<'de> for Tag {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        Ok(match decoder.decode_u8()? {
-            Self::FIXED8_BYTE => Self::Fixed8,
-            Self::FIXED16_BYTE => Self::Fixed16,
-            Self::FIXED32_BYTE => Self::Fixed32,
-            Self::FIXED64_BYTE => Self::Fixed64,
-            Self::FIXED128_BYTE => Self::Fixed128,
-            Self::CONTINUATION_BYTE => Self::Continuation,
-            Self::PREFIXED_BYTE => Self::Prefixed,
-            Self::SEQUENCE_BYTE => Self::Sequence,
-            Self::PAIR_BYTE => Self::Pair,
-            Self::PAIR_SEQUENCE_BYTE => Self::PairSequence,
-            Self::OPTION_SOME_BYTE => Self::OptionSome,
-            Self::EMPTY_BYTE => Self::Empty,
-            _ => Self::Unknown,
-        })
+        Ok(Self::from_byte(decoder.decode_u8()?))
     }
 }

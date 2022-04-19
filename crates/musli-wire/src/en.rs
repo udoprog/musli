@@ -1,7 +1,7 @@
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use crate::types::TypeTag;
+use crate::types::{Kind, Tag};
 use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
 use musli_binary_common::writer::Writer;
 
@@ -63,8 +63,13 @@ where
 
     #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.writer.write_byte(TypeTag::Prefixed as u8)?;
-        L::encode_usize(&mut self.writer, bytes.len())?;
+        let (tag, embedded) = Tag::with_len(Kind::Prefixed, bytes.len());
+        self.writer.write_byte(tag.byte())?;
+
+        if !embedded {
+            L::encode_usize(&mut self.writer, bytes.len())?;
+        }
+
         self.writer.write_bytes(bytes)?;
         Ok(())
     }
@@ -73,8 +78,12 @@ where
     fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<(), Self::Error> {
         let len = vectors.into_iter().map(|v| v.len()).sum();
 
-        self.writer.write_byte(TypeTag::Prefixed as u8)?;
-        L::encode_usize(&mut self.writer, len)?;
+        let (tag, embedded) = Tag::with_len(Kind::Prefixed, len);
+        self.writer.write_byte(tag.byte())?;
+
+        if !embedded {
+            L::encode_usize(&mut self.writer, len)?;
+        }
 
         for bytes in vectors {
             self.writer.write_bytes(bytes)?;
@@ -85,8 +94,13 @@ where
 
     #[inline]
     fn encode_str(mut self, string: &str) -> Result<(), Self::Error> {
-        self.writer.write_byte(TypeTag::Prefixed as u8)?;
-        L::encode_usize(&mut self.writer, string.len())?;
+        let (tag, embedded) = Tag::with_len(Kind::Prefixed, string.len());
+        self.writer.write_byte(tag.byte())?;
+
+        if !embedded {
+            L::encode_usize(&mut self.writer, string.len())?;
+        }
+
         self.writer.write_bytes(string.as_bytes())?;
         Ok(())
     }
@@ -104,7 +118,7 @@ where
     #[inline]
     fn encode_bool(self, value: bool) -> Result<(), Self::Error> {
         self.writer
-            .write_byte(if value { 1 } else { 0 } | TypeTag::Fixed8 as u8)
+            .write_byte(Tag::new(Kind::Fixed, if value { 1 } else { 0 }).byte())
     }
 
     #[inline]
@@ -114,10 +128,10 @@ where
 
     #[inline]
     fn encode_u8(self, value: u8) -> Result<(), Self::Error> {
-        if value < !(TypeTag::Fixed8 as u8) {
-            self.writer.write_byte(TypeTag::Fixed8 as u8 | value)?;
-        } else {
-            self.writer.write_byte(TypeTag::Fixed8Next as u8)?;
+        let (tag, embedded) = Tag::with_byte(Kind::Byte, value);
+        self.writer.write_byte(tag.byte())?;
+
+        if !embedded {
             self.writer.write_byte(value)?;
         }
 
@@ -181,53 +195,74 @@ where
 
     #[inline]
     fn encode_some(self) -> Result<Self::Some, Self::Error> {
-        self.writer.write_byte(TypeTag::OptionSome as u8)?;
+        self.writer.write_byte(Tag::new(Kind::Mark, 1).byte())?;
         Ok(self)
     }
 
     #[inline]
     fn encode_none(self) -> Result<(), Self::Error> {
-        self.writer.write_byte(TypeTag::Empty as u8)?;
+        self.writer.write_byte(Tag::new(Kind::Mark, 0).byte())?;
         Ok(())
     }
 
     #[inline]
     fn encode_sequence(self, len: usize) -> Result<Self::Sequence, Self::Error> {
-        self.writer.write_byte(TypeTag::Sequence as u8)?;
-        L::encode_usize(&mut *self.writer, len)?;
+        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
+        self.writer.write_byte(tag.byte())?;
+
+        if !embedded {
+            L::encode_usize(&mut *self.writer, len)?;
+        }
+
         Ok(self)
     }
 
     #[inline]
     fn encode_map(self, len: usize) -> Result<Self::Map, Self::Error> {
-        self.writer.write_byte(TypeTag::PairSequence as u8)?;
-        L::encode_usize(&mut *self.writer, len)?;
+        let (tag, embedded) = Tag::with_len(Kind::PairSequence, len);
+        self.writer.write_byte(tag.byte())?;
+
+        if !embedded {
+            L::encode_usize(&mut *self.writer, len)?;
+        }
+
         Ok(self)
     }
 
     #[inline]
     fn encode_struct(self, fields: usize) -> Result<Self::Struct, Self::Error> {
-        self.writer.write_byte(TypeTag::PairSequence as u8)?;
-        L::encode_usize(&mut *self.writer, fields)?;
+        let (tag, embedded) = Tag::with_len(Kind::PairSequence, fields);
+        self.writer.write_byte(tag.byte())?;
+
+        if !embedded {
+            L::encode_usize(&mut *self.writer, fields)?;
+        }
+
         Ok(self)
     }
 
     #[inline]
     fn encode_tuple(self, len: usize) -> Result<Self::Tuple, Self::Error> {
-        self.writer.write_byte(TypeTag::PairSequence as u8)?;
-        L::encode_usize(&mut *self.writer, len)?;
+        let (tag, embedded) = Tag::with_len(Kind::PairSequence, len);
+        self.writer.write_byte(tag.byte())?;
+
+        if !embedded {
+            L::encode_usize(&mut *self.writer, len)?;
+        }
+
         Ok(self)
     }
 
     #[inline]
     fn encode_unit_struct(self) -> Result<(), Self::Error> {
-        self.writer.write_byte(TypeTag::Empty as u8)?;
+        self.writer.write_byte(Tag::new(Kind::Mark, 0).byte())?;
         Ok(())
     }
 
     #[inline]
     fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
-        self.writer.write_byte(TypeTag::Pair as u8)?;
+        self.writer
+            .write_byte(Tag::new(Kind::PairSequence, 1).byte())?;
         Ok(self)
     }
 }

@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use musli::de::PackDecoder;
 use musli::{Decode, Decoder, Encode};
 
-use crate::types::TypeTag;
+use crate::types::Tag;
 
 /// A typed field, which is prefixed with a type tag.
 ///
@@ -13,13 +13,13 @@ use crate::types::TypeTag;
 /// tags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Typed<T> {
-    tag: TypeTag,
+    tag: Tag,
     value: T,
 }
 
 impl<T> Typed<T> {
     /// Construct a new typed field.
-    pub const fn new(tag: TypeTag, value: T) -> Self {
+    pub const fn new(tag: Tag, value: T) -> Self {
         Self { tag, value }
     }
 }
@@ -33,7 +33,7 @@ where
         D: Decoder<'de>,
     {
         let mut pack = decoder.decode_pack()?;
-        let tag = pack.next().and_then(TypeTag::decode)?;
+        let tag = pack.next().and_then(Tag::decode)?;
         let value = pack.next().and_then(T::decode)?;
 
         Ok(Self { tag, value })
@@ -48,7 +48,6 @@ where
 {
     let out = crate::to_vec(&expected).expect("failed to encode");
     let mut buf = &out[..];
-    dbg!(buf);
     let value: T = crate::decode(&mut buf).expect("failed to decode");
     assert!(buf.is_empty(), "deserialized buffer should be empty");
     assert_eq!(value, expected, "roundtrip does not match");

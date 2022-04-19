@@ -155,6 +155,7 @@
 //!
 //! ```
 //! use musli::{Encode, Decode};
+//! use musli_wire::types::{Tag, Kind};
 //!
 //! #[derive(Encode)]
 //! #[musli(transparent)]
@@ -162,7 +163,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let data = musli_wire::to_vec(&Struct(42))?;
-//! assert_eq!(data, vec![musli_wire::types::TypeTag::Continuation as u8, 42]);
+//! assert_eq!(data, vec![CONTINUATION.byte(), 42]);
 //! # Ok(()) }
 //! ```
 //!

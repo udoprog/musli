@@ -2,7 +2,11 @@ use core::fmt;
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use crate::types::TypeTag;
+use crate::types::Kind;
+use crate::types::Tag;
+use crate::types::CONTINUATION;
+use crate::types::EMPTY;
+use crate::types::SOME;
 use musli::de::{
     Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, ReferenceVisitor,
     SequenceDecoder, StructDecoder,
@@ -44,32 +48,58 @@ where
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any(&mut self) -> Result<(), R::Error> {
-        let b = self.reader.read_byte()?;
+        let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        // Special case: MSB is set indicating that the rest of the bits are the
-        // payload.
-        if b & TypeTag::Fixed8 as u8 == TypeTag::Fixed8 as u8 {
-            if b == TypeTag::Fixed8Next as u8 {
-                self.reader.skip(1)?;
+        match tag.kind() {
+            Kind::Mark => {
+                match tag {
+                    // Empty
+                    EMPTY => {
+                        // Nothing to do.
+                    }
+                    // Option::Some
+                    SOME => {
+                        self.skip_any()?;
+                    }
+                    CONTINUATION => {
+                        let _ = c::decode::<_, u128>(&mut *self.reader)?;
+                    }
+                    _ => {
+                        return Err(R::Error::collect_from_display(UnsupportedMark(
+                            tag.data(),
+                            self.reader.pos(),
+                        )));
+                    }
+                }
             }
-
-            return Ok(());
-        }
-
-        match b {
-            TypeTag::CONTINUATION_BYTE => {
-                let _ = c::decode::<_, u128>(&mut *self.reader)?;
+            Kind::Byte => {
+                if tag.data().is_none() {
+                    self.reader.skip(1)?;
+                }
             }
-            TypeTag::SEQUENCE_BYTE => {
-                let len = L::decode_usize(&mut *self.reader)?;
+            Kind::Fixed => {
+                if let Some(len) = tag.data() {
+                    self.reader.skip(len as usize)?;
+                }
+            }
+            Kind::Sequence => {
+                let len = if let Some(len) = tag.data() {
+                    len as usize
+                } else {
+                    L::decode_usize(&mut *self.reader)?
+                };
 
                 // Skip over all values in the sequence.
                 for _ in 0..len {
                     self.skip_any()?;
                 }
             }
-            TypeTag::PAIR_SEQUENCE_BYTE => {
-                let len = L::decode_usize(&mut *self.reader)?;
+            Kind::PairSequence => {
+                let len = if let Some(len) = tag.data() {
+                    len as usize
+                } else {
+                    L::decode_usize(&mut *self.reader)?
+                };
 
                 for _ in 0..len {
                     // Skip field.
@@ -78,36 +108,20 @@ where
                     self.skip_any()?;
                 }
             }
-            TypeTag::PAIR_BYTE => {
-                self.skip_any()?;
-                self.skip_any()?;
-            }
-            TypeTag::PREFIXED_BYTE => {
-                let len = L::decode_usize(&mut *self.reader)?;
+            Kind::Prefixed => {
+                let len = if let Some(len) = tag.data() {
+                    len as usize
+                } else {
+                    L::decode_usize(&mut *self.reader)?
+                };
+
                 self.reader.skip(len)?;
-            }
-            TypeTag::FIXED16_BYTE => {
-                self.reader.skip(2)?;
-            }
-            TypeTag::FIXED32_BYTE => {
-                self.reader.skip(4)?;
-            }
-            TypeTag::FIXED64_BYTE => {
-                self.reader.skip(8)?;
-            }
-            TypeTag::FIXED128_BYTE => {
-                self.reader.skip(16)?;
-            }
-            TypeTag::EMPTY_BYTE => {
-                // Nothing following this tag.
-            }
-            TypeTag::OPTION_SOME_BYTE => {
-                self.skip_any()?;
             }
             other => {
                 return Err(R::Error::custom(format!(
-                    "unexpected type tag {:08b}",
-                    other
+                    "unexpected type kind {:?} ({:08b})",
+                    other,
+                    tag.byte(),
                 )));
             }
         }
@@ -118,11 +132,19 @@ where
     // Standard function for decoding a pair sequence.
     #[inline]
     fn shared_decode_sequence(self) -> Result<RemainingSimpleDecoder<'a, R, I, L>, R::Error> {
-        match self.reader.read_byte()? {
-            TypeTag::SEQUENCE_BYTE => RemainingSimpleDecoder::new(self),
-            TypeTag::EMPTY_BYTE => Ok(RemainingSimpleDecoder::empty(self)),
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        match tag.kind() {
+            Kind::Sequence => {
+                if let Some(len) = tag.data() {
+                    RemainingSimpleDecoder::with_len(self, len as usize)
+                } else {
+                    RemainingSimpleDecoder::new(self)
+                }
+            }
+            Kind::Mark => Ok(RemainingSimpleDecoder::empty(self)),
             _ => Err(R::Error::collect_from_display(Expected(
-                TypeTag::Sequence,
+                Kind::Sequence,
                 self.reader.pos(),
             ))),
         }
@@ -131,11 +153,19 @@ where
     // Standard function for decoding a pair sequence.
     #[inline]
     fn shared_decode_pair_sequence(self) -> Result<RemainingSimpleDecoder<'a, R, I, L>, R::Error> {
-        match self.reader.read_byte()? {
-            TypeTag::PAIR_SEQUENCE_BYTE => RemainingSimpleDecoder::new(self),
-            TypeTag::EMPTY_BYTE => Ok(RemainingSimpleDecoder::empty(self)),
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        match tag.kind() {
+            Kind::PairSequence => {
+                if let Some(len) = tag.data() {
+                    RemainingSimpleDecoder::with_len(self, len as usize)
+                } else {
+                    RemainingSimpleDecoder::new(self)
+                }
+            }
+            Kind::Mark => Ok(RemainingSimpleDecoder::empty(self)),
             _ => Err(R::Error::collect_from_display(Expected(
-                TypeTag::PairSequence,
+                Kind::PairSequence,
                 self.reader.pos(),
             ))),
         }
@@ -192,14 +222,21 @@ where
     where
         V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
     {
-        if self.reader.read_byte()? != TypeTag::Prefixed as u8 {
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        if tag.kind() != Kind::Prefixed {
             return Err(Self::Error::collect_from_display(Expected(
-                TypeTag::Prefixed,
+                Kind::Prefixed,
                 self.reader.pos(),
             )));
         }
 
-        let len = L::decode_usize(&mut *self.reader)?;
+        let len = if let Some(len) = tag.data() {
+            len as usize
+        } else {
+            L::decode_usize(&mut *self.reader)?
+        };
+
         let bytes = self.reader.read_bytes(len)?;
         visitor.visit_ref(bytes)
     }
@@ -264,13 +301,20 @@ where
 
     #[inline]
     fn decode_u8(self) -> Result<u8, Self::Error> {
-        let b = self.reader.read_byte()?;
+        let b = Tag::from_byte(self.reader.read_byte()?);
 
-        Ok(if b == TypeTag::Fixed8Next as u8 {
-            self.reader.read_byte()?
+        if b.kind() != Kind::Byte {
+            return Err(Self::Error::collect_from_display(Expected(
+                Kind::Byte,
+                self.reader.pos(),
+            )));
+        }
+
+        if let Some(b) = b.data() {
+            Ok(b)
         } else {
-            b & !(TypeTag::Fixed8 as u8)
-        })
+            self.reader.read_byte()
+        }
     }
 
     #[inline]
@@ -346,20 +390,19 @@ where
 
     #[inline]
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
-        let b = self.reader.read_byte()?;
+        let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        if b & TypeTag::EMPTY_BYTE != TypeTag::EMPTY_BYTE {
-            return Err(Self::Error::collect_from_display(Expected(
-                TypeTag::OptionSome,
+        match tag.kind() {
+            Kind::Mark => Ok(if tag.data_raw() == 1 {
+                Some(self)
+            } else {
+                None
+            }),
+            _ => Err(Self::Error::collect_from_display(Expected(
+                Kind::Mark,
                 self.reader.pos(),
-            )));
+            ))),
         }
-
-        Ok(if b == TypeTag::OptionSome as u8 {
-            Some(self)
-        } else {
-            None
-        })
     }
 
     #[inline]
@@ -390,9 +433,9 @@ where
 
     #[inline]
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
-        if self.reader.read_byte()? != TypeTag::Pair as u8 {
+        if Tag::from_byte(self.reader.read_byte()?) != Tag::new(Kind::PairSequence, 1) {
             return Err(Self::Error::collect_from_display(Expected(
-                TypeTag::Pair,
+                Kind::PairSequence,
                 self.reader.pos(),
             )));
         }
@@ -430,6 +473,11 @@ where
     #[inline]
     fn new(decoder: WireDecoder<'a, R, I, L>) -> Result<Self, R::Error> {
         let remaining = L::decode_usize(&mut *decoder.reader)?;
+        Ok(Self { remaining, decoder })
+    }
+
+    #[inline]
+    fn with_len(decoder: WireDecoder<'a, R, I, L>, remaining: usize) -> Result<Self, R::Error> {
         Ok(Self { remaining, decoder })
     }
 
@@ -571,7 +619,7 @@ where
     }
 }
 
-struct Expected(TypeTag, Option<usize>);
+struct Expected(Kind, Option<usize>);
 
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -579,6 +627,18 @@ impl fmt::Display for Expected {
             write!(f, "Expected {:?} (at {})", self.0, pos)
         } else {
             write!(f, "Expected {:?}", self.0)
+        }
+    }
+}
+
+struct UnsupportedMark(Option<u8>, Option<usize>);
+
+impl fmt::Display for UnsupportedMark {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(pos) = self.1 {
+            write!(f, "Unsupported mark {:?} (at {})", self.0, pos)
+        } else {
+            write!(f, "Unsupported mark {:?}", self.0)
         }
     }
 }

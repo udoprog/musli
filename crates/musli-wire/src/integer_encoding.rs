@@ -3,7 +3,7 @@ use core::hash::Hash;
 use core::marker;
 
 use crate::traits::Typed;
-use crate::types::TypeTag;
+use crate::types::{Tag, CONTINUATION};
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
 use musli_binary_common::int::zigzag as zig;
@@ -87,7 +87,7 @@ impl IntegerEncoding for Variable {
         W: Writer,
         T: Unsigned,
     {
-        writer.write_byte(TypeTag::Continuation as u8)?;
+        writer.write_byte(CONTINUATION.byte())?;
         c::encode(writer, value)
     }
 
@@ -97,8 +97,8 @@ impl IntegerEncoding for Variable {
         R: Reader<'de>,
         T: Unsigned,
     {
-        if reader.read_byte()? != TypeTag::Continuation as u8 {
-            return Err(R::Error::custom("expected Continuation"));
+        if Tag::from_byte(reader.read_byte()?) != CONTINUATION {
+            return Err(R::Error::custom("Expected Continuation"));
         }
 
         c::decode(reader)
@@ -110,7 +110,7 @@ impl IntegerEncoding for Variable {
         W: Writer,
         T: Signed,
     {
-        writer.write_byte(TypeTag::Continuation as u8)?;
+        writer.write_byte(CONTINUATION.byte())?;
         c::encode(writer, zig::encode(value))
     }
 
@@ -121,12 +121,15 @@ impl IntegerEncoding for Variable {
         T: Signed,
         T::Unsigned: Unsigned<Signed = T>,
     {
-        if reader.read_byte()? != TypeTag::Continuation as u8 {
-            return Err(R::Error::custom("expected Continuation"));
-        }
+        let tag = Tag::from_byte(reader.read_byte()?);
 
-        let value: T::Unsigned = c::decode(reader)?;
-        Ok(zig::decode(value))
+        match tag {
+            CONTINUATION => {
+                let value: T::Unsigned = c::decode(reader)?;
+                Ok(zig::decode(value))
+            }
+            _ => Err(R::Error::custom("Expected Continuation")),
+        }
     }
 }
 
@@ -144,7 +147,7 @@ impl UsizeEncoding for Variable {
     where
         W: Writer,
     {
-        writer.write_byte(TypeTag::Continuation as u8)?;
+        writer.write_byte(CONTINUATION.byte())?;
         c::encode(writer, value)
     }
 
@@ -161,8 +164,8 @@ impl UsizeEncoding for Variable {
     where
         R: Reader<'de>,
     {
-        if reader.read_byte()? != TypeTag::Continuation as u8 {
-            return Err(R::Error::custom("expected Continuation"));
+        if Tag::from_byte(reader.read_byte()?) != CONTINUATION {
+            return Err(R::Error::custom("Expected Continuation"));
         }
 
         c::decode(reader)
@@ -187,7 +190,7 @@ where
         W: Writer,
         T: ByteOrderIo + Typed,
     {
-        writer.write_byte(T::TYPE_FLAG as u8)?;
+        writer.write_byte(T::TYPE_FLAG.byte())?;
         value.write_bytes::<_, B>(writer)
     }
 
@@ -197,7 +200,7 @@ where
         R: Reader<'de>,
         T: ByteOrderIo + Typed,
     {
-        if reader.read_byte()? != T::TYPE_FLAG as u8 {
+        if reader.read_byte()? != T::TYPE_FLAG.byte() {
             return Err(R::Error::custom("expected fixed integer"));
         }
 
@@ -211,7 +214,7 @@ where
         T: Signed,
         T::Unsigned: ByteOrderIo + Typed,
     {
-        writer.write_byte(T::Unsigned::TYPE_FLAG as u8)?;
+        writer.write_byte(T::Unsigned::TYPE_FLAG.byte())?;
         value.unsigned().write_bytes::<_, B>(writer)
     }
 
@@ -222,7 +225,7 @@ where
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T> + Typed,
     {
-        if reader.read_byte()? != T::Unsigned::TYPE_FLAG as u8 {
+        if reader.read_byte()? != T::Unsigned::TYPE_FLAG.byte() {
             return Err(R::Error::custom("expected fixed integer"));
         }
 
@@ -264,7 +267,7 @@ where
     where
         W: Writer,
     {
-        writer.write_byte(L::TYPE_FLAG as u8)?;
+        writer.write_byte(L::TYPE_FLAG.byte())?;
         let value: L = value.try_into().map_err(W::Error::custom)?;
         value.write_bytes::<_, B>(writer)
     }
@@ -282,7 +285,7 @@ where
     where
         R: Reader<'de>,
     {
-        if reader.read_byte()? != L::TYPE_FLAG as u8 {
+        if reader.read_byte()? != L::TYPE_FLAG.byte() {
             return Err(R::Error::custom("expected fixed integer"));
         }
 
