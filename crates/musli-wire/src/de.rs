@@ -98,8 +98,8 @@ where
             TypeTag::FIXED128_BYTE => {
                 self.reader.skip(16)?;
             }
-            TypeTag::OPTION_NONE_BYTE => {
-                // Nothing follows this tag.
+            TypeTag::EMPTY_BYTE => {
+                // Nothing following this tag.
             }
             TypeTag::OPTION_SOME_BYTE => {
                 self.skip_any()?;
@@ -113,6 +113,32 @@ where
         }
 
         Ok(())
+    }
+
+    // Standard function for decoding a pair sequence.
+    #[inline]
+    fn shared_decode_sequence(self) -> Result<RemainingSimpleDecoder<'a, R, I, L>, R::Error> {
+        match self.reader.read_byte()? {
+            TypeTag::SEQUENCE_BYTE => RemainingSimpleDecoder::new(self),
+            TypeTag::EMPTY_BYTE => Ok(RemainingSimpleDecoder::empty(self)),
+            _ => Err(R::Error::collect_from_display(Expected(
+                TypeTag::Sequence,
+                self.reader.pos(),
+            ))),
+        }
+    }
+
+    // Standard function for decoding a pair sequence.
+    #[inline]
+    fn shared_decode_pair_sequence(self) -> Result<RemainingSimpleDecoder<'a, R, I, L>, R::Error> {
+        match self.reader.read_byte()? {
+            TypeTag::PAIR_SEQUENCE_BYTE => RemainingSimpleDecoder::new(self),
+            TypeTag::EMPTY_BYTE => Ok(RemainingSimpleDecoder::empty(self)),
+            _ => Err(R::Error::collect_from_display(Expected(
+                TypeTag::PairSequence,
+                self.reader.pos(),
+            ))),
+        }
     }
 }
 
@@ -322,7 +348,7 @@ where
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
         let b = self.reader.read_byte()?;
 
-        if b & TypeTag::OptionNone as u8 != TypeTag::OptionNone as u8 {
+        if b & TypeTag::EMPTY_BYTE != TypeTag::EMPTY_BYTE {
             return Err(Self::Error::collect_from_display(Expected(
                 TypeTag::OptionSome,
                 self.reader.pos(),
@@ -338,69 +364,27 @@ where
 
     #[inline]
     fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
-        if self.reader.read_byte()? != TypeTag::Sequence as u8 {
-            return Err(Self::Error::collect_from_display(Expected(
-                TypeTag::Sequence,
-                self.reader.pos(),
-            )));
-        }
-
-        RemainingSimpleDecoder::new(self)
+        self.shared_decode_sequence()
     }
 
     #[inline]
     fn decode_map(self) -> Result<Self::Map, Self::Error> {
-        if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
-            return Err(Self::Error::collect_from_display(Expected(
-                TypeTag::PairSequence,
-                self.reader.pos(),
-            )));
-        }
-
-        RemainingSimpleDecoder::new(self)
+        self.shared_decode_pair_sequence()
     }
 
     #[inline]
     fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
-        if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
-            return Err(Self::Error::collect_from_display(Expected(
-                TypeTag::PairSequence,
-                self.reader.pos(),
-            )));
-        }
-
-        RemainingSimpleDecoder::new(self)
+        self.shared_decode_pair_sequence()
     }
 
     #[inline]
     fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
-        if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
-            return Err(Self::Error::collect_from_display(Expected(
-                TypeTag::PairSequence,
-                self.reader.pos(),
-            )));
-        }
-
-        RemainingSimpleDecoder::new(self)
+        self.shared_decode_pair_sequence()
     }
 
     #[inline]
     fn decode_unit_struct(mut self) -> Result<(), Self::Error> {
-        if self.reader.read_byte()? != TypeTag::PairSequence as u8 {
-            return Err(Self::Error::collect_from_display(Expected(
-                TypeTag::PairSequence,
-                self.reader.pos(),
-            )));
-        }
-
-        let len = L::decode_usize(&mut *self.reader)?;
-
-        // Skip over fields.
-        for _ in 0..len {
-            self.skip_any()?;
-            self.skip_any()?;
-        }
-
+        self.skip_any()?;
         Ok(())
     }
 
@@ -447,6 +431,14 @@ where
     fn new(decoder: WireDecoder<'a, R, I, L>) -> Result<Self, R::Error> {
         let remaining = L::decode_usize(&mut *decoder.reader)?;
         Ok(Self { remaining, decoder })
+    }
+
+    #[inline]
+    fn empty(decoder: WireDecoder<'a, R, I, L>) -> Self {
+        Self {
+            remaining: 0,
+            decoder,
+        }
     }
 }
 

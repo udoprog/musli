@@ -187,7 +187,7 @@ where
 
     #[inline]
     fn encode_none(self) -> Result<(), Self::Error> {
-        self.writer.write_byte(TypeTag::OptionNone as u8)?;
+        self.writer.write_byte(TypeTag::Empty as u8)?;
         Ok(())
     }
 
@@ -221,8 +221,7 @@ where
 
     #[inline]
     fn encode_unit_struct(self) -> Result<(), Self::Error> {
-        self.writer.write_byte(TypeTag::PairSequence as u8)?;
-        L::encode_usize(&mut *self.writer, 0)?;
+        self.writer.write_byte(TypeTag::Empty as u8)?;
         Ok(())
     }
 

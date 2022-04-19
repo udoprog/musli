@@ -7,16 +7,16 @@ use musli::{Decode, Decoder};
 #[repr(u8)]
 pub enum TypeTag {
     /// unknown type tag.
-    Unknown = 0b0,
+    Unknown = 0b0000_0000,
     /// A single encoded byte. The contents of which is packed in 7 least
-    /// significant bits. If all LSBs are set to 1 (i.e. `0b1111_1111`), the next
-    /// byte is used as the byte of the tag. All other types avoids having the MSB
-    /// set.
+    /// significant bits. If all LSBs are set to 1 (i.e. `0b1111_1111`), the
+    /// next byte is used as the byte of the tag. All other types avoids having
+    /// the MSB set.
     Fixed8 = 0b1000_0000,
-    /// Read the entire next byte.
+    /// The subsequent byte is the byte to read.
     Fixed8Next = 0b1111_1111,
-    /// An absent optional value.
-    OptionNone = 0b0111_1110,
+    /// An empty value.
+    Empty = 0b0111_1110,
     /// A present optional value.
     OptionSome = 0b0111_1111,
     /// Fixed-length 2 bytes.
@@ -51,7 +51,7 @@ impl TypeTag {
     pub(crate) const PAIR_BYTE: u8 = TypeTag::Pair as u8;
     pub(crate) const PAIR_SEQUENCE_BYTE: u8 = TypeTag::PairSequence as u8;
     pub(crate) const OPTION_SOME_BYTE: u8 = TypeTag::OptionSome as u8;
-    pub(crate) const OPTION_NONE_BYTE: u8 = TypeTag::OptionNone as u8;
+    pub(crate) const EMPTY_BYTE: u8 = TypeTag::Empty as u8;
 }
 
 impl<'de> Decode<'de> for TypeTag {
@@ -72,7 +72,7 @@ impl<'de> Decode<'de> for TypeTag {
             Self::PAIR_BYTE => Self::Pair,
             Self::PAIR_SEQUENCE_BYTE => Self::PairSequence,
             Self::OPTION_SOME_BYTE => Self::OptionSome,
-            Self::OPTION_NONE_BYTE => Self::OptionNone,
+            Self::EMPTY_BYTE => Self::Empty,
             _ => Self::Unknown,
         })
     }
