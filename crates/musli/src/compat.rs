@@ -75,6 +75,7 @@ impl Encode for Bytes<Vec<u8>> {
 }
 
 impl<'de> Decode<'de> for Bytes<Vec<u8>> {
+    #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: crate::Decoder<'de>,
@@ -95,6 +96,7 @@ impl Encode for Bytes<VecDeque<u8>> {
 }
 
 impl<'de> Decode<'de> for Bytes<VecDeque<u8>> {
+    #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: crate::Decoder<'de>,
