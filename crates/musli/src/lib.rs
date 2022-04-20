@@ -40,8 +40,8 @@
 //! Add the following to your `Cargo.toml`:
 //!
 //! ```toml
-//! musli = "0.0.11"
-//! musli-wire = "0.0.11"
+//! musli = "0.0.12"
+//! musli-wire = "0.0.12"
 //! ```
 //!
 //! <br>
