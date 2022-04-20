@@ -4,7 +4,8 @@
 //! it which allows it to make the assumption the bytes are always returned with
 //! the `'de` lifetime.
 
-use core::fmt;
+use core::{fmt, slice};
+use std::{marker, ops::Range, ptr};
 
 use musli::error::Error;
 
@@ -225,5 +226,71 @@ where
         let array = self.reader.read_array()?;
         self.pos += N;
         Ok(array)
+    }
+}
+
+/// An efficient [Reader] wrapper around a slice.
+pub struct SliceReader<'de> {
+    range: Range<*const u8>,
+    _marker: marker::PhantomData<&'de [u8]>,
+}
+
+impl<'de> SliceReader<'de> {
+    /// Construct a new instance around the specified slice.
+    #[inline]
+    pub fn new(slice: &'de [u8]) -> Self {
+        Self {
+            range: slice.as_ptr_range(),
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<'de> Reader<'de> for SliceReader<'de> {
+    type Error = SliceReaderError;
+
+    #[inline]
+    fn pos(&self) -> Option<usize> {
+        None
+    }
+
+    #[inline]
+    fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
+        self.range.start = bounds_check_add(&self.range, n)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
+        let outcome = bounds_check_add(&self.range, n)?;
+
+        unsafe {
+            let bytes = slice::from_raw_parts(self.range.start, n);
+            self.range.start = outcome;
+            Ok(bytes)
+        }
+    }
+
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        let outcome = bounds_check_add(&self.range, buf.len())?;
+
+        unsafe {
+            ptr::copy_nonoverlapping(self.range.start, buf.as_mut_ptr(), buf.len());
+            self.range.start = outcome;
+        }
+
+        Ok(())
+    }
+}
+
+#[inline]
+fn bounds_check_add(range: &Range<*const u8>, len: usize) -> Result<*const u8, SliceReaderError> {
+    let outcome = range.start.wrapping_add(len);
+
+    if outcome > range.end || outcome < range.start {
+        Err(SliceReaderError::custom("buffer underflow"))
+    } else {
+        Ok(outcome)
     }
 }

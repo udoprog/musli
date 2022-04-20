@@ -12,7 +12,7 @@ use musli::Decode;
 use musli::Encode;
 use musli_binary_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
 use musli_binary_common::int::{BigEndian, LittleEndian, NetworkEndian};
-use musli_binary_common::reader::Reader;
+use musli_binary_common::reader::{Reader, SliceReader, SliceReaderError};
 #[cfg(feature = "std")]
 use musli_binary_common::writer::VecWriterError;
 use musli_binary_common::writer::Writer;
@@ -80,6 +80,16 @@ where
     T: Decode<'de>,
 {
     DEFAULT.decode(reader)
+}
+
+/// Decode the given type `T` from the given slice using the [DEFAULT]
+/// configuration.
+#[inline]
+pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, SliceReaderError>
+where
+    T: Decode<'de>,
+{
+    DEFAULT.from_slice(bytes)
 }
 
 /// Setting up encoding with parameters.
@@ -256,6 +266,17 @@ where
         T: Decode<'de>,
     {
         let mut reader = reader.with_position();
+        T::decode(WireDecoder::<_, I, L>::new(&mut reader))
+    }
+
+    /// Decode the given type `T` from the given slice using the current
+    /// configuration.
+    #[inline]
+    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, SliceReaderError>
+    where
+        T: Decode<'de>,
+    {
+        let mut reader = SliceReader::new(bytes).with_position();
         T::decode(WireDecoder::<_, I, L>::new(&mut reader))
     }
 }

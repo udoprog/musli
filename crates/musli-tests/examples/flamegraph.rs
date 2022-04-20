@@ -103,7 +103,7 @@ fn decode_musli<'de, T>(data: &'de [u8]) -> T
 where
     T: Decode<'de>,
 {
-    ENCODING.decode(data).unwrap()
+    ENCODING.from_slice(data).unwrap()
 }
 
 fn main() {

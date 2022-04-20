@@ -103,7 +103,7 @@ mod integer_encoding;
 #[cfg(feature = "test")]
 pub mod test;
 
-pub use self::encoding::{decode, encode, to_fixed_bytes, StorageEncoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, StorageEncoding};
 #[cfg(feature = "std")]
 pub use self::encoding::{to_vec, to_writer};
 pub use self::integer_encoding::{Fixed, FixedLength, Variable};

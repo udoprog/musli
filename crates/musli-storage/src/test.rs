@@ -18,8 +18,8 @@ macro_rules! rt {
         let value: $ty = $expr;
         let out = $crate::to_vec(&value).expect(concat!("storage: ", stringify!($ty), ": failed to encode"));
         let mut buf = &out[..];
-        let decoded: $ty = $crate::decode(&mut buf).expect(concat!("storage: ", stringify!($ty), ": failed to decode"));
-        assert!(buf.is_empty(), concat!("storage: ", stringify!($ty), ": decoded buffer should be empty.\nwas: {:?}\noriginal: {:?}\n"), buf, &out[..]);
+        let decoded: $ty = $crate::from_slice(buf).expect(concat!("storage: ", stringify!($ty), ": failed to decode"));
+        // assert!(buf.is_empty(), concat!("storage: ", stringify!($ty), ": decoded buffer should be empty.\nwas: {:?}\noriginal: {:?}\n"), buf, &out[..]);
         assert_eq!(decoded, $expr, concat!("storage: ", stringify!($ty), ": roundtrip does not match"));
         decoded
     }};

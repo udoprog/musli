@@ -151,6 +151,20 @@
 //!
 //! <br>
 //!
+//! ## Unsafety
+//!
+//! This library currently has two instances of unsafe:
+//!
+//! * A `mem::transcode` in `Tag::kind`. Which guarantees that converting into
+//!   the `Kind` enum which is `#[repr(u8)]` is as efficient as possible. (Soon
+//!   to be replaced with an equivalent safe variant).
+//!
+//! * A largely unsafe `SliceReader` which provides more efficient reading than
+//!   the default `Reader` impl for `&[u8]` does (which uses split_at). Since it
+//!   can perform most of the necessary comparisons directly on the pointers.
+//!
+//! <br>
+//!
 //! ## Performance
 //!
 //! > The following are the results of preliminary benchmarking and should be

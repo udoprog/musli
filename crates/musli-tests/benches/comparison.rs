@@ -173,7 +173,7 @@ where
     // NB: bincode uses a 128-byte pre-allocated vector.
     let mut data = Vec::with_capacity(128);
     WIRE_ENCODING.encode(&mut data, expected).unwrap();
-    let value: T = WIRE_ENCODING.decode(&data[..]).unwrap();
+    let value: T = WIRE_ENCODING.from_slice(&data[..]).unwrap();
     value
 }
 
@@ -208,7 +208,7 @@ where
     // NB: bincode uses a 128-byte pre-allocated vector.
     let mut data = Vec::with_capacity(128);
     STORAGE_ENCODING.encode(&mut data, expected).unwrap();
-    let value: T = STORAGE_ENCODING.decode(&data[..]).unwrap();
+    let value: T = STORAGE_ENCODING.from_slice(&data[..]).unwrap();
     value
 }
 
@@ -226,7 +226,7 @@ fn musli_storage_dec<'de, T>(data: &'de [u8]) -> T
 where
     T: Decode<'de>,
 {
-    STORAGE_ENCODING.decode(data).unwrap()
+    STORAGE_ENCODING.from_slice(data).unwrap()
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -259,7 +259,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         }};
     }
 
-    benches!("rmp-serde", rmp_enc, rmp_dec, rmp_rt);
+    // benches!("rmp-serde", rmp_enc, rmp_dec, rmp_rt);
     benches!("bincode-serde", bin_enc, bin_dec, bin_rt);
     benches!("cbor-serde", cbor_enc, cbor_dec, cbor_rt);
     benches!("json", json_enc, json_dec, json_rt);

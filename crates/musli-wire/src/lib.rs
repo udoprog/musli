@@ -103,7 +103,7 @@ pub mod tag;
 #[macro_use]
 pub mod test;
 
-pub use self::encoding::{decode, encode, to_fixed_bytes, WireEncoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, WireEncoding};
 #[cfg(feature = "std")]
 pub use self::encoding::{to_vec, to_writer};
 pub use self::integer_encoding::{Fixed, FixedLength, Variable};
