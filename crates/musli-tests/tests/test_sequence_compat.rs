@@ -1,4 +1,4 @@
-use musli::compat::{Bytes, Sequence};
+use musli::compat::Sequence;
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]

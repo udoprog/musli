@@ -6,14 +6,22 @@ use musli::{Decode, Encode};
 /// Roundtrip encode the given value.
 #[macro_export]
 macro_rules! rt {
-    ($expr:expr) => {{
-        let mut value = $expr;
-        let out = $crate::to_vec(&value).expect("encode failed");
+    ($enum:ident :: $variant:ident $($body:tt)?) => {
+        $crate::rt!($enum, $enum :: $variant $($body)*)
+    };
+
+    ($struct:ident $($body:tt)?) => {
+        $crate::rt!($struct, $struct $($body)*)
+    };
+
+    ($ty:ty, $expr:expr) => {{
+        let value: $ty = $expr;
+        let out = $crate::to_vec(&value).expect(concat!("storage: ", stringify!($ty), ": failed to encode"));
         let mut buf = &out[..];
-        value = $crate::decode(&mut buf).expect("decode failed");
-        assert!(buf.is_empty());
-        assert_eq!(value, $expr);
-        value
+        let decoded: $ty = $crate::decode(&mut buf).expect(concat!("storage: ", stringify!($ty), ": failed to decode"));
+        assert!(buf.is_empty(), concat!("storage: ", stringify!($ty), ": decoded buffer should be empty.\nwas: {:?}\noriginal: {:?}\n"), buf, &out[..]);
+        assert_eq!(decoded, $expr, concat!("storage: ", stringify!($ty), ": roundtrip does not match"));
+        decoded
     }};
 }
 

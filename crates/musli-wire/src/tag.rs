@@ -31,12 +31,10 @@ pub enum Kind {
 
 /// A type tag.
 ///
-/// The type of the element is the 3 MSBs, which indicates that it's one of the
-/// specified variants in the [Kind] enumeration.
-///
-/// The remaining 5 bits are the data field, and its use depends on the [Kind]
-/// in question. Usually it's just used to smuggle extra data in case a value is
-/// small (which it usually is).
+/// The [Kind] of the element is indicates by its 2 MSBs, and remaining 6 bits
+/// is the data field. The exact use of the data field depends on the [Kind] in
+/// question. It is primarily used to smuggle extra data for the kind in
+/// question.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Tag {
@@ -45,13 +43,14 @@ pub struct Tag {
 }
 
 impl Tag {
-    /// Construct a new tag.
+    /// Construct a new tag through an unchecked constructor.
     ///
-    /// If `data` is larger or equal to [DATA_MASK] it is considered as empty.
+    /// `data` must not be equal to or larger than [DATA_MASK], or else it could
+    /// corrupt the payload.
     #[inline]
     pub const fn new(kind: Kind, data: u8) -> Self {
         Self {
-            repr: kind as u8 | if data < DATA_MASK { data } else { DATA_MASK },
+            repr: kind as u8 | data,
         }
     }
 
@@ -61,20 +60,6 @@ impl Tag {
         Self {
             repr: kind as u8 | DATA_MASK,
         }
-    }
-
-    /// Access the kind of the tag.
-    #[inline]
-    pub const fn kind(self) -> Kind {
-        // SAFETY: this is safe because we've ensured that all available Kind
-        // variants occupy all available bit patterns.
-        unsafe { mem::transmute(self.repr & !DATA_MASK) }
-    }
-
-    /// Access the data of the tag.
-    #[inline]
-    pub const fn data_raw(self) -> u8 {
-        self.repr & DATA_MASK
     }
 
     /// Construct from a byte.
@@ -87,6 +72,34 @@ impl Tag {
     #[inline]
     pub const fn byte(self) -> u8 {
         self.repr
+    }
+
+    /// Access the kind of the tag.
+    #[inline]
+    pub const fn kind(self) -> Kind {
+        // SAFETY: this is safe because we've ensured that all available Kind
+        // variants occupy all available bit patterns.
+        unsafe { mem::transmute(self.repr & !DATA_MASK) }
+    }
+
+    /// Perform raw access over the data payload. Will return [DATA_MASK] if
+    /// data is empty.
+    #[inline]
+    const fn data_raw(self) -> u8 {
+        self.repr & DATA_MASK
+    }
+
+    /// Perform checked access over the internal data. Returns [None] if data is
+    /// empty.
+    #[inline]
+    pub const fn data(self) -> Option<u8> {
+        let data = self.data_raw();
+
+        if data == DATA_MASK {
+            None
+        } else {
+            Some(data)
+        }
     }
 
     /// Attempt to construct a type tag with the given length embedded.
@@ -112,16 +125,6 @@ impl Tag {
             (Self::new(kind, len), true)
         } else {
             (Self::new(kind, DATA_MASK), false)
-        }
-    }
-
-    /// Get the embedded length as a byte.
-    #[inline]
-    pub const fn data(self) -> Option<u8> {
-        if self.data_raw() == DATA_MASK {
-            None
-        } else {
-            Some(self.data_raw())
         }
     }
 }

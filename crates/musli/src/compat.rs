@@ -150,7 +150,7 @@ impl<const N: usize> Encode for Bytes<[u8; N]> {
     where
         E: Encoder,
     {
-        encoder.encode_bytes(self.0.as_slice())
+        encoder.encode_array(self.0)
     }
 }
 

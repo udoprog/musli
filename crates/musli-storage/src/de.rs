@@ -7,7 +7,7 @@ use musli::de::{
     SequenceDecoder, StructDecoder,
 };
 use musli::error::Error;
-use musli_binary_common::reader::Reader;
+use musli_binary_common::reader::{Reader, WithPosition};
 
 /// A very simple decoder.
 pub struct StorageDecoder<'de, R, I, L>
@@ -15,7 +15,7 @@ where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
-    reader: &'de mut R,
+    reader: &'de mut WithPosition<R>,
     _marker: marker::PhantomData<(I, L)>,
 }
 
@@ -26,7 +26,7 @@ where
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(reader: &'de mut R) -> Self {
+    pub(crate) fn new(reader: &'de mut WithPosition<R>) -> Self {
         Self {
             reader,
             _marker: marker::PhantomData,
@@ -65,8 +65,13 @@ where
 
     #[inline]
     fn decode_unit(self) -> Result<(), Self::Error> {
-        if L::decode_usize(&mut *self.reader)? != 0 {
-            return Err(Self::Error::custom("expected empty sequence"));
+        let count = L::decode_usize(&mut *self.reader)?;
+
+        if count != 0 {
+            return Err(Self::Error::collect_from_display(ExpectedEmptySequence(
+                count,
+                self.reader.pos(),
+            )));
         }
 
         Ok(())
@@ -130,12 +135,12 @@ where
 
     #[inline]
     fn decode_bool(self) -> Result<bool, Self::Error> {
-        match self.decode_u8()? {
+        match self.reader.read_byte()? {
             0 => Ok(false),
             1 => Ok(true),
-            b => Err(Self::Error::custom(format!(
-                "bad boolean, expected byte 1 or 0 but was {}",
-                b
+            b => Err(Self::Error::collect_from_display(BadBoolean(
+                b,
+                self.reader.pos(),
             ))),
         }
     }
@@ -146,7 +151,7 @@ where
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(Self::Error::custom("bad character")),
+            None => Err(Self::Error::collect_from_display(BadCharacter(num))),
         }
     }
 
@@ -421,5 +426,41 @@ where
     #[inline]
     fn skip_second(self) -> Result<bool, Self::Error> {
         Ok(false)
+    }
+}
+
+struct ExpectedEmptySequence(usize, Option<usize>);
+
+impl fmt::Display for ExpectedEmptySequence {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(pos) = self.1 {
+            write!(
+                f,
+                "Expected empty sequence, but was {:?} (at {})",
+                self.0, pos
+            )
+        } else {
+            write!(f, "Expected empty sequence, but was {:?}", self.0)
+        }
+    }
+}
+
+struct BadBoolean(u8, Option<usize>);
+
+impl fmt::Display for BadBoolean {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(pos) = self.1 {
+            write!(f, "Bad boolean byte 0x{:02x} (at {})", self.0, pos)
+        } else {
+            write!(f, "Bad boolean byte 0x{:02x}", self.0)
+        }
+    }
+}
+
+struct BadCharacter(u32);
+
+impl fmt::Display for BadCharacter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Bad character number {:?}", self.0)
     }
 }

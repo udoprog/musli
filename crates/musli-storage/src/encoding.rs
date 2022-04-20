@@ -250,11 +250,12 @@ where
     /// Decode the given type `T` from the given [Reader] using the current
     /// configuration.
     #[inline]
-    pub fn decode<'de, R, T>(self, mut reader: R) -> Result<T, R::Error>
+    pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
         T: Decode<'de>,
     {
+        let mut reader = reader.with_position();
         T::decode(StorageDecoder::<_, I, L>::new(&mut reader))
     }
 }

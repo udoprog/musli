@@ -42,14 +42,22 @@ where
 /// Roundtrip encode the given value.
 #[macro_export]
 macro_rules! rt {
-    ($expr:expr) => {{
-        let mut value = $expr;
-        let out = $crate::to_vec(&value).expect("failed to encode");
+    ($enum:ident :: $variant:ident $($body:tt)?) => {
+        $crate::rt!($enum, $enum :: $variant $($body)*)
+    };
+
+    ($struct:ident $($body:tt)?) => {
+        $crate::rt!($struct, $struct $($body)*)
+    };
+
+    ($ty:ty, $expr:expr) => {{
+        let value: $ty = $expr;
+        let out = $crate::to_vec(&value).expect(concat!("wire: ", stringify!($ty), ": failed to encode"));
         let mut buf = &out[..];
-        value = $crate::decode(&mut buf).expect("failed to decode");
-        assert!(buf.is_empty(), "deserialized buffer should be empty");
-        assert_eq!(value, $expr, "roundtrip does not match");
-        value
+        let decoded: $ty = $crate::decode(&mut buf).expect(concat!("wire: ", stringify!($ty), ": failed to decode"));
+        assert!(buf.is_empty(), concat!("wire: ", stringify!($ty), ": decoded buffer should be empty.\nwas: {:?}\noriginal: {:?}\n"), buf, &out[..]);
+        assert_eq!(decoded, $expr, concat!("wire: ", stringify!($ty), ": roundtrip does not match"));
+        decoded
     }};
 }
 

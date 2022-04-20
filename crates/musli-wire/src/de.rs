@@ -96,10 +96,11 @@ where
                     RemainingSimpleDecoder::sequence(self)
                 }
             }
-            _ => Err(R::Error::collect_from_display(Expected(
-                Kind::Sequence,
-                self.reader.pos(),
-            ))),
+            _ => Err(R::Error::collect_from_display(Expected {
+                expected: Kind::Sequence,
+                actual: tag,
+                pos: self.reader.pos(),
+            })),
         }
     }
 
@@ -116,10 +117,11 @@ where
                     RemainingSimpleDecoder::pairs(self)
                 }
             }
-            _ => Err(R::Error::collect_from_display(Expected(
-                Kind::Sequence,
-                self.reader.pos(),
-            ))),
+            _ => Err(R::Error::collect_from_display(Expected {
+                expected: Kind::Sequence,
+                actual: tag,
+                pos: self.reader.pos(),
+            })),
         }
     }
 }
@@ -169,10 +171,11 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         if tag.kind() != Kind::Prefix {
-            return Err(Self::Error::collect_from_display(Expected(
-                Kind::Prefix,
-                self.reader.pos(),
-            )));
+            return Err(Self::Error::collect_from_display(Expected {
+                expected: Kind::Prefix,
+                actual: tag,
+                pos: self.reader.pos(),
+            }));
         }
 
         let len = if let Some(len) = tag.data() {
@@ -200,10 +203,11 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         if tag.kind() != Kind::Prefix {
-            return Err(Self::Error::collect_from_display(Expected(
-                Kind::Prefix,
-                self.reader.pos(),
-            )));
+            return Err(Self::Error::collect_from_display(Expected {
+                expected: Kind::Prefix,
+                actual: tag,
+                pos: self.reader.pos(),
+            }));
         }
 
         let len = if let Some(len) = tag.data() {
@@ -254,12 +258,17 @@ where
 
     #[inline]
     fn decode_bool(self) -> Result<bool, Self::Error> {
-        match self.decode_u8()? {
-            0 => Ok(false),
-            1 => Ok(true),
-            b => Err(Self::Error::custom(format!(
-                "bad boolean, expected byte 1 or 0 but was {}",
-                b
+        const FALSE: Tag = Tag::new(Kind::Byte, 0);
+        const TRUE: Tag = Tag::new(Kind::Byte, 1);
+
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        match tag {
+            FALSE => Ok(false),
+            TRUE => Ok(true),
+            tag => Err(Self::Error::collect_from_display(BadBoolean(
+                tag,
+                self.reader.pos(),
             ))),
         }
     }
@@ -270,22 +279,23 @@ where
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(Self::Error::custom("bad character")),
+            None => Err(Self::Error::collect_from_display(BadCharacter(num))),
         }
     }
 
     #[inline]
     fn decode_u8(self) -> Result<u8, Self::Error> {
-        let b = Tag::from_byte(self.reader.read_byte()?);
+        let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        if b.kind() != Kind::Byte {
-            return Err(Self::Error::collect_from_display(Expected(
-                Kind::Byte,
-                self.reader.pos(),
-            )));
+        if tag.kind() != Kind::Byte {
+            return Err(Self::Error::collect_from_display(Expected {
+                expected: Kind::Byte,
+                actual: tag,
+                pos: self.reader.pos(),
+            }));
         }
 
-        if let Some(b) = b.data() {
+        if let Some(b) = tag.data() {
             Ok(b)
         } else {
             self.reader.read_byte()
@@ -365,21 +375,19 @@ where
 
     #[inline]
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
+        // Options are encoded as empty or sequences with a single element.
+        const NONE: Tag = Tag::new(Kind::Sequence, 0);
+        const SOME: Tag = Tag::new(Kind::Sequence, 1);
+
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        match tag.kind() {
-            Kind::Sequence => match tag.data_raw() {
-                0 => Ok(None),
-                1 => Ok(Some(self)),
-                _ => Err(Self::Error::collect_from_display(Expected(
-                    Kind::Sequence,
-                    self.reader.pos(),
-                ))),
-            },
-            _ => Err(Self::Error::collect_from_display(Expected(
-                Kind::Sequence,
-                self.reader.pos(),
-            ))),
+        match tag {
+            NONE => Ok(None),
+            SOME => Ok(Some(self)),
+            tag => Err(Self::Error::collect_from_display(ExpectedOption {
+                tag,
+                pos: self.reader.pos(),
+            })),
         }
     }
 
@@ -411,11 +419,14 @@ where
 
     #[inline]
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
-        if Tag::from_byte(self.reader.read_byte()?) != Tag::new(Kind::Sequence, 2) {
-            return Err(Self::Error::collect_from_display(Expected(
-                Kind::Sequence,
-                self.reader.pos(),
-            )));
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        if tag != Tag::new(Kind::Sequence, 2) {
+            return Err(Self::Error::collect_from_display(Expected {
+                expected: Kind::Sequence,
+                actual: tag,
+                pos: self.reader.pos(),
+            }));
         }
 
         Ok(self)
@@ -598,14 +609,61 @@ where
     }
 }
 
-struct Expected(Kind, Option<usize>);
+struct Expected {
+    expected: Kind,
+    actual: Tag,
+    pos: Option<usize>,
+}
 
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(pos) = self.1 {
-            write!(f, "Expected {:?} (at {})", self.0, pos)
+        if let Some(pos) = self.pos {
+            write!(
+                f,
+                "Expected {:?} but was {:?} (at {})",
+                self.expected, self.actual, pos
+            )
         } else {
-            write!(f, "Expected {:?}", self.0)
+            write!(f, "Expected {:?} but was {:?}", self.expected, self.actual)
+        }
+    }
+}
+
+struct BadBoolean(Tag, Option<usize>);
+
+impl fmt::Display for BadBoolean {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(pos) = self.1 {
+            write!(f, "Bad boolean tag {:?} (at {})", self.0, pos)
+        } else {
+            write!(f, "Bad boolean tag {:?}", self.0)
+        }
+    }
+}
+
+struct BadCharacter(u32);
+
+impl fmt::Display for BadCharacter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Bad character number 0x{:02x}", self.0)
+    }
+}
+
+struct ExpectedOption {
+    tag: Tag,
+    pos: Option<usize>,
+}
+
+impl fmt::Display for ExpectedOption {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(pos) = self.pos {
+            write!(
+                f,
+                "Expected zero-to-single sequence, was {:?} (at {})",
+                self.tag, pos
+            )
+        } else {
+            write!(f, "Expected zero-to-single sequence, was {:?}", self.tag)
         }
     }
 }
@@ -628,18 +686,6 @@ impl fmt::Display for BadLength {
             )
         } else {
             write!(f, "Bad length, got {actual} but expect {expected}")
-        }
-    }
-}
-
-struct UnsupportedMark(Option<u8>, Option<usize>);
-
-impl fmt::Display for UnsupportedMark {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(pos) = self.1 {
-            write!(f, "Unsupported mark {:?} (at {})", self.0, pos)
-        } else {
-            write!(f, "Unsupported mark {:?}", self.0)
         }
     }
 }
