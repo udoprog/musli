@@ -2,7 +2,6 @@ use core::fmt::{Debug, Display};
 use core::hash::Hash;
 use core::marker;
 
-use crate::traits::Typed;
 use crate::types::{Kind, Tag, DATA_MASK};
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
@@ -27,27 +26,27 @@ pub trait IntegerEncoding:
     fn encode_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
     where
         W: Writer,
-        T: ByteOrderIo + Typed;
+        T: ByteOrderIo;
 
     /// Governs how unsigned integers are decoded from a [Reader].
     fn decode_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
-        T: ByteOrderIo + Typed;
+        T: ByteOrderIo;
 
     /// Governs how signed integers are encoded into a [Writer].
     fn encode_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
     where
         W: Writer,
         T: Signed,
-        T::Unsigned: ByteOrderIo + Typed;
+        T::Unsigned: ByteOrderIo;
 
     /// Governs how signed integers are decoded from a [Reader].
     fn decode_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
         T: Signed,
-        T::Unsigned: ByteOrderIo<Signed = T> + Typed;
+        T::Unsigned: ByteOrderIo<Signed = T>;
 }
 
 /// Encoding formats which ensure that variably sized types (like `usize`,
@@ -119,7 +118,7 @@ impl IntegerEncoding for Variable {
     where
         W: Writer,
         T: Signed,
-        T::Unsigned: Typed + ByteOrderIo,
+        T::Unsigned: ByteOrderIo,
     {
         Self::encode_unsigned(writer, zig::encode(value))
     }
@@ -129,7 +128,7 @@ impl IntegerEncoding for Variable {
     where
         R: Reader<'de>,
         T: Signed,
-        T::Unsigned: Unsigned<Signed = T> + Typed + ByteOrderIo,
+        T::Unsigned: Unsigned<Signed = T> + ByteOrderIo,
     {
         let value: T::Unsigned = Self::decode_unsigned(reader)?;
         Ok(zig::decode(value))
@@ -201,9 +200,9 @@ where
     fn encode_unsigned<W, T>(mut writer: W, value: T) -> Result<(), W::Error>
     where
         W: Writer,
-        T: ByteOrderIo + Typed,
+        T: ByteOrderIo,
     {
-        writer.write_byte(T::TYPE_FLAG.byte())?;
+        writer.write_byte(Tag::new(Kind::Prefix, T::BYTES).byte())?;
         value.write_bytes::<_, B>(writer)
     }
 
@@ -211,9 +210,9 @@ where
     fn decode_unsigned<'de, R, T>(mut reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
-        T: ByteOrderIo + Typed,
+        T: ByteOrderIo,
     {
-        if reader.read_byte()? != T::TYPE_FLAG.byte() {
+        if Tag::from_byte(reader.read_byte()?) != Tag::new(Kind::Prefix, T::BYTES) {
             return Err(R::Error::custom("expected fixed integer"));
         }
 
@@ -225,9 +224,9 @@ where
     where
         W: Writer,
         T: Signed,
-        T::Unsigned: ByteOrderIo + Typed,
+        T::Unsigned: ByteOrderIo,
     {
-        writer.write_byte(T::Unsigned::TYPE_FLAG.byte())?;
+        writer.write_byte(Tag::new(Kind::Prefix, T::Unsigned::BYTES).byte())?;
         value.unsigned().write_bytes::<_, B>(writer)
     }
 
@@ -236,9 +235,9 @@ where
     where
         R: Reader<'de>,
         T: Signed,
-        T::Unsigned: ByteOrderIo<Signed = T> + Typed,
+        T::Unsigned: ByteOrderIo<Signed = T>,
     {
-        if reader.read_byte()? != T::Unsigned::TYPE_FLAG.byte() {
+        if Tag::from_byte(reader.read_byte()?) != Tag::new(Kind::Prefix, T::Unsigned::BYTES) {
             return Err(R::Error::custom("expected fixed integer"));
         }
 
@@ -262,7 +261,7 @@ impl<L, B> UsizeEncoding for FixedLength<L, B>
 where
     B: ByteOrder,
     usize: TryFrom<L>,
-    L: ByteOrderIo + Typed + TryFrom<usize>,
+    L: ByteOrderIo + TryFrom<usize>,
     L::Error: 'static + Debug + Display + Send + Sync,
     <usize as TryFrom<L>>::Error: 'static + Debug + Display + Send + Sync,
 {
@@ -280,7 +279,7 @@ where
     where
         W: Writer,
     {
-        writer.write_byte(L::TYPE_FLAG.byte())?;
+        writer.write_byte(Tag::new(Kind::Prefix, L::BYTES).byte())?;
         let value: L = value.try_into().map_err(W::Error::custom)?;
         value.write_bytes::<_, B>(writer)
     }
@@ -298,7 +297,7 @@ where
     where
         R: Reader<'de>,
     {
-        if reader.read_byte()? != L::TYPE_FLAG.byte() {
+        if Tag::from_byte(reader.read_byte()?) != Tag::new(Kind::Prefix, L::BYTES) {
             return Err(R::Error::custom("expected fixed integer"));
         }
 

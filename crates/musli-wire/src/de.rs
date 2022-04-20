@@ -73,29 +73,10 @@ where
                     self.skip_any()?;
                 }
             }
-            Kind::PairSequence => {
-                let len = if let Some(len) = tag.data() {
-                    len as usize
-                } else {
-                    L::decode_usize(&mut *self.reader)?
-                };
-
-                for _ in 0..len {
-                    self.skip_any()?;
-                    self.skip_any()?;
-                }
-            }
             Kind::Continuation => {
                 if tag.data().is_none() {
                     let _ = c::decode::<_, u128>(&mut *self.reader)?;
                 }
-            }
-            other => {
-                return Err(R::Error::custom(format!(
-                    "unexpected type kind {:?} ({:08b})",
-                    other,
-                    tag.byte(),
-                )));
             }
         }
 
@@ -112,7 +93,7 @@ where
                 if let Some(len) = tag.data() {
                     RemainingSimpleDecoder::with_len(self, len as usize)
                 } else {
-                    RemainingSimpleDecoder::new(self)
+                    RemainingSimpleDecoder::sequence(self)
                 }
             }
             _ => Err(R::Error::collect_from_display(Expected(
@@ -128,15 +109,15 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         match tag.kind() {
-            Kind::PairSequence => {
+            Kind::Sequence => {
                 if let Some(len) = tag.data() {
-                    RemainingSimpleDecoder::with_len(self, len as usize)
+                    RemainingSimpleDecoder::with_len(self, (len / 2) as usize)
                 } else {
-                    RemainingSimpleDecoder::new(self)
+                    RemainingSimpleDecoder::pairs(self)
                 }
             }
             _ => Err(R::Error::collect_from_display(Expected(
-                Kind::PairSequence,
+                Kind::Sequence,
                 self.reader.pos(),
             ))),
         }
@@ -407,9 +388,9 @@ where
 
     #[inline]
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
-        if Tag::from_byte(self.reader.read_byte()?) != Tag::new(Kind::PairSequence, 1) {
+        if Tag::from_byte(self.reader.read_byte()?) != Tag::new(Kind::Sequence, 2) {
             return Err(Self::Error::collect_from_display(Expected(
-                Kind::PairSequence,
+                Kind::Sequence,
                 self.reader.pos(),
             )));
         }
@@ -445,9 +426,18 @@ where
     L: UsizeEncoding,
 {
     #[inline]
-    fn new(decoder: WireDecoder<'a, R, I, L>) -> Result<Self, R::Error> {
+    fn sequence(decoder: WireDecoder<'a, R, I, L>) -> Result<Self, R::Error> {
         let remaining = L::decode_usize(&mut *decoder.reader)?;
         Ok(Self { remaining, decoder })
+    }
+
+    #[inline]
+    fn pairs(decoder: WireDecoder<'a, R, I, L>) -> Result<Self, R::Error> {
+        let remaining = L::decode_usize(&mut *decoder.reader)?;
+        Ok(Self {
+            remaining: remaining / 2,
+            decoder,
+        })
     }
 
     #[inline]

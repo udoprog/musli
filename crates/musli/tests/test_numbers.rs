@@ -29,12 +29,12 @@ fn test_signed_unpacked() {
     assert_eq! {
         unpacked,
         Unpacked {
-            count: Tag::new(Kind::PairSequence, 5),
+            count: Tag::new(Kind::Sequence, 10),
             a: (Tag::new(Kind::Continuation, 0), Tag::new(Kind::Continuation, 1)),
             b: (Tag::new(Kind::Continuation, 1), Tag::new(Kind::Continuation, 2)),
             c: (Tag::new(Kind::Continuation, 2), Tag::new(Kind::Continuation, 3)),
             d: (Tag::new(Kind::Continuation, 3), Tag::new(Kind::Continuation, 4)),
-            e: Typed::new(Tag::new(Kind::Continuation, 4), [159, 128, 144, 223, 192, 74]),
+            e: (Tag::new(Kind::Continuation, 4), Typed::new(Tag::empty(Kind::Continuation), [128, 144, 223, 192, 74])),
         }
     };
 
@@ -46,6 +46,6 @@ fn test_signed_unpacked() {
         b: (Tag, Tag),
         c: (Tag, Tag),
         d: (Tag, Tag),
-        e: Typed<[u8; 6]>,
+        e: (Tag, Typed<[u8; 5]>),
     }
 }

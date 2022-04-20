@@ -100,7 +100,6 @@ pub mod encoding;
 mod integer_encoding;
 #[cfg(feature = "test")]
 pub mod test;
-mod traits;
 pub mod types;
 
 pub use self::encoding::{decode, encode, to_fixed_bytes, WireEncoding};

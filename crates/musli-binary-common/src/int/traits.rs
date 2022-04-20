@@ -18,6 +18,9 @@ pub trait Unsigned:
     /// The number `1` as represented by the current unsigned number.
     const ONE: Self;
 
+    /// Number of bytes.
+    const BYTES: u8;
+
     /// The signed representation of this unsigned number.
     type Signed: Signed;
 
@@ -95,6 +98,7 @@ macro_rules! implement {
 
         impl Unsigned for $unsigned {
             const ONE: Self = 1;
+            const BYTES: u8 = (<$unsigned>::BITS / 8) as u8;
 
             type Signed = $signed;
 

@@ -34,7 +34,7 @@ fn struct_named_fields() {
     assert_eq!(
         unpacked,
         Unpacked {
-            field_count: Tag::new(Kind::PairSequence, 2),
+            field_count: Tag::new(Kind::Sequence, 4),
             field1_name: Typed::new(
                 Tag::new(Kind::Prefix, 6),
                 [b's', b't', b'r', b'i', b'n', b'g']
@@ -44,7 +44,7 @@ fn struct_named_fields() {
                 Tag::new(Kind::Prefix, 6),
                 [b'n', b'u', b'm', b'b', b'e', b'r']
             ),
-            field2_value: Typed::new(Tag::empty(Kind::Continuation), 42),
+            field2_value: Tag::new(Kind::Continuation, 42),
         }
     );
 
@@ -55,7 +55,7 @@ fn struct_named_fields() {
         field1_name: Typed<[u8; 6]>,
         field1_value: Typed<[u8; 3]>,
         field2_name: Typed<[u8; 6]>,
-        field2_value: Typed<u8>,
+        field2_value: Tag,
     }
 }
 
@@ -77,11 +77,11 @@ fn struct_indexed_fields() {
     assert_eq!(
         unpacked,
         Unpacked {
-            field_count: Tag::new(Kind::PairSequence, 2),
+            field_count: Tag::new(Kind::Sequence, 4),
             field1_index: Tag::new(Kind::Continuation, 0),
             field1_value: Typed::new(Tag::new(Kind::Prefix, 3), [b'f', b'o', b'o']),
             field2_index: Tag::new(Kind::Continuation, 1),
-            field2_value: Typed::new(Tag::empty(Kind::Continuation), 42),
+            field2_value: Tag::new(Kind::Continuation, 42),
         }
     );
 
@@ -92,6 +92,6 @@ fn struct_indexed_fields() {
         field1_index: Tag,
         field1_value: Typed<[u8; 3]>,
         field2_index: Tag,
-        field2_value: Typed<u32>,
+        field2_value: Tag,
     }
 }

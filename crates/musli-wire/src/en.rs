@@ -1,8 +1,9 @@
-use core::marker;
+use core::{fmt, marker};
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use crate::types::{Kind, Tag};
 use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
+use musli::error::Error;
 use musli_binary_common::writer::Writer;
 
 /// A very simple encoder.
@@ -219,7 +220,10 @@ where
 
     #[inline]
     fn encode_map(self, len: usize) -> Result<Self::Map, Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::PairSequence, len);
+        let len = len
+            .checked_mul(2)
+            .ok_or_else(|| Self::Error::collect_from_display(Overflow))?;
+        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
@@ -230,12 +234,15 @@ where
     }
 
     #[inline]
-    fn encode_struct(self, fields: usize) -> Result<Self::Struct, Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::PairSequence, fields);
+    fn encode_struct(self, len: usize) -> Result<Self::Struct, Self::Error> {
+        let len = len
+            .checked_mul(2)
+            .ok_or_else(|| Self::Error::collect_from_display(Overflow))?;
+        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
-            L::encode_usize(&mut *self.writer, fields)?;
+            L::encode_usize(&mut *self.writer, len)?;
         }
 
         Ok(self)
@@ -243,7 +250,10 @@ where
 
     #[inline]
     fn encode_tuple(self, len: usize) -> Result<Self::Tuple, Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::PairSequence, len);
+        let len = len
+            .checked_mul(2)
+            .ok_or_else(|| Self::Error::collect_from_display(Overflow))?;
+        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
@@ -255,15 +265,13 @@ where
 
     #[inline]
     fn encode_unit_struct(self) -> Result<(), Self::Error> {
-        self.writer
-            .write_byte(Tag::new(Kind::PairSequence, 0).byte())?;
+        self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
 
     #[inline]
     fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
-        self.writer
-            .write_byte(Tag::new(Kind::PairSequence, 1).byte())?;
+        self.writer.write_byte(Tag::new(Kind::Sequence, 2).byte())?;
         Ok(self)
     }
 }
@@ -353,5 +361,13 @@ where
     #[inline]
     fn encode_variant_value(self) -> Result<Self::VariantValue, Self::Error> {
         Ok(self)
+    }
+}
+
+struct Overflow;
+
+impl fmt::Display for Overflow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "integer overflow")
     }
 }

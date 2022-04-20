@@ -6,29 +6,27 @@ use std::mem;
 use musli::{Decode, Decoder};
 
 /// Data masked into the data type.
-pub(crate) const DATA_MASK: u8 = 0b000_11111;
+pub(crate) const DATA_MASK: u8 = 0b00_111111;
 
 /// The structure of a type tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Kind {
-    /// A single byte.
-    Byte = 0b000_00000,
-    /// A fixed element where data indicates how many bytes it consists of.
-    Prefix = 0b001_00000,
-    /// A length-prefixed sequence of typed values.
-    Sequence = 0b010_00000,
-    /// A length-prefixed sequence of typed pairs of values.
-    PairSequence = 0b011_00000,
+    /// A single byte. If it fits in 6 bits that is used, but if all data bits
+    /// are 1s the following byte is used.
+    Byte = 0b00_000000,
+    /// A fixed element where data indicates how many bytes it consists of. Data
+    /// contains the prefix length unless it's set to all 1s after which a
+    /// continuation sequence indicating the length should be decoded.
+    Prefix = 0b01_000000,
+    /// A length-prefixed sequence of values. Data contains the length of the
+    /// sequence if it's short enough to fit in 6 bits. All bits as 1s is
+    /// reserved to indicate when it's empty.
+    Sequence = 0b10_000000,
     /// A continuation-encoded value. Data is the immediate value embedded if
-    /// it's small enough.
-    Continuation = 0b100_00000,
-    /// Unknown.
-    Unknown1 = 0b101_00000,
-    /// Unknown.
-    Unknown2 = 0b110_00000,
-    /// Unknown.
-    Unknown3 = 0b111_00000,
+    /// it's small enough to fit in 6 bits. All bits as 1s is reserved to
+    /// indicate when it's empty.
+    Continuation = 0b11_000000,
 }
 
 /// A type tag.
