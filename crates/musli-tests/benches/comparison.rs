@@ -259,7 +259,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         }};
     }
 
-    // benches!("rmp-serde", rmp_enc, rmp_dec, rmp_rt);
+    benches!("rmp-serde", rmp_enc, rmp_dec, rmp_rt);
     benches!("bincode-serde", bin_enc, bin_dec, bin_rt);
     benches!("cbor-serde", cbor_enc, cbor_dec, cbor_rt);
     benches!("json", json_enc, json_dec, json_rt);

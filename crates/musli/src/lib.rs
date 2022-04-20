@@ -12,17 +12,6 @@
 //!
 //! **Müsli currently depends on [GATs] and is nightly-only**
 //!
-//! We make the following assumptions:
-//!
-//! * Anything being deserialized must be fully held in memory and able to hand
-//!   out contiguous slices of it. This allows users of musli to perform
-//!   zero-copy deserialization for bytes-oriented types.
-//!
-//! * Decoding is biased to assume strings are encoded verbatim in the format
-//!   used so that references to strings can always be used. That means strings
-//!   have to be UTF-8. A format that deviates from this will have to rely on
-//!   runtime errors.
-//!
 //! I've chosen to internally use the term "encoding", "encode", and "decode"
 //! because it's common terminology when talking about binary formats. It's also
 //! distinct from [serde]'s use of "serialization" allowing for the ease of
@@ -51,8 +40,8 @@
 //! Add the following to your `Cargo.toml`:
 //!
 //! ```toml
-//! musli = "0.0.10"
-//! musli-wire = "0.0.10"
+//! musli = "0.0.11"
+//! musli-wire = "0.0.11"
 //! ```
 //!
 //! <br>
