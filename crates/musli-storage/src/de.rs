@@ -65,6 +65,10 @@ where
 
     #[inline]
     fn decode_unit(self) -> Result<(), Self::Error> {
+        if L::decode_usize(&mut *self.reader)? != 0 {
+            return Err(Self::Error::custom("expected empty sequence"));
+        }
+
         Ok(())
     }
 
@@ -250,11 +254,7 @@ where
 
     #[inline]
     fn decode_unit_struct(self) -> Result<(), Self::Error> {
-        if L::decode_usize(&mut *self.reader)? != 0 {
-            return Err(Self::Error::custom("expected empty struct"));
-        }
-
-        Ok(())
+        self.decode_unit()
     }
 
     #[inline]

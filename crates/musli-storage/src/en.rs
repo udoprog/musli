@@ -47,7 +47,7 @@ where
 
     #[inline]
     fn encode_unit(self) -> Result<(), Self::Error> {
-        Ok(())
+        SequenceEncoder::finish(self.encode_sequence(0)?)
     }
 
     #[inline]
