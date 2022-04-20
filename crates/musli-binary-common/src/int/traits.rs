@@ -30,6 +30,9 @@ pub trait Unsigned:
     /// Coerce into the lowest 8-bits as a byte.
     fn as_byte(self) -> u8;
 
+    /// Test if this value is smaller than the specified byte.
+    fn is_smaller_than(self, byte: u8) -> bool;
+
     /// Test if value is zero.
     fn is_zero(self) -> bool;
 
@@ -108,6 +111,11 @@ macro_rules! implement {
             #[inline]
             fn as_byte(self) -> u8 {
                 self as u8
+            }
+
+            #[inline]
+            fn is_smaller_than(self, b: u8) -> bool {
+                self < b as $unsigned
             }
 
             #[inline]

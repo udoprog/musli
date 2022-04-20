@@ -1,18 +1,12 @@
 //! Type flags available for `musli-wire`.
 
+use core::fmt;
 use std::mem;
 
 use musli::{Decode, Decoder};
 
-/// Mark for the empty placeholder.
-pub const EMPTY: Tag = Tag::new(Kind::Mark, 0);
-/// Mark for a present value.
-pub const SOME: Tag = Tag::new(Kind::Mark, 1);
-/// Mark for a continuation sequence.
-pub const CONTINUATION: Tag = Tag::new(Kind::Mark, 2);
-
 /// Data masked into the data type.
-const DATA_MASK: u8 = 0b000_11111;
+pub(crate) const DATA_MASK: u8 = 0b000_11111;
 
 /// The structure of a type tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,22 +14,21 @@ const DATA_MASK: u8 = 0b000_11111;
 pub enum Kind {
     /// A single byte.
     Byte = 0b000_00000,
-    /// A fixed element where the length how many bytes it consists of.
-    Fixed = 0b001_00000,
-    /// A length-prefixed byte sequence. The length bits indicate the length of
-    /// the sequence unless they are all set to 1s.
-    Prefixed = 0b010_00000,
-    /// A length-prefixed sequence of typed values. The length bits indicate the
-    /// length of the sequence unless they are all set to 1s.
-    Sequence = 0b011_00000,
+    /// A fixed element where data indicates how many bytes it consists of.
+    Prefix = 0b001_00000,
+    /// A length-prefixed sequence of typed values.
+    Sequence = 0b010_00000,
     /// A length-prefixed sequence of typed pairs of values.
-    PairSequence = 0b100_00000,
-    /// A special kind of mark.
-    Mark = 0b101_00000,
-    /// Unknown kind.
-    Unknown0 = 0b110_00000,
-    /// Unknown kind.
-    Unknown1 = 0b111_00000,
+    PairSequence = 0b011_00000,
+    /// A continuation-encoded value. Data is the immediate value embedded if
+    /// it's small enough.
+    Continuation = 0b100_00000,
+    /// Unknown.
+    Unknown1 = 0b101_00000,
+    /// Unknown.
+    Unknown2 = 0b110_00000,
+    /// Unknown.
+    Unknown3 = 0b111_00000,
 }
 
 /// A type tag.
@@ -46,7 +39,7 @@ pub enum Kind {
 /// The remaining 5 bits are the data field, and its use depends on the [Kind]
 /// in question. Usually it's just used to smuggle extra data in case a value is
 /// small (which it usually is).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Tag {
     /// The internal representation of the tag.
@@ -61,6 +54,14 @@ impl Tag {
     pub const fn new(kind: Kind, data: u8) -> Self {
         Self {
             repr: kind as u8 | if data < DATA_MASK { data } else { DATA_MASK },
+        }
+    }
+
+    /// Construct a new empty tag of the given [Kind].
+    #[inline]
+    pub const fn empty(kind: Kind) -> Self {
+        Self {
+            repr: kind as u8 | DATA_MASK,
         }
     }
 
@@ -124,6 +125,15 @@ impl Tag {
         } else {
             Some(self.data_raw())
         }
+    }
+}
+
+impl fmt::Debug for Tag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Tag")
+            .field("kind", &self.kind())
+            .field("data", &self.data())
+            .finish()
     }
 }
 

@@ -3,7 +3,7 @@ use core::hash::Hash;
 use core::marker;
 
 use crate::traits::Typed;
-use crate::types::{Tag, CONTINUATION};
+use crate::types::{Kind, Tag, DATA_MASK};
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
 use musli_binary_common::int::zigzag as zig;
@@ -87,8 +87,12 @@ impl IntegerEncoding for Variable {
         W: Writer,
         T: Unsigned,
     {
-        writer.write_byte(CONTINUATION.byte())?;
-        c::encode(writer, value)
+        if value.is_smaller_than(DATA_MASK) {
+            writer.write_byte(Tag::new(Kind::Continuation, value.as_byte()).byte())
+        } else {
+            writer.write_byte(Tag::empty(Kind::Continuation).byte())?;
+            c::encode(writer, value)
+        }
     }
 
     #[inline]
@@ -97,39 +101,38 @@ impl IntegerEncoding for Variable {
         R: Reader<'de>,
         T: Unsigned,
     {
-        if Tag::from_byte(reader.read_byte()?) != CONTINUATION {
+        let tag = Tag::from_byte(reader.read_byte()?);
+
+        if tag.kind() != Kind::Continuation {
             return Err(R::Error::custom("Expected Continuation"));
         }
 
-        c::decode(reader)
+        if let Some(data) = tag.data() {
+            Ok(T::from_byte(data))
+        } else {
+            c::decode(reader)
+        }
     }
 
     #[inline]
-    fn encode_signed<W, T>(mut writer: W, value: T) -> Result<(), W::Error>
+    fn encode_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
     where
         W: Writer,
         T: Signed,
+        T::Unsigned: Typed + ByteOrderIo,
     {
-        writer.write_byte(CONTINUATION.byte())?;
-        c::encode(writer, zig::encode(value))
+        Self::encode_unsigned(writer, zig::encode(value))
     }
 
     #[inline]
-    fn decode_signed<'de, R, T>(mut reader: R) -> Result<T, R::Error>
+    fn decode_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
         T: Signed,
-        T::Unsigned: Unsigned<Signed = T>,
+        T::Unsigned: Unsigned<Signed = T> + Typed + ByteOrderIo,
     {
-        let tag = Tag::from_byte(reader.read_byte()?);
-
-        match tag {
-            CONTINUATION => {
-                let value: T::Unsigned = c::decode(reader)?;
-                Ok(zig::decode(value))
-            }
-            _ => Err(R::Error::custom("Expected Continuation")),
-        }
+        let value: T::Unsigned = Self::decode_unsigned(reader)?;
+        Ok(zig::decode(value))
     }
 }
 
@@ -147,8 +150,12 @@ impl UsizeEncoding for Variable {
     where
         W: Writer,
     {
-        writer.write_byte(CONTINUATION.byte())?;
-        c::encode(writer, value)
+        if value.is_smaller_than(DATA_MASK) {
+            writer.write_byte(Tag::new(Kind::Continuation, value.as_byte()).byte())
+        } else {
+            writer.write_byte(Tag::empty(Kind::Continuation).byte())?;
+            c::encode(writer, value)
+        }
     }
 
     #[inline]
@@ -164,11 +171,17 @@ impl UsizeEncoding for Variable {
     where
         R: Reader<'de>,
     {
-        if Tag::from_byte(reader.read_byte()?) != CONTINUATION {
+        let tag = Tag::from_byte(reader.read_byte()?);
+
+        if tag.kind() != Kind::Continuation {
             return Err(R::Error::custom("Expected Continuation"));
         }
 
-        c::decode(reader)
+        if let Some(data) = tag.data() {
+            Ok(usize::from_byte(data))
+        } else {
+            c::decode(reader)
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use musli::{Decode, Encode};
 use musli_wire::test::Typed;
-use musli_wire::types::{Kind, Tag, CONTINUATION};
+use musli_wire::types::{Kind, Tag};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(default_field_tag = "name")]
@@ -36,15 +36,15 @@ fn struct_named_fields() {
         Unpacked {
             field_count: Tag::new(Kind::PairSequence, 2),
             field1_name: Typed::new(
-                Tag::new(Kind::Prefixed, 6),
+                Tag::new(Kind::Prefix, 6),
                 [b's', b't', b'r', b'i', b'n', b'g']
             ),
-            field1_value: Typed::new(Tag::new(Kind::Prefixed, 3), [b'f', b'o', b'o']),
+            field1_value: Typed::new(Tag::new(Kind::Prefix, 3), [b'f', b'o', b'o']),
             field2_name: Typed::new(
-                Tag::new(Kind::Prefixed, 6),
+                Tag::new(Kind::Prefix, 6),
                 [b'n', b'u', b'm', b'b', b'e', b'r']
             ),
-            field2_value: Typed::new(CONTINUATION, 42),
+            field2_value: Typed::new(Tag::empty(Kind::Continuation), 42),
         }
     );
 
@@ -78,10 +78,10 @@ fn struct_indexed_fields() {
         unpacked,
         Unpacked {
             field_count: Tag::new(Kind::PairSequence, 2),
-            field1_index: Typed::new(CONTINUATION, 0),
-            field1_value: Typed::new(Tag::new(Kind::Prefixed, 3), [b'f', b'o', b'o']),
-            field2_index: Typed::new(CONTINUATION, 1),
-            field2_value: Typed::new(CONTINUATION, 42),
+            field1_index: Tag::new(Kind::Continuation, 0),
+            field1_value: Typed::new(Tag::new(Kind::Prefix, 3), [b'f', b'o', b'o']),
+            field2_index: Tag::new(Kind::Continuation, 1),
+            field2_value: Typed::new(Tag::empty(Kind::Continuation), 42),
         }
     );
 
@@ -89,9 +89,9 @@ fn struct_indexed_fields() {
     #[musli(packed)]
     pub struct Unpacked {
         field_count: Tag,
-        field1_index: Typed<u8>,
+        field1_index: Tag,
         field1_value: Typed<[u8; 3]>,
-        field2_index: Typed<u8>,
+        field2_index: Tag,
         field2_value: Typed<u32>,
     }
 }

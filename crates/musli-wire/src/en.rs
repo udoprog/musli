@@ -63,7 +63,7 @@ where
 
     #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<(), Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Prefixed, bytes.len());
+        let (tag, embedded) = Tag::with_len(Kind::Prefix, bytes.len());
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
@@ -78,7 +78,7 @@ where
     fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<(), Self::Error> {
         let len = vectors.into_iter().map(|v| v.len()).sum();
 
-        let (tag, embedded) = Tag::with_len(Kind::Prefixed, len);
+        let (tag, embedded) = Tag::with_len(Kind::Prefix, len);
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
@@ -94,7 +94,7 @@ where
 
     #[inline]
     fn encode_str(mut self, string: &str) -> Result<(), Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Prefixed, string.len());
+        let (tag, embedded) = Tag::with_len(Kind::Prefix, string.len());
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
@@ -118,7 +118,7 @@ where
     #[inline]
     fn encode_bool(self, value: bool) -> Result<(), Self::Error> {
         self.writer
-            .write_byte(Tag::new(Kind::Fixed, if value { 1 } else { 0 }).byte())
+            .write_byte(Tag::new(Kind::Prefix, if value { 1 } else { 0 }).byte())
     }
 
     #[inline]
@@ -195,13 +195,13 @@ where
 
     #[inline]
     fn encode_some(self) -> Result<Self::Some, Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Mark, 1).byte())?;
+        self.writer.write_byte(Tag::new(Kind::Sequence, 1).byte())?;
         Ok(self)
     }
 
     #[inline]
     fn encode_none(self) -> Result<(), Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Mark, 0).byte())?;
+        self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
 
@@ -255,7 +255,8 @@ where
 
     #[inline]
     fn encode_unit_struct(self) -> Result<(), Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Mark, 0).byte())?;
+        self.writer
+            .write_byte(Tag::new(Kind::PairSequence, 0).byte())?;
         Ok(())
     }
 

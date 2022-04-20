@@ -163,7 +163,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let data = musli_wire::to_vec(&Struct(42))?;
-//! assert_eq!(data, vec![CONTINUATION.byte(), 42]);
+//! assert_eq!(data, vec![Tag::empty(Kind::Continuation).byte(), 42]);
 //! # Ok(()) }
 //! ```
 //!

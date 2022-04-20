@@ -4,9 +4,6 @@ use core::marker;
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use crate::types::Kind;
 use crate::types::Tag;
-use crate::types::CONTINUATION;
-use crate::types::EMPTY;
-use crate::types::SOME;
 use musli::de::{
     Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, ReferenceVisitor,
     SequenceDecoder, StructDecoder,
@@ -51,36 +48,19 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         match tag.kind() {
-            Kind::Mark => {
-                match tag {
-                    // Empty
-                    EMPTY => {
-                        // Nothing to do.
-                    }
-                    // Option::Some
-                    SOME => {
-                        self.skip_any()?;
-                    }
-                    CONTINUATION => {
-                        let _ = c::decode::<_, u128>(&mut *self.reader)?;
-                    }
-                    _ => {
-                        return Err(R::Error::collect_from_display(UnsupportedMark(
-                            tag.data(),
-                            self.reader.pos(),
-                        )));
-                    }
-                }
-            }
             Kind::Byte => {
                 if tag.data().is_none() {
                     self.reader.skip(1)?;
                 }
             }
-            Kind::Fixed => {
-                if let Some(len) = tag.data() {
-                    self.reader.skip(len as usize)?;
-                }
+            Kind::Prefix => {
+                let len = if let Some(len) = tag.data() {
+                    len as usize
+                } else {
+                    L::decode_usize(&mut *self.reader)?
+                };
+
+                self.reader.skip(len)?;
             }
             Kind::Sequence => {
                 let len = if let Some(len) = tag.data() {
@@ -89,7 +69,6 @@ where
                     L::decode_usize(&mut *self.reader)?
                 };
 
-                // Skip over all values in the sequence.
                 for _ in 0..len {
                     self.skip_any()?;
                 }
@@ -102,20 +81,14 @@ where
                 };
 
                 for _ in 0..len {
-                    // Skip field.
                     self.skip_any()?;
-                    // Skip field value.
                     self.skip_any()?;
                 }
             }
-            Kind::Prefixed => {
-                let len = if let Some(len) = tag.data() {
-                    len as usize
-                } else {
-                    L::decode_usize(&mut *self.reader)?
-                };
-
-                self.reader.skip(len)?;
+            Kind::Continuation => {
+                if tag.data().is_none() {
+                    let _ = c::decode::<_, u128>(&mut *self.reader)?;
+                }
             }
             other => {
                 return Err(R::Error::custom(format!(
@@ -142,7 +115,6 @@ where
                     RemainingSimpleDecoder::new(self)
                 }
             }
-            Kind::Mark => Ok(RemainingSimpleDecoder::empty(self)),
             _ => Err(R::Error::collect_from_display(Expected(
                 Kind::Sequence,
                 self.reader.pos(),
@@ -163,7 +135,6 @@ where
                     RemainingSimpleDecoder::new(self)
                 }
             }
-            Kind::Mark => Ok(RemainingSimpleDecoder::empty(self)),
             _ => Err(R::Error::collect_from_display(Expected(
                 Kind::PairSequence,
                 self.reader.pos(),
@@ -224,9 +195,9 @@ where
     {
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        if tag.kind() != Kind::Prefixed {
+        if tag.kind() != Kind::Prefix {
             return Err(Self::Error::collect_from_display(Expected(
-                Kind::Prefixed,
+                Kind::Prefix,
                 self.reader.pos(),
             )));
         }
@@ -393,13 +364,16 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         match tag.kind() {
-            Kind::Mark => Ok(if tag.data_raw() == 1 {
-                Some(self)
-            } else {
-                None
-            }),
+            Kind::Sequence => match tag.data_raw() {
+                0 => Ok(None),
+                1 => Ok(Some(self)),
+                _ => Err(Self::Error::collect_from_display(Expected(
+                    Kind::Sequence,
+                    self.reader.pos(),
+                ))),
+            },
             _ => Err(Self::Error::collect_from_display(Expected(
-                Kind::Mark,
+                Kind::Sequence,
                 self.reader.pos(),
             ))),
         }
@@ -479,14 +453,6 @@ where
     #[inline]
     fn with_len(decoder: WireDecoder<'a, R, I, L>, remaining: usize) -> Result<Self, R::Error> {
         Ok(Self { remaining, decoder })
-    }
-
-    #[inline]
-    fn empty(decoder: WireDecoder<'a, R, I, L>) -> Self {
-        Self {
-            remaining: 0,
-            decoder,
-        }
     }
 }
 

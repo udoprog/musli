@@ -14,9 +14,9 @@ macro_rules! implement {
     };
 }
 
-implement!(u16, Tag::new(Kind::Fixed, 2));
-implement!(u32, Tag::new(Kind::Fixed, 4));
-implement!(u64, Tag::new(Kind::Fixed, 8));
-implement!(u128, Tag::new(Kind::Fixed, 16));
+implement!(u16, Tag::new(Kind::Prefix, 2));
+implement!(u32, Tag::new(Kind::Prefix, 4));
+implement!(u64, Tag::new(Kind::Prefix, 8));
+implement!(u128, Tag::new(Kind::Prefix, 16));
 // TODO: this needs to be easier to determine.
-implement!(usize, Tag::new(Kind::Fixed, 8));
+implement!(usize, Tag::new(Kind::Prefix, 8));
