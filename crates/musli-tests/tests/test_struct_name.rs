@@ -1,6 +1,6 @@
 use musli::{Decode, Encode};
-use musli_wire::tag::{Kind, Tag};
-use musli_wire::test::Typed;
+use musli_tests::wire::tag::{Kind, Tag};
+use musli_tests::wire::Typed;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(default_field_tag = "name")]
@@ -18,18 +18,18 @@ pub struct Indexed {
 
 #[test]
 fn struct_named_fields() {
-    musli_wire::test::rt(Named {
+    musli_tests::rt!(Named {
         string: String::from("foo"),
         number: 42,
     });
 
-    let out = musli_wire::to_vec(&Named {
+    let out = musli_tests::wire::to_vec(&Named {
         string: String::from("foo"),
         number: 42,
     })
     .expect("failed to encode");
 
-    let unpacked: Unpacked = musli_storage::decode(&out[..]).expect("failed to decode");
+    let unpacked: Unpacked = musli_tests::storage::decode(&out[..]).expect("failed to decode");
 
     assert_eq!(
         unpacked,
@@ -61,18 +61,18 @@ fn struct_named_fields() {
 
 #[test]
 fn struct_indexed_fields() {
-    musli_wire::test::rt(Indexed {
+    musli_tests::rt!(Indexed {
         string: String::from("foo"),
         number: 42,
     });
 
-    let out = musli_wire::to_vec(&Indexed {
+    let out = musli_tests::wire::to_vec(&Indexed {
         string: String::from("foo"),
         number: 42,
     })
     .expect("failed to encode");
 
-    let unpacked: Unpacked = musli_storage::decode(&out[..]).expect("failed to decode");
+    let unpacked: Unpacked = musli_tests::storage::decode(&out[..]).expect("failed to decode");
 
     assert_eq!(
         unpacked,

@@ -1,6 +1,5 @@
 //! Helpers for writing tests.
 
-use anyhow::Result;
 use core::fmt::Debug;
 use musli::de::PackDecoder;
 use musli::{Decode, Decoder, Encode};
@@ -41,17 +40,17 @@ where
 }
 
 /// Roundtrip encode the given value.
-#[inline(never)]
-pub fn rt<T>(expected: T) -> T
-where
-    T: Debug + PartialEq + for<'de> Decode<'de> + Encode,
-{
-    let out = crate::to_vec(&expected).expect("failed to encode");
-    let mut buf = &out[..];
-    let value: T = crate::decode(&mut buf).expect("failed to decode");
-    assert!(buf.is_empty(), "deserialized buffer should be empty");
-    assert_eq!(value, expected, "roundtrip does not match");
-    value
+#[macro_export]
+macro_rules! rt {
+    ($expr:expr) => {{
+        let mut value = $expr;
+        let out = $crate::to_vec(&value).expect("failed to encode");
+        let mut buf = &out[..];
+        value = $crate::decode(&mut buf).expect("failed to decode");
+        assert!(buf.is_empty(), "deserialized buffer should be empty");
+        assert_eq!(value, $expr, "roundtrip does not match");
+        value
+    }};
 }
 
 /// Encode a type as one and decode as another.

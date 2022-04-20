@@ -9,12 +9,12 @@ struct StructWithStr<'a> {
 
 #[test]
 fn test_deserialize_roundtrip() -> Result<()> {
-    let data = musli_wire::to_vec(&StructWithStr {
+    let data = musli_tests::wire::to_vec(&StructWithStr {
         name: "Jane Doe",
         age: 42,
     })?;
 
-    let with_str: StructWithStr<'_> = musli_wire::decode(&data[..])?;
+    let with_str: StructWithStr<'_> = musli_tests::wire::decode(&data[..])?;
     assert_eq!(with_str.name, "Jane Doe");
     assert_eq!(with_str.age, 42);
     Ok(())

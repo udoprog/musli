@@ -13,9 +13,9 @@ pub enum UntaggedVariants {
 /// Enums may contain packed variants.
 #[test]
 fn test_untagged_variants() {
-    musli_wire::test::rt(UntaggedVariants::Empty);
-    musli_wire::test::rt(UntaggedVariants::Tuple(42, 84));
-    musli_wire::test::rt(UntaggedVariants::Struct { a: 42, b: 84 });
+    musli_tests::rt!(UntaggedVariants::Empty);
+    musli_tests::rt!(UntaggedVariants::Tuple(42, 84));
+    musli_tests::rt!(UntaggedVariants::Struct { a: 42, b: 84 });
 }
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode)]
@@ -30,7 +30,7 @@ enum UntaggedSingleFields {
 
 #[test]
 fn test_untagged_single_field_variant() {
-    musli_wire::test::rt(UntaggedSingleFields::Variant1(String::from("hello")));
-    musli_wire::test::rt(UntaggedSingleFields::Variant2(1.0));
-    musli_wire::test::rt(UntaggedSingleFields::Variant3(42));
+    musli_tests::rt!(UntaggedSingleFields::Variant1(String::from("hello")));
+    musli_tests::rt!(UntaggedSingleFields::Variant2(1.0));
+    musli_tests::rt!(UntaggedSingleFields::Variant3(42));
 }

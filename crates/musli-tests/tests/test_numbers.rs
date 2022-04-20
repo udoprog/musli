@@ -1,6 +1,6 @@
 use musli::{Decode, Encode};
-use musli_wire::tag::{Kind, Tag};
-use musli_wire::test::Typed;
+use musli_tests::wire::tag::{Kind, Tag};
+use musli_tests::wire::Typed;
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode)]
 struct StructWithNumbers {
@@ -13,7 +13,7 @@ struct StructWithNumbers {
 
 #[test]
 fn test_signed_unpacked() {
-    let out = musli_wire::test::rt(StructWithNumbers {
+    let out = musli_tests::rt!(StructWithNumbers {
         a: -1,
         b: 1,
         c: -2,
@@ -21,8 +21,8 @@ fn test_signed_unpacked() {
         e: 10000000000,
     });
 
-    let out = musli_wire::to_vec(&out).expect("failed to encode");
-    let unpacked: Unpacked = musli_storage::decode(&out[..]).expect("failed to decode");
+    let out = musli_tests::wire::to_vec(&out).expect("failed to encode");
+    let unpacked: Unpacked = musli_tests::storage::decode(&out[..]).expect("failed to decode");
 
     assert_eq! {
         unpacked,

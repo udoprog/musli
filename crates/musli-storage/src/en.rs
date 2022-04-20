@@ -88,12 +88,12 @@ where
 
     #[inline]
     fn encode_usize(mut self, value: usize) -> Result<(), Self::Error> {
-        L::encode_typed_usize(&mut self.writer, value)
+        L::encode_usize(&mut self.writer, value)
     }
 
     #[inline]
-    fn encode_isize(mut self, value: isize) -> Result<(), Self::Error> {
-        L::encode_typed_usize(&mut self.writer, value as usize)
+    fn encode_isize(self, value: isize) -> Result<(), Self::Error> {
+        self.encode_usize(value as usize)
     }
 
     #[inline]
@@ -108,8 +108,7 @@ where
 
     #[inline]
     fn encode_u8(self, value: u8) -> Result<(), Self::Error> {
-        self.writer.write_byte(value)?;
-        Ok(())
+        self.writer.write_byte(value)
     }
 
     #[inline]

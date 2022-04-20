@@ -4,10 +4,12 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[dependencies]
+musli-wire = { path = "../musli-wire", features = ["test"] }
+musli-storage = { path = "../musli-storage", features = ["test"] }
+
 [dev-dependencies]
 musli = { path = "../musli" }
-musli-wire = { path = "../musli-wire" }
-musli-storage = { path = "../musli-storage" }
 
 anyhow = "1.0.56"
 rand = "0.8.5"
@@ -17,6 +19,8 @@ criterion = { version = "0.3.5", features = ["html_reports"] }
 bincode = "1.3.3"
 serde_json = "1.0.79"
 serde_cbor = "0.11.2"
+
+trybuild = "1.0.60"
 
 [[bench]]
 name = "comparison"

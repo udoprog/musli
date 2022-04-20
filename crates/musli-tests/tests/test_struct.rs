@@ -22,13 +22,13 @@ pub struct Struct5 {
 
 #[test]
 fn test_struct() {
-    musli_wire::test::rt(EmptyStruct);
-    musli_wire::test::rt(Struct2(String::from("Hello World")));
-    musli_wire::test::rt(Struct3(String::from("Hello World"), 42));
-    musli_wire::test::rt(Struct4 {
+    musli_tests::rt!(EmptyStruct);
+    musli_tests::rt!(Struct2(String::from("Hello World")));
+    musli_tests::rt!(Struct3(String::from("Hello World"), 42));
+    musli_tests::rt!(Struct4 {
         value: String::from("Hello World"),
     });
-    musli_wire::test::rt(Struct5 {
+    musli_tests::rt!(Struct5 {
         value: String::from("Hello World"),
         value2: 42,
     });

@@ -27,12 +27,12 @@ pub struct StructCustomFieldAsStruct {
 
 #[test]
 fn test_bytes_tag_vec() {
-    musli_wire::test::rt(BytesTagVec(b"hello world".to_vec()));
+    musli_tests::rt!(BytesTagVec(b"hello world".to_vec()));
 }
 
 #[test]
 fn test_custom_struct_tag() {
-    musli_wire::test::rt(StructCustomFieldAsStruct {
+    musli_tests::rt!(StructCustomFieldAsStruct {
         field1: 42,
         field2: 84,
     });
@@ -49,7 +49,7 @@ pub struct StructCustomTag {
 
 #[test]
 fn test_custom_tag() {
-    musli_wire::test::rt(StructCustomTag {
+    musli_tests::rt!(StructCustomTag {
         field1: 42,
         field2: 84,
     });
@@ -64,7 +64,7 @@ struct StructWithBytesTag {
 
 #[test]
 fn test_struct_with_bytes_tag() {
-    musli_wire::test::rt(StructWithBytesTag {
+    musli_tests::rt!(StructWithBytesTag {
         string: String::from("Some String"),
     });
 }
@@ -83,11 +83,11 @@ enum EnumWithBytesTag {
 
 #[test]
 fn test_bytes_tag_in_enum() {
-    musli_wire::test::rt(EnumWithBytesTag::Variant1 {
+    musli_tests::rt!(EnumWithBytesTag::Variant1 {
         string: String::from("st"),
     });
 
-    musli_wire::test::rt(EnumWithBytesTag::Variant2 {
+    musli_tests::rt!(EnumWithBytesTag::Variant2 {
         string: String::from("st"),
     });
 }

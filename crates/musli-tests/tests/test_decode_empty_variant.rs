@@ -9,5 +9,5 @@ enum EnumEmptyVariant {
 
 #[test]
 fn test_enum_with_empty_variant() {
-    musli_wire::test::rt(EnumEmptyVariant::Something {});
+    musli_tests::rt!(EnumEmptyVariant::Something {});
 }

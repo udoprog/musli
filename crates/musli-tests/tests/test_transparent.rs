@@ -32,35 +32,35 @@ struct TransparentEnumUnpacked {
 
 #[test]
 fn test_transparent_struct() {
-    musli_wire::test::rt(TransparentStruct {
+    musli_tests::rt!(TransparentStruct {
         string: String::from("Hello"),
     });
-    let string = musli_wire::test::transcode::<_, String>(TransparentStruct {
+    let string = musli_tests::wire::transcode::<_, String>(TransparentStruct {
         string: String::from("Hello"),
     });
     assert_eq!(string, "Hello");
 
-    musli_wire::test::rt(TransparentTuple(String::from("Hello")));
-    let string = musli_wire::test::transcode::<_, String>(TransparentTuple(String::from("Hello")));
+    musli_tests::rt!(TransparentTuple(String::from("Hello")));
+    let string = musli_tests::wire::transcode::<_, String>(TransparentTuple(String::from("Hello")));
     assert_eq!(string, "Hello");
 }
 
 #[test]
 fn test_transparent_enum() {
-    musli_wire::test::rt(TransparentEnum::Transparent(42));
+    musli_tests::rt!(TransparentEnum::Transparent(42));
 
     /*
-    let unpacked = musli_wire::test::transcode::<_, TransparentEnumUnpacked>(
+    let unpacked = musli_tests::wire::transcode::<_, TransparentEnumUnpacked>(
         TransparentEnum::Transparent(42),
     )?;
 
     assert_eq!(
         unpacked,
         TransparentEnumUnpacked {
-            type_tag: musli_wire::tag::VARIANT,
-            variant_tag_type: musli_wire::tag::Continuation,
+            type_tag: musli_tests::wire::tag::VARIANT,
+            variant_tag_type: musli_tests::wire::tag::Continuation,
             variant_tag: 1,
-            value_type: musli_wire::tag::Continuation,
+            value_type: musli_tests::wire::tag::Continuation,
             value: 42,
         }
     );

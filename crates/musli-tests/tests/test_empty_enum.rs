@@ -6,7 +6,7 @@ enum EmptyEnum {}
 
 #[test]
 fn test_decode_empty() {
-    let e = musli_wire::decode::<_, EmptyEnum>(&[][..]).unwrap_err();
+    let e = musli_tests::wire::decode::<_, EmptyEnum>(&[][..]).unwrap_err();
     assert_eq!(
         e.to_string(),
         "EmptyEnum: cannot decode uninhabitable types"

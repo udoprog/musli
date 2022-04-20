@@ -64,18 +64,8 @@ pub trait UsizeEncoding: private::Sealed {
     where
         W: Writer;
 
-    /// Governs how usize lengths are encoded into a [Writer].
-    fn encode_typed_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
-    where
-        W: Writer;
-
     /// Governs how usize lengths are decoded from a [Reader].
     fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
-    where
-        R: Reader<'de>;
-
-    /// Governs how usize lengths are decoded from a [Reader].
-    fn decode_typed_usize<'de, R>(reader: R) -> Result<usize, R::Error>
     where
         R: Reader<'de>;
 }
@@ -138,23 +128,7 @@ impl UsizeEncoding for Variable {
     }
 
     #[inline]
-    fn encode_typed_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
-    where
-        W: Writer,
-    {
-        c::encode(writer, value)
-    }
-
-    #[inline]
     fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
-    where
-        R: Reader<'de>,
-    {
-        c::decode(reader)
-    }
-
-    #[inline]
-    fn decode_typed_usize<'de, R>(reader: R) -> Result<usize, R::Error>
     where
         R: Reader<'de>,
     {
@@ -246,24 +220,7 @@ where
     }
 
     #[inline]
-    fn encode_typed_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
-    where
-        W: Writer,
-    {
-        let value: L = value.try_into().map_err(W::Error::custom)?;
-        value.write_bytes::<_, B>(writer)
-    }
-
-    #[inline]
     fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
-    where
-        R: Reader<'de>,
-    {
-        usize::try_from(L::read_bytes::<_, B>(reader)?).map_err(R::Error::custom)
-    }
-
-    #[inline]
-    fn decode_typed_usize<'de, R>(reader: R) -> Result<usize, R::Error>
     where
         R: Reader<'de>,
     {

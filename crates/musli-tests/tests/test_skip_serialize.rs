@@ -19,13 +19,13 @@ pub struct SkipSerializeUntagged {
 
 #[test]
 fn test_skip_serialize() {
-    musli_wire::test::rt(SkipSerializeUntagged {
+    musli_tests::rt!(SkipSerializeUntagged {
         before: 1,
         skipped: Some(2),
         after: 3,
     });
 
-    let out = musli_wire::test::transcode::<_, (u32, u32)>(SkipSerializeUntagged {
+    let out = musli_tests::wire::transcode::<_, (u32, u32)>(SkipSerializeUntagged {
         before: 1,
         skipped: None,
         after: 3,

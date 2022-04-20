@@ -27,8 +27,9 @@ pub struct Numbers {
 
 #[test]
 fn test_primitives_max() {
-    musli_wire::test::rt(Numbers {
-        bool_field: false,
+    // TODO: this doesn't work with storage for some reason.
+    musli_tests::wire::rt!(Numbers {
+        bool_field: true,
         char_field: char::MAX,
         u8_field: u8::MAX,
         u16_field: u16::MAX,
@@ -50,7 +51,8 @@ fn test_primitives_max() {
 
 #[test]
 fn test_primitives_min() {
-    musli_wire::test::rt(Numbers {
+    // TODO: this doesn't work with storage for some reason.
+    musli_tests::wire::rt!(Numbers {
         bool_field: false,
         char_field: '\u{0000}',
         u8_field: u8::MIN,

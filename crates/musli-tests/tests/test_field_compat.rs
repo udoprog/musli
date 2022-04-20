@@ -48,7 +48,7 @@ pub struct SimpleStructToEmpty;
 
 #[test]
 fn test_simple_struct_compat() {
-    let to = musli_wire::test::transcode::<_, SimpleStructTo>(SimpleStructFrom {
+    let to = musli_tests::wire::transcode::<_, SimpleStructTo>(SimpleStructFrom {
         field: String::from("Aristotle"),
         interior: 42,
         option: Some(108),
@@ -67,7 +67,7 @@ fn test_simple_struct_compat() {
 #[test]
 fn test_simple_struct_to_enum_compat() {
     for expected in [ENUM1, ENUM2, ENUM3] {
-        let to = musli_wire::test::transcode::<_, SimpleStructEnum>(SimpleStructFrom {
+        let to = musli_tests::wire::transcode::<_, SimpleStructEnum>(SimpleStructFrom {
             field: String::from("Aristotle"),
             interior: 42,
             option: Some(108),
@@ -81,7 +81,7 @@ fn test_simple_struct_to_enum_compat() {
 
 #[test]
 fn test_simple_struct_compat_to_empty() {
-    let to = musli_wire::test::transcode::<_, SimpleStructToEmpty>(SimpleStructFrom {
+    let to = musli_tests::wire::transcode::<_, SimpleStructToEmpty>(SimpleStructFrom {
         field: String::from("Aristotle"),
         interior: 42,
         option: Some(108),

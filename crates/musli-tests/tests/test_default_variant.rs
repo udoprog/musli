@@ -18,12 +18,12 @@ pub enum OnlyFallback {
 /// Test that enums can use fallback variants when decoding.
 #[test]
 fn test_fallback_variant() {
-    let actual = musli_wire::test::transcode::<_, OnlyFallback>(SeveralVariants::Variant1);
+    let actual = musli_tests::wire::transcode::<_, OnlyFallback>(SeveralVariants::Variant1);
     assert_eq!(actual, OnlyFallback::Fallback);
 
-    let actual = musli_wire::test::transcode::<_, OnlyFallback>(SeveralVariants::Variant2);
+    let actual = musli_tests::wire::transcode::<_, OnlyFallback>(SeveralVariants::Variant2);
     assert_eq!(actual, OnlyFallback::Fallback);
 
-    let actual = musli_wire::test::transcode::<_, OnlyFallback>(SeveralVariants::Variant3);
+    let actual = musli_tests::wire::transcode::<_, OnlyFallback>(SeveralVariants::Variant3);
     assert_eq!(actual, OnlyFallback::Fallback);
 }

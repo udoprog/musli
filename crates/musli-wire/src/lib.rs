@@ -100,10 +100,13 @@ pub mod encoding;
 mod integer_encoding;
 pub mod tag;
 #[cfg(feature = "test")]
+#[macro_use]
 pub mod test;
 
 pub use self::encoding::{decode, encode, to_fixed_bytes, WireEncoding};
 #[cfg(feature = "std")]
 pub use self::encoding::{to_vec, to_writer};
 pub use self::integer_encoding::{Fixed, FixedLength, Variable};
+#[cfg(feature = "test")]
+pub use self::test::{transcode, Typed};
 pub use musli_binary_common::fixed_bytes::FixedBytes;

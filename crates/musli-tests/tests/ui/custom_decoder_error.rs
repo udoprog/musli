@@ -1,3 +1,5 @@
+use musli::{Encode, Decode};
+
 #[derive(Encode, Decode)]
 pub struct Container<'a> {
     #[musli(with = "bytes")]

@@ -12,12 +12,12 @@ pub struct Outer {
 
 #[test]
 fn test_skip_serializing_if_outer() {
-    musli_wire::test::rt(Outer {
+    musli_tests::rt!(Outer {
         flag: false,
         inner: Some(Inner),
     });
 
-    musli_wire::test::rt(Outer {
+    musli_tests::rt!(Outer {
         flag: false,
         inner: None,
     });

@@ -148,8 +148,7 @@ where
 
     #[inline]
     fn decode_u8(self) -> Result<u8, Self::Error> {
-        let b = self.reader.read_byte()?;
-        Ok(b)
+        self.reader.read_byte()
     }
 
     #[inline]
@@ -199,7 +198,7 @@ where
 
     #[inline]
     fn decode_usize(self) -> Result<usize, Self::Error> {
-        L::decode_typed_usize(self.reader)
+        L::decode_usize(self.reader)
     }
 
     #[inline]
@@ -251,6 +250,10 @@ where
 
     #[inline]
     fn decode_unit_struct(self) -> Result<(), Self::Error> {
+        if L::decode_usize(&mut *self.reader)? != 0 {
+            return Err(Self::Error::custom("expected empty struct"));
+        }
+
         Ok(())
     }
 
