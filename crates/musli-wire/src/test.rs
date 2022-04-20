@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use musli::de::PackDecoder;
 use musli::{Decode, Decoder, Encode};
 
-use crate::types::Tag;
+use crate::tag::Tag;
 
 /// A typed field, which is prefixed with a type tag.
 ///

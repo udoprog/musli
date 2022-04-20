@@ -57,10 +57,10 @@ fn test_transparent_enum() {
     assert_eq!(
         unpacked,
         TransparentEnumUnpacked {
-            type_tag: musli_wire::types::VARIANT,
-            variant_tag_type: musli_wire::types::Continuation,
+            type_tag: musli_wire::tag::VARIANT,
+            variant_tag_type: musli_wire::tag::Continuation,
             variant_tag: 1,
-            value_type: musli_wire::types::Continuation,
+            value_type: musli_wire::tag::Continuation,
             value: 42,
         }
     );

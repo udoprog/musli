@@ -1,7 +1,7 @@
 use core::{fmt, marker};
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use crate::types::{Kind, Tag};
+use crate::tag::{Kind, Tag};
 use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
 use musli_binary_common::writer::Writer;

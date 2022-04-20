@@ -98,9 +98,9 @@ mod de;
 mod en;
 pub mod encoding;
 mod integer_encoding;
+pub mod tag;
 #[cfg(feature = "test")]
 pub mod test;
-pub mod types;
 
 pub use self::encoding::{decode, encode, to_fixed_bytes, WireEncoding};
 #[cfg(feature = "std")]

@@ -1,8 +1,6 @@
 use musli::{Decode, Encode};
-use musli_wire::{
-    test::Typed,
-    types::{Kind, Tag},
-};
+use musli_wire::tag::{Kind, Tag};
+use musli_wire::test::Typed;
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode)]
 struct StructWithNumbers {

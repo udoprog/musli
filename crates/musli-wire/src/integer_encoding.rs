@@ -2,7 +2,7 @@ use core::fmt::{Debug, Display};
 use core::hash::Hash;
 use core::marker;
 
-use crate::types::{Kind, Tag, DATA_MASK};
+use crate::tag::{Kind, Tag, DATA_MASK};
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
 use musli_binary_common::int::zigzag as zig;

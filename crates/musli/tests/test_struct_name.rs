@@ -1,6 +1,6 @@
 use musli::{Decode, Encode};
+use musli_wire::tag::{Kind, Tag};
 use musli_wire::test::Typed;
-use musli_wire::types::{Kind, Tag};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(default_field_tag = "name")]

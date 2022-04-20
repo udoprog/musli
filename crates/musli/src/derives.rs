@@ -155,7 +155,7 @@
 //!
 //! ```
 //! use musli::{Encode, Decode};
-//! use musli_wire::types::{Tag, Kind};
+//! use musli_wire::tag::{Tag, Kind};
 //!
 //! #[derive(Encode)]
 //! #[musli(transparent)]

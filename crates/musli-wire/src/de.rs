@@ -2,8 +2,8 @@ use core::fmt;
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use crate::types::Kind;
-use crate::types::Tag;
+use crate::tag::Kind;
+use crate::tag::Tag;
 use musli::de::{
     Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, ReferenceVisitor,
     SequenceDecoder, StructDecoder,
