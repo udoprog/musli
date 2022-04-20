@@ -166,6 +166,29 @@ where
 
     #[inline]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        if tag.kind() != Kind::Prefix {
+            return Err(Self::Error::collect_from_display(Expected(
+                Kind::Prefix,
+                self.reader.pos(),
+            )));
+        }
+
+        let len = if let Some(len) = tag.data() {
+            len as usize
+        } else {
+            L::decode_usize(&mut *self.reader)?
+        };
+
+        if len != N {
+            return Err(Self::Error::collect_from_display(BadLength {
+                actual: len,
+                expected: N,
+                pos: self.reader.pos(),
+            }));
+        }
+
         self.reader.read_array()
     }
 
@@ -583,6 +606,28 @@ impl fmt::Display for Expected {
             write!(f, "Expected {:?} (at {})", self.0, pos)
         } else {
             write!(f, "Expected {:?}", self.0)
+        }
+    }
+}
+
+struct BadLength {
+    actual: usize,
+    expected: usize,
+    pos: Option<usize>,
+}
+
+impl fmt::Display for BadLength {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let actual = self.actual;
+        let expected = self.expected;
+
+        if let Some(pos) = self.pos {
+            write!(
+                f,
+                "Bad length, got {actual} but expect {expected} (at {pos})"
+            )
+        } else {
+            write!(f, "Bad length, got {actual} but expect {expected}")
         }
     }
 }

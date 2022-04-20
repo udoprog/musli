@@ -8,7 +8,7 @@ use std::marker;
 use crate::de::ReferenceVisitor;
 use crate::en::SequenceEncoder;
 use crate::error::Error;
-use crate::{Decode, Encode, Encoder};
+use crate::{Decode, Decoder, Encode, Encoder};
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
@@ -18,14 +18,14 @@ use crate::{Decode, Encode, Encoder};
 /// We must use a wrapper like this, because we can't provide an implementation
 /// for `&[T]` since it would conflict with `&[u8]` which is specialized to
 /// encode and decode as a byte array.
-pub struct Sequence<T> {
-    value: T,
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct Sequence<T>(pub T);
 
 impl<T> Sequence<T> {
     /// Construct a new sequence wrapper.
     pub const fn new(value: T) -> Self {
-        Self { value }
+        Self(value)
     }
 }
 
@@ -38,14 +38,33 @@ where
     where
         E: Encoder,
     {
-        let mut seq = encoder.encode_sequence(self.value.len())?;
+        let mut seq = encoder.encode_sequence(self.0.len())?;
 
-        for value in self.value {
+        for value in self.0 {
             let encoder = seq.encode_next()?;
             T::encode(value, encoder)?;
         }
 
         seq.finish()
+    }
+}
+
+impl Encode for Sequence<()> {
+    #[inline]
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    where
+        E: Encoder,
+    {
+        encoder.encode_sequence(0)?.finish()
+    }
+}
+
+impl<'de> Decode<'de> for Sequence<()> {
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        Ok(Self(decoder.decode_unit()?))
     }
 }
 
@@ -57,6 +76,8 @@ where
 /// We must use a wrapper like this, because we can't provide an implementation
 /// for `Vec<T>` since it would conflict with `Vec<u8>` which is generalized to
 /// encode as a sequence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
 pub struct Bytes<T>(pub T);
 
 impl Encode for Bytes<Vec<u8>> {
@@ -73,7 +94,7 @@ impl<'de> Decode<'de> for Bytes<Vec<u8>> {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: crate::Decoder<'de>,
+        D: Decoder<'de>,
     {
         return decoder
             .decode_bytes(Visitor(marker::PhantomData))
@@ -117,8 +138,28 @@ impl<'de> Decode<'de> for Bytes<VecDeque<u8>> {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: crate::Decoder<'de>,
+        D: Decoder<'de>,
     {
         Bytes::<Vec<u8>>::decode(decoder).map(|Bytes(bytes)| Bytes(VecDeque::from(bytes)))
+    }
+}
+
+impl<const N: usize> Encode for Bytes<[u8; N]> {
+    #[inline]
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    where
+        E: Encoder,
+    {
+        encoder.encode_bytes(self.0.as_slice())
+    }
+}
+
+impl<'de, const N: usize> Decode<'de> for Bytes<[u8; N]> {
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        decoder.decode_array().map(Self)
     }
 }

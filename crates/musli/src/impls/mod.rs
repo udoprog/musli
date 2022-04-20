@@ -249,7 +249,7 @@ impl Encode for str {
     where
         E: Encoder,
     {
-        encoder.encode_str(self)
+        encoder.encode_string(self)
     }
 }
 

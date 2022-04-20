@@ -137,7 +137,7 @@ pub trait Encoder: Sized {
     fn encode_bytes_vectored(self, vectors: &[&[u8]]) -> Result<(), Self::Error>;
 
     /// Encode a string who's length is included in the payload.
-    fn encode_str(self, string: &str) -> Result<(), Self::Error>;
+    fn encode_string(self, string: &str) -> Result<(), Self::Error>;
 
     /// Encode a usize value.
     fn encode_usize(self, value: usize) -> Result<(), Self::Error>;

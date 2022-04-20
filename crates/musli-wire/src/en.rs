@@ -49,6 +49,7 @@ where
 
     #[inline]
     fn encode_unit(self) -> Result<(), Self::Error> {
+        self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
 
@@ -59,7 +60,7 @@ where
 
     #[inline]
     fn encode_array<const N: usize>(self, array: [u8; N]) -> Result<(), Self::Error> {
-        self.writer.write_array(array)
+        self.encode_bytes(array.as_slice())
     }
 
     #[inline]
@@ -94,16 +95,8 @@ where
     }
 
     #[inline]
-    fn encode_str(mut self, string: &str) -> Result<(), Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Prefix, string.len());
-        self.writer.write_byte(tag.byte())?;
-
-        if !embedded {
-            L::encode_usize(&mut self.writer, string.len())?;
-        }
-
-        self.writer.write_bytes(string.as_bytes())?;
-        Ok(())
+    fn encode_string(self, string: &str) -> Result<(), Self::Error> {
+        self.encode_bytes(string.as_bytes())
     }
 
     #[inline]
@@ -119,7 +112,7 @@ where
     #[inline]
     fn encode_bool(self, value: bool) -> Result<(), Self::Error> {
         self.writer
-            .write_byte(Tag::new(Kind::Prefix, if value { 1 } else { 0 }).byte())
+            .write_byte(Tag::new(Kind::Byte, if value { 1 } else { 0 }).byte())
     }
 
     #[inline]

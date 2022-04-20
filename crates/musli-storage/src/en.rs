@@ -80,7 +80,7 @@ where
     }
 
     #[inline]
-    fn encode_str(mut self, string: &str) -> Result<(), Self::Error> {
+    fn encode_string(mut self, string: &str) -> Result<(), Self::Error> {
         L::encode_usize(&mut self.writer, string.len())?;
         self.writer.write_bytes(string.as_bytes())?;
         Ok(())
