@@ -4,7 +4,7 @@ use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
 use musli_binary_common::writer::Writer;
 
-/// A very simple encoder.
+/// A vaery simple encoder suitable for storage encoding.
 pub struct StorageEncoder<'a, W, I, L>
 where
     I: IntegerEncoding,
@@ -21,7 +21,7 @@ where
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(writer: &'a mut W) -> Self {
+    pub fn new(writer: &'a mut W) -> Self {
         Self {
             writer,
             _marker: marker::PhantomData,

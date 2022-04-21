@@ -7,9 +7,10 @@ use std::io;
 
 use crate::de::StorageDecoder;
 use crate::en::StorageEncoder;
-use crate::integer_encoding::{Fixed, FixedLength, IntegerEncoding, UsizeEncoding, Variable};
+use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::Decode;
 use musli::Encode;
+use musli_binary_common::encoding::{Fixed, FixedLength, Variable};
 use musli_binary_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
 use musli_binary_common::int::{BigEndian, LittleEndian, NetworkEndian};
 use musli_binary_common::reader::{Reader, SliceReader, SliceReaderError};

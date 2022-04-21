@@ -7,15 +7,15 @@ use musli::de::{
     SequenceDecoder, StructDecoder,
 };
 use musli::error::Error;
-use musli_binary_common::reader::{Reader, WithPosition};
+use musli_binary_common::reader::Reader;
 
-/// A very simple decoder.
+/// A very simple decoder suitable for storage decoding.
 pub struct StorageDecoder<'de, R, I, L>
 where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
-    reader: &'de mut WithPosition<R>,
+    reader: &'de mut R,
     _marker: marker::PhantomData<(I, L)>,
 }
 
@@ -26,7 +26,7 @@ where
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(reader: &'de mut WithPosition<R>) -> Self {
+    pub fn new(reader: &'de mut R) -> Self {
         Self {
             reader,
             _marker: marker::PhantomData,

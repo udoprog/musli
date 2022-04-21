@@ -59,6 +59,17 @@ pub trait Reader<'de> {
             reader: self,
         }
     }
+
+    /// Keep an accurate record of the position within the reader.
+    fn limit(self, limit: usize) -> Limit<Self>
+    where
+        Self: Sized,
+    {
+        Limit {
+            remaining: limit,
+            reader: self,
+        }
+    }
 }
 
 decl_message_repr!(SliceReaderErrorRepr, "error reading from slice");
@@ -174,61 +185,6 @@ where
     }
 }
 
-/// Keep a record of the current position.
-///
-/// Constructed through [Reader::with_position].
-pub struct WithPosition<R> {
-    pos: usize,
-    reader: R,
-}
-
-impl<'de, R> Reader<'de> for WithPosition<R>
-where
-    R: Reader<'de>,
-{
-    type Error = R::Error;
-
-    #[inline]
-    fn pos(&self) -> Option<usize> {
-        Some(self.pos)
-    }
-
-    #[inline]
-    fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
-        self.reader.skip(n)?;
-        self.pos += n;
-        Ok(())
-    }
-
-    #[inline]
-    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
-        let bytes = self.reader.read_bytes(n)?;
-        self.pos += bytes.len();
-        Ok(bytes)
-    }
-
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        self.reader.read(buf)?;
-        self.pos += buf.len();
-        Ok(())
-    }
-
-    #[inline]
-    fn read_byte(&mut self) -> Result<u8, Self::Error> {
-        let b = self.reader.read_byte()?;
-        self.pos += 1;
-        Ok(b)
-    }
-
-    #[inline]
-    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
-        let array = self.reader.read_array()?;
-        self.pos += N;
-        Ok(array)
-    }
-}
-
 /// An efficient [Reader] wrapper around a slice.
 pub struct SliceReader<'de> {
     range: Range<*const u8>,
@@ -292,5 +248,125 @@ fn bounds_check_add(range: &Range<*const u8>, len: usize) -> Result<*const u8, S
         Err(SliceReaderError::custom("buffer underflow"))
     } else {
         Ok(outcome)
+    }
+}
+
+/// Keep a record of the current position.
+///
+/// Constructed through [Reader::with_position].
+pub struct WithPosition<R> {
+    pos: usize,
+    reader: R,
+}
+
+impl<'de, R> Reader<'de> for WithPosition<R>
+where
+    R: Reader<'de>,
+{
+    type Error = R::Error;
+
+    #[inline]
+    fn pos(&self) -> Option<usize> {
+        Some(self.pos)
+    }
+
+    #[inline]
+    fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
+        self.reader.skip(n)?;
+        self.pos += n;
+        Ok(())
+    }
+
+    #[inline]
+    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
+        let bytes = self.reader.read_bytes(n)?;
+        self.pos += bytes.len();
+        Ok(bytes)
+    }
+
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        self.reader.read(buf)?;
+        self.pos += buf.len();
+        Ok(())
+    }
+
+    #[inline]
+    fn read_byte(&mut self) -> Result<u8, Self::Error> {
+        let b = self.reader.read_byte()?;
+        self.pos += 1;
+        Ok(b)
+    }
+
+    #[inline]
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
+        let array = self.reader.read_array()?;
+        self.pos += N;
+        Ok(array)
+    }
+}
+
+/// Limit the number of bytes that can be read out of a reader to the specified limit.
+///
+/// Constructed through [Reader::limit].
+pub struct Limit<R> {
+    remaining: usize,
+    reader: R,
+}
+
+impl<'de, R> Limit<R>
+where
+    R: Reader<'de>,
+{
+    fn bounds_check(&mut self, n: usize) -> Result<(), R::Error> {
+        match self.remaining.checked_sub(n) {
+            Some(remaining) => {
+                self.remaining = remaining;
+                Ok(())
+            }
+            None => Err(R::Error::custom("out of bounds")),
+        }
+    }
+}
+
+impl<'de, R> Reader<'de> for Limit<R>
+where
+    R: Reader<'de>,
+{
+    type Error = R::Error;
+
+    #[inline]
+    fn pos(&self) -> Option<usize> {
+        self.reader.pos()
+    }
+
+    #[inline]
+    fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
+        self.bounds_check(n)?;
+        self.reader.skip(n)
+    }
+
+    #[inline]
+    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
+        self.bounds_check(n)?;
+        self.reader.read_bytes(n)
+    }
+
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        self.bounds_check(buf.len())?;
+        self.reader.read(buf)
+    }
+
+    #[inline]
+    fn read_byte(&mut self) -> Result<u8, Self::Error> {
+        self.bounds_check(1)?;
+        self.reader.read_byte()
+    }
+
+    #[inline]
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
+        self.bounds_check(N)?;
+        self.reader.read_array()
     }
 }

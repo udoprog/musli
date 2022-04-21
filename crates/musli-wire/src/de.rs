@@ -1,7 +1,7 @@
 use core::fmt;
 use core::marker;
 
-use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
+use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::Kind;
 use crate::tag::Tag;
 use musli::de::{
@@ -10,26 +10,27 @@ use musli::de::{
 };
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
-use musli_binary_common::reader::{Reader, WithPosition};
+use musli_binary_common::reader::Reader;
+use musli_storage::de::StorageDecoder;
 
 /// A very simple decoder.
 pub struct WireDecoder<'de, R, I, L>
 where
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
-    reader: &'de mut WithPosition<R>,
+    reader: &'de mut R,
     _marker: marker::PhantomData<(I, L)>,
 }
 
 impl<'de, R, I, L> WireDecoder<'de, R, I, L>
 where
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(reader: &'de mut WithPosition<R>) -> Self {
+    pub(crate) fn new(reader: &'de mut R) -> Self {
         Self {
             reader,
             _marker: marker::PhantomData,
@@ -40,8 +41,8 @@ where
 impl<'de, 'a, R, I, L> WireDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any(&mut self) -> Result<(), R::Error> {
@@ -124,6 +125,26 @@ where
             })),
         }
     }
+
+    /// Decode the length of a prefix.
+    #[inline]
+    fn decode_prefix(&mut self) -> Result<usize, R::Error> {
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        if tag.kind() != Kind::Prefix {
+            return Err(R::Error::collect_from_display(Expected {
+                expected: Kind::Prefix,
+                actual: tag,
+                pos: self.reader.pos(),
+            }));
+        }
+
+        Ok(if let Some(len) = tag.data() {
+            len as usize
+        } else {
+            L::decode_usize(&mut *self.reader)?
+        })
+    }
 }
 
 /// A length-prefixed decode wrapper.
@@ -133,8 +154,8 @@ where
 #[doc(hidden)]
 pub struct RemainingSimpleDecoder<'a, R, I, L>
 where
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     remaining: usize,
     decoder: WireDecoder<'a, R, I, L>,
@@ -143,8 +164,8 @@ where
 impl<'de, 'a, R, I, L> Decoder<'de> for WireDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = R::Error;
     type Pack = Self;
@@ -162,27 +183,14 @@ where
     }
 
     #[inline]
-    fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
+    fn decode_pack(mut self) -> Result<Self::Pack, Self::Error> {
+        let _ = self.decode_prefix()?;
         Ok(self)
     }
 
     #[inline]
-    fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
-        let tag = Tag::from_byte(self.reader.read_byte()?);
-
-        if tag.kind() != Kind::Prefix {
-            return Err(Self::Error::collect_from_display(Expected {
-                expected: Kind::Prefix,
-                actual: tag,
-                pos: self.reader.pos(),
-            }));
-        }
-
-        let len = if let Some(len) = tag.data() {
-            len as usize
-        } else {
-            L::decode_usize(&mut *self.reader)?
-        };
+    fn decode_array<const N: usize>(mut self) -> Result<[u8; N], Self::Error> {
+        let len = self.decode_prefix()?;
 
         if len != N {
             return Err(Self::Error::collect_from_display(BadLength {
@@ -304,22 +312,22 @@ where
 
     #[inline]
     fn decode_u16(self) -> Result<u16, Self::Error> {
-        I::decode_unsigned(self.reader)
+        I::decode_typed_unsigned(self.reader)
     }
 
     #[inline]
     fn decode_u32(self) -> Result<u32, Self::Error> {
-        I::decode_unsigned(self.reader)
+        I::decode_typed_unsigned(self.reader)
     }
 
     #[inline]
     fn decode_u64(self) -> Result<u64, Self::Error> {
-        I::decode_unsigned(self.reader)
+        I::decode_typed_unsigned(self.reader)
     }
 
     #[inline]
     fn decode_u128(self) -> Result<u128, Self::Error> {
-        I::decode_unsigned(self.reader)
+        I::decode_typed_unsigned(self.reader)
     }
 
     #[inline]
@@ -329,22 +337,22 @@ where
 
     #[inline]
     fn decode_i16(self) -> Result<i16, Self::Error> {
-        I::decode_signed(self.reader)
+        I::decode_typed_signed(self.reader)
     }
 
     #[inline]
     fn decode_i32(self) -> Result<i32, Self::Error> {
-        I::decode_signed(self.reader)
+        I::decode_typed_signed(self.reader)
     }
 
     #[inline]
     fn decode_i64(self) -> Result<i64, Self::Error> {
-        I::decode_signed(self.reader)
+        I::decode_typed_signed(self.reader)
     }
 
     #[inline]
     fn decode_i128(self) -> Result<i128, Self::Error> {
-        I::decode_signed(self.reader)
+        I::decode_typed_signed(self.reader)
     }
 
     #[inline]
@@ -436,15 +444,15 @@ where
 impl<'de, R, I, L> PackDecoder<'de> for WireDecoder<'_, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
-        Ok(WireDecoder::new(self.reader))
+        Ok(StorageDecoder::new(self.reader))
     }
 
     #[inline]
@@ -456,8 +464,8 @@ where
 impl<'de, 'a, R, I, L> RemainingSimpleDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     #[inline]
     fn sequence(decoder: WireDecoder<'a, R, I, L>) -> Result<Self, R::Error> {
@@ -483,8 +491,8 @@ where
 impl<'a, 'de, R, I, L> SequenceDecoder<'de> for RemainingSimpleDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = R::Error;
     type Next<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
@@ -508,8 +516,8 @@ where
 impl<'a, 'de, R, I, L> MapDecoder<'de> for RemainingSimpleDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = R::Error;
 
@@ -536,8 +544,8 @@ where
 impl<'a, 'de, R, I, L> MapEntryDecoder<'de> for WireDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = R::Error;
     type Key<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
@@ -557,8 +565,8 @@ where
 impl<'a, 'de, R, I, L> PairDecoder<'de> for WireDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = R::Error;
     type First<'this> = WireDecoder<'this, R, I, L> where Self: 'this;
@@ -584,8 +592,8 @@ where
 impl<'a, 'de, R, I, L> StructDecoder<'de> for RemainingSimpleDecoder<'a, R, I, L>
 where
     R: Reader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = R::Error;
 

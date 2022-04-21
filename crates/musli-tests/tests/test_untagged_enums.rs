@@ -36,21 +36,21 @@ fn test_untagged_enums() -> Result<(), Box<dyn std::error::Error>> {
     let _: Empty = musli_tests::wire::decode(&out[..])?;
 
     let out = musli_tests::wire::to_vec(&UntaggedEnum2::Variant1(String::from("foo")))?;
-    let value: String = musli_tests::wire::decode(&out[..])?;
-    assert_eq!(value, "foo");
+    let value: (String,) = musli_tests::wire::decode(&out[..])?;
+    assert_eq!(value.0, "foo");
 
     let out = musli_tests::wire::to_vec(&UntaggedEnum2::Variant2(42))?;
-    let value: u32 = musli_tests::wire::decode(&out[..])?;
-    assert_eq!(value, 42);
+    let value: (u32,) = musli_tests::wire::decode(&out[..])?;
+    assert_eq!(value.0, 42);
 
     let out = musli_tests::wire::to_vec(&UntaggedEnum3::Variant1 {
         value: String::from("foo"),
     })?;
-    let value: String = musli_tests::wire::decode(&out[..])?;
-    assert_eq!(value, "foo");
+    let value: (String,) = musli_tests::wire::decode(&out[..])?;
+    assert_eq!(value.0, "foo");
 
     let out = musli_tests::wire::to_vec(&UntaggedEnum3::Variant2 { value: 42 })?;
-    let value: u32 = musli_tests::wire::decode(&out[..])?;
-    assert_eq!(value, 42);
+    let value: (u32,) = musli_tests::wire::decode(&out[..])?;
+    assert_eq!(value.0, 42);
     Ok(())
 }

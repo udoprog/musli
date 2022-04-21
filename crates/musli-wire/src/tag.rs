@@ -7,6 +7,9 @@ use musli::{Decode, Decoder};
 
 /// Data masked into the data type.
 pub(crate) const DATA_MASK: u8 = 0b00_111111;
+/// The maximum length that can be inlined in the tag without adding additional
+/// data to the wire format.
+pub const MAX_INLINE_LEN: usize = (DATA_MASK - 1) as usize;
 
 /// The structure of a type tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

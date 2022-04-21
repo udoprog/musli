@@ -96,17 +96,20 @@
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-mod de;
-mod en;
+#[doc(hidden)]
+pub mod de;
+#[doc(hidden)]
+pub mod en;
 pub mod encoding;
-mod integer_encoding;
+#[doc(hidden)]
+pub mod integer_encoding;
 #[cfg(feature = "test")]
 pub mod test;
 
 pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, StorageEncoding};
 #[cfg(feature = "std")]
 pub use self::encoding::{to_vec, to_writer};
-pub use self::integer_encoding::{Fixed, FixedLength, Variable};
 #[cfg(feature = "test")]
 pub use self::test::transcode;
+pub use musli_binary_common::encoding::{Fixed, FixedLength, Variable};
 pub use musli_binary_common::fixed_bytes::FixedBytes;

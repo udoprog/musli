@@ -2,6 +2,7 @@
 //! the stack and read into and from it.
 
 use core::fmt;
+use core::marker;
 use core::mem::MaybeUninit;
 use core::ptr;
 
@@ -10,21 +11,29 @@ use musli::error::Error;
 use crate::writer::Writer;
 
 /// A fixed-size bytes storage which keeps track of how much has been initialized.
-pub struct FixedBytes<const N: usize> {
+pub struct FixedBytes<const N: usize, E = FixedBytesWriterError> {
     /// Data storage.
     data: [MaybeUninit<u8>; N],
     /// How many bytes have been initialized.
     init: usize,
+    /// Error type to raise when this is used as a `Writer` implementation.
+    _marker: marker::PhantomData<E>,
 }
 
-impl<const N: usize> FixedBytes<N> {
+impl<const N: usize, E> FixedBytes<N, E> {
     /// Construct a new fixed bytes array storage.
     pub const fn new() -> Self {
         Self {
             // SAFETY: MaybeUnint::uninit_array is not stable.
             data: unsafe { MaybeUninit::<[MaybeUninit<u8>; N]>::uninit().assume_init() },
             init: 0,
+            _marker: marker::PhantomData,
         }
+    }
+
+    /// Get the length of the collection.
+    pub const fn len(&self) -> usize {
+        self.init
     }
 
     /// Coerce into the underlying bytes if all of them have been initialized.
@@ -84,12 +93,15 @@ impl Error for FixedBytesWriterError {
 #[cfg(feature = "std")]
 impl std::error::Error for FixedBytesWriterError {}
 
-impl<const N: usize> Writer for FixedBytes<N> {
-    type Error = FixedBytesWriterError;
+impl<const N: usize, E> Writer for FixedBytes<N, E>
+where
+    E: Error,
+{
+    type Error = E;
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
         if bytes.len() > N.saturating_sub(self.init) {
-            return Err(FixedBytesWriterError::custom("buffer overflow"));
+            return Err(E::custom("buffer overflow"));
         }
 
         unsafe {

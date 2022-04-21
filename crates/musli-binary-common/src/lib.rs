@@ -19,6 +19,7 @@
 #[macro_use]
 mod macros;
 
+pub mod encoding;
 pub mod fixed_bytes;
 pub mod int;
 pub mod io;

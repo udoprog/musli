@@ -316,7 +316,9 @@ impl<'a> Expander<'a> {
                     #finish
                 }
             }
-            Packing::Packed if !encoders.is_empty() => {
+            Packing::Packed => {
+                needs.mark_used();
+
                 let encoder_t = &self.tokens.encoder_t;
                 let pack_encoder_t = &self.tokens.pack_encoder_t;
 
@@ -327,7 +329,6 @@ impl<'a> Expander<'a> {
                     #pack_encoder_t::finish(pack)?;
                 }
             }
-            _ => quote!(),
         };
 
         Some(quote! {
@@ -804,7 +805,9 @@ impl<'a> Expander<'a> {
                     #(#encoders)*
                 }
             }
-            Packing::Packed if !encoders.is_empty() => {
+            Packing::Packed => {
+                needs.mark_used();
+
                 let encoder_t = &self.tokens.encoder_t;
                 let encoder_var = &self.tokens.encoder_var;
                 let pack_encoder_t = &self.tokens.pack_encoder_t;

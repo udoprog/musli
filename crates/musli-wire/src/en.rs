@@ -1,25 +1,27 @@
 use core::{fmt, marker};
 
-use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
+use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::{Kind, Tag};
 use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
+use musli_binary_common::fixed_bytes::FixedBytes;
 use musli_binary_common::writer::Writer;
+use musli_storage::en::StorageEncoder;
 
 /// A very simple encoder.
-pub struct WireEncoder<'a, W, I, L>
+pub struct WireEncoder<'a, W, I, L, const P: usize>
 where
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     writer: &'a mut W,
     _marker: marker::PhantomData<(I, L)>,
 }
 
-impl<'a, W, I, L> WireEncoder<'a, W, I, L>
+impl<'a, W, I, L, const P: usize> WireEncoder<'a, W, I, L, P>
 where
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
@@ -31,15 +33,43 @@ where
     }
 }
 
-impl<'a, W, I, L> Encoder for WireEncoder<'a, W, I, L>
+pub struct WirePackEncoder<'a, W, I, L, const P: usize>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
+{
+    pack_buf: FixedBytes<P, W::Error>,
+    writer: &'a mut W,
+    _marker: marker::PhantomData<(I, L)>,
+}
+
+impl<'a, W, I, L, const P: usize> WirePackEncoder<'a, W, I, L, P>
+where
+    W: Writer,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
+{
+    /// Construct a new fixed width message encoder.
+    #[inline]
+    pub(crate) fn new(writer: &'a mut W) -> Self {
+        Self {
+            pack_buf: FixedBytes::new(),
+            writer,
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, W, I, L, const P: usize> Encoder for WireEncoder<'a, W, I, L, P>
+where
+    W: Writer,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = W::Error;
 
-    type Pack = Self;
+    type Pack = WirePackEncoder<'a, W, I, L, P>;
     type Some = Self;
     type Sequence = Self;
     type Map = Self;
@@ -55,7 +85,7 @@ where
 
     #[inline]
     fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
-        Ok(self)
+        Ok(WirePackEncoder::new(self.writer))
     }
 
     #[inline]
@@ -64,14 +94,8 @@ where
     }
 
     #[inline]
-    fn encode_bytes(mut self, bytes: &[u8]) -> Result<(), Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Prefix, bytes.len());
-        self.writer.write_byte(tag.byte())?;
-
-        if !embedded {
-            L::encode_usize(&mut self.writer, bytes.len())?;
-        }
-
+    fn encode_bytes(self, bytes: &[u8]) -> Result<(), Self::Error> {
+        encode_prefix::<W, L>(self.writer, bytes.len())?;
         self.writer.write_bytes(bytes)?;
         Ok(())
     }
@@ -134,22 +158,22 @@ where
 
     #[inline]
     fn encode_u16(mut self, value: u16) -> Result<(), Self::Error> {
-        I::encode_unsigned(&mut self.writer, value)
+        I::encode_typed_unsigned(&mut self.writer, value)
     }
 
     #[inline]
     fn encode_u32(mut self, value: u32) -> Result<(), Self::Error> {
-        I::encode_unsigned(&mut self.writer, value)
+        I::encode_typed_unsigned(&mut self.writer, value)
     }
 
     #[inline]
     fn encode_u64(mut self, value: u64) -> Result<(), Self::Error> {
-        I::encode_unsigned(&mut self.writer, value)
+        I::encode_typed_unsigned(&mut self.writer, value)
     }
 
     #[inline]
     fn encode_u128(mut self, value: u128) -> Result<(), Self::Error> {
-        I::encode_unsigned(&mut self.writer, value)
+        I::encode_typed_unsigned(&mut self.writer, value)
     }
 
     #[inline]
@@ -159,22 +183,22 @@ where
 
     #[inline]
     fn encode_i16(mut self, value: i16) -> Result<(), Self::Error> {
-        I::encode_signed(&mut self.writer, value)
+        I::encode_typed_signed(&mut self.writer, value)
     }
 
     #[inline]
     fn encode_i32(mut self, value: i32) -> Result<(), Self::Error> {
-        I::encode_signed(&mut self.writer, value)
+        I::encode_typed_signed(&mut self.writer, value)
     }
 
     #[inline]
     fn encode_i64(mut self, value: i64) -> Result<(), Self::Error> {
-        I::encode_signed(&mut self.writer, value)
+        I::encode_typed_signed(&mut self.writer, value)
     }
 
     #[inline]
     fn encode_i128(mut self, value: i128) -> Result<(), Self::Error> {
-        I::encode_signed(&mut self.writer, value)
+        I::encode_typed_signed(&mut self.writer, value)
     }
 
     #[inline]
@@ -269,34 +293,36 @@ where
     }
 }
 
-impl<W, I, L> PackEncoder for WireEncoder<'_, W, I, L>
+impl<W, I, L, const P: usize> PackEncoder for WirePackEncoder<'_, W, I, L, P>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = W::Error;
-    type Encoder<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<'this, FixedBytes<P, W::Error>, I, L> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer))
+        Ok(StorageEncoder::new(&mut self.pack_buf))
     }
 
     #[inline]
     fn finish(self) -> Result<(), Self::Error> {
+        encode_prefix::<W, L>(self.writer, self.pack_buf.len())?;
+        self.writer.write_bytes(self.pack_buf.as_bytes())?;
         Ok(())
     }
 }
 
-impl<'a, W, I, L> SequenceEncoder for WireEncoder<'a, W, I, L>
+impl<'a, W, I, L, const P: usize> SequenceEncoder for WireEncoder<'a, W, I, L, P>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = W::Error;
-    type Next<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
+    type Next<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::Next<'_>, Self::Error> {
@@ -309,15 +335,15 @@ where
     }
 }
 
-impl<'a, W, I, L> PairEncoder for WireEncoder<'a, W, I, L>
+impl<'a, W, I, L, const P: usize> PairEncoder for WireEncoder<'a, W, I, L, P>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = W::Error;
-    type First<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
-    type Second<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
+    type First<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
+    type Second<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
 
     #[inline]
     fn encode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -335,15 +361,15 @@ where
     }
 }
 
-impl<'a, W, I, L> VariantEncoder for WireEncoder<'a, W, I, L>
+impl<'a, W, I, L, const P: usize> VariantEncoder for WireEncoder<'a, W, I, L, P>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
 {
     type Error = W::Error;
 
-    type VariantTag<'this> = WireEncoder<'this, W, I, L> where Self: 'this;
+    type VariantTag<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
     type VariantValue = Self;
 
     #[inline]
@@ -363,4 +389,21 @@ impl fmt::Display for Overflow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "integer overflow")
     }
+}
+
+/// Encode a length prefix.
+#[inline]
+fn encode_prefix<W, L>(writer: &mut W, len: usize) -> Result<(), W::Error>
+where
+    W: Writer,
+    L: TypedUsizeEncoding,
+{
+    let (tag, embedded) = Tag::with_len(Kind::Prefix, len);
+    writer.write_byte(tag.byte())?;
+
+    if !embedded {
+        L::encode_usize(writer, len)?;
+    }
+
+    Ok(())
 }
