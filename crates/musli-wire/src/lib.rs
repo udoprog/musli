@@ -55,8 +55,9 @@
 //! use musli_wire::{Fixed, Variable};
 //! use musli::{Encode, Decode};
 //!
-//! const CONFIG: WireEncoding<Fixed, Variable> = WireEncoding::new()
-//!     .with_fixed_integers();
+//! const CONFIG: WireEncoding<Fixed, Variable, 128> = WireEncoding::new()
+//!     .with_fixed_integers()
+//!     .with_max_pack::<128>();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Struct<'a> {

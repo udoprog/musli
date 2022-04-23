@@ -42,8 +42,8 @@ the API efficient and ergonomic.
 Add the following to your `Cargo.toml`:
 
 ```toml
-musli = "0.0.14"
-musli-wire = "0.0.14"
+musli = "0.0.15"
+musli-wire = "0.0.15"
 ```
 
 <br>
@@ -142,6 +142,20 @@ assert_eq!(version2, Version2 {
     age: None,
 });
 ```
+
+<br>
+
+### Unsafety
+
+This library currently has two instances of unsafe:
+
+* A `mem::transcode` in `Tag::kind`. Which guarantees that converting into
+  the `Kind` enum which is `#[repr(u8)]` is as efficient as possible. (Soon
+  to be replaced with an equivalent safe variant).
+
+* A largely unsafe `SliceReader` which provides more efficient reading than
+  the default `Reader` impl for `&[u8]` does (which uses split_at). Since it
+  can perform most of the necessary comparisons directly on the pointers.
 
 <br>
 
