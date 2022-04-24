@@ -210,12 +210,12 @@ where
     /// Encode the given value to the given [Writer] using the current
     /// configuration.
     #[inline]
-    pub fn encode<W, T>(self, mut writer: W, value: &T) -> Result<(), W::Error>
+    pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), W::Error>
     where
         W: Writer,
         T: ?Sized + Encode,
     {
-        T::encode(value, StorageEncoder::<_, I, L>::new(&mut writer))
+        T::encode(value, StorageEncoder::<_, I, L>::new(writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
@@ -227,8 +227,8 @@ where
         W: io::Write,
         T: ?Sized + Encode,
     {
-        let mut writer = musli_binary_common::io::wrap(write);
-        T::encode(value, StorageEncoder::<_, I, L>::new(&mut writer))
+        let writer = musli_binary_common::io::wrap(write);
+        T::encode(value, StorageEncoder::<_, I, L>::new(writer))
     }
 
     /// Encode the given value to a [Vec] using the current configuration.
