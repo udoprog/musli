@@ -7,26 +7,26 @@ use musli::de::{
     SequenceDecoder, StructDecoder,
 };
 use musli::error::Error;
-use musli_binary_common::reader::Reader;
+use musli_binary_common::reader::PositionedReader;
 
 /// A very simple decoder suitable for storage decoding.
-pub struct StorageDecoder<'de, R, I, L>
+pub struct StorageDecoder<R, I, L>
 where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
-    reader: &'de mut R,
+    reader: R,
     _marker: marker::PhantomData<(I, L)>,
 }
 
-impl<'de, R, I, L> StorageDecoder<'de, R, I, L>
+impl<R, I, L> StorageDecoder<R, I, L>
 where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub fn new(reader: &'de mut R) -> Self {
+    pub fn new(reader: R) -> Self {
         Self {
             reader,
             _marker: marker::PhantomData,
@@ -39,39 +39,40 @@ where
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct RemainingSimpleDecoder<'a, R, I, L>
+pub struct RemainingSimpleDecoder<R, I, L>
 where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     remaining: usize,
-    decoder: StorageDecoder<'a, R, I, L>,
+    decoder: StorageDecoder<R, I, L>,
 }
 
-impl<'de, 'a, R, I, L> Decoder<'de> for StorageDecoder<'a, R, I, L>
+impl<'de, R, I, L> Decoder<'de> for StorageDecoder<R, I, L>
 where
-    R: Reader<'de>,
+    R: PositionedReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
     type Pack = Self;
     type Some = Self;
-    type Sequence = RemainingSimpleDecoder<'a, R, I, L>;
-    type Map = RemainingSimpleDecoder<'a, R, I, L>;
-    type Struct = RemainingSimpleDecoder<'a, R, I, L>;
-    type Tuple = RemainingSimpleDecoder<'a, R, I, L>;
+    type Sequence = RemainingSimpleDecoder<R, I, L>;
+    type Map = RemainingSimpleDecoder<R, I, L>;
+    type Struct = RemainingSimpleDecoder<R, I, L>;
+    type Tuple = RemainingSimpleDecoder<R, I, L>;
     type Variant = Self;
 
     #[inline]
-    fn decode_unit(self) -> Result<(), Self::Error> {
-        let count = L::decode_usize(&mut *self.reader)?;
+    fn decode_unit(mut self) -> Result<(), Self::Error> {
+        let pos = self.reader.pos();
+        let count = L::decode_usize(&mut self.reader)?;
 
         if count != 0 {
-            return Err(Self::Error::collect_from_display(ExpectedEmptySequence(
-                count,
-                self.reader.pos(),
-            )));
+            return Err(Self::Error::collect_from_display(ExpectedEmptySequence {
+                actual: count,
+                pos,
+            }));
         }
 
         Ok(())
@@ -83,16 +84,16 @@ where
     }
 
     #[inline]
-    fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
+    fn decode_array<const N: usize>(mut self) -> Result<[u8; N], Self::Error> {
         self.reader.read_array()
     }
 
     #[inline]
-    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
         V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
     {
-        let len = L::decode_usize(&mut *self.reader)?;
+        let len = L::decode_usize(&mut self.reader)?;
         let bytes = self.reader.read_bytes(len)?;
         visitor.visit_ref(bytes)
     }
@@ -134,29 +135,36 @@ where
     }
 
     #[inline]
-    fn decode_bool(self) -> Result<bool, Self::Error> {
-        match self.reader.read_byte()? {
+    fn decode_bool(mut self) -> Result<bool, Self::Error> {
+        let pos = self.reader.pos();
+        let byte = self.reader.read_byte()?;
+
+        match byte {
             0 => Ok(false),
             1 => Ok(true),
-            b => Err(Self::Error::collect_from_display(BadBoolean(
-                b,
-                self.reader.pos(),
-            ))),
+            b => Err(Self::Error::collect_from_display(BadBoolean {
+                actual: b,
+                pos,
+            })),
         }
     }
 
     #[inline]
     fn decode_char(self) -> Result<char, Self::Error> {
+        let pos = self.reader.pos();
         let num = self.decode_u32()?;
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(Self::Error::collect_from_display(BadCharacter(num))),
+            None => Err(Self::Error::collect_from_display(BadCharacter {
+                actual: num,
+                pos,
+            })),
         }
     }
 
     #[inline]
-    fn decode_u8(self) -> Result<u8, Self::Error> {
+    fn decode_u8(mut self) -> Result<u8, Self::Error> {
         self.reader.read_byte()
     }
 
@@ -232,7 +240,7 @@ where
     }
 
     #[inline]
-    fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
+    fn decode_option(mut self) -> Result<Option<Self::Some>, Self::Error> {
         let b = self.reader.read_byte()?;
         Ok(if b == 1 { Some(self) } else { None })
     }
@@ -268,18 +276,18 @@ where
     }
 }
 
-impl<'de, R, I, L> PackDecoder<'de> for StorageDecoder<'_, R, I, L>
+impl<'de, R, I, L> PackDecoder<'de> for StorageDecoder<R, I, L>
 where
-    R: Reader<'de>,
+    R: PositionedReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
-        Ok(StorageDecoder::new(self.reader))
+        Ok(StorageDecoder::new(&mut self.reader))
     }
 
     #[inline]
@@ -288,27 +296,27 @@ where
     }
 }
 
-impl<'de, 'a, R, I, L> RemainingSimpleDecoder<'a, R, I, L>
+impl<'de, R, I, L> RemainingSimpleDecoder<R, I, L>
 where
-    R: Reader<'de>,
+    R: PositionedReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     #[inline]
-    fn new(decoder: StorageDecoder<'a, R, I, L>) -> Result<Self, R::Error> {
-        let remaining = L::decode_usize(&mut *decoder.reader)?;
+    fn new(mut decoder: StorageDecoder<R, I, L>) -> Result<Self, R::Error> {
+        let remaining = L::decode_usize(&mut decoder.reader)?;
         Ok(Self { remaining, decoder })
     }
 }
 
-impl<'a, 'de, R, I, L> SequenceDecoder<'de> for RemainingSimpleDecoder<'a, R, I, L>
+impl<'de, R, I, L> SequenceDecoder<'de> for RemainingSimpleDecoder<R, I, L>
 where
-    R: Reader<'de>,
+    R: PositionedReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Next<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
+    type Next<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
@@ -322,19 +330,19 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(StorageDecoder::new(self.decoder.reader)))
+        Ok(Some(StorageDecoder::new(&mut self.decoder.reader)))
     }
 }
 
-impl<'a, 'de, R, I, L> MapDecoder<'de> for RemainingSimpleDecoder<'a, R, I, L>
+impl<'de, R, I, L> MapDecoder<'de> for RemainingSimpleDecoder<R, I, L>
 where
-    R: Reader<'de>,
+    R: PositionedReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
 
-    type Entry<'this> = StorageDecoder<'this, R, I, L>
+    type Entry<'this> = StorageDecoder<&'this mut R, I, L>
     where
         Self: 'this;
 
@@ -350,40 +358,40 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(StorageDecoder::new(self.decoder.reader)))
+        Ok(Some(StorageDecoder::new(&mut self.decoder.reader)))
     }
 }
 
-impl<'a, 'de, R, I, L> MapEntryDecoder<'de> for StorageDecoder<'a, R, I, L>
+impl<'de, R, I, L> MapEntryDecoder<'de> for StorageDecoder<R, I, L>
 where
-    R: Reader<'de>,
+    R: PositionedReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Key<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
-    type Value<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
+    type Key<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
+    type Value<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
 
     #[inline]
     fn decode_key(&mut self) -> Result<Self::Key<'_>, Self::Error> {
-        Ok(StorageDecoder::new(self.reader))
+        Ok(StorageDecoder::new(&mut self.reader))
     }
 
     #[inline]
     fn decode_value(&mut self) -> Result<Self::Value<'_>, Self::Error> {
-        Ok(StorageDecoder::new(self.reader))
+        Ok(StorageDecoder::new(&mut self.reader))
     }
 }
 
-impl<'a, 'de, R, I, L> StructDecoder<'de> for RemainingSimpleDecoder<'a, R, I, L>
+impl<'de, R, I, L> StructDecoder<'de> for RemainingSimpleDecoder<R, I, L>
 where
-    R: Reader<'de>,
+    R: PositionedReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
 
-    type Field<'this> = StorageDecoder<'this, R, I, L>
+    type Field<'this> = StorageDecoder<&'this mut R, I, L>
     where
         Self: 'this;
 
@@ -399,23 +407,23 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(StorageDecoder::new(self.decoder.reader)))
+        Ok(Some(StorageDecoder::new(&mut self.decoder.reader)))
     }
 }
 
-impl<'a, 'de, R, I, L> PairDecoder<'de> for StorageDecoder<'a, R, I, L>
+impl<'de, R, I, L> PairDecoder<'de> for StorageDecoder<R, I, L>
 where
-    R: Reader<'de>,
+    R: PositionedReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type First<'this> = StorageDecoder<'this, R, I, L> where Self: 'this;
-    type Second = StorageDecoder<'a, R, I, L>;
+    type First<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
+    type Second = StorageDecoder<R, I, L>;
 
     #[inline]
     fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(StorageDecoder::new(self.reader))
+        Ok(StorageDecoder::new(&mut self.reader))
     }
 
     #[inline]
@@ -429,38 +437,38 @@ where
     }
 }
 
-struct ExpectedEmptySequence(usize, Option<usize>);
+struct ExpectedEmptySequence {
+    actual: usize,
+    pos: usize,
+}
 
 impl fmt::Display for ExpectedEmptySequence {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(pos) = self.1 {
-            write!(
-                f,
-                "Expected empty sequence, but was {:?} (at {})",
-                self.0, pos
-            )
-        } else {
-            write!(f, "Expected empty sequence, but was {:?}", self.0)
-        }
+        let Self { actual, pos } = *self;
+        write!(f, "Expected empty sequence, but was {actual} (at {pos})",)
     }
 }
 
-struct BadBoolean(u8, Option<usize>);
+struct BadBoolean {
+    actual: u8,
+    pos: usize,
+}
 
 impl fmt::Display for BadBoolean {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(pos) = self.1 {
-            write!(f, "Bad boolean byte 0x{:02x} (at {})", self.0, pos)
-        } else {
-            write!(f, "Bad boolean byte 0x{:02x}", self.0)
-        }
+        let Self { actual, pos } = *self;
+        write!(f, "Bad boolean byte 0x{actual:02x} (at {pos})")
     }
 }
 
-struct BadCharacter(u32);
+struct BadCharacter {
+    actual: u32,
+    pos: usize,
+}
 
 impl fmt::Display for BadCharacter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Bad character number {:?}", self.0)
+        let Self { actual, pos } = *self;
+        write!(f, "Bad character number {actual} (at {pos})")
     }
 }

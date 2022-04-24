@@ -3,6 +3,7 @@ use std::fmt::Debug;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use musli::{Decode, Encode};
+use musli_wire::WireEncoding;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
@@ -23,7 +24,6 @@ enum MediumEnum {
 }
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
-#[musli(packed)]
 struct BigStruct {
     elements: Vec<SmallStruct>,
     values: Vec<MediumEnum>,
@@ -161,10 +161,9 @@ where
     value
 }
 
-const WIRE_ENCODING: musli_wire::WireEncoding<musli_wire::Fixed, musli_wire::FixedLength> =
-    musli_wire::WireEncoding::new()
-        .with_fixed_integers()
-        .with_fixed_lengths();
+const WIRE_ENCODING: WireEncoding<musli_wire::Fixed, musli_wire::FixedLength> = WireEncoding::new()
+    .with_fixed_integers()
+    .with_fixed_lengths();
 
 fn musli_wire_rt<T>(expected: &T) -> T
 where

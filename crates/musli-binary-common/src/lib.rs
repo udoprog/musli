@@ -15,6 +15,7 @@
 //! [Writer]: https://docs.rs/musli-binary-common/latest/musli-binary-common/writer/trait.Writer.html
 
 #![deny(missing_docs)]
+#![feature(generic_associated_types)]
 
 #[macro_use]
 mod macros;

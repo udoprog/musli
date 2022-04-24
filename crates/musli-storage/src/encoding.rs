@@ -266,8 +266,8 @@ where
         R: Reader<'de>,
         T: Decode<'de>,
     {
-        let mut reader = reader.with_position();
-        T::decode(StorageDecoder::<_, I, L>::new(&mut reader))
+        let reader = reader.with_position();
+        T::decode(StorageDecoder::<_, I, L>::new(reader))
     }
 
     /// Decode the given type `T` from the given slice using the current
@@ -277,7 +277,7 @@ where
     where
         T: Decode<'de>,
     {
-        let mut reader = SliceReader::new(bytes).with_position();
-        T::decode(StorageDecoder::<_, I, L>::new(&mut reader))
+        let reader = SliceReader::new(bytes).with_position();
+        T::decode(StorageDecoder::<_, I, L>::new(reader))
     }
 }

@@ -101,7 +101,11 @@ where
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
         if bytes.len() > N.saturating_sub(self.init) {
-            return Err(E::custom("buffer overflow"));
+            return Err(E::collect_from_display(BufferOverflow {
+                at: self.init,
+                additional: bytes.len(),
+                capacity: N,
+            }));
         }
 
         unsafe {
@@ -111,5 +115,26 @@ where
 
         self.init += bytes.len();
         Ok(())
+    }
+}
+
+struct BufferOverflow {
+    at: usize,
+    additional: usize,
+    capacity: usize,
+}
+
+impl fmt::Display for BufferOverflow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            at,
+            additional,
+            capacity,
+        } = *self;
+
+        write!(
+            f,
+            "Overflow when writing {additional} bytes at {at} with capacity {capacity}"
+        )
     }
 }

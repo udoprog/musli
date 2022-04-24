@@ -9,6 +9,12 @@ use std::{marker, ops::Range, ptr};
 
 use musli::error::Error;
 
+/// A reader where the current position is exactly known.
+pub trait PositionedReader<'de>: Reader<'de> {
+    /// The exact position of a reader.
+    fn pos(&self) -> usize;
+}
+
 /// Trait governing how a source of bytes is read.
 ///
 /// This requires the reader to be able to hand out contiguous references to the
@@ -16,9 +22,6 @@ use musli::error::Error;
 pub trait Reader<'de> {
     /// Error type raised by the current reader.
     type Error: Error;
-
-    /// The position of the reader.
-    fn pos(&self) -> Option<usize>;
 
     /// Skip over the given number of bytes.
     fn skip(&mut self, n: usize) -> Result<(), Self::Error>;
@@ -109,11 +112,6 @@ impl<'de> Reader<'de> for &'de [u8] {
     type Error = SliceReaderError;
 
     #[inline]
-    fn pos(&self) -> Option<usize> {
-        None
-    }
-
-    #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
         if self.len() < n {
             return Err(SliceReaderError::custom("buffer underflow"));
@@ -148,43 +146,6 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 }
 
-impl<'de, R> Reader<'de> for &mut R
-where
-    R: ?Sized + Reader<'de>,
-{
-    type Error = R::Error;
-
-    #[inline]
-    fn pos(&self) -> Option<usize> {
-        (**self).pos()
-    }
-
-    #[inline]
-    fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
-        (**self).skip(n)
-    }
-
-    #[inline]
-    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
-        (**self).read_bytes(n)
-    }
-
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        (**self).read(buf)
-    }
-
-    #[inline]
-    fn read_byte(&mut self) -> Result<u8, Self::Error> {
-        (**self).read_byte()
-    }
-
-    #[inline]
-    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
-        (**self).read_array()
-    }
-}
-
 /// An efficient [Reader] wrapper around a slice.
 pub struct SliceReader<'de> {
     range: Range<*const u8>,
@@ -204,11 +165,6 @@ impl<'de> SliceReader<'de> {
 
 impl<'de> Reader<'de> for SliceReader<'de> {
     type Error = SliceReaderError;
-
-    #[inline]
-    fn pos(&self) -> Option<usize> {
-        None
-    }
 
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
@@ -259,16 +215,21 @@ pub struct WithPosition<R> {
     reader: R,
 }
 
+impl<'de, R> PositionedReader<'de> for WithPosition<R>
+where
+    R: Reader<'de>,
+{
+    #[inline]
+    fn pos(&self) -> usize {
+        self.pos
+    }
+}
+
 impl<'de, R> Reader<'de> for WithPosition<R>
 where
     R: Reader<'de>,
 {
     type Error = R::Error;
-
-    #[inline]
-    fn pos(&self) -> Option<usize> {
-        Some(self.pos)
-    }
 
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
@@ -329,16 +290,21 @@ where
     }
 }
 
+impl<'de, R> PositionedReader<'de> for Limit<R>
+where
+    R: PositionedReader<'de>,
+{
+    #[inline]
+    fn pos(&self) -> usize {
+        self.reader.pos()
+    }
+}
+
 impl<'de, R> Reader<'de> for Limit<R>
 where
     R: Reader<'de>,
 {
     type Error = R::Error;
-
-    #[inline]
-    fn pos(&self) -> Option<usize> {
-        self.reader.pos()
-    }
 
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
@@ -368,5 +334,49 @@ where
     fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
         self.bounds_check(N)?;
         self.reader.read_array()
+    }
+}
+
+// Forward implementations.
+
+impl<'de, R> PositionedReader<'de> for &mut R
+where
+    R: ?Sized + PositionedReader<'de>,
+{
+    #[inline]
+    fn pos(&self) -> usize {
+        (**self).pos()
+    }
+}
+
+impl<'de, R> Reader<'de> for &mut R
+where
+    R: ?Sized + Reader<'de>,
+{
+    type Error = R::Error;
+
+    #[inline]
+    fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
+        (**self).skip(n)
+    }
+
+    #[inline]
+    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
+        (**self).read_bytes(n)
+    }
+
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        (**self).read(buf)
+    }
+
+    #[inline]
+    fn read_byte(&mut self) -> Result<u8, Self::Error> {
+        (**self).read_byte()
+    }
+
+    #[inline]
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
+        (**self).read_array()
     }
 }
