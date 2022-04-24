@@ -42,8 +42,8 @@ the API efficient and ergonomic.
 Add the following to your `Cargo.toml`:
 
 ```toml
-musli = "0.0.16"
-musli-wire = "0.0.16"
+musli = "0.0.17"
+musli-wire = "0.0.17"
 ```
 
 <br>
