@@ -75,6 +75,7 @@ impl fmt::Display for FixedBytesWriterError {
 }
 
 impl Error for FixedBytesWriterError {
+    #[inline]
     fn custom<T>(message: T) -> Self
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -82,6 +83,7 @@ impl Error for FixedBytesWriterError {
         Self(FixedBytesWriterErrorRepr::collect(message))
     }
 
+    #[inline]
     fn collect_from_display<T>(message: T) -> Self
     where
         T: fmt::Display,
@@ -99,6 +101,7 @@ where
 {
     type Error = E;
 
+    #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
         if bytes.len() > N.saturating_sub(self.init) {
             return Err(E::collect_from_display(BufferOverflow {
