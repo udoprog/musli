@@ -70,26 +70,6 @@ pub trait PairEncoder {
     fn finish(self) -> Result<(), Self::Error>;
 }
 
-/// Encoding a variant tag.
-pub trait VariantEncoder {
-    /// The error raised by an encoder.
-    type Error: Error;
-
-    /// Tag encoder.
-    type VariantTag<'this>: Encoder<Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Encoder for the value of the variant.
-    type VariantValue: Encoder<Error = Self::Error>;
-
-    /// Start encoding a tag.
-    fn encode_variant_tag(&mut self) -> Result<Self::VariantTag<'_>, Self::Error>;
-
-    /// Setup encoder for the value of the variant.
-    fn encode_variant_value(self) -> Result<Self::VariantValue, Self::Error>;
-}
-
 /// Trait governing how the encoder works.
 pub trait Encoder: Sized {
     /// The error raised by an encoder.
@@ -114,7 +94,7 @@ pub trait Encoder: Sized {
     type Tuple: PairEncoder<Error = Self::Error>;
 
     /// Encoder for a unit variant.
-    type Variant: VariantEncoder<Error = Self::Error>;
+    type Variant: PairEncoder<Error = Self::Error>;
 
     /// Encode a unit or something that is empty.
     fn encode_unit(self) -> Result<(), Self::Error>;

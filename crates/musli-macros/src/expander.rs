@@ -20,7 +20,6 @@ struct Tokens {
     pair_decoder_t: TokenStream,
     pair_encoder_t: TokenStream,
     struct_decoder_t: TokenStream,
-    variant_encoder_t: TokenStream,
 }
 
 pub(crate) struct Expander<'a> {
@@ -56,7 +55,6 @@ impl<'a> Expander<'a> {
                 pair_decoder_t: quote!(#prefix::de::PairDecoder),
                 pair_encoder_t: quote!(#prefix::en::PairEncoder),
                 struct_decoder_t: quote!(#prefix::de::StructDecoder),
-                variant_encoder_t: quote!(#prefix::en::VariantEncoder),
             },
         }
     }
@@ -724,7 +722,7 @@ impl<'a> Expander<'a> {
             let Tokens {
                 encode_t,
                 encoder_t,
-                variant_encoder_t,
+                pair_encoder_t,
                 ..
             } = &self.tokens;
 
@@ -737,10 +735,11 @@ impl<'a> Expander<'a> {
 
             encode = quote! {{
                 let mut variant_encoder = #encoder_t::encode_variant(#encoder_var)?;
-                let tag_encoder = #variant_encoder_t::encode_variant_tag(&mut variant_encoder)?;
+                let tag_encoder = #pair_encoder_t::encode_first(&mut variant_encoder)?;
                 #encode_t::encode(&#tag, tag_encoder)?;
-                let #encoder_var = #variant_encoder_t::encode_variant_value(variant_encoder)?;
+                let #encoder_var = #pair_encoder_t::encode_second(&mut variant_encoder)?;
                 #encode
+                #pair_encoder_t::finish(variant_encoder)?;
             }};
         }
 

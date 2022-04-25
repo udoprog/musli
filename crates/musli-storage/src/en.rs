@@ -1,7 +1,7 @@
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder};
 use musli_binary_common::writer::Writer;
 
 /// A vaery simple encoder suitable for storage encoding.
@@ -277,27 +277,5 @@ where
     #[inline]
     fn finish(self) -> Result<(), Self::Error> {
         Ok(())
-    }
-}
-
-impl<W, I, L> VariantEncoder for StorageEncoder<W, I, L>
-where
-    W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = W::Error;
-
-    type VariantTag<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
-    type VariantValue = Self;
-
-    #[inline]
-    fn encode_variant_tag(&mut self) -> Result<Self::VariantTag<'_>, Self::Error> {
-        Ok(StorageEncoder::new(&mut self.writer))
-    }
-
-    #[inline]
-    fn encode_variant_value(self) -> Result<Self::VariantValue, Self::Error> {
-        Ok(self)
     }
 }

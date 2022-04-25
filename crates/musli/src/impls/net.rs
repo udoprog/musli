@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 use crate::de::{Decode, Decoder, PackDecoder, PairDecoder};
-use crate::en::{Encode, Encoder, PackEncoder, VariantEncoder};
+use crate::en::{Encode, Encoder, PackEncoder, PairEncoder};
 use crate::error::Error;
 
 impl Encode for Ipv4Addr {
@@ -53,14 +53,16 @@ impl Encode for IpAddr {
         match self {
             IpAddr::V4(v4) => {
                 let mut variant = encoder.encode_variant()?;
-                usize::encode(&0, variant.encode_variant_tag()?)?;
-                v4.encode(variant.encode_variant_value()?)?;
+                usize::encode(&0, variant.encode_first()?)?;
+                v4.encode(variant.encode_second()?)?;
+                variant.finish()?;
                 Ok(())
             }
             IpAddr::V6(v6) => {
                 let mut variant = encoder.encode_variant()?;
-                usize::encode(&1, variant.encode_variant_tag()?)?;
-                v6.encode(variant.encode_variant_value()?)?;
+                usize::encode(&1, variant.encode_first()?)?;
+                v6.encode(variant.encode_second()?)?;
+                variant.finish()?;
                 Ok(())
             }
         }
@@ -150,14 +152,16 @@ impl Encode for SocketAddr {
         match self {
             SocketAddr::V4(v4) => {
                 let mut variant = encoder.encode_variant()?;
-                usize::encode(&0, variant.encode_variant_tag()?)?;
-                v4.encode(variant.encode_variant_value()?)?;
+                usize::encode(&0, variant.encode_first()?)?;
+                v4.encode(variant.encode_second()?)?;
+                variant.finish()?;
                 Ok(())
             }
             SocketAddr::V6(v6) => {
                 let mut variant = encoder.encode_variant()?;
-                usize::encode(&1, variant.encode_variant_tag()?)?;
-                v6.encode(variant.encode_variant_value()?)?;
+                usize::encode(&1, variant.encode_first()?)?;
+                v6.encode(variant.encode_second()?)?;
+                variant.finish()?;
                 Ok(())
             }
         }

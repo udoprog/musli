@@ -7,7 +7,7 @@ use crate::de::{
     Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, ReferenceVisitor,
     SequenceDecoder, StructDecoder,
 };
-use crate::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
+use crate::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder};
 use crate::error::Error;
 
 enum NeverMarker {}
@@ -544,29 +544,6 @@ where
     }
 
     fn finish(self) -> Result<(), Self::Error> {
-        unreachable!()
-    }
-}
-
-impl<E> VariantEncoder for Never<E>
-where
-    E: Error,
-{
-    type Error = E;
-
-    type VariantTag<'this> = Self
-    where
-        Self: 'this;
-
-    type VariantValue = Self;
-
-    #[inline]
-    fn encode_variant_tag(&mut self) -> Result<Self::VariantTag<'_>, Self::Error> {
-        unreachable!()
-    }
-
-    #[inline]
-    fn encode_variant_value(self) -> Result<Self::VariantValue, Self::Error> {
         unreachable!()
     }
 }

@@ -15,7 +15,7 @@ use core::sync::atomic::{
 use core::{fmt, marker};
 
 use crate::de::{Decode, Decoder, PairDecoder, ReferenceVisitor};
-use crate::en::{Encode, Encoder, VariantEncoder};
+use crate::en::{Encode, Encoder, PairEncoder};
 use crate::error::Error;
 
 impl Encode for () {
@@ -374,13 +374,15 @@ where
 
         match self {
             Ok(ok) => {
-                Encode::encode(&0usize, variant.encode_variant_tag()?)?;
-                Encode::encode(ok, variant.encode_variant_value()?)?;
+                Encode::encode(&0usize, variant.encode_first()?)?;
+                Encode::encode(ok, variant.encode_second()?)?;
+                variant.finish()?;
                 Ok(())
             }
             Err(err) => {
-                Encode::encode(&1usize, variant.encode_variant_tag()?)?;
-                Encode::encode(err, variant.encode_variant_value()?)?;
+                Encode::encode(&1usize, variant.encode_first()?)?;
+                Encode::encode(err, variant.encode_second()?)?;
+                variant.finish()?;
                 Ok(())
             }
         }

@@ -2,7 +2,7 @@ use core::{fmt, marker};
 
 use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::{Kind, Tag};
-use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder};
 use musli::error::Error;
 use musli_binary_common::fixed_bytes::FixedBytes;
 use musli_binary_common::writer::Writer;
@@ -358,28 +358,6 @@ where
     #[inline]
     fn finish(self) -> Result<(), Self::Error> {
         Ok(())
-    }
-}
-
-impl<W, I, L, const P: usize> VariantEncoder for WireEncoder<W, I, L, P>
-where
-    W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
-{
-    type Error = W::Error;
-
-    type VariantTag<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
-    type VariantValue = Self;
-
-    #[inline]
-    fn encode_variant_tag(&mut self) -> Result<Self::VariantTag<'_>, Self::Error> {
-        Ok(WireEncoder::new(&mut self.writer))
-    }
-
-    #[inline]
-    fn encode_variant_value(self) -> Result<Self::VariantValue, Self::Error> {
-        Ok(self)
     }
 }
 
