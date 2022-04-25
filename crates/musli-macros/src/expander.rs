@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
@@ -5,6 +7,20 @@ use syn::spanned::Spanned;
 use crate::internals::attr::{self, DefaultTag, FieldAttr, Packing, TypeAttr};
 use crate::internals::symbol::*;
 use crate::internals::{Ctxt, Needs, NeedsKind};
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum TagMethod {
+    /// The default tag method.
+    Default,
+    /// Special method that requires generating a visitor.
+    String,
+}
+
+impl Default for TagMethod {
+    fn default() -> Self {
+        Self::Default
+    }
+}
 
 struct Tokens {
     decode_t: TokenStream,
@@ -20,6 +36,9 @@ struct Tokens {
     pair_decoder_t: TokenStream,
     pair_encoder_t: TokenStream,
     struct_decoder_t: TokenStream,
+    reference_visitor_t: TokenStream,
+    phantom_data: TokenStream,
+    fmt: TokenStream,
 }
 
 pub(crate) struct Expander<'a> {
@@ -55,6 +74,9 @@ impl<'a> Expander<'a> {
                 pair_decoder_t: quote!(#prefix::de::PairDecoder),
                 pair_encoder_t: quote!(#prefix::en::PairEncoder),
                 struct_decoder_t: quote!(#prefix::de::StructDecoder),
+                reference_visitor_t: quote!(#prefix::de::ReferenceVisitor),
+                phantom_data: quote!(core::marker::PhantomData),
+                fmt: quote!(core::fmt),
             },
         }
     }
@@ -841,7 +863,7 @@ impl<'a> Expander<'a> {
 
         let body = match tagged {
             Packing::Tagged | Packing::Transparent => {
-                let tag = self.expand_field_tag(
+                let (tag, _) = self.expand_field_tag(
                     field_attr.rename.as_ref(),
                     default_field_tag,
                     index,
@@ -920,26 +942,51 @@ impl<'a> Expander<'a> {
         let mut decls = Vec::with_capacity(fields_len);
         let mut patterns = Vec::with_capacity(fields_len);
         let mut assigns = Vec::with_capacity(fields_len);
+        let mut string_patterns = Vec::with_capacity(fields_len);
+        let mut output_variants = Vec::with_capacity(fields_len);
+
+        let tag_visitor_output = syn::Ident::new("TagVisitorOutput", self.input.ident.span());
+
+        let mut tag_methods = HashSet::new();
 
         for (index, field) in fields.enumerate() {
             let field_attr = attr::field_attrs(&self.cx, &field.attrs);
 
-            let tag =
+            let (tag, tag_method) =
                 self.expand_field_tag(field_attr.rename.as_ref(), default_field_tag, index, field)?;
+
+            let before = tag_methods.len();
+            tag_methods.insert(tag_method);
+
+            if before == 1 && tag_methods.len() > 1 {
+                self.cx
+                    .error_spanned_by(field, format!("#[{}({})] conflicting tag kind", ATTR, TAG));
+            }
 
             let (span, decode_path) = field_attr.decode_path(decode_t, field.span());
             let var = syn::Ident::new(&format!("v{}", index), span);
             decls.push(quote_spanned!(span => let mut #var = None;));
             let decode = quote_spanned!(span => #var = Some(#decode_path(#decoder_var)?));
 
-            let pair_decoder_t = &self.tokens.pair_decoder_t;
+            let output_tag = match tag_method {
+                TagMethod::String => {
+                    let variant = syn::Ident::new(&format!("Variant{}", index), field.span());
+                    let mut path = syn::Path::from(tag_visitor_output.clone());
+                    path.segments.push(syn::PathSegment::from(variant.clone()));
 
-            patterns.push(quote! {
-                #tag => {
-                    let #decoder_var = #pair_decoder_t::decode_second(#decoder_var)?;
-                    #decode;
+                    string_patterns.push(quote!(#tag => Ok(#path)));
+                    output_variants.push(variant.clone());
+
+                    syn::Expr::Path(syn::ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path,
+                    })
                 }
-            });
+                TagMethod::Default => tag.clone(),
+            };
+
+            patterns.push((output_tag, decode));
 
             let field = match &field.ident {
                 Some(ident) => quote!(#ident),
@@ -981,13 +1028,85 @@ impl<'a> Expander<'a> {
             }
         };
 
+        let tag_method = tag_methods.into_iter().next().unwrap_or_default();
+
         let pair_decoder_t = &self.tokens.pair_decoder_t;
         let decode_t = &self.tokens.decode_t;
 
-        let decode_tag = quote! {{
-            let index_decoder = #pair_decoder_t::decode_first(&mut #decoder_var)?;
-            #decode_t::decode(index_decoder)?
-        }};
+        let (decode_tag, unsupported_pattern, patterns, output_enum) = match tag_method {
+            TagMethod::String => {
+                let reference_visitor_t = &self.tokens.reference_visitor_t;
+                let phantom_data = &self.tokens.phantom_data;
+                let fmt = &self.tokens.fmt;
+                let error_t = &self.tokens.error_t;
+
+                // Declare a tag visitor, allowing string tags to be decoded by
+                // decoders that owns the string.
+                let decode_tag = quote! {{
+                    struct TagVisitor<E>(#phantom_data<E>);
+
+                    impl<'de, E> #reference_visitor_t<'de> for TagVisitor<E> where E: #error_t {
+                        type Target = str;
+                        type Ok = Result<#tag_visitor_output, Box<str>>;
+                        type Error = E;
+
+                        #[inline]
+                        fn expected(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
+                            write!(f, "expected string tag")
+                        }
+
+                        #[inline]
+                        fn visit(self, string: &Self::Target) -> Result<Self::Ok, Self::Error> {
+                            Ok(match string {
+                                #(#string_patterns,)*
+                                _ => Err(string.into()),
+                            })
+                        }
+                    }
+
+                    let index_decoder = #pair_decoder_t::decode_first(&mut #decoder_var)?;
+                    #decoder_t::decode_string(index_decoder, TagVisitor::<D::Error>(#phantom_data))?
+                }};
+
+                let patterns = patterns
+                    .into_iter()
+                    .map(|(tag, decode)| (quote!(Ok(#tag)), decode))
+                    .collect::<Vec<_>>();
+
+                let output_enum = quote! {
+                    enum #tag_visitor_output {
+                        #(#output_variants,)*
+                    }
+                };
+
+                (decode_tag, quote!(Err(tag)), patterns, Some(output_enum))
+            }
+            TagMethod::Default => {
+                let decode_tag = quote! {{
+                    let index_decoder = #pair_decoder_t::decode_first(&mut #decoder_var)?;
+                    #decode_t::decode(index_decoder)?
+                }};
+
+                let patterns = patterns
+                    .into_iter()
+                    .map(|(tag, decode)| (quote!(#tag), decode))
+                    .collect::<Vec<_>>();
+
+                (decode_tag, quote!(tag), patterns, None)
+            }
+        };
+
+        let patterns = patterns
+            .into_iter()
+            .map(|(tag, decode)| {
+                quote! {
+                    #tag => {
+                        let #decoder_var = #pair_decoder_t::decode_second(#decoder_var)?;
+                        #decode;
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
 
         let skip_field = quote! {
             #pair_decoder_t::skip_second(#decoder_var)?
@@ -1014,7 +1133,7 @@ impl<'a> Expander<'a> {
             quote! {
                 match tag {
                     #(#patterns,)*
-                    tag => {
+                    #unsupported_pattern => {
                         if !#skip_field {
                             return Err(#unsupported);
                         }
@@ -1025,6 +1144,7 @@ impl<'a> Expander<'a> {
 
         Some(quote! {
             #(#decls;)*
+            #output_enum
 
             let mut #decoder_var = #declare;
 
@@ -1125,10 +1245,14 @@ impl<'a> Expander<'a> {
         default_field_tag: DefaultTag,
         index: usize,
         field: &syn::Field,
-    ) -> Option<syn::Expr> {
-        let lit = match (rename, default_field_tag, &field.ident) {
-            (Some((_, rename)), _, _) => return Some(self.rename_lit(rename)),
-            (None, DefaultTag::Index, _) => usize_int(index, field.span()).into(),
+    ) -> Option<(syn::Expr, TagMethod)> {
+        let (lit, tag_method) = match (rename, default_field_tag, &field.ident) {
+            (Some((_, rename)), _, _) => {
+                return Some((self.rename_lit(rename), self.determine_tag_method(rename)))
+            }
+            (None, DefaultTag::Index, _) => {
+                (usize_int(index, field.span()).into(), TagMethod::Default)
+            }
             (None, DefaultTag::Name, None) => {
                 self.cx.error_spanned_by(
                     field,
@@ -1139,15 +1263,18 @@ impl<'a> Expander<'a> {
                 );
                 return None;
             }
-            (None, DefaultTag::Name, Some(ident)) => {
-                syn::LitStr::new(&ident.to_string(), ident.span()).into()
-            }
+            (None, DefaultTag::Name, Some(ident)) => (
+                syn::LitStr::new(&ident.to_string(), ident.span()).into(),
+                TagMethod::String,
+            ),
         };
 
-        Some(syn::Expr::Lit(syn::ExprLit {
+        let tag = syn::Expr::Lit(syn::ExprLit {
             attrs: Vec::new(),
             lit,
-        }))
+        });
+
+        Some((tag, tag_method))
     }
 
     /// Process rename literal to ensure it's always typed.
@@ -1161,6 +1288,22 @@ impl<'a> Expander<'a> {
                 lit: syn::LitInt::new(&format!("{}usize", int), int.span()).into(),
             }),
             expr => expr.clone(),
+        }
+    }
+
+    /// Try and determine tag method from the given expression.
+    fn determine_tag_method(&self, expr: &syn::Expr) -> TagMethod {
+        let lit = match expr {
+            syn::Expr::Lit(lit) => lit,
+            _ => return TagMethod::Default,
+        };
+
+        match lit {
+            syn::ExprLit {
+                lit: syn::Lit::Str(..),
+                ..
+            } => TagMethod::String,
+            _ => TagMethod::Default,
         }
     }
 }
