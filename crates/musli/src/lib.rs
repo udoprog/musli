@@ -228,6 +228,7 @@ pub mod en;
 pub mod error;
 mod impls;
 mod internal;
+pub mod never;
 
 pub use self::de::{Decode, Decoder};
 pub use self::en::{Encode, Encoder};

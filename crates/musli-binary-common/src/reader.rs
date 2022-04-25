@@ -7,6 +7,7 @@
 use core::{fmt, slice};
 use std::{marker, ops::Range, ptr};
 
+use musli::de::ReferenceVisitor;
 use musli::error::Error;
 
 /// A reader where the current position is exactly known.
@@ -29,13 +30,35 @@ pub trait Reader<'de> {
     /// Read a slice into the given buffer.
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        let source = self.read_bytes(buf.len())?;
-        buf.copy_from_slice(source);
-        Ok(())
+        return self.read_bytes(buf.len(), Visitor::<Self::Error>(buf, marker::PhantomData));
+
+        struct Visitor<'a, E>(&'a mut [u8], marker::PhantomData<E>);
+
+        impl<'a, 'de, E> ReferenceVisitor<'de> for Visitor<'a, E>
+        where
+            E: Error,
+        {
+            type Target = [u8];
+            type Ok = ();
+            type Error = E;
+
+            #[inline]
+            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "expected bytes")
+            }
+
+            #[inline]
+            fn visit(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
+                self.0.copy_from_slice(bytes);
+                Ok(())
+            }
+        }
     }
 
     /// Read a slice out of the current reader.
-    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error>;
+    fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>;
 
     /// Read a single byte.
     #[inline]
@@ -47,9 +70,29 @@ pub trait Reader<'de> {
     /// Read an array out of the current reader.
     #[inline]
     fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
-        let mut output = [0u8; N];
-        output.copy_from_slice(self.read_bytes(N)?);
-        Ok(output)
+        return self.read_bytes(N, Visitor::<N, Self::Error>([0u8; N], marker::PhantomData));
+
+        struct Visitor<const N: usize, E>([u8; N], marker::PhantomData<E>);
+
+        impl<'de, const N: usize, E> ReferenceVisitor<'de> for Visitor<N, E>
+        where
+            E: Error,
+        {
+            type Target = [u8];
+            type Ok = [u8; N];
+            type Error = E;
+
+            #[inline]
+            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "expected bytes")
+            }
+
+            #[inline]
+            fn visit(mut self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
+                self.0.copy_from_slice(bytes);
+                Ok(self.0)
+            }
+        }
     }
 
     /// Keep an accurate record of the position within the reader.
@@ -123,14 +166,17 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
+    fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+    {
         if self.len() < n {
             return Err(SliceReaderError::custom("buffer underflow"));
         }
 
         let (head, tail) = self.split_at(n);
         *self = tail;
-        Ok(head)
+        visitor.visit_ref(head)
     }
 
     #[inline]
@@ -173,13 +219,16 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
-    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
+    fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+    {
         let outcome = bounds_check_add(&self.range, n)?;
 
         unsafe {
             let bytes = slice::from_raw_parts(self.range.start, n);
             self.range.start = outcome;
-            Ok(bytes)
+            visitor.visit_ref(bytes)
         }
     }
 
@@ -239,10 +288,13 @@ where
     }
 
     #[inline]
-    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
-        let bytes = self.reader.read_bytes(n)?;
-        self.pos += bytes.len();
-        Ok(bytes)
+    fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+    {
+        let ok = self.reader.read_bytes(n, visitor)?;
+        self.pos += n;
+        Ok(ok)
     }
 
     #[inline]
@@ -313,9 +365,12 @@ where
     }
 
     #[inline]
-    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
+    fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+    {
         self.bounds_check(n)?;
-        self.reader.read_bytes(n)
+        self.reader.read_bytes(n, visitor)
     }
 
     #[inline]
@@ -361,8 +416,11 @@ where
     }
 
     #[inline]
-    fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Self::Error> {
-        (**self).read_bytes(n)
+    fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+    {
+        (**self).read_bytes(n, visitor)
     }
 
     #[inline]

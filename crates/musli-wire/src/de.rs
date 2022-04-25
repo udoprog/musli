@@ -216,8 +216,7 @@ where
             L::decode_usize(&mut self.reader)?
         };
 
-        let bytes = self.reader.read_bytes(len)?;
-        visitor.visit_ref(bytes)
+        self.reader.read_bytes(len, visitor)
     }
 
     #[inline]
