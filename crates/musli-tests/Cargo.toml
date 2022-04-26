@@ -4,12 +4,16 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[features]
+default = ["std"]
+std = ["musli/std", "musli-wire/std", "musli-storage/std"]
+
 [dependencies]
-musli-wire = { path = "../musli-wire", features = ["test"] }
-musli-storage = { path = "../musli-storage", features = ["test"] }
+musli-wire = { path = "../musli-wire", features = ["test"], default_features = false }
+musli-storage = { path = "../musli-storage", features = ["test"], default_features = false }
 
 [dev-dependencies]
-musli = { path = "../musli" }
+musli = { path = "../musli", default_features = false }
 
 anyhow = "1.0.56"
 rand = "0.8.5"

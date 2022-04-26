@@ -310,7 +310,6 @@ dependencies = [
 name = "musli-binary-common"
 version = "0.0.18"
 dependencies = [
- "anyhow",
  "musli",
  "rand",
 ]

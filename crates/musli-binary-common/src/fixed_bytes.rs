@@ -58,7 +58,7 @@ impl<const N: usize, E> FixedBytes<N, E> {
 
         // SAFETY: We've asserted that `initialized` accounts for the number of
         // bytes that have been initialized.
-        unsafe { std::slice::from_raw_parts(self.data.as_ptr() as *const u8, self.init) }
+        unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const u8, self.init) }
     }
 }
 

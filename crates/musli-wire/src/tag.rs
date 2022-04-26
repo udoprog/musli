@@ -1,7 +1,7 @@
 //! Type flags available for `musli-wire`.
 
 use core::fmt;
-use std::mem;
+use core::mem;
 
 use musli::{Decode, Decoder};
 

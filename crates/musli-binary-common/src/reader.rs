@@ -4,8 +4,11 @@
 //! it which allows it to make the assumption the bytes are always returned with
 //! the `'de` lifetime.
 
-use core::{fmt, slice};
-use std::{marker, ops::Range, ptr};
+use core::fmt;
+use core::marker;
+use core::ops::Range;
+use core::ptr;
+use core::slice;
 
 use musli::de::ValueVisitor;
 use musli::error::Error;

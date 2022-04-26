@@ -15,9 +15,9 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["musli-binary-common/std", "musli/std"]
-test = []
+std = ["musli/std", "musli-binary-common/std"]
+test = ["std"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.18" }
-musli-binary-common = { path = "../musli-binary-common", version = "0.0.18" }
+musli = { path = "../musli", version = "0.0.18", default_features = false }
+musli-binary-common = { path = "../musli-binary-common", version = "0.0.18", default_features = false }

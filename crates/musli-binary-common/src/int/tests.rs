@@ -1,6 +1,6 @@
 use std::fmt;
 
-use anyhow::Result;
+type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;

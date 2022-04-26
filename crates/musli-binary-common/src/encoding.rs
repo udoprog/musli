@@ -1,6 +1,6 @@
 //! Helpers for determining integer encoding at compile time.
 
-use std::marker;
+use core::marker;
 
 use crate::int::NetworkEndian;
 
