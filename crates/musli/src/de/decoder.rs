@@ -1,19 +1,7 @@
 use core::fmt;
 
 use crate::error::Error;
-use crate::expecting::{self, Expecting, InvalidType};
-
-struct RefVisitorExpected<T>(T);
-
-impl<'de, T> fmt::Display for RefVisitorExpected<T>
-where
-    T: ReferenceVisitor<'de>,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expecting(f)
-    }
-}
+use crate::expecting::{self, BadVisitorType, Expecting, InvalidType};
 
 /// A visitor for data where it might be possible to borrow it without copying
 /// from the underlying [Decoder].
@@ -42,15 +30,21 @@ pub trait ReferenceVisitor<'de>: Sized {
 
     /// Visit a string that is borrowed directly from the source data.
     #[inline]
-    fn visit_ref(self, string: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
-        self.visit(string)
+    fn visit_borrowed(self, _: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::message(BadVisitorType::new(
+            expecting::BorrowedReference,
+            &ReferenceVisistorExpecting(self),
+        )))
     }
 
     /// Visit a string that is provided from the decoder in any manner possible.
     /// Which might require additional decoding work.
     #[inline]
-    fn visit(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(RefVisitorExpected(self)))
+    fn visit_any(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::message(BadVisitorType::new(
+            expecting::AnyReference,
+            &ReferenceVisistorExpecting(self),
+        )))
     }
 }
 
@@ -335,7 +329,7 @@ pub trait Decoder<'de>: Sized {
     ///             }
     ///
     ///             #[inline]
-    ///             fn visit_ref(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+    ///             fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
     ///                 Ok(bytes)
     ///             }
     ///         }
@@ -394,7 +388,7 @@ pub trait Decoder<'de>: Sized {
     ///             }
     ///
     ///             #[inline]
-    ///             fn visit_ref(self, bytes: &'de str) -> Result<Self::Ok, Self::Error> {
+    ///             fn visit_borrowed(self, bytes: &'de str) -> Result<Self::Ok, Self::Error> {
     ///                 Ok(bytes)
     ///             }
     ///         }
@@ -1192,6 +1186,18 @@ struct ExpectingWrapper<T>(T);
 impl<'de, T> Expecting for ExpectingWrapper<T>
 where
     T: Decoder<'de>,
+{
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expecting(f)
+    }
+}
+
+#[repr(transparent)]
+struct ReferenceVisistorExpecting<T>(T);
+
+impl<'de, T> Expecting for ReferenceVisistorExpecting<T>
+where
+    T: ReferenceVisitor<'de>,
 {
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.expecting(f)

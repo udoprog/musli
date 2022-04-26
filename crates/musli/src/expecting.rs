@@ -40,8 +40,32 @@ where
             f,
             "invalid type: got {}, but expected {}",
             self.actual, self.expecting
-        )?;
-        Ok(())
+        )
+    }
+}
+
+pub(crate) struct BadVisitorType<'a, A> {
+    actual: A,
+    expecting: &'a dyn Expecting,
+}
+
+impl<'a, A> BadVisitorType<'a, A> {
+    pub(crate) const fn new(actual: A, expecting: &'a dyn Expecting) -> Self {
+        Self { actual, expecting }
+    }
+}
+
+impl<'a, 'de, A> fmt::Display for BadVisitorType<'a, A>
+where
+    A: fmt::Display,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "bad reference type: got: {}, expected: {}",
+            self.actual, self.expecting
+        )
     }
 }
 
@@ -88,4 +112,6 @@ expect! {
     pub(crate) Struct("struct");
     pub(crate) UnitStruct("unit struct");
     pub(crate) Variant("variant");
+    pub(crate) BorrowedReference("reference borrowed from source");
+    pub(crate) AnyReference("any reference");
 }

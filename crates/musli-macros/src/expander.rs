@@ -1021,7 +1021,12 @@ impl<'a> Expander<'a> {
                         }
 
                         #[inline]
-                        fn visit(self, string: &Self::Target) -> Result<Self::Ok, Self::Error> {
+                        fn visit_borrowed(self, string: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
+                            self.visit_any(string)
+                        }
+
+                        #[inline]
+                        fn visit_any(self, string: &Self::Target) -> Result<Self::Ok, Self::Error> {
                             Ok(match string {
                                 #(#string_patterns,)*
                                 _ => Err(string.into()),

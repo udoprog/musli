@@ -274,11 +274,11 @@ impl<'de> Decode<'de> for &'de str {
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "exact string reference")
+                write!(f, "string borrowed from source")
             }
 
             #[inline]
-            fn visit_ref(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
+            fn visit_borrowed(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
                 Ok(string)
             }
         }
@@ -314,11 +314,11 @@ impl<'de> Decode<'de> for &'de [u8] {
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "exact bytes reference")
+                write!(f, "bytes borrowed from source")
             }
 
             #[inline]
-            fn visit_ref(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+            fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
                 Ok(bytes)
             }
         }

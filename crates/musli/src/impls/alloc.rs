@@ -44,7 +44,12 @@ impl<'de> Decode<'de> for String {
             }
 
             #[inline]
-            fn visit(self, string: &str) -> Result<Self::Ok, Self::Error> {
+            fn visit_borrowed(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
+                self.visit_any(string)
+            }
+
+            #[inline]
+            fn visit_any(self, string: &str) -> Result<Self::Ok, Self::Error> {
                 Ok(string.to_owned())
             }
         }
@@ -105,12 +110,12 @@ impl<'de> Decode<'de> for Cow<'de, str> {
             }
 
             #[inline]
-            fn visit_ref(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
+            fn visit_borrowed(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
                 Ok(Cow::Borrowed(string))
             }
 
             #[inline]
-            fn visit(self, string: &str) -> Result<Self::Ok, Self::Error> {
+            fn visit_any(self, string: &str) -> Result<Self::Ok, Self::Error> {
                 Ok(Cow::Owned(string.to_owned()))
             }
         }

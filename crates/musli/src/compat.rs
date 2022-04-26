@@ -116,7 +116,12 @@ impl<'de> Decode<'de> for Bytes<Vec<u8>> {
             }
 
             #[inline]
-            fn visit(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+            fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+                Ok(bytes.to_vec())
+            }
+
+            #[inline]
+            fn visit_any(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 Ok(bytes.to_vec())
             }
         }

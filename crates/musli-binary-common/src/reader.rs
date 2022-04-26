@@ -48,7 +48,12 @@ pub trait Reader<'de> {
             }
 
             #[inline]
-            fn visit(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
+            fn visit_borrowed(self, bytes: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
+                self.visit_any(bytes)
+            }
+
+            #[inline]
+            fn visit_any(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
                 self.0.copy_from_slice(bytes);
                 Ok(())
             }
@@ -88,7 +93,12 @@ pub trait Reader<'de> {
             }
 
             #[inline]
-            fn visit(mut self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
+            fn visit_borrowed(self, bytes: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
+                self.visit_any(bytes)
+            }
+
+            #[inline]
+            fn visit_any(mut self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
                 self.0.copy_from_slice(bytes);
                 Ok(self.0)
             }
@@ -176,7 +186,7 @@ impl<'de> Reader<'de> for &'de [u8] {
 
         let (head, tail) = self.split_at(n);
         *self = tail;
-        visitor.visit_ref(head)
+        visitor.visit_borrowed(head)
     }
 
     #[inline]
@@ -228,7 +238,7 @@ impl<'de> Reader<'de> for SliceReader<'de> {
         unsafe {
             let bytes = slice::from_raw_parts(self.range.start, n);
             self.range.start = outcome;
-            visitor.visit_ref(bytes)
+            visitor.visit_borrowed(bytes)
         }
     }
 
