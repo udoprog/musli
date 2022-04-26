@@ -299,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "musli"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "musli-macros",
  "musli-storage",
@@ -308,7 +308,7 @@ dependencies = [
 
 [[package]]
 name = "musli-binary-common"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "musli",
  "rand",
@@ -316,7 +316,7 @@ dependencies = [
 
 [[package]]
 name = "musli-macros"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "musli-storage"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "musli",
  "musli-binary-common",
@@ -351,7 +351,7 @@ dependencies = [
 
 [[package]]
 name = "musli-wire"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "musli",
  "musli-binary-common",
