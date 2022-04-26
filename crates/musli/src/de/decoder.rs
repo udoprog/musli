@@ -143,6 +143,8 @@ pub trait Decoder<'de>: Sized {
     type Pack: PackDecoder<'de, Error = Self::Error>;
     /// Sequence decoder implementation.
     type Sequence: SequenceDecoder<'de, Error = Self::Error>;
+    /// Tuple decoder implementation.
+    type Tuple: PackDecoder<'de, Error = Self::Error>;
     /// Map decoder implementation.
     type Map: PairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a value that is present.
@@ -156,7 +158,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// The caller receives a [PairsDecoder] which when advanced with
     /// [PairsDecoder::next] indicates the elements in the tuple.
-    type Tuple: PairsDecoder<'de, Error = Self::Error>;
+    type TupleStruct: PairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a variant.
     ///
     /// The caller receives a [PairDecoder] which when advanced with
@@ -179,10 +181,11 @@ pub trait Decoder<'de>: Sized {
     ///     type Error = String;
     ///     type Pack = Never<Self>;
     ///     type Sequence = Never<Self>;
+    ///     type Tuple = Never<Self>;
     ///     type Map = Never<Self>;
     ///     type Some = Never<Self>;
     ///     type Struct = Never<Self>;
-    ///     type Tuple = Never<Self>;
+    ///     type TupleStruct = Never<Self>;
     ///     type Variant = Never<Self>;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -965,6 +968,40 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
+    /// Return a helper to decode a tuple.
+    ///
+    /// A tuple is a fixed-length sequence.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    ///
+    /// use musli::de::{Decode, Decoder, PackDecoder};
+    /// use musli::error::Error;
+    ///
+    /// struct TupleStruct(String, u32);
+    ///
+    /// impl<'de> Decode<'de> for TupleStruct {
+    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         let mut tuple = decoder.decode_tuple(2)?;
+    ///         let string = tuple.next().and_then(String::decode)?;
+    ///         let integer = tuple.next().and_then(u32::decode)?;
+    ///         Ok(Self(string, integer))
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Tuple,
+            &ExpectingWrapper(self),
+        )))
+    }
+
     /// Decode a map.
     ///
     /// # Examples
@@ -1079,7 +1116,7 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut st = decoder.decode_tuple(2)?;
+    ///         let mut st = decoder.decode_tuple_struct(2)?;
     ///         let mut string = None;
     ///         let mut integer = None;
     ///
@@ -1107,9 +1144,9 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
-            expecting::Tuple,
+            expecting::TupleStruct,
             &ExpectingWrapper(self),
         )))
     }

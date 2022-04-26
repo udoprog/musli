@@ -24,10 +24,11 @@ enum NeverMarker {}
 ///     type Error = String;
 ///     type Pack = Never<Self>;
 ///     type Sequence = Never<Self>;
+///     type Tuple = Never<Self>;
 ///     type Map = Never<Self>;
 ///     type Some = Never<Self>;
 ///     type Struct = Never<Self>;
-///     type Tuple = Never<Self>;
+///     type TupleStruct = Never<Self>;
 ///     type Variant = Never<Self>;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -52,10 +53,11 @@ where
     type Error = T::Error;
     type Pack = Self;
     type Sequence = Self;
+    type Tuple = Self;
     type Map = Self;
     type Some = Self;
     type Struct = Self;
-    type Tuple = Self;
+    type TupleStruct = Self;
     type Variant = Self;
 
     #[inline]
@@ -164,9 +166,10 @@ where
     type Pack = Self;
     type Some = Self;
     type Sequence = Self;
+    type Tuple = Self;
     type Map = Self;
     type Struct = Self;
-    type Tuple = Self;
+    type TupleStruct = Self;
     type StructVariant = Self;
     type TupleVariant = Self;
     type UnitVariant = Self;

@@ -158,9 +158,10 @@ where
     type Pack = WireDecoder<Limit<R>, I, L>;
     type Some = Self;
     type Sequence = RemainingWireDecoder<R, I, L>;
+    type Tuple = Self;
     type Map = RemainingWireDecoder<R, I, L>;
     type Struct = RemainingWireDecoder<R, I, L>;
-    type Tuple = RemainingWireDecoder<R, I, L>;
+    type TupleStruct = RemainingWireDecoder<R, I, L>;
     type Variant = Self;
 
     #[inline]
@@ -398,6 +399,19 @@ where
     }
 
     #[inline]
+    fn decode_tuple(mut self, len: usize) -> Result<Self::Tuple, Self::Error> {
+        let actual = self.decode_sequence_len()?;
+
+        if len != actual {
+            return Err(Self::Error::message(format_args!(
+                "tuple length mismatch: len: {len}, actual: {actual}"
+            )));
+        }
+
+        Ok(self)
+    }
+
+    #[inline]
     fn decode_map(self) -> Result<Self::Map, Self::Error> {
         self.shared_decode_pair_sequence()
     }
@@ -408,7 +422,7 @@ where
     }
 
     #[inline]
-    fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
         self.shared_decode_pair_sequence()
     }
 

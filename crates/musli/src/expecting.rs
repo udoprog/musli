@@ -106,10 +106,11 @@ expect! {
     pub(crate) Array("array");
     pub(crate) Map("map");
     pub(crate) Option("option");
-    pub(crate) Sequence("sequence");
     pub(crate) Tuple("tuple");
+    pub(crate) Sequence("sequence");
     pub(crate) Unit("unit");
     pub(crate) Struct("struct");
+    pub(crate) TupleStruct("tuple struct");
     pub(crate) UnitStruct("unit struct");
     pub(crate) Variant("variant");
     pub(crate) StructVariant("struct variant");

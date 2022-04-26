@@ -36,7 +36,7 @@ where
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct RemainingSimpleDecoder<R, I, L>
+pub struct LimitedStorageDecoder<R, I, L>
 where
     I: IntegerEncoding,
     L: UsizeEncoding,
@@ -54,10 +54,11 @@ where
     type Error = R::Error;
     type Pack = Self;
     type Some = Self;
-    type Sequence = RemainingSimpleDecoder<R, I, L>;
-    type Map = RemainingSimpleDecoder<R, I, L>;
-    type Struct = RemainingSimpleDecoder<R, I, L>;
-    type Tuple = RemainingSimpleDecoder<R, I, L>;
+    type Sequence = LimitedStorageDecoder<R, I, L>;
+    type Tuple = Self;
+    type Map = LimitedStorageDecoder<R, I, L>;
+    type Struct = LimitedStorageDecoder<R, I, L>;
+    type TupleStruct = LimitedStorageDecoder<R, I, L>;
     type Variant = Self;
 
     #[inline]
@@ -242,22 +243,27 @@ where
 
     #[inline]
     fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
-        RemainingSimpleDecoder::new(self)
-    }
-
-    #[inline]
-    fn decode_map(self) -> Result<Self::Map, Self::Error> {
-        RemainingSimpleDecoder::new(self)
-    }
-
-    #[inline]
-    fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
-        RemainingSimpleDecoder::new(self)
+        LimitedStorageDecoder::new(self)
     }
 
     #[inline]
     fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
-        RemainingSimpleDecoder::new(self)
+        Ok(self)
+    }
+
+    #[inline]
+    fn decode_map(self) -> Result<Self::Map, Self::Error> {
+        LimitedStorageDecoder::new(self)
+    }
+
+    #[inline]
+    fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
+        LimitedStorageDecoder::new(self)
+    }
+
+    #[inline]
+    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
+        LimitedStorageDecoder::new(self)
     }
 
     #[inline]
@@ -291,7 +297,7 @@ where
     }
 }
 
-impl<'de, R, I, L> RemainingSimpleDecoder<R, I, L>
+impl<'de, R, I, L> LimitedStorageDecoder<R, I, L>
 where
     R: PositionedReader<'de>,
     I: IntegerEncoding,
@@ -304,7 +310,7 @@ where
     }
 }
 
-impl<'de, R, I, L> SequenceDecoder<'de> for RemainingSimpleDecoder<R, I, L>
+impl<'de, R, I, L> SequenceDecoder<'de> for LimitedStorageDecoder<R, I, L>
 where
     R: PositionedReader<'de>,
     I: IntegerEncoding,
@@ -329,7 +335,7 @@ where
     }
 }
 
-impl<'de, R, I, L> PairsDecoder<'de> for RemainingSimpleDecoder<R, I, L>
+impl<'de, R, I, L> PairsDecoder<'de> for LimitedStorageDecoder<R, I, L>
 where
     R: PositionedReader<'de>,
     I: IntegerEncoding,

@@ -25,11 +25,15 @@ fn test_skip_serialize() {
         after: 3,
     });
 
-    let out = musli_tests::wire::transcode::<_, (u32, u32)>(SkipSerializeUntagged {
+    let out = musli_tests::wire::transcode::<_, Unpacked>(SkipSerializeUntagged {
         before: 1,
         skipped: None,
         after: 3,
     });
 
-    assert_eq!(out, (1, 3));
+    assert_eq!(out, Unpacked(1, 3));
+
+    #[derive(Debug, PartialEq, Eq, Decode)]
+    #[musli(packed)]
+    struct Unpacked(u32, u32);
 }

@@ -650,7 +650,7 @@ impl<'a> Expander<'a> {
             }
             syn::Fields::Unnamed(..) => {
                 let fields = calculate_tests(fields.len(), tests);
-                quote!(#encoder_t::encode_tuple(#encoder_var, #fields)?)
+                quote!(#encoder_t::encode_tuple_struct(#encoder_var, #fields)?)
             }
             syn::Fields::Unit => {
                 return quote!(#encoder_t::encode_unit_struct(#encoder_var));
@@ -990,7 +990,7 @@ impl<'a> Expander<'a> {
                 #decoder_t::decode_struct(#decoder_var, #fields_len)?
             },
             FieldKind::Tuple => quote! {
-                #decoder_t::decode_tuple(#decoder_var, #fields_len)?
+                #decoder_t::decode_tuple_struct(#decoder_var, #fields_len)?
             },
         };
 

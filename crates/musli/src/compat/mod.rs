@@ -3,6 +3,9 @@
 
 #[cfg(feature = "std")]
 mod alloc;
+mod packed;
+
+pub use self::packed::Packed;
 
 use crate::en::SequenceEncoder;
 use crate::{Decode, Decoder, Encode, Encoder};

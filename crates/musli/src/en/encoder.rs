@@ -93,12 +93,14 @@ pub trait Encoder: Sized {
     type Some: Encoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a sequence encoder.
     type Sequence: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
+    /// The type of a tuple encoder.
+    type Tuple: PackEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a map encoder.
     type Map: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a struct.
     type Struct: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a tuple struct.
-    type Tuple: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type TupleStruct: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a struct variant.
     type StructVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a tuple variant.
@@ -845,6 +847,35 @@ pub trait Encoder: Sized {
         )))
     }
 
+    /// Encode a tuple.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder, PackEncoder};
+    ///
+    /// struct PackedTuple(u32, [u8; 364]);
+    ///
+    /// impl Encode for PackedTuple {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         let mut pack = encoder.encode_tuple(2)?;
+    ///         pack.next()?.encode_u32(self.0)?;
+    ///         pack.next()?.encode_array(self.1)?;
+    ///         pack.end()
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Tuple,
+            &ExpectingWrapper(self),
+        )))
+    }
+
     /// Encode a map with a known length.
     #[inline]
     fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
@@ -902,7 +933,7 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
-    ///         let mut tuple = encoder.encode_tuple(1)?;
+    ///         let mut tuple = encoder.encode_tuple_struct(1)?;
     ///         tuple.first()?.encode_usize(0)?;
     ///         self.0.encode(tuple.second()?)?;
     ///         tuple.end()
@@ -910,9 +941,9 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+    fn encode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
-            expecting::Tuple,
+            expecting::TupleStruct,
             &ExpectingWrapper(self),
         )))
     }
