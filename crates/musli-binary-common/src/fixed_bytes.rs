@@ -84,7 +84,7 @@ impl Error for FixedBytesWriterError {
     }
 
     #[inline]
-    fn collect_from_display<T>(message: T) -> Self
+    fn message<T>(message: T) -> Self
     where
         T: fmt::Display,
     {
@@ -104,7 +104,7 @@ where
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
         if bytes.len() > N.saturating_sub(self.init) {
-            return Err(E::collect_from_display(BufferOverflow {
+            return Err(E::message(BufferOverflow {
                 at: self.init,
                 additional: bytes.len(),
                 capacity: N,

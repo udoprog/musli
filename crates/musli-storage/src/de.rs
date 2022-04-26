@@ -64,8 +64,8 @@ where
     type Variant = Self;
 
     #[inline]
-    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "type not supported by the storage decoder")
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type supported by the storage decoder")
     }
 
     #[inline]
@@ -74,7 +74,7 @@ where
         let count = L::decode_usize(&mut self.reader)?;
 
         if count != 0 {
-            return Err(Self::Error::collect_from_display(ExpectedEmptySequence {
+            return Err(Self::Error::message(ExpectedEmptySequence {
                 actual: count,
                 pos,
             }));
@@ -146,10 +146,7 @@ where
         match byte {
             0 => Ok(false),
             1 => Ok(true),
-            b => Err(Self::Error::collect_from_display(BadBoolean {
-                actual: b,
-                pos,
-            })),
+            b => Err(Self::Error::message(BadBoolean { actual: b, pos })),
         }
     }
 
@@ -160,10 +157,7 @@ where
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(Self::Error::collect_from_display(BadCharacter {
-                actual: num,
-                pos,
-            })),
+            None => Err(Self::Error::message(BadCharacter { actual: num, pos })),
         }
     }
 
@@ -292,6 +286,11 @@ where
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         Ok(StorageDecoder::new(&mut self.reader))
+    }
+
+    #[inline]
+    fn finish(self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 

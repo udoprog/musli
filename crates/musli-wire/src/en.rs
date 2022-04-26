@@ -78,8 +78,8 @@ where
     type Variant = Self;
 
     #[inline]
-    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "type not supported by the wire encoder")
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type supported by the wire encoder")
     }
 
     #[inline]
@@ -244,7 +244,7 @@ where
     fn encode_map(mut self, len: usize) -> Result<Self::Map, Self::Error> {
         let len = len
             .checked_mul(2)
-            .ok_or_else(|| Self::Error::collect_from_display(Overflow))?;
+            .ok_or_else(|| Self::Error::message(Overflow))?;
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(tag.byte())?;
 
@@ -259,7 +259,7 @@ where
     fn encode_struct(mut self, len: usize) -> Result<Self::Struct, Self::Error> {
         let len = len
             .checked_mul(2)
-            .ok_or_else(|| Self::Error::collect_from_display(Overflow))?;
+            .ok_or_else(|| Self::Error::message(Overflow))?;
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(tag.byte())?;
 
@@ -274,7 +274,7 @@ where
     fn encode_tuple(mut self, len: usize) -> Result<Self::Tuple, Self::Error> {
         let len = len
             .checked_mul(2)
-            .ok_or_else(|| Self::Error::collect_from_display(Overflow))?;
+            .ok_or_else(|| Self::Error::message(Overflow))?;
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(tag.byte())?;
 

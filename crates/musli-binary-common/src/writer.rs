@@ -72,7 +72,7 @@ impl Error for VecWriterError {
     }
 
     #[inline]
-    fn collect_from_display<T>(message: T) -> Self
+    fn message<T>(message: T) -> Self
     where
         T: fmt::Display,
     {

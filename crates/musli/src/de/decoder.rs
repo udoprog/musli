@@ -1,6 +1,7 @@
 use core::fmt;
 
 use crate::error::Error;
+use crate::expecting::{self, Expecting, InvalidType};
 
 struct RefVisitorExpected<T>(T);
 
@@ -49,7 +50,7 @@ pub trait ReferenceVisitor<'de>: Sized {
     /// Which might require additional decoding work.
     #[inline]
     fn visit(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::collect_from_display(RefVisitorExpected(self)))
+        Err(Self::Error::message(RefVisitorExpected(self)))
     }
 }
 
@@ -174,36 +175,60 @@ pub trait PairDecoder<'de> {
 pub trait Decoder<'de>: Sized {
     /// Error type raised by the decoder.
     type Error: Error;
-
     /// Trait for an unpack.
     type Pack: PackDecoder<'de, Error = Self::Error>;
-
     /// The type of a sequence decoder.
     type Sequence: SequenceDecoder<'de, Error = Self::Error>;
-
     /// The type of a map decoder.
     type Map: MapDecoder<'de, Error = Self::Error>;
-
     /// Decoder to use when an optional value is present.
     type Some: Decoder<'de, Error = Self::Error>;
-
     /// Decoder returned to decode a struct variant.
     type Struct: StructDecoder<'de, Error = Self::Error>;
-
     /// Decoder returned to decode a tuple struct.
     type Tuple: StructDecoder<'de, Error = Self::Error>;
-
     /// Decode a variant.
     type Variant: PairDecoder<'de, Error = Self::Error>;
 
-    /// An expectation error. Every other implementation defers to this to
-    /// report that something unexpected happened.
-    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+    /// Format the human-readable message that should occur if the decoder was
+    /// expecting to decode some specific kind of value.
+    ///
+    /// ```
+    /// use std::fmt;
+    ///
+    /// use musli::de::Decoder;
+    /// use musli::never::Never;
+    ///
+    /// struct MyDecoder;
+    ///
+    /// impl Decoder<'_> for MyDecoder {
+    ///     type Error = String;
+    ///     type Pack = Never<Self::Error>;
+    ///     type Sequence = Never<Self::Error>;
+    ///     type Map = Never<Self::Error>;
+    ///     type Some = Never<Self::Error>;
+    ///     type Struct = Never<Self::Error>;
+    ///     type Tuple = Never<Self::Error>;
+    ///     type Variant = Never<Self::Error>;
+    ///
+    ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    ///         write!(f, "32-bit unsigned integers")
+    ///     }
+    ///
+    ///     fn decode_u32(self) -> Result<u32, Self::Error> {
+    ///         Ok(42)
+    ///     }
+    /// }
+    /// ```
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
-    /// Decode a unit, or something that is empty.
+    /// Decode a unit or something that is empty.
     #[inline]
     fn decode_unit(self) -> Result<(), Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Unit,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Construct an unpack that can decode more than one element at a time.
@@ -214,13 +239,19 @@ pub trait Decoder<'de>: Sized {
     /// [Encoder::pack][crate::Encoder::encode_pack].
     #[inline]
     fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Pack,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a fixed-length array.
     #[inline]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Array,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a sequence of bytes whos length is encoded in the payload.
@@ -229,7 +260,10 @@ pub trait Decoder<'de>: Sized {
     where
         V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
     {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Bytes,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a string slice from the current decoder.
@@ -238,91 +272,136 @@ pub trait Decoder<'de>: Sized {
     where
         V: ReferenceVisitor<'de, Target = str, Error = Self::Error>,
     {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::String,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a boolean.
     #[inline]
     fn decode_bool(self) -> Result<bool, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Bool,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a character.
     #[inline]
     fn decode_char(self) -> Result<char, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Char,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 8-bit unsigned integer (a.k.a. a byte).
     #[inline]
     fn decode_u8(self) -> Result<u8, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Unsigned8,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 16-bit unsigned integer.
     #[inline]
     fn decode_u16(self) -> Result<u16, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Unsigned16,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 32-bit unsigned integer.
     #[inline]
     fn decode_u32(self) -> Result<u32, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Unsigned32,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 64-bit unsigned integer.
     #[inline]
     fn decode_u64(self) -> Result<u64, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Unsigned64,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 128-bit unsigned integer.
     #[inline]
     fn decode_u128(self) -> Result<u128, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Unsigned128,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 8-bit signed integer.
     #[inline]
     fn decode_i8(self) -> Result<i8, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Signed8,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 16-bit signed integer.
     #[inline]
     fn decode_i16(self) -> Result<i16, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Signed16,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 32-bit signed integer.
     #[inline]
     fn decode_i32(self) -> Result<i32, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Signed32,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 64-bit signed integer.
     #[inline]
     fn decode_i64(self) -> Result<i64, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Signed64,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 128-bit signed integer.
     #[inline]
     fn decode_i128(self) -> Result<i128, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Signed128,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a usize value.
     #[inline]
     fn decode_usize(self) -> Result<usize, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Usize,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a isize value.
     #[inline]
     fn decode_isize(self) -> Result<isize, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Isize,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 32-bit floating point value.
@@ -330,7 +409,10 @@ pub trait Decoder<'de>: Sized {
     /// Default to reading the 32-bit in-memory IEEE 754 encoding byte-by-byte.
     #[inline]
     fn decode_f32(self) -> Result<f32, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Float32,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a 64-bit floating point value.
@@ -338,59 +420,84 @@ pub trait Decoder<'de>: Sized {
     /// Default to reading the 64-bit in-memory IEEE 754 encoding byte-by-byte.
     #[inline]
     fn decode_f64(self) -> Result<f64, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Float64,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode an optional value.
     #[inline]
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Option,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a sequence, this returns a decoder that can be used to define the structure of the sequence.
     #[inline]
     fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Sequence,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a map, this returns a decoder that can be used to extract map-like values.
     #[inline]
     fn decode_map(self) -> Result<Self::Map, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Map,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Return a helper to decode a struct with named fields.
     #[inline]
     fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Struct,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Return a helper to decode a tuple struct.
     #[inline]
     fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Tuple,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Decode a unit variant.
     #[inline]
     fn decode_unit_struct(self) -> Result<(), Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::UnitStruct,
+            &ExpectingWrapper(self),
+        )))
     }
 
     /// Return decoder for a variant.
     #[inline]
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
-        Err(Self::Error::collect_from_display(Expected(self)))
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Variant,
+            &ExpectingWrapper(self),
+        )))
     }
 }
 
-struct Expected<D>(D);
+#[repr(transparent)]
+struct ExpectingWrapper<T>(T);
 
-impl<'de, D> fmt::Display for Expected<D>
+impl<'de, T> Expecting for ExpectingWrapper<T>
 where
-    D: Decoder<'de>,
+    T: Decoder<'de>,
 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expected(f)
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expecting(f)
     }
 }

@@ -226,6 +226,7 @@ pub mod de;
 pub mod derives;
 pub mod en;
 pub mod error;
+mod expecting;
 mod impls;
 mod internal;
 pub mod never;

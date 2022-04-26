@@ -33,7 +33,7 @@ where
     type Variant = Self;
 
     #[inline]
-    fn expected(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}
     }
 }
@@ -189,7 +189,7 @@ where
     type Variant = Self;
 
     #[inline]
-    fn expected(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}
     }
 }

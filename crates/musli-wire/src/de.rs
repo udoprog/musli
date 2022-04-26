@@ -94,7 +94,7 @@ where
             } else {
                 L::decode_usize(&mut self.reader)?
             }),
-            _ => Err(R::Error::collect_from_display(Expected {
+            _ => Err(R::Error::message(Expected {
                 expected: Kind::Sequence,
                 actual: tag,
                 pos: self.reader.pos().saturating_sub(1),
@@ -122,7 +122,7 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         if tag.kind() != Kind::Prefix {
-            return Err(R::Error::collect_from_display(Expected {
+            return Err(R::Error::message(Expected {
                 expected: Kind::Prefix,
                 actual: tag,
                 pos,
@@ -167,8 +167,8 @@ where
     type Variant = Self;
 
     #[inline]
-    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "type not supported by the wire decoder")
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type supported by the wire decoder")
     }
 
     #[inline]
@@ -190,7 +190,7 @@ where
         let len = self.decode_prefix(pos)?;
 
         if len != N {
-            return Err(Self::Error::collect_from_display(BadLength {
+            return Err(Self::Error::message(BadLength {
                 actual: len,
                 expected: N,
                 pos,
@@ -208,7 +208,7 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         if tag.kind() != Kind::Prefix {
-            return Err(Self::Error::collect_from_display(Expected {
+            return Err(Self::Error::message(Expected {
                 expected: Kind::Prefix,
                 actual: tag,
                 pos: self.reader.pos().saturating_sub(1),
@@ -270,7 +270,7 @@ where
         match tag {
             FALSE => Ok(false),
             TRUE => Ok(true),
-            tag => Err(Self::Error::collect_from_display(BadBoolean {
+            tag => Err(Self::Error::message(BadBoolean {
                 actual: tag,
                 pos: self.reader.pos().saturating_sub(1),
             })),
@@ -283,7 +283,7 @@ where
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(Self::Error::collect_from_display(BadCharacter(num))),
+            None => Err(Self::Error::message(BadCharacter(num))),
         }
     }
 
@@ -292,7 +292,7 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         if tag.kind() != Kind::Byte {
-            return Err(Self::Error::collect_from_display(Expected {
+            return Err(Self::Error::message(Expected {
                 expected: Kind::Byte,
                 actual: tag,
                 pos: self.reader.pos().saturating_sub(1),
@@ -388,7 +388,7 @@ where
         match tag {
             NONE => Ok(None),
             SOME => Ok(Some(self)),
-            tag => Err(Self::Error::collect_from_display(ExpectedOption {
+            tag => Err(Self::Error::message(ExpectedOption {
                 tag,
                 pos: self.reader.pos().saturating_sub(1),
             })),
@@ -426,7 +426,7 @@ where
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         if tag != Tag::new(Kind::Sequence, 2) {
-            return Err(Self::Error::collect_from_display(Expected {
+            return Err(Self::Error::message(Expected {
                 expected: Kind::Sequence,
                 actual: tag,
                 pos: self.reader.pos().saturating_sub(1),

@@ -103,7 +103,7 @@ macro_rules! non_zero {
 
                 match Self::new(value) {
                     Some(value) => Ok(value),
-                    None => Err(D::Error::collect_from_display(NonZeroUnsupportedValue {
+                    None => Err(D::Error::message(NonZeroUnsupportedValue {
                         type_name: stringify!($ty),
                         value,
                     })),

@@ -18,22 +18,26 @@ pub trait Error: Sized {
     ///
     /// This is made available to format custom error messages in `no_std`
     /// environments. The error message is to be collected by formatting `T`.
-    fn collect_from_display<T>(message: T) -> Self
+    fn message<T>(message: T) -> Self
     where
         T: fmt::Display;
 
-    /// The given value was unexpected.
-    fn bad_value<T>(value: T) -> Self
+    /// The value for the given tag could not be collected.
+    #[inline]
+    fn expected_tag<T>(type_name: &'static str, tag: T) -> Self
     where
         T: fmt::Debug,
     {
-        Self::collect_from_display(BadValue { value })
+        Self::message(format_args!("{}: missing field {:?}", type_name, tag))
     }
 
     /// Trying to decode an uninhabitable type.
     #[inline]
     fn uninhabitable(type_name: &'static str) -> Self {
-        Self::collect_from_display(Uninhabitable { type_name })
+        Self::message(format_args!(
+            "{}: cannot decode uninhabitable types",
+            type_name
+        ))
     }
 
     /// Indicate that a variant wasn't supported by tag.
@@ -42,7 +46,7 @@ pub trait Error: Sized {
     where
         T: fmt::Debug,
     {
-        Self::collect_from_display(UnsupportedVariant { type_name, tag })
+        Self::message(format_args!("{}: unsupported variant {:?}", type_name, tag))
     }
 
     /// Encountered an unsupported number tag.
@@ -51,7 +55,7 @@ pub trait Error: Sized {
     where
         T: fmt::Debug,
     {
-        Self::collect_from_display(UnsupportedField { type_name, tag })
+        Self::message(format_args!("{}: unsupported field {:?}", type_name, tag))
     }
 
     /// Encountered an unsupported variant field.
@@ -61,26 +65,10 @@ pub trait Error: Sized {
         V: fmt::Debug,
         T: fmt::Debug,
     {
-        Self::collect_from_display(UnsupportedVariantField {
-            type_name,
-            variant,
-            tag,
-        })
-    }
-
-    /// Found an unexpected field.
-    #[inline]
-    fn unexpected_field(type_name: &'static str) -> Self {
-        Self::collect_from_display(UnexpectedField { type_name })
-    }
-
-    /// The value for the given tag could not be collected.
-    #[inline]
-    fn expected_tag<T>(type_name: &'static str, tag: T) -> Self
-    where
-        T: fmt::Debug,
-    {
-        Self::collect_from_display(ExpectedTag { type_name, tag })
+        Self::message(format_args!(
+            "{}: unsupported field {:?} in variant {:?}",
+            type_name, tag, variant
+        ))
     }
 }
 
@@ -93,7 +81,7 @@ impl Error for std::io::Error {
         std::io::Error::new(std::io::ErrorKind::Other, message.to_string())
     }
 
-    fn collect_from_display<T>(message: T) -> Self
+    fn message<T>(message: T) -> Self
     where
         T: fmt::Display,
     {
@@ -101,111 +89,19 @@ impl Error for std::io::Error {
     }
 }
 
-struct BadValue<T> {
-    value: T,
-}
-
-impl<T> fmt::Display for BadValue<T>
-where
-    T: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "bad value: {:?}", self.value)
+#[cfg(feature = "std")]
+impl Error for String {
+    fn custom<T>(message: T) -> Self
+    where
+        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+    {
+        message.to_string()
     }
-}
 
-struct Uninhabitable {
-    type_name: &'static str,
-}
-
-impl fmt::Display for Uninhabitable {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: cannot decode uninhabitable types", self.type_name)
-    }
-}
-
-struct UnsupportedVariant<T> {
-    type_name: &'static str,
-    tag: T,
-}
-
-impl<T> fmt::Display for UnsupportedVariant<T>
-where
-    T: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: unsupported variant {:?}", self.type_name, self.tag)
-    }
-}
-
-struct ExpectedTag<T> {
-    type_name: &'static str,
-    tag: T,
-}
-
-impl<T> fmt::Display for ExpectedTag<T>
-where
-    T: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: missing field {:?}", self.type_name, self.tag)
-    }
-}
-
-struct UnsupportedField<T> {
-    type_name: &'static str,
-    tag: T,
-}
-
-impl<T> fmt::Display for UnsupportedField<T>
-where
-    T: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: unsupported field {:?}", self.type_name, self.tag)
-    }
-}
-
-struct UnsupportedVariantField<V, T> {
-    type_name: &'static str,
-    variant: V,
-    tag: T,
-}
-
-impl<V, T> fmt::Display for UnsupportedVariantField<V, T>
-where
-    V: fmt::Debug,
-    T: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}: unsupported field {:?} in variant {:?}",
-            self.type_name, self.tag, self.variant
-        )
-    }
-}
-
-struct UnsupportedValue {
-    type_name: &'static str,
-}
-
-impl fmt::Display for UnsupportedValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}: trying to construct from unsupported value",
-            self.type_name
-        )
-    }
-}
-
-struct UnexpectedField {
-    type_name: &'static str,
-}
-
-impl fmt::Display for UnexpectedField {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: got a field but expected none", self.type_name)
+    fn message<T>(message: T) -> Self
+    where
+        T: fmt::Display,
+    {
+        message.to_string()
     }
 }
