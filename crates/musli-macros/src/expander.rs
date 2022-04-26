@@ -604,14 +604,14 @@ impl<'a> Expander<'a> {
             Some(ident) => {
                 quote! {
                     if !#pair_decoder_t::skip_second(variant)? {
-                        return Err(<D::Error as #error_t>::unsupported_variant(#type_name, tag));
+                        return Err(<D::Error as #error_t>::invalid_variant_tag(#type_name, tag));
                     }
 
                     Self::#ident {}
                 }
             }
             None => quote! {
-                return Err(<D::Error as #error_t>::unsupported_variant(#type_name, tag));
+                return Err(<D::Error as #error_t>::invalid_variant_tag(#type_name, tag));
             },
         };
 
@@ -1016,8 +1016,8 @@ impl<'a> Expander<'a> {
                         type Error = E;
 
                         #[inline]
-                        fn expected(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
-                            write!(f, "expected string tag")
+                        fn expecting(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
+                            write!(f, "string tag")
                         }
 
                         #[inline]
@@ -1079,10 +1079,10 @@ impl<'a> Expander<'a> {
 
         let unsupported = match variant_tag {
             Some(variant_tag) => quote! {
-                <D::Error as #error_t>::unsupported_variant_field(#type_name, #variant_tag, tag)
+                <D::Error as #error_t>::invalid_variant_field_tag(#type_name, #variant_tag, tag)
             },
             None => quote! {
-                <D::Error as #error_t>::unsupported_field(#type_name, tag)
+                <D::Error as #error_t>::invalid_field_tag(#type_name, tag)
             },
         };
 

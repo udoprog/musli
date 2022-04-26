@@ -39,8 +39,8 @@ impl<'de> Decode<'de> for String {
             type Error = E;
 
             #[inline]
-            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "expected string")
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "a string")
             }
 
             #[inline]
@@ -100,8 +100,8 @@ impl<'de> Decode<'de> for Cow<'de, str> {
             type Error = E;
 
             #[inline]
-            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "expected string")
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "a string")
             }
 
             #[inline]

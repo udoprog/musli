@@ -119,8 +119,8 @@ where
             type Error = V::Error;
 
             #[inline]
-            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                self.0.expected(f)
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.0.expecting(f)
             }
 
             #[inline]

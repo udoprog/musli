@@ -313,7 +313,7 @@
 //!   signature:
 //!
 //! ```rust,ignore
-//! fn encode<E>(field: &Field, encoder: E) -> Result<(), E::Error>
+//! fn encode<E>(field: &Field, encoder: E) -> Result<E::Ok, E::Error>
 //! where
 //!    E: Encoder;
 //! ```

@@ -22,15 +22,6 @@ pub trait Error: Sized {
     where
         T: fmt::Display;
 
-    /// The value for the given tag could not be collected.
-    #[inline]
-    fn expected_tag<T>(type_name: &'static str, tag: T) -> Self
-    where
-        T: fmt::Debug,
-    {
-        Self::message(format_args!("{}: missing field {:?}", type_name, tag))
-    }
-
     /// Trying to decode an uninhabitable type.
     #[inline]
     fn uninhabitable(type_name: &'static str) -> Self {
@@ -40,33 +31,45 @@ pub trait Error: Sized {
         ))
     }
 
-    /// Indicate that a variant wasn't supported by tag.
+    /// The value for the given tag could not be collected.
     #[inline]
-    fn unsupported_variant<T>(type_name: &'static str, tag: T) -> Self
+    fn expected_tag<T>(type_name: &'static str, tag: T) -> Self
     where
         T: fmt::Debug,
     {
-        Self::message(format_args!("{}: unsupported variant {:?}", type_name, tag))
+        Self::message(format_args!("expected tag: {}: {:?}", type_name, tag))
     }
 
     /// Encountered an unsupported number tag.
     #[inline]
-    fn unsupported_field<T>(type_name: &'static str, tag: T) -> Self
+    fn invalid_field_tag<T>(type_name: &'static str, tag: T) -> Self
     where
         T: fmt::Debug,
     {
-        Self::message(format_args!("{}: unsupported field {:?}", type_name, tag))
+        Self::message(format_args!("invalid field tag: {}: {:?}", type_name, tag))
+    }
+
+    /// Indicate that a variant wasn't supported by tag.
+    #[inline]
+    fn invalid_variant_tag<T>(type_name: &'static str, tag: T) -> Self
+    where
+        T: fmt::Debug,
+    {
+        Self::message(format_args!(
+            "invalid variant tag: {}: {:?}",
+            type_name, tag
+        ))
     }
 
     /// Encountered an unsupported variant field.
     #[inline]
-    fn unsupported_variant_field<V, T>(type_name: &'static str, variant: V, tag: T) -> Self
+    fn invalid_variant_field_tag<V, T>(type_name: &'static str, variant: V, tag: T) -> Self
     where
         V: fmt::Debug,
         T: fmt::Debug,
     {
         Self::message(format_args!(
-            "{}: unsupported field {:?} in variant {:?}",
+            "invalid variant field tag: {}: variant: {:?}, field: {:?}",
             type_name, tag, variant
         ))
     }

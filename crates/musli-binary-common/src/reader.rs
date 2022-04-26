@@ -43,8 +43,8 @@ pub trait Reader<'de> {
             type Error = E;
 
             #[inline]
-            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "expected bytes")
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "bytes")
             }
 
             #[inline]
@@ -83,8 +83,8 @@ pub trait Reader<'de> {
             type Error = E;
 
             #[inline]
-            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "expected bytes")
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "bytes")
             }
 
             #[inline]

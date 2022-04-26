@@ -111,8 +111,8 @@ impl<'de> Decode<'de> for Bytes<Vec<u8>> {
             type Error = E;
 
             #[inline]
-            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "expected bytes")
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "bytes")
             }
 
             #[inline]

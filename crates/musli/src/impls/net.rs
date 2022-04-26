@@ -79,7 +79,7 @@ impl<'de> Decode<'de> for IpAddr {
             0 => Self::V4(variant.second().and_then(Ipv4Addr::decode)?),
             1 => Self::V6(variant.second().and_then(Ipv6Addr::decode)?),
             index => {
-                return Err(<D::Error as Error>::unsupported_variant("IpAddr", index));
+                return Err(<D::Error as Error>::invalid_variant_tag("IpAddr", index));
             }
         })
     }
@@ -176,7 +176,7 @@ impl<'de> Decode<'de> for SocketAddr {
             0 => Self::V4(variant.second().and_then(SocketAddrV4::decode)?),
             1 => Self::V6(variant.second().and_then(SocketAddrV6::decode)?),
             index => {
-                return Err(<D::Error as Error>::unsupported_variant(
+                return Err(<D::Error as Error>::invalid_variant_tag(
                     "SocketAddr",
                     index,
                 ));

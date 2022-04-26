@@ -273,8 +273,8 @@ impl<'de> Decode<'de> for &'de str {
             type Error = E;
 
             #[inline]
-            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "expected exact string reference")
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "exact string reference")
             }
 
             #[inline]
@@ -313,8 +313,8 @@ impl<'de> Decode<'de> for &'de [u8] {
             type Error = E;
 
             #[inline]
-            fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "expected exact bytes reference")
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "exact bytes reference")
             }
 
             #[inline]
@@ -403,7 +403,7 @@ where
         match variant.first().and_then(usize::decode)? {
             0 => variant.second().and_then(T::decode).map(Ok),
             1 => variant.second().and_then(U::decode).map(Err),
-            tag => Err(D::Error::unsupported_variant("Result", tag)),
+            tag => Err(D::Error::invalid_variant_tag("Result", tag)),
         }
     }
 }
