@@ -12,11 +12,19 @@ jobs:
         toolchain: nightly
         override: true
         profile: minimal
-    - name: cargo check
-      uses: actions-rs/cargo@v1
+    - run: cargo build --no-default-features --tests --benches --examples
+        
+  build_no_default:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions-rs/toolchain@v1
       with:
-        command: build
-        args: --tests --benches --examples --all-targets
+        toolchain: nightly
+        override: true
+        profile: minimal
+    - run: cargo install cargo-hack
+    - run: cargo build --workspace --no-default-features --tests --benches --examples
 
   test:
     runs-on: ubuntu-latest

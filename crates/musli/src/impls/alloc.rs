@@ -5,7 +5,7 @@ use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
 use std::marker;
 
-use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, ReferenceVisitor, SequenceDecoder};
+use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
 use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
 use crate::error::Error;
 use crate::internal::size_hint;
@@ -30,7 +30,7 @@ impl<'de> Decode<'de> for String {
 
         struct Visitor<E>(marker::PhantomData<E>);
 
-        impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
+        impl<'de, E> ValueVisitor<'de> for Visitor<E>
         where
             E: Error,
         {
@@ -96,7 +96,7 @@ impl<'de> Decode<'de> for Cow<'de, str> {
 
         struct Visitor<E>(marker::PhantomData<E>);
 
-        impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
+        impl<'de, E> ValueVisitor<'de> for Visitor<E>
         where
             E: Error,
         {

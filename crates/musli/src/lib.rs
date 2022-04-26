@@ -230,6 +230,11 @@ mod expecting;
 mod impls;
 mod internal;
 pub mod never;
+#[cfg(not(feature = "std"))]
+mod no_std;
+#[cfg(feature = "std")]
+#[path = "std.rs"]
+mod no_std;
 
 pub use self::de::{Decode, Decoder};
 pub use self::en::{Encode, Encoder};

@@ -1,3 +1,5 @@
+use crate::no_std::ToOwned;
+use core::borrow::Borrow;
 use core::fmt;
 
 use crate::error::Error;
@@ -15,9 +17,9 @@ use crate::expecting::{self, BadVisitorType, Expecting, InvalidType};
 /// scenarios, even if one involves erroring. A type like
 /// [Cow][std::borrow::Cow] is an example of a type which can comfortably handle
 /// both.
-pub trait ReferenceVisitor<'de>: Sized {
+pub trait ValueVisitor<'de>: Sized {
     /// The value being visited.
-    type Target: ?Sized;
+    type Target: ?Sized + ToOwned;
     /// The value produced.
     type Ok;
     /// The error produced.
@@ -28,13 +30,16 @@ pub trait ReferenceVisitor<'de>: Sized {
     /// Override to be more specific about the type that failed.
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
+    /// Visit an owned value.
+    #[inline]
+    fn visit_owned(self, value: <Self::Target as ToOwned>::Owned) -> Result<Self::Ok, Self::Error> {
+        self.visit_any(value.borrow())
+    }
+
     /// Visit a string that is borrowed directly from the source data.
     #[inline]
-    fn visit_borrowed(self, _: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::BorrowedReference,
-            &ReferenceVisistorExpecting(self),
-        )))
+    fn visit_borrowed(self, value: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
+        self.visit_any(value)
     }
 
     /// Visit a string that is provided from the decoder in any manner possible.
@@ -296,7 +301,7 @@ pub trait Decoder<'de>: Sized {
     /// use std::fmt;
     /// use std::marker;
     ///
-    /// use musli::de::{Decode, Decoder, ReferenceVisitor};
+    /// use musli::de::{Decode, Decoder, ValueVisitor};
     /// use musli::error::Error;
     ///
     /// struct BytesReference<'de> {
@@ -315,7 +320,7 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         struct Visitor<E>(marker::PhantomData<E>);
     ///
-    ///         impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
+    ///         impl<'de, E> ValueVisitor<'de> for Visitor<E>
     ///         where
     ///             E: Error,
     ///         {
@@ -339,7 +344,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn decode_bytes<V>(self, _: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::Bytes,
@@ -355,7 +360,7 @@ pub trait Decoder<'de>: Sized {
     /// use std::fmt;
     /// use std::marker;
     ///
-    /// use musli::de::{Decode, Decoder, ReferenceVisitor};
+    /// use musli::de::{Decode, Decoder, ValueVisitor};
     /// use musli::error::Error;
     ///
     /// struct StringReference<'de> {
@@ -374,7 +379,7 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         struct Visitor<E>(marker::PhantomData<E>);
     ///
-    ///         impl<'de, E> ReferenceVisitor<'de> for Visitor<E>
+    ///         impl<'de, E> ValueVisitor<'de> for Visitor<E>
     ///         where
     ///             E: Error,
     ///         {
@@ -398,7 +403,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn decode_string<V>(self, _: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = str, Error = Self::Error>,
+        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::String,
@@ -1197,7 +1202,7 @@ struct ReferenceVisistorExpecting<T>(T);
 
 impl<'de, T> Expecting for ReferenceVisistorExpecting<T>
 where
-    T: ReferenceVisitor<'de>,
+    T: ValueVisitor<'de>,
 {
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.expecting(f)

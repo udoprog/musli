@@ -7,7 +7,7 @@
 use core::{fmt, slice};
 use std::{marker, ops::Range, ptr};
 
-use musli::de::ReferenceVisitor;
+use musli::de::ValueVisitor;
 use musli::error::Error;
 
 /// A reader where the current position is exactly known.
@@ -34,7 +34,7 @@ pub trait Reader<'de> {
 
         struct Visitor<'a, E>(&'a mut [u8], marker::PhantomData<E>);
 
-        impl<'a, 'de, E> ReferenceVisitor<'de> for Visitor<'a, E>
+        impl<'a, 'de, E> ValueVisitor<'de> for Visitor<'a, E>
         where
             E: Error,
         {
@@ -63,7 +63,7 @@ pub trait Reader<'de> {
     /// Read a slice out of the current reader.
     fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>;
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>;
 
     /// Read a single byte.
     #[inline]
@@ -79,7 +79,7 @@ pub trait Reader<'de> {
 
         struct Visitor<const N: usize, E>([u8; N], marker::PhantomData<E>);
 
-        impl<'de, const N: usize, E> ReferenceVisitor<'de> for Visitor<N, E>
+        impl<'de, const N: usize, E> ValueVisitor<'de> for Visitor<N, E>
         where
             E: Error,
         {
@@ -178,7 +178,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         if self.len() < n {
             return Err(SliceReaderError::custom("buffer underflow"));
@@ -231,7 +231,7 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     #[inline]
     fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         let outcome = bounds_check_add(&self.range, n)?;
 
@@ -300,7 +300,7 @@ where
     #[inline]
     fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         let ok = self.reader.read_bytes(n, visitor)?;
         self.pos += n;
@@ -377,7 +377,7 @@ where
     #[inline]
     fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         self.bounds_check(n)?;
         self.reader.read_bytes(n, visitor)
@@ -428,7 +428,7 @@ where
     #[inline]
     fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         (**self).read_bytes(n, visitor)
     }

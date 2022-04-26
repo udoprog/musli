@@ -4,9 +4,7 @@ use core::marker;
 use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::Kind;
 use crate::tag::Tag;
-use musli::de::{
-    Decoder, PackDecoder, PairDecoder, PairsDecoder, ReferenceVisitor, SequenceDecoder,
-};
+use musli::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
 use musli_binary_common::reader::{Limit, PositionedReader};
@@ -202,7 +200,7 @@ where
     #[inline]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
@@ -226,15 +224,15 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = str, Error = Self::Error>,
+        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
         return self.decode_bytes(Visitor(visitor));
 
         struct Visitor<V>(V);
 
-        impl<'de, V> ReferenceVisitor<'de> for Visitor<V>
+        impl<'de, V> ValueVisitor<'de> for Visitor<V>
         where
-            V: ReferenceVisitor<'de, Target = str>,
+            V: ValueVisitor<'de, Target = str>,
         {
             type Target = [u8];
             type Ok = V::Ok;

@@ -112,6 +112,7 @@ expect! {
     pub(crate) Struct("struct");
     pub(crate) UnitStruct("unit struct");
     pub(crate) Variant("variant");
+    pub(crate) Owned("owned value");
     pub(crate) BorrowedReference("reference borrowed from source");
     pub(crate) AnyReference("any reference");
 }

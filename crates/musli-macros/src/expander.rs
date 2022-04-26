@@ -74,7 +74,7 @@ impl<'a> Expander<'a> {
                 pair_decoder_t: quote!(#prefix::de::PairDecoder),
                 pair_encoder_t: quote!(#prefix::en::PairEncoder),
                 struct_decoder_t: quote!(#prefix::de::PairsDecoder),
-                reference_visitor_t: quote!(#prefix::de::ReferenceVisitor),
+                reference_visitor_t: quote!(#prefix::de::ValueVisitor),
                 phantom_data: quote!(core::marker::PhantomData),
                 fmt: quote!(core::fmt),
             },

@@ -16,6 +16,7 @@
 
 #![deny(missing_docs)]
 #![feature(generic_associated_types)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[macro_use]
 mod macros;

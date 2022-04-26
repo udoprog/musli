@@ -301,7 +301,6 @@ dependencies = [
 name = "musli"
 version = "0.0.18"
 dependencies = [
- "anyhow",
  "musli-macros",
  "musli-storage",
  "musli-wire",

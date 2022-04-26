@@ -21,7 +21,5 @@ std = []
 musli-macros = { path = "../musli-macros", version = "0.0.18" }
 
 [dev-dependencies]
-musli-wire = { path = "../musli-wire" }
-musli-storage = { path = "../musli-storage" }
-
-anyhow = "1.0.56"
+musli-wire = { path = "../musli-wire", version = "0.0.18" }
+musli-storage = { path = "../musli-storage", version = "0.0.18" }

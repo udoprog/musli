@@ -15,7 +15,7 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = []
+std = ["musli/std"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.18" }

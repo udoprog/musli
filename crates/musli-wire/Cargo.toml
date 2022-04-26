@@ -15,7 +15,7 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["musli-binary-common/std"]
+std = ["musli-binary-common/std", "musli-storage/std", "musli/std"]
 test = []
 
 [dependencies]
