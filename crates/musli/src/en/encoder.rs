@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::en::Encode;
 use crate::error::Error;
 
@@ -96,8 +98,15 @@ pub trait Encoder: Sized {
     /// Encoder for a unit variant.
     type Variant: PairEncoder<Error = Self::Error>;
 
+    /// An expectation error. Every other implementation defers to this to
+    /// report that something unexpected happened.
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
     /// Encode a unit or something that is empty.
-    fn encode_unit(self) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_unit(self) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Construct a pack that can encode more than one element at a time.
     ///
@@ -105,97 +114,195 @@ pub trait Encoder: Sized {
     /// elements in the packed sequence as compact as possible and that
     /// subsequent unpackers will know the exact length of the element being
     /// unpacked.
-    fn encode_pack(self) -> Result<Self::Pack, Self::Error>;
+    #[inline]
+    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode fixed-length array.
-    fn encode_array<const N: usize>(self, array: [u8; N]) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_array<const N: usize>(self, _: [u8; N]) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a sequence of bytes who's length is included in the payload.
-    fn encode_bytes(self, bytes: &[u8]) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_bytes(self, _: &[u8]) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode the given slice of bytes in sequence, with one following another.
-    fn encode_bytes_vectored(self, vectors: &[&[u8]]) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_bytes_vectored(self, _: &[&[u8]]) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a string who's length is included in the payload.
-    fn encode_string(self, string: &str) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_string(self, _: &str) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a usize value.
-    fn encode_usize(self, value: usize) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_usize(self, _: usize) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a isize value.
-    fn encode_isize(self, value: isize) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_isize(self, _: isize) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a boolean value.
-    fn encode_bool(self, value: bool) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_bool(self, _: bool) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a character.
-    fn encode_char(self, value: char) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_char(self, _: char) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 8-bit unsigned integer.
-    fn encode_u8(self, value: u8) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_u8(self, _: u8) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 16-bit unsigned integer.
-    fn encode_u16(self, value: u16) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_u16(self, _: u16) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 32-bit unsigned integer.
-    fn encode_u32(self, value: u32) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_u32(self, _: u32) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 64-bit unsigned integer.
-    fn encode_u64(self, value: u64) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_u64(self, _: u64) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 128-bit unsigned integer.
-    fn encode_u128(self, value: u128) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_u128(self, _: u128) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 8-bit signed integer.
-    fn encode_i8(self, value: i8) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_i8(self, _: i8) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 16-bit signed integer.
-    fn encode_i16(self, value: i16) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_i16(self, _: i16) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 32-bit signed integer.
-    fn encode_i32(self, value: i32) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_i32(self, _: i32) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 64-bit signed integer.
     ///
     /// Defaults to using [Encoder::encode_u64] with the signed value casted.
-    fn encode_i64(self, value: i64) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_i64(self, _: i64) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 128-bit signed integer.
     ///
     /// Defaults to using [Encoder::encode_u128] with the signed value casted.
-    fn encode_i128(self, value: i128) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_i128(self, _: i128) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 32-bit floating point value.
     ///
     /// Default to taking the 32-bit in-memory IEEE 754 encoding and writing it byte-by-byte.
-    fn encode_f32(self, value: f32) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_f32(self, _: f32) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a 64-bit floating point value.
     ///
     /// Default to taking the 64-bit in-memory IEEE 754 encoding and writing it byte-by-byte.
-    fn encode_f64(self, value: f64) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_f64(self, _: f64) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode an optional value that is present.
-    fn encode_some(self) -> Result<Self::Some, Self::Error>;
+    #[inline]
+    fn encode_some(self) -> Result<Self::Some, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode an optional value that is absent.
-    fn encode_none(self) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_none(self) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a sequence with a known length.
-    fn encode_sequence(self, len: usize) -> Result<Self::Sequence, Self::Error>;
+    #[inline]
+    fn encode_sequence(self, _: usize) -> Result<Self::Sequence, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a map with a known length.
-    fn encode_map(self, len: usize) -> Result<Self::Map, Self::Error>;
+    #[inline]
+    fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a struct.
-    fn encode_struct(self, fields: usize) -> Result<Self::Struct, Self::Error>;
+    #[inline]
+    fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a tuple struct.
-    fn encode_tuple(self, fields: usize) -> Result<Self::Tuple, Self::Error>;
+    #[inline]
+    fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a unit struct.
-    fn encode_unit_struct(self) -> Result<(), Self::Error>;
+    #[inline]
+    fn encode_unit_struct(self) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Encode a struct variant.
-    fn encode_variant(self) -> Result<Self::Variant, Self::Error>;
+    #[inline]
+    fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
+}
+
+struct Expected<E>(E);
+
+impl<E> fmt::Display for Expected<E>
+where
+    E: Encoder,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expected(f)
+    }
 }

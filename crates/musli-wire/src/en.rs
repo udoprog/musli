@@ -78,6 +78,11 @@ where
     type Variant = Self;
 
     #[inline]
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type not supported by the wire encoder")
+    }
+
+    #[inline]
     fn encode_unit(mut self) -> Result<(), Self::Error> {
         self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())

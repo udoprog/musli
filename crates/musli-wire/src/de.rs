@@ -167,6 +167,11 @@ where
     type Variant = Self;
 
     #[inline]
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type not supported by the wire decoder")
+    }
+
+    #[inline]
     fn decode_unit(mut self) -> Result<(), Self::Error> {
         self.skip_any()?;
         Ok(())

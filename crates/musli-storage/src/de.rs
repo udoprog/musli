@@ -64,6 +64,11 @@ where
     type Variant = Self;
 
     #[inline]
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type not supported by the storage decoder")
+    }
+
+    #[inline]
     fn decode_unit(mut self) -> Result<(), Self::Error> {
         let pos = self.reader.pos();
         let count = L::decode_usize(&mut self.reader)?;
@@ -287,11 +292,6 @@ where
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         Ok(StorageDecoder::new(&mut self.reader))
-    }
-
-    #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
-        Ok(())
     }
 }
 

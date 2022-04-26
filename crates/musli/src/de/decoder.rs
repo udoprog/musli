@@ -196,8 +196,15 @@ pub trait Decoder<'de>: Sized {
     /// Decode a variant.
     type Variant: PairDecoder<'de, Error = Self::Error>;
 
+    /// An expectation error. Every other implementation defers to this to
+    /// report that something unexpected happened.
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
     /// Decode a unit, or something that is empty.
-    fn decode_unit(self) -> Result<(), Self::Error>;
+    #[inline]
+    fn decode_unit(self) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Construct an unpack that can decode more than one element at a time.
     ///
@@ -205,91 +212,185 @@ pub trait Decoder<'de>: Sized {
     /// elements in the packed sequence from an as compact format as possible
     /// compatible with what's being returned by
     /// [Encoder::pack][crate::Encoder::encode_pack].
-    fn decode_pack(self) -> Result<Self::Pack, Self::Error>;
+    #[inline]
+    fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a fixed-length array.
-    fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error>;
+    #[inline]
+    fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a sequence of bytes whos length is encoded in the payload.
-    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    #[inline]
+    fn decode_bytes<V>(self, _: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>;
+        V: ReferenceVisitor<'de, Target = [u8], Error = Self::Error>,
+    {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a string slice from the current decoder.
-    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    #[inline]
+    fn decode_string<V>(self, _: V) -> Result<V::Ok, V::Error>
     where
-        V: ReferenceVisitor<'de, Target = str, Error = Self::Error>;
+        V: ReferenceVisitor<'de, Target = str, Error = Self::Error>,
+    {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a boolean.
-    fn decode_bool(self) -> Result<bool, Self::Error>;
+    #[inline]
+    fn decode_bool(self) -> Result<bool, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a character.
-    fn decode_char(self) -> Result<char, Self::Error>;
+    #[inline]
+    fn decode_char(self) -> Result<char, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 8-bit unsigned integer (a.k.a. a byte).
-    fn decode_u8(self) -> Result<u8, Self::Error>;
+    #[inline]
+    fn decode_u8(self) -> Result<u8, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 16-bit unsigned integer.
-    fn decode_u16(self) -> Result<u16, Self::Error>;
+    #[inline]
+    fn decode_u16(self) -> Result<u16, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 32-bit unsigned integer.
-    fn decode_u32(self) -> Result<u32, Self::Error>;
+    #[inline]
+    fn decode_u32(self) -> Result<u32, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 64-bit unsigned integer.
-    fn decode_u64(self) -> Result<u64, Self::Error>;
+    #[inline]
+    fn decode_u64(self) -> Result<u64, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 128-bit unsigned integer.
-    fn decode_u128(self) -> Result<u128, Self::Error>;
+    #[inline]
+    fn decode_u128(self) -> Result<u128, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 8-bit signed integer.
-    fn decode_i8(self) -> Result<i8, Self::Error>;
+    #[inline]
+    fn decode_i8(self) -> Result<i8, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 16-bit signed integer.
-    fn decode_i16(self) -> Result<i16, Self::Error>;
+    #[inline]
+    fn decode_i16(self) -> Result<i16, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 32-bit signed integer.
-    fn decode_i32(self) -> Result<i32, Self::Error>;
+    #[inline]
+    fn decode_i32(self) -> Result<i32, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 64-bit signed integer.
-    fn decode_i64(self) -> Result<i64, Self::Error>;
+    #[inline]
+    fn decode_i64(self) -> Result<i64, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 128-bit signed integer.
-    fn decode_i128(self) -> Result<i128, Self::Error>;
+    #[inline]
+    fn decode_i128(self) -> Result<i128, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a usize value.
-    fn decode_usize(self) -> Result<usize, Self::Error>;
+    #[inline]
+    fn decode_usize(self) -> Result<usize, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a isize value.
-    fn decode_isize(self) -> Result<isize, Self::Error>;
+    #[inline]
+    fn decode_isize(self) -> Result<isize, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 32-bit floating point value.
     ///
     /// Default to reading the 32-bit in-memory IEEE 754 encoding byte-by-byte.
-    fn decode_f32(self) -> Result<f32, Self::Error>;
+    #[inline]
+    fn decode_f32(self) -> Result<f32, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a 64-bit floating point value.
     ///
     /// Default to reading the 64-bit in-memory IEEE 754 encoding byte-by-byte.
-    fn decode_f64(self) -> Result<f64, Self::Error>;
+    #[inline]
+    fn decode_f64(self) -> Result<f64, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode an optional value.
-    fn decode_option(self) -> Result<Option<Self::Some>, Self::Error>;
+    #[inline]
+    fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a sequence, this returns a decoder that can be used to define the structure of the sequence.
-    fn decode_sequence(self) -> Result<Self::Sequence, Self::Error>;
+    #[inline]
+    fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a map, this returns a decoder that can be used to extract map-like values.
-    fn decode_map(self) -> Result<Self::Map, Self::Error>;
+    #[inline]
+    fn decode_map(self) -> Result<Self::Map, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Return a helper to decode a struct with named fields.
-    fn decode_struct(self, fields: usize) -> Result<Self::Struct, Self::Error>;
+    #[inline]
+    fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Return a helper to decode a tuple struct.
-    fn decode_tuple(self, fields: usize) -> Result<Self::Tuple, Self::Error>;
+    #[inline]
+    fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Decode a unit variant.
-    fn decode_unit_struct(self) -> Result<(), Self::Error>;
+    #[inline]
+    fn decode_unit_struct(self) -> Result<(), Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
 
     /// Return decoder for a variant.
-    fn decode_variant(self) -> Result<Self::Variant, Self::Error>;
+    #[inline]
+    fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
+        Err(Self::Error::collect_from_display(Expected(self)))
+    }
+}
+
+struct Expected<D>(D);
+
+impl<'de, D> fmt::Display for Expected<D>
+where
+    D: Decoder<'de>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expected(f)
+    }
 }

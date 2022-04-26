@@ -1,3 +1,4 @@
+use core::fmt;
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
@@ -44,6 +45,11 @@ where
     type Struct = Self;
     type Tuple = Self;
     type Variant = Self;
+
+    #[inline]
+    fn expected(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type not supported by the storage encoder")
+    }
 
     #[inline]
     fn encode_unit(self) -> Result<(), Self::Error> {
