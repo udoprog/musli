@@ -851,6 +851,31 @@ pub trait Encoder: Sized {
     }
 
     /// Encode a struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder, PairEncoder};
+    ///
+    /// struct TupleStruct {
+    ///     name: String,
+    ///     age: u32,
+    /// }
+    ///
+    /// impl Encode for TupleStruct {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         let mut st = encoder.encode_struct(2)?;
+    ///         st.first()?.encode_string("name")?;
+    ///         self.name.encode(st.second()?)?;
+    ///         st.first()?.encode_string("age")?;
+    ///         self.age.encode(st.second()?)?;
+    ///         st.end()
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
@@ -860,6 +885,26 @@ pub trait Encoder: Sized {
     }
 
     /// Encode a tuple struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder, PairEncoder};
+    ///
+    /// struct TupleStruct(String);
+    ///
+    /// impl Encode for TupleStruct {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         let mut tuple = encoder.encode_tuple(1)?;
+    ///         tuple.first()?.encode_usize(0)?;
+    ///         self.0.encode(tuple.second()?)?;
+    ///         tuple.end()
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
@@ -869,6 +914,23 @@ pub trait Encoder: Sized {
     }
 
     /// Encode a unit struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct UnitStruct;
+    ///
+    /// impl Encode for UnitStruct {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         encoder.encode_unit_struct()
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_unit_struct(self) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
