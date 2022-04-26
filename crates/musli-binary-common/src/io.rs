@@ -6,6 +6,7 @@
 
 /// Wrapper constructed with [wrap].
 pub struct Wrap<T> {
+    #[cfg_attr(not(feature = "std"), allow(unused))]
     inner: T,
 }
 

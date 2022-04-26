@@ -23,8 +23,7 @@ jobs:
         toolchain: nightly
         override: true
         profile: minimal
-    - run: cargo install cargo-hack
-    - run: cargo build --workspace --no-default-features --tests --benches --examples
+    - run: cargo build --workspace --exclude musli-tests --no-default-features
 
   test:
     runs-on: ubuntu-latest
