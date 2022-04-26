@@ -67,6 +67,7 @@ where
     I: TypedIntegerEncoding,
     L: TypedUsizeEncoding,
 {
+    type Ok = ();
     type Error = W::Error;
 
     type Pack = WirePackEncoder<W, I, L, P>;
@@ -304,6 +305,7 @@ where
     I: TypedIntegerEncoding,
     L: TypedUsizeEncoding,
 {
+    type Ok = ();
     type Error = W::Error;
     type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, I, L> where Self: 'this;
 
@@ -313,7 +315,7 @@ where
     }
 
     #[inline]
-    fn finish(mut self) -> Result<(), Self::Error> {
+    fn end(mut self) -> Result<(), Self::Error> {
         encode_prefix::<W, L>(&mut self.writer, self.pack_buf.len())?;
         self.writer.write_bytes(self.pack_buf.as_bytes())?;
         Ok(())
@@ -326,16 +328,17 @@ where
     I: TypedIntegerEncoding,
     L: TypedUsizeEncoding,
 {
+    type Ok = ();
     type Error = W::Error;
-    type Next<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
+    type Encoder<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
 
     #[inline]
-    fn encode_next(&mut self) -> Result<Self::Next<'_>, Self::Error> {
+    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(WireEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -346,22 +349,23 @@ where
     I: TypedIntegerEncoding,
     L: TypedUsizeEncoding,
 {
+    type Ok = ();
     type Error = W::Error;
     type First<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
     type Second<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
 
     #[inline]
-    fn encode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         Ok(WireEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn encode_second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
         Ok(WireEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<(), Self::Error> {
         Ok(())
     }
 }

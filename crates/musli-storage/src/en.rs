@@ -36,6 +36,7 @@ where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
+    type Ok = ();
     type Error = W::Error;
 
     type Pack = Self;
@@ -53,7 +54,7 @@ where
 
     #[inline]
     fn encode_unit(self) -> Result<(), Self::Error> {
-        SequenceEncoder::finish(self.encode_sequence(0)?)
+        SequenceEncoder::end(self.encode_sequence(0)?)
     }
 
     #[inline]
@@ -226,6 +227,7 @@ where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
+    type Ok = ();
     type Error = W::Error;
     type Encoder<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
 
@@ -235,7 +237,7 @@ where
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -246,16 +248,17 @@ where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
+    type Ok = ();
     type Error = W::Error;
-    type Next<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
 
     #[inline]
-    fn encode_next(&mut self) -> Result<Self::Next<'_>, Self::Error> {
+    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -266,22 +269,23 @@ where
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
+    type Ok = ();
     type Error = W::Error;
     type First<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
     type Second<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
 
     #[inline]
-    fn encode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn encode_second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<(), Self::Error> {
         Ok(())
     }
 }

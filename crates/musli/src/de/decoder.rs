@@ -68,7 +68,7 @@ pub trait PackDecoder<'de> {
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error>;
 
     /// Finish unpacking.
-    fn finish(self) -> Result<(), Self::Error>;
+    fn end(self) -> Result<(), Self::Error>;
 }
 
 /// Trait governing how to decode a sequence.
@@ -77,7 +77,7 @@ pub trait SequenceDecoder<'de> {
     type Error: Error;
 
     /// The decoder for individual items.
-    type Next<'this>: Decoder<'de, Error = Self::Error>
+    type Decoder<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
@@ -85,38 +85,19 @@ pub trait SequenceDecoder<'de> {
     fn size_hint(&self) -> Option<usize>;
 
     /// Decode the next element.
-    fn decode_next(&mut self) -> Result<Option<Self::Next<'_>>, Self::Error>;
+    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error>;
 }
 
-/// Trait governing how to decode a map entry.
-pub trait MapEntryDecoder<'de> {
+/// Trait governing how to decode a sequence of pairs.
+///
+/// Each invocation of [PairsDecoder::next] returns an implementation of
+/// [PairDecoder].
+pub trait PairsDecoder<'de> {
     /// Error type.
     type Error: Error;
 
     /// The decoder to use for a key.
-    type Key<'this>: Decoder<'de, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// The decoder to use for a key.
-    type Value<'this>: Decoder<'de, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Decode the next key.
-    fn decode_key(&mut self) -> Result<Self::Key<'_>, Self::Error>;
-
-    /// Follow up the decoding of a key by decoding a value.
-    fn decode_value(&mut self) -> Result<Self::Value<'_>, Self::Error>;
-}
-
-/// Trait governing how to decode a map.
-pub trait MapDecoder<'de> {
-    /// Error type.
-    type Error: Error;
-
-    /// The decoder to use for a key.
-    type Entry<'this>: MapEntryDecoder<'de, Error = Self::Error>
+    type Decoder<'this>: PairDecoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
@@ -124,24 +105,7 @@ pub trait MapDecoder<'de> {
     fn size_hint(&self) -> Option<usize>;
 
     /// Decode the next key. This returns `Ok(None)` where there are no more elements to decode.
-    fn decode_entry(&mut self) -> Result<Option<Self::Entry<'_>>, Self::Error>;
-}
-
-/// Trait governing how to decode a map.
-pub trait StructDecoder<'de> {
-    /// Error type.
-    type Error: Error;
-
-    /// The decoder to use for a key.
-    type Field<'this>: PairDecoder<'de, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Get a size hint of known remaining elements.
-    fn size_hint(&self) -> Option<usize>;
-
-    /// Decode the next key. This returns `Ok(None)` where there are no more elements to decode.
-    fn decode_field(&mut self) -> Result<Option<Self::Field<'_>>, Self::Error>;
+    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error>;
 }
 
 /// Trait governing how to decode a field.
@@ -157,17 +121,18 @@ pub trait PairDecoder<'de> {
     /// The decoder to use for a tuple field value.
     type Second: Decoder<'de, Error = Self::Error>;
 
-    /// Decoder for the next index.
-    fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error>;
-
-    /// Decoder for the next value.
-    fn decode_second(self) -> Result<Self::Second, Self::Error>;
-
-    /// Indicate that the second element is not compatible with the current
-    /// struct and skip it.
+    /// Return the decoder for the first value in the pair.
     ///
-    /// Returns a boolean indicating if the second value was successfully
-    /// skipped.
+    /// If this is a map the first value would be the key of the map, if this is
+    /// a struct the first value would be the field of the struct.
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error>;
+
+    /// Decode the second value in the pair..
+    fn second(self) -> Result<Self::Second, Self::Error>;
+
+    /// Indicate that the second value should be skipped.
+    ///
+    /// The boolean returned indicates if the value was skipped or not.
     fn skip_second(self) -> Result<bool, Self::Error>;
 }
 
@@ -175,19 +140,29 @@ pub trait PairDecoder<'de> {
 pub trait Decoder<'de>: Sized {
     /// Error type raised by the decoder.
     type Error: Error;
-    /// Trait for an unpack.
+    /// Pack decoder implementation.
     type Pack: PackDecoder<'de, Error = Self::Error>;
-    /// The type of a sequence decoder.
+    /// Sequence decoder implementation.
     type Sequence: SequenceDecoder<'de, Error = Self::Error>;
-    /// The type of a map decoder.
-    type Map: MapDecoder<'de, Error = Self::Error>;
-    /// Decoder to use when an optional value is present.
+    /// Map decoder implementation.
+    type Map: PairsDecoder<'de, Error = Self::Error>;
+    /// Decoder for a value that is present.
     type Some: Decoder<'de, Error = Self::Error>;
-    /// Decoder returned to decode a struct variant.
-    type Struct: StructDecoder<'de, Error = Self::Error>;
-    /// Decoder returned to decode a tuple struct.
-    type Tuple: StructDecoder<'de, Error = Self::Error>;
-    /// Decode a variant.
+    /// Decoder for a struct.
+    ///
+    /// The caller receives a [PairsDecoder] which when advanced with
+    /// [PairsDecoder::next] indicates the fields of the structure.
+    type Struct: PairsDecoder<'de, Error = Self::Error>;
+    /// Decoder for a tuple struct.
+    ///
+    /// The caller receives a [PairsDecoder] which when advanced with
+    /// [PairsDecoder::next] indicates the elements in the tuple.
+    type Tuple: PairsDecoder<'de, Error = Self::Error>;
+    /// Decoder for a variant.
+    ///
+    /// The caller receives a [PairDecoder] which when advanced with
+    /// [PairDecoder::first] indicates which variant is being decoded and
+    /// [PairDecoder::second] is the content of the variant.
     type Variant: PairDecoder<'de, Error = Self::Error>;
 
     /// Format the human-readable message that should occur if the decoder was
@@ -203,13 +178,13 @@ pub trait Decoder<'de>: Sized {
     ///
     /// impl Decoder<'_> for MyDecoder {
     ///     type Error = String;
-    ///     type Pack = Never<Self::Error>;
-    ///     type Sequence = Never<Self::Error>;
-    ///     type Map = Never<Self::Error>;
-    ///     type Some = Never<Self::Error>;
-    ///     type Struct = Never<Self::Error>;
-    ///     type Tuple = Never<Self::Error>;
-    ///     type Variant = Never<Self::Error>;
+    ///     type Pack = Never<Self>;
+    ///     type Sequence = Never<Self>;
+    ///     type Map = Never<Self>;
+    ///     type Some = Never<Self>;
+    ///     type Struct = Never<Self>;
+    ///     type Tuple = Never<Self>;
+    ///     type Variant = Never<Self>;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")

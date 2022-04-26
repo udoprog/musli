@@ -345,7 +345,7 @@
 //!
 //!     use super::CustomUuid;
 //!
-//!     pub fn encode<E>(uuid: &CustomUuid, encoder: E) -> Result<(), E::Error>
+//!     pub fn encode<E>(uuid: &CustomUuid, encoder: E) -> Result<E::Ok, E::Error>
 //!     where
 //!         E: Encoder
 //!     {

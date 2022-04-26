@@ -3,8 +3,7 @@ use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::de::{
-    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, ReferenceVisitor,
-    SequenceDecoder, StructDecoder,
+    Decoder, PackDecoder, PairDecoder, PairsDecoder, ReferenceVisitor, SequenceDecoder,
 };
 use musli::error::Error;
 use musli_binary_common::reader::PositionedReader;
@@ -289,7 +288,7 @@ where
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -314,7 +313,7 @@ where
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Next<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
@@ -322,7 +321,7 @@ where
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::Next<'_>>, Self::Error> {
+    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -332,7 +331,7 @@ where
     }
 }
 
-impl<'de, R, I, L> MapDecoder<'de> for RemainingSimpleDecoder<R, I, L>
+impl<'de, R, I, L> PairsDecoder<'de> for RemainingSimpleDecoder<R, I, L>
 where
     R: PositionedReader<'de>,
     I: IntegerEncoding,
@@ -340,7 +339,7 @@ where
 {
     type Error = R::Error;
 
-    type Entry<'this> = StorageDecoder<&'this mut R, I, L>
+    type Decoder<'this> = StorageDecoder<&'this mut R, I, L>
     where
         Self: 'this;
 
@@ -350,56 +349,7 @@ where
     }
 
     #[inline]
-    fn decode_entry(&mut self) -> Result<Option<Self::Entry<'_>>, Self::Error> {
-        if self.remaining == 0 {
-            return Ok(None);
-        }
-
-        self.remaining -= 1;
-        Ok(Some(StorageDecoder::new(&mut self.decoder.reader)))
-    }
-}
-
-impl<'de, R, I, L> MapEntryDecoder<'de> for StorageDecoder<R, I, L>
-where
-    R: PositionedReader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = R::Error;
-    type Key<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
-    type Value<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
-
-    #[inline]
-    fn decode_key(&mut self) -> Result<Self::Key<'_>, Self::Error> {
-        Ok(StorageDecoder::new(&mut self.reader))
-    }
-
-    #[inline]
-    fn decode_value(&mut self) -> Result<Self::Value<'_>, Self::Error> {
-        Ok(StorageDecoder::new(&mut self.reader))
-    }
-}
-
-impl<'de, R, I, L> StructDecoder<'de> for RemainingSimpleDecoder<R, I, L>
-where
-    R: PositionedReader<'de>,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Error = R::Error;
-
-    type Field<'this> = StorageDecoder<&'this mut R, I, L>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
-    }
-
-    #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::Field<'_>>, Self::Error> {
+    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -420,12 +370,12 @@ where
     type Second = StorageDecoder<R, I, L>;
 
     #[inline]
-    fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         Ok(StorageDecoder::new(&mut self.reader))
     }
 
     #[inline]
-    fn decode_second(self) -> Result<Self::Second, Self::Error> {
+    fn second(self) -> Result<Self::Second, Self::Error> {
         Ok(StorageDecoder::new(self.reader))
     }
 

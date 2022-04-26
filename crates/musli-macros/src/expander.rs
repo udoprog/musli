@@ -73,7 +73,7 @@ impl<'a> Expander<'a> {
                 pack_encoder_t: quote!(#prefix::en::PackEncoder),
                 pair_decoder_t: quote!(#prefix::de::PairDecoder),
                 pair_encoder_t: quote!(#prefix::en::PairEncoder),
-                struct_decoder_t: quote!(#prefix::de::StructDecoder),
+                struct_decoder_t: quote!(#prefix::de::PairsDecoder),
                 reference_visitor_t: quote!(#prefix::de::ReferenceVisitor),
                 phantom_data: quote!(core::marker::PhantomData),
                 fmt: quote!(core::fmt),
@@ -129,7 +129,7 @@ impl<'a> Expander<'a> {
             #[automatically_derived]
             impl #type_generics #encode_t for #type_ident #type_generics {
                 #inline
-                fn encode<E>(&self, #assignment: E) -> Result<(), E::Error>
+                fn encode<E>(&self, #assignment: E) -> Result<E::Ok, E::Error>
                 where
                     E: #encoder_t
                 {
@@ -193,8 +193,7 @@ impl<'a> Expander<'a> {
         let (span, encode_path) = field_attr.encode_path(encode_t, span);
 
         Some(quote_spanned! {
-            span =>
-            #encode_path(#accessor, #encoder_var)?;
+            span => #encode_path(#accessor, #encoder_var)
         })
     }
 
@@ -232,8 +231,7 @@ impl<'a> Expander<'a> {
         let (span, encode_path) = field_attr.encode_path(encode_t, span);
 
         let encode = quote_spanned! {
-            span =>
-            #encode_path(this, #encoder_var)?;
+            span => #encode_path(this, #encoder_var)
         };
 
         Some((encode, vec![pattern]))
@@ -326,15 +324,8 @@ impl<'a> Expander<'a> {
             }
             Packing::Tagged => {
                 needs.mark_used();
-
-                let (setup, finish) = self.encode_field_tag(fields, &field_tests)?;
-
-                quote! {
-                    #(#decls)*
-                    let mut #encoder_var = #setup;
-                    #(#encoders)*
-                    #finish
-                }
+                let encode = quote! { #(#encoders)* };
+                self.encode_field_tag(fields, &decls, encode, &field_tests)
             }
             Packing::Packed => {
                 needs.mark_used();
@@ -346,15 +337,12 @@ impl<'a> Expander<'a> {
                     #(#decls)*
                     let mut pack = #encoder_t::encode_pack(#encoder_var)?;
                     #(#encoders)*
-                    #pack_encoder_t::finish(pack)?;
+                    #pack_encoder_t::end(pack)
                 }
             }
         };
 
-        Some(quote! {
-            #encode
-            Ok(())
-        })
+        Some(encode)
     }
 
     fn encode_enum(&self, data: &syn::DataEnum, needs: &mut Needs) -> Option<TokenStream> {
@@ -384,8 +372,6 @@ impl<'a> Expander<'a> {
                 match self {
                     #(#variants)*
                 }
-
-                Ok(())
             }
         })
     }
@@ -600,7 +586,7 @@ impl<'a> Expander<'a> {
 
             variants.push(quote! {
                 #tag => {
-                    let #decoder_var = #pair_decoder_t::decode_second(variant)?;
+                    let #decoder_var = #pair_decoder_t::second(variant)?;
                     #output
                 }
             });
@@ -633,7 +619,7 @@ impl<'a> Expander<'a> {
             let mut variant = #decoder_t::decode_variant(#decoder_var)?;
 
             let #variant_tag #tag_type = {
-                let tag_decoder = #pair_decoder_t::decode_first(&mut variant)?;
+                let tag_decoder = #pair_decoder_t::first(&mut variant)?;
                 #decode_t::decode(tag_decoder)?
             };
 
@@ -649,49 +635,33 @@ impl<'a> Expander<'a> {
     fn encode_field_tag(
         &self,
         fields: &syn::Fields,
+        decls: &[TokenStream],
+        encode: TokenStream,
         tests: &[syn::Ident],
-    ) -> Option<(TokenStream, Option<TokenStream>)> {
+    ) -> TokenStream {
         let encoder_var = &self.tokens.encoder_var;
         let encoder_t = &self.tokens.encoder_t;
+        let pair_encoder_t = &self.tokens.pair_encoder_t;
 
-        match fields {
+        let setup = match fields {
             syn::Fields::Named(..) => {
                 let fields = calculate_tests(fields.len(), tests);
-
-                let setup = quote! {
-                    #encoder_t::encode_struct(#encoder_var, #fields)?
-                };
-
-                let pair_encoder_t = &self.tokens.pair_encoder_t;
-
-                let finish = Some(quote! {
-                    #pair_encoder_t::finish(#encoder_var)?;
-                });
-
-                Some((setup, finish))
+                quote!(#encoder_t::encode_struct(#encoder_var, #fields)?)
             }
             syn::Fields::Unnamed(..) => {
                 let fields = calculate_tests(fields.len(), tests);
-
-                let setup = quote! {
-                    #encoder_t::encode_tuple(#encoder_var, #fields)?
-                };
-
-                let pair_encoder_t = &self.tokens.pair_encoder_t;
-
-                let finish = Some(quote! {
-                    #pair_encoder_t::finish(#encoder_var)?;
-                });
-
-                Some((setup, finish))
+                quote!(#encoder_t::encode_tuple(#encoder_var, #fields)?)
             }
             syn::Fields::Unit => {
-                let setup = quote! {
-                    #encoder_t::encode_unit_struct(#encoder_var)?
-                };
-
-                Some((setup, None))
+                return quote!(#encoder_t::encode_unit_struct(#encoder_var));
             }
+        };
+
+        quote! {
+            #(#decls)*
+            let mut #encoder_var = #setup;
+            #encode
+            #pair_encoder_t::end(#encoder_var)
         }
     }
 
@@ -720,14 +690,7 @@ impl<'a> Expander<'a> {
                     self.encode_variant_fields(&variant.fields, needs, packing, default_field_tag)?;
 
                 // Special stuff needed to encode the field if its tagged.
-                let (setup, finish) = self.encode_field_tag(&variant.fields, &tests)?;
-
-                let encode = quote! {
-                    let mut #encoder_var = #setup;
-                    #encode
-                    #finish
-                };
-
+                let encode = self.encode_field_tag(&variant.fields, &[], encode, &tests);
                 (encode, patterns)
             }
             Packing::Packed => {
@@ -757,11 +720,13 @@ impl<'a> Expander<'a> {
 
             encode = quote! {{
                 let mut variant_encoder = #encoder_t::encode_variant(#encoder_var)?;
-                let tag_encoder = #pair_encoder_t::encode_first(&mut variant_encoder)?;
+                let tag_encoder = #pair_encoder_t::first(&mut variant_encoder)?;
                 #encode_t::encode(&#tag, tag_encoder)?;
-                let #encoder_var = #pair_encoder_t::encode_second(&mut variant_encoder)?;
-                #encode
-                #pair_encoder_t::finish(variant_encoder)?;
+                let _ = {
+                    let #encoder_var = #pair_encoder_t::second(&mut variant_encoder)?;
+                    #encode
+                }?;
+                #pair_encoder_t::end(variant_encoder)
             }};
         }
 
@@ -837,7 +802,7 @@ impl<'a> Expander<'a> {
                     #(#decls)*
                     let mut pack = #encoder_t::encode_pack(#encoder_var)?;
                     #(#encoders)*
-                    #pack_encoder_t::finish(pack)?;
+                    #pack_encoder_t::end(pack)
                 }
             }
             _ => quote!(),
@@ -874,9 +839,9 @@ impl<'a> Expander<'a> {
 
                 quote_spanned! {
                     span => {
-                        let field_encoder = #pair_encoder_t::encode_first(&mut #encoder_var)?;
+                        let field_encoder = #pair_encoder_t::first(&mut #encoder_var)?;
                         #encode_t::encode(&#tag, field_encoder)?;
-                        let value_encoder = #pair_encoder_t::encode_second(&mut #encoder_var)?;
+                        let value_encoder = #pair_encoder_t::second(&mut #encoder_var)?;
                         #encode_path(#access, value_encoder)?;
                     }
                 }
@@ -1017,14 +982,14 @@ impl<'a> Expander<'a> {
             },
         };
 
-        let decode_next = match field_kind {
+        let next = match field_kind {
             FieldKind::Struct => {
                 let struct_decoder_t = &self.tokens.struct_decoder_t;
-                quote!(#struct_decoder_t::decode_field)
+                quote!(#struct_decoder_t::next)
             }
             FieldKind::Tuple => {
                 let struct_decoder_t = &self.tokens.struct_decoder_t;
-                quote!(#struct_decoder_t::decode_field)
+                quote!(#struct_decoder_t::next)
             }
         };
 
@@ -1064,7 +1029,7 @@ impl<'a> Expander<'a> {
                         }
                     }
 
-                    let index_decoder = #pair_decoder_t::decode_first(&mut #decoder_var)?;
+                    let index_decoder = #pair_decoder_t::first(&mut #decoder_var)?;
                     #decoder_t::decode_string(index_decoder, TagVisitor::<D::Error>(#phantom_data))?
                 }};
 
@@ -1083,7 +1048,7 @@ impl<'a> Expander<'a> {
             }
             TagMethod::Default => {
                 let decode_tag = quote! {{
-                    let index_decoder = #pair_decoder_t::decode_first(&mut #decoder_var)?;
+                    let index_decoder = #pair_decoder_t::first(&mut #decoder_var)?;
                     #decode_t::decode(index_decoder)?
                 }};
 
@@ -1101,7 +1066,7 @@ impl<'a> Expander<'a> {
             .map(|(tag, decode)| {
                 quote! {
                     #tag => {
-                        let #decoder_var = #pair_decoder_t::decode_second(#decoder_var)?;
+                        let #decoder_var = #pair_decoder_t::second(#decoder_var)?;
                         #decode;
                     }
                 }
@@ -1148,7 +1113,7 @@ impl<'a> Expander<'a> {
 
             let mut #decoder_var = #declare;
 
-            while let Some(mut #decoder_var) = #decode_next(&mut #decoder_var)? {
+            while let Some(mut #decoder_var) = #next(&mut #decoder_var)? {
                 let tag #tag_type = #decode_tag;
                 #body
             }
@@ -1212,7 +1177,7 @@ impl<'a> Expander<'a> {
             Some(quote! {{
                 let mut unpack = #decoder_t::decode_pack(#decoder_var)?;
                 let this = #path { #(#assign),* };
-                #pack_decoder_t::finish(unpack)?;
+                #pack_decoder_t::end(unpack)?;
                 this
             }})
         }

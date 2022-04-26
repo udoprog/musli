@@ -5,14 +5,14 @@ use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
 use std::marker;
 
-use crate::de::{Decode, Decoder, MapDecoder, MapEntryDecoder, ReferenceVisitor, SequenceDecoder};
+use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, ReferenceVisitor, SequenceDecoder};
 use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
 use crate::error::Error;
 use crate::internal::size_hint;
 
 impl Encode for String {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -53,7 +53,7 @@ impl<'de> Decode<'de> for String {
 
 impl Encode for Box<str> {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -73,7 +73,7 @@ impl<'de> Decode<'de> for Box<str> {
 
 impl Encode for Cow<'_, str> {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -130,17 +130,17 @@ macro_rules! sequence {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder,
             {
                 let mut seq = encoder.encode_sequence(self.len())?;
 
                 for value in self {
-                    value.encode(seq.encode_next()?)?;
+                    value.encode(seq.next()?)?;
                 }
 
-                seq.finish()
+                seq.end()
             }
         }
 
@@ -157,7 +157,7 @@ macro_rules! sequence {
                 let mut $access = decoder.decode_sequence()?;
                 let mut out = $factory;
 
-                while let Some(value) = $access.decode_next()? {
+                while let Some(value) = $access.next()? {
                     out.$insert(T::decode(value)?);
                 }
 
@@ -205,20 +205,20 @@ macro_rules! map {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder,
             {
                 let mut map = encoder.encode_map(self.len())?;
 
                 for (k, v) in self {
-                    let entry = map.encode_first()?;
+                    let entry = map.first()?;
                     Encode::encode(k, entry)?;
-                    let value = map.encode_second()?;
+                    let value = map.second()?;
                     Encode::encode(v, value)?;
                 }
 
-                map.finish()
+                map.end()
             }
         }
 
@@ -236,9 +236,9 @@ macro_rules! map {
                 let mut $access = decoder.decode_map()?;
                 let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.decode_entry()? {
-                    let key = K::decode(entry.decode_key()?)?;
-                    let value = V::decode(entry.decode_value()?)?;
+                while let Some(mut entry) = $access.next()? {
+                    let key = K::decode(entry.first()?)?;
+                    let value = V::decode(entry.second()?)?;
                     out.insert(key, value);
                 }
 
@@ -261,7 +261,7 @@ map!(
 
 impl Encode for CStr {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -282,7 +282,7 @@ impl<'de> Decode<'de> for &'de CStr {
 
 impl Encode for CString {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {

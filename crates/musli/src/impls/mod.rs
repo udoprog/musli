@@ -20,7 +20,7 @@ use crate::error::Error;
 
 impl Encode for () {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -40,19 +40,20 @@ impl<'de> Decode<'de> for () {
 
 impl<T> Encode for marker::PhantomData<T> {
     #[inline]
-    fn encode<E>(&self, _: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        Ok(())
+        encoder.encode_unit()
     }
 }
 
 impl<'de, T> Decode<'de> for marker::PhantomData<T> {
-    fn decode<D>(_: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
+        let () = decoder.decode_unit()?;
         Ok(marker::PhantomData)
     }
 }
@@ -86,7 +87,7 @@ macro_rules! non_zero {
     ($ty:ty) => {
         impl Encode for $ty {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder,
             {
@@ -146,7 +147,7 @@ where
 
 impl<const N: usize> Encode for [u8; N] {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -168,7 +169,7 @@ macro_rules! impl_number {
     ($ty:ty, $read:ident, $write:ident) => {
         impl Encode for $ty {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder,
             {
@@ -190,7 +191,7 @@ macro_rules! impl_number {
 
 impl Encode for bool {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -210,7 +211,7 @@ impl<'de> Decode<'de> for bool {
 
 impl Encode for char {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -245,7 +246,7 @@ impl_number!(f64, decode_f64, encode_f64);
 
 impl Encode for str {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -285,7 +286,7 @@ impl<'de> Decode<'de> for &'de str {
 }
 
 impl Encode for [u8] {
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -329,7 +330,7 @@ where
     T: Encode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -366,7 +367,7 @@ where
     U: Encode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -374,16 +375,14 @@ where
 
         match self {
             Ok(ok) => {
-                Encode::encode(&0usize, variant.encode_first()?)?;
-                Encode::encode(ok, variant.encode_second()?)?;
-                variant.finish()?;
-                Ok(())
+                Encode::encode(&0usize, variant.first()?)?;
+                Encode::encode(ok, variant.second()?)?;
+                variant.end()
             }
             Err(err) => {
-                Encode::encode(&1usize, variant.encode_first()?)?;
-                Encode::encode(err, variant.encode_second()?)?;
-                variant.finish()?;
-                Ok(())
+                Encode::encode(&1usize, variant.first()?)?;
+                Encode::encode(err, variant.second()?)?;
+                variant.end()
             }
         }
     }
@@ -401,9 +400,9 @@ where
     {
         let mut variant = decoder.decode_variant()?;
 
-        match variant.decode_first().and_then(usize::decode)? {
-            0 => variant.decode_second().and_then(T::decode).map(Ok),
-            1 => variant.decode_second().and_then(U::decode).map(Err),
+        match variant.first().and_then(usize::decode)? {
+            0 => variant.second().and_then(T::decode).map(Ok),
+            1 => variant.second().and_then(U::decode).map(Err),
             tag => Err(D::Error::unsupported_variant("Result", tag)),
         }
     }
@@ -414,7 +413,7 @@ where
     T: Encode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {

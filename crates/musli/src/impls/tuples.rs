@@ -10,7 +10,7 @@ macro_rules! declare {
     ($ty0:ident, $ident0:ident $(,)? $($ty:ident, $ident:ident),*) => {
         impl<$ty0, $($ty),*> Encode for ($ty0, $($ty),*) where $ty0: Encode, $($ty: Encode),* {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder
             {
@@ -18,7 +18,7 @@ macro_rules! declare {
                 let mut pack = encoder.encode_pack()?;
                 <$ty0>::encode($ident0, pack.next()?)?;
                 $(<$ty>::encode($ident, pack.next()?)?;)*
-                Ok(())
+                pack.end()
             }
         }
 

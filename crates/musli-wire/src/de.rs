@@ -5,8 +5,7 @@ use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::Kind;
 use crate::tag::Tag;
 use musli::de::{
-    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, ReferenceVisitor,
-    SequenceDecoder, StructDecoder,
+    Decoder, PackDecoder, PairDecoder, PairsDecoder, ReferenceVisitor, SequenceDecoder,
 };
 use musli::error::Error;
 use musli_binary_common::int::continuation as c;
@@ -452,7 +451,7 @@ where
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -476,7 +475,7 @@ where
     L: TypedUsizeEncoding,
 {
     type Error = R::Error;
-    type Next<'this> = WireDecoder<&'this mut R, I, L> where Self: 'this;
+    type Decoder<'this> = WireDecoder<&'this mut R, I, L> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
@@ -484,62 +483,13 @@ where
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::Next<'_>>, Self::Error> {
+    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
 
         self.remaining -= 1;
         Ok(Some(WireDecoder::new(&mut self.decoder.reader)))
-    }
-}
-
-impl<'de, R, I, L> MapDecoder<'de> for RemainingWireDecoder<R, I, L>
-where
-    R: PositionedReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
-{
-    type Error = R::Error;
-
-    type Entry<'this> = WireDecoder<&'this mut R, I, L>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
-    }
-
-    #[inline]
-    fn decode_entry(&mut self) -> Result<Option<Self::Entry<'_>>, Self::Error> {
-        if self.remaining == 0 {
-            return Ok(None);
-        }
-
-        self.remaining -= 1;
-        Ok(Some(WireDecoder::new(&mut self.decoder.reader)))
-    }
-}
-
-impl<'a, 'de, R, I, L> MapEntryDecoder<'de> for WireDecoder<R, I, L>
-where
-    R: PositionedReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
-{
-    type Error = R::Error;
-    type Key<'this> = WireDecoder<&'this mut R, I, L> where Self: 'this;
-    type Value<'this> = WireDecoder<&'this mut R, I, L> where Self: 'this;
-
-    #[inline]
-    fn decode_key(&mut self) -> Result<Self::Key<'_>, Self::Error> {
-        Ok(WireDecoder::new(&mut self.reader))
-    }
-
-    #[inline]
-    fn decode_value(&mut self) -> Result<Self::Value<'_>, Self::Error> {
-        Ok(WireDecoder::new(&mut self.reader))
     }
 }
 
@@ -554,12 +504,12 @@ where
     type Second = Self;
 
     #[inline]
-    fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         Ok(WireDecoder::new(&mut self.reader))
     }
 
     #[inline]
-    fn decode_second(self) -> Result<Self::Second, Self::Error> {
+    fn second(self) -> Result<Self::Second, Self::Error> {
         Ok(self)
     }
 
@@ -570,7 +520,7 @@ where
     }
 }
 
-impl<'de, R, I, L> StructDecoder<'de> for RemainingWireDecoder<R, I, L>
+impl<'de, R, I, L> PairsDecoder<'de> for RemainingWireDecoder<R, I, L>
 where
     R: PositionedReader<'de>,
     I: TypedIntegerEncoding,
@@ -578,7 +528,7 @@ where
 {
     type Error = R::Error;
 
-    type Field<'this> = WireDecoder<&'this mut R, I, L>
+    type Decoder<'this> = WireDecoder<&'this mut R, I, L>
     where
         Self: 'this;
 
@@ -588,7 +538,7 @@ where
     }
 
     #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::Field<'_>>, Self::Error> {
+    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }

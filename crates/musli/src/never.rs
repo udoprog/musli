@@ -3,11 +3,8 @@
 
 use core::{fmt, marker};
 
-use crate::de::{
-    Decoder, MapDecoder, MapEntryDecoder, PackDecoder, PairDecoder, SequenceDecoder, StructDecoder,
-};
+use crate::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder};
 use crate::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder};
-use crate::error::Error;
 
 enum NeverMarker {}
 
@@ -25,13 +22,13 @@ enum NeverMarker {}
 ///
 /// impl Decoder<'_> for MyDecoder {
 ///     type Error = String;
-///     type Pack = Never<Self::Error>;
-///     type Sequence = Never<Self::Error>;
-///     type Map = Never<Self::Error>;
-///     type Some = Never<Self::Error>;
-///     type Struct = Never<Self::Error>;
-///     type Tuple = Never<Self::Error>;
-///     type Variant = Never<Self::Error>;
+///     type Pack = Never<Self>;
+///     type Sequence = Never<Self>;
+///     type Map = Never<Self>;
+///     type Some = Never<Self>;
+///     type Struct = Never<Self>;
+///     type Tuple = Never<Self>;
+///     type Variant = Never<Self>;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
@@ -42,17 +39,17 @@ enum NeverMarker {}
 ///     }
 /// }
 /// ```
-pub struct Never<E> {
+pub struct Never<T> {
     // Field makes type uninhabitable.
     _never: NeverMarker,
-    _marker: marker::PhantomData<E>,
+    _marker: marker::PhantomData<T>,
 }
 
-impl<'de, E> Decoder<'de> for Never<E>
+impl<'de, T> Decoder<'de> for Never<T>
 where
-    E: Error,
+    T: Decoder<'de>,
 {
-    type Error = E;
+    type Error = T::Error;
     type Pack = Self;
     type Sequence = Self;
     type Map = Self;
@@ -67,11 +64,11 @@ where
     }
 }
 
-impl<'de, E> PairDecoder<'de> for Never<E>
+impl<'de, T> PairDecoder<'de> for Never<T>
 where
-    E: Error,
+    T: Decoder<'de>,
 {
-    type Error = E;
+    type Error = T::Error;
 
     type First<'this> = Self
     where
@@ -80,12 +77,12 @@ where
     type Second = Self;
 
     #[inline]
-    fn decode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn decode_second(self) -> Result<Self::Second, Self::Error> {
+    fn second(self) -> Result<Self::Second, Self::Error> {
         match self._never {}
     }
 
@@ -95,13 +92,13 @@ where
     }
 }
 
-impl<'de, E> StructDecoder<'de> for Never<E>
+impl<'de, T> PairsDecoder<'de> for Never<T>
 where
-    E: Error,
+    T: Decoder<'de>,
 {
-    type Error = E;
+    type Error = T::Error;
 
-    type Field<'this> = Self
+    type Decoder<'this> = Self
     where
         Self: 'this;
 
@@ -111,18 +108,18 @@ where
     }
 
     #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::Field<'_>>, Self::Error> {
+    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         match self._never {}
     }
 }
 
-impl<'de, E> MapDecoder<'de> for Never<E>
+impl<'de, T> SequenceDecoder<'de> for Never<T>
 where
-    E: Error,
+    T: Decoder<'de>,
 {
-    type Error = E;
+    type Error = T::Error;
 
-    type Entry<'this> = Self
+    type Decoder<'this> = Self
     where
         Self: 'this;
 
@@ -132,62 +129,16 @@ where
     }
 
     #[inline]
-    fn decode_entry(&mut self) -> Result<Option<Self::Entry<'_>>, Self::Error> {
+    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         match self._never {}
     }
 }
 
-impl<'de, E> MapEntryDecoder<'de> for Never<E>
+impl<'de, T> PackDecoder<'de> for Never<T>
 where
-    E: Error,
+    T: Decoder<'de>,
 {
-    type Error = E;
-
-    type Key<'this> = Self
-    where
-        Self: 'this;
-
-    type Value<'this> = Self
-    where
-        Self: 'this;
-
-    #[inline]
-    fn decode_key(&mut self) -> Result<Self::Key<'_>, Self::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn decode_value(&mut self) -> Result<Self::Value<'_>, Self::Error> {
-        match self._never {}
-    }
-}
-
-impl<'de, E> SequenceDecoder<'de> for Never<E>
-where
-    E: Error,
-{
-    type Error = E;
-
-    type Next<'this> = Self
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::Next<'_>>, Self::Error> {
-        match self._never {}
-    }
-}
-
-impl<'de, E> PackDecoder<'de> for Never<E>
-where
-    E: Error,
-{
-    type Error = E;
+    type Error = T::Error;
 
     type Decoder<'this> = Self
     where
@@ -199,16 +150,17 @@ where
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }
 
-impl<E> Encoder for Never<E>
+impl<T> Encoder for Never<T>
 where
-    E: Error,
+    T: Encoder,
 {
-    type Error = E;
+    type Ok = T::Ok;
+    type Error = T::Error;
     type Pack = Self;
     type Some = Self;
     type Sequence = Self;
@@ -223,11 +175,12 @@ where
     }
 }
 
-impl<E> PackEncoder for Never<E>
+impl<T> PackEncoder for Never<T>
 where
-    E: Error,
+    T: Encoder,
 {
-    type Error = E;
+    type Ok = T::Ok;
+    type Error = T::Error;
 
     type Encoder<'this> = Self
     where
@@ -237,37 +190,39 @@ where
         match self._never {}
     }
 
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
 
-impl<E> SequenceEncoder for Never<E>
+impl<T> SequenceEncoder for Never<T>
 where
-    E: Error,
+    T: Encoder,
 {
-    type Error = E;
+    type Ok = T::Ok;
+    type Error = T::Error;
 
-    type Next<'this> = Self
+    type Encoder<'this> = Self
     where
         Self: 'this;
 
     #[inline]
-    fn encode_next(&mut self) -> Result<Self::Next<'_>, Self::Error> {
+    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
 
-impl<E> PairEncoder for Never<E>
+impl<T> PairEncoder for Never<T>
 where
-    E: Error,
+    T: Encoder,
 {
-    type Error = E;
+    type Ok = T::Ok;
+    type Error = T::Error;
 
     type First<'this> = Self
     where
@@ -277,15 +232,15 @@ where
     where
         Self: 'this;
 
-    fn encode_first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         match self._never {}
     }
 
-    fn encode_second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
         match self._never {}
     }
 
-    fn finish(self) -> Result<(), Self::Error> {
+    fn end(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }

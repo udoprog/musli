@@ -6,7 +6,7 @@ use crate::error::Error;
 
 impl Encode for Ipv4Addr {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -26,7 +26,7 @@ impl<'de> Decode<'de> for Ipv4Addr {
 
 impl Encode for Ipv6Addr {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -46,24 +46,22 @@ impl<'de> Decode<'de> for Ipv6Addr {
 
 impl Encode for IpAddr {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
         match self {
             IpAddr::V4(v4) => {
                 let mut variant = encoder.encode_variant()?;
-                usize::encode(&0, variant.encode_first()?)?;
-                v4.encode(variant.encode_second()?)?;
-                variant.finish()?;
-                Ok(())
+                usize::encode(&0, variant.first()?)?;
+                v4.encode(variant.second()?)?;
+                variant.end()
             }
             IpAddr::V6(v6) => {
                 let mut variant = encoder.encode_variant()?;
-                usize::encode(&1, variant.encode_first()?)?;
-                v6.encode(variant.encode_second()?)?;
-                variant.finish()?;
-                Ok(())
+                usize::encode(&1, variant.first()?)?;
+                v6.encode(variant.second()?)?;
+                variant.end()
             }
         }
     }
@@ -77,9 +75,9 @@ impl<'de> Decode<'de> for IpAddr {
     {
         let mut variant = decoder.decode_variant()?;
 
-        Ok(match variant.decode_first().and_then(usize::decode)? {
-            0 => Self::V4(variant.decode_second().and_then(Ipv4Addr::decode)?),
-            1 => Self::V6(variant.decode_second().and_then(Ipv6Addr::decode)?),
+        Ok(match variant.first().and_then(usize::decode)? {
+            0 => Self::V4(variant.second().and_then(Ipv4Addr::decode)?),
+            1 => Self::V6(variant.second().and_then(Ipv6Addr::decode)?),
             index => {
                 return Err(<D::Error as Error>::unsupported_variant("IpAddr", index));
             }
@@ -89,14 +87,14 @@ impl<'de> Decode<'de> for IpAddr {
 
 impl Encode for SocketAddrV4 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
         let mut pack = encoder.encode_pack()?;
         pack.push(self.ip())?;
         pack.push(self.port())?;
-        pack.finish()
+        pack.end()
     }
 }
 
@@ -115,7 +113,7 @@ impl<'de> Decode<'de> for SocketAddrV4 {
 
 impl Encode for SocketAddrV6 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -124,7 +122,7 @@ impl Encode for SocketAddrV6 {
         pack.push(self.port())?;
         pack.push(self.flowinfo())?;
         pack.push(self.scope_id())?;
-        Ok(())
+        pack.end()
     }
 }
 
@@ -145,24 +143,22 @@ impl<'de> Decode<'de> for SocketAddrV6 {
 
 impl Encode for SocketAddr {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
         match self {
             SocketAddr::V4(v4) => {
                 let mut variant = encoder.encode_variant()?;
-                usize::encode(&0, variant.encode_first()?)?;
-                v4.encode(variant.encode_second()?)?;
-                variant.finish()?;
-                Ok(())
+                usize::encode(&0, variant.first()?)?;
+                v4.encode(variant.second()?)?;
+                variant.end()
             }
             SocketAddr::V6(v6) => {
                 let mut variant = encoder.encode_variant()?;
-                usize::encode(&1, variant.encode_first()?)?;
-                v6.encode(variant.encode_second()?)?;
-                variant.finish()?;
-                Ok(())
+                usize::encode(&1, variant.first()?)?;
+                v6.encode(variant.second()?)?;
+                variant.end()
             }
         }
     }
@@ -176,9 +172,9 @@ impl<'de> Decode<'de> for SocketAddr {
     {
         let mut variant = decoder.decode_variant()?;
 
-        Ok(match variant.decode_first().and_then(usize::decode)? {
-            0 => Self::V4(variant.decode_second().and_then(SocketAddrV4::decode)?),
-            1 => Self::V6(variant.decode_second().and_then(SocketAddrV6::decode)?),
+        Ok(match variant.first().and_then(usize::decode)? {
+            0 => Self::V4(variant.second().and_then(SocketAddrV4::decode)?),
+            1 => Self::V6(variant.second().and_then(SocketAddrV6::decode)?),
             index => {
                 return Err(<D::Error as Error>::unsupported_variant(
                     "SocketAddr",

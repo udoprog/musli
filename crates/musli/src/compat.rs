@@ -34,28 +34,28 @@ where
     T: Encode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
         let mut seq = encoder.encode_sequence(self.0.len())?;
 
         for value in self.0 {
-            let encoder = seq.encode_next()?;
+            let encoder = seq.next()?;
             T::encode(value, encoder)?;
         }
 
-        seq.finish()
+        seq.end()
     }
 }
 
 impl Encode for Sequence<()> {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        encoder.encode_sequence(0)?.finish()
+        encoder.encode_sequence(0)?.end()
     }
 }
 
@@ -82,7 +82,7 @@ pub struct Bytes<T>(pub T);
 
 impl Encode for Bytes<Vec<u8>> {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -125,7 +125,7 @@ impl<'de> Decode<'de> for Bytes<Vec<u8>> {
 
 impl Encode for Bytes<VecDeque<u8>> {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -146,7 +146,7 @@ impl<'de> Decode<'de> for Bytes<VecDeque<u8>> {
 
 impl<const N: usize> Encode for Bytes<[u8; N]> {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
