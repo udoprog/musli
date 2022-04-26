@@ -1,6 +1,6 @@
 [package]
 name = "musli"
-version = "0.0.18"
+version = "0.0.19"
 edition = "2021"
 license = "MIT/Apache-2.0"
 readme = "README.md"
@@ -18,8 +18,8 @@ default = ["std"]
 std = []
 
 [dependencies]
-musli-macros = { path = "../musli-macros", version = "0.0.18" }
+musli-macros = { path = "../musli-macros", version = "0.0.19" }
 
 [dev-dependencies]
-musli-wire = { path = "../musli-wire", version = "0.0.18", default_features = false }
-musli-storage = { path = "../musli-storage", version = "0.0.18", default_features = false }
+musli-wire = { path = "../musli-wire", default_features = false }
+musli-storage = { path = "../musli-storage", default_features = false }
