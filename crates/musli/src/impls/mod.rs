@@ -371,7 +371,7 @@ where
     where
         E: Encoder,
     {
-        let mut variant = encoder.encode_variant()?;
+        let mut variant = encoder.encode_struct_variant(1)?;
 
         match self {
             Ok(ok) => {

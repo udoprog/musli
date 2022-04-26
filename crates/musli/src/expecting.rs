@@ -112,5 +112,8 @@ expect! {
     pub(crate) Struct("struct");
     pub(crate) UnitStruct("unit struct");
     pub(crate) Variant("variant");
+    pub(crate) StructVariant("struct variant");
+    pub(crate) TupleVariant("tuple variant");
+    pub(crate) UnitVariant("unit variant");
     pub(crate) AnyValue("a value");
 }

@@ -76,7 +76,9 @@ where
     type Map = Self;
     type Struct = Self;
     type Tuple = Self;
-    type Variant = Self;
+    type StructVariant = Self;
+    type TupleVariant = Self;
+    type UnitVariant = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -293,7 +295,19 @@ where
     }
 
     #[inline]
-    fn encode_variant(mut self) -> Result<Self::Variant, Self::Error> {
+    fn encode_struct_variant(mut self, _: usize) -> Result<Self::StructVariant, Self::Error> {
+        self.writer.write_byte(Tag::new(Kind::Sequence, 2).byte())?;
+        Ok(self)
+    }
+
+    #[inline]
+    fn encode_tuple_variant(mut self, _: usize) -> Result<Self::TupleVariant, Self::Error> {
+        self.writer.write_byte(Tag::new(Kind::Sequence, 2).byte())?;
+        Ok(self)
+    }
+
+    #[inline]
+    fn encode_unit_variant(mut self) -> Result<Self::UnitVariant, Self::Error> {
         self.writer.write_byte(Tag::new(Kind::Sequence, 2).byte())?;
         Ok(self)
     }

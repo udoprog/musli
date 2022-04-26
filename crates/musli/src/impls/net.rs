@@ -52,13 +52,13 @@ impl Encode for IpAddr {
     {
         match self {
             IpAddr::V4(v4) => {
-                let mut variant = encoder.encode_variant()?;
+                let mut variant = encoder.encode_struct_variant(1)?;
                 usize::encode(&0, variant.first()?)?;
                 v4.encode(variant.second()?)?;
                 variant.end()
             }
             IpAddr::V6(v6) => {
-                let mut variant = encoder.encode_variant()?;
+                let mut variant = encoder.encode_struct_variant(1)?;
                 usize::encode(&1, variant.first()?)?;
                 v6.encode(variant.second()?)?;
                 variant.end()
@@ -149,13 +149,13 @@ impl Encode for SocketAddr {
     {
         match self {
             SocketAddr::V4(v4) => {
-                let mut variant = encoder.encode_variant()?;
+                let mut variant = encoder.encode_struct_variant(1)?;
                 usize::encode(&0, variant.first()?)?;
                 v4.encode(variant.second()?)?;
                 variant.end()
             }
             SocketAddr::V6(v6) => {
-                let mut variant = encoder.encode_variant()?;
+                let mut variant = encoder.encode_struct_variant(1)?;
                 usize::encode(&1, variant.first()?)?;
                 v6.encode(variant.second()?)?;
                 variant.end()

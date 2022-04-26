@@ -99,8 +99,12 @@ pub trait Encoder: Sized {
     type Struct: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a tuple struct.
     type Tuple: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    /// Encoder for a struct variant.
+    type StructVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    /// Encoder for a tuple variant.
+    type TupleVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a unit variant.
-    type Variant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type UnitVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
 
     /// An expectation error. Every other implementation defers to this to
     /// report that something unexpected happened.
@@ -939,7 +943,9 @@ pub trait Encoder: Sized {
         )))
     }
 
-    /// Encode an enum variant.
+    /// Encode an struct enum variant.
+    ///
+    /// # Examples
     ///
     /// ```
     /// use musli::en::{Encode, Encoder, PairEncoder};
@@ -954,7 +960,7 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
-    ///         let mut variant = encoder.encode_variant()?;
+    ///         let mut variant = encoder.encode_struct_variant(1)?;
     ///
     ///         match self {
     ///             Enum::Variant1 => {
@@ -972,9 +978,27 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
+    fn encode_struct_variant(self, _: usize) -> Result<Self::StructVariant, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
-            expecting::Variant,
+            expecting::StructVariant,
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Encode an tuple enum variant.
+    #[inline]
+    fn encode_tuple_variant(self, _: usize) -> Result<Self::TupleVariant, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::TupleVariant,
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Encode an unit enum variant.
+    #[inline]
+    fn encode_unit_variant(self) -> Result<Self::UnitVariant, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::UnitVariant,
             &ExpectingWrapper(self),
         )))
     }

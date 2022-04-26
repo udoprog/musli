@@ -718,8 +718,20 @@ impl<'a> Expander<'a> {
                 &variant.ident,
             );
 
+            let (encode_function, len) = match &variant.fields {
+                syn::Fields::Named(_) => (
+                    syn::Ident::new("encode_struct_variant", variant.span()),
+                    Some(variant.fields.len()),
+                ),
+                syn::Fields::Unnamed(_) => (
+                    syn::Ident::new("encode_tuple_variant", variant.span()),
+                    Some(variant.fields.len()),
+                ),
+                syn::Fields::Unit => (syn::Ident::new("encode_unit_variant", variant.span()), None),
+            };
+
             encode = quote! {{
-                let mut variant_encoder = #encoder_t::encode_variant(#encoder_var)?;
+                let mut variant_encoder = #encoder_t::#encode_function(#encoder_var, #len)?;
                 let tag_encoder = #pair_encoder_t::first(&mut variant_encoder)?;
                 #encode_t::encode(&#tag, tag_encoder)?;
                 let _ = {
