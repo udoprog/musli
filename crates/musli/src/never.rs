@@ -11,8 +11,37 @@ use crate::error::Error;
 
 enum NeverMarker {}
 
-/// A never type which implements all decoder functions so it can be used as a
-/// type for a no-op implementation.
+/// An uninhabitable never type which implements all possible encoders and
+/// decoders. This can be used if your [Encoder] implementation doesn't
+/// implement a particular function.
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::de::Decoder;
+/// use musli::never::Never;
+///
+/// struct MyDecoder;
+///
+/// impl Decoder<'_> for MyDecoder {
+///     type Error = String;
+///     type Pack = Never<Self::Error>;
+///     type Sequence = Never<Self::Error>;
+///     type Map = Never<Self::Error>;
+///     type Some = Never<Self::Error>;
+///     type Struct = Never<Self::Error>;
+///     type Tuple = Never<Self::Error>;
+///     type Variant = Never<Self::Error>;
+///
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(f, "32-bit unsigned integers")
+///     }
+///
+///     fn decode_u32(self) -> Result<u32, Self::Error> {
+///         Ok(42)
+///     }
+/// }
+/// ```
 pub struct Never<E> {
     // Field makes type uninhabitable.
     _never: NeverMarker,

@@ -1,6 +1,6 @@
 use core::fmt;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::ffi::{CStr, CString};
 use std::hash::{BuildHasher, Hash};
 use std::marker;
@@ -174,10 +174,16 @@ sequence!(
     Vec::with_capacity(size_hint::cautious(seq.size_hint()))
 );
 sequence!(
+    VecDeque<T>,
+    push_back,
+    seq,
+    VecDeque::with_capacity(size_hint::cautious(seq.size_hint()))
+);
+sequence!(
     HashSet<T: Eq + Hash, S: BuildHasher + Default>,
     insert,
-    set,
-    HashSet::with_capacity_and_hasher(size_hint::cautious(set.size_hint()), S::default())
+    seq,
+    HashSet::with_capacity_and_hasher(size_hint::cautious(seq.size_hint()), S::default())
 );
 sequence!(
     BinaryHeap<T: Ord>,

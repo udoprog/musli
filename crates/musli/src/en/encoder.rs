@@ -96,7 +96,24 @@ pub trait Encoder: Sized {
     /// report that something unexpected happened.
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
-    /// Encode a unit or something that is empty.
+    /// Encode a unit or something that is completely empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct EmptyStruct;
+    ///
+    /// impl Encode for EmptyStruct {
+    ///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         encoder.encode_unit()
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_unit(self) -> Result<(), Self::Error> {
         Err(Self::Error::message(InvalidType::new(
@@ -111,6 +128,29 @@ pub trait Encoder: Sized {
     /// elements in the packed sequence as compact as possible and that
     /// subsequent unpackers will know the exact length of the element being
     /// unpacked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder, PackEncoder};
+    ///
+    /// struct PackedStruct {
+    ///     field: u32,
+    ///     data: [u8; 364],
+    /// }
+    ///
+    /// impl Encode for PackedStruct {
+    ///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         let mut pack = encoder.encode_pack()?;
+    ///         pack.next()?.encode_u32(self.field)?;
+    ///         pack.next()?.encode_array(self.data)?;
+    ///         pack.finish()
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
@@ -120,6 +160,25 @@ pub trait Encoder: Sized {
     }
 
     /// Encode fixed-length array.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: [u8; 364],
+    /// }
+    ///
+    /// impl Encode for MyType {
+    ///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         encoder.encode_array(self.data)
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_array<const N: usize>(self, _: [u8; N]) -> Result<(), Self::Error> {
         Err(Self::Error::message(InvalidType::new(
@@ -128,7 +187,26 @@ pub trait Encoder: Sized {
         )))
     }
 
-    /// Encode a sequence of bytes who's length is included in the payload.
+    /// Encode a sequence of bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: Vec<u8>,
+    /// }
+    ///
+    /// impl Encode for MyType {
+    ///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         encoder.encode_bytes(self.data.as_slice())
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_bytes(self, _: &[u8]) -> Result<(), Self::Error> {
         Err(Self::Error::message(InvalidType::new(
@@ -137,7 +215,34 @@ pub trait Encoder: Sized {
         )))
     }
 
-    /// Encode the given slice of bytes in sequence, with one following another.
+    /// Encode the given slices of bytes in sequence, with one following another
+    /// as a single contiguous byte array.
+    ///
+    /// This can be useful to avoid allocations when a caller doesn't have
+    /// access to a single byte sequence like in
+    /// [VecDeque][std::collections::VecDeque].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::collections::VecDeque;
+    ///
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: VecDeque<u8>,
+    /// }
+    ///
+    /// impl Encode for MyType {
+    ///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         let (first, second) = self.data.as_slices();
+    ///         encoder.encode_bytes_vectored(&[first, second])
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_bytes_vectored(self, _: &[&[u8]]) -> Result<(), Self::Error> {
         Err(Self::Error::message(InvalidType::new(
@@ -146,7 +251,26 @@ pub trait Encoder: Sized {
         )))
     }
 
-    /// Encode a string who's length is included in the payload.
+    /// Encode a string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: String,
+    /// }
+    ///
+    /// impl Encode for MyType {
+    ///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         encoder.encode_string(self.data.as_str())
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_string(self, _: &str) -> Result<(), Self::Error> {
         Err(Self::Error::message(InvalidType::new(
