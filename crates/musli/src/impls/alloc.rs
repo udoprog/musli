@@ -44,6 +44,11 @@ impl<'de> Decode<'de> for String {
             }
 
             #[inline]
+            fn visit_owned(self, value: String) -> Result<Self::Ok, Self::Error> {
+                Ok(value)
+            }
+
+            #[inline]
             fn visit_borrowed(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
                 self.visit_any(string)
             }
@@ -72,7 +77,7 @@ impl<'de> Decode<'de> for Box<str> {
     where
         D: Decoder<'de>,
     {
-        Ok(<&str>::decode(decoder)?.into())
+        Ok(String::decode(decoder)?.into())
     }
 }
 
@@ -107,6 +112,11 @@ impl<'de> Decode<'de> for Cow<'de, str> {
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "a string")
+            }
+
+            #[inline]
+            fn visit_owned(self, string: String) -> Result<Self::Ok, Self::Error> {
+                Ok(Cow::Owned(string))
             }
 
             #[inline]

@@ -47,7 +47,7 @@ pub trait ValueVisitor<'de>: Sized {
     #[inline]
     fn visit_any(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(BadVisitorType::new(
-            expecting::AnyReference,
+            expecting::AnyValue,
             &ReferenceVisistorExpecting(self),
         )))
     }
