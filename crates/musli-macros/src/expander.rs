@@ -727,10 +727,8 @@ impl<'a> Expander<'a> {
 
             let body = quote! {
                 |mut variant_encoder| {
-                    let tag_encoder = #pair_encoder_t::first(&mut variant_encoder)?;
-                    #encode_t::encode(&#tag, tag_encoder)?;
-                    let #encoder_var = #pair_encoder_t::second(variant_encoder)?;
-                    #encode?;
+                    #pair_encoder_t::first(&mut variant_encoder, |tag_encoder| #encode_t::encode(&#tag, tag_encoder))?;
+                    #pair_encoder_t::second(&mut variant_encoder, |#encoder_var| #encode)?;
                     Ok(())
                 }
             };
@@ -869,10 +867,8 @@ impl<'a> Expander<'a> {
                 quote_spanned! {
                     span => {
                         let mut pair_encoder = #pairs_encoder_t::next(&mut #encoder_var)?;
-                        let field_encoder = #pair_encoder_t::first(&mut pair_encoder)?;
-                        #encode_t::encode(&#tag, field_encoder)?;
-                        let value_encoder = #pair_encoder_t::second(pair_encoder)?;
-                        #encode_path(#access, value_encoder)?;
+                        #pair_encoder_t::first(&mut pair_encoder, |field_encoder| #encode_t::encode(&#tag, field_encoder))?;
+                        #pair_encoder_t::second(&mut pair_encoder, |value_encoder| #encode_path(#access, value_encoder))?;
                     }
                 }
             }

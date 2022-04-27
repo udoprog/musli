@@ -77,15 +77,19 @@ pub trait PairEncoder {
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type Second: Encoder<Ok = Self::Ok, Error = Self::Error>;
+    type Second<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
 
     /// Encode the first element in a pair.
-    #[must_use = "encoders must be consumed"]
-    fn first(self) -> Result<Self::First<'_>, Self::Error>;
+    fn first<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
+    where
+        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>;
 
     /// Encode the second element in the pair.
-    #[must_use = "encoders must be consumed"]
-    fn second(self) -> Result<Self::Second, Self::Error>;
+    fn second<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
+    where
+        F: FnOnce(Self::Second<'a>) -> Result<O, Self::Error>;
 }
 
 /// Trait governing how the encoder works.
@@ -935,13 +939,17 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         encoder.encode_struct(2, |mut st | {
-    ///             let mut field = st.next()?;
-    ///             field.first()?.encode_string("name")?;
-    ///             self.name.encode(field.second()?)?;
+    ///             {
+    ///                 let mut field = st.next()?;
+    ///                 field.first(|e| e.encode_string("name"))?;
+    ///                 field.second(|e| self.name.encode(e))?;
+    ///             }
     ///
-    ///             let mut field = st.next()?;
-    ///             field.first()?.encode_string("age")?;
-    ///             self.age.encode(field.second()?)?;
+    ///             {
+    ///                 let mut field = st.next()?;
+    ///                 field.first(|e| e.encode_string("age"))?;
+    ///                 field.second(|e| self.age.encode(e))?;
+    ///             }
     ///
     ///             Ok(())
     ///         })
@@ -975,8 +983,8 @@ pub trait Encoder: Sized {
     ///     {
     ///         encoder.encode_tuple_struct(1, |mut tuple| {
     ///             let mut field = tuple.next()?;
-    ///             field.first()?.encode_usize(0)?;
-    ///             self.0.encode(field.second()?)?;
+    ///             field.first(|e| e.encode_usize(0))?;
+    ///             field.second(|e| self.0.encode(e))?;
     ///             Ok(())
     ///         })
     ///     }
@@ -1043,32 +1051,37 @@ pub trait Encoder: Sized {
     ///         match self {
     ///             Enum::UnitVariant => {
     ///                 encoder.encode_unit_variant(|mut variant| {
-    ///                     variant.first()?.encode_string("variant1")?;
-    ///                     variant.second()?.encode_unit()?;
+    ///                     variant.first(|e| e.encode_string("variant1"))?;
+    ///                     variant.second(|e| e.encode_unit())?;
     ///                     Ok(())
     ///                 })
     ///             }
     ///             Enum::TupleVariant(data) => {
     ///                 encoder.encode_tuple_variant(1, |mut variant| {
-    ///                     variant.first()?.encode_string("variant2")?;
-    ///                     variant.second()?.encode_string(data)?;
+    ///                     variant.first(|e| e.encode_string("variant2"))?;
+    ///                     variant.second(|e| e.encode_string(data))?;
     ///                     Ok(())
     ///                 })
     ///             }
     ///             Enum::StructVariant { data, age } => {
     ///                 encoder.encode_struct_variant(2, |mut variant| {
-    ///                     variant.first()?.encode_string("variant3")?;
+    ///                     variant.first(|e| e.encode_string("variant3"))?;
     ///
-    ///                     variant.second()?.encode_struct(2, |mut data| {
-    ///                         let mut field = data.next()?;
-    ///                         field.first()?.encode_string("data")?;
-    ///                         field.second()?.encode_string(data)?;
+    ///                     variant.second(|e| e.encode_struct(2, |mut st| {
+    ///                         {
+    ///                             let mut field = st.next()?;
+    ///                             field.first(|e| e.encode_string("data"))?;
+    ///                             field.second(|e| e.encode_string(data))?;
+    ///                         }
     ///
-    ///                         let mut field = data.next()?;
-    ///                         field.first()?.encode_string("age")?;
-    ///                         field.second()?.encode_u32(*age)?;
+    ///                         {
+    ///                             let mut field = st.next()?;
+    ///                             field.first(|e| e.encode_string("age"))?;
+    ///                             field.second(|e| e.encode_u32(*age))?;
+    ///                         }
+    ///
     ///                         Ok(())
-    ///                     })?;
+    ///                     }))?;
     ///
     ///                     Ok(())
     ///                 })

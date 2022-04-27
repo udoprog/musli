@@ -228,8 +228,8 @@ macro_rules! map {
                 encoder.encode_map(self.len(), |mut map| {
                     for (k, v) in self {
                         let mut entry = map.next()?;
-                        Encode::encode(k, entry.first()?)?;
-                        Encode::encode(v, entry.second()?)?;
+                        entry.first(|e| Encode::encode(k, e))?;
+                        entry.second(|e| Encode::encode(v, e))?;
                     }
 
                     Ok(())

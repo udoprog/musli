@@ -429,16 +429,22 @@ where
     type Ok = ();
     type Error = W::Error;
     type First<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
-    type Second = Self;
+    type Second<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
 
     #[inline]
-    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(WireEncoder::new(&mut self.writer))
+    fn first<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
+    where
+        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>,
+    {
+        encoder(WireEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
-        Ok(self)
+    fn second<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
+    where
+        F: FnOnce(Self::Second<'a>) -> Result<O, Self::Error>,
+    {
+        encoder(WireEncoder::new(&mut self.writer))
     }
 }
 

@@ -231,20 +231,22 @@ where
 {
     type Ok = T::Ok;
     type Error = T::Error;
-
-    type First<'this> = Self
-    where
-        Self: 'this;
-
-    type Second = Self;
+    type First<'this> = Self where Self: 'this;
+    type Second<'this> = Self where Self: 'this;
 
     #[inline]
-    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first<'a, F, O>(&'a mut self, _: F) -> Result<O, Self::Error>
+    where
+        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>,
+    {
         match self._never {}
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
+    fn second<'a, F, O>(&'a mut self, _: F) -> Result<O, Self::Error>
+    where
+        F: FnOnce(Self::Second<'a>) -> Result<O, Self::Error>,
+    {
         match self._never {}
     }
 }

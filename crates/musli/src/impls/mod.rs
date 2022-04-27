@@ -374,12 +374,12 @@ where
         encoder.encode_struct_variant(1, |mut variant| {
             match self {
                 Ok(ok) => {
-                    Encode::encode(&0usize, variant.first()?)?;
-                    Encode::encode(ok, variant.second()?)?;
+                    variant.first(|e| Encode::encode(&0usize, e))?;
+                    variant.second(|e| Encode::encode(ok, e))?;
                 }
                 Err(err) => {
-                    Encode::encode(&1usize, variant.first()?)?;
-                    Encode::encode(err, variant.second()?)?;
+                    variant.first(|e| Encode::encode(&1usize, e))?;
+                    variant.second(|e| Encode::encode(err, e))?;
                 }
             }
 

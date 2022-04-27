@@ -327,15 +327,21 @@ where
     type Ok = ();
     type Error = W::Error;
     type First<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
-    type Second = Self;
+    type Second<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
 
     #[inline]
-    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(StorageEncoder::new(&mut self.writer))
+    fn first<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
+    where
+        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>,
+    {
+        encoder(StorageEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
-        Ok(self)
+    fn second<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
+    where
+        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>,
+    {
+        encoder(StorageEncoder::new(&mut self.writer))
     }
 }

@@ -52,13 +52,13 @@ impl Encode for IpAddr {
     {
         match self {
             IpAddr::V4(v4) => encoder.encode_struct_variant(1, |mut variant| {
-                usize::encode(&0, variant.first()?)?;
-                v4.encode(variant.second()?)?;
+                variant.first(|e| usize::encode(&0, e))?;
+                variant.second(|e| v4.encode(e))?;
                 Ok(())
             }),
             IpAddr::V6(v6) => encoder.encode_struct_variant(1, |mut variant| {
-                usize::encode(&1, variant.first()?)?;
-                v6.encode(variant.second()?)?;
+                variant.first(|e| usize::encode(&1, e))?;
+                variant.second(|e| v6.encode(e))?;
                 Ok(())
             }),
         }
@@ -151,13 +151,13 @@ impl Encode for SocketAddr {
     {
         match self {
             SocketAddr::V4(v4) => encoder.encode_struct_variant(1, |mut variant| {
-                usize::encode(&0, variant.first()?)?;
-                v4.encode(variant.second()?)?;
+                variant.first(|e| usize::encode(&0, e))?;
+                variant.second(|e| v4.encode(e))?;
                 Ok(())
             }),
             SocketAddr::V6(v6) => encoder.encode_struct_variant(1, |mut variant| {
-                usize::encode(&1, variant.first()?)?;
-                v6.encode(variant.second()?)?;
+                variant.first(|e| usize::encode(&1, e))?;
+                variant.second(|e| v6.encode(e))?;
                 Ok(())
             }),
         }
