@@ -4,37 +4,6 @@ use crate::en::Encode;
 use crate::error::Error;
 use crate::expecting::{self, Expecting, InvalidType};
 
-/// A pack that can construct encoders.
-pub trait PackEncoder {
-    /// Result type of the encoder.
-    type Ok;
-    /// The error type of the pack.
-    type Error: Error;
-
-    /// The encoder to use for the pack.
-    type Encoder<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Construct a decoder for the next element to pack.
-    #[must_use = "encoders must be consumed"]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error>;
-
-    /// Push a value into the pack.
-    #[inline]
-    fn push<T>(&mut self, value: T) -> Result<(), Self::Error>
-    where
-        T: Encode,
-    {
-        let encoder = self.next()?;
-        Encode::encode(&value, encoder)?;
-        Ok(())
-    }
-
-    /// End the current pack.
-    fn end(self) -> Result<Self::Ok, Self::Error>;
-}
-
 /// Trait governing how to encode a sequence.
 pub trait SequenceEncoder {
     /// Result type of the encoder.
@@ -147,13 +116,13 @@ pub trait Encoder: Sized {
     /// The error raised by an encoder.
     type Error: Error;
     /// A simple pack that packs a sequence of elements.
-    type Pack<'this>: PackEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Pack<'this>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder returned when encoding an optional value which is present.
     type Some<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a sequence encoder.
     type Sequence<'this>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a tuple encoder.
-    type Tuple<'this>: PackEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Tuple<'this>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a map encoder.
     type Map<'this>: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a struct.
@@ -207,7 +176,7 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder, PackEncoder};
+    /// use musli::en::{Encode, Encoder, SequenceEncoder};
     ///
     /// struct PackedStruct {
     ///     field: u32,
@@ -921,7 +890,7 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder, PackEncoder};
+    /// use musli::en::{Encode, Encoder, SequenceEncoder};
     ///
     /// struct PackedTuple(u32, [u8; 364]);
     ///

@@ -31,15 +31,15 @@ struct Tokens {
     encoder_t: TokenStream,
     encoder_var: syn::Ident,
     error_t: TokenStream,
+    fmt: TokenStream,
     pack_decoder_t: TokenStream,
-    pack_encoder_t: TokenStream,
     pair_decoder_t: TokenStream,
     pair_encoder_t: TokenStream,
-    pairs_encoder_t: TokenStream,
     pairs_decoder_t: TokenStream,
-    reference_visitor_t: TokenStream,
+    pairs_encoder_t: TokenStream,
     phantom_data: TokenStream,
-    fmt: TokenStream,
+    reference_visitor_t: TokenStream,
+    sequence_encoder_t: TokenStream,
 }
 
 pub(crate) struct Expander<'a> {
@@ -70,15 +70,15 @@ impl<'a> Expander<'a> {
                 encoder_t: quote!(#prefix::en::Encoder),
                 encoder_var: syn::Ident::new("encoder", input.ident.span()),
                 error_t: quote!(#prefix::error::Error),
+                fmt: quote!(core::fmt),
                 pack_decoder_t: quote!(#prefix::de::PackDecoder),
-                pack_encoder_t: quote!(#prefix::en::PackEncoder),
                 pair_decoder_t: quote!(#prefix::de::PairDecoder),
                 pair_encoder_t: quote!(#prefix::en::PairEncoder),
-                pairs_encoder_t: quote!(#prefix::en::PairsEncoder),
                 pairs_decoder_t: quote!(#prefix::de::PairsDecoder),
-                reference_visitor_t: quote!(#prefix::de::ValueVisitor),
+                pairs_encoder_t: quote!(#prefix::en::PairsEncoder),
                 phantom_data: quote!(core::marker::PhantomData),
-                fmt: quote!(core::fmt),
+                reference_visitor_t: quote!(#prefix::de::ValueVisitor),
+                sequence_encoder_t: quote!(#prefix::en::SequenceEncoder),
             },
         }
     }
@@ -333,13 +333,13 @@ impl<'a> Expander<'a> {
                 needs.mark_used();
 
                 let encoder_t = &self.tokens.encoder_t;
-                let pack_encoder_t = &self.tokens.pack_encoder_t;
+                let sequence_encoder_t = &self.tokens.sequence_encoder_t;
 
                 quote! {
                     #encoder_t::encode_pack(#encoder_var, |mut pack| {
                         #(#field_tests)*
                         #(#encoders)*
-                        #pack_encoder_t::end(pack)
+                        #sequence_encoder_t::end(pack)
                     })
                 }
             }
@@ -826,13 +826,13 @@ impl<'a> Expander<'a> {
 
                 let encoder_t = &self.tokens.encoder_t;
                 let encoder_var = &self.tokens.encoder_var;
-                let pack_encoder_t = &self.tokens.pack_encoder_t;
+                let sequence_encoder_t = &self.tokens.sequence_encoder_t;
 
                 quote! {
                     #encoder_t::encode_pack(#encoder_var, |mut pack| {
                         #(#field_tests)*
                         #(#encoders)*
-                        #pack_encoder_t::end(pack)
+                        #sequence_encoder_t::end(pack)
                     })
                 }
             }
@@ -881,8 +881,8 @@ impl<'a> Expander<'a> {
                 }
             }
             Packing::Packed => {
-                let pack_encoder_t = &self.tokens.pack_encoder_t;
-                quote_spanned!(span => #encode_path(#access, #pack_encoder_t::next(&mut pack)?)?;)
+                let sequence_encoder_t = &self.tokens.sequence_encoder_t;
+                quote_spanned!(span => #encode_path(#access, #sequence_encoder_t::next(&mut pack)?)?;)
             }
         };
 

@@ -2,7 +2,7 @@ use core::{fmt, marker};
 
 use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::{Kind, Tag};
-use musli::en::{Encoder, PackEncoder, PairEncoder, PairsEncoder, SequenceEncoder};
+use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use musli::error::Error;
 use musli_binary_common::fixed_bytes::FixedBytes;
 use musli_binary_common::writer::Writer;
@@ -356,7 +356,7 @@ where
     }
 }
 
-impl<'a, I, L, const P: usize, E> PackEncoder for WirePackEncoder<'a, I, L, P, E>
+impl<'a, I, L, const P: usize, E> SequenceEncoder for WirePackEncoder<'a, I, L, P, E>
 where
     E: Error,
     I: TypedIntegerEncoding,
@@ -369,27 +369,6 @@ where
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut *self.pack_buf))
-    }
-
-    #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(())
-    }
-}
-
-impl<W, I, L, const P: usize> PackEncoder for WireEncoder<W, I, L, P>
-where
-    W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
-{
-    type Ok = ();
-    type Error = W::Error;
-    type Encoder<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
-
-    #[inline]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(WireEncoder::new(&mut self.writer))
     }
 
     #[inline]

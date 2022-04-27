@@ -2,7 +2,7 @@ use core::fmt;
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use musli::en::{Encoder, PackEncoder, PairEncoder, PairsEncoder, SequenceEncoder};
+use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use musli_binary_common::writer::Writer;
 
 /// A vaery simple encoder suitable for storage encoding.
@@ -267,27 +267,6 @@ where
         T: FnOnce(Self::UnitVariant<'_>) -> Result<(), Self::Error>,
     {
         encoder(self)
-    }
-}
-
-impl<W, I, L> PackEncoder for StorageEncoder<W, I, L>
-where
-    W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-    type Ok = ();
-    type Error = W::Error;
-    type Encoder<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
-
-    #[inline]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(StorageEncoder::new(&mut self.writer))
-    }
-
-    #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(())
     }
 }
 

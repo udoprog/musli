@@ -2,7 +2,7 @@
 
 use crate::compat::Packed;
 use crate::de::{Decode, Decoder, PackDecoder};
-use crate::en::{Encode, Encoder, PackEncoder};
+use crate::en::{Encode, Encoder, SequenceEncoder};
 
 macro_rules! count {
     (_) => { 1 };

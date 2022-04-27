@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 use crate::de::{Decode, Decoder, PackDecoder, PairDecoder};
-use crate::en::{Encode, Encoder, PackEncoder, PairEncoder};
+use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
 use crate::error::Error;
 
 impl Encode for Ipv4Addr {

@@ -4,7 +4,7 @@
 use core::{fmt, marker};
 
 use crate::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder};
-use crate::en::{Encoder, PackEncoder, PairEncoder, PairsEncoder, SequenceEncoder};
+use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 
 enum NeverMarker {}
 
@@ -173,28 +173,6 @@ where
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self._never {}
-    }
-}
-
-impl<T> PackEncoder for Never<T>
-where
-    T: Encoder,
-{
-    type Ok = T::Ok;
-    type Error = T::Error;
-
-    type Encoder<'this> = Self
-    where
-        Self: 'this;
-
-    #[inline]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
