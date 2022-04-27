@@ -4,7 +4,7 @@
 use core::{fmt, marker};
 
 use crate::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder};
-use crate::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder};
+use crate::en::{Encoder, PackEncoder, PairEncoder, PairsEncoder, SequenceEncoder};
 
 enum NeverMarker {}
 
@@ -13,6 +13,8 @@ enum NeverMarker {}
 /// implement a particular function.
 ///
 /// ```
+/// #![feature(generic_associated_types)]
+///
 /// use std::fmt;
 ///
 /// use musli::de::Decoder;
@@ -22,14 +24,14 @@ enum NeverMarker {}
 ///
 /// impl Decoder<'_> for MyDecoder {
 ///     type Error = String;
-///     type Pack = Never<Self>;
-///     type Sequence = Never<Self>;
-///     type Tuple = Never<Self>;
-///     type Map = Never<Self>;
+///     type Pack<'this> = Never<Self>;
+///     type Sequence<'this> = Never<Self>;
+///     type Tuple<'this> = Never<Self>;
+///     type Map<'this> = Never<Self>;
 ///     type Some = Never<Self>;
-///     type Struct = Never<Self>;
-///     type TupleStruct = Never<Self>;
-///     type Variant = Never<Self>;
+///     type Struct<'this> = Never<Self>;
+///     type TupleStruct<'this> = Never<Self>;
+///     type Variant<'this> = Never<Self>;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
@@ -51,14 +53,14 @@ where
     T: Decoder<'de>,
 {
     type Error = T::Error;
-    type Pack = Self;
-    type Sequence = Self;
-    type Tuple = Self;
-    type Map = Self;
+    type Pack<'this> = Self;
+    type Sequence<'this> = Self;
+    type Tuple<'this> = Self;
+    type Map<'this> = Self;
     type Some = Self;
-    type Struct = Self;
-    type TupleStruct = Self;
-    type Variant = Self;
+    type Struct<'this> = Self;
+    type TupleStruct<'this> = Self;
+    type Variant<'this> = Self;
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -150,11 +152,6 @@ where
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         match self._never {}
     }
-
-    #[inline]
-    fn end(self) -> Result<(), Self::Error> {
-        match self._never {}
-    }
 }
 
 impl<T> Encoder for Never<T>
@@ -163,16 +160,16 @@ where
 {
     type Ok = T::Ok;
     type Error = T::Error;
-    type Pack = Self;
-    type Some = Self;
-    type Sequence = Self;
-    type Tuple = Self;
-    type Map = Self;
-    type Struct = Self;
-    type TupleStruct = Self;
-    type StructVariant = Self;
-    type TupleVariant = Self;
-    type UnitVariant = Self;
+    type Pack<'this> = Self;
+    type Some<'this> = Self;
+    type Sequence<'this> = Self;
+    type Tuple<'this> = Self;
+    type Map<'this> = Self;
+    type Struct<'this> = Self;
+    type TupleStruct<'this> = Self;
+    type StructVariant<'this> = Self;
+    type TupleVariant<'this> = Self;
+    type UnitVariant<'this> = Self;
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -191,11 +188,8 @@ where
     where
         Self: 'this;
 
+    #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        match self._never {}
-    }
-
-    fn end(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
@@ -215,9 +209,18 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         match self._never {}
     }
+}
+
+impl<T> PairsEncoder for Never<T>
+where
+    T: Encoder,
+{
+    type Ok = T::Ok;
+    type Error = T::Error;
+    type Encoder<'this> = Self where Self: 'this;
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         match self._never {}
     }
 }
@@ -233,19 +236,15 @@ where
     where
         Self: 'this;
 
-    type Second<'this> = Self
-    where
-        Self: 'this;
+    type Second = Self;
 
+    #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         match self._never {}
     }
 
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
-        match self._never {}
-    }
-
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    #[inline]
+    fn second(self) -> Result<Self::Second, Self::Error> {
         match self._never {}
     }
 }

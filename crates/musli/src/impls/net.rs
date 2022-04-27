@@ -51,18 +51,16 @@ impl Encode for IpAddr {
         E: Encoder,
     {
         match self {
-            IpAddr::V4(v4) => {
-                let mut variant = encoder.encode_struct_variant(1)?;
+            IpAddr::V4(v4) => encoder.encode_struct_variant(1, |mut variant| {
                 usize::encode(&0, variant.first()?)?;
                 v4.encode(variant.second()?)?;
-                variant.end()
-            }
-            IpAddr::V6(v6) => {
-                let mut variant = encoder.encode_struct_variant(1)?;
+                Ok(())
+            }),
+            IpAddr::V6(v6) => encoder.encode_struct_variant(1, |mut variant| {
                 usize::encode(&1, variant.first()?)?;
                 v6.encode(variant.second()?)?;
-                variant.end()
-            }
+                Ok(())
+            }),
         }
     }
 }
@@ -73,14 +71,14 @@ impl<'de> Decode<'de> for IpAddr {
     where
         D: Decoder<'de>,
     {
-        let mut variant = decoder.decode_variant()?;
-
-        Ok(match variant.first().and_then(usize::decode)? {
-            0 => Self::V4(variant.second().and_then(Ipv4Addr::decode)?),
-            1 => Self::V6(variant.second().and_then(Ipv6Addr::decode)?),
-            index => {
-                return Err(<D::Error as Error>::invalid_variant_tag("IpAddr", index));
-            }
+        decoder.decode_variant(|mut variant| {
+            Ok(match variant.first().and_then(usize::decode)? {
+                0 => Self::V4(variant.second().and_then(Ipv4Addr::decode)?),
+                1 => Self::V6(variant.second().and_then(Ipv6Addr::decode)?),
+                index => {
+                    return Err(<D::Error as Error>::invalid_variant_tag("IpAddr", index));
+                }
+            })
         })
     }
 }
@@ -91,10 +89,11 @@ impl Encode for SocketAddrV4 {
     where
         E: Encoder,
     {
-        let mut pack = encoder.encode_pack()?;
-        pack.push(self.ip())?;
-        pack.push(self.port())?;
-        pack.end()
+        encoder.encode_pack(|mut pack| {
+            pack.push(self.ip())?;
+            pack.push(self.port())?;
+            Ok(())
+        })
     }
 }
 
@@ -104,10 +103,11 @@ impl<'de> Decode<'de> for SocketAddrV4 {
     where
         D: Decoder<'de>,
     {
-        let mut unpack = decoder.decode_pack()?;
-        let ip = unpack.next().and_then(Ipv4Addr::decode)?;
-        let port = unpack.next().and_then(u16::decode)?;
-        Ok(SocketAddrV4::new(ip, port))
+        decoder.decode_pack(|mut unpack| {
+            let ip = unpack.next().and_then(Ipv4Addr::decode)?;
+            let port = unpack.next().and_then(u16::decode)?;
+            Ok(SocketAddrV4::new(ip, port))
+        })
     }
 }
 
@@ -117,12 +117,13 @@ impl Encode for SocketAddrV6 {
     where
         E: Encoder,
     {
-        let mut pack = encoder.encode_pack()?;
-        pack.push(self.ip())?;
-        pack.push(self.port())?;
-        pack.push(self.flowinfo())?;
-        pack.push(self.scope_id())?;
-        pack.end()
+        encoder.encode_pack(|mut pack| {
+            pack.push(self.ip())?;
+            pack.push(self.port())?;
+            pack.push(self.flowinfo())?;
+            pack.push(self.scope_id())?;
+            Ok(())
+        })
     }
 }
 
@@ -132,12 +133,13 @@ impl<'de> Decode<'de> for SocketAddrV6 {
     where
         D: Decoder<'de>,
     {
-        let mut unpack = decoder.decode_pack()?;
-        let ip = unpack.next().and_then(Ipv6Addr::decode)?;
-        let port = unpack.next().and_then(u16::decode)?;
-        let flowinfo = unpack.next().and_then(u32::decode)?;
-        let scope_id = unpack.next().and_then(u32::decode)?;
-        Ok(Self::new(ip, port, flowinfo, scope_id))
+        decoder.decode_pack(|mut unpack| {
+            let ip = unpack.next().and_then(Ipv6Addr::decode)?;
+            let port = unpack.next().and_then(u16::decode)?;
+            let flowinfo = unpack.next().and_then(u32::decode)?;
+            let scope_id = unpack.next().and_then(u32::decode)?;
+            Ok(Self::new(ip, port, flowinfo, scope_id))
+        })
     }
 }
 
@@ -148,18 +150,16 @@ impl Encode for SocketAddr {
         E: Encoder,
     {
         match self {
-            SocketAddr::V4(v4) => {
-                let mut variant = encoder.encode_struct_variant(1)?;
+            SocketAddr::V4(v4) => encoder.encode_struct_variant(1, |mut variant| {
                 usize::encode(&0, variant.first()?)?;
                 v4.encode(variant.second()?)?;
-                variant.end()
-            }
-            SocketAddr::V6(v6) => {
-                let mut variant = encoder.encode_struct_variant(1)?;
+                Ok(())
+            }),
+            SocketAddr::V6(v6) => encoder.encode_struct_variant(1, |mut variant| {
                 usize::encode(&1, variant.first()?)?;
                 v6.encode(variant.second()?)?;
-                variant.end()
-            }
+                Ok(())
+            }),
         }
     }
 }
@@ -170,17 +170,17 @@ impl<'de> Decode<'de> for SocketAddr {
     where
         D: Decoder<'de>,
     {
-        let mut variant = decoder.decode_variant()?;
-
-        Ok(match variant.first().and_then(usize::decode)? {
-            0 => Self::V4(variant.second().and_then(SocketAddrV4::decode)?),
-            1 => Self::V6(variant.second().and_then(SocketAddrV6::decode)?),
-            index => {
-                return Err(<D::Error as Error>::invalid_variant_tag(
-                    "SocketAddr",
-                    index,
-                ));
-            }
+        decoder.decode_variant(|mut variant| {
+            Ok(match variant.first().and_then(usize::decode)? {
+                0 => Self::V4(variant.second().and_then(SocketAddrV4::decode)?),
+                1 => Self::V6(variant.second().and_then(SocketAddrV6::decode)?),
+                index => {
+                    return Err(<D::Error as Error>::invalid_variant_tag(
+                        "SocketAddr",
+                        index,
+                    ));
+                }
+            })
         })
     }
 }

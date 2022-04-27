@@ -52,14 +52,14 @@ where
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Pack = Self;
+    type Pack<'this> = Self;
     type Some = Self;
-    type Sequence = LimitedStorageDecoder<R, I, L>;
-    type Tuple = Self;
-    type Map = LimitedStorageDecoder<R, I, L>;
-    type Struct = LimitedStorageDecoder<R, I, L>;
-    type TupleStruct = LimitedStorageDecoder<R, I, L>;
-    type Variant = Self;
+    type Sequence<'this> = LimitedStorageDecoder<R, I, L>;
+    type Tuple<'this> = Self;
+    type Map<'this> = LimitedStorageDecoder<R, I, L>;
+    type Struct<'this> = LimitedStorageDecoder<R, I, L>;
+    type TupleStruct<'this> = LimitedStorageDecoder<R, I, L>;
+    type Variant<'this> = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -82,8 +82,11 @@ where
     }
 
     #[inline]
-    fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
-        Ok(self)
+    fn decode_pack<T, O>(self, decoder: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Pack<'_>) -> Result<O, Self::Error>,
+    {
+        decoder(self)
     }
 
     #[inline]
@@ -242,28 +245,43 @@ where
     }
 
     #[inline]
-    fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
-        LimitedStorageDecoder::new(self)
+    fn decode_sequence<T, O>(self, decoder: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Sequence<'_>) -> Result<O, Self::Error>,
+    {
+        decoder(LimitedStorageDecoder::new(self)?)
     }
 
     #[inline]
-    fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
-        Ok(self)
+    fn decode_tuple<T, O>(self, _: usize, decoder: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Tuple<'_>) -> Result<O, Self::Error>,
+    {
+        decoder(self)
     }
 
     #[inline]
-    fn decode_map(self) -> Result<Self::Map, Self::Error> {
-        LimitedStorageDecoder::new(self)
+    fn decode_map<T, O>(self, decoder: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Map<'_>) -> Result<O, Self::Error>,
+    {
+        decoder(LimitedStorageDecoder::new(self)?)
     }
 
     #[inline]
-    fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
-        LimitedStorageDecoder::new(self)
+    fn decode_struct<T, O>(self, _: usize, decoder: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Struct<'_>) -> Result<O, Self::Error>,
+    {
+        decoder(LimitedStorageDecoder::new(self)?)
     }
 
     #[inline]
-    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
-        LimitedStorageDecoder::new(self)
+    fn decode_tuple_struct<T, O>(self, _: usize, decoder: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::TupleStruct<'_>) -> Result<O, Self::Error>,
+    {
+        decoder(LimitedStorageDecoder::new(self)?)
     }
 
     #[inline]
@@ -272,8 +290,11 @@ where
     }
 
     #[inline]
-    fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
-        Ok(self)
+    fn decode_variant<T, O>(self, decoder: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Variant<'_>) -> Result<O, Self::Error>,
+    {
+        decoder(self)
     }
 }
 
@@ -289,11 +310,6 @@ where
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         Ok(StorageDecoder::new(&mut self.reader))
-    }
-
-    #[inline]
-    fn end(self) -> Result<(), Self::Error> {
-        Ok(())
     }
 }
 

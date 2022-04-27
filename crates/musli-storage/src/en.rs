@@ -2,7 +2,7 @@ use core::fmt;
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use musli::en::{Encoder, PackEncoder, PairEncoder, SequenceEncoder};
+use musli::en::{Encoder, PackEncoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use musli_binary_common::writer::Writer;
 
 /// A vaery simple encoder suitable for storage encoding.
@@ -39,16 +39,16 @@ where
     type Ok = ();
     type Error = W::Error;
 
-    type Pack = Self;
-    type Some = Self;
-    type Sequence = Self;
-    type Tuple = Self;
-    type Map = Self;
-    type Struct = Self;
-    type TupleStruct = Self;
-    type StructVariant = Self;
-    type TupleVariant = Self;
-    type UnitVariant = Self;
+    type Pack<'this> = Self;
+    type Some<'this> = Self;
+    type Sequence<'this> = Self;
+    type Tuple<'this> = Self;
+    type Map<'this> = Self;
+    type Struct<'this> = Self;
+    type TupleStruct<'this> = Self;
+    type StructVariant<'this> = Self;
+    type TupleVariant<'this> = Self;
+    type UnitVariant<'this> = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -57,12 +57,15 @@ where
 
     #[inline]
     fn encode_unit(self) -> Result<Self::Ok, Self::Error> {
-        SequenceEncoder::end(self.encode_sequence(0)?)
+        self.encode_sequence(0, |_| Ok(()))
     }
 
     #[inline]
-    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
-        Ok(self)
+    fn encode_pack<T>(self, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::Pack<'_>) -> Result<(), Self::Error>,
+    {
+        encoder(self)
     }
 
     #[inline]
@@ -177,9 +180,12 @@ where
     }
 
     #[inline]
-    fn encode_some(mut self) -> Result<Self::Some, Self::Error> {
+    fn encode_some<T>(mut self, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::Some<'_>) -> Result<(), Self::Error>,
+    {
         self.writer.write_byte(1)?;
-        Ok(self)
+        encoder(self)
     }
 
     #[inline]
@@ -189,33 +195,48 @@ where
     }
 
     #[inline]
-    fn encode_sequence(mut self, len: usize) -> Result<Self::Sequence, Self::Error> {
+    fn encode_sequence<T>(mut self, len: usize, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::Sequence<'_>) -> Result<(), Self::Error>,
+    {
         L::encode_usize(&mut self.writer, len)?;
-        Ok(self)
+        encoder(self)
     }
 
     #[inline]
-    fn encode_tuple(self, _: usize) -> Result<Self::Sequence, Self::Error> {
+    fn encode_tuple<T>(self, _: usize, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::Sequence<'_>) -> Result<(), Self::Error>,
+    {
         // NB: tuple has statically known fixed length.
-        Ok(self)
+        encoder(self)
     }
 
     #[inline]
-    fn encode_map(mut self, len: usize) -> Result<Self::Map, Self::Error> {
+    fn encode_map<T>(mut self, len: usize, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::Map<'_>) -> Result<(), Self::Error>,
+    {
         L::encode_usize(&mut self.writer, len)?;
-        Ok(self)
+        encoder(self)
     }
 
     #[inline]
-    fn encode_struct(mut self, fields: usize) -> Result<Self::Struct, Self::Error> {
+    fn encode_struct<T>(mut self, fields: usize, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::Struct<'_>) -> Result<(), Self::Error>,
+    {
         L::encode_usize(&mut self.writer, fields)?;
-        Ok(self)
+        encoder(self)
     }
 
     #[inline]
-    fn encode_tuple_struct(mut self, len: usize) -> Result<Self::TupleStruct, Self::Error> {
+    fn encode_tuple_struct<T>(mut self, len: usize, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::TupleStruct<'_>) -> Result<(), Self::Error>,
+    {
         L::encode_usize(&mut self.writer, len)?;
-        Ok(self)
+        encoder(self)
     }
 
     #[inline]
@@ -225,18 +246,27 @@ where
     }
 
     #[inline]
-    fn encode_struct_variant(self, _: usize) -> Result<Self::StructVariant, Self::Error> {
-        Ok(self)
+    fn encode_struct_variant<T>(self, _: usize, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::StructVariant<'_>) -> Result<(), Self::Error>,
+    {
+        encoder(self)
     }
 
     #[inline]
-    fn encode_tuple_variant(self, _: usize) -> Result<Self::TupleVariant, Self::Error> {
-        Ok(self)
+    fn encode_tuple_variant<T>(self, _: usize, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::TupleVariant<'_>) -> Result<(), Self::Error>,
+    {
+        encoder(self)
     }
 
     #[inline]
-    fn encode_unit_variant(self) -> Result<Self::UnitVariant, Self::Error> {
-        Ok(self)
+    fn encode_unit_variant<T>(self, encoder: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: FnOnce(Self::UnitVariant<'_>) -> Result<(), Self::Error>,
+    {
+        encoder(self)
     }
 }
 
@@ -254,11 +284,6 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut self.writer))
     }
-
-    #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(())
-    }
 }
 
 impl<W, I, L> SequenceEncoder for StorageEncoder<W, I, L>
@@ -275,10 +300,21 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut self.writer))
     }
+}
+
+impl<W, I, L> PairsEncoder for StorageEncoder<W, I, L>
+where
+    W: Writer,
+    I: IntegerEncoding,
+    L: UsizeEncoding,
+{
+    type Ok = ();
+    type Error = W::Error;
+    type Encoder<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(())
+    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+        Ok(StorageEncoder::new(&mut self.writer))
     }
 }
 
@@ -291,7 +327,7 @@ where
     type Ok = ();
     type Error = W::Error;
     type First<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
-    type Second<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
+    type Second = Self;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -299,12 +335,7 @@ where
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
-        Ok(StorageEncoder::new(&mut self.writer))
-    }
-
-    #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(())
+    fn second(self) -> Result<Self::Second, Self::Error> {
+        Ok(self)
     }
 }

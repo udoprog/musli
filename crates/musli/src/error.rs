@@ -8,7 +8,7 @@
 use core::fmt;
 
 /// Trait governing errors raised during encodeing or decoding.
-pub trait Error: Sized {
+pub trait Error: 'static + Send + Sync + Sized {
     /// Construct a custom error.
     fn custom<T>(message: T) -> Self
     where

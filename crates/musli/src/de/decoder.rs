@@ -64,10 +64,8 @@ pub trait PackDecoder<'de> {
         Self: 'this;
 
     /// Return decoder to unpack the next element.
+    #[must_use = "decoders must be consumed"]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error>;
-
-    /// Finish unpacking.
-    fn end(self) -> Result<(), Self::Error>;
 }
 
 /// Trait governing how to decode a sequence.
@@ -84,6 +82,7 @@ pub trait SequenceDecoder<'de> {
     fn size_hint(&self) -> Option<usize>;
 
     /// Decode the next element.
+    #[must_use = "decoders must be consumed"]
     fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error>;
 }
 
@@ -104,6 +103,7 @@ pub trait PairsDecoder<'de> {
     fn size_hint(&self) -> Option<usize>;
 
     /// Decode the next key. This returns `Ok(None)` where there are no more elements to decode.
+    #[must_use = "decoders must be consumed"]
     fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error>;
 }
 
@@ -124,6 +124,7 @@ pub trait PairDecoder<'de> {
     ///
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
+    #[must_use = "decoders must be consumed"]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error>;
 
     /// Decode the second value in the pair..
@@ -140,36 +141,38 @@ pub trait Decoder<'de>: Sized {
     /// Error type raised by the decoder.
     type Error: Error;
     /// Pack decoder implementation.
-    type Pack: PackDecoder<'de, Error = Self::Error>;
+    type Pack<'this>: PackDecoder<'de, Error = Self::Error>;
     /// Sequence decoder implementation.
-    type Sequence: SequenceDecoder<'de, Error = Self::Error>;
+    type Sequence<'this>: SequenceDecoder<'de, Error = Self::Error>;
     /// Tuple decoder implementation.
-    type Tuple: PackDecoder<'de, Error = Self::Error>;
+    type Tuple<'this>: PackDecoder<'de, Error = Self::Error>;
     /// Map decoder implementation.
-    type Map: PairsDecoder<'de, Error = Self::Error>;
+    type Map<'this>: PairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a value that is present.
     type Some: Decoder<'de, Error = Self::Error>;
     /// Decoder for a struct.
     ///
     /// The caller receives a [PairsDecoder] which when advanced with
     /// [PairsDecoder::next] indicates the fields of the structure.
-    type Struct: PairsDecoder<'de, Error = Self::Error>;
+    type Struct<'this>: PairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a tuple struct.
     ///
     /// The caller receives a [PairsDecoder] which when advanced with
     /// [PairsDecoder::next] indicates the elements in the tuple.
-    type TupleStruct: PairsDecoder<'de, Error = Self::Error>;
+    type TupleStruct<'this>: PairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a variant.
     ///
     /// The caller receives a [PairDecoder] which when advanced with
     /// [PairDecoder::first] indicates which variant is being decoded and
     /// [PairDecoder::second] is the content of the variant.
-    type Variant: PairDecoder<'de, Error = Self::Error>;
+    type Variant<'this>: PairDecoder<'de, Error = Self::Error>;
 
     /// Format the human-readable message that should occur if the decoder was
     /// expecting to decode some specific kind of value.
     ///
     /// ```
+    /// #![feature(generic_associated_types)]
+    ///
     /// use std::fmt;
     ///
     /// use musli::de::Decoder;
@@ -179,14 +182,14 @@ pub trait Decoder<'de>: Sized {
     ///
     /// impl Decoder<'_> for MyDecoder {
     ///     type Error = String;
-    ///     type Pack = Never<Self>;
-    ///     type Sequence = Never<Self>;
-    ///     type Tuple = Never<Self>;
-    ///     type Map = Never<Self>;
+    ///     type Pack<'this> = Never<Self>;
+    ///     type Sequence<'this> = Never<Self>;
+    ///     type Tuple<'this> = Never<Self>;
+    ///     type Map<'this> = Never<Self>;
     ///     type Some = Never<Self>;
-    ///     type Struct = Never<Self>;
-    ///     type TupleStruct = Never<Self>;
-    ///     type Variant = Never<Self>;
+    ///     type Struct<'this> = Never<Self>;
+    ///     type TupleStruct<'this> = Never<Self>;
+    ///     type Variant<'this> = Never<Self>;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")
@@ -247,19 +250,23 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut unpack = decoder.decode_pack()?;
-    ///         let field = unpack.next().and_then(Decode::decode)?;
-    ///         let data = unpack.next().and_then(Decode::decode)?;
+    ///         decoder.decode_pack(|mut unpack| {
+    ///             let field = unpack.next().and_then(Decode::decode)?;
+    ///             let data = unpack.next().and_then(Decode::decode)?;
     ///
-    ///         Ok(Self {
-    ///             field,
-    ///             data,
+    ///             Ok(Self {
+    ///                 field,
+    ///                 data,
+    ///             })
     ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
+    fn decode_pack<T, O>(self, _: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Pack<'_>) -> Result<O, Self::Error>,
+    {
         Err(Self::Error::message(InvalidType::new(
             expecting::Pack,
             &ExpectingWrapper(self),
@@ -923,6 +930,7 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
+    #[must_use = "decoders must be consumed"]
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Option,
@@ -946,22 +954,25 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut data = Vec::new();
+    ///         decoder.decode_sequence(|mut seq| {
+    ///             let mut data = Vec::new();
     ///
-    ///         let mut seq = decoder.decode_sequence()?;
+    ///             while let Some(decoder) = seq.next()? {
+    ///                 data.push(String::decode(decoder)?);
+    ///             }
     ///
-    ///         while let Some(decoder) = seq.next()? {
-    ///             data.push(String::decode(decoder)?);
-    ///         }
-    ///
-    ///         Ok(Self {
-    ///             data
+    ///             Ok(Self {
+    ///                 data
+    ///             })
     ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
+    fn decode_sequence<T, O>(self, _: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Sequence<'_>) -> Result<O, Self::Error>,
+    {
         Err(Self::Error::message(InvalidType::new(
             expecting::Sequence,
             &ExpectingWrapper(self),
@@ -987,15 +998,19 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut tuple = decoder.decode_tuple(2)?;
-    ///         let string = tuple.next().and_then(String::decode)?;
-    ///         let integer = tuple.next().and_then(u32::decode)?;
-    ///         Ok(Self(string, integer))
+    ///         decoder.decode_tuple(2, |mut tuple| {
+    ///             let string = tuple.next().and_then(String::decode)?;
+    ///             let integer = tuple.next().and_then(u32::decode)?;
+    ///             Ok(Self(string, integer))
+    ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+    fn decode_tuple<T, O>(self, _: usize, _: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Tuple<'_>) -> Result<O, Self::Error>,
+    {
         Err(Self::Error::message(InvalidType::new(
             expecting::Tuple,
             &ExpectingWrapper(self),
@@ -1020,23 +1035,27 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut map = decoder.decode_map()?;
-    ///         let mut data = HashMap::with_capacity(map.size_hint().unwrap_or_default());
+    ///         decoder.decode_map(|mut map| {
+    ///             let mut data = HashMap::with_capacity(map.size_hint().unwrap_or_default());
     ///
-    ///         while let Some(mut entry) = map.next()? {
-    ///             let key = entry.first().and_then(String::decode)?;
-    ///             let value = entry.second().and_then(u32::decode)?;
-    ///             data.insert(key, value);
-    ///         }
+    ///             while let Some(mut entry) = map.next()? {
+    ///                 let key = entry.first().and_then(String::decode)?;
+    ///                 let value = entry.second().and_then(u32::decode)?;
+    ///                 data.insert(key, value);
+    ///             }
     ///
-    ///         Ok(Self {
-    ///             data
+    ///             Ok(Self {
+    ///                 data
+    ///             })
     ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_map(self) -> Result<Self::Map, Self::Error> {
+    fn decode_map<T, O>(self, _: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Map<'_>) -> Result<O, Self::Error>,
+    {
         Err(Self::Error::message(InvalidType::new(
             expecting::Map,
             &ExpectingWrapper(self),
@@ -1063,36 +1082,40 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut st = decoder.decode_struct(2)?;
-    ///         let mut string = None;
-    ///         let mut integer = None;
+    ///         decoder.decode_struct(2, |mut st| {
+    ///             let mut string = None;
+    ///             let mut integer = None;
     ///
-    ///         while let Some(mut entry) = st.next()? {
-    ///             // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///             let tag = entry.first().and_then(String::decode)?;
+    ///             while let Some(mut entry) = st.next()? {
+    ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
+    ///                 let tag = entry.first().and_then(String::decode)?;
     ///
-    ///             match tag.as_str() {
-    ///                 "string" => {
-    ///                     string = Some(entry.second().and_then(String::decode)?);
-    ///                 }
-    ///                 "integer" => {
-    ///                     integer = Some(entry.second().and_then(u32::decode)?);
-    ///                 }
-    ///                 tag => {
-    ///                     return Err(D::Error::invalid_field_tag("Struct", tag))
+    ///                 match tag.as_str() {
+    ///                     "string" => {
+    ///                         string = Some(entry.second().and_then(String::decode)?);
+    ///                     }
+    ///                     "integer" => {
+    ///                         integer = Some(entry.second().and_then(u32::decode)?);
+    ///                     }
+    ///                     tag => {
+    ///                         return Err(D::Error::invalid_field_tag("Struct", tag))
+    ///                     }
     ///                 }
     ///             }
-    ///         }
     ///
-    ///         Ok(Self {
-    ///             string: string.ok_or_else(|| D::Error::expected_tag("Struct", "string"))?,
-    ///             integer: integer.ok_or_else(|| D::Error::expected_tag("Struct", "integer"))?,
+    ///             Ok(Self {
+    ///                 string: string.ok_or_else(|| D::Error::expected_tag("Struct", "string"))?,
+    ///                 integer: integer.ok_or_else(|| D::Error::expected_tag("Struct", "integer"))?,
+    ///             })
     ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
+    fn decode_struct<T, O>(self, _: usize, _: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Struct<'_>) -> Result<O, Self::Error>,
+    {
         Err(Self::Error::message(InvalidType::new(
             expecting::Struct,
             &ExpectingWrapper(self),
@@ -1116,35 +1139,39 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut st = decoder.decode_tuple_struct(2)?;
-    ///         let mut string = None;
-    ///         let mut integer = None;
+    ///         decoder.decode_tuple_struct(2, |mut st| {
+    ///             let mut string = None;
+    ///             let mut integer = None;
     ///
-    ///         while let Some(mut entry) = st.next()? {
-    ///             let tag = entry.first().and_then(usize::decode)?;
+    ///             while let Some(mut entry) = st.next()? {
+    ///                 let tag = entry.first().and_then(usize::decode)?;
     ///
-    ///             match tag {
-    ///                 0 => {
-    ///                     string = Some(entry.second().and_then(String::decode)?);
-    ///                 }
-    ///                 1 => {
-    ///                     integer = Some(entry.second().and_then(u32::decode)?);
-    ///                 }
-    ///                 tag => {
-    ///                     return Err(D::Error::invalid_field_tag("Struct", tag))
+    ///                 match tag {
+    ///                     0 => {
+    ///                         string = Some(entry.second().and_then(String::decode)?);
+    ///                     }
+    ///                     1 => {
+    ///                         integer = Some(entry.second().and_then(u32::decode)?);
+    ///                     }
+    ///                     tag => {
+    ///                         return Err(D::Error::invalid_field_tag("Struct", tag))
+    ///                     }
     ///                 }
     ///             }
-    ///         }
     ///
-    ///         let string = string.ok_or_else(|| D::Error::expected_tag("Struct", "string"))?;
-    ///         let integer = integer.ok_or_else(|| D::Error::expected_tag("Struct", "integer"))?;
+    ///             let string = string.ok_or_else(|| D::Error::expected_tag("Struct", "string"))?;
+    ///             let integer = integer.ok_or_else(|| D::Error::expected_tag("Struct", "integer"))?;
     ///
-    ///         Ok(Self(string, integer))
+    ///             Ok(Self(string, integer))
+    ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
+    fn decode_tuple_struct<T, O>(self, _: usize, _: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::TupleStruct<'_>) -> Result<O, Self::Error>,
+    {
         Err(Self::Error::message(InvalidType::new(
             expecting::TupleStruct,
             &ExpectingWrapper(self),
@@ -1196,25 +1223,29 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut variant = decoder.decode_variant()?;
-    ///         let tag = variant.first().and_then(usize::decode)?;
+    ///         decoder.decode_variant(|mut variant| {
+    ///             let tag = variant.first().and_then(usize::decode)?;
     ///
-    ///         match tag {
-    ///             0 => {
-    ///                 Ok(Self::Variant1(variant.second().and_then(u32::decode)?))
+    ///             match tag {
+    ///                 0 => {
+    ///                     Ok(Self::Variant1(variant.second().and_then(u32::decode)?))
+    ///                 }
+    ///                 1 => {
+    ///                     Ok(Self::Variant2(variant.second().and_then(String::decode)?))
+    ///                 }
+    ///                 tag => {
+    ///                     Err(D::Error::invalid_variant_tag("Enum", tag))
+    ///                 }
     ///             }
-    ///             1 => {
-    ///                 Ok(Self::Variant2(variant.second().and_then(String::decode)?))
-    ///             }
-    ///             tag => {
-    ///                 Err(D::Error::invalid_variant_tag("Enum", tag))
-    ///             }
-    ///         }
+    ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
+    fn decode_variant<T, O>(self, _: T) -> Result<O, Self::Error>
+    where
+        T: FnOnce(Self::Variant<'_>) -> Result<O, Self::Error>,
+    {
         Err(Self::Error::message(InvalidType::new(
             expecting::Variant,
             &ExpectingWrapper(self),

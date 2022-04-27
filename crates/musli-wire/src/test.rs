@@ -31,11 +31,11 @@ where
     where
         D: Decoder<'de>,
     {
-        let mut pack = decoder.decode_pack()?;
-        let tag = pack.next().and_then(Tag::decode)?;
-        let value = pack.next().and_then(T::decode)?;
-
-        Ok(Self { tag, value })
+        decoder.decode_pack(|mut unpack| {
+            let tag = unpack.next().and_then(Tag::decode)?;
+            let value = unpack.next().and_then(T::decode)?;
+            Ok(Self { tag, value })
+        })
     }
 }
 

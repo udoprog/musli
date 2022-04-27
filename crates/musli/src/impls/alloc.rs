@@ -6,7 +6,7 @@ use std::hash::{BuildHasher, Hash};
 use std::marker;
 
 use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
-use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
+use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use crate::error::Error;
 use crate::internal::size_hint;
 
@@ -149,13 +149,13 @@ macro_rules! sequence {
             where
                 E: Encoder,
             {
-                let mut seq = encoder.encode_sequence(self.len())?;
+                encoder.encode_sequence(self.len(), |mut seq| {
+                    for value in self {
+                        value.encode(seq.next()?)?;
+                    }
 
-                for value in self {
-                    value.encode(seq.next()?)?;
-                }
-
-                seq.end()
+                    Ok(())
+                })
             }
         }
 
@@ -169,14 +169,15 @@ macro_rules! sequence {
             where
                 D: Decoder<'de>,
             {
-                let mut $access = decoder.decode_sequence()?;
-                let mut out = $factory;
+                decoder.decode_sequence(|mut $access| {
+                    let mut out = $factory;
 
-                while let Some(value) = $access.next()? {
-                    out.$insert(T::decode(value)?);
-                }
+                    while let Some(value) = $access.next()? {
+                        out.$insert(T::decode(value)?);
+                    }
 
-                Ok(out)
+                    Ok(out)
+                })
             }
         }
     }
@@ -224,16 +225,15 @@ macro_rules! map {
             where
                 E: Encoder,
             {
-                let mut map = encoder.encode_map(self.len())?;
+                encoder.encode_map(self.len(), |mut map| {
+                    for (k, v) in self {
+                        let mut entry = map.next()?;
+                        Encode::encode(k, entry.first()?)?;
+                        Encode::encode(v, entry.second()?)?;
+                    }
 
-                for (k, v) in self {
-                    let entry = map.first()?;
-                    Encode::encode(k, entry)?;
-                    let value = map.second()?;
-                    Encode::encode(v, value)?;
-                }
-
-                map.end()
+                    Ok(())
+                })
             }
         }
 
@@ -248,16 +248,17 @@ macro_rules! map {
             where
                 D: Decoder<'de>,
             {
-                let mut $access = decoder.decode_map()?;
-                let mut out = $with_capacity;
+                decoder.decode_map(|mut $access| {
+                    let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.next()? {
-                    let key = K::decode(entry.first()?)?;
-                    let value = V::decode(entry.second()?)?;
-                    out.insert(key, value);
-                }
+                    while let Some(mut entry) = $access.next()? {
+                        let key = entry.first().and_then(K::decode)?;
+                        let value = entry.second().and_then(V::decode)?;
+                        out.insert(key, value);
+                    }
 
-                Ok(out)
+                    Ok(out)
+                })
             }
         }
     }
