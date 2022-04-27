@@ -77,6 +77,18 @@ pub trait PairsEncoder {
     where
         Self: 'this;
 
+    /// Insert a pair immediately.
+    #[inline]
+    fn insert<F, S>(&mut self, first: F, second: S) -> Result<(), Self::Error>
+    where
+        Self: Sized,
+        F: Encode,
+        S: Encode,
+    {
+        self.next()?.insert(first, second)?;
+        Ok(())
+    }
+
     /// Encode the next pair.
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error>;
 
@@ -967,8 +979,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         encoder.encode_struct(2, |mut st | {
-    ///             st.next()?.insert("name", &self.name)?;
-    ///             st.next()?.insert("age", self.age)?;
+    ///             st.insert("name", &self.name)?;
+    ///             st.insert("age", self.age)?;
     ///             st.end()
     ///         })
     ///     }
@@ -1000,12 +1012,7 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         encoder.encode_tuple_struct(1, |mut tuple| {
-    ///             {
-    ///                 let mut field = tuple.next()?;
-    ///                 field.first()?.encode_usize(0)?;
-    ///                 self.0.encode(field.second()?)?;
-    ///             }
-    ///
+    ///             tuple.insert(0usize, &self.0)?;
     ///             tuple.end()
     ///         })
     ///     }
@@ -1089,8 +1096,8 @@ pub trait Encoder: Sized {
     ///                     variant.first()?.encode_string("variant3")?;
     ///
     ///                     variant.second()?.encode_struct(2, |mut st| {
-    ///                         st.next()?.insert("data", data)?;
-    ///                         st.next()?.insert("age", age)?;
+    ///                         st.insert("data", data)?;
+    ///                         st.insert("age", age)?;
     ///                         st.end()
     ///                     })?;
     ///
