@@ -248,6 +248,12 @@ where
             }
 
             #[inline]
+            fn visit_owned(self, bytes: Vec<u8>) -> Result<Self::Ok, Self::Error> {
+                let string = String::from_utf8(bytes).map_err(Self::Error::custom)?;
+                self.0.visit_owned(string)
+            }
+
+            #[inline]
             fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
                 let string = core::str::from_utf8(bytes).map_err(Self::Error::custom)?;
                 self.0.visit_borrowed(string)
