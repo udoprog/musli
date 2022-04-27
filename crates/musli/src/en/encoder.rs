@@ -22,12 +22,13 @@ pub trait PackEncoder {
 
     /// Push a value into the pack.
     #[inline]
-    fn push<T>(&mut self, value: T) -> Result<Self::Ok, Self::Error>
+    fn push<T>(&mut self, value: T) -> Result<(), Self::Error>
     where
         T: Encode,
     {
         let encoder = self.next()?;
-        Encode::encode(&value, encoder)
+        Encode::encode(&value, encoder)?;
+        Ok(())
     }
 
     /// End the current pack.
@@ -49,6 +50,17 @@ pub trait SequenceEncoder {
     /// Prepare encoding of the next element.
     #[must_use = "encoders must be consumed"]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error>;
+
+    /// Push an element into the sequence.
+    #[inline]
+    fn push<T>(&mut self, value: T) -> Result<(), Self::Error>
+    where
+        T: Encode,
+    {
+        let encoder = self.next()?;
+        value.encode(encoder)?;
+        Ok(())
+    }
 
     /// End the sequence.
     fn end(self) -> Result<Self::Ok, Self::Error>;
@@ -89,11 +101,24 @@ pub trait PairEncoder {
     where
         Self: 'this;
 
-    /// Encode the first element in a pair.
+    /// Insert the pair immediately.
+    #[inline]
+    fn insert<F, S>(mut self, first: F, second: S) -> Result<Self::Ok, Self::Error>
+    where
+        Self: Sized,
+        F: Encode,
+        S: Encode,
+    {
+        self.first().and_then(|e| first.encode(e))?;
+        self.second().and_then(|e| second.encode(e))?;
+        self.end()
+    }
+
+    /// Return the encoder for the first element in the pair.
     #[must_use = "encoders must be consumed"]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error>;
 
-    /// Encode the second element in the pair.
+    /// Return encoder for the second element in the pair.
     #[must_use = "encoders must be consumed"]
     fn second(&mut self) -> Result<Self::Second<'_>, Self::Error>;
 
@@ -860,7 +885,7 @@ pub trait Encoder: Sized {
     ///     {
     ///         encoder.encode_sequence(self.data.len(), |mut seq| {
     ///             for element in &self.data {
-    ///                 seq.next()?.encode_string(element)?;
+    ///                 seq.push(element)?;
     ///             }
     ///
     ///             seq.end()
@@ -942,18 +967,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         encoder.encode_struct(2, |mut st | {
-    ///             {
-    ///                 let mut field = st.next()?;
-    ///                 field.first()?.encode_string("name")?;
-    ///                 self.name.encode(field.second()?)?;
-    ///             }
-    ///
-    ///             {
-    ///                 let mut field = st.next()?;
-    ///                 field.first()?.encode_string("age")?;
-    ///                 self.age.encode(field.second()?)?;
-    ///             }
-    ///
+    ///             st.next()?.insert("name", &self.name)?;
+    ///             st.next()?.insert("age", self.age)?;
     ///             st.end()
     ///         })
     ///     }
@@ -1074,18 +1089,8 @@ pub trait Encoder: Sized {
     ///                     variant.first()?.encode_string("variant3")?;
     ///
     ///                     variant.second()?.encode_struct(2, |mut st| {
-    ///                         {
-    ///                             let mut field = st.next()?;
-    ///                             field.first()?.encode_string("data")?;
-    ///                             field.second()?.encode_string(data)?;
-    ///                         }
-    ///
-    ///                         {
-    ///                             let mut field = st.next()?;
-    ///                             field.first()?.encode_string("age")?;
-    ///                             field.second()?.encode_u32(*age)?;
-    ///                         }
-    ///
+    ///                         st.next()?.insert("data", data)?;
+    ///                         st.next()?.insert("age", age)?;
     ///                         st.end()
     ///                     })?;
     ///

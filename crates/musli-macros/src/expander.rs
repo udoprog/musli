@@ -876,6 +876,7 @@ impl<'a> Expander<'a> {
                         #encode_t::encode(&#tag, field_encoder)?;
                         let value_encoder = #pair_encoder_t::second(&mut pair_encoder)?;
                         #encode_path(#access, value_encoder)?;
+                        #pair_encoder_t::end(pair_encoder)?;
                     }
                 }
             }
