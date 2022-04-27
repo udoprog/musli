@@ -29,6 +29,9 @@ pub trait PackEncoder {
         let encoder = self.next()?;
         Encode::encode(&value, encoder)
     }
+
+    /// End the current pack.
+    fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
 /// Trait governing how to encode a sequence.
@@ -46,6 +49,9 @@ pub trait SequenceEncoder {
     /// Prepare encoding of the next element.
     #[must_use = "encoders must be consumed"]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error>;
+
+    /// End the sequence.
+    fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
 /// Encoder for a sequence of pairs.
@@ -60,8 +66,10 @@ pub trait PairsEncoder {
         Self: 'this;
 
     /// Encode the next pair.
-    #[must_use = "encoders must be consumed"]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error>;
+
+    /// Finish encoding pairs.
+    fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
 /// Trait governing how to encode a sequence of pairs.
@@ -82,14 +90,15 @@ pub trait PairEncoder {
         Self: 'this;
 
     /// Encode the first element in a pair.
-    fn first<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
-    where
-        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>;
+    #[must_use = "encoders must be consumed"]
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error>;
 
     /// Encode the second element in the pair.
-    fn second<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
-    where
-        F: FnOnce(Self::Second<'a>) -> Result<O, Self::Error>;
+    #[must_use = "encoders must be consumed"]
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error>;
+
+    /// End the pair encoder.
+    fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
 /// Trait governing how the encoder works.
@@ -176,7 +185,7 @@ pub trait Encoder: Sized {
     ///         encoder.encode_pack(|mut pack| {
     ///             pack.next()?.encode_u32(self.field)?;
     ///             pack.next()?.encode_array(self.data)?;
-    ///             Ok(())
+    ///             pack.end()
     ///         })
     ///     }
     /// }
@@ -184,7 +193,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_pack<T>(self, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: for<'a> FnOnce(Self::Pack<'a>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::Pack<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::Pack,
@@ -778,10 +787,7 @@ pub trait Encoder: Sized {
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some(|encoder| {
-    ///                     encoder.encode_string(data)?;
-    ///                     Ok(())
-    ///                 })
+    ///                 encoder.encode_some(|encoder| data.encode(encoder))
     ///             }
     ///             None => {
     ///                 encoder.encode_none()
@@ -793,7 +799,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_some<T>(self, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::Some<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::Some<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::Option,
@@ -819,10 +825,7 @@ pub trait Encoder: Sized {
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some(|encoder| {
-    ///                     encoder.encode_string(data)?;
-    ///                     Ok(())
-    ///                 })
+    ///                 encoder.encode_some(|encoder| data.encode(encoder))
     ///             }
     ///             None => {
     ///                 encoder.encode_none()
@@ -860,7 +863,7 @@ pub trait Encoder: Sized {
     ///                 seq.next()?.encode_string(element)?;
     ///             }
     ///
-    ///             Ok(())
+    ///             seq.end()
     ///         })
     ///     }
     /// }
@@ -868,7 +871,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_sequence<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::Sequence<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::Sequence<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::Sequence,
@@ -890,10 +893,10 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_tuple(2, |mut pack| {
-    ///             pack.next()?.encode_u32(self.0)?;
-    ///             pack.next()?.encode_array(self.1)?;
-    ///             Ok(())
+    ///         encoder.encode_tuple(2, |mut tuple| {
+    ///             tuple.next()?.encode_u32(self.0)?;
+    ///             tuple.next()?.encode_array(self.1)?;
+    ///             tuple.end()
     ///         })
     ///     }
     /// }
@@ -901,7 +904,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_tuple<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::Tuple<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::Tuple<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::Tuple,
@@ -913,7 +916,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_map<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::Map<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::Map<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::Map,
@@ -941,17 +944,17 @@ pub trait Encoder: Sized {
     ///         encoder.encode_struct(2, |mut st | {
     ///             {
     ///                 let mut field = st.next()?;
-    ///                 field.first(|e| e.encode_string("name"))?;
-    ///                 field.second(|e| self.name.encode(e))?;
+    ///                 field.first()?.encode_string("name")?;
+    ///                 self.name.encode(field.second()?)?;
     ///             }
     ///
     ///             {
     ///                 let mut field = st.next()?;
-    ///                 field.first(|e| e.encode_string("age"))?;
-    ///                 field.second(|e| self.age.encode(e))?;
+    ///                 field.first()?.encode_string("age")?;
+    ///                 self.age.encode(field.second()?)?;
     ///             }
     ///
-    ///             Ok(())
+    ///             st.end()
     ///         })
     ///     }
     /// }
@@ -959,7 +962,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_struct<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::Struct<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::Struct<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::Struct,
@@ -982,10 +985,13 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         encoder.encode_tuple_struct(1, |mut tuple| {
-    ///             let mut field = tuple.next()?;
-    ///             field.first(|e| e.encode_usize(0))?;
-    ///             field.second(|e| self.0.encode(e))?;
-    ///             Ok(())
+    ///             {
+    ///                 let mut field = tuple.next()?;
+    ///                 field.first()?.encode_usize(0)?;
+    ///                 self.0.encode(field.second()?)?;
+    ///             }
+    ///
+    ///             tuple.end()
     ///         })
     ///     }
     /// }
@@ -993,7 +999,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_tuple_struct<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::TupleStruct<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::TupleStruct<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::TupleStruct,
@@ -1051,39 +1057,39 @@ pub trait Encoder: Sized {
     ///         match self {
     ///             Enum::UnitVariant => {
     ///                 encoder.encode_unit_variant(|mut variant| {
-    ///                     variant.first(|e| e.encode_string("variant1"))?;
-    ///                     variant.second(|e| e.encode_unit())?;
-    ///                     Ok(())
+    ///                     variant.first()?.encode_string("variant1")?;
+    ///                     variant.second()?.encode_unit()?;
+    ///                     variant.end()
     ///                 })
     ///             }
     ///             Enum::TupleVariant(data) => {
     ///                 encoder.encode_tuple_variant(1, |mut variant| {
-    ///                     variant.first(|e| e.encode_string("variant2"))?;
-    ///                     variant.second(|e| e.encode_string(data))?;
-    ///                     Ok(())
+    ///                     variant.first()?.encode_string("variant2")?;
+    ///                     variant.second()?.encode_string(data)?;
+    ///                     variant.end()
     ///                 })
     ///             }
     ///             Enum::StructVariant { data, age } => {
     ///                 encoder.encode_struct_variant(2, |mut variant| {
-    ///                     variant.first(|e| e.encode_string("variant3"))?;
+    ///                     variant.first()?.encode_string("variant3")?;
     ///
-    ///                     variant.second(|e| e.encode_struct(2, |mut st| {
+    ///                     variant.second()?.encode_struct(2, |mut st| {
     ///                         {
     ///                             let mut field = st.next()?;
-    ///                             field.first(|e| e.encode_string("data"))?;
-    ///                             field.second(|e| e.encode_string(data))?;
+    ///                             field.first()?.encode_string("data")?;
+    ///                             field.second()?.encode_string(data)?;
     ///                         }
     ///
     ///                         {
     ///                             let mut field = st.next()?;
-    ///                             field.first(|e| e.encode_string("age"))?;
-    ///                             field.second(|e| e.encode_u32(*age))?;
+    ///                             field.first()?.encode_string("age")?;
+    ///                             field.second()?.encode_u32(*age)?;
     ///                         }
     ///
-    ///                         Ok(())
-    ///                     }))?;
+    ///                         st.end()
+    ///                     })?;
     ///
-    ///                     Ok(())
+    ///                     variant.end()
     ///                 })
     ///             }
     ///         }
@@ -1093,7 +1099,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_struct_variant<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::StructVariant<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::StructVariant<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::StructVariant,
@@ -1105,7 +1111,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_tuple_variant<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::TupleVariant<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::TupleVariant<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::TupleVariant,
@@ -1117,7 +1123,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_unit_variant<T>(self, _: T) -> Result<Self::Ok, Self::Error>
     where
-        T: FnOnce(Self::UnitVariant<'_>) -> Result<(), Self::Error>,
+        T: FnOnce(Self::UnitVariant<'_>) -> Result<Self::Ok, Self::Error>,
     {
         Err(Self::Error::message(InvalidType::new(
             expecting::UnitVariant,

@@ -529,7 +529,7 @@ where
 {
     type Error = R::Error;
     type First<'this> = WireDecoder<&'this mut R, I, L> where Self: 'this;
-    type Second = Self;
+    type Second<'this> = WireDecoder<&'this mut R, I, L> where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -537,12 +537,12 @@ where
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
-        Ok(self)
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+        Ok(WireDecoder::new(&mut self.reader))
     }
 
     #[inline]
-    fn skip_second(mut self) -> Result<bool, Self::Error> {
+    fn skip_second(&mut self) -> Result<bool, Self::Error> {
         self.skip_any()?;
         Ok(true)
     }

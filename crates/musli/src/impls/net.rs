@@ -52,14 +52,14 @@ impl Encode for IpAddr {
     {
         match self {
             IpAddr::V4(v4) => encoder.encode_struct_variant(1, |mut variant| {
-                variant.first(|e| usize::encode(&0, e))?;
-                variant.second(|e| v4.encode(e))?;
-                Ok(())
+                usize::encode(&0, variant.first()?)?;
+                v4.encode(variant.second()?)?;
+                variant.end()
             }),
             IpAddr::V6(v6) => encoder.encode_struct_variant(1, |mut variant| {
-                variant.first(|e| usize::encode(&1, e))?;
-                variant.second(|e| v6.encode(e))?;
-                Ok(())
+                usize::encode(&1, variant.first()?)?;
+                v6.encode(variant.second()?)?;
+                variant.end()
             }),
         }
     }
@@ -92,7 +92,7 @@ impl Encode for SocketAddrV4 {
         encoder.encode_pack(|mut pack| {
             pack.push(self.ip())?;
             pack.push(self.port())?;
-            Ok(())
+            pack.end()
         })
     }
 }
@@ -122,7 +122,7 @@ impl Encode for SocketAddrV6 {
             pack.push(self.port())?;
             pack.push(self.flowinfo())?;
             pack.push(self.scope_id())?;
-            Ok(())
+            pack.end()
         })
     }
 }
@@ -151,14 +151,14 @@ impl Encode for SocketAddr {
     {
         match self {
             SocketAddr::V4(v4) => encoder.encode_struct_variant(1, |mut variant| {
-                variant.first(|e| usize::encode(&0, e))?;
-                variant.second(|e| v4.encode(e))?;
-                Ok(())
+                usize::encode(&0, variant.first()?)?;
+                v4.encode(variant.second()?)?;
+                variant.end()
             }),
             SocketAddr::V6(v6) => encoder.encode_struct_variant(1, |mut variant| {
-                variant.first(|e| usize::encode(&1, e))?;
-                variant.second(|e| v6.encode(e))?;
-                Ok(())
+                usize::encode(&1, variant.first()?)?;
+                v6.encode(variant.second()?)?;
+                variant.end()
             }),
         }
     }

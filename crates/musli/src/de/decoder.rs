@@ -118,7 +118,9 @@ pub trait PairDecoder<'de> {
         Self: 'this;
 
     /// The decoder to use for a tuple field value.
-    type Second: Decoder<'de, Error = Self::Error>;
+    type Second<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
 
     /// Return the decoder for the first value in the pair.
     ///
@@ -128,12 +130,13 @@ pub trait PairDecoder<'de> {
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error>;
 
     /// Decode the second value in the pair..
-    fn second(self) -> Result<Self::Second, Self::Error>;
+    #[must_use = "decoders must be consumed"]
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error>;
 
     /// Indicate that the second value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_second(self) -> Result<bool, Self::Error>;
+    fn skip_second(&mut self) -> Result<bool, Self::Error>;
 }
 
 /// Trait governing the implementation of a decoder.

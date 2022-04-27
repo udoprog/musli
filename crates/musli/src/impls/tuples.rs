@@ -50,7 +50,7 @@ macro_rules! declare {
                     let ($ident0, $($ident),*) = self;
                     <$ty0>::encode($ident0, pack.next()?)?;
                     $(<$ty>::encode($ident, pack.next()?)?;)*
-                    Ok(())
+                    pack.end()
                 })
             }
         }
@@ -79,7 +79,7 @@ macro_rules! declare {
                     let Packed(($ident0, $($ident),*)) = self;
                     <$ty0>::encode($ident0, pack.next()?)?;
                     $(<$ty>::encode($ident, pack.next()?)?;)*
-                    Ok(())
+                    pack.end()
                 })
             }
         }

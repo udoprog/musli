@@ -44,7 +44,7 @@ where
                 T::encode(value, encoder)?;
             }
 
-            Ok(())
+            seq.end()
         })
     }
 }
@@ -55,7 +55,7 @@ impl Encode for Sequence<()> {
     where
         E: Encoder,
     {
-        encoder.encode_sequence(0, |_| Ok(()))
+        encoder.encode_sequence(0, |seq| seq.end())
     }
 }
 

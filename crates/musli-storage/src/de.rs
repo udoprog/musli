@@ -387,7 +387,7 @@ where
 {
     type Error = R::Error;
     type First<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
-    type Second = StorageDecoder<R, I, L>;
+    type Second<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -395,12 +395,12 @@ where
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
-        Ok(StorageDecoder::new(self.reader))
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+        Ok(StorageDecoder::new(&mut self.reader))
     }
 
     #[inline]
-    fn skip_second(self) -> Result<bool, Self::Error> {
+    fn skip_second(&mut self) -> Result<bool, Self::Error> {
         Ok(false)
     }
 }

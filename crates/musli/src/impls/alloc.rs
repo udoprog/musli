@@ -154,7 +154,7 @@ macro_rules! sequence {
                         value.encode(seq.next()?)?;
                     }
 
-                    Ok(())
+                    seq.end()
                 })
             }
         }
@@ -228,11 +228,12 @@ macro_rules! map {
                 encoder.encode_map(self.len(), |mut map| {
                     for (k, v) in self {
                         let mut entry = map.next()?;
-                        entry.first(|e| Encode::encode(k, e))?;
-                        entry.second(|e| Encode::encode(v, e))?;
+                        k.encode(entry.first()?)?;
+                        v.encode(entry.second()?)?;
+                        entry.end()?;
                     }
 
-                    Ok(())
+                    map.end()
                 })
             }
         }

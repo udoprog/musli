@@ -78,7 +78,7 @@ where
     where
         Self: 'this;
 
-    type Second = Self;
+    type Second<'this> = Self where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -86,12 +86,12 @@ where
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn skip_second(self) -> Result<bool, Self::Error> {
+    fn skip_second(&mut self) -> Result<bool, Self::Error> {
         match self._never {}
     }
 }
@@ -192,6 +192,11 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         match self._never {}
     }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        match self._never {}
+    }
 }
 
 impl<T> SequenceEncoder for Never<T>
@@ -209,6 +214,11 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         match self._never {}
     }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        match self._never {}
+    }
 }
 
 impl<T> PairsEncoder for Never<T>
@@ -223,6 +233,10 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         match self._never {}
     }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        match self._never {}
+    }
 }
 
 impl<T> PairEncoder for Never<T>
@@ -231,22 +245,23 @@ where
 {
     type Ok = T::Ok;
     type Error = T::Error;
-    type First<'this> = Self where Self: 'this;
+    type First<'this> = Self
+    where
+        Self: 'this;
     type Second<'this> = Self where Self: 'this;
 
     #[inline]
-    fn first<'a, F, O>(&'a mut self, _: F) -> Result<O, Self::Error>
-    where
-        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>,
-    {
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn second<'a, F, O>(&'a mut self, _: F) -> Result<O, Self::Error>
-    where
-        F: FnOnce(Self::Second<'a>) -> Result<O, Self::Error>,
-    {
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }

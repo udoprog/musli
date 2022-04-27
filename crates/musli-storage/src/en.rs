@@ -284,6 +284,11 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut self.writer))
     }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
 }
 
 impl<W, I, L> SequenceEncoder for StorageEncoder<W, I, L>
@@ -299,6 +304,11 @@ where
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut self.writer))
+    }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
     }
 }
 
@@ -316,6 +326,11 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         Ok(StorageEncoder::new(&mut self.writer))
     }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
 }
 
 impl<W, I, L> PairEncoder for StorageEncoder<W, I, L>
@@ -330,18 +345,17 @@ where
     type Second<'this> = StorageEncoder<&'this mut W, I, L> where Self: 'this;
 
     #[inline]
-    fn first<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
-    where
-        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>,
-    {
-        encoder(StorageEncoder::new(&mut self.writer))
+    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+        Ok(StorageEncoder::new(&mut self.writer))
     }
 
     #[inline]
-    fn second<'a, F, O>(&'a mut self, encoder: F) -> Result<O, Self::Error>
-    where
-        F: FnOnce(Self::First<'a>) -> Result<O, Self::Error>,
-    {
-        encoder(StorageEncoder::new(&mut self.writer))
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+        Ok(StorageEncoder::new(&mut self.writer))
+    }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
     }
 }

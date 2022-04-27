@@ -333,12 +333,13 @@ impl<'a> Expander<'a> {
                 needs.mark_used();
 
                 let encoder_t = &self.tokens.encoder_t;
+                let pack_encoder_t = &self.tokens.pack_encoder_t;
 
                 quote! {
                     #encoder_t::encode_pack(#encoder_var, |mut pack| {
                         #(#field_tests)*
                         #(#encoders)*
-                        Ok(())
+                        #pack_encoder_t::end(pack)
                     })
                 }
             }
@@ -588,7 +589,7 @@ impl<'a> Expander<'a> {
 
             variants.push(quote! {
                 #tag => {
-                    let #decoder_var = #pair_decoder_t::second(variant)?;
+                    let #decoder_var = #pair_decoder_t::second(&mut variant)?;
                     #output
                 }
             });
@@ -605,7 +606,7 @@ impl<'a> Expander<'a> {
         let fallback = match fallback {
             Some(ident) => {
                 quote! {
-                    if !#pair_decoder_t::skip_second(variant)? {
+                    if !#pair_decoder_t::skip_second(&mut variant)? {
                         return Err(<D::Error as #error_t>::invalid_variant_tag(#type_name, tag));
                     }
 
@@ -643,11 +644,12 @@ impl<'a> Expander<'a> {
     ) -> TokenStream {
         let encoder_var = &self.tokens.encoder_var;
         let encoder_t = &self.tokens.encoder_t;
+        let pairs_encoder_t = &self.tokens.pairs_encoder_t;
 
         let body = quote! {
             |mut #encoder_var| {
                 #encode
-                Ok(())
+                #pairs_encoder_t::end(#encoder_var)
             }
         };
 
@@ -727,9 +729,11 @@ impl<'a> Expander<'a> {
 
             let body = quote! {
                 |mut variant_encoder| {
-                    #pair_encoder_t::first(&mut variant_encoder, |tag_encoder| #encode_t::encode(&#tag, tag_encoder))?;
-                    #pair_encoder_t::second(&mut variant_encoder, |#encoder_var| #encode)?;
-                    Ok(())
+                    let tag_encoder = #pair_encoder_t::first(&mut variant_encoder)?;
+                    #encode_t::encode(&#tag, tag_encoder)?;
+                    let #encoder_var = #pair_encoder_t::second(&mut variant_encoder)?;
+                    #encode?;
+                    #pair_encoder_t::end(variant_encoder)
                 }
             };
 
@@ -771,10 +775,10 @@ impl<'a> Expander<'a> {
         tagged: Packing,
         default_field_tag: DefaultTag,
     ) -> Option<(TokenStream, Vec<TokenStream>, Vec<syn::Ident>)> {
-        let mut decls = Vec::with_capacity(fields.len());
+        let mut field_tests = Vec::with_capacity(fields.len());
         let mut encoders = Vec::with_capacity(fields.len());
         let mut patterns = Vec::with_capacity(fields.len());
-        let mut field_tests = Vec::with_capacity(fields.len());
+        let mut test_variables = Vec::with_capacity(fields.len());
 
         for (index, field) in fields.iter().enumerate() {
             needs.mark_used();
@@ -805,15 +809,15 @@ impl<'a> Expander<'a> {
             encoders.push(encoder);
 
             if let Some((decl, test)) = skip {
-                decls.push(decl);
-                field_tests.push(test);
+                field_tests.push(decl);
+                test_variables.push(test);
             }
         }
 
         let encode = match tagged {
             Packing::Tagged => {
                 quote! {
-                    #(#decls)*
+                    #(#field_tests)*
                     #(#encoders)*
                 }
             }
@@ -822,19 +826,20 @@ impl<'a> Expander<'a> {
 
                 let encoder_t = &self.tokens.encoder_t;
                 let encoder_var = &self.tokens.encoder_var;
+                let pack_encoder_t = &self.tokens.pack_encoder_t;
 
                 quote! {
                     #encoder_t::encode_pack(#encoder_var, |mut pack| {
-                        #(#decls)*
+                        #(#field_tests)*
                         #(#encoders)*
-                        Ok(())
+                        #pack_encoder_t::end(pack)
                     })
                 }
             }
             _ => quote!(),
         };
 
-        Some((encode, patterns, field_tests))
+        Some((encode, patterns, test_variables))
     }
 
     /// Encode a field.
@@ -867,8 +872,10 @@ impl<'a> Expander<'a> {
                 quote_spanned! {
                     span => {
                         let mut pair_encoder = #pairs_encoder_t::next(&mut #encoder_var)?;
-                        #pair_encoder_t::first(&mut pair_encoder, |field_encoder| #encode_t::encode(&#tag, field_encoder))?;
-                        #pair_encoder_t::second(&mut pair_encoder, |value_encoder| #encode_path(#access, value_encoder))?;
+                        let field_encoder = #pair_encoder_t::first(&mut pair_encoder)?;
+                        #encode_t::encode(&#tag, field_encoder)?;
+                        let value_encoder = #pair_encoder_t::second(&mut pair_encoder)?;
+                        #encode_path(#access, value_encoder)?;
                     }
                 }
             }
@@ -1078,7 +1085,7 @@ impl<'a> Expander<'a> {
             .map(|(tag, decode)| {
                 quote! {
                     #tag => {
-                        let #decoder_var = #pair_decoder_t::second(#decoder_var)?;
+                        let #decoder_var = #pair_decoder_t::second(&mut #decoder_var)?;
                         #decode;
                     }
                 }
@@ -1086,7 +1093,7 @@ impl<'a> Expander<'a> {
             .collect::<Vec<_>>();
 
         let skip_field = quote! {
-            #pair_decoder_t::skip_second(#decoder_var)?
+            #pair_decoder_t::skip_second(&mut #decoder_var)?
         };
 
         let unsupported = match variant_tag {
