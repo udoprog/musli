@@ -15,7 +15,7 @@ musli-storage = { path = "../musli-storage", features = ["test"], default_featur
 [dev-dependencies]
 musli = { path = "../musli", default_features = false }
 
-anyhow = "1.0.56"
+anyhow = "1.0.57"
 rand = "0.8.5"
 rmp-serde = "1.1.0"
 serde = { version = "1.0.136", features = ["derive"] }
