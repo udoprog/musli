@@ -11,6 +11,7 @@ std = ["musli/std", "musli-wire/std", "musli-storage/std"]
 [dependencies]
 musli-wire = { path = "../musli-wire", features = ["test"], default_features = false }
 musli-storage = { path = "../musli-storage", features = ["test"], default_features = false }
+musli-json = { path = "../musli-json", features = ["test"], default_features = false }
 
 [dev-dependencies]
 musli = { path = "../musli", default_features = false }
@@ -28,4 +29,8 @@ trybuild = "1.0.60"
 
 [[bench]]
 name = "comparison"
+harness = false
+
+[[bench]]
+name = "json"
 harness = false

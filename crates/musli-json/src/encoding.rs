@@ -124,6 +124,7 @@ impl<Mode> JsonEncoding<Mode> {
     /// // assert_eq!(expected, actual);
     /// # Ok(()) }
     /// ```
+    #[inline]
     pub const fn new() -> Self {
         JsonEncoding {
             _mode: marker::PhantomData,

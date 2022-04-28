@@ -2,7 +2,6 @@ use core::fmt;
 
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use musli::never::Never;
-use musli_common::buffered_writer::BufferedWriter;
 use musli_common::writer::Writer;
 
 /// A JSON encoder for Müsli.
@@ -28,7 +27,7 @@ where
     type Some = Never<Self>;
     type Sequence = JsonArrayEncoder<W>;
     type Tuple = Never<Self>;
-    type Map = Never<Self>;
+    type Map = JsonObjectEncoder<W>;
     type Struct = JsonObjectEncoder<W>;
     type TupleStruct = Never<Self>;
     type StructVariant = Never<Self>;
@@ -52,7 +51,7 @@ where
 
     #[inline]
     fn encode_string(mut self, string: &str) -> Result<Self::Ok, Self::Error> {
-        encode_chars(&mut self.writer, string.chars())
+        encode_string(&mut self.writer, string.as_bytes())
     }
 
     #[inline]
@@ -63,7 +62,10 @@ where
 
     #[inline]
     fn encode_char(mut self, value: char) -> Result<Self::Ok, Self::Error> {
-        encode_chars(&mut self.writer, [value])
+        encode_string(
+            &mut self.writer,
+            value.encode_utf8(&mut [0, 0, 0, 0]).as_bytes(),
+        )
     }
 
     #[inline]
@@ -151,6 +153,11 @@ where
     }
 
     #[inline]
+    fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
+        JsonObjectEncoder::new(self.writer)
+    }
+
+    #[inline]
     fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         JsonObjectEncoder::new(self.writer)
     }
@@ -166,6 +173,7 @@ impl<W> JsonObjectEncoder<W>
 where
     W: Writer,
 {
+    #[inline]
     fn new(mut writer: W) -> Result<Self, W::Error> {
         writer.write_byte(b'{')?;
 
@@ -287,8 +295,17 @@ where
     }
 
     #[inline]
+    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, Self::Error> {
+        self.writer.write_byte(b'"')?;
+        let mut buffer = itoa::Buffer::new();
+        self.writer.write_bytes(buffer.format(value).as_bytes())?;
+        self.writer.write_byte(b'"')?;
+        Ok(())
+    }
+
+    #[inline]
     fn encode_string(self, string: &str) -> Result<Self::Ok, Self::Error> {
-        encode_chars(self.writer, string.chars())
+        encode_string(self.writer, string.as_bytes())
     }
 }
 
@@ -302,6 +319,7 @@ impl<W> JsonArrayEncoder<W>
 where
     W: Writer,
 {
+    #[inline]
     fn new(mut writer: W) -> Result<Self, W::Error> {
         writer.write_byte(b'[')?;
         Ok(Self {
@@ -322,6 +340,7 @@ where
     where
         Self: 'this;
 
+    #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         if !self.first {
             self.writer.write_byte(b',')?;
@@ -330,6 +349,7 @@ where
         Ok(JsonEncoder::new(&mut self.writer))
     }
 
+    #[inline]
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
         self.writer.write_byte(b']')?;
         Ok(())
@@ -338,51 +358,101 @@ where
 
 /// Encode a sequence of chars as a string.
 #[inline]
-fn encode_chars<W, I>(writer: W, it: I) -> Result<(), W::Error>
+fn encode_string<W>(mut writer: W, bytes: &[u8]) -> Result<(), W::Error>
 where
     W: Writer,
-    I: IntoIterator<Item = char>,
 {
-    let mut writer = BufferedWriter::<64, _>::new(writer);
-
     writer.write_byte(b'"')?;
 
-    for c in it {
-        match c {
-            '"' => {
-                writer.write_bytes(b"\\\"")?;
-            }
-            '\\' => {
-                writer.write_bytes(b"\\\\")?;
-            }
-            // Specially encoded control characters.
-            '\u{0008}' => {
-                writer.write_bytes(b"\\b")?;
-            }
-            '\u{000C}' => {
-                writer.write_bytes(b"\\f")?;
-            }
-            '\n' => {
-                writer.write_bytes(b"\\n")?;
-            }
-            '\r' => {
-                writer.write_bytes(b"\\r")?;
-            }
-            '\t' => {
-                writer.write_bytes(b"\\t")?;
-            }
-            c => {
-                if c.is_control() {
-                    todo!("control characters are not supported yet")
-                } else {
-                    let mut bytes = [0, 0, 0, 0];
-                    let bytes = c.encode_utf8(bytes.as_mut_slice());
-                    writer.write_bytes(bytes.as_bytes())?;
-                }
-            }
+    let mut start = 0;
+
+    for (i, &byte) in bytes.iter().enumerate() {
+        let escape = ESCAPE[byte as usize];
+
+        if escape == 0 {
+            continue;
         }
+
+        if start < i {
+            writer.write_bytes(&bytes[start..1])?;
+        }
+
+        write_escape(&mut writer, escape, byte)?;
+        start = i + 1;
+    }
+
+    if start != bytes.len() {
+        writer.write_bytes(&bytes[start..])?;
     }
 
     writer.write_byte(b'"')?;
-    writer.finish()
+    Ok(())
+}
+
+// Parts below copied from serde-json under the MIT license:
+//
+// https://github.com/serde-rs/json
+
+const BB: u8 = b'b'; // \x08
+const TT: u8 = b't'; // \x09
+const NN: u8 = b'n'; // \x0A
+const FF: u8 = b'f'; // \x0C
+const RR: u8 = b'r'; // \x0D
+const QU: u8 = b'"'; // \x22
+const BS: u8 = b'\\'; // \x5C
+const UU: u8 = b'u'; // \x00...\x1F except the ones above
+const __: u8 = 0;
+
+// Lookup table of escape sequences. A value of b'x' at index i means that byte
+// i is escaped as "\x" in JSON. A value of 0 means that byte i is not escaped.
+static ESCAPE: [u8; 256] = [
+    //   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+    UU, UU, UU, UU, UU, UU, UU, UU, BB, TT, NN, UU, FF, RR, UU, UU, // 0
+    UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, // 1
+    __, __, QU, __, __, __, __, __, __, __, __, __, __, __, __, __, // 2
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 3
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 4
+    __, __, __, __, __, __, __, __, __, __, __, __, BS, __, __, __, // 5
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 6
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 7
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 8
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 9
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // A
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // B
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // C
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // D
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // E
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // F
+];
+
+// Hex digits.
+static HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
+
+fn write_escape<W>(writer: &mut W, escape: u8, byte: u8) -> Result<(), W::Error>
+where
+    W: Writer,
+{
+    let s = match escape {
+        BB => b"\\b",
+        TT => b"\\t",
+        NN => b"\\n",
+        FF => b"\\f",
+        RR => b"\\r",
+        QU => b"\\\"",
+        BS => b"\\\\",
+        UU => {
+            let bytes = &[
+                b'\\',
+                b'u',
+                b'0',
+                b'0',
+                HEX_DIGITS[(byte >> 4) as usize],
+                HEX_DIGITS[(byte & 0xF) as usize],
+            ];
+            return writer.write_bytes(bytes);
+        }
+        _ => unreachable!(),
+    };
+
+    writer.write_bytes(s)
 }

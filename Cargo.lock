@@ -350,6 +350,7 @@ dependencies = [
  "bincode",
  "criterion",
  "musli",
+ "musli-json",
  "musli-storage",
  "musli-wire",
  "rand",
