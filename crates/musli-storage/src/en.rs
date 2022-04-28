@@ -39,16 +39,16 @@ where
     type Ok = ();
     type Error = W::Error;
 
-    type Pack<'this> = Self;
-    type Some<'this> = Self;
-    type Sequence<'this> = Self;
-    type Tuple<'this> = Self;
-    type Map<'this> = Self;
-    type Struct<'this> = Self;
-    type TupleStruct<'this> = Self;
-    type StructVariant<'this> = Self;
-    type TupleVariant<'this> = Self;
-    type UnitVariant<'this> = Self;
+    type Pack = Self;
+    type Some = Self;
+    type Sequence = Self;
+    type Tuple = Self;
+    type Map = Self;
+    type Struct = Self;
+    type TupleStruct = Self;
+    type StructVariant = Self;
+    type TupleVariant = Self;
+    type UnitVariant = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -57,15 +57,12 @@ where
 
     #[inline]
     fn encode_unit(self) -> Result<Self::Ok, Self::Error> {
-        self.encode_sequence(0, |_| Ok(()))
+        SequenceEncoder::end(self.encode_sequence(0)?)
     }
 
     #[inline]
-    fn encode_pack<T>(self, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Pack<'_>) -> Result<(), Self::Error>,
-    {
-        encoder(self)
+    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
+        Ok(self)
     }
 
     #[inline]
@@ -180,12 +177,9 @@ where
     }
 
     #[inline]
-    fn encode_some<T>(mut self, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Some<'_>) -> Result<(), Self::Error>,
-    {
+    fn encode_some(mut self) -> Result<Self::Some, Self::Error> {
         self.writer.write_byte(1)?;
-        encoder(self)
+        Ok(self)
     }
 
     #[inline]
@@ -195,48 +189,33 @@ where
     }
 
     #[inline]
-    fn encode_sequence<T>(mut self, len: usize, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Sequence<'_>) -> Result<(), Self::Error>,
-    {
+    fn encode_sequence(mut self, len: usize) -> Result<Self::Sequence, Self::Error> {
         L::encode_usize(&mut self.writer, len)?;
-        encoder(self)
+        Ok(self)
     }
 
     #[inline]
-    fn encode_tuple<T>(self, _: usize, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Sequence<'_>) -> Result<(), Self::Error>,
-    {
+    fn encode_tuple(self, _: usize) -> Result<Self::Sequence, Self::Error> {
         // NB: tuple has statically known fixed length.
-        encoder(self)
+        Ok(self)
     }
 
     #[inline]
-    fn encode_map<T>(mut self, len: usize, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Map<'_>) -> Result<(), Self::Error>,
-    {
+    fn encode_map(mut self, len: usize) -> Result<Self::Map, Self::Error> {
         L::encode_usize(&mut self.writer, len)?;
-        encoder(self)
+        Ok(self)
     }
 
     #[inline]
-    fn encode_struct<T>(mut self, fields: usize, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Struct<'_>) -> Result<(), Self::Error>,
-    {
+    fn encode_struct(mut self, fields: usize) -> Result<Self::Struct, Self::Error> {
         L::encode_usize(&mut self.writer, fields)?;
-        encoder(self)
+        Ok(self)
     }
 
     #[inline]
-    fn encode_tuple_struct<T>(mut self, len: usize, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::TupleStruct<'_>) -> Result<(), Self::Error>,
-    {
+    fn encode_tuple_struct(mut self, len: usize) -> Result<Self::TupleStruct, Self::Error> {
         L::encode_usize(&mut self.writer, len)?;
-        encoder(self)
+        Ok(self)
     }
 
     #[inline]
@@ -246,27 +225,18 @@ where
     }
 
     #[inline]
-    fn encode_struct_variant<T>(self, _: usize, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::StructVariant<'_>) -> Result<(), Self::Error>,
-    {
-        encoder(self)
+    fn encode_struct_variant(self, _: usize) -> Result<Self::StructVariant, Self::Error> {
+        Ok(self)
     }
 
     #[inline]
-    fn encode_tuple_variant<T>(self, _: usize, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::TupleVariant<'_>) -> Result<(), Self::Error>,
-    {
-        encoder(self)
+    fn encode_tuple_variant(self, _: usize) -> Result<Self::TupleVariant, Self::Error> {
+        Ok(self)
     }
 
     #[inline]
-    fn encode_unit_variant<T>(self, encoder: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::UnitVariant<'_>) -> Result<(), Self::Error>,
-    {
-        encoder(self)
+    fn encode_unit_variant(self) -> Result<Self::UnitVariant, Self::Error> {
+        Ok(self)
     }
 }
 

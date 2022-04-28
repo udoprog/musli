@@ -149,13 +149,13 @@ macro_rules! sequence {
             where
                 E: Encoder,
             {
-                encoder.encode_sequence(self.len(), |mut seq| {
-                    for value in self {
-                        value.encode(seq.next()?)?;
-                    }
+                let mut seq = encoder.encode_sequence(self.len())?;
 
-                    seq.end()
-                })
+                for value in self {
+                    value.encode(seq.next()?)?;
+                }
+
+                seq.end()
             }
         }
 
@@ -169,15 +169,14 @@ macro_rules! sequence {
             where
                 D: Decoder<'de>,
             {
-                decoder.decode_sequence(|mut $access| {
-                    let mut out = $factory;
+                let mut $access = decoder.decode_sequence()?;
+                let mut out = $factory;
 
-                    while let Some(value) = $access.next()? {
-                        out.$insert(T::decode(value)?);
-                    }
+                while let Some(value) = $access.next()? {
+                    out.$insert(T::decode(value)?);
+                }
 
-                    Ok(out)
-                })
+                Ok(out)
             }
         }
     }
@@ -225,16 +224,15 @@ macro_rules! map {
             where
                 E: Encoder,
             {
-                encoder.encode_map(self.len(), |mut map| {
-                    for (k, v) in self {
-                        let mut entry = map.next()?;
-                        k.encode(entry.first()?)?;
-                        v.encode(entry.second()?)?;
-                        entry.end()?;
-                    }
+                let mut map = encoder.encode_map(self.len())?;
 
-                    map.end()
-                })
+                for (k, v) in self {
+                    let mut entry = map.next()?;
+                    k.encode(entry.first()?)?;
+                    v.encode(entry.second()?)?;
+                }
+
+                map.end()
             }
         }
 
@@ -249,17 +247,16 @@ macro_rules! map {
             where
                 D: Decoder<'de>,
             {
-                decoder.decode_map(|mut $access| {
-                    let mut out = $with_capacity;
+                let mut $access = decoder.decode_map()?;
+                let mut out = $with_capacity;
 
-                    while let Some(mut entry) = $access.next()? {
-                        let key = entry.first().and_then(K::decode)?;
-                        let value = entry.second().and_then(V::decode)?;
-                        out.insert(key, value);
-                    }
+                while let Some(mut entry) = $access.next()? {
+                    let key = entry.first().and_then(K::decode)?;
+                    let value = entry.second().and_then(V::decode)?;
+                    out.insert(key, value);
+                }
 
-                    Ok(out)
-                })
+                Ok(out)
             }
         }
     }

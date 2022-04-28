@@ -315,6 +315,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "musli-json"
+version = "0.0.24"
+dependencies = [
+ "musli",
+ "musli-binary-common",
+]
+
+[[package]]
 name = "musli-macros"
 version = "0.0.24"
 dependencies = [

@@ -116,25 +116,25 @@ pub trait Encoder: Sized {
     /// The error raised by an encoder.
     type Error: Error;
     /// A simple pack that packs a sequence of elements.
-    type Pack<'this>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Pack: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder returned when encoding an optional value which is present.
-    type Some<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>;
+    type Some: Encoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a sequence encoder.
-    type Sequence<'this>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Sequence: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a tuple encoder.
-    type Tuple<'this>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Tuple: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a map encoder.
-    type Map<'this>: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Map: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a struct.
-    type Struct<'this>: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Struct: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a tuple struct.
-    type TupleStruct<'this>: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type TupleStruct: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a struct variant.
-    type StructVariant<'this>: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type StructVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a tuple variant.
-    type TupleVariant<'this>: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type TupleVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a unit variant.
-    type UnitVariant<'this>: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type UnitVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
 
     /// An expectation error. Every other implementation defers to this to
     /// report that something unexpected happened.
@@ -188,19 +188,15 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_pack(|mut pack| {
-    ///             pack.next()?.encode_u32(self.field)?;
-    ///             pack.next()?.encode_array(self.data)?;
-    ///             pack.end()
-    ///         })
+    ///         let mut pack = encoder.encode_pack()?;
+    ///         pack.next()?.encode_u32(self.field)?;
+    ///         pack.next()?.encode_array(self.data)?;
+    ///         pack.end()
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_pack<T>(self, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Pack<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Pack,
             &ExpectingWrapper(self),
@@ -793,7 +789,7 @@ pub trait Encoder: Sized {
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some(|encoder| data.encode(encoder))
+    ///                 encoder.encode_some().and_then(|e| data.encode(e))
     ///             }
     ///             None => {
     ///                 encoder.encode_none()
@@ -803,10 +799,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_some<T>(self, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Some<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_some(self) -> Result<Self::Some, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Option,
             &ExpectingWrapper(self),
@@ -831,7 +824,7 @@ pub trait Encoder: Sized {
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some(|encoder| data.encode(encoder))
+    ///                 encoder.encode_some().and_then(|e| data.encode(e))
     ///             }
     ///             None => {
     ///                 encoder.encode_none()
@@ -864,21 +857,18 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_sequence(self.data.len(), |mut seq| {
-    ///             for element in &self.data {
-    ///                 seq.push(element)?;
-    ///             }
+    ///         let mut seq = encoder.encode_sequence(self.data.len())?;
     ///
-    ///             seq.end()
-    ///         })
+    ///         for element in &self.data {
+    ///             seq.push(element)?;
+    ///         }
+    ///
+    ///         seq.end()
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_sequence<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Sequence<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_sequence(self, _: usize) -> Result<Self::Sequence, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Sequence,
             &ExpectingWrapper(self),
@@ -899,19 +889,15 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_tuple(2, |mut tuple| {
-    ///             tuple.next()?.encode_u32(self.0)?;
-    ///             tuple.next()?.encode_array(self.1)?;
-    ///             tuple.end()
-    ///         })
+    ///         let mut tuple = encoder.encode_tuple(2)?;
+    ///         tuple.next()?.encode_u32(self.0)?;
+    ///         tuple.next()?.encode_array(self.1)?;
+    ///         tuple.end()
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_tuple<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Tuple<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Tuple,
             &ExpectingWrapper(self),
@@ -920,10 +906,7 @@ pub trait Encoder: Sized {
 
     /// Encode a map with a known length.
     #[inline]
-    fn encode_map<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Map<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Map,
             &ExpectingWrapper(self),
@@ -947,19 +930,15 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_struct(2, |mut st | {
-    ///             st.insert("name", &self.name)?;
-    ///             st.insert("age", self.age)?;
-    ///             st.end()
-    ///         })
+    ///         let mut st = encoder.encode_struct(2)?;
+    ///         st.insert("name", &self.name)?;
+    ///         st.insert("age", self.age)?;
+    ///         st.end()
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_struct<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::Struct<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Struct,
             &ExpectingWrapper(self),
@@ -980,18 +959,14 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_tuple_struct(1, |mut tuple| {
-    ///             tuple.insert(0usize, &self.0)?;
-    ///             tuple.end()
-    ///         })
+    ///         let mut tuple = encoder.encode_tuple_struct(1)?;
+    ///         tuple.insert(0usize, &self.0)?;
+    ///         tuple.end()
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_tuple_struct<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::TupleStruct<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::TupleStruct,
             &ExpectingWrapper(self),
@@ -1047,41 +1022,30 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 encoder.encode_unit_variant(|mut variant| {
-    ///                     variant.first()?.encode_string("variant1")?;
-    ///                     variant.second()?.encode_unit()?;
-    ///                     variant.end()
-    ///                 })
+    ///                 let variant = encoder.encode_unit_variant()?;
+    ///                 variant.insert("variant1", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 encoder.encode_tuple_variant(1, |mut variant| {
-    ///                     variant.first()?.encode_string("variant2")?;
-    ///                     variant.second()?.encode_string(data)?;
-    ///                     variant.end()
-    ///                 })
+    ///                 let variant = encoder.encode_tuple_variant(1)?;
+    ///                 variant.insert("variant2", data)
     ///             }
     ///             Enum::StructVariant { data, age } => {
-    ///                 encoder.encode_struct_variant(2, |mut variant| {
-    ///                     variant.first()?.encode_string("variant3")?;
+    ///                 let mut variant = encoder.encode_struct_variant(2)?;
+    ///                 variant.first()?.encode_string("variant3")?;
     ///
-    ///                     variant.second()?.encode_struct(2, |mut st| {
-    ///                         st.insert("data", data)?;
-    ///                         st.insert("age", age)?;
-    ///                         st.end()
-    ///                     })?;
+    ///                 let mut st = variant.second()?.encode_struct(2)?;
+    ///                 st.insert("data", data)?;
+    ///                 st.insert("age", age)?;
+    ///                 st.end()?;
     ///
-    ///                     variant.end()
-    ///                 })
+    ///                 variant.end()
     ///             }
     ///         }
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_struct_variant<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::StructVariant<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_struct_variant(self, _: usize) -> Result<Self::StructVariant, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::StructVariant,
             &ExpectingWrapper(self),
@@ -1090,10 +1054,7 @@ pub trait Encoder: Sized {
 
     /// Encode an tuple enum variant.
     #[inline]
-    fn encode_tuple_variant<T>(self, _: usize, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::TupleVariant<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_tuple_variant(self, _: usize) -> Result<Self::TupleVariant, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::TupleVariant,
             &ExpectingWrapper(self),
@@ -1102,10 +1063,7 @@ pub trait Encoder: Sized {
 
     /// Encode an unit enum variant.
     #[inline]
-    fn encode_unit_variant<T>(self, _: T) -> Result<Self::Ok, Self::Error>
-    where
-        T: FnOnce(Self::UnitVariant<'_>) -> Result<Self::Ok, Self::Error>,
-    {
+    fn encode_unit_variant(self) -> Result<Self::UnitVariant, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::UnitVariant,
             &ExpectingWrapper(self),
@@ -1116,7 +1074,7 @@ pub trait Encoder: Sized {
 #[repr(transparent)]
 struct ExpectingWrapper<T>(T);
 
-impl<'de, T> Expecting for ExpectingWrapper<T>
+impl<T> Expecting for ExpectingWrapper<T>
 where
     T: Encoder,
 {

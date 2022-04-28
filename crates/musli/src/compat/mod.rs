@@ -38,14 +38,14 @@ where
     where
         E: Encoder,
     {
-        encoder.encode_sequence(self.0.len(), |mut seq| {
-            for value in self.0 {
-                let encoder = seq.next()?;
-                T::encode(value, encoder)?;
-            }
+        let mut seq = encoder.encode_sequence(self.0.len())?;
 
-            seq.end()
-        })
+        for value in self.0 {
+            let encoder = seq.next()?;
+            T::encode(value, encoder)?;
+        }
+
+        seq.end()
     }
 }
 
@@ -55,7 +55,7 @@ impl Encode for Sequence<()> {
     where
         E: Encoder,
     {
-        encoder.encode_sequence(0, |seq| seq.end())
+        encoder.encode_sequence(0)?.end()
     }
 }
 

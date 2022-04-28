@@ -335,7 +335,9 @@ where
         E: Encoder,
     {
         match self {
-            Some(value) => encoder.encode_some(|encoder| value.encode(encoder)),
+            Some(value) => encoder
+                .encode_some()
+                .and_then(|encoder| value.encode(encoder)),
             None => encoder.encode_none(),
         }
     }
@@ -368,20 +370,18 @@ where
     where
         E: Encoder,
     {
-        encoder.encode_struct_variant(1, |mut variant| {
-            match self {
-                Ok(ok) => {
-                    Encode::encode(&0usize, variant.first()?)?;
-                    Encode::encode(ok, variant.second()?)?;
-                }
-                Err(err) => {
-                    Encode::encode(&1usize, variant.first()?)?;
-                    Encode::encode(err, variant.second()?)?;
-                }
-            }
+        let mut variant = encoder.encode_struct_variant(1)?;
 
-            variant.end()
-        })
+        match self {
+            Ok(ok) => {
+                Encode::encode(&0usize, variant.first()?)?;
+                Encode::encode(ok, variant.second()?)
+            }
+            Err(err) => {
+                Encode::encode(&1usize, variant.first()?)?;
+                Encode::encode(err, variant.second()?)
+            }
+        }
     }
 }
 
@@ -395,13 +395,13 @@ where
     where
         D: Decoder<'de>,
     {
-        decoder.decode_variant(
-            |mut variant| match variant.first().and_then(usize::decode)? {
-                0 => variant.second().and_then(T::decode).map(Ok),
-                1 => variant.second().and_then(U::decode).map(Err),
-                tag => Err(D::Error::invalid_variant_tag("Result", tag)),
-            },
-        )
+        let mut variant = decoder.decode_variant()?;
+
+        match variant.first().and_then(usize::decode)? {
+            0 => variant.second().and_then(T::decode).map(Ok),
+            1 => variant.second().and_then(U::decode).map(Err),
+            tag => Err(D::Error::invalid_variant_tag("Result", tag)),
+        }
     }
 }
 

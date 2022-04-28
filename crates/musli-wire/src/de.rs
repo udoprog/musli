@@ -155,14 +155,14 @@ where
     L: TypedUsizeEncoding,
 {
     type Error = R::Error;
-    type Pack<'this> = WireDecoder<Limit<R>, I, L>;
+    type Pack = WireDecoder<Limit<R>, I, L>;
     type Some = Self;
-    type Sequence<'this> = RemainingWireDecoder<R, I, L>;
-    type Tuple<'this> = Self;
-    type Map<'this> = RemainingWireDecoder<R, I, L>;
-    type Struct<'this> = RemainingWireDecoder<R, I, L>;
-    type TupleStruct<'this> = RemainingWireDecoder<R, I, L>;
-    type Variant<'this> = Self;
+    type Sequence = RemainingWireDecoder<R, I, L>;
+    type Tuple = Self;
+    type Map = RemainingWireDecoder<R, I, L>;
+    type Struct = RemainingWireDecoder<R, I, L>;
+    type TupleStruct = RemainingWireDecoder<R, I, L>;
+    type Variant = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -176,13 +176,10 @@ where
     }
 
     #[inline]
-    fn decode_pack<T, O>(mut self, decode: T) -> Result<O, Self::Error>
-    where
-        T: FnOnce(Self::Pack<'_>) -> Result<O, Self::Error>,
-    {
+    fn decode_pack(mut self) -> Result<Self::Pack, Self::Error> {
         let pos = self.reader.pos();
         let len = self.decode_prefix(pos)?;
-        decode(WireDecoder::new(self.reader.limit(len)))
+        Ok(WireDecoder::new(self.reader.limit(len)))
     }
 
     #[inline]
@@ -403,18 +400,12 @@ where
     }
 
     #[inline]
-    fn decode_sequence<T, O>(self, decoder: T) -> Result<O, Self::Error>
-    where
-        T: FnOnce(Self::Sequence<'_>) -> Result<O, Self::Error>,
-    {
-        decoder(self.shared_decode_sequence()?)
+    fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
+        self.shared_decode_sequence()
     }
 
     #[inline]
-    fn decode_tuple<T, O>(mut self, len: usize, decoder: T) -> Result<O, Self::Error>
-    where
-        T: FnOnce(Self::Tuple<'_>) -> Result<O, Self::Error>,
-    {
+    fn decode_tuple(mut self, len: usize) -> Result<Self::Tuple, Self::Error> {
         let actual = self.decode_sequence_len()?;
 
         if len != actual {
@@ -423,31 +414,22 @@ where
             )));
         }
 
-        decoder(self)
+        Ok(self)
     }
 
     #[inline]
-    fn decode_map<T, O>(self, decoder: T) -> Result<O, Self::Error>
-    where
-        T: FnOnce(Self::Map<'_>) -> Result<O, Self::Error>,
-    {
-        decoder(self.shared_decode_pair_sequence()?)
+    fn decode_map(self) -> Result<Self::Map, Self::Error> {
+        self.shared_decode_pair_sequence()
     }
 
     #[inline]
-    fn decode_struct<T, O>(self, _: usize, decoder: T) -> Result<O, Self::Error>
-    where
-        T: FnOnce(Self::Struct<'_>) -> Result<O, Self::Error>,
-    {
-        decoder(self.shared_decode_pair_sequence()?)
+    fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
+        self.shared_decode_pair_sequence()
     }
 
     #[inline]
-    fn decode_tuple_struct<T, O>(self, _: usize, decoder: T) -> Result<O, Self::Error>
-    where
-        T: FnOnce(Self::TupleStruct<'_>) -> Result<O, Self::Error>,
-    {
-        decoder(self.shared_decode_pair_sequence()?)
+    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
+        self.shared_decode_pair_sequence()
     }
 
     #[inline]
@@ -457,10 +439,7 @@ where
     }
 
     #[inline]
-    fn decode_variant<T, O>(mut self, decoder: T) -> Result<O, Self::Error>
-    where
-        T: FnOnce(Self::Variant<'_>) -> Result<O, Self::Error>,
-    {
+    fn decode_variant(mut self) -> Result<Self::Variant, Self::Error> {
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         if tag != Tag::new(Kind::Sequence, 2) {
@@ -471,7 +450,7 @@ where
             }));
         }
 
-        decoder(self)
+        Ok(self)
     }
 }
 
@@ -535,7 +514,7 @@ where
 {
     type Error = R::Error;
     type First<'this> = WireDecoder<&'this mut R, I, L> where Self: 'this;
-    type Second<'this> = WireDecoder<&'this mut R, I, L> where Self: 'this;
+    type Second = WireDecoder<R, I, L>;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -543,12 +522,12 @@ where
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
-        Ok(WireDecoder::new(&mut self.reader))
+    fn second(self) -> Result<Self::Second, Self::Error> {
+        Ok(self)
     }
 
     #[inline]
-    fn skip_second(&mut self) -> Result<bool, Self::Error> {
+    fn skip_second(mut self) -> Result<bool, Self::Error> {
         self.skip_any()?;
         Ok(true)
     }

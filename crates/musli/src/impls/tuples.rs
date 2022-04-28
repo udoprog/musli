@@ -46,12 +46,11 @@ macro_rules! declare {
             where
                 E: Encoder
             {
-                encoder.encode_tuple(count!($ident0 $($ident)*), |mut pack| {
-                    let ($ident0, $($ident),*) = self;
-                    <$ty0>::encode($ident0, pack.next()?)?;
-                    $(<$ty>::encode($ident, pack.next()?)?;)*
-                    pack.end()
-                })
+                let mut pack = encoder.encode_tuple(count!($ident0 $($ident)*))?;
+                let ($ident0, $($ident),*) = self;
+                <$ty0>::encode($ident0, pack.next()?)?;
+                $(<$ty>::encode($ident, pack.next()?)?;)*
+                pack.end()
             }
         }
 
@@ -61,11 +60,10 @@ macro_rules! declare {
             where
                 D: Decoder<'de>
             {
-                decoder.decode_tuple(count!($ident0 $($ident)*), |mut unpack| {
-                    let $ident0 = unpack.next().and_then(<$ty0>::decode)?;
-                    $(let $ident = unpack.next().and_then(<$ty>::decode)?;)*
-                    Ok(($ident0, $($ident),*))
-                })
+                let mut unpack = decoder.decode_tuple(count!($ident0 $($ident)*))?;
+                let $ident0 = unpack.next().and_then(<$ty0>::decode)?;
+                $(let $ident = unpack.next().and_then(<$ty>::decode)?;)*
+                Ok(($ident0, $($ident),*))
             }
         }
 
@@ -75,12 +73,11 @@ macro_rules! declare {
             where
                 E: Encoder
             {
-                encoder.encode_pack(|mut pack| {
-                    let Packed(($ident0, $($ident),*)) = self;
-                    <$ty0>::encode($ident0, pack.next()?)?;
-                    $(<$ty>::encode($ident, pack.next()?)?;)*
-                    pack.end()
-                })
+                let Packed(($ident0, $($ident),*)) = self;
+                let mut pack = encoder.encode_pack()?;
+                <$ty0>::encode($ident0, pack.next()?)?;
+                $(<$ty>::encode($ident, pack.next()?)?;)*
+                pack.end()
             }
         }
 
@@ -90,11 +87,10 @@ macro_rules! declare {
             where
                 D: Decoder<'de>
             {
-                decoder.decode_pack(|mut unpack| {
-                    let $ident0 = unpack.next().and_then(<$ty0>::decode)?;
-                    $(let $ident = unpack.next().and_then(<$ty>::decode)?;)*
-                    Ok(Packed(($ident0, $($ident),*)))
-                })
+                let mut unpack = decoder.decode_pack()?;
+                let $ident0 = unpack.next().and_then(<$ty0>::decode)?;
+                $(let $ident = unpack.next().and_then(<$ty>::decode)?;)*
+                Ok(Packed(($ident0, $($ident),*)))
             }
         }
 

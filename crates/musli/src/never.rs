@@ -24,14 +24,14 @@ enum NeverMarker {}
 ///
 /// impl Decoder<'_> for MyDecoder {
 ///     type Error = String;
-///     type Pack<'this> = Never<Self>;
-///     type Sequence<'this> = Never<Self>;
-///     type Tuple<'this> = Never<Self>;
-///     type Map<'this> = Never<Self>;
+///     type Pack = Never<Self>;
+///     type Sequence = Never<Self>;
+///     type Tuple = Never<Self>;
+///     type Map = Never<Self>;
 ///     type Some = Never<Self>;
-///     type Struct<'this> = Never<Self>;
-///     type TupleStruct<'this> = Never<Self>;
-///     type Variant<'this> = Never<Self>;
+///     type Struct = Never<Self>;
+///     type TupleStruct = Never<Self>;
+///     type Variant = Never<Self>;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
@@ -53,14 +53,14 @@ where
     T: Decoder<'de>,
 {
     type Error = T::Error;
-    type Pack<'this> = Self;
-    type Sequence<'this> = Self;
-    type Tuple<'this> = Self;
-    type Map<'this> = Self;
+    type Pack = Self;
+    type Sequence = Self;
+    type Tuple = Self;
+    type Map = Self;
     type Some = Self;
-    type Struct<'this> = Self;
-    type TupleStruct<'this> = Self;
-    type Variant<'this> = Self;
+    type Struct = Self;
+    type TupleStruct = Self;
+    type Variant = Self;
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -78,7 +78,7 @@ where
     where
         Self: 'this;
 
-    type Second<'this> = Self where Self: 'this;
+    type Second = Self;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -86,12 +86,12 @@ where
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second(self) -> Result<Self::Second, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn skip_second(&mut self) -> Result<bool, Self::Error> {
+    fn skip_second(self) -> Result<bool, Self::Error> {
         match self._never {}
     }
 }
@@ -160,16 +160,16 @@ where
 {
     type Ok = T::Ok;
     type Error = T::Error;
-    type Pack<'this> = Self;
-    type Some<'this> = Self;
-    type Sequence<'this> = Self;
-    type Tuple<'this> = Self;
-    type Map<'this> = Self;
-    type Struct<'this> = Self;
-    type TupleStruct<'this> = Self;
-    type StructVariant<'this> = Self;
-    type TupleVariant<'this> = Self;
-    type UnitVariant<'this> = Self;
+    type Pack = Self;
+    type Some = Self;
+    type Sequence = Self;
+    type Tuple = Self;
+    type Map = Self;
+    type Struct = Self;
+    type TupleStruct = Self;
+    type StructVariant = Self;
+    type TupleVariant = Self;
+    type UnitVariant = Self;
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
