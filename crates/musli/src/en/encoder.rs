@@ -162,7 +162,7 @@ pub trait Encoder: Sized {
     fn encode_unit(self) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Unit,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -199,7 +199,7 @@ pub trait Encoder: Sized {
     fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Pack,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -227,7 +227,7 @@ pub trait Encoder: Sized {
     fn encode_array<const N: usize>(self, _: [u8; N]) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Array,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -255,7 +255,7 @@ pub trait Encoder: Sized {
     fn encode_bytes(self, _: &[u8]) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Bytes,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -291,7 +291,7 @@ pub trait Encoder: Sized {
     fn encode_bytes_vectored(self, _: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Bytes,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -319,7 +319,7 @@ pub trait Encoder: Sized {
     fn encode_string(self, _: &str) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::String,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -347,7 +347,7 @@ pub trait Encoder: Sized {
     fn encode_bool(self, _: bool) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Bool,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -375,7 +375,7 @@ pub trait Encoder: Sized {
     fn encode_char(self, _: char) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Char,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -403,7 +403,7 @@ pub trait Encoder: Sized {
     fn encode_u8(self, _: u8) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Unsigned8,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -431,7 +431,7 @@ pub trait Encoder: Sized {
     fn encode_u16(self, _: u16) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Unsigned16,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -459,7 +459,7 @@ pub trait Encoder: Sized {
     fn encode_u32(self, _: u32) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Unsigned32,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -487,7 +487,7 @@ pub trait Encoder: Sized {
     fn encode_u64(self, _: u64) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Unsigned64,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -515,7 +515,7 @@ pub trait Encoder: Sized {
     fn encode_u128(self, _: u128) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Unsigned128,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -543,7 +543,7 @@ pub trait Encoder: Sized {
     fn encode_i8(self, _: i8) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Signed8,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -571,7 +571,7 @@ pub trait Encoder: Sized {
     fn encode_i16(self, _: i16) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Signed16,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -599,7 +599,7 @@ pub trait Encoder: Sized {
     fn encode_i32(self, _: i32) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Signed32,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -627,7 +627,7 @@ pub trait Encoder: Sized {
     fn encode_i64(self, _: i64) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Signed64,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -655,7 +655,7 @@ pub trait Encoder: Sized {
     fn encode_i128(self, _: i128) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Signed128,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -683,7 +683,7 @@ pub trait Encoder: Sized {
     fn encode_usize(self, _: usize) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Usize,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -711,7 +711,7 @@ pub trait Encoder: Sized {
     fn encode_isize(self, _: isize) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Isize,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -739,7 +739,7 @@ pub trait Encoder: Sized {
     fn encode_f32(self, _: f32) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Float32,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -767,7 +767,7 @@ pub trait Encoder: Sized {
     fn encode_f64(self, _: f64) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Float64,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -802,7 +802,7 @@ pub trait Encoder: Sized {
     fn encode_some(self) -> Result<Self::Some, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Option,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -837,7 +837,7 @@ pub trait Encoder: Sized {
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Option,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -871,7 +871,7 @@ pub trait Encoder: Sized {
     fn encode_sequence(self, _: usize) -> Result<Self::Sequence, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Sequence,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -900,7 +900,7 @@ pub trait Encoder: Sized {
     fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Tuple,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -909,7 +909,7 @@ pub trait Encoder: Sized {
     fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Map,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -941,7 +941,7 @@ pub trait Encoder: Sized {
     fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Struct,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -969,7 +969,7 @@ pub trait Encoder: Sized {
     fn encode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::TupleStruct,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -995,7 +995,7 @@ pub trait Encoder: Sized {
     fn encode_unit_struct(self) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::UnitStruct,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -1048,7 +1048,7 @@ pub trait Encoder: Sized {
     fn encode_struct_variant(self, _: usize) -> Result<Self::StructVariant, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::StructVariant,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -1057,7 +1057,7 @@ pub trait Encoder: Sized {
     fn encode_tuple_variant(self, _: usize) -> Result<Self::TupleVariant, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::TupleVariant,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
@@ -1066,13 +1066,20 @@ pub trait Encoder: Sized {
     fn encode_unit_variant(self) -> Result<Self::UnitVariant, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::UnitVariant,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 }
 
 #[repr(transparent)]
 struct ExpectingWrapper<T>(T);
+
+impl<T> ExpectingWrapper<T> {
+    #[inline]
+    const fn new(value: T) -> Self {
+        Self(value)
+    }
+}
 
 impl<T> Expecting for ExpectingWrapper<T>
 where

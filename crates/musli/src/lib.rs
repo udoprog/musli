@@ -229,6 +229,7 @@ pub mod error;
 mod expecting;
 mod impls;
 mod internal;
+pub mod mode;
 pub mod never;
 #[cfg(not(feature = "std"))]
 mod no_std;
