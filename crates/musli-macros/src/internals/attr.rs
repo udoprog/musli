@@ -5,7 +5,7 @@ use crate::internals::symbol::*;
 use crate::internals::Ctxt;
 use crate::internals::Mode;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned};
+use quote::quote_spanned;
 use syn::parse;
 use syn::parse::Parse;
 use syn::spanned::Spanned;
@@ -278,27 +278,27 @@ impl FieldAttr {
                 quote_spanned!(*span => #encode_path::<#mode_ident, _>),
             )
         } else {
-            let encode_t_encode = mode.encode_t_encode();
-            (span, quote_spanned!(span => #encode_t_encode))
+            let encode_path = mode.encode_t_encode();
+            (span, encode_path)
         }
     }
 
     /// Expand decode of the given field.
-    pub(crate) fn decode_path(
-        &self,
-        mode: Mode<'_>,
-        decode_trait: &TokenStream,
-        span: Span,
-    ) -> (Span, TokenStream) {
+    pub(crate) fn decode_path(&self, mode: Mode<'_>, span: Span) -> (Span, TokenStream) {
         let decode_path = mode
             .ident
             .and_then(|m| self.modes.get(m)?.decode_path.as_ref())
             .or_else(|| self.root.decode_path.as_ref());
 
         if let Some((span, decode_path)) = decode_path {
-            (*span, quote_spanned!(*span => #decode_path))
+            let mode_ident = mode.mode_ident();
+            (
+                *span,
+                quote_spanned!(*span => #decode_path::<#mode_ident, _>),
+            )
         } else {
-            (span, quote!(#decode_trait::decode))
+            let decode_path = mode.decode_t_decode();
+            (span, decode_path)
         }
     }
 

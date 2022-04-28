@@ -239,3 +239,4 @@ mod no_std;
 
 pub use self::de::{Decode, Decoder};
 pub use self::en::{Encode, Encoder};
+pub use self::mode::DefaultMode;

@@ -1,4 +1,4 @@
-//! Declares types related to modes of encoding / decoding.
+//! Type that describe a mode of encoding.
 
 /// The default encoding mode.
 #[derive(Clone, Copy)]

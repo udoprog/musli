@@ -1,15 +1,19 @@
 use musli::{Decode, Encode};
 use musli_json::JsonEncoding;
 
-const CONFIG: JsonEncoding<Json> = JsonEncoding::new();
-
-// Mode marker indicating that some attributes should only apply when we're decoding in a JSON mode.
+// Mode marker indicating that some attributes should only apply when we're
+// decoding in a JSON mode.
 enum Json {}
+
+const CONFIG: JsonEncoding<Json> = JsonEncoding::new();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(mode = Json, default_field_tag = "name")]
 struct SimpleJsonStruct<'a> {
+    #[musli(tag = "fuck/bucket")]
+    #[musli(mode = Json, tag = "name")]
     name: &'a str,
+    #[musli(tag = "age")]
     age: u32,
 }
 

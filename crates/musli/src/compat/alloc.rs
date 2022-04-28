@@ -20,7 +20,7 @@ impl<Mode> Encode<Mode> for Bytes<Vec<u8>> {
     }
 }
 
-impl<'de> Decode<'de> for Bytes<Vec<u8>> {
+impl<'de, Mode> Decode<'de, Mode> for Bytes<Vec<u8>> {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
@@ -69,12 +69,13 @@ impl<Mode> Encode<Mode> for Bytes<VecDeque<u8>> {
     }
 }
 
-impl<'de> Decode<'de> for Bytes<VecDeque<u8>> {
+impl<'de, Mode> Decode<'de, Mode> for Bytes<VecDeque<u8>> {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        Bytes::<Vec<u8>>::decode(decoder).map(|Bytes(bytes)| Bytes(VecDeque::from(bytes)))
+        <Bytes<Vec<u8>> as Decode<Mode>>::decode(decoder)
+            .map(|Bytes(bytes)| Bytes(VecDeque::from(bytes)))
     }
 }

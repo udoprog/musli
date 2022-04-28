@@ -101,7 +101,7 @@ where
 #[inline(never)]
 fn decode_musli<'de, T>(data: &'de [u8]) -> T
 where
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     ENCODING.from_slice(data).unwrap()
 }

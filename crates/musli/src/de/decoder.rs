@@ -212,7 +212,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// struct UnitType;
     ///
-    /// impl<'de> Decode<'de> for UnitType {
+    /// impl<'de, Mode> Decode<'de, Mode> for UnitType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -245,15 +245,15 @@ pub trait Decoder<'de>: Sized {
     ///     data: [u8; 364],
     /// }
     ///
-    /// impl<'de> Decode<'de> for PackedStruct {
+    /// impl<'de, Mode> Decode<'de, Mode> for PackedStruct {
     ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut unpack = decoder.decode_pack()?;
-    ///         let field = unpack.next().and_then(Decode::decode)?;
-    ///         let data = unpack.next().and_then(Decode::decode)?;
+    ///         let field = unpack.next().and_then(Decode::<Mode>::decode)?;
+    ///         let data = unpack.next().and_then(Decode::<Mode>::decode)?;
     ///
     ///         Ok(Self {
     ///             field,
@@ -281,7 +281,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: [u8; 128],
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -315,7 +315,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: &'de [u8],
     /// }
     ///
-    /// impl<'de> Decode<'de> for BytesReference<'de> {
+    /// impl<'de, Mode> Decode<'de, Mode> for BytesReference<'de> {
     ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
@@ -374,7 +374,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: &'de str,
     /// }
     ///
-    /// impl<'de> Decode<'de> for StringReference<'de> {
+    /// impl<'de, Mode> Decode<'de, Mode> for StringReference<'de> {
     ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
@@ -429,7 +429,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: bool,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -459,7 +459,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: char,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -489,7 +489,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: u8,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -519,7 +519,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: u16,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -549,7 +549,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: u32,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -579,7 +579,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: u64,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -609,7 +609,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: u128,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -639,7 +639,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: i8,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -669,7 +669,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: i16,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -699,7 +699,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: i32,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -729,7 +729,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: i64,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -759,7 +759,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: i128,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -789,7 +789,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: usize,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -819,7 +819,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: isize,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -849,7 +849,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: f32,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -879,7 +879,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: f64,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -909,13 +909,13 @@ pub trait Decoder<'de>: Sized {
     ///     data: Option<String>,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
     ///         let data = if let Some(decoder) = decoder.decode_option()? {
-    ///             Some(String::decode(decoder)?)
+    ///             Some(<String as Decode<Mode>>::decode(decoder)?)
     ///         } else {
     ///             None
     ///         };
@@ -946,7 +946,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: Vec<String>,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MyType {
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -955,7 +955,7 @@ pub trait Decoder<'de>: Sized {
     ///         let mut data = Vec::new();
     ///
     ///         while let Some(decoder) = seq.next()? {
-    ///             data.push(String::decode(decoder)?);
+    ///             data.push(<String as Decode<Mode>>::decode(decoder)?);
     ///         }
     ///
     ///         Ok(Self {
@@ -986,14 +986,14 @@ pub trait Decoder<'de>: Sized {
     ///
     /// struct TupleStruct(String, u32);
     ///
-    /// impl<'de> Decode<'de> for TupleStruct {
+    /// impl<'de, Mode> Decode<'de, Mode> for TupleStruct {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut tuple = decoder.decode_tuple(2)?;
-    ///         let string = tuple.next().and_then(String::decode)?;
-    ///         let integer = tuple.next().and_then(u32::decode)?;
+    ///         let string = tuple.next().and_then(<String as Decode<Mode>>::decode)?;
+    ///         let integer = tuple.next().and_then(<u32 as Decode<Mode>>::decode)?;
     ///         Ok(Self(string, integer))
     ///     }
     /// }
@@ -1019,7 +1019,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: HashMap<String, u32>,
     /// }
     ///
-    /// impl<'de> Decode<'de> for MapStruct {
+    /// impl<'de, Mode> Decode<'de, Mode> for MapStruct {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1028,8 +1028,8 @@ pub trait Decoder<'de>: Sized {
     ///         let mut data = HashMap::with_capacity(map.size_hint().unwrap_or_default());
     ///
     ///         while let Some(mut entry) = map.next()? {
-    ///             let key = entry.first().and_then(String::decode)?;
-    ///             let value = entry.second().and_then(u32::decode)?;
+    ///             let key = entry.first().and_then(<String as Decode<Mode>>::decode)?;
+    ///             let value = entry.second().and_then(<u32 as Decode<Mode>>::decode)?;
     ///             data.insert(key, value);
     ///         }
     ///
@@ -1062,7 +1062,7 @@ pub trait Decoder<'de>: Sized {
     ///     integer: u32,
     /// }
     ///
-    /// impl<'de> Decode<'de> for Struct {
+    /// impl<'de, Mode> Decode<'de, Mode> for Struct {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1073,14 +1073,14 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         while let Some(mut entry) = st.next()? {
     ///             // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///             let tag = entry.first().and_then(String::decode)?;
+    ///             let tag = entry.first().and_then(<String as Decode<Mode>>::decode)?;
     ///
     ///             match tag.as_str() {
     ///                 "string" => {
-    ///                     string = Some(entry.second().and_then(String::decode)?);
+    ///                     string = Some(entry.second().and_then(<String as Decode<Mode>>::decode)?);
     ///                 }
     ///                 "integer" => {
-    ///                     integer = Some(entry.second().and_then(u32::decode)?);
+    ///                     integer = Some(entry.second().and_then(<u32 as Decode<Mode>>::decode)?);
     ///                 }
     ///                 tag => {
     ///                     return Err(D::Error::invalid_field_tag("Struct", tag))
@@ -1115,7 +1115,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// struct TupleStruct(String, u32);
     ///
-    /// impl<'de> Decode<'de> for TupleStruct {
+    /// impl<'de, Mode> Decode<'de, Mode> for TupleStruct {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1125,14 +1125,14 @@ pub trait Decoder<'de>: Sized {
     ///         let mut integer = None;
     ///
     ///         while let Some(mut entry) = st.next()? {
-    ///             let tag = entry.first().and_then(usize::decode)?;
+    ///             let tag = entry.first().and_then(<usize as Decode<Mode>>::decode)?;
     ///
     ///             match tag {
     ///                 0 => {
-    ///                     string = Some(entry.second().and_then(String::decode)?);
+    ///                     string = Some(entry.second().and_then(<String as Decode<Mode>>::decode)?);
     ///                 }
     ///                 1 => {
-    ///                     integer = Some(entry.second().and_then(u32::decode)?);
+    ///                     integer = Some(entry.second().and_then(<u32 as Decode<Mode>>::decode)?);
     ///                 }
     ///                 tag => {
     ///                     return Err(D::Error::invalid_field_tag("Struct", tag))
@@ -1164,7 +1164,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// struct UnitStruct;
     ///
-    /// impl<'de> Decode<'de> for UnitStruct {
+    /// impl<'de, Mode> Decode<'de, Mode> for UnitStruct {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1195,20 +1195,20 @@ pub trait Decoder<'de>: Sized {
     ///     Variant2(String),
     /// }
     ///
-    /// impl<'de> Decode<'de> for Enum {
+    /// impl<'de, Mode> Decode<'de, Mode> for Enum {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut variant = decoder.decode_variant()?;
-    ///         let tag = variant.first().and_then(usize::decode)?;
+    ///         let tag = variant.first().and_then(<usize as Decode<Mode>>::decode)?;
     ///
     ///         match tag {
     ///             0 => {
-    ///                 Ok(Self::Variant1(variant.second().and_then(u32::decode)?))
+    ///                 Ok(Self::Variant1(variant.second().and_then(<u32 as Decode<Mode>>::decode)?))
     ///             }
     ///             1 => {
-    ///                 Ok(Self::Variant2(variant.second().and_then(String::decode)?))
+    ///                 Ok(Self::Variant2(variant.second().and_then(<String as Decode<Mode>>::decode)?))
     ///             }
     ///             tag => {
     ///                 Err(D::Error::invalid_variant_tag("Enum", tag))

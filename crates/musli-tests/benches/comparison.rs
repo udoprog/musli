@@ -167,7 +167,7 @@ const WIRE_ENCODING: WireEncoding<musli_wire::Fixed, musli_wire::FixedLength> = 
 
 fn musli_wire_rt<T>(expected: &T) -> T
 where
-    T: Encode<DefaultMode> + for<'de> Decode<'de>,
+    T: Encode<DefaultMode> + for<'de> Decode<'de, DefaultMode>,
 {
     // NB: bincode uses a 128-byte pre-allocated vector.
     let mut data = Vec::with_capacity(128);
@@ -188,7 +188,7 @@ where
 
 fn musli_wire_dec<'de, T>(data: &'de [u8]) -> T
 where
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     WIRE_ENCODING.decode(data).unwrap()
 }
@@ -202,7 +202,7 @@ const STORAGE_ENCODING: musli_storage::StorageEncoding<
 
 fn musli_storage_rt<T>(expected: &T) -> T
 where
-    T: Encode<DefaultMode> + for<'de> Decode<'de>,
+    T: Encode<DefaultMode> + for<'de> Decode<'de, DefaultMode>,
 {
     // NB: bincode uses a 128-byte pre-allocated vector.
     let mut data = Vec::with_capacity(128);
@@ -223,7 +223,7 @@ where
 
 fn musli_storage_dec<'de, T>(data: &'de [u8]) -> T
 where
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     STORAGE_ENCODING.from_slice(data).unwrap()
 }

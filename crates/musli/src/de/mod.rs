@@ -25,6 +25,6 @@ pub use self::decoder::{
 };
 
 /// An owned decoder.
-pub trait DecodeOwned: for<'de> Decode<'de> {}
+pub trait DecodeOwned<Mode>: for<'de> Decode<'de, Mode> {}
 
-impl<D> DecodeOwned for D where D: for<'de> Decode<'de> {}
+impl<Mode, D> DecodeOwned<Mode> for D where D: for<'de> Decode<'de, Mode> {}

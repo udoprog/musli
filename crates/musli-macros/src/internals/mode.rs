@@ -27,6 +27,7 @@ pub(crate) struct Mode<'a> {
     pub(crate) ident: Option<&'a syn::Ident>,
     pub(crate) moded_ident: ModeIdent<'a>,
     pub(crate) encode_t: &'a TokenStream,
+    pub(crate) decode_t: &'a TokenStream,
 }
 
 impl<'a> Mode<'a> {
@@ -40,5 +41,12 @@ impl<'a> Mode<'a> {
         let moded_ident = &self.moded_ident;
         let encode_t = &self.encode_t;
         quote!(#encode_t::<#moded_ident>::encode)
+    }
+
+    /// Construct a typed encode call.
+    pub(crate) fn decode_t_decode(&self) -> TokenStream {
+        let moded_ident = &self.moded_ident;
+        let decode_t = &self.decode_t;
+        quote!(#decode_t::<#moded_ident>::decode)
     }
 }

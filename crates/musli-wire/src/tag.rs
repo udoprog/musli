@@ -141,7 +141,7 @@ impl fmt::Debug for Tag {
     }
 }
 
-impl<'de> Decode<'de> for Tag {
+impl<'de, Mode> Decode<'de, Mode> for Tag {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where

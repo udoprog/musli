@@ -1,4 +1,5 @@
-use crate::{de::Decoder, mode::DefaultMode};
+use crate::de::Decoder;
+use crate::mode::DefaultMode;
 pub use musli_macros::Decode;
 
 /// Trait governing how types are decoded.

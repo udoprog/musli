@@ -24,17 +24,17 @@ impl<T> Typed<T> {
     }
 }
 
-impl<'de, T> Decode<'de> for Typed<T>
+impl<'de, Mode, T> Decode<'de, Mode> for Typed<T>
 where
-    T: Decode<'de>,
+    T: Decode<'de, Mode>,
 {
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
         let mut unpack = decoder.decode_pack()?;
-        let tag = unpack.next().and_then(Tag::decode)?;
-        let value = unpack.next().and_then(T::decode)?;
+        let tag = unpack.next().and_then(<Tag as Decode<Mode>>::decode)?;
+        let value = unpack.next().and_then(<T as Decode<Mode>>::decode)?;
         Ok(Self { tag, value })
     }
 }
@@ -65,7 +65,7 @@ macro_rules! rt {
 pub fn transcode<T, O>(value: T) -> O
 where
     T: Debug + PartialEq + Encode<DefaultMode>,
-    O: for<'de> Decode<'de>,
+    O: for<'de> Decode<'de, DefaultMode>,
 {
     let out = crate::to_vec(&value).expect("failed to encode");
     let mut buf = &out[..];

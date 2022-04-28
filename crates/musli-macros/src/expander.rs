@@ -28,6 +28,52 @@ enum ExpansionMode<'a> {
     Moded { mode_ident: &'a syn::Ident },
 }
 
+impl ExpansionMode<'_> {
+    fn as_mode<'a>(&'a self, tokens: &'a Tokens) -> Mode<'a> {
+        match self {
+            ExpansionMode::Generic { mode_ident } => Mode {
+                ident: None,
+                moded_ident: ModeIdent::Ident(mode_ident),
+                encode_t: &tokens.encode_t,
+                decode_t: &tokens.decode_t,
+            },
+            ExpansionMode::Default => Mode {
+                ident: None,
+                moded_ident: ModeIdent::Stream(&tokens.default_mode),
+                encode_t: &tokens.encode_t,
+                decode_t: &tokens.decode_t,
+            },
+            ExpansionMode::Moded { mode_ident } => Mode {
+                ident: Some(mode_ident),
+                moded_ident: ModeIdent::Ident(mode_ident),
+                encode_t: &tokens.encode_t,
+                decode_t: &tokens.decode_t,
+            },
+        }
+    }
+
+    /// Coerce into impl generics.
+    fn as_impl_generics(
+        &self,
+        generics: syn::Generics,
+        tokens: &Tokens,
+    ) -> (syn::Generics, TokenStream) {
+        match *self {
+            ExpansionMode::Generic { mode_ident } => {
+                let mut impl_generics = generics.clone();
+
+                impl_generics
+                    .params
+                    .push(syn::TypeParam::from(mode_ident.clone()).into());
+
+                (impl_generics, quote!(#mode_ident))
+            }
+            ExpansionMode::Default => (generics, tokens.default_mode.clone()),
+            ExpansionMode::Moded { mode_ident } => (generics, quote!(#mode_ident)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum StructKind {
     Named,
@@ -210,23 +256,7 @@ impl<'a> Expander<'a> {
 
         let mut needs = Needs::default();
 
-        let mode = match expansion {
-            ExpansionMode::Generic { mode_ident } => Mode {
-                ident: None,
-                moded_ident: ModeIdent::Ident(mode_ident),
-                encode_t: &self.tokens.encode_t,
-            },
-            ExpansionMode::Default => Mode {
-                ident: None,
-                moded_ident: ModeIdent::Stream(&self.tokens.default_mode),
-                encode_t: &self.tokens.encode_t,
-            },
-            ExpansionMode::Moded { mode_ident } => Mode {
-                ident: Some(mode_ident),
-                moded_ident: ModeIdent::Ident(mode_ident),
-                encode_t: &self.tokens.encode_t,
-            },
-        };
+        let mode = expansion.as_mode(&self.tokens);
 
         let body = match &self.data {
             Data::Struct(data) => self.encode_struct(mode, data, &mut needs)?,
@@ -255,23 +285,8 @@ impl<'a> Expander<'a> {
         let encode_t = &self.tokens.encode_t;
         let encoder_t = &self.tokens.encoder_t;
 
-        let (impl_generics, mode_ident) = match expansion {
-            ExpansionMode::Generic { mode_ident } => {
-                let mut impl_generics = self.input.generics.clone();
-                impl_generics
-                    .params
-                    .push(syn::TypeParam::from(mode_ident.clone()).into());
-
-                (impl_generics, quote!(#mode_ident))
-            }
-            ExpansionMode::Default => (
-                self.input.generics.clone(),
-                self.tokens.default_mode.clone(),
-            ),
-            ExpansionMode::Moded { mode_ident } => {
-                (self.input.generics.clone(), quote!(#mode_ident))
-            }
-        };
+        let (impl_generics, mode_ident) =
+            expansion.as_impl_generics(self.input.generics.clone(), &self.tokens);
 
         let type_generics = &self.input.generics;
 
@@ -410,13 +425,12 @@ impl<'a> Expander<'a> {
             }
         };
 
-        let decode_t = &self.tokens.decode_t;
         let decoder_var = &self.tokens.decoder_var;
 
         needs.mark_used();
         needs.mark_inline();
 
-        let (span, decode_path) = field.attr.decode_path(mode, decode_t, span);
+        let (span, decode_path) = field.attr.decode_path(mode, span);
 
         Some(quote_spanned! {
             span =>
@@ -532,41 +546,45 @@ impl<'a> Expander<'a> {
 
     /// Expand Decode implementation.
     pub(crate) fn expand_decode(&self) -> Option<TokenStream> {
+        let modes = self.cx.modes();
+
+        let mode_ident = syn::Ident::new("Mode", self.type_name.span());
+
+        if modes.is_empty() {
+            return self.expand_decode_moded(ExpansionMode::Generic {
+                mode_ident: &mode_ident,
+            });
+        }
+
+        let mut out = TokenStream::new();
+
+        for mode in modes {
+            out.extend(self.expand_decode_moded(ExpansionMode::Moded { mode_ident: &mode })?);
+        }
+
+        out.extend(self.expand_decode_moded(ExpansionMode::Default)?);
+        Some(out)
+    }
+
+    fn expand_decode_moded(&self, expansion: ExpansionMode) -> Option<TokenStream> {
         let span = self.input.ident.span();
 
         let decoder_var = &self.tokens.decoder_var;
-        let type_generics = &self.input.generics;
+        let mut impl_generics = self.input.generics.clone();
         let type_ident = &self.input.ident;
 
-        let no_lifetimes = type_generics.lifetimes().count() == 0;
-
-        let lts = if no_lifetimes {
-            quote!(<'de>)
+        let (lt, exists) = if let Some(existing) = impl_generics.lifetimes().next() {
+            (existing.clone(), true)
         } else {
-            let lts = type_generics.lifetimes();
-            quote!(<#(#lts),*>)
+            let lt = syn::LifetimeDef::new(syn::Lifetime::new("'de", self.input.span()));
+            (lt, false)
         };
 
-        let impl_clause = if type_generics.params.is_empty() {
-            quote!(<'de>)
-        } else if no_lifetimes {
-            quote!(#type_generics)
-        } else {
-            let params = type_generics.params.iter();
-            quote!(<#(#params),*, 'de>)
-        };
+        if !exists {
+            impl_generics.params.push(lt.clone().into());
+        }
 
-        let decoder_lt = if let Some(lt) = type_generics.lifetimes().next() {
-            quote!(#lt)
-        } else {
-            quote!('de)
-        };
-
-        let mode = Mode {
-            ident: None,
-            moded_ident: ModeIdent::Stream(&self.tokens.default_mode),
-            encode_t: &self.tokens.encode_t,
-        };
+        let mode = expansion.as_mode(&self.tokens);
 
         let mut needs = Needs::default();
 
@@ -596,15 +614,18 @@ impl<'a> Expander<'a> {
 
         let decode_t = &self.tokens.decode_t;
         let decoder_t = &self.tokens.decoder_t;
+        let original_generics = &self.input.generics;
+
+        let (impl_generics, mode_ident) = expansion.as_impl_generics(impl_generics, &self.tokens);
 
         Some(quote_spanned! {
             span =>
             #[automatically_derived]
-            impl #impl_clause #decode_t #lts for #type_ident #type_generics {
+            impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #original_generics {
                 #inline
                 fn decode<D>(#assignment: D) -> Result<Self, D::Error>
                 where
-                    D: #decoder_t<#decoder_lt>
+                    D: #decoder_t<#lt>
                 {
                     #body
                 }
@@ -802,6 +823,7 @@ impl<'a> Expander<'a> {
         };
 
         let (decode_tag, unsupported_pattern, patterns, output_enum) = self.handle_tag_decode(
+            mode,
             tag_methods.pick(),
             &tag_visitor_output,
             &output_variants,
@@ -1155,7 +1177,6 @@ impl<'a> Expander<'a> {
         variant_tag: Option<&syn::Ident>,
         default_field_tag: DefaultTag,
     ) -> Option<TokenStream> {
-        let decode_t = &self.tokens.decode_t;
         let decoder_t = &self.tokens.decoder_t;
         let decoder_var = &self.tokens.decoder_var;
         let error_t = &self.tokens.error_t;
@@ -1184,7 +1205,7 @@ impl<'a> Expander<'a> {
 
             tag_methods.insert(field.span, tag_method);
 
-            let (span, decode_path) = field.attr.decode_path(mode, decode_t, field.span);
+            let (span, decode_path) = field.attr.decode_path(mode, field.span);
             let var = syn::Ident::new(&format!("v{}", index), span);
             decls.push(quote_spanned!(span => let mut #var = None;));
             let decode = quote_spanned!(span => #var = Some(#decode_path(#decoder_var)?));
@@ -1224,6 +1245,7 @@ impl<'a> Expander<'a> {
         let pair_decoder_t = &self.tokens.pair_decoder_t;
 
         let (decode_tag, unsupported_pattern, patterns, output_enum) = self.handle_tag_decode(
+            mode,
             tag_methods.pick(),
             &tag_visitor_output,
             &output_variants,
@@ -1342,6 +1364,7 @@ impl<'a> Expander<'a> {
     /// Handle tag decoding.
     fn handle_tag_decode(
         &self,
+        mode: Mode<'_>,
         tag_method: TagMethod,
         tag_visitor_output: &syn::Ident,
         output_variants: &[syn::Ident],
@@ -1353,7 +1376,6 @@ impl<'a> Expander<'a> {
         Vec<(TokenStream, TokenStream)>,
         Option<TokenStream>,
     )> {
-        let decode_t = &self.tokens.decode_t;
         let decoder_var = &self.tokens.decoder_var;
         let pair_decoder_t = &self.tokens.pair_decoder_t;
 
@@ -1373,9 +1395,11 @@ impl<'a> Expander<'a> {
                 Some((decode_tag, quote!(Err(tag)), patterns, Some(output_enum)))
             }
             TagMethod::Default => {
+                let decode_t_decode = mode.decode_t_decode();
+
                 let decode_tag = quote! {{
                     let index_decoder = #pair_decoder_t::first(&mut #decoder_var)?;
-                    #decode_t::decode(index_decoder)?
+                    #decode_t_decode(index_decoder)?
                 }};
 
                 let patterns = patterns
@@ -1452,7 +1476,6 @@ impl<'a> Expander<'a> {
         fields: &[FieldData],
         needs: &mut Needs,
     ) -> Option<TokenStream> {
-        let decode_t = &self.tokens.decode_t;
         let pack_decoder_t = &self.tokens.pack_decoder_t;
         let decoder_var = &self.tokens.decoder_var;
         let decoder_t = &self.tokens.decoder_t;
@@ -1472,7 +1495,7 @@ impl<'a> Expander<'a> {
                 );
             }
 
-            let (span, decode_path) = field.attr.decode_path(mode, decode_t, field.span);
+            let (span, decode_path) = field.attr.decode_path(mode, field.span);
 
             let decode = quote! {{
                 let field_decoder = #pack_decoder_t::next(&mut unpack)?;

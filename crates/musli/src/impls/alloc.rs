@@ -20,7 +20,7 @@ impl<Mode> Encode<Mode> for String {
     }
 }
 
-impl<'de> Decode<'de> for String {
+impl<'de, Mode> Decode<'de, Mode> for String {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
@@ -71,13 +71,13 @@ impl<Mode> Encode<Mode> for Box<str> {
     }
 }
 
-impl<'de> Decode<'de> for Box<str> {
+impl<'de, Mode> Decode<'de, Mode> for Box<str> {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        Ok(String::decode(decoder)?.into())
+        Ok(<String as Decode<Mode>>::decode(decoder)?.into())
     }
 }
 
@@ -91,7 +91,7 @@ impl<Mode> Encode<Mode> for Cow<'_, str> {
     }
 }
 
-impl<'de> Decode<'de> for Cow<'de, str> {
+impl<'de, Mode> Decode<'de, Mode> for Cow<'de, str> {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
@@ -159,9 +159,9 @@ macro_rules! sequence {
             }
         }
 
-        impl<'de, T $(, $extra)*> Decode<'de> for $ty<T $(, $extra)*>
+        impl<'de, Mode, T $(, $extra)*> Decode<'de, Mode> for $ty<T $(, $extra)*>
         where
-            T: Decode<'de> $(+ $trait0 $(+ $trait)*)*,
+            T: Decode<'de, Mode> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
@@ -213,7 +213,7 @@ macro_rules! map {
         $access:ident,
         $with_capacity:expr
     ) => {
-        impl<'de, K, V, Mode $(, $extra)*> Encode<Mode> for $ty<K, V $(, $extra)*>
+        impl<'de, Mode, K, V $(, $extra)*> Encode<Mode> for $ty<K, V $(, $extra)*>
         where
             K: Encode<Mode>,
             V: Encode<Mode>,
@@ -236,10 +236,10 @@ macro_rules! map {
             }
         }
 
-        impl<'de, K, V $(, $extra)*> Decode<'de> for $ty<K, V $(, $extra)*>
+        impl<'de, K, V, Mode $(, $extra)*> Decode<'de, Mode> for $ty<K, V $(, $extra)*>
         where
-            K: Decode<'de> $(+ $key_bound0 $(+ $key_bound)*)*,
-            V: Decode<'de>,
+            K: Decode<'de, Mode> $(+ $key_bound0 $(+ $key_bound)*)*,
+            V: Decode<'de, Mode>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
@@ -283,13 +283,13 @@ impl<Mode> Encode<Mode> for CStr {
     }
 }
 
-impl<'de> Decode<'de> for &'de CStr {
+impl<'de, Mode> Decode<'de, Mode> for &'de CStr {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        let bytes = <&[u8]>::decode(decoder)?;
+        let bytes = <&[u8] as Decode<Mode>>::decode(decoder)?;
         CStr::from_bytes_with_nul(bytes).map_err(D::Error::custom)
     }
 }
@@ -304,12 +304,12 @@ impl<Mode> Encode<Mode> for CString {
     }
 }
 
-impl<'de> Decode<'de> for CString {
+impl<'de, Mode> Decode<'de, Mode> for CString {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        Ok(<&CStr>::decode(decoder)?.to_owned())
+        Ok(<&CStr as Decode<Mode>>::decode(decoder)?.to_owned())
     }
 }

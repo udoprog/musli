@@ -84,7 +84,7 @@ where
 pub fn decode<'de, R, T>(reader: R) -> Result<T, R::Error>
 where
     R: Reader<'de>,
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     DEFAULT.decode(reader)
 }
@@ -94,7 +94,7 @@ where
 #[inline]
 pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, SliceReaderError>
 where
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     DEFAULT.from_slice(bytes)
 }
@@ -279,7 +279,7 @@ where
     pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
-        T: Decode<'de>,
+        T: Decode<'de, DefaultMode>,
     {
         T::decode(WireDecoder::<_, I, L>::new(reader.with_position()))
     }
@@ -289,7 +289,7 @@ where
     #[inline]
     pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, SliceReaderError>
     where
-        T: Decode<'de>,
+        T: Decode<'de, DefaultMode>,
     {
         T::decode(WireDecoder::<_, I, L>::new(
             SliceReader::new(bytes).with_position(),

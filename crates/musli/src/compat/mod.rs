@@ -59,7 +59,7 @@ impl<Mode> Encode<Mode> for Sequence<()> {
     }
 }
 
-impl<'de> Decode<'de> for Sequence<()> {
+impl<'de, Mode> Decode<'de, Mode> for Sequence<()> {
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -90,7 +90,7 @@ impl<const N: usize, Mode> Encode<Mode> for Bytes<[u8; N]> {
     }
 }
 
-impl<'de, const N: usize> Decode<'de> for Bytes<[u8; N]> {
+impl<'de, Mode, const N: usize> Decode<'de, Mode> for Bytes<[u8; N]> {
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where

@@ -7,9 +7,7 @@ use std::io;
 
 use crate::de::JsonDecoder;
 use crate::en::JsonEncoder;
-use musli::mode::DefaultMode;
-use musli::Decode;
-use musli::Encode;
+use musli::{Decode, DefaultMode, Encode};
 use musli_binary_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
 use musli_binary_common::reader::{Reader, SliceReader, SliceReaderError};
 #[cfg(feature = "std")]
@@ -68,7 +66,7 @@ where
 pub fn decode<'de, R, T>(reader: R) -> Result<T, R::Error>
 where
     R: Reader<'de>,
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     DEFAULT.decode(reader)
 }
@@ -78,7 +76,7 @@ where
 #[inline]
 pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, SliceReaderError>
 where
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     DEFAULT.from_slice(bytes)
 }

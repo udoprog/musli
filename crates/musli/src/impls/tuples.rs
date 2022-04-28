@@ -40,7 +40,7 @@ macro_rules! declare {
     };
 
     (($ty0:ident, $ident0:ident) $(, ($ty:ident, $ident:ident))* $(,)?) => {
-        impl<$ty0 $(, $ty)*, Mode> Encode<Mode> for ($ty0, $($ty),*) where $ty0: Encode<Mode>, $($ty: Encode<Mode>),* {
+        impl<Mode, $ty0 $(, $ty)*> Encode<Mode> for ($ty0, $($ty),*) where $ty0: Encode<Mode>, $($ty: Encode<Mode>),* {
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -54,7 +54,7 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, $ty0, $($ty,)*> Decode<'de> for ($ty0, $($ty),*) where $ty0: Decode<'de>, $($ty: Decode<'de>),* {
+        impl<'de, Mode, $ty0, $($ty,)*> Decode<'de, Mode> for ($ty0, $($ty),*) where $ty0: Decode<'de, Mode>, $($ty: Decode<'de, Mode>),* {
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
@@ -67,7 +67,7 @@ macro_rules! declare {
             }
         }
 
-        impl<$ty0 $(,$ty)*, Mode> Encode<Mode> for Packed<($ty0, $($ty),*)> where $ty0: Encode<Mode>, $($ty: Encode<Mode>),* {
+        impl<Mode, $ty0 $(,$ty)*> Encode<Mode> for Packed<($ty0, $($ty),*)> where $ty0: Encode<Mode>, $($ty: Encode<Mode>),* {
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -81,7 +81,7 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, $ty0, $($ty,)*> Decode<'de> for Packed<($ty0, $($ty),*)> where $ty0: Decode<'de>, $($ty: Decode<'de>),* {
+        impl<'de, Mode, $ty0, $($ty,)*> Decode<'de, Mode> for Packed<($ty0, $($ty),*)> where $ty0: Decode<'de, Mode>, $($ty: Decode<'de, Mode>),* {
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where

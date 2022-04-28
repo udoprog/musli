@@ -8,8 +8,7 @@ use std::io;
 use crate::de::StorageDecoder;
 use crate::en::StorageEncoder;
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use musli::mode::DefaultMode;
-use musli::{Decode, Encode};
+use musli::{Decode, DefaultMode, Encode};
 use musli_binary_common::encoding::{Fixed, FixedLength, Variable};
 use musli_binary_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
 use musli_binary_common::int::{BigEndian, LittleEndian, NetworkEndian};
@@ -78,7 +77,7 @@ where
 pub fn decode<'de, R, T>(reader: R) -> Result<T, R::Error>
 where
     R: Reader<'de>,
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     DEFAULT.decode(reader)
 }
@@ -88,7 +87,7 @@ where
 #[inline]
 pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, SliceReaderError>
 where
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     DEFAULT.from_slice(bytes)
 }
@@ -264,7 +263,7 @@ where
     pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
-        T: Decode<'de>,
+        T: Decode<'de, DefaultMode>,
     {
         let reader = reader.with_position();
         T::decode(StorageDecoder::<_, I, L>::new(reader))
@@ -275,7 +274,7 @@ where
     #[inline]
     pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, SliceReaderError>
     where
-        T: Decode<'de>,
+        T: Decode<'de, DefaultMode>,
     {
         let reader = SliceReader::new(bytes).with_position();
         T::decode(StorageDecoder::<_, I, L>::new(reader))

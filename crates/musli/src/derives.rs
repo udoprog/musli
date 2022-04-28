@@ -352,11 +352,11 @@
 //!         Encode::<Mode>::encode(&uuid.0, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, D>(decoder: D) -> Result<CustomUuid, D::Error>
+//!     pub fn decode<'de, Mode, D>(decoder: D) -> Result<CustomUuid, D::Error>
 //!     where
 //!         D: Decoder<'de>
 //!     {
-//!         Ok(CustomUuid(u128::decode(decoder)?))
+//!         Ok(CustomUuid(<u128 as Decode<Mode>>::decode(decoder)?))
 //!     }
 //! }
 //! # }
