@@ -4,7 +4,7 @@ use crate::de::{Decode, Decoder, PackDecoder, PairDecoder};
 use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
 use crate::error::Error;
 
-impl Encode for Ipv4Addr {
+impl<Mode> Encode<Mode> for Ipv4Addr {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -24,7 +24,7 @@ impl<'de> Decode<'de> for Ipv4Addr {
     }
 }
 
-impl Encode for Ipv6Addr {
+impl<Mode> Encode<Mode> for Ipv6Addr {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -44,7 +44,7 @@ impl<'de> Decode<'de> for Ipv6Addr {
     }
 }
 
-impl Encode for IpAddr {
+impl<Mode> Encode<Mode> for IpAddr {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -53,14 +53,14 @@ impl Encode for IpAddr {
         match self {
             IpAddr::V4(v4) => {
                 let mut variant = encoder.encode_struct_variant(1)?;
-                usize::encode(&0, variant.first()?)?;
-                v4.encode(variant.second()?)?;
+                Encode::<Mode>::encode(&0usize, variant.first()?)?;
+                Encode::<Mode>::encode(v4, variant.second()?)?;
                 variant.end()
             }
             IpAddr::V6(v6) => {
                 let mut variant = encoder.encode_struct_variant(1)?;
-                usize::encode(&1, variant.first()?)?;
-                v6.encode(variant.second()?)?;
+                Encode::<Mode>::encode(&1usize, variant.first()?)?;
+                Encode::<Mode>::encode(v6, variant.second()?)?;
                 variant.end()
             }
         }
@@ -85,15 +85,15 @@ impl<'de> Decode<'de> for IpAddr {
     }
 }
 
-impl Encode for SocketAddrV4 {
+impl<Mode> Encode<Mode> for SocketAddrV4 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
         let mut pack = encoder.encode_pack()?;
-        pack.push(self.ip())?;
-        pack.push(self.port())?;
+        pack.push::<Mode, _>(self.ip())?;
+        pack.push::<Mode, _>(self.port())?;
         pack.end()
     }
 }
@@ -111,17 +111,17 @@ impl<'de> Decode<'de> for SocketAddrV4 {
     }
 }
 
-impl Encode for SocketAddrV6 {
+impl<Mode> Encode<Mode> for SocketAddrV6 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
         let mut pack = encoder.encode_pack()?;
-        pack.push(self.ip())?;
-        pack.push(self.port())?;
-        pack.push(self.flowinfo())?;
-        pack.push(self.scope_id())?;
+        pack.push::<Mode, _>(self.ip())?;
+        pack.push::<Mode, _>(self.port())?;
+        pack.push::<Mode, _>(self.flowinfo())?;
+        pack.push::<Mode, _>(self.scope_id())?;
         pack.end()
     }
 }
@@ -141,7 +141,7 @@ impl<'de> Decode<'de> for SocketAddrV6 {
     }
 }
 
-impl Encode for SocketAddr {
+impl<Mode> Encode<Mode> for SocketAddr {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -149,16 +149,12 @@ impl Encode for SocketAddr {
     {
         match self {
             SocketAddr::V4(v4) => {
-                let mut variant = encoder.encode_struct_variant(1)?;
-                usize::encode(&0, variant.first()?)?;
-                v4.encode(variant.second()?)?;
-                variant.end()
+                let variant = encoder.encode_struct_variant(1)?;
+                variant.insert::<Mode, _, _>(0usize, v4)
             }
             SocketAddr::V6(v6) => {
-                let mut variant = encoder.encode_struct_variant(1)?;
-                usize::encode(&1, variant.first()?)?;
-                v6.encode(variant.second()?)?;
-                variant.end()
+                let variant = encoder.encode_struct_variant(1)?;
+                variant.insert::<Mode, _, _>(1usize, v6)
             }
         }
     }

@@ -40,11 +40,11 @@ macro_rules! declare {
     };
 
     (($ty0:ident, $ident0:ident) $(, ($ty:ident, $ident:ident))* $(,)?) => {
-        impl<$ty0, $($ty),*> Encode for ($ty0, $($ty),*) where $ty0: Encode, $($ty: Encode),* {
+        impl<$ty0 $(, $ty)*, Mode> Encode<Mode> for ($ty0, $($ty),*) where $ty0: Encode<Mode>, $($ty: Encode<Mode>),* {
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
-                E: Encoder
+                E: Encoder,
             {
                 let mut pack = encoder.encode_tuple(count!($ident0 $($ident)*))?;
                 let ($ident0, $($ident),*) = self;
@@ -67,11 +67,11 @@ macro_rules! declare {
             }
         }
 
-        impl<$ty0, $($ty),*> Encode for Packed<($ty0, $($ty),*)> where $ty0: Encode, $($ty: Encode),* {
+        impl<$ty0 $(,$ty)*, Mode> Encode<Mode> for Packed<($ty0, $($ty),*)> where $ty0: Encode<Mode>, $($ty: Encode<Mode>),* {
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
-                E: Encoder
+                E: Encoder,
             {
                 let Packed(($ident0, $($ident),*)) = self;
                 let mut pack = encoder.encode_pack()?;

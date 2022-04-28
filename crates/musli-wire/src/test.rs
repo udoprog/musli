@@ -2,6 +2,7 @@
 
 use core::fmt::Debug;
 use musli::de::PackDecoder;
+use musli::mode::DefaultMode;
 use musli::{Decode, Decoder, Encode};
 
 use crate::tag::Tag;
@@ -63,7 +64,7 @@ macro_rules! rt {
 #[inline(never)]
 pub fn transcode<T, O>(value: T) -> O
 where
-    T: Debug + PartialEq + Encode,
+    T: Debug + PartialEq + Encode<DefaultMode>,
     O: for<'de> Decode<'de>,
 {
     let out = crate::to_vec(&value).expect("failed to encode");

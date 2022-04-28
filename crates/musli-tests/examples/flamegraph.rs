@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use criterion::black_box;
-use musli::{Decode, Encode};
+use musli::{mode::DefaultMode, Decode, Encode};
 use musli_storage::{Fixed, FixedLength, StorageEncoding};
 use serde::{Deserialize, Serialize};
 
@@ -90,7 +90,7 @@ const ENCODING: StorageEncoding<Fixed, FixedLength> = StorageEncoding::new()
 #[inline(never)]
 fn encode_musli<T>(expected: &T) -> Vec<u8>
 where
-    T: Encode,
+    T: Encode<DefaultMode>,
 {
     // NB: bincode uses a 128-byte preallocated buffer.
     let mut data = Vec::with_capacity(128);

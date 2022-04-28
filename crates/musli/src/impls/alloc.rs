@@ -10,13 +10,13 @@ use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use crate::error::Error;
 use crate::internal::size_hint;
 
-impl Encode for String {
+impl<Mode> Encode<Mode> for String {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        self.as_str().encode(encoder)
+        Encode::<Mode>::encode(self.as_str(), encoder)
     }
 }
 
@@ -61,13 +61,13 @@ impl<'de> Decode<'de> for String {
     }
 }
 
-impl Encode for Box<str> {
+impl<Mode> Encode<Mode> for Box<str> {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        self.as_ref().encode(encoder)
+        Encode::<Mode>::encode(self.as_ref(), encoder)
     }
 }
 
@@ -81,13 +81,13 @@ impl<'de> Decode<'de> for Box<str> {
     }
 }
 
-impl Encode for Cow<'_, str> {
+impl<Mode> Encode<Mode> for Cow<'_, str> {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        self.as_ref().encode(encoder)
+        Encode::<Mode>::encode(self.as_ref(), encoder)
     }
 }
 
@@ -139,9 +139,9 @@ macro_rules! sequence {
         $access:ident,
         $factory:expr
     ) => {
-        impl<T $(, $extra)*> Encode for $ty<T $(, $extra)*>
+        impl<T, Mode $(, $extra)*> Encode<Mode> for $ty<T $(, $extra)*>
         where
-            T: Encode,
+            T: Encode<Mode>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
@@ -213,10 +213,10 @@ macro_rules! map {
         $access:ident,
         $with_capacity:expr
     ) => {
-        impl<'de, K, V $(, $extra)*> Encode for $ty<K, V $(, $extra)*>
+        impl<'de, K, V, Mode $(, $extra)*> Encode<Mode> for $ty<K, V $(, $extra)*>
         where
-            K: Encode,
-            V: Encode,
+            K: Encode<Mode>,
+            V: Encode<Mode>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
@@ -273,7 +273,7 @@ map!(
     HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default())
 );
 
-impl Encode for CStr {
+impl<Mode> Encode<Mode> for CStr {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -294,7 +294,7 @@ impl<'de> Decode<'de> for &'de CStr {
     }
 }
 
-impl Encode for CString {
+impl<Mode> Encode<Mode> for CString {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where

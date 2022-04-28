@@ -29,9 +29,9 @@ impl<T> Sequence<T> {
     }
 }
 
-impl<T> Encode for Sequence<&'_ [T]>
+impl<T, Mode> Encode<Mode> for Sequence<&'_ [T]>
 where
-    T: Encode,
+    T: Encode<Mode>,
 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -49,7 +49,7 @@ where
     }
 }
 
-impl Encode for Sequence<()> {
+impl<Mode> Encode<Mode> for Sequence<()> {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -80,7 +80,7 @@ impl<'de> Decode<'de> for Sequence<()> {
 #[repr(transparent)]
 pub struct Bytes<T>(pub T);
 
-impl<const N: usize> Encode for Bytes<[u8; N]> {
+impl<const N: usize, Mode> Encode<Mode> for Bytes<[u8; N]> {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where

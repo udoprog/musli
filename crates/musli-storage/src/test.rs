@@ -1,6 +1,7 @@
 //! Helpers for writing tests.
 
 use core::fmt::Debug;
+use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 
 /// Roundtrip encode the given value.
@@ -29,7 +30,7 @@ macro_rules! rt {
 #[inline(never)]
 pub fn transcode<T, O>(value: T) -> O
 where
-    T: Debug + PartialEq + Encode,
+    T: Debug + PartialEq + Encode<DefaultMode>,
     O: for<'de> Decode<'de>,
 {
     let out = crate::to_vec(&value).expect("encode failed");

@@ -67,4 +67,9 @@ impl Ctxt {
     pub(crate) fn into_errors(self) -> Vec<syn::Error> {
         std::mem::take(&mut self.inner.borrow_mut().errors)
     }
+
+    /// Get all "extra" modes specified.
+    pub(crate) fn modes(&self) -> Vec<syn::Ident> {
+        self.inner.borrow().modes.iter().cloned().collect()
+    }
 }

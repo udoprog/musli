@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use musli::{Decode, Encode};
+use musli::{mode::DefaultMode, Decode, Encode};
 use musli_wire::WireEncoding;
 use serde::{Deserialize, Serialize};
 
@@ -167,7 +167,7 @@ const WIRE_ENCODING: WireEncoding<musli_wire::Fixed, musli_wire::FixedLength> = 
 
 fn musli_wire_rt<T>(expected: &T) -> T
 where
-    T: Encode + for<'de> Decode<'de>,
+    T: Encode<DefaultMode> + for<'de> Decode<'de>,
 {
     // NB: bincode uses a 128-byte pre-allocated vector.
     let mut data = Vec::with_capacity(128);
@@ -178,7 +178,7 @@ where
 
 fn musli_wire_enc<T>(expected: &T) -> Vec<u8>
 where
-    T: Encode,
+    T: Encode<DefaultMode>,
 {
     // NB: bincode uses a 128-byte pre-allocated vector.
     let mut data = Vec::with_capacity(128);
@@ -202,7 +202,7 @@ const STORAGE_ENCODING: musli_storage::StorageEncoding<
 
 fn musli_storage_rt<T>(expected: &T) -> T
 where
-    T: Encode + for<'de> Decode<'de>,
+    T: Encode<DefaultMode> + for<'de> Decode<'de>,
 {
     // NB: bincode uses a 128-byte pre-allocated vector.
     let mut data = Vec::with_capacity(128);
@@ -213,7 +213,7 @@ where
 
 fn musli_storage_enc<T>(expected: &T) -> Vec<u8>
 where
-    T: Encode,
+    T: Encode<DefaultMode>,
 {
     // NB: bincode uses a 128-byte pre-allocated vector.
     let mut data = Vec::with_capacity(128);

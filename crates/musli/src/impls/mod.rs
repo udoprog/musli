@@ -18,7 +18,7 @@ use crate::de::{Decode, Decoder, PairDecoder, ValueVisitor};
 use crate::en::{Encode, Encoder, PairEncoder};
 use crate::error::Error;
 
-impl Encode for () {
+impl<Mode> Encode<Mode> for () {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -38,7 +38,7 @@ impl<'de> Decode<'de> for () {
     }
 }
 
-impl<T> Encode for marker::PhantomData<T> {
+impl<T, Mode> Encode<Mode> for marker::PhantomData<T> {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -85,13 +85,13 @@ atomic_impl!(AtomicUsize);
 
 macro_rules! non_zero {
     ($ty:ty) => {
-        impl Encode for $ty {
+        impl<Mode> Encode<Mode> for $ty {
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder,
             {
-                Encode::encode(&self.get(), encoder)
+                Encode::<Mode>::encode(&self.get(), encoder)
             }
         }
 
@@ -145,7 +145,7 @@ where
     }
 }
 
-impl<const N: usize> Encode for [u8; N] {
+impl<const N: usize, Mode> Encode<Mode> for [u8; N] {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -167,7 +167,7 @@ impl<'de, const N: usize> Decode<'de> for [u8; N] {
 
 macro_rules! impl_number {
     ($ty:ty, $read:ident, $write:ident) => {
-        impl Encode for $ty {
+        impl<Mode> Encode<Mode> for $ty {
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -189,7 +189,7 @@ macro_rules! impl_number {
     };
 }
 
-impl Encode for bool {
+impl<Mode> Encode<Mode> for bool {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -209,7 +209,7 @@ impl<'de> Decode<'de> for bool {
     }
 }
 
-impl Encode for char {
+impl<Mode> Encode<Mode> for char {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -244,7 +244,7 @@ impl_number!(i128, decode_i128, encode_i128);
 impl_number!(f32, decode_f32, encode_f32);
 impl_number!(f64, decode_f64, encode_f64);
 
-impl Encode for str {
+impl<Mode> Encode<Mode> for str {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -285,7 +285,7 @@ impl<'de> Decode<'de> for &'de str {
     }
 }
 
-impl Encode for [u8] {
+impl<Mode> Encode<Mode> for [u8] {
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
@@ -325,9 +325,9 @@ impl<'de> Decode<'de> for &'de [u8] {
     }
 }
 
-impl<T> Encode for Option<T>
+impl<T, Mode> Encode<Mode> for Option<T>
 where
-    T: Encode,
+    T: Encode<Mode>,
 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -360,10 +360,10 @@ where
     }
 }
 
-impl<T, U> Encode for Result<T, U>
+impl<T, U, Mode> Encode<Mode> for Result<T, U>
 where
-    T: Encode,
-    U: Encode,
+    T: Encode<Mode>,
+    U: Encode<Mode>,
 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -374,12 +374,12 @@ where
 
         match self {
             Ok(ok) => {
-                Encode::encode(&0usize, variant.first()?)?;
-                Encode::encode(ok, variant.second()?)
+                Encode::<Mode>::encode(&0usize, variant.first()?)?;
+                Encode::<Mode>::encode(ok, variant.second()?)
             }
             Err(err) => {
-                Encode::encode(&1usize, variant.first()?)?;
-                Encode::encode(err, variant.second()?)
+                Encode::<Mode>::encode(&1usize, variant.first()?)?;
+                Encode::<Mode>::encode(err, variant.second()?)
             }
         }
     }
@@ -405,9 +405,9 @@ where
     }
 }
 
-impl<T> Encode for Wrapping<T>
+impl<T, Mode> Encode<Mode> for Wrapping<T>
 where
-    T: Encode,
+    T: Encode<Mode>,
 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>

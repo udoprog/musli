@@ -10,7 +10,7 @@ use crate::de::ValueVisitor;
 use crate::error::Error;
 use crate::{Decode, Decoder, Encode, Encoder};
 
-impl Encode for Bytes<Vec<u8>> {
+impl<Mode> Encode<Mode> for Bytes<Vec<u8>> {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -58,7 +58,7 @@ impl<'de> Decode<'de> for Bytes<Vec<u8>> {
     }
 }
 
-impl Encode for Bytes<VecDeque<u8>> {
+impl<Mode> Encode<Mode> for Bytes<VecDeque<u8>> {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where

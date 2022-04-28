@@ -9,6 +9,7 @@ use crate::de::WireDecoder;
 use crate::en::WireEncoder;
 use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::MAX_INLINE_LEN;
+use musli::mode::DefaultMode;
 use musli::Decode;
 use musli::Encode;
 use musli_binary_common::encoding::{Fixed, FixedLength, Variable};
@@ -40,7 +41,7 @@ pub const DEFAULT: WireEncoding = WireEncoding::new();
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
 where
     W: Writer,
-    T: ?Sized + Encode,
+    T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
 }
@@ -52,7 +53,7 @@ where
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), io::Error>
 where
     W: io::Write,
-    T: ?Sized + Encode,
+    T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_writer(writer, value)
 }
@@ -62,7 +63,7 @@ where
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, VecWriterError>
 where
-    T: ?Sized + Encode,
+    T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_vec(value)
 }
@@ -72,7 +73,7 @@ where
 #[inline]
 pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, FixedBytesWriterError>
 where
-    T: ?Sized + Encode,
+    T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_fixed_bytes::<N, _>(value)
 }
@@ -227,7 +228,7 @@ where
     pub fn encode<W, T>(self, mut writer: W, value: &T) -> Result<(), W::Error>
     where
         W: Writer,
-        T: ?Sized + Encode,
+        T: ?Sized + Encode<DefaultMode>,
     {
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut writer))
     }
@@ -239,7 +240,7 @@ where
     pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
     where
         W: io::Write,
-        T: ?Sized + Encode,
+        T: ?Sized + Encode<DefaultMode>,
     {
         let mut writer = musli_binary_common::io::wrap(write);
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut writer))
@@ -250,7 +251,7 @@ where
     #[inline]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, VecWriterError>
     where
-        T: ?Sized + Encode,
+        T: ?Sized + Encode<DefaultMode>,
     {
         let mut data = Vec::new();
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut data))?;
@@ -265,7 +266,7 @@ where
         value: &T,
     ) -> Result<FixedBytes<N>, FixedBytesWriterError>
     where
-        T: ?Sized + Encode,
+        T: ?Sized + Encode<DefaultMode>,
     {
         let mut bytes = FixedBytes::new();
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut bytes))?;

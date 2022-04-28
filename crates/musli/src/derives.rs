@@ -345,11 +345,11 @@
 //!
 //!     use super::CustomUuid;
 //!
-//!     pub fn encode<E>(uuid: &CustomUuid, encoder: E) -> Result<E::Ok, E::Error>
+//!     pub fn encode<Mode, E>(uuid: &CustomUuid, encoder: E) -> Result<E::Ok, E::Error>
 //!     where
 //!         E: Encoder
 //!     {
-//!         uuid.0.encode(encoder)
+//!         Encode::<Mode>::encode(&uuid.0, encoder)
 //!     }
 //!
 //!     pub fn decode<'de, D>(decoder: D) -> Result<CustomUuid, D::Error>

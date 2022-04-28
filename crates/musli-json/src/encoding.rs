@@ -25,7 +25,7 @@ pub const DEFAULT: JsonEncoding = JsonEncoding::new();
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
 where
     W: Writer,
-    T: ?Sized + Encode,
+    T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
 }
@@ -37,7 +37,7 @@ where
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), io::Error>
 where
     W: io::Write,
-    T: ?Sized + Encode,
+    T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_writer(writer, value)
 }
@@ -47,7 +47,7 @@ where
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, VecWriterError>
 where
-    T: ?Sized + Encode,
+    T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_vec(value)
 }
@@ -57,7 +57,7 @@ where
 #[inline]
 pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, FixedBytesWriterError>
 where
-    T: ?Sized + Encode,
+    T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_fixed_bytes::<N, _>(value)
 }
@@ -100,12 +100,11 @@ impl<Mode> JsonEncoding<Mode> {
     ///
     /// const CONFIG: JsonEncoding<Json> = JsonEncoding::new();
     ///
-    /// // Marker indicating that something should only apply for JSON.
-    /// #[derive(Clone, Copy)]
+    /// // Mode marker indicating that some attributes should only apply when we're decoding in a JSON mode.
     /// enum Json {}
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
-    /// #[musli(mode = Json, default_field_tag = "name")]
+    /// #[musli(default_field_tag = "name")]
     /// struct Struct<'a> {
     ///     name: &'a str,
     ///     age: u32,
@@ -117,9 +116,11 @@ impl<Mode> JsonEncoding<Mode> {
     ///     age: 61,
     /// };
     ///
-    /// // TODO: uncomment these.
     /// let out = CONFIG.to_vec(&expected)?;
-    /// panic!("{}", String::from_utf8(out)?);
+    /// println!("{}", String::from_utf8(out)?);
+    ///
+    /// let out = musli_json::to_vec(&expected)?;
+    /// println!("{}", String::from_utf8(out)?);
     /// // let actual = CONFIG.decode(&out[..])?;
     ///
     /// // assert_eq!(expected, actual);
@@ -130,9 +131,7 @@ impl<Mode> JsonEncoding<Mode> {
             _mode: marker::PhantomData,
         }
     }
-}
 
-impl<Mode> JsonEncoding<Mode> {
     /// Encode the given value to the given [Writer] using the current
     /// configuration.
     #[inline]
@@ -177,7 +176,7 @@ impl<Mode> JsonEncoding<Mode> {
         value: &T,
     ) -> Result<FixedBytes<N>, FixedBytesWriterError>
     where
-        T: ?Sized + Encode,
+        T: ?Sized + Encode<Mode>,
     {
         let mut bytes = FixedBytes::new();
         T::encode(value, JsonEncoder::new(&mut bytes))?;

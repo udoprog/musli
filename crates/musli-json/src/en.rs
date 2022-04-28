@@ -1,6 +1,6 @@
 use core::fmt;
 
-use musli::en::{Encoder, PairEncoder, PairsEncoder};
+use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use musli::never::Never;
 use musli_binary_common::buffered_writer::BufferedWriter;
 use musli_binary_common::writer::Writer;
@@ -26,7 +26,7 @@ where
     type Ok = ();
     type Pack = Never<Self>;
     type Some = Never<Self>;
-    type Sequence = Never<Self>;
+    type Sequence = JsonArrayEncoder<W>;
     type Tuple = Never<Self>;
     type Map = Never<Self>;
     type Struct = JsonObjectEncoder<W>;
@@ -38,6 +38,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be encoded to JSON")
+    }
+
+    #[inline]
+    fn encode_sequence(self, _: usize) -> Result<Self::Sequence, Self::Error> {
+        JsonArrayEncoder::new(self.writer)
     }
 
     #[inline]
@@ -284,6 +289,50 @@ where
     #[inline]
     fn encode_string(self, string: &str) -> Result<Self::Ok, Self::Error> {
         encode_chars(self.writer, string.chars())
+    }
+}
+
+/// Encoder for a pairs sequence.
+pub struct JsonArrayEncoder<W> {
+    first: bool,
+    writer: W,
+}
+
+impl<W> JsonArrayEncoder<W>
+where
+    W: Writer,
+{
+    fn new(mut writer: W) -> Result<Self, W::Error> {
+        writer.write_byte(b'[')?;
+        Ok(Self {
+            first: true,
+            writer,
+        })
+    }
+}
+
+impl<W> SequenceEncoder for JsonArrayEncoder<W>
+where
+    W: Writer,
+{
+    type Ok = ();
+    type Error = W::Error;
+
+    type Encoder<'this> = JsonEncoder<&'this mut W>
+    where
+        Self: 'this;
+
+    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+        if !self.first {
+            self.writer.write_byte(b',')?;
+        }
+
+        Ok(JsonEncoder::new(&mut self.writer))
+    }
+
+    fn end(mut self) -> Result<Self::Ok, Self::Error> {
+        self.writer.write_byte(b']')?;
+        Ok(())
     }
 }
 

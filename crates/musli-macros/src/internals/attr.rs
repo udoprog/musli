@@ -3,15 +3,13 @@ use std::collections::HashMap;
 
 use crate::internals::symbol::*;
 use crate::internals::Ctxt;
+use crate::internals::Mode;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::parse;
 use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Ident;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct Mode(syn::Ident);
 
 /// The kind of tag to use.
 #[derive(Debug, Clone, Copy)]
@@ -88,35 +86,36 @@ pub(crate) struct TypeAttr {
 
 impl TypeAttr {
     /// Indicates the packing state of the type.
-    pub(crate) fn packing(&self, mode: Option<&syn::Ident>) -> Option<(Span, Packing)> {
-        mode.and_then(|m| self.modes.get(m))
+    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<(Span, Packing)> {
+        mode.ident
+            .and_then(|m| self.modes.get(m))
             .and_then(|a| a.packing)
             .or_else(|| self.root.packing)
     }
 
     /// Indicates the packing state of the type.
-    pub(crate) fn packing_or_default(&self, mode: Option<&syn::Ident>) -> Packing {
+    pub(crate) fn packing_or_default(&self, mode: Mode<'_>) -> Packing {
         self.packing(mode).map(|p| p.1).unwrap_or_default()
     }
 
     /// Default field tag.
-    pub(crate) fn default_field_tag(&self, mode: Option<&syn::Ident>) -> DefaultTag {
-        mode.and_then(|m| self.modes.get(m))
-            .map(|a| a.default_field_tag)
-            .unwrap_or_default()
+    pub(crate) fn default_field_tag(&self, mode: Mode<'_>) -> DefaultTag {
+        mode.ident
+            .and_then(|m| Some(self.modes.get(m)?.default_field_tag))
+            .unwrap_or(self.root.default_field_tag)
     }
 
-    pub(crate) fn default_variant_tag(&self, mode: Option<&syn::Ident>) -> DefaultTag {
-        mode.and_then(|m| self.modes.get(m))
-            .map(|a| a.default_variant_tag)
-            .unwrap_or_else(|| self.root.default_variant_tag)
+    pub(crate) fn default_variant_tag(&self, mode: Mode<'_>) -> DefaultTag {
+        mode.ident
+            .and_then(|m| Some(self.modes.get(m)?.default_variant_tag))
+            .unwrap_or(self.root.default_variant_tag)
     }
 
     /// Get the tag type of the type.
-    pub(crate) fn tag_type(&self, mode: Option<&syn::Ident>) -> Option<&(Span, syn::Type)> {
-        mode.and_then(|m| self.modes.get(m))
-            .map(|a| a.tag_type.as_ref())
-            .unwrap_or_else(|| self.root.tag_type.as_ref())
+    pub(crate) fn tag_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.tag_type.as_ref())
+            .or_else(|| self.root.tag_type.as_ref())
     }
 }
 
@@ -208,32 +207,37 @@ pub(crate) struct VariantAttr {
 
 impl VariantAttr {
     /// Test if the `#[musli(default)]` tag is specified.
-    pub(crate) fn default_attr(&self, mode: Option<&syn::Ident>) -> Option<Span> {
-        mode.and_then(|m| self.modes.get(m)?.default)
+    pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.default)
             .or_else(|| self.root.default)
     }
 
     /// Test if the `#[musli(rename)]` tag is specified.
-    pub(crate) fn rename(&self, mode: Option<&syn::Ident>) -> Option<&(Span, syn::Expr)> {
-        mode.and_then(|m| self.modes.get(m)?.rename.as_ref())
+    pub(crate) fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.rename.as_ref())
             .or_else(|| self.root.rename.as_ref())
     }
 
     /// Indicates if the tagged state of the variant is set.
-    pub(crate) fn packing(&self, mode: Option<&syn::Ident>) -> Option<Packing> {
-        mode.and_then(|m| Some(self.modes.get(m)?.packing?.1))
+    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<Packing> {
+        mode.ident
+            .and_then(|m| Some(self.modes.get(m)?.packing?.1))
             .or_else(|| Some(self.root.packing?.1))
     }
 
     /// Default field tag.
-    pub(crate) fn default_field_tag(&self, mode: Option<&syn::Ident>) -> Option<DefaultTag> {
-        mode.and_then(|m| self.modes.get(m)?.default_field_tag)
+    pub(crate) fn default_field_tag(&self, mode: Mode<'_>) -> Option<DefaultTag> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.default_field_tag)
             .or_else(|| self.root.default_field_tag)
     }
 
     /// Get the tag type of the type.
-    pub(crate) fn tag_type(&self, mode: Option<&syn::Ident>) -> Option<&(Span, syn::Type)> {
-        mode.and_then(|m| self.modes.get(m))
+    pub(crate) fn tag_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
+        mode.ident
+            .and_then(|m| self.modes.get(m))
             .map(|a| a.tag_type.as_ref())
             .unwrap_or_else(|| self.root.tag_type.as_ref())
     }
@@ -247,43 +251,47 @@ pub(crate) struct FieldAttr {
 
 impl FieldAttr {
     /// Test if the `#[musli(default)]` tag is specified.
-    pub(crate) fn default_attr(&self, mode: Option<&syn::Ident>) -> Option<Span> {
-        mode.and_then(|m| self.modes.get(m)?.default)
+    pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.default)
             .or_else(|| self.root.default)
     }
 
     /// Test if the `#[musli(rename)]` tag is specified.
-    pub(crate) fn rename(&self, mode: Option<&syn::Ident>) -> Option<&(Span, syn::Expr)> {
-        mode.and_then(|m| self.modes.get(m)?.rename.as_ref())
+    pub(crate) fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.rename.as_ref())
             .or_else(|| self.root.rename.as_ref())
     }
 
     /// Expand encode of the given field.
-    pub(crate) fn encode_path(
-        &self,
-        mode: Option<&syn::Ident>,
-        encode_trait: &TokenStream,
-        span: Span,
-    ) -> (Span, TokenStream) {
+    pub(crate) fn encode_path(&self, mode: Mode<'_>, span: Span) -> (Span, TokenStream) {
         let encode_path = mode
+            .ident
             .and_then(|m| self.modes.get(m)?.encode_path.as_ref())
             .or_else(|| self.root.encode_path.as_ref());
 
         if let Some((span, encode_path)) = encode_path {
-            (*span, quote_spanned!(*span => #encode_path))
+            let mode_ident = mode.mode_ident();
+            (
+                *span,
+                quote_spanned!(*span => #encode_path::<#mode_ident, _>),
+            )
         } else {
-            (span, quote_spanned!(span => #encode_trait::encode))
+            let encode_t_encode = mode.encode_t_encode();
+            (span, quote_spanned!(span => #encode_t_encode))
         }
     }
 
     /// Expand decode of the given field.
     pub(crate) fn decode_path(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         decode_trait: &TokenStream,
         span: Span,
     ) -> (Span, TokenStream) {
         let decode_path = mode
+            .ident
             .and_then(|m| self.modes.get(m)?.decode_path.as_ref())
             .or_else(|| self.root.decode_path.as_ref());
 
@@ -295,11 +303,9 @@ impl FieldAttr {
     }
 
     /// Get skip encoding if.
-    pub(crate) fn skip_encoding_if(
-        &self,
-        mode: Option<&syn::Ident>,
-    ) -> Option<(Span, &syn::ExprPath)> {
+    pub(crate) fn skip_encoding_if(&self, mode: Mode<'_>) -> Option<(Span, &syn::ExprPath)> {
         let (span, path) = mode
+            .ident
             .and_then(|m| self.modes.get(m)?.skip_encoding_if.as_ref())
             .or_else(|| self.root.skip_encoding_if.as_ref())?;
 

@@ -6,7 +6,7 @@ use syn::spanned::Spanned;
 
 use crate::internals::attr::{self, DefaultTag, Packing, TypeAttr};
 use crate::internals::symbol::*;
-use crate::internals::{Ctxt, Needs, NeedsKind};
+use crate::internals::{Ctxt, Mode, ModeIdent, Needs, NeedsKind};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum TagMethod {
@@ -20,6 +20,12 @@ impl Default for TagMethod {
     fn default() -> Self {
         Self::Default
     }
+}
+
+enum ExpansionMode<'a> {
+    Generic { mode_ident: &'a syn::Ident },
+    Default,
+    Moded { mode_ident: &'a syn::Ident },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -76,6 +82,7 @@ struct Tokens {
     phantom_data: TokenStream,
     value_visitor_t: TokenStream,
     sequence_encoder_t: TokenStream,
+    default_mode: TokenStream,
 }
 
 pub(crate) struct Expander<'a> {
@@ -162,6 +169,7 @@ impl<'a> Expander<'a> {
                 phantom_data: quote!(core::marker::PhantomData),
                 value_visitor_t: quote!(#prefix::de::ValueVisitor),
                 sequence_encoder_t: quote!(#prefix::en::SequenceEncoder),
+                default_mode: quote!(#prefix::mode::DefaultMode),
             },
         }
     }
@@ -173,15 +181,52 @@ impl<'a> Expander<'a> {
 
     /// Expand Encode implementation.
     pub(crate) fn expand_encode(&self) -> Option<TokenStream> {
+        let modes = self.cx.modes();
+
+        let mode_ident = syn::Ident::new("Mode", self.type_name.span());
+
+        if modes.is_empty() {
+            return self.expand_encode_moded(ExpansionMode::Generic {
+                mode_ident: &mode_ident,
+            });
+        }
+
+        let mut out = TokenStream::new();
+
+        for mode in modes {
+            out.extend(self.expand_encode_moded(ExpansionMode::Moded { mode_ident: &mode })?);
+        }
+
+        out.extend(self.expand_encode_moded(ExpansionMode::Default)?);
+        Some(out)
+    }
+
+    fn expand_encode_moded(&self, expansion: ExpansionMode) -> Option<TokenStream> {
         let span = self.input.ident.span();
 
         let encoder_var = &self.tokens.encoder_var;
 
-        let type_generics = &self.input.generics;
         let type_ident = &self.input.ident;
 
-        let mode = None;
         let mut needs = Needs::default();
+
+        let mode = match expansion {
+            ExpansionMode::Generic { mode_ident } => Mode {
+                ident: None,
+                moded_ident: ModeIdent::Ident(mode_ident),
+                encode_t: &self.tokens.encode_t,
+            },
+            ExpansionMode::Default => Mode {
+                ident: None,
+                moded_ident: ModeIdent::Stream(&self.tokens.default_mode),
+                encode_t: &self.tokens.encode_t,
+            },
+            ExpansionMode::Moded { mode_ident } => Mode {
+                ident: Some(mode_ident),
+                moded_ident: ModeIdent::Ident(mode_ident),
+                encode_t: &self.tokens.encode_t,
+            },
+        };
 
         let body = match &self.data {
             Data::Struct(data) => self.encode_struct(mode, data, &mut needs)?,
@@ -210,10 +255,30 @@ impl<'a> Expander<'a> {
         let encode_t = &self.tokens.encode_t;
         let encoder_t = &self.tokens.encoder_t;
 
+        let (impl_generics, mode_ident) = match expansion {
+            ExpansionMode::Generic { mode_ident } => {
+                let mut impl_generics = self.input.generics.clone();
+                impl_generics
+                    .params
+                    .push(syn::TypeParam::from(mode_ident.clone()).into());
+
+                (impl_generics, quote!(#mode_ident))
+            }
+            ExpansionMode::Default => (
+                self.input.generics.clone(),
+                self.tokens.default_mode.clone(),
+            ),
+            ExpansionMode::Moded { mode_ident } => {
+                (self.input.generics.clone(), quote!(#mode_ident))
+            }
+        };
+
+        let type_generics = &self.input.generics;
+
         Some(quote_spanned! {
             span =>
             #[automatically_derived]
-            impl #type_generics #encode_t for #type_ident #type_generics {
+            impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics {
                 #inline
                 fn encode<E>(&self, #assignment: E) -> Result<E::Ok, E::Error>
                 where
@@ -248,7 +313,7 @@ impl<'a> Expander<'a> {
     /// Encode a transparent element.
     fn encode_transparent(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         span: Span,
         fields: &[FieldData],
         needs: &mut Needs,
@@ -270,12 +335,11 @@ impl<'a> Expander<'a> {
             }
         };
 
-        let encode_t = &self.tokens.encode_t;
         let encoder_var = &self.tokens.encoder_var;
 
         needs.mark_used();
 
-        let (span, encode_path) = field_attr.encode_path(mode, encode_t, span);
+        let (span, encode_path) = field_attr.encode_path(mode, span);
 
         Some(quote_spanned! {
             span => #encode_path(#accessor, #encoder_var)
@@ -285,7 +349,7 @@ impl<'a> Expander<'a> {
     /// Encode a transparent element.
     fn transparent_variant(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         span: Span,
         fields: &[FieldData],
         needs: &mut Needs,
@@ -307,12 +371,11 @@ impl<'a> Expander<'a> {
             }
         };
 
-        let encode_t = &self.tokens.encode_t;
         let encoder_var = &self.tokens.encoder_var;
 
         needs.mark_used();
 
-        let (span, encode_path) = field_attr.encode_path(mode, encode_t, span);
+        let (span, encode_path) = field_attr.encode_path(mode, span);
 
         let encode = quote_spanned! {
             span => #encode_path(this, #encoder_var)
@@ -324,7 +387,7 @@ impl<'a> Expander<'a> {
     /// Decode a transparent value.
     fn decode_transparent(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         span: Span,
         path: syn::Path,
         fields: &[FieldData],
@@ -366,7 +429,7 @@ impl<'a> Expander<'a> {
     /// Encode a struct.
     fn encode_struct(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         st: &StructData,
         needs: &mut Needs,
     ) -> Option<TokenStream> {
@@ -433,7 +496,7 @@ impl<'a> Expander<'a> {
 
     fn encode_enum(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         data: &EnumData,
         needs: &mut Needs,
     ) -> Option<TokenStream> {
@@ -499,7 +562,12 @@ impl<'a> Expander<'a> {
             quote!('de)
         };
 
-        let mode = None;
+        let mode = Mode {
+            ident: None,
+            moded_ident: ModeIdent::Stream(&self.tokens.default_mode),
+            encode_t: &self.tokens.encode_t,
+        };
+
         let mut needs = Needs::default();
 
         let body = match &self.data {
@@ -546,7 +614,7 @@ impl<'a> Expander<'a> {
 
     fn decode_struct(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         span: Span,
         data: &StructData,
         needs: &mut Needs,
@@ -583,7 +651,7 @@ impl<'a> Expander<'a> {
 
     fn decode_enum(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         data: &EnumData,
         needs: &mut Needs,
     ) -> Option<TokenStream> {
@@ -830,7 +898,7 @@ impl<'a> Expander<'a> {
     /// Setup encoding for a single variant.
     fn encode_variant(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         variant_index: usize,
         variant: &VariantData,
         needs: &mut Needs,
@@ -881,7 +949,6 @@ impl<'a> Expander<'a> {
             needs.mark_used();
 
             let Tokens {
-                encode_t,
                 encoder_t,
                 pair_encoder_t,
                 ..
@@ -895,9 +962,11 @@ impl<'a> Expander<'a> {
                 Some(&variant.ident),
             )?;
 
+            let encode_t_encode = mode.encode_t_encode();
+
             let body = quote! {
                 let tag_encoder = #pair_encoder_t::first(&mut variant_encoder)?;
-                #encode_t::encode(&#tag, tag_encoder)?;
+                #encode_t_encode(&#tag, tag_encoder)?;
                 let #encoder_var = #pair_encoder_t::second(&mut variant_encoder)?;
                 #encode?;
                 #pair_encoder_t::end(variant_encoder)
@@ -939,7 +1008,7 @@ impl<'a> Expander<'a> {
 
     fn encode_variant_fields(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         fields: &[FieldData],
         needs: &mut Needs,
         tagged: Packing,
@@ -1006,7 +1075,7 @@ impl<'a> Expander<'a> {
     /// Encode a field.
     fn encode_field(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         index: usize,
         field: &FieldData,
         access: &TokenStream,
@@ -1014,9 +1083,8 @@ impl<'a> Expander<'a> {
         default_field_tag: DefaultTag,
     ) -> Option<(TokenStream, Option<(TokenStream, syn::Ident)>)> {
         let encoder_var = &self.tokens.encoder_var;
-        let encode_t = &self.tokens.encode_t;
 
-        let (span, encode_path) = field.attr.encode_path(mode, encode_t, field.span);
+        let (span, encode_path) = field.attr.encode_path(mode, field.span);
 
         let body = match tagged {
             Packing::Tagged | Packing::Transparent => {
@@ -1031,11 +1099,13 @@ impl<'a> Expander<'a> {
                 let pair_encoder_t = &self.tokens.pair_encoder_t;
                 let pairs_encoder_t = &self.tokens.pairs_encoder_t;
 
+                let encode_t_encode = mode.encode_t_encode();
+
                 quote_spanned! {
                     span => {
                         let mut pair_encoder = #pairs_encoder_t::next(&mut #encoder_var)?;
                         let field_encoder = #pair_encoder_t::first(&mut pair_encoder)?;
-                        #encode_t::encode(&#tag, field_encoder)?;
+                        #encode_t_encode(&#tag, field_encoder)?;
                         let value_encoder = #pair_encoder_t::second(&mut pair_encoder)?;
                         #encode_path(#access, value_encoder)?;
                         #pair_encoder_t::end(pair_encoder)?;
@@ -1076,7 +1146,7 @@ impl<'a> Expander<'a> {
     /// decoded.
     fn decode_tagged(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         type_name: &syn::LitStr,
         tag_type: Option<&(Span, syn::Type)>,
         path: syn::Path,
@@ -1377,7 +1447,7 @@ impl<'a> Expander<'a> {
     /// Decode something packed.
     fn decode_untagged(
         &self,
-        mode: Option<&syn::Ident>,
+        mode: Mode<'_>,
         path: syn::Path,
         fields: &[FieldData],
         needs: &mut Needs,
