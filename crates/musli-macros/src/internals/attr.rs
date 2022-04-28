@@ -50,6 +50,8 @@ impl Default for Packing {
 
 #[derive(Default)]
 struct InnerTypeAttr {
+    /// `#[musli(crate = <path>)]`.
+    krate: Option<(Span, syn::ExprPath)>,
     /// `#[musli(tag_type)]`.
     tag_type: Option<(Span, syn::Type)>,
     /// `#[musli(default_variant_tag = "..")]`.
@@ -75,13 +77,24 @@ impl InnerTypeAttr {
 
         self.packing = Some((span, packing));
     }
+
+    fn set_crate(&mut self, cx: &Ctxt, span: Span, path: syn::ExprPath) {
+        if let Some((span, _)) = self.krate {
+            cx.error_span(
+                span,
+                format!("#[{}({})] cannot be used multiple times", ATTR, CRATE),
+            );
+        }
+
+        self.krate = Some((span, path));
+    }
 }
 
 #[derive(Default)]
 pub(crate) struct TypeAttr {
     root: InnerTypeAttr,
     /// Nested configuartions for modes.
-    modes: HashMap<syn::Ident, InnerTypeAttr>,
+    modes: HashMap<syn::ExprPath, InnerTypeAttr>,
 }
 
 impl TypeAttr {
@@ -116,6 +129,21 @@ impl TypeAttr {
         mode.ident
             .and_then(|m| self.modes.get(m)?.tag_type.as_ref())
             .or_else(|| self.root.tag_type.as_ref())
+    }
+
+    /// Get the configured crate, or fallback to default.
+    pub(crate) fn crate_or_default(&self) -> syn::ExprPath {
+        if let Some((_, krate)) = &self.root.krate {
+            krate.clone()
+        } else {
+            let path = syn::Path::from(syn::Ident::new(&*ATTR, Span::call_site()));
+
+            syn::ExprPath {
+                attrs: Vec::new(),
+                qself: None,
+                path: path.into(),
+            }
+        }
     }
 }
 
@@ -202,7 +230,7 @@ impl InternalVariantAttr {
 #[derive(Default)]
 pub(crate) struct VariantAttr {
     root: InternalVariantAttr,
-    modes: HashMap<syn::Ident, InternalVariantAttr>,
+    modes: HashMap<syn::ExprPath, InternalVariantAttr>,
 }
 
 impl VariantAttr {
@@ -246,7 +274,7 @@ impl VariantAttr {
 #[derive(Default)]
 pub(crate) struct FieldAttr {
     root: InnerFieldAttr,
-    modes: HashMap<syn::Ident, InnerFieldAttr>,
+    modes: HashMap<syn::ExprPath, InnerFieldAttr>,
 }
 
 impl FieldAttr {
@@ -328,6 +356,12 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             for attribute in attributes.attributes {
                 match attribute {
+                    // parse #[musli(crate = <path>)]
+                    Attribute::KeyValue(path, value) if path == CRATE => {
+                        if let Some(path) = value_as_path(cx, CRATE, value) {
+                            attr.set_crate(cx, path.span(), path);
+                        }
+                    }
                     // parse #[musli(tag_type = <type>)]
                     Attribute::KeyValue(path, value) if path == TAG_TYPE => {
                         if let Some(ty) = value_as_type(cx, TAG_TYPE, value) {
@@ -645,7 +679,7 @@ impl Spanned for Attribute {
 
 struct TypeAttributes {
     _parens: syn::token::Paren,
-    mode: Option<syn::Ident>,
+    mode: Option<syn::ExprPath>,
     attributes: Vec<Attribute>,
 }
 
@@ -672,6 +706,8 @@ impl Parse for TypeAttributes {
 
                         continue;
                     }
+                    // parse #[musli(crate = <path>)]
+                    path if path == CRATE => AttributeValue::Path(content.parse()?),
                     // parse #[musli(tag_type = <type>)]
                     path if path == TAG_TYPE => AttributeValue::Type(content.parse()?),
                     // parse #[musli(default_variant_tag = "..")]
@@ -703,7 +739,7 @@ impl Parse for TypeAttributes {
 
 struct VariantAttributes {
     _parens: syn::token::Paren,
-    mode: Option<syn::Ident>,
+    mode: Option<syn::ExprPath>,
     attributes: Vec<Attribute>,
 }
 
@@ -761,7 +797,7 @@ impl Parse for VariantAttributes {
 
 struct FieldAttributes {
     _parens: syn::token::Paren,
-    mode: Option<syn::Ident>,
+    mode: Option<syn::ExprPath>,
     attributes: Vec<Attribute>,
 }
 

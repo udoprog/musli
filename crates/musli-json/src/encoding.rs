@@ -102,7 +102,7 @@ impl<Mode> JsonEncoding<Mode> {
     /// enum Json {}
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
-    /// #[musli(default_field_tag = "name")]
+    /// #[musli(mode = Json, default_field_tag = "name")]
     /// struct Struct<'a> {
     ///     name: &'a str,
     ///     age: u32,
@@ -164,6 +164,19 @@ impl<Mode> JsonEncoding<Mode> {
         let mut data = Vec::new();
         T::encode(value, JsonEncoder::new(&mut data))?;
         Ok(data)
+    }
+
+    /// Encode the given value to a [Vec] using the current configuration.
+    #[cfg(feature = "std")]
+    #[inline]
+    pub fn to_string<T>(self, value: &T) -> Result<String, VecWriterError>
+    where
+        T: ?Sized + Encode<Mode>,
+    {
+        let mut data = Vec::new();
+        T::encode(value, JsonEncoder::new(&mut data))?;
+        // SAFETY: Encoder is guaranteed to produce valid UTF-8.
+        Ok(unsafe { String::from_utf8_unchecked(data) })
     }
 
     /// Encode the given value to a fixed-size bytes using the current

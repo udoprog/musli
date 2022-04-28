@@ -6,7 +6,7 @@ use proc_macro2::Span;
 use quote::ToTokens;
 
 struct Inner {
-    modes: HashSet<syn::Ident>,
+    modes: HashSet<syn::ExprPath>,
     errors: Vec<syn::Error>,
 }
 
@@ -26,7 +26,7 @@ impl Ctxt {
     }
 
     /// Register a new mode.
-    pub(crate) fn register_mode(&self, mode: syn::Ident) {
+    pub(crate) fn register_mode(&self, mode: syn::ExprPath) {
         self.inner.borrow_mut().modes.insert(mode);
     }
 
@@ -69,7 +69,7 @@ impl Ctxt {
     }
 
     /// Get all "extra" modes specified.
-    pub(crate) fn modes(&self) -> Vec<syn::Ident> {
+    pub(crate) fn modes(&self) -> Vec<syn::ExprPath> {
         self.inner.borrow().modes.iter().cloned().collect()
     }
 }

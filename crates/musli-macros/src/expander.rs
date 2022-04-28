@@ -6,7 +6,8 @@ use syn::spanned::Spanned;
 
 use crate::internals::attr::{self, DefaultTag, Packing, TypeAttr};
 use crate::internals::symbol::*;
-use crate::internals::{Ctxt, Mode, ModeIdent, Needs, NeedsKind};
+use crate::internals::tokens::Tokens;
+use crate::internals::{Ctxt, Mode, ModePath, Needs, NeedsKind};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum TagMethod {
@@ -25,29 +26,26 @@ impl Default for TagMethod {
 enum ExpansionMode<'a> {
     Generic { mode_ident: &'a syn::Ident },
     Default,
-    Moded { mode_ident: &'a syn::Ident },
+    Moded { mode_ident: &'a syn::ExprPath },
 }
 
 impl ExpansionMode<'_> {
     fn as_mode<'a>(&'a self, tokens: &'a Tokens) -> Mode<'a> {
-        match self {
+        match *self {
             ExpansionMode::Generic { mode_ident } => Mode {
                 ident: None,
-                moded_ident: ModeIdent::Ident(mode_ident),
-                encode_t: &tokens.encode_t,
-                decode_t: &tokens.decode_t,
+                mode_path: ModePath::Ident(mode_ident),
+                tokens,
             },
             ExpansionMode::Default => Mode {
                 ident: None,
-                moded_ident: ModeIdent::Stream(&tokens.default_mode),
-                encode_t: &tokens.encode_t,
-                decode_t: &tokens.decode_t,
+                mode_path: ModePath::Path(&tokens.default_mode),
+                tokens,
             },
             ExpansionMode::Moded { mode_ident } => Mode {
                 ident: Some(mode_ident),
-                moded_ident: ModeIdent::Ident(mode_ident),
-                encode_t: &tokens.encode_t,
-                decode_t: &tokens.decode_t,
+                mode_path: ModePath::Path(mode_ident),
+                tokens,
             },
         }
     }
@@ -57,7 +55,7 @@ impl ExpansionMode<'_> {
         &self,
         generics: syn::Generics,
         tokens: &Tokens,
-    ) -> (syn::Generics, TokenStream) {
+    ) -> (syn::Generics, syn::ExprPath) {
         match *self {
             ExpansionMode::Generic { mode_ident } => {
                 let mut impl_generics = generics.clone();
@@ -66,10 +64,16 @@ impl ExpansionMode<'_> {
                     .params
                     .push(syn::TypeParam::from(mode_ident.clone()).into());
 
-                (impl_generics, quote!(#mode_ident))
+                let path = syn::ExprPath {
+                    attrs: Vec::new(),
+                    qself: None,
+                    path: syn::Path::from(mode_ident.clone()),
+                };
+
+                (impl_generics, path)
             }
             ExpansionMode::Default => (generics, tokens.default_mode.clone()),
-            ExpansionMode::Moded { mode_ident } => (generics, quote!(#mode_ident)),
+            ExpansionMode::Moded { mode_ident } => (generics, mode_ident.clone()),
         }
     }
 }
@@ -110,27 +114,6 @@ enum Data<'a> {
     Union,
 }
 
-struct Tokens {
-    decode_t: TokenStream,
-    decoder_t: TokenStream,
-    decoder_var: syn::Ident,
-    default_t: TokenStream,
-    encode_t: TokenStream,
-    encoder_t: TokenStream,
-    encoder_var: syn::Ident,
-    error_t: TokenStream,
-    fmt: TokenStream,
-    pack_decoder_t: TokenStream,
-    pair_decoder_t: TokenStream,
-    pair_encoder_t: TokenStream,
-    pairs_decoder_t: TokenStream,
-    pairs_encoder_t: TokenStream,
-    phantom_data: TokenStream,
-    value_visitor_t: TokenStream,
-    sequence_encoder_t: TokenStream,
-    default_mode: TokenStream,
-}
-
 pub(crate) struct Expander<'a> {
     pub(crate) input: &'a syn::DeriveInput,
     cx: Ctxt,
@@ -141,7 +124,7 @@ pub(crate) struct Expander<'a> {
 }
 
 impl<'a> Expander<'a> {
-    pub(crate) fn new(input: &'a syn::DeriveInput, prefix: &TokenStream) -> Self {
+    pub(crate) fn new(input: &'a syn::DeriveInput) -> Self {
         let cx = Ctxt::new();
         let type_attr = attr::type_attrs(&cx, &input.attrs);
         let type_name = syn::LitStr::new(&input.ident.to_string(), input.ident.span());
@@ -191,32 +174,15 @@ impl<'a> Expander<'a> {
             syn::Data::Union(..) => Data::Union,
         };
 
+        let prefix = type_attr.crate_or_default();
+
         Self {
             input,
             cx,
             type_attr,
             type_name,
             data,
-            tokens: Tokens {
-                decode_t: quote!(#prefix::de::Decode),
-                decoder_t: quote!(#prefix::de::Decoder),
-                decoder_var: syn::Ident::new("decoder", input.ident.span()),
-                default_t: quote!(::core::default::Default::default()),
-                encode_t: quote!(#prefix::en::Encode),
-                encoder_t: quote!(#prefix::en::Encoder),
-                encoder_var: syn::Ident::new("encoder", input.ident.span()),
-                error_t: quote!(#prefix::error::Error),
-                fmt: quote!(core::fmt),
-                pack_decoder_t: quote!(#prefix::de::PackDecoder),
-                pair_decoder_t: quote!(#prefix::de::PairDecoder),
-                pair_encoder_t: quote!(#prefix::en::PairEncoder),
-                pairs_decoder_t: quote!(#prefix::de::PairsDecoder),
-                pairs_encoder_t: quote!(#prefix::en::PairsEncoder),
-                phantom_data: quote!(core::marker::PhantomData),
-                value_visitor_t: quote!(#prefix::de::ValueVisitor),
-                sequence_encoder_t: quote!(#prefix::en::SequenceEncoder),
-                default_mode: quote!(#prefix::mode::DefaultMode),
-            },
+            tokens: Tokens::new(input.ident.span(), &prefix),
         }
     }
 

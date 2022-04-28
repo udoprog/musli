@@ -18,7 +18,7 @@ mod internals;
 #[proc_macro_derive(Encode, attributes(musli))]
 pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
-    let expander = expander::Expander::new(&input, &quote::quote!(::musli));
+    let expander = expander::Expander::new(&input);
 
     let dump = std::env::var("MUSLI_DUMP").ok();
 
@@ -40,7 +40,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Decode, attributes(musli))]
 pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
-    let expander = expander::Expander::new(&input, &quote::quote!(::musli));
+    let expander = expander::Expander::new(&input);
 
     let dump = std::env::var("MUSLI_DUMP").ok();
 

@@ -1,10 +1,12 @@
-use std::fmt::{self, Display};
+use std::fmt;
+use std::ops::Deref;
 use syn::{Ident, Path};
 
 #[derive(Copy, Clone)]
 pub struct Symbol(&'static str);
 
 pub const ATTR: Symbol = Symbol("musli");
+pub const CRATE: Symbol = Symbol("crate");
 pub const WITH: Symbol = Symbol("with");
 pub const DEFAULT_FIELD_TAG: Symbol = Symbol("default_field_tag");
 pub const DEFAULT_VARIANT_TAG: Symbol = Symbol("default_variant_tag");
@@ -40,8 +42,16 @@ impl<'a> PartialEq<Symbol> for &'a Path {
     }
 }
 
-impl Display for Symbol {
+impl fmt::Display for Symbol {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str(self.0)
+    }
+}
+
+impl Deref for Symbol {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

@@ -3,17 +3,16 @@ use musli_json::JsonEncoding;
 
 // Mode marker indicating that some attributes should only apply when we're
 // decoding in a JSON mode.
-enum Json {}
+mod my_modes {
+    pub(crate) enum Json {}
+}
 
-const CONFIG: JsonEncoding<Json> = JsonEncoding::new();
+const CONFIG: JsonEncoding<my_modes::Json> = JsonEncoding::new();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(mode = Json, default_field_tag = "name")]
+#[musli(mode = my_modes::Json, default_field_tag = "name")]
 struct SimpleJsonStruct<'a> {
-    #[musli(tag = "fuck/bucket")]
-    #[musli(mode = Json, tag = "name")]
     name: &'a str,
-    #[musli(tag = "age")]
     age: u32,
 }
 

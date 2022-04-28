@@ -1,10 +1,68 @@
 //! # The `Encode` and `Decode` derives
 //!
 //! The `Encode` and `Decode` derives allows for automatically implementing
-//! [Decode] and [Encode].
+//! [Encode] and [Decode].
 //!
 //! They come with a number of options for customizing their implementation,
-//! detailed below.
+//! detailed below. But first we need to talk about *modes*.
+//!
+//! #### Modes
+//!
+//! If you've paid close attention to the [Encode] and [Decode] traits you
+//! might've noticed that they have an extra parameter called `Mode`.
+//!
+//! This allows a single type to have *more than one* implementation of encoding
+//! traits, allowing for a high level of flexibility in how a type should be
+//! encoded.
+//!
+//! When it comes to deriving these traits you can scope attributes to apply to
+//! either any mode, the [default mode], or a completely custom mode. This is
+//! done using the `#[musli(mode = ..)]` attribute like this:
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! enum Json {}
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(default_field_tag = "index")]
+//! #[musli(mode = Json, default_field_tag = "name")]
+//! struct Person<'a> {
+//!     name: &'a str,
+//!     age: u32,
+//! }
+//! ```
+//!
+//! What this means is that if we want to serialize `Person` using named fields,
+//! we can simply turn on the `Json` mode for our given serializer. If we want
+//! to revert back to the default behavior and use indexed fields we can instead
+//! use [DefaultMode].
+//!
+//! ```
+//! # use musli::{Encode, Decode};
+//! # enum Json {}
+//! # #[derive(Encode, Decode)]
+//! # #[musli(mode = Json, default_field_tag = "name")]
+//! # struct Person<'a> { name: &'a str, age: u32 }
+//! use musli_json::JsonEncoding;
+//!
+//! const JSON_ENCODING: JsonEncoding<Json> = JsonEncoding::new();
+//! const DEFAULT_ENCODING: JsonEncoding = JsonEncoding::new();
+//!
+//! let named = JSON_ENCODING.to_string(&Person { name: "Aristotle", age: 62 })?;
+//! assert_eq!(named, "{\"name\":\"Aristotle\",\"age\":62}");
+//!
+//! let indexed = DEFAULT_ENCODING.to_string(&Person { name: "Plato", age: 84 })?;
+//! assert_eq!(indexed, "{\"0\":\"Plato\",\"1\":84}");
+//!
+//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! So the `#[musli(mode)]` atttribute is supported in any position. And any of
+//! its sibling attributes will be added to the given *alternative* mode, rather
+//! the [default mode].
+//!
+//! #### Attributes
 //!
 //! * *Container attributes* are attributes which apply to the `struct` or
 //!   `enum`. Like the uses of `#[musli(packed)]` and
@@ -392,5 +450,7 @@
 //! }
 //! ```
 //!
+//! [default mode]: crate::mode::DefaultMode
+//! [DefaultMode]: crate::mode::DefaultMode
 //! [Encode]: crate::Encode
 //! [Decode]: crate::Decode
