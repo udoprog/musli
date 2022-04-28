@@ -12,13 +12,13 @@ use crate::tag::MAX_INLINE_LEN;
 use musli::mode::DefaultMode;
 use musli::Decode;
 use musli::Encode;
-use musli_binary_common::encoding::{Fixed, FixedLength, Variable};
-use musli_binary_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
-use musli_binary_common::int::{BigEndian, LittleEndian, NetworkEndian};
-use musli_binary_common::reader::{Reader, SliceReader, SliceReaderError};
+use musli_common::encoding::{Fixed, FixedLength, Variable};
+use musli_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
+use musli_common::int::{BigEndian, LittleEndian, NetworkEndian};
+use musli_common::reader::{Reader, SliceReader, SliceReaderError};
 #[cfg(feature = "std")]
-use musli_binary_common::writer::VecWriterError;
-use musli_binary_common::writer::Writer;
+use musli_common::writer::VecWriterError;
+use musli_common::writer::Writer;
 
 /// The default configuration.
 ///
@@ -27,12 +27,12 @@ use musli_binary_common::writer::Writer;
 /// The variable length encoding uses [zigzag] with [continuation] encoding for
 /// numbers.
 ///
-/// The maximum pack length permitted equals to [MAX_INLINE_LEN], which is 30.
+/// The maximum pack length permitted equals to [MAX_INLINE_LEN], which is 62.
 /// Trying to encode larger packs will result in a runtime error. This can be
 /// modified with [WireEncoding::with_max_pack].
 ///
-/// [zigzag]: musli_binary_common::int::zigzag
-/// [continuation]: musli_binary_common::int::continuation
+/// [zigzag]: musli_common::int::zigzag
+/// [continuation]: musli_common::int::continuation
 pub const DEFAULT: WireEncoding = WireEncoding::new();
 
 /// Encode the given value to the given [Writer] using the [DEFAULT]
@@ -242,7 +242,7 @@ where
         W: io::Write,
         T: ?Sized + Encode<DefaultMode>,
     {
-        let mut writer = musli_binary_common::io::wrap(write);
+        let mut writer = musli_common::io::wrap(write);
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut writer))
     }
 

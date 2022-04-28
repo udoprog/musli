@@ -11,6 +11,8 @@
 //! * ✔ Can tolerate missing fields if they are annotated with
 //!   `#[musli(default)]`.
 //! * ✔ Can skip over unknown fields.
+//!
+//! [Müsli]: https://github.com/udoprog/musli
 
 #![feature(generic_associated_types)]
 #![deny(missing_docs)]

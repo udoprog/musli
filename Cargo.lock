@@ -308,7 +308,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "musli-binary-common"
+name = "musli-common"
 version = "0.0.24"
 dependencies = [
  "musli",
@@ -321,7 +321,7 @@ version = "0.0.24"
 dependencies = [
  "itoa 1.0.1",
  "musli",
- "musli-binary-common",
+ "musli-common",
  "ryu",
 ]
 
@@ -339,7 +339,7 @@ name = "musli-storage"
 version = "0.0.24"
 dependencies = [
  "musli",
- "musli-binary-common",
+ "musli-common",
 ]
 
 [[package]]
@@ -365,7 +365,7 @@ name = "musli-wire"
 version = "0.0.24"
 dependencies = [
  "musli",
- "musli-binary-common",
+ "musli-common",
  "musli-storage",
 ]
 

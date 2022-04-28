@@ -3,7 +3,7 @@ use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
-use musli_binary_common::writer::Writer;
+use musli_common::writer::Writer;
 
 /// A vaery simple encoder suitable for storage encoding.
 pub struct StorageEncoder<W, I, L>

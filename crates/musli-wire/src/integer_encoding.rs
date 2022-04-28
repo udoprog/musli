@@ -2,18 +2,18 @@ use core::fmt::{Debug, Display};
 
 use crate::tag::{Kind, Tag, DATA_MASK};
 use musli::error::Error;
-use musli_binary_common::encoding::{Fixed, FixedLength, Variable};
-use musli_binary_common::int::continuation as c;
-use musli_binary_common::int::zigzag as zig;
-use musli_binary_common::int::{ByteOrder, ByteOrderIo, Signed, Unsigned};
-use musli_binary_common::reader::Reader;
-use musli_binary_common::writer::Writer;
+use musli_common::encoding::{Fixed, FixedLength, Variable};
+use musli_common::int::continuation as c;
+use musli_common::int::zigzag as zig;
+use musli_common::int::{ByteOrder, ByteOrderIo, Signed, Unsigned};
+use musli_common::reader::Reader;
+use musli_common::writer::Writer;
 
 mod private {
     pub trait Sealed {}
-    impl<B> Sealed for musli_binary_common::encoding::Fixed<B> {}
-    impl<L, B> Sealed for musli_binary_common::encoding::FixedLength<L, B> {}
-    impl Sealed for musli_binary_common::encoding::Variable {}
+    impl<B> Sealed for musli_common::encoding::Fixed<B> {}
+    impl<L, B> Sealed for musli_common::encoding::FixedLength<L, B> {}
+    impl Sealed for musli_common::encoding::Variable {}
 }
 
 /// Trait which governs how integers are encoded in a binary format.

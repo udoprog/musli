@@ -15,12 +15,12 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["musli-binary-common/std"]
+std = ["musli-common/std"]
 test = []
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.24" }
-musli-binary-common = { path = "../musli-binary-common", version = "0.0.24" }
+musli-common = { path = "../musli-common", version = "0.0.24" }
 
 itoa = "1.0.1"
 ryu = "1.0.9"

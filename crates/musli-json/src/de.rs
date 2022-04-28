@@ -1,25 +1,16 @@
 use musli::{de::Decoder, never::Never};
-use musli_binary_common::reader::Reader;
+use musli_common::reader::Reader;
 
 /// A JSON decoder for Müsli.
 pub struct JsonDecoder<'de, R> {
-    reader: &'de mut R,
+    _reader: &'de mut R,
 }
 
 impl<'de, R> JsonDecoder<'de, R> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(reader: &'de mut R) -> Self {
-        Self { reader }
-    }
-}
-
-impl<'de, 'a, R> JsonDecoder<'a, R>
-where
-    R: Reader<'de>,
-{
-    pub(crate) fn skip_any(&mut self) -> Result<(), R::Error> {
-        Ok(())
+        Self { _reader: reader }
     }
 }
 

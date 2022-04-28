@@ -2,8 +2,8 @@
 //! continuation of the sequence or not.
 //!
 //! ```
-//! use musli_binary_common::int::continuation as c;
-//! use musli_binary_common::fixed_bytes::FixedBytes;
+//! use musli_common::int::continuation as c;
+//! use musli_common::fixed_bytes::FixedBytes;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut bytes = FixedBytes::<8>::new();

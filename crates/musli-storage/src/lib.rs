@@ -111,5 +111,5 @@ pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, StorageEnco
 pub use self::encoding::{to_vec, to_writer};
 #[cfg(feature = "test")]
 pub use self::test::transcode;
-pub use musli_binary_common::encoding::{Fixed, FixedLength, Variable};
-pub use musli_binary_common::fixed_bytes::FixedBytes;
+pub use musli_common::encoding::{Fixed, FixedLength, Variable};
+pub use musli_common::fixed_bytes::FixedBytes;

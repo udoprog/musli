@@ -8,11 +8,11 @@ use std::io;
 use crate::de::JsonDecoder;
 use crate::en::JsonEncoder;
 use musli::{Decode, DefaultMode, Encode};
-use musli_binary_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
-use musli_binary_common::reader::{Reader, SliceReader, SliceReaderError};
+use musli_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
+use musli_common::reader::{Reader, SliceReader, SliceReaderError};
 #[cfg(feature = "std")]
-use musli_binary_common::writer::VecWriterError;
-use musli_binary_common::writer::Writer;
+use musli_common::writer::VecWriterError;
+use musli_common::writer::Writer;
 
 /// The default configuration.
 pub const DEFAULT: JsonEncoding = JsonEncoding::new();
@@ -150,7 +150,7 @@ impl<Mode> JsonEncoding<Mode> {
         W: io::Write,
         T: ?Sized + Encode<Mode>,
     {
-        let mut writer = musli_binary_common::io::wrap(write);
+        let mut writer = musli_common::io::wrap(write);
         T::encode(value, JsonEncoder::new(&mut writer))
     }
 

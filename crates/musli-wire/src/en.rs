@@ -4,8 +4,8 @@ use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::{Kind, Tag};
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use musli::error::Error;
-use musli_binary_common::fixed_bytes::FixedBytes;
-use musli_binary_common::writer::Writer;
+use musli_common::fixed_bytes::FixedBytes;
+use musli_common::writer::Writer;
 use musli_storage::en::StorageEncoder;
 
 /// A very simple encoder.

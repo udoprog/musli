@@ -371,7 +371,7 @@
 //!   signature:
 //!
 //! ```rust,ignore
-//! fn encode<E>(field: &Field, encoder: E) -> Result<E::Ok, E::Error>
+//! fn encode<Mode, E>(field: &Field, encoder: E) -> Result<E::Ok, E::Error>
 //! where
 //!    E: Encoder;
 //! ```
@@ -380,7 +380,7 @@
 //!   signature:
 //!
 //! ```rust,ignore
-//! fn decode<'de, D>(decoder: D) -> Result<Field, D::Error>
+//! fn decode<'de, Mode, D>(decoder: D) -> Result<Field, D::Error>
 //! where
 //!     D: Decoder<'de>;
 //! ```

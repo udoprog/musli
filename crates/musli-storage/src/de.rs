@@ -4,7 +4,7 @@ use core::marker;
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
 use musli::error::Error;
-use musli_binary_common::reader::PositionedReader;
+use musli_common::reader::PositionedReader;
 
 /// A very simple decoder suitable for storage decoding.
 pub struct StorageDecoder<R, I, L>

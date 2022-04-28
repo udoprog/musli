@@ -3,8 +3,8 @@
 //! [zigzag encoding]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
 //!
 //! ```rust
-//! assert_eq!(musli_binary_common::int::zigzag::encode(-1i32), 1u32);
-//! assert_eq!(musli_binary_common::int::zigzag::encode(-2i32), 3u32);
+//! assert_eq!(musli_common::int::zigzag::encode(-1i32), 1u32);
+//! assert_eq!(musli_common::int::zigzag::encode(-2i32), 3u32);
 //! ```
 
 use crate::int::{Signed, Unsigned};

@@ -2,8 +2,8 @@ use core::fmt;
 
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use musli::never::Never;
-use musli_binary_common::buffered_writer::BufferedWriter;
-use musli_binary_common::writer::Writer;
+use musli_common::buffered_writer::BufferedWriter;
+use musli_common::writer::Writer;
 
 /// A JSON encoder for Müsli.
 pub struct JsonEncoder<W> {

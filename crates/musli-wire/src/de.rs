@@ -6,8 +6,8 @@ use crate::tag::Kind;
 use crate::tag::Tag;
 use musli::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
 use musli::error::Error;
-use musli_binary_common::int::continuation as c;
-use musli_binary_common::reader::{Limit, PositionedReader};
+use musli_common::int::continuation as c;
+use musli_common::reader::{Limit, PositionedReader};
 use musli_storage::de::StorageDecoder;
 
 /// A very simple decoder.

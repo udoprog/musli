@@ -1,5 +1,5 @@
 [package]
-name = "musli-binary-common"
+name = "musli-common"
 version = "0.0.24"
 edition = "2021"
 readme = "README.md"
@@ -8,7 +8,7 @@ repository = "https://github.com/udoprog/musli"
 homepage = "https://github.com/udoprog/musli"
 documentation = "https://docs.rs/musli"
 description = """
-Common utilities for Müsli.
+Common utilities shared among Müsli encodings.
 """
 keywords = ["serialization", "no_std"]
 categories = ["encoding"]

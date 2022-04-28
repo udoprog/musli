@@ -85,10 +85,14 @@
 //! Each field is prefix *typed* with a single byte tag that allows a receiver
 //! to figure out exactly how much should be skipped over.
 //!
-//! The types available are defined in the [types] module.
+//! Packed items are prefix-length encoded, and have a limited size. Its exact
+//! length is defined by [MAX_INLINE_LEN] and can be modified with
+//! [WireEncoding::with_max_pack].
 //!
-//! [Müsli]: https://docs.rs/musli
 //! [default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.WireEncoding.html
+//! [MAX_INLINE_LEN]: https://docs.rs/musli-wire/latest/musli_wire/tag/constant.MAX_INLINE_LEN.html
+//! [Müsli]: https://docs.rs/musli
+//! [WireEncoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_wire/encoding/struct.WireEncoding.html#method.with_max_pack
 //! [WireEncoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.WireEncoding.html
 
 #![feature(generic_associated_types)]
@@ -109,5 +113,5 @@ pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, WireEncodin
 pub use self::encoding::{to_vec, to_writer};
 #[cfg(feature = "test")]
 pub use self::test::{transcode, Typed};
-pub use musli_binary_common::encoding::{Fixed, FixedLength, Variable};
-pub use musli_binary_common::fixed_bytes::FixedBytes;
+pub use musli_common::encoding::{Fixed, FixedLength, Variable};
+pub use musli_common::fixed_bytes::FixedBytes;

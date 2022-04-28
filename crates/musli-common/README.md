@@ -1,4 +1,4 @@
-# musli-binary-common
+# musli-common
 
 [<img alt="github" src="https://img.shields.io/badge/github-udoprog/musli?style=for-the-badge&logo=github" height="20">](https://github.com/udoprog/musli)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/musli.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/musli)
@@ -13,7 +13,7 @@ types that can be used in collaboration with [Müsli].
 Please refer to <https://docs.rs/musli> for documentation.
 
 [Müsli]: <https://docs.rs/musli>
-[Reader]: https://docs.rs/musli-binary-common/latest/musli-binary-common/reader/trait.Reader.html
-[Writer]: https://docs.rs/musli-binary-common/latest/musli-binary-common/writer/trait.Writer.html
+[Reader]: https://docs.rs/musli-common/latest/musli-common/reader/trait.Reader.html
+[Writer]: https://docs.rs/musli-common/latest/musli-common/writer/trait.Writer.html
 
 License: MIT/Apache-2.0

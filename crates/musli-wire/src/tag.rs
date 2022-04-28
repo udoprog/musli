@@ -48,8 +48,8 @@ pub struct Tag {
 impl Tag {
     /// Construct a new tag through an unchecked constructor.
     ///
-    /// `data` must not be equal to or larger than [DATA_MASK], or else it could
-    /// corrupt the payload.
+    /// `data` must not be equal to or larger than [MAX_INLINE_LEN], or else it
+    /// could corrupt the payload.
     #[inline]
     pub const fn new(kind: Kind, data: u8) -> Self {
         Self {
