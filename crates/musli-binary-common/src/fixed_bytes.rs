@@ -36,6 +36,21 @@ impl<const N: usize, E> FixedBytes<N, E> {
         self.init
     }
 
+    /// Test if the current container is empty.
+    pub const fn is_empty(&self) -> bool {
+        self.init == 0
+    }
+
+    /// Clear the [FixedBytes] container.
+    pub fn clear(&mut self) {
+        self.init = 0;
+    }
+
+    /// Get the remaining capacity of the [FixedBytes].
+    pub const fn remaining(&self) -> usize {
+        N.saturating_sub(self.init)
+    }
+
     /// Coerce into the underlying bytes if all of them have been initialized.
     pub fn into_bytes(self) -> Option<[u8; N]> {
         if self.init == N {
@@ -104,10 +119,11 @@ where
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
         if bytes.len() > N.saturating_sub(self.init) {
-            return Err(E::message(BufferOverflow {
-                at: self.init,
-                additional: bytes.len(),
-                capacity: N,
+            return Err(E::message(format_args! {
+                "Overflow when writing {additional} bytes at {at} with capacity {capacity}",
+                at = self.init,
+                additional = bytes.len(),
+                capacity = N,
             }));
         }
 
@@ -118,26 +134,5 @@ where
 
         self.init += bytes.len();
         Ok(())
-    }
-}
-
-struct BufferOverflow {
-    at: usize,
-    additional: usize,
-    capacity: usize,
-}
-
-impl fmt::Display for BufferOverflow {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            at,
-            additional,
-            capacity,
-        } = *self;
-
-        write!(
-            f,
-            "Overflow when writing {additional} bytes at {at} with capacity {capacity}"
-        )
     }
 }

@@ -1,0 +1,26 @@
+[package]
+name = "musli-json"
+version = "0.0.24"
+edition = "2021"
+readme = "README.md"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/udoprog/musli"
+homepage = "https://github.com/udoprog/musli"
+documentation = "https://docs.rs/musli"
+description = """
+JSON support for Müsli.
+"""
+keywords = ["serialization", "no_std"]
+categories = ["encoding"]
+
+[features]
+default = ["std"]
+std = ["musli-binary-common/std"]
+test = []
+
+[dependencies]
+musli = { path = "../musli", version = "0.0.24" }
+musli-binary-common = { path = "../musli-binary-common", version = "0.0.24" }
+
+itoa = "1.0.1"
+ryu = "1.0.9"
