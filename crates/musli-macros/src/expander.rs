@@ -1265,8 +1265,10 @@ impl<'a> Expander<'a> {
             }
         };
 
+        let type_decoder_var = syn::Ident::new("type_decoder", self.type_name.span());
+
         let body = quote! {
-            while let Some(mut #decoder_var) = #pairs_decoder_t::next(&mut type_decoder)? {
+            while let Some(mut #decoder_var) = #pairs_decoder_t::next(&mut #type_decoder_var)? {
                 let tag #tag_type = #decode_tag;
                 #body
             }
@@ -1276,11 +1278,11 @@ impl<'a> Expander<'a> {
 
         let body = match kind {
             StructKind::Named => quote! {{
-                let mut type_decoder = #decoder_t::decode_struct(#decoder_var, #fields_len)?;
+                let mut #type_decoder_var = #decoder_t::decode_struct(#decoder_var, #fields_len)?;
                 #body
             }},
             StructKind::Unnamed => quote! {
-                let mut type_decoder = #decoder_t::decode_tuple_struct(#decoder_var, #fields_len)?;
+                let mut #type_decoder_var = #decoder_t::decode_tuple_struct(#decoder_var, #fields_len)?;
                 #body
             },
             StructKind::Unit => {
@@ -1484,10 +1486,10 @@ impl<'a> Expander<'a> {
         if assign.is_empty() {
             Some(quote!(#path {}))
         } else {
-            Some(quote! {{
+            Some(quote! {
                 let mut unpack = #decoder_t::decode_pack(#decoder_var)?;
                 #path { #(#assign),* }
-            }})
+            })
         }
     }
 

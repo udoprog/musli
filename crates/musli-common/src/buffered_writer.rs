@@ -31,7 +31,7 @@ where
     /// Finish writing.
     pub fn finish(mut self) -> Result<(), W::Error> {
         if !self.buf.is_empty() {
-            self.writer.write_bytes(self.buf.as_bytes())?;
+            self.writer.write_bytes(self.buf.as_slice())?;
         }
 
         Ok(())
@@ -47,7 +47,7 @@ where
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
         if self.buf.remaining() < bytes.len() {
-            self.writer.write_bytes(self.buf.as_bytes())?;
+            self.writer.write_bytes(self.buf.as_slice())?;
             self.buf.clear();
         }
 

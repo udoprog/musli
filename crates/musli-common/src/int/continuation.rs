@@ -8,9 +8,9 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut bytes = FixedBytes::<8>::new();
 //! c::encode(&mut bytes, 5000u32)?;
-//! assert_eq!(bytes.as_bytes(), &[0b1000_1000, 0b0010_0111]);
+//! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let number: u32 = c::decode(bytes.as_bytes())?;
+//! let number: u32 = c::decode(bytes.as_slice())?;
 //! assert_eq!(number, 5000u32);
 //! # Ok(()) }
 //! ```

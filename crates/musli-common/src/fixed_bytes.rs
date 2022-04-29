@@ -66,14 +66,64 @@ impl<const N: usize, E> FixedBytes<N, E> {
     }
 
     /// Coerce into the slice of initialized memory which is present.
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_slice(&self) -> &[u8] {
         if self.init == 0 {
             return &[];
         }
 
         // SAFETY: We've asserted that `initialized` accounts for the number of
         // bytes that have been initialized.
-        unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const u8, self.init) }
+        unsafe { core::slice::from_raw_parts(self.data.as_ptr().cast(), self.init) }
+    }
+
+    /// Coerce into the mutable slice of initialized memory which is present.
+    pub fn as_mut_slice(&mut self) -> &[u8] {
+        if self.init == 0 {
+            return &[];
+        }
+
+        // SAFETY: We've asserted that `initialized` accounts for the number of
+        // bytes that have been initialized.
+        unsafe { core::slice::from_raw_parts_mut(self.data.as_mut_ptr().cast(), self.init) }
+    }
+
+    /// Try and push a single byte.
+    pub fn push(&mut self, value: u8) -> bool {
+        if N.saturating_sub(self.init) == 0 {
+            return false;
+        }
+
+        unsafe {
+            self.data
+                .as_mut_ptr()
+                .cast::<u8>()
+                .add(self.init)
+                .write(value)
+        }
+
+        self.init += 1;
+        true
+    }
+
+    /// Try and extend from the given slice.
+    pub fn extend_from_slice(&mut self, source: &[u8]) -> bool {
+        if source.len() > N.saturating_sub(self.init) {
+            return false;
+        }
+
+        unsafe {
+            let dst = (self.data.as_mut_ptr() as *mut u8).add(self.init);
+            ptr::copy_nonoverlapping(source.as_ptr(), dst, source.len());
+        }
+
+        self.init += source.len();
+        true
+    }
+}
+
+impl<const N: usize, E> Default for FixedBytes<N, E> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -118,7 +168,7 @@ where
 
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
-        if bytes.len() > N.saturating_sub(self.init) {
+        if !self.extend_from_slice(bytes) {
             return Err(E::message(format_args! {
                 "Overflow when writing {additional} bytes at {at} with capacity {capacity}",
                 at = self.init,
@@ -127,12 +177,6 @@ where
             }));
         }
 
-        unsafe {
-            let dst = (self.data.as_mut_ptr() as *mut u8).add(self.init);
-            ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
-        }
-
-        self.init += bytes.len();
         Ok(())
     }
 }

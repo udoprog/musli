@@ -21,6 +21,7 @@
 mod de;
 mod en;
 pub mod encoding;
+pub mod reader;
 
 pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, JsonEncoding};
 #[cfg(feature = "std")]

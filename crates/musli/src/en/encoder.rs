@@ -166,163 +166,6 @@ pub trait Encoder: Sized {
         )))
     }
 
-    /// Construct a pack that can encode more than one element at a time.
-    ///
-    /// This hints to the format that it should attempt to encode all of the
-    /// elements in the packed sequence as compact as possible and that
-    /// subsequent unpackers will know the exact length of the element being
-    /// unpacked.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::en::{Encode, Encoder, SequenceEncoder};
-    ///
-    /// struct PackedStruct {
-    ///     field: u32,
-    ///     data: [u8; 364],
-    /// }
-    ///
-    /// impl<Mode> Encode<Mode> for PackedStruct {
-    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    ///     where
-    ///         E: Encoder
-    ///     {
-    ///         let mut pack = encoder.encode_pack()?;
-    ///         pack.next()?.encode_u32(self.field)?;
-    ///         pack.next()?.encode_array(self.data)?;
-    ///         pack.end()
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Pack,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
-    /// Encode fixed-length array.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::en::{Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: [u8; 364],
-    /// }
-    ///
-    /// impl<Mode> Encode<Mode> for MyType {
-    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    ///     where
-    ///         E: Encoder
-    ///     {
-    ///         encoder.encode_array(self.data)
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn encode_array<const N: usize>(self, _: [u8; N]) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Array,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
-    /// Encode a sequence of bytes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::en::{Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: Vec<u8>,
-    /// }
-    ///
-    /// impl<Mode> Encode<Mode> for MyType {
-    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    ///     where
-    ///         E: Encoder
-    ///     {
-    ///         encoder.encode_bytes(self.data.as_slice())
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn encode_bytes(self, _: &[u8]) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Bytes,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
-    /// Encode the given slices of bytes in sequence, with one following another
-    /// as a single contiguous byte array.
-    ///
-    /// This can be useful to avoid allocations when a caller doesn't have
-    /// access to a single byte sequence like in
-    /// [VecDeque][std::collections::VecDeque].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::collections::VecDeque;
-    ///
-    /// use musli::en::{Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: VecDeque<u8>,
-    /// }
-    ///
-    /// impl<Mode> Encode<Mode> for MyType {
-    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    ///     where
-    ///         E: Encoder
-    ///     {
-    ///         let (first, second) = self.data.as_slices();
-    ///         encoder.encode_bytes_vectored(&[first, second])
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn encode_bytes_vectored(self, _: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Bytes,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
-    /// Encode a string.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::en::{Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: String,
-    /// }
-    ///
-    /// impl<Mode> Encode<Mode> for MyType {
-    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    ///     where
-    ///         E: Encoder
-    ///     {
-    ///         encoder.encode_string(self.data.as_str())
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn encode_string(self, _: &str) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::String,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
     /// Encode a boolean value.
     ///
     /// # Examples
@@ -771,6 +614,126 @@ pub trait Encoder: Sized {
         )))
     }
 
+    /// Encode fixed-length array.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: [u8; 364],
+    /// }
+    ///
+    /// impl<Mode> Encode<Mode> for MyType {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         encoder.encode_array(self.data)
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_array<const N: usize>(self, _: [u8; N]) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Array,
+            &ExpectingWrapper::new(self),
+        )))
+    }
+
+    /// Encode a sequence of bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: Vec<u8>,
+    /// }
+    ///
+    /// impl<Mode> Encode<Mode> for MyType {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         encoder.encode_bytes(self.data.as_slice())
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_bytes(self, _: &[u8]) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Bytes,
+            &ExpectingWrapper::new(self),
+        )))
+    }
+
+    /// Encode the given slices of bytes in sequence, with one following another
+    /// as a single contiguous byte array.
+    ///
+    /// This can be useful to avoid allocations when a caller doesn't have
+    /// access to a single byte sequence like in
+    /// [VecDeque][std::collections::VecDeque].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::collections::VecDeque;
+    ///
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: VecDeque<u8>,
+    /// }
+    ///
+    /// impl<Mode> Encode<Mode> for MyType {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         let (first, second) = self.data.as_slices();
+    ///         encoder.encode_bytes_vectored(&[first, second])
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_bytes_vectored(self, _: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Bytes,
+            &ExpectingWrapper::new(self),
+        )))
+    }
+
+    /// Encode a string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: String,
+    /// }
+    ///
+    /// impl<Mode> Encode<Mode> for MyType {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         encoder.encode_string(self.data.as_str())
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_string(self, _: &str) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::String,
+            &ExpectingWrapper::new(self),
+        )))
+    }
+
     /// Encode an optional value that is present.
     ///
     /// # Examples
@@ -837,6 +800,43 @@ pub trait Encoder: Sized {
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Option,
+            &ExpectingWrapper::new(self),
+        )))
+    }
+
+    /// Construct a pack that can encode more than one element at a time.
+    ///
+    /// This hints to the format that it should attempt to encode all of the
+    /// elements in the packed sequence as compact as possible and that
+    /// subsequent unpackers will know the exact length of the element being
+    /// unpacked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::en::{Encode, Encoder, SequenceEncoder};
+    ///
+    /// struct PackedStruct {
+    ///     field: u32,
+    ///     data: [u8; 364],
+    /// }
+    ///
+    /// impl<Mode> Encode<Mode> for PackedStruct {
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder
+    ///     {
+    ///         let mut pack = encoder.encode_pack()?;
+    ///         pack.next()?.encode_u32(self.field)?;
+    ///         pack.next()?.encode_array(self.data)?;
+    ///         pack.end()
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Pack,
             &ExpectingWrapper::new(self),
         )))
     }

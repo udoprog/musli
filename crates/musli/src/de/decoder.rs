@@ -230,194 +230,6 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Construct an unpack that can decode more than one element at a time.
-    ///
-    /// This hints to the format that it should attempt to decode all of the
-    /// elements in the packed sequence from an as compact format as possible
-    /// compatible with what's being returned by
-    /// [Encoder::pack][crate::Encoder::encode_pack].
-    ///
-    /// ```
-    /// use musli::de::{Decode, Decoder, PackDecoder};
-    ///
-    /// struct PackedStruct {
-    ///     field: u32,
-    ///     data: [u8; 364],
-    /// }
-    ///
-    /// impl<'de, Mode> Decode<'de, Mode> for PackedStruct {
-    ///     #[inline]
-    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    ///     where
-    ///         D: Decoder<'de>,
-    ///     {
-    ///         let mut unpack = decoder.decode_pack()?;
-    ///         let field = unpack.next().and_then(Decode::<Mode>::decode)?;
-    ///         let data = unpack.next().and_then(Decode::<Mode>::decode)?;
-    ///
-    ///         Ok(Self {
-    ///             field,
-    ///             data,
-    ///         })
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Pack,
-            &ExpectingWrapper(self),
-        )))
-    }
-
-    /// Decode a fixed-length array.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::de::{Decode, Decoder};
-    ///
-    /// struct MyType {
-    ///     data: [u8; 128],
-    /// }
-    ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
-    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    ///     where
-    ///         D: Decoder<'de>,
-    ///     {
-    ///         Ok(Self {
-    ///             data: decoder.decode_array()?,
-    ///         })
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Array,
-            &ExpectingWrapper(self),
-        )))
-    }
-
-    /// Decode a sequence of bytes whos length is encoded in the payload.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::fmt;
-    /// use std::marker;
-    ///
-    /// use musli::de::{Decode, Decoder, ValueVisitor};
-    /// use musli::error::Error;
-    ///
-    /// struct BytesReference<'de> {
-    ///     data: &'de [u8],
-    /// }
-    ///
-    /// impl<'de, Mode> Decode<'de, Mode> for BytesReference<'de> {
-    ///     #[inline]
-    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    ///     where
-    ///         D: Decoder<'de>,
-    ///     {
-    ///         return Ok(Self {
-    ///             data: decoder.decode_bytes(Visitor(marker::PhantomData))?,
-    ///         });
-    ///
-    ///         struct Visitor<E>(marker::PhantomData<E>);
-    ///
-    ///         impl<'de, E> ValueVisitor<'de> for Visitor<E>
-    ///         where
-    ///             E: Error,
-    ///         {
-    ///             type Target = [u8];
-    ///             type Ok = &'de [u8];
-    ///             type Error = E;
-    ///
-    ///             #[inline]
-    ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    ///                 write!(f, "exact bytes reference")
-    ///             }
-    ///
-    ///             #[inline]
-    ///             fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
-    ///                 Ok(bytes)
-    ///             }
-    ///         }
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn decode_bytes<V>(self, _: V) -> Result<V::Ok, V::Error>
-    where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
-    {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Bytes,
-            &ExpectingWrapper(self),
-        )))
-    }
-
-    /// Decode a string slice from the current decoder.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::fmt;
-    /// use std::marker;
-    ///
-    /// use musli::de::{Decode, Decoder, ValueVisitor};
-    /// use musli::error::Error;
-    ///
-    /// struct StringReference<'de> {
-    ///     data: &'de str,
-    /// }
-    ///
-    /// impl<'de, Mode> Decode<'de, Mode> for StringReference<'de> {
-    ///     #[inline]
-    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    ///     where
-    ///         D: Decoder<'de>,
-    ///     {
-    ///         return Ok(Self {
-    ///             data: decoder.decode_string(Visitor(marker::PhantomData))?,
-    ///         });
-    ///
-    ///         struct Visitor<E>(marker::PhantomData<E>);
-    ///
-    ///         impl<'de, E> ValueVisitor<'de> for Visitor<E>
-    ///         where
-    ///             E: Error,
-    ///         {
-    ///             type Target = str;
-    ///             type Ok = &'de str;
-    ///             type Error = E;
-    ///
-    ///             #[inline]
-    ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    ///                 write!(f, "exact bytes reference")
-    ///             }
-    ///
-    ///             #[inline]
-    ///             fn visit_borrowed(self, bytes: &'de str) -> Result<Self::Ok, Self::Error> {
-    ///                 Ok(bytes)
-    ///             }
-    ///         }
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn decode_string<V>(self, _: V) -> Result<V::Ok, V::Error>
-    where
-        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
-    {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::String,
-            &ExpectingWrapper(self),
-        )))
-    }
-
     /// Decode a boolean.
     ///
     /// # Examples
@@ -898,6 +710,154 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
+    /// Decode a fixed-length array.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::de::{Decode, Decoder};
+    ///
+    /// struct MyType {
+    ///     data: [u8; 128],
+    /// }
+    ///
+    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         Ok(Self {
+    ///             data: decoder.decode_array()?,
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Array,
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Decode a sequence of bytes whos length is encoded in the payload.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::fmt;
+    /// use std::marker;
+    ///
+    /// use musli::de::{Decode, Decoder, ValueVisitor};
+    /// use musli::error::Error;
+    ///
+    /// struct BytesReference<'de> {
+    ///     data: &'de [u8],
+    /// }
+    ///
+    /// impl<'de, Mode> Decode<'de, Mode> for BytesReference<'de> {
+    ///     #[inline]
+    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         return Ok(Self {
+    ///             data: decoder.decode_bytes(Visitor(marker::PhantomData))?,
+    ///         });
+    ///
+    ///         struct Visitor<E>(marker::PhantomData<E>);
+    ///
+    ///         impl<'de, E> ValueVisitor<'de> for Visitor<E>
+    ///         where
+    ///             E: Error,
+    ///         {
+    ///             type Target = [u8];
+    ///             type Ok = &'de [u8];
+    ///             type Error = E;
+    ///
+    ///             #[inline]
+    ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    ///                 write!(f, "exact bytes reference")
+    ///             }
+    ///
+    ///             #[inline]
+    ///             fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+    ///                 Ok(bytes)
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_bytes<V>(self, _: V) -> Result<V::Ok, V::Error>
+    where
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+    {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Bytes,
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Decode a string slice from the current decoder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::fmt;
+    /// use std::marker;
+    ///
+    /// use musli::de::{Decode, Decoder, ValueVisitor};
+    /// use musli::error::Error;
+    ///
+    /// struct StringReference<'de> {
+    ///     data: &'de str,
+    /// }
+    ///
+    /// impl<'de, Mode> Decode<'de, Mode> for StringReference<'de> {
+    ///     #[inline]
+    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         return Ok(Self {
+    ///             data: decoder.decode_string(Visitor(marker::PhantomData))?,
+    ///         });
+    ///
+    ///         struct Visitor<E>(marker::PhantomData<E>);
+    ///
+    ///         impl<'de, E> ValueVisitor<'de> for Visitor<E>
+    ///         where
+    ///             E: Error,
+    ///         {
+    ///             type Target = str;
+    ///             type Ok = &'de str;
+    ///             type Error = E;
+    ///
+    ///             #[inline]
+    ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    ///                 write!(f, "exact bytes reference")
+    ///             }
+    ///
+    ///             #[inline]
+    ///             fn visit_borrowed(self, bytes: &'de str) -> Result<Self::Ok, Self::Error> {
+    ///                 Ok(bytes)
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_string<V>(self, _: V) -> Result<V::Ok, V::Error>
+    where
+        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
+    {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::String,
+            &ExpectingWrapper(self),
+        )))
+    }
+
     /// Decode an optional value.
     ///
     /// # Examples
@@ -931,6 +891,46 @@ pub trait Decoder<'de>: Sized {
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Option,
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Construct an unpack that can decode more than one element at a time.
+    ///
+    /// This hints to the format that it should attempt to decode all of the
+    /// elements in the packed sequence from an as compact format as possible
+    /// compatible with what's being returned by
+    /// [Encoder::pack][crate::Encoder::encode_pack].
+    ///
+    /// ```
+    /// use musli::de::{Decode, Decoder, PackDecoder};
+    ///
+    /// struct PackedStruct {
+    ///     field: u32,
+    ///     data: [u8; 364],
+    /// }
+    ///
+    /// impl<'de, Mode> Decode<'de, Mode> for PackedStruct {
+    ///     #[inline]
+    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         let mut unpack = decoder.decode_pack()?;
+    ///         let field = unpack.next().and_then(Decode::<Mode>::decode)?;
+    ///         let data = unpack.next().and_then(Decode::<Mode>::decode)?;
+    ///
+    ///         Ok(Self {
+    ///             field,
+    ///             data,
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Pack,
             &ExpectingWrapper(self),
         )))
     }

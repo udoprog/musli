@@ -111,7 +111,7 @@ where
 
     #[inline]
     fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
-        let len = vectors.into_iter().map(|v| v.len()).sum();
+        let len = vectors.iter().map(|v| v.len()).sum();
 
         let (tag, embedded) = Tag::with_len(Kind::Prefix, len);
         self.writer.write_byte(tag.byte())?;
@@ -344,7 +344,7 @@ where
     #[inline]
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
         encode_prefix::<W, L>(&mut self.writer, self.pack_buf.len())?;
-        self.writer.write_bytes(self.pack_buf.as_bytes())?;
+        self.writer.write_bytes(self.pack_buf.as_slice())?;
         Ok(())
     }
 }

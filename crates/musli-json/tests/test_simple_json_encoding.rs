@@ -18,27 +18,20 @@ struct SimpleJsonStruct<'a> {
 
 #[test]
 fn test_simple_encoding() {
-    let expected = vec![
-        SimpleJsonStruct {
-            name: "Aristotle",
-            age: 61,
-        },
-        SimpleJsonStruct {
-            name: "Socrates",
-            age: 12,
-        },
-        SimpleJsonStruct {
-            name: "Plato",
-            age: 42,
-        },
-    ];
+    let expected = vec![SimpleJsonStruct {
+        name: "Aristotle",
+        age: 61,
+    }];
 
     let out = CONFIG.to_vec(&expected).unwrap();
-    println!("{}", String::from_utf8(out).unwrap());
+    println!("{}", std::str::from_utf8(&out[..]).unwrap());
+    let actual: Vec<SimpleJsonStruct<'_>> = CONFIG.from_slice(&out[..]).unwrap();
+    assert_eq!(expected, actual);
 
     let out = musli_json::to_vec(&expected).unwrap();
-    println!("{}", String::from_utf8(out).unwrap());
-    // let actual = CONFIG.decode(&out[..]).unwrap();
+    println!("{}", std::str::from_utf8(&out[..]).unwrap());
+    let actual: Vec<SimpleJsonStruct<'_>> = musli_json::from_slice(&out[..]).unwrap();
+    assert_eq!(expected, actual);
 
     // assert_eq!(expected, actual);
 }

@@ -10,7 +10,7 @@ use core::fmt;
 /// Trait governing errors raised during encodeing or decoding.
 pub trait Error: 'static + Send + Sync + Sized {
     /// Construct a custom error.
-    fn custom<T>(message: T) -> Self
+    fn custom<T>(error: T) -> Self
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug;
 

@@ -5,14 +5,16 @@ use core::marker;
 #[cfg(feature = "std")]
 use std::io;
 
-use crate::de::JsonDecoder;
-use crate::en::JsonEncoder;
+use crate::reader::{ParseError, Scratch};
 use musli::{Decode, DefaultMode, Encode};
 use musli_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
-use musli_common::reader::{Reader, SliceReader, SliceReaderError};
 #[cfg(feature = "std")]
 use musli_common::writer::VecWriterError;
 use musli_common::writer::Writer;
+
+use crate::de::JsonDecoder;
+use crate::en::JsonEncoder;
+use crate::reader::{Parser, SliceParser};
 
 /// The default configuration.
 pub const DEFAULT: JsonEncoding = JsonEncoding::new();
@@ -63,9 +65,9 @@ where
 /// Decode the given type `T` from the given [Reader] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn decode<'de, R, T>(reader: R) -> Result<T, R::Error>
+pub fn decode<'de, R, T>(reader: R) -> Result<T, ParseError>
 where
-    R: Reader<'de>,
+    R: Parser<'de>,
     T: Decode<'de, DefaultMode>,
 {
     DEFAULT.decode(reader)
@@ -74,7 +76,7 @@ where
 /// Decode the given type `T` from the given slice using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, SliceReaderError>
+pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, ParseError>
 where
     T: Decode<'de, DefaultMode>,
 {
@@ -139,7 +141,7 @@ impl<Mode> JsonEncoding<Mode> {
         W: Writer,
         T: ?Sized + Encode<Mode>,
     {
-        T::encode(value, JsonEncoder::new(&mut writer))
+        T::encode(value, JsonEncoder::<Mode, _>::new(&mut writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
@@ -152,7 +154,7 @@ impl<Mode> JsonEncoding<Mode> {
         T: ?Sized + Encode<Mode>,
     {
         let mut writer = musli_common::io::wrap(write);
-        T::encode(value, JsonEncoder::new(&mut writer))
+        T::encode(value, JsonEncoder::<Mode, _>::new(&mut writer))
     }
 
     /// Encode the given value to a [Vec] using the current configuration.
@@ -163,7 +165,7 @@ impl<Mode> JsonEncoding<Mode> {
         T: ?Sized + Encode<Mode>,
     {
         let mut data = Vec::new();
-        T::encode(value, JsonEncoder::new(&mut data))?;
+        T::encode(value, JsonEncoder::<Mode, _>::new(&mut data))?;
         Ok(data)
     }
 
@@ -175,7 +177,7 @@ impl<Mode> JsonEncoding<Mode> {
         T: ?Sized + Encode<Mode>,
     {
         let mut data = Vec::new();
-        T::encode(value, JsonEncoder::new(&mut data))?;
+        T::encode(value, JsonEncoder::<Mode, _>::new(&mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }
@@ -191,30 +193,31 @@ impl<Mode> JsonEncoding<Mode> {
         T: ?Sized + Encode<Mode>,
     {
         let mut bytes = FixedBytes::new();
-        T::encode(value, JsonEncoder::new(&mut bytes))?;
+        T::encode(value, JsonEncoder::<Mode, _>::new(&mut bytes))?;
         Ok(bytes)
     }
 
     /// Decode the given type `T` from the given [Reader] using the current
     /// configuration.
     #[inline]
-    pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
+    pub fn decode<'de, R, T>(self, mut reader: R) -> Result<T, ParseError>
     where
-        R: Reader<'de>,
+        R: Parser<'de>,
         T: Decode<'de, Mode>,
     {
-        let mut reader = reader.with_position();
-        T::decode(JsonDecoder::new(&mut reader))
+        let mut scratch = Scratch::new();
+        T::decode(JsonDecoder::new(&mut scratch, &mut reader))
     }
 
     /// Decode the given type `T` from the given slice using the current
     /// configuration.
     #[inline]
-    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, SliceReaderError>
+    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, ParseError>
     where
         T: Decode<'de, Mode>,
     {
-        let mut reader = SliceReader::new(bytes).with_position();
-        T::decode(JsonDecoder::new(&mut reader))
+        let mut scratch = Scratch::new();
+        let mut reader = SliceParser::new(bytes);
+        T::decode(JsonDecoder::new(&mut scratch, &mut reader))
     }
 }
