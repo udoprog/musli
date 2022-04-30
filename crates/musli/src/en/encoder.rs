@@ -130,11 +130,7 @@ pub trait Encoder: Sized {
     /// Encoder that can encode a tuple struct.
     type TupleStruct: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a struct variant.
-    type StructVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
-    /// Encoder for a tuple variant.
-    type TupleVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
-    /// Encoder for a unit variant.
-    type UnitVariant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Variant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
 
     /// An expectation error. Every other implementation defers to this to
     /// report that something unexpected happened.
@@ -1009,7 +1005,7 @@ pub trait Encoder: Sized {
     /// enum Enum {
     ///     UnitVariant,
     ///     TupleVariant(String),
-    ///     StructVariant {
+    ///     Variant {
     ///         data: String,
     ///         age: u32,
     ///     }
@@ -1020,17 +1016,16 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder
     ///     {
+    ///         let mut variant = encoder.encode_variant()?;
+    ///
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 let variant = encoder.encode_unit_variant()?;
     ///                 variant.insert::<Mode, _, _>("variant1", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 let variant = encoder.encode_tuple_variant(1)?;
     ///                 variant.insert::<Mode, _, _>("variant2", data)
     ///             }
-    ///             Enum::StructVariant { data, age } => {
-    ///                 let mut variant = encoder.encode_struct_variant(2)?;
+    ///             Enum::Variant { data, age } => {
     ///                 variant.first()?.encode_string("variant3")?;
     ///
     ///                 let mut st = variant.second()?.encode_struct(2)?;
@@ -1045,27 +1040,9 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_struct_variant(self, _: usize) -> Result<Self::StructVariant, Self::Error> {
+    fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
-            expecting::StructVariant,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
-    /// Encode an tuple enum variant.
-    #[inline]
-    fn encode_tuple_variant(self, _: usize) -> Result<Self::TupleVariant, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::TupleVariant,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
-    /// Encode an unit enum variant.
-    #[inline]
-    fn encode_unit_variant(self) -> Result<Self::UnitVariant, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::UnitVariant,
+            expecting::Variant,
             &ExpectingWrapper::new(self),
         )))
     }

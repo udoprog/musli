@@ -50,19 +50,11 @@ impl<Mode> Encode<Mode> for IpAddr {
     where
         E: Encoder,
     {
+        let variant = encoder.encode_variant()?;
+
         match self {
-            IpAddr::V4(v4) => {
-                let mut variant = encoder.encode_struct_variant(1)?;
-                Encode::<Mode>::encode(&0usize, variant.first()?)?;
-                Encode::<Mode>::encode(v4, variant.second()?)?;
-                variant.end()
-            }
-            IpAddr::V6(v6) => {
-                let mut variant = encoder.encode_struct_variant(1)?;
-                Encode::<Mode>::encode(&1usize, variant.first()?)?;
-                Encode::<Mode>::encode(v6, variant.second()?)?;
-                variant.end()
-            }
+            IpAddr::V4(v4) => variant.insert::<Mode, _, _>(0usize, v4),
+            IpAddr::V6(v6) => variant.insert::<Mode, _, _>(0usize, v6),
         }
     }
 }
@@ -157,15 +149,11 @@ impl<Mode> Encode<Mode> for SocketAddr {
     where
         E: Encoder,
     {
+        let variant = encoder.encode_variant()?;
+
         match self {
-            SocketAddr::V4(v4) => {
-                let variant = encoder.encode_struct_variant(1)?;
-                variant.insert::<Mode, _, _>(0usize, v4)
-            }
-            SocketAddr::V6(v6) => {
-                let variant = encoder.encode_struct_variant(1)?;
-                variant.insert::<Mode, _, _>(1usize, v6)
-            }
+            SocketAddr::V4(v4) => variant.insert::<Mode, _, _>(0usize, v4),
+            SocketAddr::V6(v6) => variant.insert::<Mode, _, _>(1usize, v6),
         }
     }
 }

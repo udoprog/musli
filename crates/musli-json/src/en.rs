@@ -34,9 +34,7 @@ where
     type Map = JsonObjectEncoder<Mode, W>;
     type Struct = JsonObjectEncoder<Mode, W>;
     type TupleStruct = JsonObjectEncoder<Mode, W>;
-    type StructVariant = JsonVariantEncoder<Mode, W>;
-    type TupleVariant = JsonVariantEncoder<Mode, W>;
-    type UnitVariant = JsonVariantEncoder<Mode, W>;
+    type Variant = JsonVariantEncoder<Mode, W>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -222,17 +220,7 @@ where
     }
 
     #[inline]
-    fn encode_struct_variant(self, _: usize) -> Result<Self::StructVariant, Self::Error> {
-        JsonVariantEncoder::new(self.writer)
-    }
-
-    #[inline]
-    fn encode_tuple_variant(self, _: usize) -> Result<Self::TupleVariant, Self::Error> {
-        JsonVariantEncoder::new(self.writer)
-    }
-
-    #[inline]
-    fn encode_unit_variant(self) -> Result<Self::UnitVariant, Self::Error> {
+    fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
         JsonVariantEncoder::new(self.writer)
     }
 }
@@ -416,9 +404,7 @@ where
     type Map = Never<Self>;
     type Struct = Never<Self>;
     type TupleStruct = Never<Self>;
-    type StructVariant = Never<Self>;
-    type TupleVariant = Never<Self>;
-    type UnitVariant = Never<Self>;
+    type Variant = Never<Self>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

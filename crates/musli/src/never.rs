@@ -167,9 +167,7 @@ where
     type Map = Self;
     type Struct = Self;
     type TupleStruct = Self;
-    type StructVariant = Self;
-    type TupleVariant = Self;
-    type UnitVariant = Self;
+    type Variant = Self;
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {

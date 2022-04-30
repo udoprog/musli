@@ -13,7 +13,7 @@ pub enum TupleVariants {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-pub enum StructVariants {
+pub enum Variants {
     Variant1 { value: String },
     Variant2 { value: u32 },
 }
@@ -26,8 +26,8 @@ fn test_tagged_enums() {
     musli_tests::rt!(TupleVariants::Variant1(String::from("foo")));
     musli_tests::rt!(TupleVariants::Variant2(42));
 
-    musli_tests::rt!(StructVariants::Variant1 {
+    musli_tests::rt!(Variants::Variant1 {
         value: String::from("foo"),
     });
-    musli_tests::rt!(StructVariants::Variant2 { value: 42 });
+    musli_tests::rt!(Variants::Variant2 { value: 42 });
 }

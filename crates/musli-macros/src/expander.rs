@@ -952,37 +952,13 @@ impl<'a> Expander<'a> {
 
             let encode_t_encode = mode.encode_t_encode();
 
-            let body = quote! {
+            encode = quote! {
+                let mut variant_encoder = #encoder_t::encode_variant(#encoder_var)?;
                 let tag_encoder = #pair_encoder_t::first(&mut variant_encoder)?;
                 #encode_t_encode(&#tag, tag_encoder)?;
                 let #encoder_var = #pair_encoder_t::second(&mut variant_encoder)?;
                 #encode?;
                 #pair_encoder_t::end(variant_encoder)
-            };
-
-            encode = match &variant.kind {
-                StructKind::Named => {
-                    let len = variant.fields.len();
-
-                    quote! {{
-                        let mut variant_encoder = #encoder_t::encode_struct_variant(#encoder_var, #len)?;
-                        #body
-                    }}
-                }
-                StructKind::Unnamed => {
-                    let len = variant.fields.len();
-
-                    quote! {{
-                        let mut variant_encoder = #encoder_t::encode_tuple_variant(#encoder_var, #len)?;
-                        #body
-                    }}
-                }
-                StructKind::Unit => {
-                    quote! {{
-                        let mut variant_encoder = #encoder_t::encode_unit_variant(#encoder_var)?;
-                        #body
-                    }}
-                }
             };
         }
 

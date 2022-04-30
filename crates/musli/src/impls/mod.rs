@@ -370,17 +370,11 @@ where
     where
         E: Encoder,
     {
-        let mut variant = encoder.encode_struct_variant(1)?;
+        let variant = encoder.encode_variant()?;
 
         match self {
-            Ok(ok) => {
-                Encode::<Mode>::encode(&0usize, variant.first()?)?;
-                Encode::<Mode>::encode(ok, variant.second()?)
-            }
-            Err(err) => {
-                Encode::<Mode>::encode(&1usize, variant.first()?)?;
-                Encode::<Mode>::encode(err, variant.second()?)
-            }
+            Ok(ok) => variant.insert::<Mode, _, _>(0usize, ok),
+            Err(err) => variant.insert::<Mode, _, _>(1usize, err),
         }
     }
 }
