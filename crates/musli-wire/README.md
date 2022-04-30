@@ -54,8 +54,9 @@ type:
 use musli_wire::WireEncoding;
 use musli_wire::{Fixed, Variable};
 use musli::{Encode, Decode};
+use musli::mode::DefaultMode;
 
-const CONFIG: WireEncoding<Fixed, Variable, 128> = WireEncoding::new()
+const CONFIG: WireEncoding<DefaultMode, Fixed, Variable, 128> = WireEncoding::new()
     .with_fixed_integers()
     .with_max_pack::<128>();
 
