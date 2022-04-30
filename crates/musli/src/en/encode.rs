@@ -1,18 +1,22 @@
 use crate::en::Encoder;
-use crate::mode::DefaultMode;
+use crate::mode::{DefaultMode, Mode};
 pub use musli_macros::Encode;
 
 /// Trait governing how types are encoded.
-pub trait Encode<Mode = DefaultMode> {
+pub trait Encode<M = DefaultMode>
+where
+    M: Mode,
+{
     /// Encode the given output.
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder;
 }
 
-impl<T, Mode> Encode<Mode> for &T
+impl<T, M> Encode<M> for &T
 where
-    T: ?Sized + Encode<Mode>,
+    T: ?Sized + Encode<M>,
+    M: Mode,
 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -23,9 +27,10 @@ where
     }
 }
 
-impl<T, Mode> Encode<Mode> for &mut T
+impl<T, M> Encode<M> for &mut T
 where
-    T: ?Sized + Encode<Mode>,
+    T: ?Sized + Encode<M>,
+    M: Mode,
 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>

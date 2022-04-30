@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use criterion::black_box;
-use musli::{mode::DefaultMode, Decode, Encode};
+use musli::mode::DefaultMode;
+use musli::{Decode, Encode};
 use musli_storage::{Fixed, FixedLength, StorageEncoding};
 use serde::{Deserialize, Serialize};
 
@@ -83,7 +84,7 @@ where
     bincode::deserialize(data).unwrap()
 }
 
-const ENCODING: StorageEncoding<Fixed, FixedLength> = StorageEncoding::new()
+const ENCODING: StorageEncoding<DefaultMode, Fixed, FixedLength> = StorageEncoding::new()
     .with_fixed_integers()
     .with_fixed_lengths();
 

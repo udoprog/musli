@@ -6,7 +6,8 @@ use core::marker;
 use std::io;
 
 use crate::reader::{ParseError, Scratch};
-use musli::{Decode, DefaultMode, Encode};
+use musli::mode::{DefaultMode, Mode};
+use musli::{Decode, Encode};
 use musli_common::fixed_bytes::{FixedBytes, FixedBytesWriterError};
 #[cfg(feature = "std")]
 use musli_common::writer::VecWriterError;
@@ -85,23 +86,30 @@ where
 
 /// Setting up encoding with parameters.
 #[derive(Clone, Copy)]
-pub struct JsonEncoding<Mode = DefaultMode> {
-    _mode: marker::PhantomData<Mode>,
+pub struct JsonEncoding<M = DefaultMode> {
+    _marker: marker::PhantomData<M>,
 }
 
-impl<Mode> JsonEncoding<Mode> {
+impl<M> JsonEncoding<M>
+where
+    M: Mode,
+{
     /// Construct a new [JsonEncoding].
     ///
     /// You can modify this using the available factory methods:
     ///
     /// ```rust
     /// use musli_json::JsonEncoding;
-    /// use musli::{Encode, Decode};
+    /// use musli::{Encode, Decode, Mode};
     ///
     /// const CONFIG: JsonEncoding<Json> = JsonEncoding::new();
     ///
-    /// // Mode marker indicating that some attributes should only apply when we're decoding in a JSON mode.
+    /// // Mode marker indicating that some attributes should
+    /// // only apply when we're decoding in a JSON mode.
     /// enum Json {}
+    ///
+    /// impl Mode for Json {
+    /// }
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
     /// #[musli(mode = Json, default_field_tag = "name")]
@@ -129,7 +137,17 @@ impl<Mode> JsonEncoding<Mode> {
     #[inline]
     pub const fn new() -> Self {
         JsonEncoding {
-            _mode: marker::PhantomData,
+            _marker: marker::PhantomData,
+        }
+    }
+
+    /// Change the mode of the encoding.
+    pub const fn with_mode<T>(self) -> JsonEncoding<T>
+    where
+        T: Mode,
+    {
+        JsonEncoding {
+            _marker: marker::PhantomData,
         }
     }
 
@@ -139,9 +157,9 @@ impl<Mode> JsonEncoding<Mode> {
     pub fn encode<W, T>(self, mut writer: W, value: &T) -> Result<(), W::Error>
     where
         W: Writer,
-        T: ?Sized + Encode<Mode>,
+        T: ?Sized + Encode<M>,
     {
-        T::encode(value, JsonEncoder::<Mode, _>::new(&mut writer))
+        T::encode(value, JsonEncoder::<M, _>::new(&mut writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
@@ -151,10 +169,10 @@ impl<Mode> JsonEncoding<Mode> {
     pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
     where
         W: io::Write,
-        T: ?Sized + Encode<Mode>,
+        T: ?Sized + Encode<M>,
     {
         let mut writer = musli_common::io::wrap(write);
-        T::encode(value, JsonEncoder::<Mode, _>::new(&mut writer))
+        T::encode(value, JsonEncoder::<M, _>::new(&mut writer))
     }
 
     /// Encode the given value to a [Vec] using the current configuration.
@@ -162,10 +180,10 @@ impl<Mode> JsonEncoding<Mode> {
     #[inline]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, VecWriterError>
     where
-        T: ?Sized + Encode<Mode>,
+        T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
-        T::encode(value, JsonEncoder::<Mode, _>::new(&mut data))?;
+        T::encode(value, JsonEncoder::<M, _>::new(&mut data))?;
         Ok(data)
     }
 
@@ -174,10 +192,10 @@ impl<Mode> JsonEncoding<Mode> {
     #[inline]
     pub fn to_string<T>(self, value: &T) -> Result<String, VecWriterError>
     where
-        T: ?Sized + Encode<Mode>,
+        T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
-        T::encode(value, JsonEncoder::<Mode, _>::new(&mut data))?;
+        T::encode(value, JsonEncoder::<M, _>::new(&mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }
@@ -190,10 +208,10 @@ impl<Mode> JsonEncoding<Mode> {
         value: &T,
     ) -> Result<FixedBytes<N>, FixedBytesWriterError>
     where
-        T: ?Sized + Encode<Mode>,
+        T: ?Sized + Encode<M>,
     {
         let mut bytes = FixedBytes::new();
-        T::encode(value, JsonEncoder::<Mode, _>::new(&mut bytes))?;
+        T::encode(value, JsonEncoder::<M, _>::new(&mut bytes))?;
         Ok(bytes)
     }
 
@@ -203,7 +221,7 @@ impl<Mode> JsonEncoding<Mode> {
     pub fn decode<'de, R, T>(self, mut reader: R) -> Result<T, ParseError>
     where
         R: Parser<'de>,
-        T: Decode<'de, Mode>,
+        T: Decode<'de, M>,
     {
         let mut scratch = Scratch::new();
         T::decode(JsonDecoder::new(&mut scratch, &mut reader))
@@ -214,7 +232,7 @@ impl<Mode> JsonEncoding<Mode> {
     #[inline]
     pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, ParseError>
     where
-        T: Decode<'de, Mode>,
+        T: Decode<'de, M>,
     {
         let mut scratch = Scratch::new();
         let mut reader = SliceParser::new(bytes);

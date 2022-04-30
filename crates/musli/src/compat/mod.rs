@@ -8,6 +8,7 @@ mod packed;
 pub use self::packed::Packed;
 
 use crate::en::SequenceEncoder;
+use crate::mode::Mode;
 use crate::{Decode, Decoder, Encode, Encoder};
 
 /// Ensures that the given value `T` is encoded as a sequence.
@@ -29,9 +30,10 @@ impl<T> Sequence<T> {
     }
 }
 
-impl<T, Mode> Encode<Mode> for Sequence<&'_ [T]>
+impl<M, T> Encode<M> for Sequence<&'_ [T]>
 where
-    T: Encode<Mode>,
+    M: Mode,
+    T: Encode<M>,
 {
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -49,7 +51,10 @@ where
     }
 }
 
-impl<Mode> Encode<Mode> for Sequence<()> {
+impl<M> Encode<M> for Sequence<()>
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -59,7 +64,10 @@ impl<Mode> Encode<Mode> for Sequence<()> {
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for Sequence<()> {
+impl<'de, M> Decode<'de, M> for Sequence<()>
+where
+    M: Mode,
+{
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -80,7 +88,10 @@ impl<'de, Mode> Decode<'de, Mode> for Sequence<()> {
 #[repr(transparent)]
 pub struct Bytes<T>(pub T);
 
-impl<const N: usize, Mode> Encode<Mode> for Bytes<[u8; N]> {
+impl<const N: usize, M> Encode<M> for Bytes<[u8; N]>
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -90,7 +101,10 @@ impl<const N: usize, Mode> Encode<Mode> for Bytes<[u8; N]> {
     }
 }
 
-impl<'de, Mode, const N: usize> Decode<'de, Mode> for Bytes<[u8; N]> {
+impl<'de, M, const N: usize> Decode<'de, M> for Bytes<[u8; N]>
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where

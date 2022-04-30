@@ -3,6 +3,7 @@
 use crate::compat::Packed;
 use crate::de::{Decode, Decoder, PackDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder};
+use crate::mode::Mode;
 
 macro_rules! count {
     (_) => { 1 };
@@ -40,7 +41,7 @@ macro_rules! declare {
     };
 
     (($ty0:ident, $ident0:ident) $(, ($ty:ident, $ident:ident))* $(,)?) => {
-        impl<Mode, $ty0 $(, $ty)*> Encode<Mode> for ($ty0, $($ty),*) where $ty0: Encode<Mode>, $($ty: Encode<Mode>),* {
+        impl<M, $ty0 $(, $ty)*> Encode<M> for ($ty0, $($ty),*) where M: Mode, $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -54,7 +55,7 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, Mode, $ty0, $($ty,)*> Decode<'de, Mode> for ($ty0, $($ty),*) where $ty0: Decode<'de, Mode>, $($ty: Decode<'de, Mode>),* {
+        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*) where M: Mode, $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
@@ -67,7 +68,7 @@ macro_rules! declare {
             }
         }
 
-        impl<Mode, $ty0 $(,$ty)*> Encode<Mode> for Packed<($ty0, $($ty),*)> where $ty0: Encode<Mode>, $($ty: Encode<Mode>),* {
+        impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)> where M: Mode, $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -81,7 +82,7 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, Mode, $ty0, $($ty,)*> Decode<'de, Mode> for Packed<($ty0, $($ty),*)> where $ty0: Decode<'de, Mode>, $($ty: Decode<'de, Mode>),* {
+        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)> where M: Mode, $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where

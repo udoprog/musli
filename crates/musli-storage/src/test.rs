@@ -1,7 +1,8 @@
 //! Helpers for writing tests.
 
 use core::fmt::Debug;
-use musli::{Decode, DefaultMode, Encode};
+use musli::mode::DefaultMode;
+use musli::{Decode, Encode};
 
 /// Roundtrip encode the given value.
 #[macro_export]

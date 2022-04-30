@@ -24,6 +24,7 @@ pub(crate) struct Tokens {
     pub(crate) value_visitor_t: syn::ExprPath,
     pub(crate) sequence_encoder_t: syn::ExprPath,
     pub(crate) default_mode: syn::ExprPath,
+    pub(crate) mode_t: syn::ExprPath,
 }
 
 impl Tokens {
@@ -51,6 +52,7 @@ impl Tokens {
             value_visitor_t: path(span, prefix, ["de", "ValueVisitor"]),
             sequence_encoder_t: path(span, prefix, ["en", "SequenceEncoder"]),
             default_mode: path(span, prefix, ["mode", "DefaultMode"]),
+            mode_t: path(span, prefix, ["mode", "Mode"]),
         }
     }
 }

@@ -3,6 +3,7 @@
 use core::fmt;
 use core::mem;
 
+use musli::mode::Mode;
 use musli::{Decode, Decoder};
 
 /// Data masked into the data type.
@@ -141,7 +142,10 @@ impl fmt::Debug for Tag {
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for Tag {
+impl<'de, M> Decode<'de, M> for Tag
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where

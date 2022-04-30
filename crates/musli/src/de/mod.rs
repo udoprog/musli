@@ -23,8 +23,18 @@ pub use self::decode::Decode;
 pub use self::decoder::{
     Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
 };
+use crate::mode::Mode;
 
 /// An owned decoder.
-pub trait DecodeOwned<Mode>: for<'de> Decode<'de, Mode> {}
+pub trait DecodeOwned<M>: for<'de> Decode<'de, M>
+where
+    M: Mode,
+{
+}
 
-impl<Mode, D> DecodeOwned<Mode> for D where D: for<'de> Decode<'de, Mode> {}
+impl<M, D> DecodeOwned<M> for D
+where
+    D: for<'de> Decode<'de, M>,
+    M: Mode,
+{
+}

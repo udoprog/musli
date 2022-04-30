@@ -9,18 +9,25 @@ use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, Val
 use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
 use crate::error::Error;
 use crate::internal::size_hint;
+use crate::mode::Mode;
 
-impl<Mode> Encode<Mode> for String {
+impl<M> Encode<M> for String
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        Encode::<Mode>::encode(self.as_str(), encoder)
+        Encode::<M>::encode(self.as_str(), encoder)
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for String {
+impl<'de, M> Decode<'de, M> for String
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
@@ -61,37 +68,49 @@ impl<'de, Mode> Decode<'de, Mode> for String {
     }
 }
 
-impl<Mode> Encode<Mode> for Box<str> {
+impl<M> Encode<M> for Box<str>
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        Encode::<Mode>::encode(self.as_ref(), encoder)
+        Encode::<M>::encode(self.as_ref(), encoder)
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for Box<str> {
+impl<'de, M> Decode<'de, M> for Box<str>
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        Ok(<String as Decode<Mode>>::decode(decoder)?.into())
+        Ok(<String as Decode<M>>::decode(decoder)?.into())
     }
 }
 
-impl<Mode> Encode<Mode> for Cow<'_, str> {
+impl<M> Encode<M> for Cow<'_, str>
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        Encode::<Mode>::encode(self.as_ref(), encoder)
+        Encode::<M>::encode(self.as_ref(), encoder)
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for Cow<'de, str> {
+impl<'de, M> Decode<'de, M> for Cow<'de, str>
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
@@ -139,9 +158,10 @@ macro_rules! sequence {
         $access:ident,
         $factory:expr
     ) => {
-        impl<T, Mode $(, $extra)*> Encode<Mode> for $ty<T $(, $extra)*>
+        impl<M, T $(, $extra)*> Encode<M> for $ty<T $(, $extra)*>
         where
-            T: Encode<Mode>,
+            M: Mode,
+            T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
@@ -159,9 +179,10 @@ macro_rules! sequence {
             }
         }
 
-        impl<'de, Mode, T $(, $extra)*> Decode<'de, Mode> for $ty<T $(, $extra)*>
+        impl<'de, M, T $(, $extra)*> Decode<'de, M> for $ty<T $(, $extra)*>
         where
-            T: Decode<'de, Mode> $(+ $trait0 $(+ $trait)*)*,
+            M: Mode,
+            T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
@@ -213,10 +234,11 @@ macro_rules! map {
         $access:ident,
         $with_capacity:expr
     ) => {
-        impl<'de, Mode, K, V $(, $extra)*> Encode<Mode> for $ty<K, V $(, $extra)*>
+        impl<'de, M, K, V $(, $extra)*> Encode<M> for $ty<K, V $(, $extra)*>
         where
-            K: Encode<Mode>,
-            V: Encode<Mode>,
+            M: Mode,
+            K: Encode<M>,
+            V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
@@ -236,10 +258,11 @@ macro_rules! map {
             }
         }
 
-        impl<'de, K, V, Mode $(, $extra)*> Decode<'de, Mode> for $ty<K, V $(, $extra)*>
+        impl<'de, K, V, M $(, $extra)*> Decode<'de, M> for $ty<K, V $(, $extra)*>
         where
-            K: Decode<'de, Mode> $(+ $key_bound0 $(+ $key_bound)*)*,
-            V: Decode<'de, Mode>,
+            M: Mode,
+            K: Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
+            V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
@@ -273,7 +296,10 @@ map!(
     HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default())
 );
 
-impl<Mode> Encode<Mode> for CStr {
+impl<M> Encode<M> for CStr
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -283,18 +309,24 @@ impl<Mode> Encode<Mode> for CStr {
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for &'de CStr {
+impl<'de, M> Decode<'de, M> for &'de CStr
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        let bytes = <&[u8] as Decode<Mode>>::decode(decoder)?;
+        let bytes = <&[u8] as Decode<M>>::decode(decoder)?;
         CStr::from_bytes_with_nul(bytes).map_err(D::Error::custom)
     }
 }
 
-impl<Mode> Encode<Mode> for CString {
+impl<M> Encode<M> for CString
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -304,12 +336,15 @@ impl<Mode> Encode<Mode> for CString {
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for CString {
+impl<'de, M> Decode<'de, M> for CString
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        Ok(<&CStr as Decode<Mode>>::decode(decoder)?.to_owned())
+        Ok(<&CStr as Decode<M>>::decode(decoder)?.to_owned())
     }
 }

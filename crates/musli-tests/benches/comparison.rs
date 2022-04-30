@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use musli::{mode::DefaultMode, Decode, Encode};
+use musli::mode::DefaultMode;
+use musli::{Decode, Encode};
 use musli_wire::WireEncoding;
 use serde::{Deserialize, Serialize};
 
@@ -194,6 +195,7 @@ where
 }
 
 const STORAGE_ENCODING: musli_storage::StorageEncoding<
+    DefaultMode,
     musli_storage::Fixed,
     musli_storage::FixedLength,
 > = musli_storage::StorageEncoding::new()

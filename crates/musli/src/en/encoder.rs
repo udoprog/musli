@@ -3,6 +3,7 @@ use core::fmt;
 use crate::en::Encode;
 use crate::error::Error;
 use crate::expecting::{self, Expecting, InvalidType};
+use crate::mode::Mode;
 
 /// Trait governing how to encode a sequence.
 pub trait SequenceEncoder {
@@ -22,9 +23,10 @@ pub trait SequenceEncoder {
 
     /// Push an element into the sequence.
     #[inline]
-    fn push<Mode, T>(&mut self, value: T) -> Result<(), Self::Error>
+    fn push<M, T>(&mut self, value: T) -> Result<(), Self::Error>
     where
-        T: Encode<Mode>,
+        M: Mode,
+        T: Encode<M>,
     {
         let encoder = self.next()?;
         value.encode(encoder)?;
@@ -48,11 +50,12 @@ pub trait PairsEncoder {
 
     /// Insert a pair immediately.
     #[inline]
-    fn insert<Mode, F, S>(&mut self, first: F, second: S) -> Result<(), Self::Error>
+    fn insert<M, F, S>(&mut self, first: F, second: S) -> Result<(), Self::Error>
     where
         Self: Sized,
-        F: Encode<Mode>,
-        S: Encode<Mode>,
+        M: Mode,
+        F: Encode<M>,
+        S: Encode<M>,
     {
         self.next()?.insert(first, second)?;
         Ok(())
@@ -82,11 +85,12 @@ pub trait PairEncoder {
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert<Mode, F, S>(mut self, first: F, second: S) -> Result<Self::Ok, Self::Error>
+    fn insert<M, F, S>(mut self, first: F, second: S) -> Result<Self::Ok, Self::Error>
     where
         Self: Sized,
-        F: Encode<Mode>,
-        S: Encode<Mode>,
+        M: Mode,
+        F: Encode<M>,
+        S: Encode<M>,
     {
         self.first().and_then(|e| first.encode(e))?;
         self.second().and_then(|e| second.encode(e))
@@ -120,11 +124,12 @@ pub trait VariantEncoder {
 
     /// Insert the variant immediately.
     #[inline]
-    fn insert<Mode, F, S>(mut self, first: F, second: S) -> Result<Self::Ok, Self::Error>
+    fn insert<M, F, S>(mut self, first: F, second: S) -> Result<Self::Ok, Self::Error>
     where
         Self: Sized,
-        F: Encode<Mode>,
-        S: Encode<Mode>,
+        M: Mode,
+        F: Encode<M>,
+        S: Encode<M>,
     {
         self.tag().and_then(|e| first.encode(e))?;
         self.variant().and_then(|e| second.encode(e))?;
@@ -177,11 +182,11 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct EmptyStruct;
     ///
-    /// impl<Mode> Encode<Mode> for EmptyStruct {
+    /// impl<M> Encode<M> for EmptyStruct where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -203,13 +208,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: bool,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -231,13 +236,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: char,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -259,13 +264,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: u8,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -287,13 +292,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: u16,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -315,13 +320,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: u32,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -343,13 +348,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: u64,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -371,13 +376,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: u128,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -399,13 +404,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: i8,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -427,13 +432,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: i16,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -455,13 +460,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: i32,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -483,13 +488,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: i64,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -511,13 +516,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: i128,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -539,13 +544,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: usize,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -567,13 +572,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: isize,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -595,13 +600,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: f32,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -623,13 +628,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: f64,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -651,13 +656,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: [u8; 364],
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -679,13 +684,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: Vec<u8>,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -714,13 +719,13 @@ pub trait Encoder: Sized {
     /// ```
     /// use std::collections::VecDeque;
     ///
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: VecDeque<u8>,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -743,13 +748,13 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: String,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -771,20 +776,20 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: Option<String>,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some().and_then(|e| Encode::<Mode>::encode(data, e))
+    ///                 encoder.encode_some().and_then(|e| Encode::<M>::encode(data, e))
     ///             }
     ///             None => {
     ///                 encoder.encode_none()
@@ -806,20 +811,20 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct MyType {
     ///     data: Option<String>,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some().and_then(|e| Encode::<Mode>::encode(data, e))
+    ///                 encoder.encode_some().and_then(|e| Encode::<M>::encode(data, e))
     ///             }
     ///             None => {
     ///                 encoder.encode_none()
@@ -847,13 +852,14 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::en::{Encode, Encoder, SequenceEncoder};
+    /// use musli::mode::Mode;
     ///
     /// struct PackedStruct {
     ///     field: u32,
     ///     data: [u8; 364],
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for PackedStruct {
+    /// impl<M> Encode<M> for PackedStruct where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -879,12 +885,13 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::en::{Encode, Encoder, SequenceEncoder};
+    /// use musli::mode::Mode;
     ///
     /// struct MyType {
     ///     data: Vec<String>,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for MyType {
+    /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -892,7 +899,7 @@ pub trait Encoder: Sized {
     ///         let mut seq = encoder.encode_sequence(self.data.len())?;
     ///
     ///         for element in &self.data {
-    ///             seq.push::<Mode, _>(element)?;
+    ///             seq.push::<M, _>(element)?;
     ///         }
     ///
     ///         seq.end()
@@ -913,10 +920,11 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::en::{Encode, Encoder, SequenceEncoder};
+    /// use musli::mode::Mode;
     ///
     /// struct PackedTuple(u32, [u8; 364]);
     ///
-    /// impl<Mode> Encode<Mode> for PackedTuple {
+    /// impl<M> Encode<M> for PackedTuple where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -951,20 +959,21 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder};
+    /// use musli::mode::Mode;
     ///
     /// struct TupleStruct {
     ///     name: String,
     ///     age: u32,
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for TupleStruct {
+    /// impl<M> Encode<M> for TupleStruct where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
     ///     {
     ///         let mut st = encoder.encode_struct(2)?;
-    ///         st.insert::<Mode, _, _>("name", &self.name)?;
-    ///         st.insert::<Mode, _, _>("age", self.age)?;
+    ///         st.insert::<M, _, _>("name", &self.name)?;
+    ///         st.insert::<M, _, _>("age", self.age)?;
     ///         st.end()
     ///     }
     /// }
@@ -983,16 +992,17 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder};
+    /// use musli::mode::Mode;
     ///
     /// struct TupleStruct(String);
     ///
-    /// impl<Mode> Encode<Mode> for TupleStruct {
+    /// impl<M> Encode<M> for TupleStruct where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
     ///     {
     ///         let mut tuple = encoder.encode_tuple_struct(1)?;
-    ///         tuple.insert::<Mode, _, _>(0usize, &self.0)?;
+    ///         tuple.insert::<M, _, _>(0usize, &self.0)?;
     ///         tuple.end()
     ///     }
     /// }
@@ -1010,11 +1020,11 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder};
+    /// use musli::{Encode, Encoder, Mode};
     ///
     /// struct UnitStruct;
     ///
-    /// impl<Mode> Encode<Mode> for UnitStruct {
+    /// impl<M> Encode<M> for UnitStruct where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -1037,6 +1047,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder};
+    /// use musli::mode::Mode;
     ///
     /// enum Enum {
     ///     UnitVariant,
@@ -1047,7 +1058,7 @@ pub trait Encoder: Sized {
     ///     }
     /// }
     ///
-    /// impl<Mode> Encode<Mode> for Enum {
+    /// impl<M> Encode<M> for Enum where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -1056,17 +1067,17 @@ pub trait Encoder: Sized {
     ///
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 variant.insert::<Mode, _, _>("variant1", ())
+    ///                 variant.insert::<M, _, _>("variant1", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 variant.insert::<Mode, _, _>("variant2", data)
+    ///                 variant.insert::<M, _, _>("variant2", data)
     ///             }
     ///             Enum::Variant { data, age } => {
-    ///                 variant.first()?.encode_string("variant3")?;
+    ///                 variant.tag()?.encode_string("variant3")?;
     ///
-    ///                 let mut st = variant.second()?.encode_struct(2)?;
-    ///                 st.insert::<Mode, _, _>("data", data)?;
-    ///                 st.insert::<Mode, _, _>("age", age)?;
+    ///                 let mut st = variant.variant()?.encode_struct(2)?;
+    ///                 st.insert::<M, _, _>("data", data)?;
+    ///                 st.insert::<M, _, _>("age", age)?;
     ///                 st.end()?;
     ///
     ///                 variant.end()

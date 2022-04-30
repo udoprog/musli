@@ -55,7 +55,7 @@ impl ExpansionMode<'_> {
         &self,
         generics: syn::Generics,
         tokens: &Tokens,
-    ) -> (syn::Generics, syn::ExprPath) {
+    ) -> (syn::Generics, syn::ExprPath, Option<syn::WhereClause>) {
         match *self {
             ExpansionMode::Generic { mode_ident } => {
                 let mut impl_generics = generics.clone();
@@ -70,10 +70,37 @@ impl ExpansionMode<'_> {
                     path: syn::Path::from(mode_ident.clone()),
                 };
 
-                (impl_generics, path)
+                let mut where_clause = syn::WhereClause {
+                    where_token: <syn::Token![where]>::default(),
+                    predicates: Default::default(),
+                };
+
+                let mut bounds: syn::punctuated::Punctuated<syn::TypeParamBound, _> =
+                    Default::default();
+
+                bounds.push(syn::TypeParamBound::Trait(syn::TraitBound {
+                    paren_token: Default::default(),
+                    modifier: syn::TraitBoundModifier::None,
+                    lifetimes: Default::default(),
+                    path: tokens.mode_t.path.clone(),
+                }));
+
+                where_clause
+                    .predicates
+                    .push(syn::WherePredicate::Type(syn::PredicateType {
+                        lifetimes: None,
+                        bounded_ty: syn::Type::Path(syn::TypePath {
+                            qself: None,
+                            path: syn::Path::from(mode_ident.clone()),
+                        }),
+                        colon_token: <syn::Token![:]>::default(),
+                        bounds,
+                    }));
+
+                (impl_generics, path, Some(where_clause))
             }
-            ExpansionMode::Default => (generics, tokens.default_mode.clone()),
-            ExpansionMode::Moded { mode_ident } => (generics, mode_ident.clone()),
+            ExpansionMode::Default => (generics, tokens.default_mode.clone(), None),
+            ExpansionMode::Moded { mode_ident } => (generics, mode_ident.clone(), None),
         }
     }
 }
@@ -196,7 +223,7 @@ impl<'a> Expander<'a> {
         let modes = self.cx.modes();
 
         if modes.is_empty() {
-            let mode_ident = syn::Ident::new("Mode", self.type_name.span());
+            let mode_ident = syn::Ident::new("M", self.type_name.span());
 
             return self.expand_encode_moded(ExpansionMode::Generic {
                 mode_ident: &mode_ident,
@@ -251,7 +278,7 @@ impl<'a> Expander<'a> {
         let encode_t = &self.tokens.encode_t;
         let encoder_t = &self.tokens.encoder_t;
 
-        let (impl_generics, mode_ident) =
+        let (impl_generics, mode_ident, where_clause) =
             expansion.as_impl_generics(self.input.generics.clone(), &self.tokens);
 
         let type_generics = &self.input.generics;
@@ -259,7 +286,7 @@ impl<'a> Expander<'a> {
         Some(quote_spanned! {
             span =>
             #[automatically_derived]
-            impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics {
+            impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
                 #inline
                 fn encode<E>(&self, #assignment: E) -> Result<E::Ok, E::Error>
                 where
@@ -515,7 +542,7 @@ impl<'a> Expander<'a> {
         let modes = self.cx.modes();
 
         if modes.is_empty() {
-            let mode_ident = syn::Ident::new("Mode", self.type_name.span());
+            let mode_ident = syn::Ident::new("M", self.type_name.span());
 
             return self.expand_decode_moded(ExpansionMode::Generic {
                 mode_ident: &mode_ident,
@@ -582,12 +609,13 @@ impl<'a> Expander<'a> {
         let decoder_t = &self.tokens.decoder_t;
         let original_generics = &self.input.generics;
 
-        let (impl_generics, mode_ident) = expansion.as_impl_generics(impl_generics, &self.tokens);
+        let (impl_generics, mode_ident, where_clause) =
+            expansion.as_impl_generics(impl_generics, &self.tokens);
 
         Some(quote_spanned! {
             span =>
             #[automatically_derived]
-            impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #original_generics {
+            impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #original_generics #where_clause {
                 #inline
                 fn decode<D>(#assignment: D) -> Result<Self, D::Error>
                 where

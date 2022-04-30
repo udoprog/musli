@@ -9,7 +9,7 @@
 //! #### Modes
 //!
 //! If you've paid close attention to the [Encode] and [Decode] traits you
-//! might've noticed that they have an extra parameter called `Mode`.
+//! might've noticed that they have an extra parameter called `M` for "mode".
 //!
 //! This allows a single type to have *more than one* implementation of encoding
 //! traits, allowing for a high level of flexibility in how a type should be
@@ -20,9 +20,12 @@
 //! done using the `#[musli(mode = ..)]` attribute like this:
 //!
 //! ```
-//! use musli::{Encode, Decode};
+//! use musli::{Encode, Decode, Mode};
 //!
 //! enum Json {}
+//!
+//! impl Mode for Json {
+//! }
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(default_field_tag = "index")]
@@ -41,6 +44,7 @@
 //! ```
 //! # use musli::{Encode, Decode};
 //! # enum Json {}
+//! # impl musli::mode::Mode for Json {}
 //! # #[derive(Encode, Decode)]
 //! # #[musli(mode = Json, default_field_tag = "name")]
 //! # struct Person<'a> { name: &'a str, age: u32 }
@@ -371,17 +375,19 @@
 //!   signature:
 //!
 //! ```rust,ignore
-//! fn encode<Mode, E>(field: &Field, encoder: E) -> Result<E::Ok, E::Error>
+//! fn encode<M, E>(field: &Field, encoder: E) -> Result<E::Ok, E::Error>
 //! where
-//!    E: Encoder;
+//!     M: Mode,
+//!     E: Encoder;
 //! ```
 //!
 //!   `encode` for decoding the field, which should match the following
 //!   signature:
 //!
 //! ```rust,ignore
-//! fn decode<'de, Mode, D>(decoder: D) -> Result<Field, D::Error>
+//! fn decode<'de, M, D>(decoder: D) -> Result<Field, D::Error>
 //! where
+//!     M: Mode,
 //!     D: Decoder<'de>;
 //! ```
 //!
@@ -400,21 +406,24 @@
 //! mod custom_uuid {
 //!     use musli::en::{Encode, Encoder};
 //!     use musli::de::{Decode, Decoder};
+//!     use musli::mode::Mode;
 //!
 //!     use super::CustomUuid;
 //!
-//!     pub fn encode<Mode, E>(uuid: &CustomUuid, encoder: E) -> Result<E::Ok, E::Error>
+//!     pub fn encode<M, E>(uuid: &CustomUuid, encoder: E) -> Result<E::Ok, E::Error>
 //!     where
-//!         E: Encoder
+//!         M: Mode,
+//!         E: Encoder,
 //!     {
-//!         Encode::<Mode>::encode(&uuid.0, encoder)
+//!         Encode::<M>::encode(&uuid.0, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, Mode, D>(decoder: D) -> Result<CustomUuid, D::Error>
+//!     pub fn decode<'de, M, D>(decoder: D) -> Result<CustomUuid, D::Error>
 //!     where
+//!         M: Mode,
 //!         D: Decoder<'de>
 //!     {
-//!         Ok(CustomUuid(<u128 as Decode<Mode>>::decode(decoder)?))
+//!         Ok(CustomUuid(<u128 as Decode<M>>::decode(decoder)?))
 //!     }
 //! }
 //! # }

@@ -6,11 +6,15 @@ use std::collections::VecDeque;
 use std::marker;
 
 use crate::compat::Bytes;
-use crate::de::ValueVisitor;
+use crate::de::{Decode, Decoder, ValueVisitor};
+use crate::en::{Encode, Encoder};
 use crate::error::Error;
-use crate::{Decode, Decoder, Encode, Encoder};
+use crate::mode::Mode;
 
-impl<Mode> Encode<Mode> for Bytes<Vec<u8>> {
+impl<M> Encode<M> for Bytes<Vec<u8>>
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -20,7 +24,10 @@ impl<Mode> Encode<Mode> for Bytes<Vec<u8>> {
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for Bytes<Vec<u8>> {
+impl<'de, M> Decode<'de, M> for Bytes<Vec<u8>>
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
@@ -58,7 +65,10 @@ impl<'de, Mode> Decode<'de, Mode> for Bytes<Vec<u8>> {
     }
 }
 
-impl<Mode> Encode<Mode> for Bytes<VecDeque<u8>> {
+impl<M> Encode<M> for Bytes<VecDeque<u8>>
+where
+    M: Mode,
+{
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -69,13 +79,16 @@ impl<Mode> Encode<Mode> for Bytes<VecDeque<u8>> {
     }
 }
 
-impl<'de, Mode> Decode<'de, Mode> for Bytes<VecDeque<u8>> {
+impl<'de, M> Decode<'de, M> for Bytes<VecDeque<u8>>
+where
+    M: Mode,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        <Bytes<Vec<u8>> as Decode<Mode>>::decode(decoder)
+        <Bytes<Vec<u8>> as Decode<M>>::decode(decoder)
             .map(|Bytes(bytes)| Bytes(VecDeque::from(bytes)))
     }
 }

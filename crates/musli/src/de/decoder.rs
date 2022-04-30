@@ -243,11 +243,11 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct UnitType;
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for UnitType {
+    /// impl<'de, M> Decode<'de, M> for UnitType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -270,13 +270,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: bool,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -300,13 +300,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: char,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -330,13 +330,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: u8,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -360,13 +360,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: u16,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -390,13 +390,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: u32,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -420,13 +420,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: u64,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -450,13 +450,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: u128,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -480,13 +480,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: i8,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -510,13 +510,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: i16,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -540,13 +540,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: i32,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -570,13 +570,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: i64,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -600,13 +600,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: i128,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -630,13 +630,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: usize,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -660,13 +660,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: isize,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -690,13 +690,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: f32,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -720,13 +720,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: f64,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -750,13 +750,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: [u8; 128],
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -785,12 +785,13 @@ pub trait Decoder<'de>: Sized {
     ///
     /// use musli::de::{Decode, Decoder, ValueVisitor};
     /// use musli::error::Error;
+    /// use musli::mode::Mode;
     ///
     /// struct BytesReference<'de> {
     ///     data: &'de [u8],
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for BytesReference<'de> {
+    /// impl<'de, M> Decode<'de, M> for BytesReference<'de> where M: Mode {
     ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
@@ -844,12 +845,13 @@ pub trait Decoder<'de>: Sized {
     ///
     /// use musli::de::{Decode, Decoder, ValueVisitor};
     /// use musli::error::Error;
+    /// use musli::mode::Mode;
     ///
     /// struct StringReference<'de> {
     ///     data: &'de str,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for StringReference<'de> {
+    /// impl<'de, M> Decode<'de, M> for StringReference<'de> where M: Mode {
     ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
@@ -898,19 +900,19 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct MyType {
     ///     data: Option<String>,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
     ///         let data = if let Some(decoder) = decoder.decode_option()? {
-    ///             Some(<String as Decode<Mode>>::decode(decoder)?)
+    ///             Some(<String as Decode<M>>::decode(decoder)?)
     ///         } else {
     ///             None
     ///         };
@@ -939,21 +941,22 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::de::{Decode, Decoder, PackDecoder};
+    /// use musli::mode::Mode;
     ///
     /// struct PackedStruct {
     ///     field: u32,
     ///     data: [u8; 364],
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for PackedStruct {
+    /// impl<'de, M> Decode<'de, M> for PackedStruct where M: Mode {
     ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut unpack = decoder.decode_pack()?;
-    ///         let field = unpack.next().and_then(Decode::<Mode>::decode)?;
-    ///         let data = unpack.next().and_then(Decode::<Mode>::decode)?;
+    ///         let field = unpack.next().and_then(Decode::<M>::decode)?;
+    ///         let data = unpack.next().and_then(Decode::<M>::decode)?;
     ///
     ///         Ok(Self {
     ///             field,
@@ -976,12 +979,13 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::de::{Decode, Decoder, SequenceDecoder};
+    /// use musli::mode::Mode;
     ///
     /// struct MyType {
     ///     data: Vec<String>,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MyType {
+    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -990,7 +994,7 @@ pub trait Decoder<'de>: Sized {
     ///         let mut data = Vec::new();
     ///
     ///         while let Some(decoder) = seq.next()? {
-    ///             data.push(<String as Decode<Mode>>::decode(decoder)?);
+    ///             data.push(<String as Decode<M>>::decode(decoder)?);
     ///         }
     ///
     ///         Ok(Self {
@@ -1018,17 +1022,18 @@ pub trait Decoder<'de>: Sized {
     ///
     /// use musli::de::{Decode, Decoder, PackDecoder};
     /// use musli::error::Error;
+    /// use musli::mode::Mode;
     ///
     /// struct TupleStruct(String, u32);
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for TupleStruct {
+    /// impl<'de, M> Decode<'de, M> for TupleStruct where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut tuple = decoder.decode_tuple(2)?;
-    ///         let string = tuple.next().and_then(<String as Decode<Mode>>::decode)?;
-    ///         let integer = tuple.next().and_then(<u32 as Decode<Mode>>::decode)?;
+    ///         let string = tuple.next().and_then(<String as Decode<M>>::decode)?;
+    ///         let integer = tuple.next().and_then(<u32 as Decode<M>>::decode)?;
     ///         Ok(Self(string, integer))
     ///     }
     /// }
@@ -1049,12 +1054,13 @@ pub trait Decoder<'de>: Sized {
     /// use std::collections::HashMap;
     ///
     /// use musli::de::{Decode, Decoder, PairsDecoder, PairDecoder};
+    /// use musli::mode::Mode;
     ///
     /// struct MapStruct {
     ///     data: HashMap<String, u32>,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for MapStruct {
+    /// impl<'de, M> Decode<'de, M> for MapStruct where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1063,8 +1069,8 @@ pub trait Decoder<'de>: Sized {
     ///         let mut data = HashMap::with_capacity(map.size_hint().unwrap_or_default());
     ///
     ///         while let Some(mut entry) = map.next()? {
-    ///             let key = entry.first().and_then(<String as Decode<Mode>>::decode)?;
-    ///             let value = entry.second().and_then(<u32 as Decode<Mode>>::decode)?;
+    ///             let key = entry.first().and_then(<String as Decode<M>>::decode)?;
+    ///             let value = entry.second().and_then(<u32 as Decode<M>>::decode)?;
     ///             data.insert(key, value);
     ///         }
     ///
@@ -1091,13 +1097,14 @@ pub trait Decoder<'de>: Sized {
     ///
     /// use musli::de::{Decode, Decoder, PairsDecoder, PairDecoder};
     /// use musli::error::Error;
+    /// use musli::mode::Mode;
     ///
     /// struct Struct {
     ///     string: String,
     ///     integer: u32,
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for Struct {
+    /// impl<'de, M> Decode<'de, M> for Struct where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1108,14 +1115,14 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         while let Some(mut entry) = st.next()? {
     ///             // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///             let tag = entry.first().and_then(<String as Decode<Mode>>::decode)?;
+    ///             let tag = entry.first().and_then(<String as Decode<M>>::decode)?;
     ///
     ///             match tag.as_str() {
     ///                 "string" => {
-    ///                     string = Some(entry.second().and_then(<String as Decode<Mode>>::decode)?);
+    ///                     string = Some(entry.second().and_then(<String as Decode<M>>::decode)?);
     ///                 }
     ///                 "integer" => {
-    ///                     integer = Some(entry.second().and_then(<u32 as Decode<Mode>>::decode)?);
+    ///                     integer = Some(entry.second().and_then(<u32 as Decode<M>>::decode)?);
     ///                 }
     ///                 tag => {
     ///                     return Err(D::Error::invalid_field_tag("Struct", tag))
@@ -1147,10 +1154,11 @@ pub trait Decoder<'de>: Sized {
     ///
     /// use musli::de::{Decode, Decoder, PairsDecoder, PairDecoder};
     /// use musli::error::Error;
+    /// use musli::mode::Mode;
     ///
     /// struct TupleStruct(String, u32);
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for TupleStruct {
+    /// impl<'de, M> Decode<'de, M> for TupleStruct where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1160,14 +1168,14 @@ pub trait Decoder<'de>: Sized {
     ///         let mut integer = None;
     ///
     ///         while let Some(mut entry) = st.next()? {
-    ///             let tag = entry.first().and_then(<usize as Decode<Mode>>::decode)?;
+    ///             let tag = entry.first().and_then(<usize as Decode<M>>::decode)?;
     ///
     ///             match tag {
     ///                 0 => {
-    ///                     string = Some(entry.second().and_then(<String as Decode<Mode>>::decode)?);
+    ///                     string = Some(entry.second().and_then(<String as Decode<M>>::decode)?);
     ///                 }
     ///                 1 => {
-    ///                     integer = Some(entry.second().and_then(<u32 as Decode<Mode>>::decode)?);
+    ///                     integer = Some(entry.second().and_then(<u32 as Decode<M>>::decode)?);
     ///                 }
     ///                 tag => {
     ///                     return Err(D::Error::invalid_field_tag("Struct", tag))
@@ -1195,11 +1203,11 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder};
+    /// use musli::{Decode, Decoder, Mode};
     ///
     /// struct UnitStruct;
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for UnitStruct {
+    /// impl<'de, M> Decode<'de, M> for UnitStruct where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1224,26 +1232,27 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::de::{Decode, Decoder, VariantDecoder, PairsDecoder};
     /// use musli::error::Error;
+    /// use musli::mode::Mode;
     ///
     /// enum Enum {
     ///     Variant1(u32),
     ///     Variant2(String),
     /// }
     ///
-    /// impl<'de, Mode> Decode<'de, Mode> for Enum {
+    /// impl<'de, M> Decode<'de, M> for Enum where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut variant = decoder.decode_variant()?;
-    ///         let tag = variant.first().and_then(<usize as Decode<Mode>>::decode)?;
+    ///         let tag = variant.tag().and_then(<usize as Decode<M>>::decode)?;
     ///
     ///         let this = match tag {
     ///             0 => {
-    ///                 Self::Variant1(variant.second().and_then(<u32 as Decode<Mode>>::decode)?)
+    ///                 Self::Variant1(variant.variant().and_then(<u32 as Decode<M>>::decode)?)
     ///             }
     ///             1 => {
-    ///                 Self::Variant2(variant.second().and_then(<String as Decode<Mode>>::decode)?)
+    ///                 Self::Variant2(variant.variant().and_then(<String as Decode<M>>::decode)?)
     ///             }
     ///             tag => {
     ///                 return Err(D::Error::invalid_variant_tag("Enum", tag));
