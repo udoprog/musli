@@ -121,8 +121,9 @@ impl WireEncoding<DefaultMode, Variable, Variable, MAX_INLINE_LEN> {
     /// ```rust
     /// use musli_wire::{WireEncoding, Fixed, Variable};
     /// use musli::{Encode, Decode};
+    /// use musli::mode::DefaultMode;
     ///
-    /// const CONFIG: WireEncoding<Fixed, Variable> = WireEncoding::new()
+    /// const CONFIG: WireEncoding<DefaultMode, Fixed, Variable> = WireEncoding::new()
     ///     .with_fixed_integers();
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]

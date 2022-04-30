@@ -6,7 +6,7 @@ publish = false
 
 [features]
 default = ["std"]
-std = ["musli/std", "musli-wire/std", "musli-storage/std"]
+std = ["musli/std", "musli-wire/std", "musli-storage/std", "musli-json/std"]
 
 [dependencies]
 musli = { path = "../musli", default_features = false }
