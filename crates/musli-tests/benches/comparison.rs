@@ -61,7 +61,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     benches!(serde_json);
     benches!(serde_bincode);
     benches!(serde_rmp);
-    benches!(serde_cbor);
+    // benches!(serde_cbor);
     benches!(musli_json);
     benches!(musli_wire);
     benches!(musli_storage);

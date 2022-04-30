@@ -30,7 +30,6 @@ enum NeverMarker {}
 ///     type Map = Never<Self>;
 ///     type Some = Never<Self>;
 ///     type Struct = Never<Self>;
-///     type TupleStruct = Never<Self>;
 ///     type Variant = Never<Self>;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -59,7 +58,6 @@ where
     type Map = Self;
     type Some = Self;
     type Struct = Self;
-    type TupleStruct = Self;
     type Variant = Self;
 
     #[inline]
@@ -199,7 +197,6 @@ where
     type Tuple = Self;
     type Map = Self;
     type Struct = Self;
-    type TupleStruct = Self;
     type Variant = Self;
 
     #[inline]

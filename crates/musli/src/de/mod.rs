@@ -18,11 +18,13 @@
 
 mod decode;
 mod decoder;
+mod type_hint;
 
 pub use self::decode::Decode;
 pub use self::decoder::{
     Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
 };
+pub use self::type_hint::TypeHint;
 use crate::mode::Mode;
 
 /// An owned decoder.

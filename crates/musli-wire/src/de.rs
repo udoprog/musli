@@ -163,7 +163,6 @@ where
     type Tuple = Self;
     type Map = RemainingWireDecoder<R, I, L>;
     type Struct = RemainingWireDecoder<R, I, L>;
-    type TupleStruct = RemainingWireDecoder<R, I, L>;
     type Variant = Self;
 
     #[inline]
@@ -427,17 +426,6 @@ where
     #[inline]
     fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         self.shared_decode_pair_sequence()
-    }
-
-    #[inline]
-    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
-        self.shared_decode_pair_sequence()
-    }
-
-    #[inline]
-    fn decode_unit_struct(mut self) -> Result<(), Self::Error> {
-        self.skip_any()?;
-        Ok(())
     }
 
     #[inline]

@@ -76,7 +76,6 @@ where
     type Tuple = Self;
     type Map = Self;
     type Struct = Self;
-    type TupleStruct = Self;
     type Variant = Self;
 
     #[inline]
@@ -282,27 +281,6 @@ where
         }
 
         Ok(self)
-    }
-
-    #[inline]
-    fn encode_tuple_struct(mut self, len: usize) -> Result<Self::TupleStruct, Self::Error> {
-        let len = len
-            .checked_mul(2)
-            .ok_or_else(|| Self::Error::message(Overflow))?;
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(tag.byte())?;
-
-        if !embedded {
-            L::encode_usize(&mut self.writer, len)?;
-        }
-
-        Ok(self)
-    }
-
-    #[inline]
-    fn encode_unit_struct(mut self) -> Result<Self::Ok, Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
-        Ok(())
     }
 
     #[inline]

@@ -35,7 +35,6 @@ where
     type Tuple = JsonArrayEncoder<M, W>;
     type Map = JsonObjectEncoder<M, W>;
     type Struct = JsonObjectEncoder<M, W>;
-    type TupleStruct = JsonObjectEncoder<M, W>;
     type Variant = JsonVariantEncoder<M, W>;
 
     #[inline]
@@ -208,17 +207,6 @@ where
     #[inline]
     fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         JsonObjectEncoder::new(self.writer)
-    }
-
-    #[inline]
-    fn encode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
-        JsonObjectEncoder::new(self.writer)
-    }
-
-    #[inline]
-    fn encode_unit_struct(mut self) -> Result<Self::Ok, Self::Error> {
-        self.writer.write_bytes(b"{}")?;
-        Ok(())
     }
 
     #[inline]
@@ -404,7 +392,6 @@ where
     type Tuple = Never<Self>;
     type Map = Never<Self>;
     type Struct = Never<Self>;
-    type TupleStruct = Never<Self>;
     type Variant = Never<Self>;
 
     #[inline]

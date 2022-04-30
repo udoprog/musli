@@ -105,13 +105,6 @@ impl ExpansionMode<'_> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum StructKind {
-    Named,
-    Unnamed,
-    Unit,
-}
-
 struct FieldData<'a> {
     span: Span,
     attr: attr::FieldAttr,
@@ -120,14 +113,12 @@ struct FieldData<'a> {
 
 struct StructData<'a> {
     fields: Vec<FieldData<'a>>,
-    kind: StructKind,
 }
 
 struct VariantData<'a> {
     span: Span,
     attr: attr::VariantAttr,
     ident: &'a syn::Ident,
-    kind: StructKind,
     fields: Vec<FieldData<'a>>,
 }
 
@@ -166,11 +157,6 @@ impl<'a> Expander<'a> {
 
                 Data::Struct(StructData {
                     fields: fields.collect(),
-                    kind: match &st.fields {
-                        syn::Fields::Named(_) => StructKind::Named,
-                        syn::Fields::Unnamed(_) => StructKind::Unnamed,
-                        syn::Fields::Unit => StructKind::Unit,
-                    },
                 })
             }
             syn::Data::Enum(en) => {
@@ -186,11 +172,6 @@ impl<'a> Expander<'a> {
                         attr: attr::variant_attrs(&cx, &variant.attrs),
                         ident: &variant.ident,
                         fields: fields.collect(),
-                        kind: match &variant.fields {
-                            syn::Fields::Named(_) => StructKind::Named,
-                            syn::Fields::Unnamed(_) => StructKind::Unnamed,
-                            syn::Fields::Unit => StructKind::Unit,
-                        },
                     }
                 });
 
@@ -481,7 +462,7 @@ impl<'a> Expander<'a> {
             Packing::Tagged => {
                 needs.mark_used();
                 let encode = quote! { #(#encoders)* };
-                self.encode_field_tag(&st.fields, st.kind, encode, &field_tests, &test_variables)
+                self.encode_field_tag(&st.fields, encode, &field_tests, &test_variables)
             }
             Packing::Packed => {
                 needs.mark_used();
@@ -646,7 +627,6 @@ impl<'a> Expander<'a> {
                     tag_type,
                     path,
                     &data.fields,
-                    data.kind,
                     None,
                     self.type_attr.default_field_tag(mode),
                 )?
@@ -759,7 +739,6 @@ impl<'a> Expander<'a> {
                     tag_type,
                     path,
                     &variant.fields,
-                    variant.kind,
                     Some(&variant_tag),
                     default_field_tag,
                 )?,
@@ -887,7 +866,6 @@ impl<'a> Expander<'a> {
     fn encode_field_tag(
         &self,
         fields: &[FieldData],
-        kind: StructKind,
         encode: TokenStream,
         field_tests: &[TokenStream],
         test_variables: &[syn::Ident],
@@ -896,28 +874,13 @@ impl<'a> Expander<'a> {
         let encoder_t = &self.tokens.encoder_t;
         let pairs_encoder_t = &self.tokens.pairs_encoder_t;
 
-        match kind {
-            StructKind::Named => {
-                let len = calculate_tests(fields.len(), test_variables);
-                quote! {{
-                    #(#field_tests)*
-                    let mut #encoder_var = #encoder_t::encode_struct(#encoder_var, #len)?;
-                    #encode
-                    #pairs_encoder_t::end(#encoder_var)
-                }}
-            }
-            StructKind::Unnamed => {
-                let len = calculate_tests(fields.len(), test_variables);
-                quote! {{
-                    #(#field_tests)*
-                    let mut #encoder_var = #encoder_t::encode_tuple_struct(#encoder_var, #len)?;
-                    #encode
-                    #pairs_encoder_t::end(#encoder_var)
-                }}
-            }
-            StructKind::Unit => {
-                quote!(#encoder_t::encode_unit_struct(#encoder_var))
-            }
+        let len = calculate_tests(fields.len(), test_variables);
+
+        quote! {
+            #(#field_tests)*
+            let mut #encoder_var = #encoder_t::encode_struct(#encoder_var, #len)?;
+            #encode
+            #pairs_encoder_t::end(#encoder_var)
         }
     }
 
@@ -954,8 +917,7 @@ impl<'a> Expander<'a> {
                 )?;
 
                 // Special stuff needed to encode the field if its tagged.
-                let encode =
-                    self.encode_field_tag(&variant.fields, variant.kind, encode, &[], &tests);
+                let encode = self.encode_field_tag(&variant.fields, encode, &[], &tests);
                 (encode, patterns)
             }
             Packing::Packed => {
@@ -1159,7 +1121,6 @@ impl<'a> Expander<'a> {
         tag_type: Option<&(Span, syn::Type)>,
         path: syn::Path,
         fields: &[FieldData],
-        kind: StructKind,
         variant_tag: Option<&syn::Ident>,
         default_field_tag: DefaultTag,
     ) -> Option<TokenStream> {
@@ -1286,38 +1247,17 @@ impl<'a> Expander<'a> {
             }
         };
 
-        let type_decoder_var = syn::Ident::new("type_decoder", self.type_name.span());
+        Some(quote! {
+            #(#decls;)*
+            #output_enum
+            let mut type_decoder = #decoder_t::decode_struct(#decoder_var, #fields_len)?;
 
-        let body = quote! {
-            while let Some(mut #decoder_var) = #pairs_decoder_t::next(&mut #type_decoder_var)? {
+            while let Some(mut #decoder_var) = #pairs_decoder_t::next(&mut type_decoder)? {
                 let tag #tag_type = #decode_tag;
                 #body
             }
 
             #path { #(#assigns),* }
-        };
-
-        let body = match kind {
-            StructKind::Named => quote! {{
-                let mut #type_decoder_var = #decoder_t::decode_struct(#decoder_var, #fields_len)?;
-                #body
-            }},
-            StructKind::Unnamed => quote! {
-                let mut #type_decoder_var = #decoder_t::decode_tuple_struct(#decoder_var, #fields_len)?;
-                #body
-            },
-            StructKind::Unit => {
-                quote! {
-                    #decoder_t::decode_unit_struct(#decoder_var)?;
-                    #path {}
-                }
-            }
-        };
-
-        Some(quote! {
-            #(#decls;)*
-            #output_enum
-            #body
         })
     }
 

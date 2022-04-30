@@ -168,8 +168,6 @@ pub trait Encoder: Sized {
     type Map: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a struct.
     type Struct: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
-    /// Encoder that can encode a tuple struct.
-    type TupleStruct: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a struct variant.
     type Variant: VariantEncoder<Ok = Self::Ok, Error = Self::Error>;
 
@@ -961,12 +959,12 @@ pub trait Encoder: Sized {
     /// use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder};
     /// use musli::mode::Mode;
     ///
-    /// struct TupleStruct {
+    /// struct Struct {
     ///     name: String,
     ///     age: u32,
     /// }
     ///
-    /// impl<M> Encode<M> for TupleStruct where M: Mode {
+    /// impl<M> Encode<M> for Struct where M: Mode {
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder
@@ -982,61 +980,6 @@ pub trait Encoder: Sized {
     fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Struct,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
-    /// Encode a tuple struct.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder};
-    /// use musli::mode::Mode;
-    ///
-    /// struct TupleStruct(String);
-    ///
-    /// impl<M> Encode<M> for TupleStruct where M: Mode {
-    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    ///     where
-    ///         E: Encoder
-    ///     {
-    ///         let mut tuple = encoder.encode_tuple_struct(1)?;
-    ///         tuple.insert::<M, _, _>(0usize, &self.0)?;
-    ///         tuple.end()
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn encode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::TupleStruct,
-            &ExpectingWrapper::new(self),
-        )))
-    }
-
-    /// Encode a unit struct.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::{Encode, Encoder, Mode};
-    ///
-    /// struct UnitStruct;
-    ///
-    /// impl<M> Encode<M> for UnitStruct where M: Mode {
-    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    ///     where
-    ///         E: Encoder
-    ///     {
-    ///         encoder.encode_unit_struct()
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn encode_unit_struct(self) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::UnitStruct,
             &ExpectingWrapper::new(self),
         )))
     }

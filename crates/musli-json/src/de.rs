@@ -112,7 +112,6 @@ where
     type Map = JsonObjectDecoder<'a, P>;
     type Some = JsonDecoder<'a, P>;
     type Struct = JsonObjectDecoder<'a, P>;
-    type TupleStruct = JsonObjectDecoder<'a, P>;
     type Variant = JsonVariantDecoder<'a, P>;
 
     #[inline]
@@ -275,16 +274,6 @@ where
     }
 
     #[inline]
-    fn decode_tuple_struct(self, len: usize) -> Result<Self::Struct, Self::Error> {
-        JsonObjectDecoder::new(self.scratch, Some(len), self.parser)
-    }
-
-    #[inline]
-    fn decode_unit_struct(self) -> Result<(), Self::Error> {
-        self.skip_any()
-    }
-
-    #[inline]
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
         JsonVariantDecoder::new(self.scratch, self.parser)
     }
@@ -410,7 +399,6 @@ where
     type Map = Never<Self>;
     type Some = Never<Self>;
     type Struct = JsonObjectDecoder<'a, P>;
-    type TupleStruct = Never<Self>;
     type Variant = Never<Self>;
 
     #[inline]

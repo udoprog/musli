@@ -2,6 +2,7 @@ use crate::no_std::ToOwned;
 use core::borrow::Borrow;
 use core::fmt;
 
+use crate::de::TypeHint;
 use crate::error::Error;
 use crate::expecting::{self, BadVisitorType, Expecting, InvalidType};
 
@@ -191,11 +192,6 @@ pub trait Decoder<'de>: Sized {
     /// The caller receives a [PairsDecoder] which when advanced with
     /// [PairsDecoder::next] indicates the fields of the structure.
     type Struct: PairsDecoder<'de, Error = Self::Error>;
-    /// Decoder for a tuple struct.
-    ///
-    /// The caller receives a [PairsDecoder] which when advanced with
-    /// [PairsDecoder::next] indicates the elements in the tuple.
-    type TupleStruct: PairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a variant.
     ///
     /// The caller receives a [PairDecoder] which when advanced with
@@ -224,7 +220,6 @@ pub trait Decoder<'de>: Sized {
     ///     type Map = Never<Self>;
     ///     type Some = Never<Self>;
     ///     type Struct = Never<Self>;
-    ///     type TupleStruct = Never<Self>;
     ///     type Variant = Never<Self>;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -237,6 +232,17 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
+    /// Return a [TypeHint] indicating which type is being produced by the
+    /// [Decoder].
+    ///
+    /// Not all formats support type hints, and they might be ranging from
+    /// detailed (`a 32-bit unsigned integer`) to vague (`a number`).
+    ///
+    /// This is used to construct dynamic containers of types.
+    fn type_hint(&self) -> TypeHint {
+        TypeHint::Any
+    }
 
     /// Decode a unit or something that is empty.
     ///
@@ -1141,86 +1147,6 @@ pub trait Decoder<'de>: Sized {
     fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         Err(Self::Error::message(InvalidType::new(
             expecting::Struct,
-            &ExpectingWrapper(self),
-        )))
-    }
-
-    /// Return a helper to decode a tuple struct.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::collections::HashMap;
-    ///
-    /// use musli::de::{Decode, Decoder, PairsDecoder, PairDecoder};
-    /// use musli::error::Error;
-    /// use musli::mode::Mode;
-    ///
-    /// struct TupleStruct(String, u32);
-    ///
-    /// impl<'de, M> Decode<'de, M> for TupleStruct where M: Mode {
-    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    ///     where
-    ///         D: Decoder<'de>,
-    ///     {
-    ///         let mut st = decoder.decode_tuple_struct(2)?;
-    ///         let mut string = None;
-    ///         let mut integer = None;
-    ///
-    ///         while let Some(mut entry) = st.next()? {
-    ///             let tag = entry.first().and_then(<usize as Decode<M>>::decode)?;
-    ///
-    ///             match tag {
-    ///                 0 => {
-    ///                     string = Some(entry.second().and_then(<String as Decode<M>>::decode)?);
-    ///                 }
-    ///                 1 => {
-    ///                     integer = Some(entry.second().and_then(<u32 as Decode<M>>::decode)?);
-    ///                 }
-    ///                 tag => {
-    ///                     return Err(D::Error::invalid_field_tag("Struct", tag))
-    ///                 }
-    ///             }
-    ///         }
-    ///
-    ///         let string = string.ok_or_else(|| D::Error::expected_tag("Struct", "string"))?;
-    ///         let integer = integer.ok_or_else(|| D::Error::expected_tag("Struct", "integer"))?;
-    ///
-    ///         Ok(Self(string, integer))
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::TupleStruct,
-            &ExpectingWrapper(self),
-        )))
-    }
-
-    /// Decode a unit variant.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::{Decode, Decoder, Mode};
-    ///
-    /// struct UnitStruct;
-    ///
-    /// impl<'de, M> Decode<'de, M> for UnitStruct where M: Mode {
-    ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    ///     where
-    ///         D: Decoder<'de>,
-    ///     {
-    ///         decoder.decode_unit_struct()?;
-    ///         Ok(Self)
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    fn decode_unit_struct(self) -> Result<(), Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::UnitStruct,
             &ExpectingWrapper(self),
         )))
     }

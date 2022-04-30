@@ -60,7 +60,6 @@ where
     type Tuple = Self;
     type Map = LimitedStorageDecoder<R, I, L>;
     type Struct = LimitedStorageDecoder<R, I, L>;
-    type TupleStruct = LimitedStorageDecoder<R, I, L>;
     type Variant = Self;
 
     #[inline]
@@ -267,16 +266,6 @@ where
     #[inline]
     fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         LimitedStorageDecoder::new(self)
-    }
-
-    #[inline]
-    fn decode_tuple_struct(self, _: usize) -> Result<Self::TupleStruct, Self::Error> {
-        LimitedStorageDecoder::new(self)
-    }
-
-    #[inline]
-    fn decode_unit_struct(self) -> Result<(), Self::Error> {
-        self.decode_unit()
     }
 
     #[inline]

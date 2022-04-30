@@ -45,7 +45,6 @@ where
     type Tuple = Self;
     type Map = Self;
     type Struct = Self;
-    type TupleStruct = Self;
     type Variant = Self;
 
     #[inline]
@@ -205,21 +204,9 @@ where
     }
 
     #[inline]
-    fn encode_struct(mut self, fields: usize) -> Result<Self::Struct, Self::Error> {
-        L::encode_usize(self.writer.borrow_mut(), fields)?;
-        Ok(self)
-    }
-
-    #[inline]
-    fn encode_tuple_struct(mut self, len: usize) -> Result<Self::TupleStruct, Self::Error> {
+    fn encode_struct(mut self, len: usize) -> Result<Self::Struct, Self::Error> {
         L::encode_usize(self.writer.borrow_mut(), len)?;
         Ok(self)
-    }
-
-    #[inline]
-    fn encode_unit_struct(mut self) -> Result<Self::Ok, Self::Error> {
-        L::encode_usize(self.writer.borrow_mut(), 0)?;
-        Ok(())
     }
 
     #[inline]
