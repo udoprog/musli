@@ -195,9 +195,9 @@ impl<'a> Expander<'a> {
     pub(crate) fn expand_encode(&self) -> Option<TokenStream> {
         let modes = self.cx.modes();
 
-        let mode_ident = syn::Ident::new("Mode", self.type_name.span());
-
         if modes.is_empty() {
+            let mode_ident = syn::Ident::new("Mode", self.type_name.span());
+
             return self.expand_encode_moded(ExpansionMode::Generic {
                 mode_ident: &mode_ident,
             });
@@ -514,9 +514,9 @@ impl<'a> Expander<'a> {
     pub(crate) fn expand_decode(&self) -> Option<TokenStream> {
         let modes = self.cx.modes();
 
-        let mode_ident = syn::Ident::new("Mode", self.type_name.span());
-
         if modes.is_empty() {
+            let mode_ident = syn::Ident::new("Mode", self.type_name.span());
+
             return self.expand_decode_moded(ExpansionMode::Generic {
                 mode_ident: &mode_ident,
             });
