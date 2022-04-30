@@ -164,7 +164,7 @@ impl<Mode> JsonEncoding<Mode> {
     where
         T: ?Sized + Encode<Mode>,
     {
-        let mut data = Vec::new();
+        let mut data = Vec::with_capacity(128);
         T::encode(value, JsonEncoder::<Mode, _>::new(&mut data))?;
         Ok(data)
     }
@@ -176,7 +176,7 @@ impl<Mode> JsonEncoding<Mode> {
     where
         T: ?Sized + Encode<Mode>,
     {
-        let mut data = Vec::new();
+        let mut data = Vec::with_capacity(128);
         T::encode(value, JsonEncoder::<Mode, _>::new(&mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })

@@ -29,6 +29,8 @@ fn test_decode_exponent() {
     test!("1.0100001e7", 10100001);
     test!("1.321e3", 1321);
     test!("0.321e3", 321);
+    test!("4000e-3", 4);
+    test!("40000e-3", 40);
 }
 
 #[test]

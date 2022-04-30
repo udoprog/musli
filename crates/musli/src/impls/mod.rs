@@ -14,8 +14,8 @@ use core::sync::atomic::{
 };
 use core::{fmt, marker};
 
-use crate::de::{Decode, Decoder, PairDecoder, ValueVisitor};
-use crate::en::{Encode, Encoder, PairEncoder};
+use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
+use crate::en::{Encode, Encoder, VariantEncoder};
 use crate::error::Error;
 
 impl<Mode> Encode<Mode> for () {
@@ -391,11 +391,14 @@ where
     {
         let mut variant = decoder.decode_variant()?;
 
-        match variant.first().and_then(<usize as Decode<Mode>>::decode)? {
-            0 => variant.second().and_then(T::decode).map(Ok),
-            1 => variant.second().and_then(U::decode).map(Err),
-            tag => Err(D::Error::invalid_variant_tag("Result", tag)),
-        }
+        let this = match variant.tag().and_then(<usize as Decode<Mode>>::decode)? {
+            0 => Ok(variant.variant().and_then(T::decode)?),
+            1 => Err(variant.variant().and_then(U::decode)?),
+            tag => return Err(D::Error::invalid_variant_tag("Result", tag)),
+        };
+
+        variant.end()?;
+        Ok(this)
     }
 }
 

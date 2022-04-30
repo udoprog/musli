@@ -2,7 +2,7 @@ use core::fmt;
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
+use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli_common::writer::Writer;
 
 /// A vaery simple encoder suitable for storage encoding.
@@ -279,7 +279,7 @@ where
     type Ok = ();
     type Error = W::Error;
     type First<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
-    type Second<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
+    type Second = Self;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -287,7 +287,29 @@ where
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second(self) -> Result<Self::Second, Self::Error> {
+        Ok(self)
+    }
+}
+
+impl<W, I, L> VariantEncoder for StorageEncoder<W, I, L>
+where
+    W: Writer,
+    I: IntegerEncoding,
+    L: UsizeEncoding,
+{
+    type Ok = ();
+    type Error = W::Error;
+    type Tag<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
+    type Variant<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
+
+    #[inline]
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
         Ok(StorageEncoder::new(self.writer.borrow_mut()))
     }
 

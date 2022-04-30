@@ -137,6 +137,41 @@ pub trait PairDecoder<'de> {
     fn skip_second(self) -> Result<bool, Self::Error>;
 }
 
+/// Trait governing how to decode a variant.
+pub trait VariantDecoder<'de> {
+    /// Error type.
+    type Error: Error;
+
+    /// The decoder to use for the variant tag.
+    type Tag<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The decoder to use for the variant value.
+    type Variant<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Return the decoder for the first value in the pair.
+    ///
+    /// If this is a map the first value would be the key of the map, if this is
+    /// a struct the first value would be the field of the struct.
+    #[must_use = "decoders must be consumed"]
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error>;
+
+    /// Decode the second value in the pair..
+    #[must_use = "decoders must be consumed"]
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error>;
+
+    /// Indicate that the second value should be skipped.
+    ///
+    /// The boolean returned indicates if the value was skipped or not.
+    fn skip_variant(&mut self) -> Result<bool, Self::Error>;
+
+    /// End the pair decoder.
+    fn end(self) -> Result<(), Self::Error>;
+}
+
 /// Trait governing the implementation of a decoder.
 pub trait Decoder<'de>: Sized {
     /// Error type raised by the decoder.
@@ -166,7 +201,7 @@ pub trait Decoder<'de>: Sized {
     /// The caller receives a [PairDecoder] which when advanced with
     /// [PairDecoder::first] indicates which variant is being decoded and
     /// [PairDecoder::second] is the content of the variant.
-    type Variant: PairDecoder<'de, Error = Self::Error>;
+    type Variant: VariantDecoder<'de, Error = Self::Error>;
 
     /// Format the human-readable message that should occur if the decoder was
     /// expecting to decode some specific kind of value.
@@ -1187,7 +1222,7 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::de::{Decode, Decoder, PairsDecoder, PairDecoder};
+    /// use musli::de::{Decode, Decoder, VariantDecoder, PairsDecoder};
     /// use musli::error::Error;
     ///
     /// enum Enum {
@@ -1203,17 +1238,20 @@ pub trait Decoder<'de>: Sized {
     ///         let mut variant = decoder.decode_variant()?;
     ///         let tag = variant.first().and_then(<usize as Decode<Mode>>::decode)?;
     ///
-    ///         match tag {
+    ///         let this = match tag {
     ///             0 => {
-    ///                 Ok(Self::Variant1(variant.second().and_then(<u32 as Decode<Mode>>::decode)?))
+    ///                 Self::Variant1(variant.second().and_then(<u32 as Decode<Mode>>::decode)?)
     ///             }
     ///             1 => {
-    ///                 Ok(Self::Variant2(variant.second().and_then(<String as Decode<Mode>>::decode)?))
+    ///                 Self::Variant2(variant.second().and_then(<String as Decode<Mode>>::decode)?)
     ///             }
     ///             tag => {
-    ///                 Err(D::Error::invalid_variant_tag("Enum", tag))
+    ///                 return Err(D::Error::invalid_variant_tag("Enum", tag));
     ///             }
-    ///         }
+    ///         };
+    ///
+    ///         variant.end()?;
+    ///         Ok(this)
     ///     }
     /// }
     /// ```

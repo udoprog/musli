@@ -4,7 +4,9 @@ use core::marker;
 use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
 use crate::tag::Kind;
 use crate::tag::Tag;
-use musli::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
+use musli::de::{
+    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
+};
 use musli::error::Error;
 use musli_common::int::continuation as c;
 use musli_common::reader::{Limit, PosReader};
@@ -514,7 +516,7 @@ where
 {
     type Error = R::Error;
     type First<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
-    type Second = WireDecoder<R, I, L>;
+    type Second = Self;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -530,6 +532,38 @@ where
     fn skip_second(mut self) -> Result<bool, Self::Error> {
         self.skip_any()?;
         Ok(true)
+    }
+}
+
+impl<'a, 'de, R, I, L> VariantDecoder<'de> for WireDecoder<R, I, L>
+where
+    R: PosReader<'de>,
+    I: TypedIntegerEncoding,
+    L: TypedUsizeEncoding,
+{
+    type Error = R::Error;
+    type Tag<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Variant<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+
+    #[inline]
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+        Ok(WireDecoder::new(self.reader.pos_borrow_mut()))
+    }
+
+    #[inline]
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
+        Ok(WireDecoder::new(self.reader.pos_borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_variant(&mut self) -> Result<bool, Self::Error> {
+        self.skip_any()?;
+        Ok(true)
+    }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 

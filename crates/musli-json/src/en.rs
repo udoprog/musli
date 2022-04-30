@@ -1,6 +1,6 @@
 use core::{fmt, marker};
 
-use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
+use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::never::Never;
 use musli_common::writer::Writer;
 
@@ -305,9 +305,7 @@ where
     where
         Self: 'this;
 
-    type Second<'this> = JsonEncoder<Mode, W::Mut<'this>>
-    where
-        Self: 'this;
+    type Second = JsonEncoder<Mode, W>;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -319,14 +317,9 @@ where
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second(mut self) -> Result<Self::Second, Self::Error> {
         self.writer.write_byte(b':')?;
-        Ok(JsonEncoder::new(self.writer.borrow_mut()))
-    }
-
-    #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(())
+        Ok(JsonEncoder::new(self.writer))
     }
 }
 
@@ -351,28 +344,28 @@ where
     }
 }
 
-impl<'a, Mode, W> PairEncoder for JsonVariantEncoder<Mode, W>
+impl<'a, Mode, W> VariantEncoder for JsonVariantEncoder<Mode, W>
 where
     W: Writer,
 {
     type Ok = ();
     type Error = W::Error;
 
-    type First<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    type Tag<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
-    type Second<'this> = JsonEncoder<Mode, W::Mut<'this>>
+    type Variant<'this> = JsonEncoder<Mode, W::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
         Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
         self.writer.write_byte(b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }

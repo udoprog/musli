@@ -3,8 +3,8 @@
 
 use core::{fmt, marker};
 
-use crate::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder};
-use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
+use crate::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder};
+use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 
 enum NeverMarker {}
 
@@ -92,6 +92,39 @@ where
 
     #[inline]
     fn skip_second(self) -> Result<bool, Self::Error> {
+        match self._never {}
+    }
+}
+
+impl<'de, T> VariantDecoder<'de> for Never<T>
+where
+    T: Decoder<'de>,
+{
+    type Error = T::Error;
+
+    type Tag<'this> = Self
+    where
+        Self: 'this;
+
+    type Variant<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn skip_variant(&mut self) -> Result<bool, Self::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }
@@ -224,7 +257,7 @@ where
     type First<'this> = Self
     where
         Self: 'this;
-    type Second<'this> = Self where Self: 'this;
+    type Second = Self;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -232,7 +265,29 @@ where
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second(self) -> Result<Self::Second, Self::Error> {
+        match self._never {}
+    }
+}
+
+impl<T> VariantEncoder for Never<T>
+where
+    T: Encoder,
+{
+    type Ok = T::Ok;
+    type Error = T::Error;
+    type Tag<'this> = Self
+    where
+        Self: 'this;
+    type Variant<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
         match self._never {}
     }
 

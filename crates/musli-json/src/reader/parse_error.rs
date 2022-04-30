@@ -47,7 +47,9 @@ impl fmt::Display for Span {
 pub(crate) enum ParseErrorKind {
     ControlCharacterInString,
     LoneLeadingSurrogatePair,
+    ExpectedColon(Token),
     ExpectedOpenBrace(Token),
+    ExpectedCloseBrace(Token),
     ExpectedOpenBracket(Token),
     InvalidEscape,
     BufferUnderflow,
@@ -57,7 +59,6 @@ pub(crate) enum ParseErrorKind {
     NumericalOverflow,
     ExpectedWholeNumber,
     InvalidNumeric,
-    UnsupportedExponent,
     ExpectedNull,
     ExpectedTrue,
     ExpectedFalse,
@@ -116,8 +117,14 @@ impl fmt::Display for ParseError {
             ParseErrorKind::LoneLeadingSurrogatePair => {
                 write!(f, "lone leading surrogate in hex escape (at {span})")
             }
+            ParseErrorKind::ExpectedColon(actual) => {
+                write!(f, "expected `:`, found {actual} (at {span})")
+            }
             ParseErrorKind::ExpectedOpenBrace(actual) => {
                 write!(f, "expected opening brace, found {actual} (at {span})")
+            }
+            ParseErrorKind::ExpectedCloseBrace(actual) => {
+                write!(f, "expected closing brace, found {actual} (at {span})")
             }
             ParseErrorKind::ExpectedOpenBracket(actual) => {
                 write!(f, "expected opening bracket, found {actual} (at {span})")
@@ -132,7 +139,6 @@ impl fmt::Display for ParseError {
             ParseErrorKind::NumericalOverflow => write!(f, "numerical overflow (at {span})"),
             ParseErrorKind::ExpectedWholeNumber => write!(f, "expected whole number (at {span})"),
             ParseErrorKind::InvalidNumeric => write!(f, "not numeric (at {span})"),
-            ParseErrorKind::UnsupportedExponent => write!(f, "unsupported exponent (at {span})"),
             ParseErrorKind::ExpectedNull => write!(f, "expected `null` (at {span})"),
             ParseErrorKind::ExpectedTrue => write!(f, "expected `true` (at {span})"),
             ParseErrorKind::ExpectedFalse => write!(f, "expected `false` (at {span})"),

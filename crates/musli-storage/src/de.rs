@@ -2,7 +2,9 @@ use core::fmt;
 use core::marker;
 
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
-use musli::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
+use musli::de::{
+    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
+};
 use musli::error::Error;
 use musli_common::reader::PosReader;
 
@@ -376,7 +378,7 @@ where
 {
     type Error = R::Error;
     type First<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
-    type Second = StorageDecoder<R, I, L>;
+    type Second = Self;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -391,6 +393,37 @@ where
     #[inline]
     fn skip_second(self) -> Result<bool, Self::Error> {
         Ok(false)
+    }
+}
+
+impl<'de, R, I, L> VariantDecoder<'de> for StorageDecoder<R, I, L>
+where
+    R: PosReader<'de>,
+    I: IntegerEncoding,
+    L: UsizeEncoding,
+{
+    type Error = R::Error;
+    type Tag<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Variant<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+
+    #[inline]
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+    }
+
+    #[inline]
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
+        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_variant(&mut self) -> Result<bool, Self::Error> {
+        Ok(false)
+    }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 

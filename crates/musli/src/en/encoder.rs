@@ -78,9 +78,7 @@ pub trait PairEncoder {
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type Second<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
-    where
-        Self: 'this;
+    type Second: Encoder<Ok = Self::Ok, Error = Self::Error>;
 
     /// Insert the pair immediately.
     #[inline]
@@ -91,8 +89,7 @@ pub trait PairEncoder {
         S: Encode<Mode>,
     {
         self.first().and_then(|e| first.encode(e))?;
-        self.second().and_then(|e| second.encode(e))?;
-        self.end()
+        self.second().and_then(|e| second.encode(e))
     }
 
     /// Return the encoder for the first element in the pair.
@@ -101,9 +98,48 @@ pub trait PairEncoder {
 
     /// Return encoder for the second element in the pair.
     #[must_use = "encoders must be consumed"]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error>;
+    fn second(self) -> Result<Self::Second, Self::Error>;
+}
 
-    /// End the pair encoder.
+/// Trait governing how to encode a variant.
+pub trait VariantEncoder {
+    /// Result type of the encoder.
+    type Ok;
+    /// The error raised by a map encoder.
+    type Error: Error;
+
+    /// The encoder returned when advancing the map encoder to encode the key.
+    type Tag<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The encoder returned when advancing the map encoder to encode the value.
+    type Variant<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Insert the variant immediately.
+    #[inline]
+    fn insert<Mode, F, S>(mut self, first: F, second: S) -> Result<Self::Ok, Self::Error>
+    where
+        Self: Sized,
+        F: Encode<Mode>,
+        S: Encode<Mode>,
+    {
+        self.tag().and_then(|e| first.encode(e))?;
+        self.variant().and_then(|e| second.encode(e))?;
+        self.end()
+    }
+
+    /// Return the encoder for the first element in the variant.
+    #[must_use = "encoders must be consumed"]
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error>;
+
+    /// Return encoder for the second element in the variant.
+    #[must_use = "encoders must be consumed"]
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error>;
+
+    /// End the variant encoder.
     fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
@@ -130,7 +166,7 @@ pub trait Encoder: Sized {
     /// Encoder that can encode a tuple struct.
     type TupleStruct: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a struct variant.
-    type Variant: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Variant: VariantEncoder<Ok = Self::Ok, Error = Self::Error>;
 
     /// An expectation error. Every other implementation defers to this to
     /// report that something unexpected happened.
@@ -1000,7 +1036,7 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder};
+    /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder};
     ///
     /// enum Enum {
     ///     UnitVariant,

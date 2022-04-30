@@ -20,4 +20,4 @@ mod encode;
 mod encoder;
 
 pub use self::encode::Encode;
-pub use self::encoder::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
+pub use self::encoder::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};

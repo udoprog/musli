@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
-use crate::de::{Decode, Decoder, PackDecoder, PairDecoder};
-use crate::en::{Encode, Encoder, PairEncoder, SequenceEncoder};
+use crate::de::{Decode, Decoder, PackDecoder, VariantDecoder};
+use crate::en::{Encode, Encoder, SequenceEncoder, VariantEncoder};
 use crate::error::Error;
 
 impl<Mode> Encode<Mode> for Ipv4Addr {
@@ -67,23 +67,24 @@ impl<'de, Mode> Decode<'de, Mode> for IpAddr {
     {
         let mut variant = decoder.decode_variant()?;
 
-        Ok(
-            match variant.first().and_then(<usize as Decode<Mode>>::decode)? {
-                0 => Self::V4(
-                    variant
-                        .second()
-                        .and_then(<Ipv4Addr as Decode<Mode>>::decode)?,
-                ),
-                1 => Self::V6(
-                    variant
-                        .second()
-                        .and_then(<Ipv6Addr as Decode<Mode>>::decode)?,
-                ),
-                index => {
-                    return Err(<D::Error as Error>::invalid_variant_tag("IpAddr", index));
-                }
-            },
-        )
+        let this = match variant.tag().and_then(<usize as Decode<Mode>>::decode)? {
+            0 => Self::V4(
+                variant
+                    .variant()
+                    .and_then(<Ipv4Addr as Decode<Mode>>::decode)?,
+            ),
+            1 => Self::V6(
+                variant
+                    .variant()
+                    .and_then(<Ipv6Addr as Decode<Mode>>::decode)?,
+            ),
+            index => {
+                return Err(<D::Error as Error>::invalid_variant_tag("IpAddr", index));
+            }
+        };
+
+        variant.end()?;
+        Ok(this)
     }
 }
 
@@ -166,25 +167,26 @@ impl<'de, Mode> Decode<'de, Mode> for SocketAddr {
     {
         let mut variant = decoder.decode_variant()?;
 
-        Ok(
-            match variant.first().and_then(<usize as Decode<Mode>>::decode)? {
-                0 => Self::V4(
-                    variant
-                        .second()
-                        .and_then(<SocketAddrV4 as Decode<Mode>>::decode)?,
-                ),
-                1 => Self::V6(
-                    variant
-                        .second()
-                        .and_then(<SocketAddrV6 as Decode<Mode>>::decode)?,
-                ),
-                index => {
-                    return Err(<D::Error as Error>::invalid_variant_tag(
-                        "SocketAddr",
-                        index,
-                    ));
-                }
-            },
-        )
+        let this = match variant.tag().and_then(<usize as Decode<Mode>>::decode)? {
+            0 => Self::V4(
+                variant
+                    .variant()
+                    .and_then(<SocketAddrV4 as Decode<Mode>>::decode)?,
+            ),
+            1 => Self::V6(
+                variant
+                    .variant()
+                    .and_then(<SocketAddrV6 as Decode<Mode>>::decode)?,
+            ),
+            index => {
+                return Err(<D::Error as Error>::invalid_variant_tag(
+                    "SocketAddr",
+                    index,
+                ));
+            }
+        };
+
+        variant.end()?;
+        Ok(this)
     }
 }

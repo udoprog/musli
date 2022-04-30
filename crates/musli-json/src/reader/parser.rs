@@ -43,6 +43,22 @@ pub trait Parser<'de>: private::Sealed {
     fn read(&mut self, buf: &mut [u8]) -> Result<(), ParseError>;
 
     #[doc(hidden)]
+    fn consume_while(&mut self, m: fn(u8) -> bool) -> Result<usize, ParseError> {
+        let mut c = 0;
+
+        while let Some(b) = self.peek_byte()? {
+            if !m(b) {
+                return Ok(c);
+            }
+
+            c += 1;
+            self.skip(1)?;
+        }
+
+        Ok(c)
+    }
+
+    #[doc(hidden)]
     fn peek(&mut self) -> Result<Token, ParseError> {
         self.skip_whitespace()?;
 

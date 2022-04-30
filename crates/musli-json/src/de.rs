@@ -5,7 +5,7 @@ use core::str;
 
 use musli::de::PackDecoder;
 use musli::de::SequenceDecoder;
-use musli::de::{Decoder, PairDecoder, PairsDecoder, ValueVisitor};
+use musli::de::{Decoder, PairDecoder, PairsDecoder, ValueVisitor, VariantDecoder};
 use musli::error::Error;
 use musli::never::Never;
 
@@ -113,7 +113,7 @@ where
     type Some = JsonDecoder<'a, P>;
     type Struct = JsonObjectDecoder<'a, P>;
     type TupleStruct = JsonObjectDecoder<'a, P>;
-    type Variant = Never<Self>;
+    type Variant = JsonVariantDecoder<'a, P>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -272,6 +272,11 @@ where
     #[inline]
     fn decode_unit_struct(self) -> Result<(), Self::Error> {
         self.skip_any()
+    }
+
+    #[inline]
+    fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
+        JsonVariantDecoder::new(self.scratch, self.parser)
     }
 }
 
@@ -599,7 +604,7 @@ where
         }
 
         self.parser.skip(1)?;
-        Ok(JsonDecoder::new(&mut *self.scratch, self.parser))
+        Ok(JsonDecoder::new(self.scratch, self.parser))
     }
 
     #[inline]
@@ -613,7 +618,7 @@ where
         }
 
         self.parser.skip(1)?;
-        JsonDecoder::new(self.scratch, self.parser).skip_any()?;
+        JsonDecoder::new(self.scratch, self.parser.borrow_mut()).skip_any()?;
         Ok(true)
     }
 }
@@ -740,5 +745,88 @@ where
                 }
             }
         }
+    }
+}
+
+pub struct JsonVariantDecoder<'a, P> {
+    scratch: &'a mut Scratch,
+    parser: P,
+}
+
+impl<'de, 'a, P> JsonVariantDecoder<'a, P>
+where
+    P: Parser<'de>,
+{
+    #[inline]
+    pub fn new(scratch: &'a mut Scratch, mut parser: P) -> Result<Self, ParseError> {
+        parser.skip_whitespace()?;
+
+        let actual = parser.peek()?;
+
+        if !matches!(actual, Token::OpenBrace) {
+            return Err(ParseError::at(
+                parser.pos(),
+                ParseErrorKind::ExpectedOpenBrace(actual),
+            ));
+        }
+
+        parser.skip(1)?;
+
+        Ok(Self { scratch, parser })
+    }
+}
+
+impl<'de, 'a, P> VariantDecoder<'de> for JsonVariantDecoder<'a, P>
+where
+    P: Parser<'de>,
+{
+    type Error = ParseError;
+
+    type Tag<'this> = JsonKeyDecoder<'this, P::Mut<'this>>
+    where
+        Self: 'this;
+
+    type Variant<'this> = JsonDecoder<'this, P::Mut<'this>> where Self: 'this;
+
+    #[inline]
+    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+        Ok(JsonKeyDecoder::new(self.scratch, self.parser.borrow_mut()))
+    }
+
+    #[inline]
+    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
+        let actual = self.parser.peek()?;
+
+        if !matches!(actual, Token::Colon) {
+            return Err(ParseError::at(
+                self.parser.pos(),
+                ParseErrorKind::ExpectedColon(actual),
+            ));
+        }
+
+        self.parser.skip(1)?;
+        Ok(JsonDecoder::new(self.scratch, self.parser.borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_variant(&mut self) -> Result<bool, Self::Error> {
+        let this = self.variant()?;
+        JsonDecoder::new(this.scratch, this.parser).skip_any()?;
+        Ok(true)
+    }
+
+    #[inline]
+    fn end(mut self) -> Result<(), Self::Error> {
+        let actual = self.parser.peek()?;
+
+        if !matches!(actual, Token::CloseBrace) {
+            return Err(ParseError::at(
+                self.parser.pos(),
+                ParseErrorKind::ExpectedCloseBrace(actual),
+            ));
+        }
+
+        self.parser.skip(1)?;
+        Ok(())
     }
 }

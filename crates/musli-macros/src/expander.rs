@@ -647,7 +647,6 @@ impl<'a> Expander<'a> {
         let error_t = &self.tokens.error_t;
         let type_ident = &self.input.ident;
         let type_name = &self.type_name;
-        let pair_decoder_t = &self.tokens.pair_decoder_t;
         let variant_tag = syn::Ident::new("variant_tag", self.input.ident.span());
 
         if let Some((span, Packing::Packed)) = self.type_attr.packing(mode) {
@@ -775,11 +774,14 @@ impl<'a> Expander<'a> {
 
         let fallback = match fallback {
             Some(ident) => {
+                let variant_decoder_t = &self.tokens.variant_decoder_t;
+
                 quote! {
-                    if !#pair_decoder_t::skip_second(#decoder_var)? {
+                    if !#variant_decoder_t::skip_variant(&mut #decoder_var)? {
                         return Err(<D::Error as #error_t>::invalid_variant_tag(#type_name, tag));
                     }
 
+                    #variant_decoder_t::end(#decoder_var)?;
                     Self::#ident {}
                 }
             }
@@ -795,6 +797,7 @@ impl<'a> Expander<'a> {
             &output_variants,
             &string_patterns,
             &patterns,
+            &self.tokens.variant_decoder_t_tag,
         )?;
 
         // A `std::fmt::Debug` implementation is necessary for the output enum
@@ -821,10 +824,17 @@ impl<'a> Expander<'a> {
         let patterns = patterns
             .into_iter()
             .map(|(tag, output)| {
+                let variant_decoder_t = &self.tokens.variant_decoder_t;
+
                 quote! {
                     #tag => {
-                        let #decoder_var = #pair_decoder_t::second(#decoder_var)?;
-                        #output
+                        let output = {
+                            let #decoder_var = #variant_decoder_t::variant(&mut #decoder_var)?;
+                            #output
+                        };
+
+                        #variant_decoder_t::end(#decoder_var)?;
+                        output
                     }
                 }
             })
@@ -938,7 +948,7 @@ impl<'a> Expander<'a> {
 
             let Tokens {
                 encoder_t,
-                pair_encoder_t,
+                variant_encoder_t,
                 ..
             } = &self.tokens;
 
@@ -954,11 +964,18 @@ impl<'a> Expander<'a> {
 
             encode = quote! {
                 let mut variant_encoder = #encoder_t::encode_variant(#encoder_var)?;
-                let tag_encoder = #pair_encoder_t::first(&mut variant_encoder)?;
-                #encode_t_encode(&#tag, tag_encoder)?;
-                let #encoder_var = #pair_encoder_t::second(&mut variant_encoder)?;
-                #encode?;
-                #pair_encoder_t::end(variant_encoder)
+
+                {
+                    let tag_encoder = #variant_encoder_t::tag(&mut variant_encoder)?;
+                    #encode_t_encode(&#tag, tag_encoder)?;
+                }
+
+                {
+                    let #encoder_var = #variant_encoder_t::variant(&mut variant_encoder)?;
+                    #encode?;
+                }
+
+                #variant_encoder_t::end(variant_encoder)
             };
         }
 
@@ -1070,9 +1087,8 @@ impl<'a> Expander<'a> {
                         let mut pair_encoder = #pairs_encoder_t::next(&mut #encoder_var)?;
                         let field_encoder = #pair_encoder_t::first(&mut pair_encoder)?;
                         #encode_t_encode(&#tag, field_encoder)?;
-                        let value_encoder = #pair_encoder_t::second(&mut pair_encoder)?;
+                        let value_encoder = #pair_encoder_t::second(pair_encoder)?;
                         #encode_path(#access, value_encoder)?;
-                        #pair_encoder_t::end(pair_encoder)?;
                     }
                 }
             }
@@ -1184,8 +1200,6 @@ impl<'a> Expander<'a> {
             }));
         }
 
-        let pair_decoder_t = &self.tokens.pair_decoder_t;
-
         let (decode_tag, unsupported_pattern, patterns, output_enum) = self.handle_tag_decode(
             mode,
             tag_methods.pick(),
@@ -1193,7 +1207,10 @@ impl<'a> Expander<'a> {
             &output_variants,
             &string_patterns,
             &patterns,
+            &self.tokens.pair_decoder_t_first,
         )?;
+
+        let pair_decoder_t = &self.tokens.pair_decoder_t;
 
         let patterns = patterns
             .into_iter()
@@ -1314,6 +1331,7 @@ impl<'a> Expander<'a> {
         output_variants: &[syn::Ident],
         string_patterns: &[TokenStream],
         patterns: &[(syn::Expr, TokenStream)],
+        thing_decoder_t_decode: &syn::ExprPath,
     ) -> Option<(
         TokenStream,
         TokenStream,
@@ -1321,7 +1339,6 @@ impl<'a> Expander<'a> {
         Option<TokenStream>,
     )> {
         let decoder_var = &self.tokens.decoder_var;
-        let pair_decoder_t = &self.tokens.pair_decoder_t;
 
         match tag_method {
             TagMethod::String => {
@@ -1329,6 +1346,7 @@ impl<'a> Expander<'a> {
                     tag_visitor_output,
                     output_variants,
                     string_patterns,
+                    thing_decoder_t_decode,
                 )?;
 
                 let patterns = patterns
@@ -1342,7 +1360,7 @@ impl<'a> Expander<'a> {
                 let decode_t_decode = mode.decode_t_decode();
 
                 let decode_tag = quote! {{
-                    let index_decoder = #pair_decoder_t::first(&mut #decoder_var)?;
+                    let index_decoder = #thing_decoder_t_decode(&mut #decoder_var)?;
                     #decode_t_decode(index_decoder)?
                 }};
 
@@ -1361,6 +1379,7 @@ impl<'a> Expander<'a> {
         output: &syn::Ident,
         output_variants: &[syn::Ident],
         string_patterns: &[TokenStream],
+        thing_decoder_t_decode: &syn::ExprPath,
     ) -> Option<(TokenStream, TokenStream)> {
         let value_visitor_t = &self.tokens.value_visitor_t;
         let phantom_data = &self.tokens.phantom_data;
@@ -1368,7 +1387,6 @@ impl<'a> Expander<'a> {
         let error_t = &self.tokens.error_t;
         let decoder_t = &self.tokens.decoder_t;
         let decoder_var = &self.tokens.decoder_var;
-        let pair_decoder_t = &self.tokens.pair_decoder_t;
 
         // Declare a tag visitor, allowing string tags to be decoded by
         // decoders that owns the string.
@@ -1399,7 +1417,7 @@ impl<'a> Expander<'a> {
                 }
             }
 
-            let index_decoder = #pair_decoder_t::first(&mut #decoder_var)?;
+            let index_decoder = #thing_decoder_t_decode(&mut #decoder_var)?;
             #decoder_t::decode_string(index_decoder, TagVisitor::<D::Error>(#phantom_data))?
         }};
 
