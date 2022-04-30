@@ -1,3 +1,6 @@
+pub mod models;
+pub mod utils;
+
 pub mod wire {
     pub use musli_wire::*;
 }
