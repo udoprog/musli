@@ -1,6 +1,6 @@
 [package]
 name = "musli-wire"
-version = "0.0.26"
+version = "0.0.27"
 edition = "2021"
 readme = "README.md"
 license = "MIT/Apache-2.0"
@@ -19,6 +19,6 @@ std = ["musli-common/std", "musli-storage/std", "musli/std"]
 test = ["std"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.26", default_features = false }
-musli-common = { path = "../musli-common", version = "0.0.26", default_features = false }
-musli-storage = { path = "../musli-storage", version = "0.0.26", default_features = false }
+musli = { path = "../musli", version = "0.0.27", default_features = false }
+musli-common = { path = "../musli-common", version = "0.0.27", default_features = false }
+musli-storage = { path = "../musli-storage", version = "0.0.27", default_features = false }
