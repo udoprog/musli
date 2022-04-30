@@ -204,6 +204,16 @@ where
     }
 
     #[inline]
+    fn decode_f32(mut self) -> Result<f32, Self::Error> {
+        self.parser.parse_f32()
+    }
+
+    #[inline]
+    fn decode_f64(mut self) -> Result<f64, Self::Error> {
+        self.parser.parse_f64()
+    }
+
+    #[inline]
     fn decode_option(mut self) -> Result<Option<Self::Some>, Self::Error> {
         if self.parser.peek()?.is_null() {
             self.parse_null()?;

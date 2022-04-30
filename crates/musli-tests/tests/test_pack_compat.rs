@@ -1,5 +1,6 @@
 //! This is a test that ensures that arbitrary packs of data can be successfully skipped over.
 
+use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 use musli_wire::tag::MAX_INLINE_LEN;
 use musli_wire::{Variable, WireEncoding};
@@ -54,7 +55,8 @@ struct IgnoreBoth {
 
 #[test]
 fn test_packed_compat() {
-    const ENCODING: WireEncoding<Variable, Variable, 128> = WireEncoding::new().with_max_pack();
+    const ENCODING: WireEncoding<DefaultMode, Variable, Variable, 128> =
+        WireEncoding::new().with_max_pack();
 
     let data = ENCODING
         .to_vec(&SmallPackCompat {

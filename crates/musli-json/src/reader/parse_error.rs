@@ -64,6 +64,7 @@ pub(crate) enum ParseErrorKind {
     ExpectedFalse,
     ExpectedBool(Token),
     ExpectedValue(Token),
+    ParseFloat(lexical::Error),
     Eof,
     Custom,
 }
@@ -147,6 +148,9 @@ impl fmt::Display for ParseError {
             }
             ParseErrorKind::ExpectedValue(actual) => {
                 write!(f, "expected value, found {actual} (at {span})")
+            }
+            ParseErrorKind::ParseFloat(error) => {
+                write!(f, "expected float, got {error} (at {span})")
             }
             ParseErrorKind::Eof => write!(f, "eof while parsing (at {span})"),
             ParseErrorKind::Custom => {

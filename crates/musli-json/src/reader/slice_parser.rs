@@ -87,4 +87,48 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     fn peek_byte(&mut self) -> Result<Option<u8>, ParseError> {
         Ok(self.slice.get(self.index).copied())
     }
+
+    #[inline]
+    fn parse_f32(&mut self) -> Result<f32, ParseError> {
+        use lexical::parse_float_options::JSON;
+        const FORMAT: u128 = lexical::format::STANDARD;
+
+        let (value, read) = match lexical::parse_partial_with_options::<f32, _, FORMAT>(
+            &self.slice[self.index..],
+            &JSON,
+        ) {
+            Ok(out) => out,
+            Err(error) => {
+                return Err(ParseError::at(
+                    self.pos(),
+                    ParseErrorKind::ParseFloat(error),
+                ))
+            }
+        };
+
+        self.index += read;
+        Ok(value)
+    }
+
+    #[inline]
+    fn parse_f64(&mut self) -> Result<f64, ParseError> {
+        use lexical::parse_float_options::JSON;
+        const FORMAT: u128 = lexical::format::STANDARD;
+
+        let (value, read) = match lexical::parse_partial_with_options::<f64, _, FORMAT>(
+            &self.slice[self.index..],
+            &JSON,
+        ) {
+            Ok(out) => out,
+            Err(error) => {
+                return Err(ParseError::at(
+                    self.pos(),
+                    ParseErrorKind::ParseFloat(error),
+                ))
+            }
+        };
+
+        self.index += read;
+        Ok(value)
+    }
 }

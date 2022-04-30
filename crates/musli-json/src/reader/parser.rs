@@ -43,6 +43,17 @@ pub trait Parser<'de>: private::Sealed {
     fn read(&mut self, buf: &mut [u8]) -> Result<(), ParseError>;
 
     #[doc(hidden)]
+    fn pos(&self) -> u32;
+
+    /// Skip over whitespace.
+    #[doc(hidden)]
+    fn skip_whitespace(&mut self) -> Result<(), ParseError>;
+
+    /// Peek the next byte.
+    #[doc(hidden)]
+    fn peek_byte(&mut self) -> Result<Option<u8>, ParseError>;
+
+    #[doc(hidden)]
     fn consume_while(&mut self, m: fn(u8) -> bool) -> Result<usize, ParseError> {
         let mut c = 0;
 
@@ -69,6 +80,12 @@ pub trait Parser<'de>: private::Sealed {
 
         Ok(Token::from_byte(b))
     }
+
+    /// Parse a 32-bit floating point number.
+    fn parse_f32(&mut self) -> Result<f32, ParseError>;
+
+    /// Parse a 64-bit floating point number.
+    fn parse_f64(&mut self) -> Result<f64, ParseError>;
 
     #[doc(hidden)]
     fn parse_hex_escape(&mut self) -> Result<u16, ParseError> {
@@ -110,17 +127,6 @@ pub trait Parser<'de>: private::Sealed {
 
         Ok(())
     }
-
-    #[doc(hidden)]
-    fn pos(&self) -> u32;
-
-    /// Skip over whitespace.
-    #[doc(hidden)]
-    fn skip_whitespace(&mut self) -> Result<(), ParseError>;
-
-    /// Peek the next byte.
-    #[doc(hidden)]
-    fn peek_byte(&mut self) -> Result<Option<u8>, ParseError>;
 }
 
 impl<'de, P> Parser<'de> for &mut P
@@ -175,5 +181,15 @@ where
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<(), ParseError> {
         (**self).read(buf)
+    }
+
+    #[inline]
+    fn parse_f32(&mut self) -> Result<f32, ParseError> {
+        (**self).parse_f32()
+    }
+
+    #[inline]
+    fn parse_f64(&mut self) -> Result<f64, ParseError> {
+        (**self).parse_f64()
     }
 }
