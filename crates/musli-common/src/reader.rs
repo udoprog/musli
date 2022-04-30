@@ -14,9 +14,25 @@ use musli::de::ValueVisitor;
 use musli::error::Error;
 
 /// A reader where the current position is exactly known.
-pub trait PositionedReader<'de>: Reader<'de> {
+pub trait PosReader<'de>: Reader<'de> {
     /// The exact position of a reader.
     fn pos(&self) -> usize;
+
+    /// Reborrowed type.
+    ///
+    /// Why oh why would we want to do this over having a simple `&'this mut T`?
+    ///
+    /// We want to avoid recursive types, which will blow up the compiler. And
+    /// the above is a typical example of when that can go wrong. This ensures
+    /// that each call to `borrow_mut` dereferences the [Reader] at each step to
+    /// avoid constructing a large muted type, like `&mut &mut &mut
+    /// SliceReader<'de>`.
+    type PosMut<'this>: PosReader<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Reborrow the current reader.
+    fn pos_borrow_mut(&mut self) -> Self::PosMut<'_>;
 }
 
 /// Trait governing how a source of bytes is read.
@@ -26,6 +42,22 @@ pub trait PositionedReader<'de>: Reader<'de> {
 pub trait Reader<'de> {
     /// Error type raised by the current reader.
     type Error: Error;
+
+    /// Reborrowed type.
+    ///
+    /// Why oh why would we want to do this over having a simple `&'this mut T`?
+    ///
+    /// We want to avoid recursive types, which will blow up the compiler. And
+    /// the above is a typical example of when that can go wrong. This ensures
+    /// that each call to `borrow_mut` dereferences the [Reader] at each step to
+    /// avoid constructing a large muted type, like `&mut &mut &mut
+    /// SliceReader<'de>`.
+    type Mut<'this>: Reader<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Reborrow the current reader.
+    fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Skip over the given number of bytes.
     fn skip(&mut self, n: usize) -> Result<(), Self::Error>;
@@ -166,6 +198,12 @@ impl std::error::Error for SliceReaderError {}
 
 impl<'de> Reader<'de> for &'de [u8] {
     type Error = SliceReaderError;
+    type Mut<'this> = &'this mut &'de [u8] where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
 
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
@@ -225,6 +263,13 @@ impl<'de> SliceReader<'de> {
 impl<'de> Reader<'de> for SliceReader<'de> {
     type Error = SliceReaderError;
 
+    type Mut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
+
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
         self.range.start = bounds_check_add(&self.range, n)?;
@@ -277,10 +322,17 @@ pub struct WithPosition<R> {
     reader: R,
 }
 
-impl<'de, R> PositionedReader<'de> for WithPosition<R>
+impl<'de, R> PosReader<'de> for WithPosition<R>
 where
     R: Reader<'de>,
 {
+    type PosMut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn pos_borrow_mut(&mut self) -> Self::PosMut<'_> {
+        self
+    }
+
     #[inline]
     fn pos(&self) -> usize {
         self.pos
@@ -292,6 +344,13 @@ where
     R: Reader<'de>,
 {
     type Error = R::Error;
+
+    type Mut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
 
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
@@ -355,10 +414,17 @@ where
     }
 }
 
-impl<'de, R> PositionedReader<'de> for Limit<R>
+impl<'de, R> PosReader<'de> for Limit<R>
 where
-    R: PositionedReader<'de>,
+    R: PosReader<'de>,
 {
+    type PosMut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn pos_borrow_mut(&mut self) -> Self::PosMut<'_> {
+        self
+    }
+
     #[inline]
     fn pos(&self) -> usize {
         self.reader.pos()
@@ -370,6 +436,13 @@ where
     R: Reader<'de>,
 {
     type Error = R::Error;
+
+    type Mut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
 
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
@@ -407,10 +480,17 @@ where
 
 // Forward implementations.
 
-impl<'de, R> PositionedReader<'de> for &mut R
+impl<'de, R> PosReader<'de> for &mut R
 where
-    R: ?Sized + PositionedReader<'de>,
+    R: ?Sized + PosReader<'de>,
 {
+    type PosMut<'this> = R::PosMut<'this> where Self: 'this;
+
+    #[inline]
+    fn pos_borrow_mut(&mut self) -> Self::PosMut<'_> {
+        (**self).pos_borrow_mut()
+    }
+
     #[inline]
     fn pos(&self) -> usize {
         (**self).pos()
@@ -422,6 +502,13 @@ where
     R: ?Sized + Reader<'de>,
 {
     type Error = R::Error;
+
+    type Mut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
 
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {

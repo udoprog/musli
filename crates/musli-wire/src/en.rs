@@ -343,11 +343,11 @@ where
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
+    type Encoder<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(WireEncoder::new(&mut self.writer))
+        Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
@@ -364,11 +364,11 @@ where
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
+    type Encoder<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(WireEncoder::new(&mut self.writer))
+        Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
@@ -385,17 +385,17 @@ where
 {
     type Ok = ();
     type Error = W::Error;
-    type First<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
-    type Second<'this> = WireEncoder<&'this mut W, I, L, P> where Self: 'this;
+    type First<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
+    type Second<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(WireEncoder::new(&mut self.writer))
+        Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
     fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
-        Ok(WireEncoder::new(&mut self.writer))
+        Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]

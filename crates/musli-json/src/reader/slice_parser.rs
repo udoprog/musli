@@ -15,6 +15,13 @@ impl<'de> SliceParser<'de> {
 }
 
 impl<'de> Parser<'de> for SliceParser<'de> {
+    type Mut<'this> = &'this mut SliceParser<'de> where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
+
     #[inline]
     fn parse_string<'scratch>(
         &mut self,

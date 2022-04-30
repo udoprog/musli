@@ -4,7 +4,7 @@ use core::marker;
 use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
 use musli::error::Error;
-use musli_common::reader::PositionedReader;
+use musli_common::reader::PosReader;
 
 /// A very simple decoder suitable for storage decoding.
 pub struct StorageDecoder<R, I, L>
@@ -47,7 +47,7 @@ where
 
 impl<'de, R, I, L> Decoder<'de> for StorageDecoder<R, I, L>
 where
-    R: PositionedReader<'de>,
+    R: PosReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
@@ -69,7 +69,7 @@ where
     #[inline]
     fn decode_unit(mut self) -> Result<(), Self::Error> {
         let pos = self.reader.pos();
-        let count = L::decode_usize(&mut self.reader)?;
+        let count = L::decode_usize(self.reader.pos_borrow_mut())?;
 
         if count != 0 {
             return Err(Self::Error::message(ExpectedEmptySequence {
@@ -96,7 +96,7 @@ where
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
-        let len = L::decode_usize(&mut self.reader)?;
+        let len = L::decode_usize(self.reader.pos_borrow_mut())?;
         self.reader.read_bytes(len, visitor)
     }
 
@@ -285,22 +285,22 @@ where
 
 impl<'de, R, I, L> PackDecoder<'de> for StorageDecoder<R, I, L>
 where
-    R: PositionedReader<'de>,
+    R: PosReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
-        Ok(StorageDecoder::new(&mut self.reader))
+        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
     }
 }
 
 impl<'de, R, I, L> LimitedStorageDecoder<R, I, L>
 where
-    R: PositionedReader<'de>,
+    R: PosReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
@@ -313,12 +313,12 @@ where
 
 impl<'de, R, I, L> SequenceDecoder<'de> for LimitedStorageDecoder<R, I, L>
 where
-    R: PositionedReader<'de>,
+    R: PosReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
@@ -332,19 +332,21 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(StorageDecoder::new(&mut self.decoder.reader)))
+        Ok(Some(StorageDecoder::new(
+            self.decoder.reader.pos_borrow_mut(),
+        )))
     }
 }
 
 impl<'de, R, I, L> PairsDecoder<'de> for LimitedStorageDecoder<R, I, L>
 where
-    R: PositionedReader<'de>,
+    R: PosReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
 
-    type Decoder<'this> = StorageDecoder<&'this mut R, I, L>
+    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, I, L>
     where
         Self: 'this;
 
@@ -360,23 +362,25 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(StorageDecoder::new(&mut self.decoder.reader)))
+        Ok(Some(StorageDecoder::new(
+            self.decoder.reader.pos_borrow_mut(),
+        )))
     }
 }
 
 impl<'de, R, I, L> PairDecoder<'de> for StorageDecoder<R, I, L>
 where
-    R: PositionedReader<'de>,
+    R: PosReader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type First<'this> = StorageDecoder<&'this mut R, I, L> where Self: 'this;
+    type First<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
     type Second = StorageDecoder<R, I, L>;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(StorageDecoder::new(&mut self.reader))
+        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
     }
 
     #[inline]

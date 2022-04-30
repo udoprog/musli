@@ -165,6 +165,12 @@ where
     E: Error,
 {
     type Error = E;
+    type Mut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
 
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {

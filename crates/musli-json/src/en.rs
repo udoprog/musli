@@ -55,7 +55,7 @@ where
     #[inline]
     fn encode_char(mut self, value: char) -> Result<Self::Ok, Self::Error> {
         encode_string(
-            &mut self.writer,
+            self.writer.borrow_mut(),
             value.encode_utf8(&mut [0, 0, 0, 0]).as_bytes(),
         )
     }
@@ -175,7 +175,7 @@ where
 
     #[inline]
     fn encode_string(mut self, string: &str) -> Result<Self::Ok, Self::Error> {
-        encode_string(&mut self.writer, string.as_bytes())
+        encode_string(self.writer.borrow_mut(), string.as_bytes())
     }
 
     #[inline]
@@ -255,7 +255,7 @@ where
     type Ok = ();
     type Error = W::Error;
 
-    type Encoder<'this> = JsonObjectPairEncoder<Mode, &'this mut W>
+    type Encoder<'this> = JsonObjectPairEncoder<Mode, W::Mut<'this>>
     where
         Self: 'this;
 
@@ -263,7 +263,10 @@ where
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
         let len = self.len;
         self.len += 1;
-        Ok(JsonObjectPairEncoder::new(len == 0, &mut self.writer))
+        Ok(JsonObjectPairEncoder::new(
+            len == 0,
+            self.writer.borrow_mut(),
+        ))
     }
 
     #[inline]
@@ -298,11 +301,11 @@ where
     type Ok = ();
     type Error = W::Error;
 
-    type First<'this> = JsonObjectKeyEncoder<&'this mut W>
+    type First<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
-    type Second<'this> = JsonEncoder<Mode, &'this mut W>
+    type Second<'this> = JsonEncoder<Mode, W::Mut<'this>>
     where
         Self: 'this;
 
@@ -312,13 +315,13 @@ where
             self.writer.write_byte(b',')?;
         }
 
-        Ok(JsonObjectKeyEncoder::new(&mut self.writer))
+        Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
     fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
         self.writer.write_byte(b':')?;
-        Ok(JsonEncoder::new(&mut self.writer))
+        Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
@@ -355,23 +358,23 @@ where
     type Ok = ();
     type Error = W::Error;
 
-    type First<'this> = JsonObjectKeyEncoder<&'this mut W>
+    type First<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
-    type Second<'this> = JsonEncoder<Mode, &'this mut W>
+    type Second<'this> = JsonEncoder<Mode, W::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(JsonObjectKeyEncoder::new(&mut self.writer))
+        Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
     fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
         self.writer.write_byte(b':')?;
-        Ok(JsonEncoder::new(&mut self.writer))
+        Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
@@ -464,7 +467,7 @@ where
     type Ok = ();
     type Error = W::Error;
 
-    type Encoder<'this> = JsonEncoder<Mode, &'this mut W>
+    type Encoder<'this> = JsonEncoder<Mode, W::Mut<'this>>
     where
         Self: 'this;
 
@@ -474,7 +477,7 @@ where
             self.writer.write_byte(b',')?;
         }
 
-        Ok(JsonEncoder::new(&mut self.writer))
+        Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]

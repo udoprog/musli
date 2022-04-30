@@ -16,26 +16,23 @@ use crate::reader::{
 };
 
 /// A JSON decoder for Müsli.
-pub struct JsonDecoder<'a, P>
-where
-    P: ?Sized,
-{
+pub struct JsonDecoder<'a, P> {
     scratch: &'a mut Scratch,
-    parser: &'a mut P,
+    parser: P,
 }
 
 impl<'de, 'a, P> JsonDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(scratch: &'a mut Scratch, parser: &'a mut P) -> Self {
+    pub(crate) fn new(scratch: &'a mut Scratch, parser: P) -> Self {
         Self { scratch, parser }
     }
 
     /// Skip over any values.
-    pub(crate) fn skip_any(self) -> Result<(), ParseError> {
+    pub(crate) fn skip_any(mut self) -> Result<(), ParseError> {
         let start = self.parser.pos();
         let actual = self.parser.peek()?;
 
@@ -65,10 +62,10 @@ where
                 return self.parse_false();
             }
             Token::Number => {
-                return integer::skip_number(self.parser);
+                return integer::skip_number(&mut self.parser);
             }
             Token::String => {
-                return string::skip_string(self.parser, true);
+                return string::skip_string(&mut self.parser, true);
             }
             actual => {
                 return Err(ParseError::spanned(
@@ -83,21 +80,21 @@ where
     }
 
     #[inline]
-    fn parse_true(self) -> Result<(), ParseError> {
+    fn parse_true(mut self) -> Result<(), ParseError> {
         self.parser.parse_exact(*b"true", |pos| {
             ParseError::at(pos, ParseErrorKind::ExpectedTrue)
         })
     }
 
     #[inline]
-    fn parse_false(self) -> Result<(), ParseError> {
+    fn parse_false(mut self) -> Result<(), ParseError> {
         self.parser.parse_exact(*b"false", |pos| {
             ParseError::at(pos, ParseErrorKind::ExpectedFalse)
         })
     }
 
     #[inline]
-    fn parse_null(self) -> Result<(), ParseError> {
+    fn parse_null(mut self) -> Result<(), ParseError> {
         self.parser.parse_exact(*b"null", |pos| {
             ParseError::at(pos, ParseErrorKind::ExpectedNull)
         })
@@ -106,7 +103,7 @@ where
 
 impl<'de, 'a, P> Decoder<'de> for JsonDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     type Error = ParseError;
     type Pack = Never<Self>;
@@ -129,7 +126,7 @@ where
     }
 
     #[inline]
-    fn decode_bool(self) -> Result<bool, Self::Error> {
+    fn decode_bool(mut self) -> Result<bool, Self::Error> {
         match self.parser.peek()? {
             Token::True => {
                 self.parse_true()?;
@@ -147,67 +144,67 @@ where
     }
 
     #[inline]
-    fn decode_u8(self) -> Result<u8, Self::Error> {
-        integer::decode_unsigned(self.parser)
+    fn decode_u8(mut self) -> Result<u8, Self::Error> {
+        integer::decode_unsigned(&mut self.parser)
     }
 
     #[inline]
-    fn decode_u16(self) -> Result<u16, Self::Error> {
-        integer::decode_unsigned(self.parser)
+    fn decode_u16(mut self) -> Result<u16, Self::Error> {
+        integer::decode_unsigned(&mut self.parser)
     }
 
     #[inline]
-    fn decode_u32(self) -> Result<u32, Self::Error> {
-        integer::decode_unsigned(self.parser)
+    fn decode_u32(mut self) -> Result<u32, Self::Error> {
+        integer::decode_unsigned(&mut self.parser)
     }
 
     #[inline]
-    fn decode_u64(self) -> Result<u64, Self::Error> {
-        integer::decode_unsigned(self.parser)
+    fn decode_u64(mut self) -> Result<u64, Self::Error> {
+        integer::decode_unsigned(&mut self.parser)
     }
 
     #[inline]
-    fn decode_u128(self) -> Result<u128, Self::Error> {
-        integer::decode_unsigned(self.parser)
+    fn decode_u128(mut self) -> Result<u128, Self::Error> {
+        integer::decode_unsigned(&mut self.parser)
     }
 
     #[inline]
-    fn decode_i8(self) -> Result<i8, Self::Error> {
-        integer::decode_signed(self.parser)
+    fn decode_i8(mut self) -> Result<i8, Self::Error> {
+        integer::decode_signed(&mut self.parser)
     }
 
     #[inline]
-    fn decode_i16(self) -> Result<i16, Self::Error> {
-        integer::decode_signed(self.parser)
+    fn decode_i16(mut self) -> Result<i16, Self::Error> {
+        integer::decode_signed(&mut self.parser)
     }
 
     #[inline]
-    fn decode_i32(self) -> Result<i32, Self::Error> {
-        integer::decode_signed(self.parser)
+    fn decode_i32(mut self) -> Result<i32, Self::Error> {
+        integer::decode_signed(&mut self.parser)
     }
 
     #[inline]
-    fn decode_i64(self) -> Result<i64, Self::Error> {
-        integer::decode_signed(self.parser)
+    fn decode_i64(mut self) -> Result<i64, Self::Error> {
+        integer::decode_signed(&mut self.parser)
     }
 
     #[inline]
-    fn decode_i128(self) -> Result<i128, Self::Error> {
-        integer::decode_signed(self.parser)
+    fn decode_i128(mut self) -> Result<i128, Self::Error> {
+        integer::decode_signed(&mut self.parser)
     }
 
     #[inline]
-    fn decode_usize(self) -> Result<usize, Self::Error> {
-        integer::decode_unsigned(self.parser)
+    fn decode_usize(mut self) -> Result<usize, Self::Error> {
+        integer::decode_unsigned(&mut self.parser)
     }
 
     #[inline]
-    fn decode_isize(self) -> Result<isize, Self::Error> {
-        integer::decode_signed(self.parser)
+    fn decode_isize(mut self) -> Result<isize, Self::Error> {
+        integer::decode_signed(&mut self.parser)
     }
 
     #[inline]
-    fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
+    fn decode_option(mut self) -> Result<Option<Self::Some>, Self::Error> {
         if self.parser.peek()?.is_null() {
             self.parse_null()?;
             Ok(None)
@@ -217,7 +214,7 @@ where
     }
 
     #[inline]
-    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
         V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
@@ -279,17 +276,14 @@ where
 }
 
 /// A JSON object key decoder for Müsli.
-pub struct JsonKeyDecoder<'a, P>
-where
-    P: ?Sized,
-{
+pub struct JsonKeyDecoder<'a, P> {
     scratch: &'a mut Scratch,
-    parser: &'a mut P,
+    parser: P,
 }
 
 impl<'de, 'a, P> JsonKeyDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     fn skip_any(self) -> Result<(), ParseError> {
         JsonDecoder::new(self.scratch, self.parser).skip_any()
@@ -298,16 +292,16 @@ where
 
 impl<'de, 'a, P> JsonKeyDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(scratch: &'a mut Scratch, parser: &'a mut P) -> Self {
+    pub(crate) fn new(scratch: &'a mut Scratch, parser: P) -> Self {
         Self { scratch, parser }
     }
 
     #[inline]
-    fn decode_escaped_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    fn decode_escaped_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = ParseError>,
     {
@@ -355,7 +349,7 @@ where
 
     #[inline]
     fn visit_any(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        integer::decode_unsigned(&mut SliceParser::new(bytes))
+        integer::decode_unsigned(&mut &mut SliceParser::new(bytes))
     }
 }
 
@@ -392,7 +386,7 @@ where
 
 impl<'de, 'a, P> Decoder<'de> for JsonKeyDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     type Error = ParseError;
     type Pack = Never<Self>;
@@ -478,25 +472,22 @@ where
     }
 }
 
-pub struct JsonObjectDecoder<'a, P>
-where
-    P: ?Sized,
-{
+pub struct JsonObjectDecoder<'a, P> {
     scratch: &'a mut Scratch,
     first: bool,
     len: Option<usize>,
-    parser: &'a mut P,
+    parser: P,
 }
 
 impl<'de, 'a, P> JsonObjectDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     #[inline]
     pub fn new(
         scratch: &'a mut Scratch,
         len: Option<usize>,
-        parser: &'a mut P,
+        mut parser: P,
     ) -> Result<Self, ParseError> {
         parser.skip_whitespace()?;
 
@@ -522,11 +513,11 @@ where
 
 impl<'de, 'a, P> PairsDecoder<'de> for JsonObjectDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     type Error = ParseError;
 
-    type Decoder<'this> = JsonObjectPairDecoder<'this, P>
+    type Decoder<'this> = JsonObjectPairDecoder<'this, P::Mut<'this>>
     where
         Self: 'this;
 
@@ -543,7 +534,10 @@ where
             let token = self.parser.peek()?;
 
             if token.is_string() {
-                return Ok(Some(JsonObjectPairDecoder::new(self.scratch, self.parser)));
+                return Ok(Some(JsonObjectPairDecoder::new(
+                    self.scratch,
+                    self.parser.borrow_mut(),
+                )));
             }
 
             match token {
@@ -562,31 +556,25 @@ where
     }
 }
 
-pub struct JsonObjectPairDecoder<'a, P>
-where
-    P: ?Sized,
-{
+pub struct JsonObjectPairDecoder<'a, P> {
     scratch: &'a mut Scratch,
-    parser: &'a mut P,
+    parser: P,
 }
 
-impl<'a, P> JsonObjectPairDecoder<'a, P>
-where
-    P: ?Sized,
-{
+impl<'a, P> JsonObjectPairDecoder<'a, P> {
     #[inline]
-    fn new(scratch: &'a mut Scratch, parser: &'a mut P) -> Self {
+    fn new(scratch: &'a mut Scratch, parser: P) -> Self {
         Self { scratch, parser }
     }
 }
 
 impl<'de, 'a, P> PairDecoder<'de> for JsonObjectPairDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     type Error = ParseError;
 
-    type First<'this> = JsonKeyDecoder<'this, P>
+    type First<'this> = JsonKeyDecoder<'this, P::Mut<'this>>
     where
         Self: 'this;
 
@@ -594,11 +582,14 @@ where
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(JsonKeyDecoder::new(&mut *self.scratch, &mut *self.parser))
+        Ok(JsonKeyDecoder::new(
+            &mut *self.scratch,
+            self.parser.borrow_mut(),
+        ))
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
+    fn second(mut self) -> Result<Self::Second, Self::Error> {
         let actual = self.parser.peek()?;
 
         if !matches!(actual, Token::Colon) {
@@ -612,7 +603,7 @@ where
     }
 
     #[inline]
-    fn skip_second(self) -> Result<bool, Self::Error> {
+    fn skip_second(mut self) -> Result<bool, Self::Error> {
         let actual = self.parser.peek()?;
 
         if !matches!(actual, Token::Colon) {
@@ -627,25 +618,22 @@ where
     }
 }
 
-pub struct JsonSequenceDecoder<'a, P>
-where
-    P: ?Sized,
-{
+pub struct JsonSequenceDecoder<'a, P> {
     scratch: &'a mut Scratch,
     len: Option<usize>,
     first: bool,
-    parser: &'a mut P,
+    parser: P,
 }
 
 impl<'de, 'a, P> JsonSequenceDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     #[inline]
     pub fn new(
         scratch: &'a mut Scratch,
         len: Option<usize>,
-        parser: &'a mut P,
+        mut parser: P,
     ) -> Result<Self, ParseError> {
         parser.skip_whitespace()?;
 
@@ -671,11 +659,11 @@ where
 
 impl<'de, 'a, P> SequenceDecoder<'de> for JsonSequenceDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     type Error = ParseError;
 
-    type Decoder<'this> = JsonDecoder<'this, P>
+    type Decoder<'this> = JsonDecoder<'this, P::Mut<'this>>
     where
         Self: 'this;
 
@@ -690,7 +678,10 @@ where
             let token = self.parser.peek()?;
 
             if token.is_value() {
-                return Ok(Some(JsonDecoder::new(self.scratch, self.parser)));
+                return Ok(Some(JsonDecoder::new(
+                    self.scratch,
+                    self.parser.borrow_mut(),
+                )));
             }
 
             match token {
@@ -713,11 +704,11 @@ where
 
 impl<'de, 'a, P> PackDecoder<'de> for JsonSequenceDecoder<'a, P>
 where
-    P: ?Sized + Parser<'de>,
+    P: Parser<'de>,
 {
     type Error = ParseError;
 
-    type Decoder<'this> = JsonDecoder<'this, P>
+    type Decoder<'this> = JsonDecoder<'this, P::Mut<'this>>
     where
         Self: 'this;
 
@@ -728,7 +719,7 @@ where
             let token = self.parser.peek()?;
 
             if token.is_value() {
-                return Ok(JsonDecoder::new(self.scratch, self.parser));
+                return Ok(JsonDecoder::new(self.scratch, self.parser.borrow_mut()));
             }
 
             match token {

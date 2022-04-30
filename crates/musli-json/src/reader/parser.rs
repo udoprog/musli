@@ -8,6 +8,22 @@ mod private {
 
 /// Parser trait for this crate.
 pub trait Parser<'de>: private::Sealed {
+    /// Reborrowed type.
+    ///
+    /// Why oh why would we want to do this over having a simple `&'this mut P`?
+    ///
+    /// We want to avoid recursive types, which will blow up the compiler. And
+    /// the above is a typical example of when that can go wrong. This ensures
+    /// that each call to `borrow_mut` dereferences the [Parser] at each step to
+    /// avoid constructing a large muted type, like `&mut &mut &mut
+    /// SliceParser<'de>`.
+    type Mut<'this>: Parser<'de>
+    where
+        Self: 'this;
+
+    /// Reborrow the current parser.
+    fn borrow_mut(&mut self) -> Self::Mut<'_>;
+
     /// Must parse the string from the input buffer and validate that it is
     /// valid UTF-8.
     #[doc(hidden)]
@@ -95,6 +111,12 @@ impl<'de, P> Parser<'de> for &mut P
 where
     P: Parser<'de>,
 {
+    type Mut<'this> = P::Mut<'this> where Self: 'this;
+
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        (**self).borrow_mut()
+    }
+
     #[inline]
     fn parse_string<'scratch>(
         &mut self,
