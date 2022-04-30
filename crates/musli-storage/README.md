@@ -59,11 +59,11 @@ To tweak the behavior of the storage format you can use the
 [StorageEncoding] type:
 
 ```rust
-use musli_storage::StorageEncoding;
-use musli_storage::{Fixed, Variable};
+use musli_storage::{Fixed, Variable, StorageEncoding};
+use musli::mode::DefaultMode;
 use musli::{Encode, Decode};
 
-const CONFIG: StorageEncoding<Fixed, Variable> = StorageEncoding::new()
+const CONFIG: StorageEncoding<DefaultMode, Fixed, Variable> = StorageEncoding::new()
     .with_fixed_integers();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
