@@ -11,6 +11,20 @@ use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Ident;
 
+#[derive(Debug, Clone)]
+pub enum Tagging {
+    /// Externally tagged.
+    External,
+    /// Tag by the specified field.
+    Tag(syn::Expr),
+}
+
+impl Default for Tagging {
+    fn default() -> Self {
+        Tagging::External
+    }
+}
+
 /// The kind of tag to use.
 #[derive(Debug, Clone, Copy)]
 pub enum DefaultTag {
@@ -25,9 +39,9 @@ impl Default for DefaultTag {
 }
 
 /// If the type is tagged or not.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Packing {
-    Tagged,
+    Tagged(Tagging),
     Packed,
     Transparent,
 }
@@ -35,7 +49,8 @@ pub enum Packing {
 impl fmt::Display for Packing {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Packing::Tagged => write!(f, "tagged"),
+            Packing::Tagged(Tagging::External) => write!(f, "tagged"),
+            Packing::Tagged(Tagging::Tag(..)) => write!(f, "internally tagged"),
             Packing::Packed => write!(f, "packed"),
             Packing::Transparent => write!(f, "transparent"),
         }
@@ -44,7 +59,7 @@ impl fmt::Display for Packing {
 
 impl Default for Packing {
     fn default() -> Self {
-        Self::Tagged
+        Self::Tagged(Tagging::External)
     }
 }
 
@@ -65,7 +80,7 @@ struct InnerTypeAttr {
 impl InnerTypeAttr {
     /// Update packing of type.
     fn set_packing(&mut self, cx: &Ctxt, span: Span, packing: Packing) {
-        if let Some((_, existing)) = self.packing {
+        if let Some((_, existing)) = &self.packing {
             cx.error_span(
                 span,
                 format!(
@@ -99,16 +114,15 @@ pub(crate) struct TypeAttr {
 
 impl TypeAttr {
     /// Indicates the packing state of the type.
-    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<(Span, Packing)> {
+    pub(crate) fn packing_span(&self, mode: Mode<'_>) -> Option<&(Span, Packing)> {
         mode.ident
-            .and_then(|m| self.modes.get(m))
-            .and_then(|a| a.packing)
-            .or_else(|| self.root.packing)
+            .and_then(|m| self.modes.get(m)?.packing.as_ref())
+            .or(self.root.packing.as_ref())
     }
 
     /// Indicates the packing state of the type.
-    pub(crate) fn packing_or_default(&self, mode: Mode<'_>) -> Packing {
-        self.packing(mode).map(|p| p.1).unwrap_or_default()
+    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<&Packing> {
+        Some(&self.packing_span(mode)?.1)
     }
 
     /// Default field tag.
@@ -213,7 +227,7 @@ struct InternalVariantAttr {
 impl InternalVariantAttr {
     /// Update packing of type.
     fn set_packing(&mut self, cx: &Ctxt, span: Span, packing: Packing) {
-        if let Some((_, existing)) = self.packing {
+        if let Some((_, existing)) = &self.packing {
             cx.error_span(
                 span,
                 format!(
@@ -249,10 +263,11 @@ impl VariantAttr {
     }
 
     /// Indicates if the tagged state of the variant is set.
-    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<Packing> {
+    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<&Packing> {
         mode.ident
-            .and_then(|m| Some(self.modes.get(m)?.packing?.1))
-            .or_else(|| Some(self.root.packing?.1))
+            .and_then(|m| self.modes.get(m)?.packing.as_ref())
+            .or_else(|| self.root.packing.as_ref())
+            .map(|p| &p.1)
     }
 
     /// Default field tag.
@@ -356,6 +371,12 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             for attribute in attributes.attributes {
                 match attribute {
+                    // parse #[musli(tag = <expr>)]
+                    Attribute::KeyValue(path, value) if path == TAG => {
+                        if let Some(expr) = value_as_expr(cx, TAG, value) {
+                            attr.set_packing(cx, path.span(), Packing::Tagged(Tagging::Tag(expr)));
+                        }
+                    }
                     // parse #[musli(crate = <path>)]
                     Attribute::KeyValue(path, value) if path == CRATE => {
                         if let Some(path) = value_as_path(cx, CRATE, value) {
@@ -706,6 +727,8 @@ impl Parse for TypeAttributes {
 
                         continue;
                     }
+                    // parse #[musli(tag = <expr>)]
+                    path if path == TAG => AttributeValue::Expr(content.parse()?),
                     // parse #[musli(crate = <path>)]
                     path if path == CRATE => AttributeValue::Path(content.parse()?),
                     // parse #[musli(tag_type = <type>)]

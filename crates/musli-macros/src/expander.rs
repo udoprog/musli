@@ -234,9 +234,9 @@ impl<'a> Expander<'a> {
 
         let body = match &self.data {
             Data::Struct(data) => self.encode_struct(mode, data, &mut needs)?,
-            Data::Enum(data) => self.encode_enum(mode, data, &mut needs)?,
+            Data::Enum(data) => self.encode_tagged_enum(mode, data, &mut needs)?,
             Data::Union => {
-                self.cx.error_span(span, "Unions are not supported");
+                self.cx.error_span(span, "musli: unions are not supported");
                 return None;
             }
         };
@@ -425,7 +425,7 @@ impl<'a> Expander<'a> {
         let mut encoders = Vec::with_capacity(st.fields.len());
         let mut test_variables = Vec::with_capacity(st.fields.len());
         let encoder_var = &self.tokens.encoder_var;
-        let packing = self.type_attr.packing_or_default(mode);
+        let packing = self.type_attr.packing(mode).cloned().unwrap_or_default();
 
         for (index, field) in st.fields.iter().enumerate() {
             needs.mark_used();
@@ -443,7 +443,7 @@ impl<'a> Expander<'a> {
                 index,
                 field,
                 &access,
-                packing,
+                &packing,
                 self.type_attr.default_field_tag(mode),
             )?;
 
@@ -459,7 +459,7 @@ impl<'a> Expander<'a> {
             Packing::Transparent => {
                 self.encode_transparent(mode, self.input.ident.span(), &st.fields, needs)?
             }
-            Packing::Tagged => {
+            Packing::Tagged(..) => {
                 needs.mark_used();
                 let encode = quote! { #(#encoders)* };
                 self.encode_field_tag(&st.fields, encode, &field_tests, &test_variables)
@@ -482,13 +482,14 @@ impl<'a> Expander<'a> {
         Some(encode)
     }
 
-    fn encode_enum(
+    /// Encode an internally tagged enum.
+    fn encode_tagged_enum(
         &self,
         mode: Mode<'_>,
         data: &EnumData,
         needs: &mut Needs,
     ) -> Option<TokenStream> {
-        if let Some((span, Packing::Transparent)) = self.type_attr.packing(mode) {
+        if let Some(&(span, Packing::Transparent)) = self.type_attr.packing_span(mode) {
             self.cx.error_span(
                 span,
                 format!("#[{}({})] cannot be used on enums", ATTR, TRANSPARENT),
@@ -499,8 +500,10 @@ impl<'a> Expander<'a> {
         let mut variants = Vec::with_capacity(data.variants.len());
 
         for (variant_index, variant) in data.variants.iter().enumerate() {
-            if let Some(variant) = self.encode_variant(mode, variant_index, variant, needs) {
-                variants.push(variant);
+            if let Some((pattern, encode)) =
+                self.encode_variant(mode, variant_index, variant, needs)
+            {
+                variants.push(quote!(#pattern => { #encode }));
             }
         }
 
@@ -512,7 +515,7 @@ impl<'a> Expander<'a> {
         } else {
             quote! {
                 match self {
-                    #(#variants)*
+                    #(#variants),*
                 }
             }
         })
@@ -566,7 +569,7 @@ impl<'a> Expander<'a> {
             Data::Struct(data) => self.decode_struct(mode, span, data, &mut needs)?,
             Data::Enum(data) => self.decode_enum(mode, data, &mut needs)?,
             Data::Union => {
-                self.cx.error_span(span, "Unions are not supported");
+                self.cx.error_span(span, "musli: unions are not supported");
                 return None;
             }
         };
@@ -618,8 +621,8 @@ impl<'a> Expander<'a> {
         let path = syn::Path::from(syn::Ident::new("Self", self.input.ident.span()));
         let tag_type = self.type_attr.tag_type(mode);
 
-        let body = match self.type_attr.packing_or_default(mode) {
-            Packing::Tagged => {
+        let body = match self.type_attr.packing(mode).cloned().unwrap_or_default() {
+            Packing::Tagged(..) => {
                 needs.mark_used();
                 self.decode_tagged(
                     mode,
@@ -657,7 +660,7 @@ impl<'a> Expander<'a> {
         let type_name = &self.type_name;
         let variant_tag = syn::Ident::new("variant_tag", self.input.ident.span());
 
-        if let Some((span, Packing::Packed)) = self.type_attr.packing(mode) {
+        if let Some(&(span, Packing::Packed)) = self.type_attr.packing_span(mode) {
             self.cx.error_span(
                 span,
                 format!(
@@ -677,7 +680,7 @@ impl<'a> Expander<'a> {
 
         needs.mark_used();
 
-        let type_packing = self.type_attr.packing_or_default(mode);
+        let type_packing = self.type_attr.packing(mode).cloned().unwrap_or_default();
 
         let tag_visitor_output =
             syn::Ident::new("VariantTagVisitorOutput", self.input.ident.span());
@@ -732,8 +735,8 @@ impl<'a> Expander<'a> {
                 .default_field_tag(mode)
                 .unwrap_or_else(|| self.type_attr.default_field_tag(mode));
 
-            let decode = match variant.attr.packing(mode).unwrap_or(type_packing) {
-                Packing::Tagged => self.decode_tagged(
+            let decode = match variant.attr.packing(mode).unwrap_or(&type_packing) {
+                Packing::Tagged(..) => self.decode_tagged(
                     mode,
                     &variant_name,
                     tag_type,
@@ -884,21 +887,22 @@ impl<'a> Expander<'a> {
         }
     }
 
-    /// Setup encoding for a single variant.
+    /// Setup encoding for a single variant. that is externally tagged.
     fn encode_variant(
         &self,
         mode: Mode<'_>,
         variant_index: usize,
         variant: &VariantData,
         needs: &mut Needs,
-    ) -> Option<TokenStream> {
+    ) -> Option<(TokenStream, TokenStream)> {
         let span = variant.span;
 
         let encoder_var = &self.tokens.encoder_var;
         let packing = variant
             .attr
             .packing(mode)
-            .or_else(|| Some(self.type_attr.packing(mode)?.1))
+            .or_else(|| self.type_attr.packing(mode))
+            .cloned()
             .unwrap_or_default();
 
         let default_field_tag = variant
@@ -906,13 +910,13 @@ impl<'a> Expander<'a> {
             .default_field_tag(mode)
             .unwrap_or_else(|| self.type_attr.default_field_tag(mode));
 
-        let (mut encode, patterns) = match packing {
-            Packing::Tagged => {
+        let (mut encode, patterns) = match &packing {
+            Packing::Tagged(..) => {
                 let (encode, patterns, tests) = self.encode_variant_fields(
                     mode,
                     &variant.fields,
                     needs,
-                    packing,
+                    &packing,
                     default_field_tag,
                 )?;
 
@@ -925,7 +929,7 @@ impl<'a> Expander<'a> {
                     mode,
                     &variant.fields,
                     needs,
-                    packing,
+                    &packing,
                     default_field_tag,
                 )?;
                 (encode, patterns)
@@ -933,7 +937,7 @@ impl<'a> Expander<'a> {
             Packing::Transparent => self.transparent_variant(mode, span, &variant.fields, needs)?,
         };
 
-        if let Packing::Tagged = self.type_attr.packing_or_default(mode) {
+        if let Packing::Tagged(..) = self.type_attr.packing(mode).cloned().unwrap_or_default() {
             needs.mark_used();
 
             let Tokens {
@@ -972,9 +976,8 @@ impl<'a> Expander<'a> {
         let mut path = syn::Path::from(syn::Ident::new("Self", span));
         path.segments.push(variant.ident.clone().into());
 
-        Some(quote! {
-            #path { #(#patterns),* } => { #encode }
-        })
+        let pattern = quote!(#path { #(#patterns),* });
+        Some((pattern, encode))
     }
 
     fn encode_variant_fields(
@@ -982,7 +985,7 @@ impl<'a> Expander<'a> {
         mode: Mode<'_>,
         fields: &[FieldData],
         needs: &mut Needs,
-        tagged: Packing,
+        packing: &Packing,
         default_field_tag: DefaultTag,
     ) -> Option<(TokenStream, Vec<TokenStream>, Vec<syn::Ident>)> {
         let mut field_tests = Vec::with_capacity(fields.len());
@@ -1007,7 +1010,7 @@ impl<'a> Expander<'a> {
             };
 
             let (encoder, skip) =
-                self.encode_field(mode, index, field, &access, tagged, default_field_tag)?;
+                self.encode_field(mode, index, field, &access, packing, default_field_tag)?;
             encoders.push(encoder);
 
             if let Some((decl, test)) = skip {
@@ -1016,8 +1019,8 @@ impl<'a> Expander<'a> {
             }
         }
 
-        let encode = match tagged {
-            Packing::Tagged => {
+        let encode = match packing {
+            Packing::Tagged(..) => {
                 quote! {
                     #(#field_tests)*
                     #(#encoders)*
@@ -1050,15 +1053,15 @@ impl<'a> Expander<'a> {
         index: usize,
         field: &FieldData,
         access: &TokenStream,
-        tagged: Packing,
+        packing: &Packing,
         default_field_tag: DefaultTag,
     ) -> Option<(TokenStream, Option<(TokenStream, syn::Ident)>)> {
         let encoder_var = &self.tokens.encoder_var;
 
         let (span, encode_path) = field.attr.encode_path(mode, field.span);
 
-        let body = match tagged {
-            Packing::Tagged | Packing::Transparent => {
+        let body = match packing {
+            Packing::Tagged(..) | Packing::Transparent => {
                 let (tag, _) = self.expand_tag(
                     field.span,
                     field.attr.rename(mode),
