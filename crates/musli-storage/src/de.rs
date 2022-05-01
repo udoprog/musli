@@ -6,6 +6,7 @@ use musli::de::{
     Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
+use musli::never::NeverDecoder;
 use musli_common::reader::PosReader;
 
 /// A very simple decoder suitable for storage decoding.
@@ -54,6 +55,7 @@ where
     L: UsizeEncoding,
 {
     type Error = R::Error;
+    type Buffer = NeverDecoder<R::Error>;
     type Pack = Self;
     type Some = Self;
     type Sequence = LimitedStorageDecoder<R, I, L>;

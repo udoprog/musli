@@ -24,14 +24,14 @@ mod value_visitor;
 
 pub use self::decode::Decode;
 pub use self::decoder::{
-    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder,
+    AsDecoder, Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder,
 };
 pub use self::number_visitor::NumberVisitor;
 pub use self::type_hint::{LengthHint, NumberHint, TypeHint};
 pub use self::value_visitor::ValueVisitor;
 use crate::mode::Mode;
 
-/// An owned decoder.
+/// Decode to a `'static` value.
 pub trait DecodeOwned<M>: for<'de> Decode<'de, M>
 where
     M: Mode,

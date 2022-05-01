@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::en::Encode;
 use crate::error::Error;
-use crate::expecting::{self, Expecting, InvalidType};
+use crate::expecting::{self, Expecting};
 use crate::mode::Mode;
 
 /// Trait governing how to encode a sequence.
@@ -201,8 +201,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_unit(self) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Unit,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Unit,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -229,8 +229,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_bool(self, _: bool) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Bool,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Bool,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -257,8 +257,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_char(self, _: char) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Char,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Char,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -285,8 +285,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_u8(self, _: u8) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Unsigned8,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Unsigned8,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -313,8 +313,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_u16(self, _: u16) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Unsigned16,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Unsigned16,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -341,8 +341,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_u32(self, _: u32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Unsigned32,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Unsigned32,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -369,8 +369,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_u64(self, _: u64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Unsigned64,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Unsigned64,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -397,8 +397,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_u128(self, _: u128) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Unsigned128,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Unsigned128,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -425,8 +425,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_i8(self, _: i8) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Signed8,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Signed8,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -453,8 +453,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_i16(self, _: i16) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Signed16,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Signed16,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -481,8 +481,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_i32(self, _: i32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Signed32,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Signed32,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -509,8 +509,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_i64(self, _: i64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Signed64,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Signed64,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -537,8 +537,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_i128(self, _: i128) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Signed128,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Signed128,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -565,8 +565,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_usize(self, _: usize) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Usize,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Usize,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -593,8 +593,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_isize(self, _: isize) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Isize,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Isize,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -621,8 +621,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_f32(self, _: f32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Float32,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Float32,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -649,8 +649,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_f64(self, _: f64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Float64,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Float64,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -677,8 +677,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_array<const N: usize>(self, _: [u8; N]) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Array,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Array,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -705,8 +705,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_bytes(self, _: &[u8]) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Bytes,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Bytes,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -741,8 +741,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_bytes_vectored(self, _: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Bytes,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Bytes,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -769,8 +769,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_string(self, _: &str) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::String,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::String,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -804,8 +804,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_some(self) -> Result<Self::Some, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Option,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Option,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -839,8 +839,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Option,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Option,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -877,8 +877,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Pack,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Pack,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -912,8 +912,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_sequence(self, _: usize) -> Result<Self::Sequence, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Sequence,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Sequence,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -942,8 +942,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Tuple,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Tuple,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -951,8 +951,8 @@ pub trait Encoder: Sized {
     /// Encode a map with a known length.
     #[inline]
     fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Map,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Map,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -984,8 +984,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Struct,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Struct,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -1037,8 +1037,8 @@ pub trait Encoder: Sized {
     /// ```
     #[inline]
     fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
-        Err(Self::Error::message(InvalidType::new(
-            expecting::Variant,
+        Err(Self::Error::message(expecting::invalid_type(
+            &expecting::Variant,
             &ExpectingWrapper::new(self),
         )))
     }

@@ -5,6 +5,15 @@ use core::fmt;
 pub trait Expecting {
     /// Generated the actual message of what we expected.
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
+    /// Return a type that can be formatted from `self`.
+    #[doc(hidden)]
+    fn format(&self) -> &dyn Expecting
+    where
+        Self: Sized,
+    {
+        self
+    }
 }
 
 impl Expecting for str {
@@ -20,53 +29,48 @@ impl fmt::Display for &dyn Expecting {
     }
 }
 
-pub(crate) struct InvalidType<'a, A> {
-    actual: A,
-    expecting: &'a dyn Expecting,
-}
+struct FormatFn<T>(T);
 
-impl<'a, A> InvalidType<'a, A> {
-    pub(crate) const fn new(actual: A, expecting: &'a dyn Expecting) -> Self {
-        Self { actual, expecting }
-    }
-}
-
-impl<'a, A> fmt::Display for InvalidType<'a, A>
+impl<T> fmt::Display for FormatFn<T>
 where
-    A: fmt::Display,
+    T: Fn(&mut fmt::Formatter<'_>) -> fmt::Result,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "invalid type: got {}, but expected {}",
-            self.actual, self.expecting
-        )
+        (self.0)(f)
     }
 }
 
-pub(crate) struct BadVisitorType<'a, A> {
-    actual: A,
-    expecting: &'a dyn Expecting,
-}
-
-impl<'a, A> BadVisitorType<'a, A> {
-    pub(crate) const fn new(actual: A, expecting: &'a dyn Expecting) -> Self {
-        Self { actual, expecting }
-    }
-}
-
-impl<'a, 'de, A> fmt::Display for BadVisitorType<'a, A>
+fn format_fn<T>(function: T) -> FormatFn<T>
 where
-    A: fmt::Display,
+    T: Fn(&mut fmt::Formatter<'_>) -> fmt::Result,
 {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+    FormatFn(function)
+}
+
+/// Format an invalid type message.
+pub(crate) fn invalid_type<'a>(
+    actual: &'a dyn fmt::Display,
+    expected: &'a dyn Expecting,
+) -> impl fmt::Display + 'a {
+    format_fn(move |f| {
+        write! {
             f,
-            "bad reference type: got: {}, expected: {}",
-            self.actual, self.expecting
-        )
-    }
+            "invalid type: got {actual}, but expected {expected}"
+        }
+    })
+}
+
+/// Format a bad visitor type message.
+pub(crate) fn bad_visitor_type<'a>(
+    actual: &'a dyn fmt::Display,
+    expected: &'a dyn Expecting,
+) -> impl fmt::Display + 'a {
+    format_fn(move |f| {
+        write! {
+            f,
+            "bad reference type: got: {actual}, expected: {expected}",
+        }
+    })
 }
 
 macro_rules! expect {

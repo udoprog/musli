@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::error::Error;
-use crate::expecting::{self, BadVisitorType, Expecting};
+use crate::expecting::{self, Expecting};
 
 /// A visitor capable of processing arbitrary number values.
 pub trait NumberVisitor: Sized {
@@ -18,8 +18,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `u8`.
     #[inline]
     fn visit_u8(self, _: u8) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Unsigned8,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Unsigned8,
             &NumberExpecting(self),
         )))
     }
@@ -27,8 +27,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `u16`.
     #[inline]
     fn visit_u16(self, _: u16) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Unsigned16,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Unsigned16,
             &NumberExpecting(self),
         )))
     }
@@ -36,8 +36,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `u32`.
     #[inline]
     fn visit_u32(self, _: u32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Unsigned32,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Unsigned32,
             &NumberExpecting(self),
         )))
     }
@@ -45,8 +45,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `u64`.
     #[inline]
     fn visit_u64(self, _: u64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Unsigned64,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Unsigned64,
             &NumberExpecting(self),
         )))
     }
@@ -54,8 +54,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `u128`.
     #[inline]
     fn visit_u128(self, _: u128) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Unsigned128,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Unsigned128,
             &NumberExpecting(self),
         )))
     }
@@ -63,8 +63,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `i8`.
     #[inline]
     fn visit_i8(self, _: i8) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Signed8,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Signed8,
             &NumberExpecting(self),
         )))
     }
@@ -72,8 +72,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `i16`.
     #[inline]
     fn visit_i16(self, _: i16) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Signed16,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Signed16,
             &NumberExpecting(self),
         )))
     }
@@ -81,8 +81,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `i32`.
     #[inline]
     fn visit_i32(self, _: i32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Signed32,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Signed32,
             &NumberExpecting(self),
         )))
     }
@@ -90,8 +90,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `i64`.
     #[inline]
     fn visit_i64(self, _: i64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Signed64,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Signed64,
             &NumberExpecting(self),
         )))
     }
@@ -99,8 +99,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `i128`.
     #[inline]
     fn visit_i128(self, _: i128) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Signed128,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Signed128,
             &NumberExpecting(self),
         )))
     }
@@ -108,8 +108,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `f32`.
     #[inline]
     fn visit_f32(self, _: f32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Float32,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Float32,
             &NumberExpecting(self),
         )))
     }
@@ -117,8 +117,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `f64`.
     #[inline]
     fn visit_f64(self, _: f64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Float64,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Float64,
             &NumberExpecting(self),
         )))
     }
@@ -126,8 +126,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `usize`.
     #[inline]
     fn visit_usize(self, _: usize) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Usize,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Usize,
             &NumberExpecting(self),
         )))
     }
@@ -135,8 +135,8 @@ pub trait NumberVisitor: Sized {
     /// Visit `isize`.
     #[inline]
     fn visit_isize(self, _: isize) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::Isize,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::Isize,
             &NumberExpecting(self),
         )))
     }

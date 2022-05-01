@@ -3,8 +3,11 @@
 
 use core::{fmt, marker};
 
-use crate::de::{Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder};
+use crate::de::{
+    AsDecoder, Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder,
+};
 use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use crate::error::Error;
 
 enum NeverMarker {}
 
@@ -52,6 +55,7 @@ where
     T: Decoder<'de>,
 {
     type Error = T::Error;
+    type Buffer = NeverDecoder<T::Error>;
     type Pack = Self;
     type Sequence = Self;
     type Tuple = Self;
@@ -62,6 +66,62 @@ where
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self._never {}
+    }
+}
+
+impl<T> AsDecoder for Never<T>
+where
+    T: Decoder<'static>,
+{
+    type Error = T::Error;
+
+    type Decoder<'this> = NeverDecoder<T::Error>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+        match self._never {}
+    }
+}
+
+/// A fake [Decoder] implementation that can never be instantiated.
+#[non_exhaustive]
+pub struct NeverDecoder<E> {
+    _never: NeverMarker,
+    _marker: marker::PhantomData<E>,
+}
+
+impl<'de, E> Decoder<'de> for NeverDecoder<E>
+where
+    E: Error,
+{
+    type Error = E;
+    type Buffer = Self;
+    type Some = Never<Self>;
+    type Pack = Never<Self>;
+    type Sequence = Never<Self>;
+    type Tuple = Never<Self>;
+    type Map = Never<Self>;
+    type Struct = Never<Self>;
+    type Variant = Never<Self>;
+
+    #[inline]
+    fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self._never {}
+    }
+}
+
+impl<E> AsDecoder for NeverDecoder<E>
+where
+    E: Error,
+{
+    type Error = E;
+    type Decoder<'this> = Never<NeverDecoder<E>> where Self: 'this;
+
+    #[inline]
+    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         match self._never {}
     }
 }

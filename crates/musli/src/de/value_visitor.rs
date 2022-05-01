@@ -2,7 +2,7 @@ use core::borrow::Borrow;
 use core::fmt;
 
 use crate::error::Error;
-use crate::expecting::{self, BadVisitorType, Expecting};
+use crate::expecting::{self, Expecting};
 use crate::no_std::ToOwned;
 
 /// A visitor for data where it might be possible to borrow it without copying
@@ -46,8 +46,8 @@ pub trait ValueVisitor<'de>: Sized {
     /// Which might require additional decoding work.
     #[inline]
     fn visit_any(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(BadVisitorType::new(
-            expecting::AnyValue,
+        Err(Self::Error::message(expecting::bad_visitor_type(
+            &expecting::AnyValue,
             &ValueVisitorExpecting(self),
         )))
     }

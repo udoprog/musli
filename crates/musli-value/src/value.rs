@@ -1,7 +1,7 @@
 use core::marker;
 
 use musli::de::{
-    Decode, Decoder, LengthHint, NumberHint, NumberVisitor, PairDecoder, PairsDecoder,
+    AsDecoder, Decode, Decoder, LengthHint, NumberHint, NumberVisitor, PairDecoder, PairsDecoder,
     SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::en::{Encode, Encoder, PairsEncoder, SequenceEncoder, VariantEncoder};
@@ -9,6 +9,7 @@ use musli::error::Error;
 use musli::mode::Mode;
 
 use crate::de::ValueDecoder;
+use crate::error::ValueError;
 
 /// A dynamic value capable of representing any [Müsli] type whether it be
 /// complex or simple.
@@ -402,5 +403,15 @@ where
                 encoder.insert::<M, _, _>(tag, variant)
             }
         }
+    }
+}
+
+impl AsDecoder for Value {
+    type Error = ValueError;
+    type Decoder<'this> = ValueDecoder<'this> where Self: 'this;
+
+    #[inline]
+    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+        Ok(self.decoder())
     }
 }

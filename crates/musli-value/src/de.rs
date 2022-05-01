@@ -2,9 +2,10 @@ use core::fmt;
 use core::slice;
 
 use musli::de::{
-    Decoder, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, TypeHint,
-    ValueVisitor, VariantDecoder,
+    AsDecoder, Decoder, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
+    TypeHint, ValueVisitor, VariantDecoder,
 };
+use musli::mode::Mode;
 
 use crate::error::ValueError;
 use crate::value::{Number, Value};
@@ -35,6 +36,7 @@ macro_rules! ensure {
 
 impl<'de> Decoder<'de> for ValueDecoder<'de> {
     type Error = ValueError;
+    type Buffer = Self;
     type Some = Self;
     type Pack = IterValueDecoder<'de>;
     type Sequence = IterValueDecoder<'de>;
@@ -50,6 +52,14 @@ impl<'de> Decoder<'de> for ValueDecoder<'de> {
     #[inline]
     fn type_hint(&mut self) -> Result<TypeHint, Self::Error> {
         Ok(self.value.type_hint())
+    }
+
+    #[inline]
+    fn decode_buffer<M>(self) -> Result<Self::Buffer, Self::Error>
+    where
+        M: Mode,
+    {
+        Ok(self)
     }
 
     #[inline]
@@ -212,6 +222,16 @@ impl<'de> Decoder<'de> for ValueDecoder<'de> {
         ensure!(self, hint, ExpectedVariant(hint), Value::Variant(st) => {
             Ok(IterValueVariantDecoder::new(st))
         })
+    }
+}
+
+impl<'a> AsDecoder for ValueDecoder<'a> {
+    type Error = ValueError;
+    type Decoder<'this> = ValueDecoder<'this> where Self: 'this;
+
+    #[inline]
+    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+        Ok(ValueDecoder::new(self.value))
     }
 }
 

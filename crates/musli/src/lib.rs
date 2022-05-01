@@ -236,6 +236,7 @@ mod no_std;
 #[cfg(feature = "std")]
 #[path = "std.rs"]
 mod no_std;
+pub mod utils;
 
 pub use self::de::{Decode, Decoder};
 pub use self::en::{Encode, Encoder};

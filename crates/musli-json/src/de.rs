@@ -8,7 +8,8 @@ use musli::de::{
     SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
-use musli::never::Never;
+use musli::mode::Mode;
+use musli::never::{Never, NeverDecoder};
 
 use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
@@ -107,6 +108,10 @@ where
     P: Parser<'de>,
 {
     type Error = ParseError;
+    #[cfg(not(feature = "std"))]
+    type Buffer = Never<Self>;
+    #[cfg(feature = "std")]
+    type Buffer = musli_value::Value;
     type Pack = Never<Self>;
     type Sequence = JsonSequenceDecoder<'a, P>;
     type Tuple = JsonSequenceDecoder<'a, P>;
@@ -132,6 +137,16 @@ where
             Token::False => TypeHint::Bool,
             _ => TypeHint::Any,
         })
+    }
+
+    #[cfg(feature = "std")]
+    #[inline]
+    fn decode_buffer<M>(self) -> Result<Self::Buffer, Self::Error>
+    where
+        M: Mode,
+    {
+        use musli::de::Decode;
+        Decode::<M>::decode(self)
     }
 
     #[inline]
@@ -416,6 +431,7 @@ where
     P: Parser<'de>,
 {
     type Error = ParseError;
+    type Buffer = NeverDecoder<ParseError>;
     type Pack = Never<Self>;
     type Sequence = Never<Self>;
     type Tuple = Never<Self>;
