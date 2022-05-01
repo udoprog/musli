@@ -159,62 +159,62 @@ where
 
     #[inline]
     fn decode_u8(mut self) -> Result<u8, Self::Error> {
-        integer::decode_unsigned(&mut self.parser)
+        integer::parse_unsigned(&mut self.parser)
     }
 
     #[inline]
     fn decode_u16(mut self) -> Result<u16, Self::Error> {
-        integer::decode_unsigned(&mut self.parser)
+        integer::parse_unsigned(&mut self.parser)
     }
 
     #[inline]
     fn decode_u32(mut self) -> Result<u32, Self::Error> {
-        integer::decode_unsigned(&mut self.parser)
+        integer::parse_unsigned(&mut self.parser)
     }
 
     #[inline]
     fn decode_u64(mut self) -> Result<u64, Self::Error> {
-        integer::decode_unsigned(&mut self.parser)
+        integer::parse_unsigned(&mut self.parser)
     }
 
     #[inline]
     fn decode_u128(mut self) -> Result<u128, Self::Error> {
-        integer::decode_unsigned(&mut self.parser)
+        integer::parse_unsigned(&mut self.parser)
     }
 
     #[inline]
     fn decode_i8(mut self) -> Result<i8, Self::Error> {
-        integer::decode_signed(&mut self.parser)
+        integer::parse_signed(&mut self.parser)
     }
 
     #[inline]
     fn decode_i16(mut self) -> Result<i16, Self::Error> {
-        integer::decode_signed(&mut self.parser)
+        integer::parse_signed(&mut self.parser)
     }
 
     #[inline]
     fn decode_i32(mut self) -> Result<i32, Self::Error> {
-        integer::decode_signed(&mut self.parser)
+        integer::parse_signed(&mut self.parser)
     }
 
     #[inline]
     fn decode_i64(mut self) -> Result<i64, Self::Error> {
-        integer::decode_signed(&mut self.parser)
+        integer::parse_signed(&mut self.parser)
     }
 
     #[inline]
     fn decode_i128(mut self) -> Result<i128, Self::Error> {
-        integer::decode_signed(&mut self.parser)
+        integer::parse_signed(&mut self.parser)
     }
 
     #[inline]
     fn decode_usize(mut self) -> Result<usize, Self::Error> {
-        integer::decode_unsigned(&mut self.parser)
+        integer::parse_unsigned(&mut self.parser)
     }
 
     #[inline]
     fn decode_isize(mut self) -> Result<isize, Self::Error> {
-        integer::decode_signed(&mut self.parser)
+        integer::parse_signed(&mut self.parser)
     }
 
     #[inline]
@@ -368,7 +368,7 @@ where
 
     #[inline]
     fn visit_any(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        integer::decode_unsigned(&mut &mut SliceParser::new(bytes))
+        integer::parse_unsigned(&mut &mut SliceParser::new(bytes))
     }
 }
 
@@ -399,7 +399,7 @@ where
 
     #[inline]
     fn visit_any(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        integer::decode_signed(&mut SliceParser::new(bytes))
+        integer::parse_signed(&mut SliceParser::new(bytes))
     }
 }
 

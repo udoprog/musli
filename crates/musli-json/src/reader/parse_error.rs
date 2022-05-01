@@ -2,6 +2,7 @@ use core::fmt;
 
 use musli::error::Error;
 
+use crate::reader::integer;
 use crate::reader::Token;
 
 /// The span of an error.
@@ -56,8 +57,6 @@ pub(crate) enum ParseErrorKind {
     BufferOverflow,
     UnexpectedHexEscapeEnd,
     InvalidUnicode,
-    NumericalOverflow,
-    ExpectedWholeNumber,
     InvalidNumeric,
     ExpectedNull,
     ExpectedTrue,
@@ -65,6 +64,7 @@ pub(crate) enum ParseErrorKind {
     ExpectedBool(Token),
     ExpectedValue(Token),
     ParseFloat(lexical::Error),
+    IntegerError(integer::Error),
     Eof,
     Custom,
 }
@@ -137,8 +137,6 @@ impl fmt::Display for ParseError {
                 write!(f, "unexpected end of hex escape (at {span})")
             }
             ParseErrorKind::InvalidUnicode => write!(f, "invalid unicode (at {span})"),
-            ParseErrorKind::NumericalOverflow => write!(f, "numerical overflow (at {span})"),
-            ParseErrorKind::ExpectedWholeNumber => write!(f, "expected whole number (at {span})"),
             ParseErrorKind::InvalidNumeric => write!(f, "not numeric (at {span})"),
             ParseErrorKind::ExpectedNull => write!(f, "expected `null` (at {span})"),
             ParseErrorKind::ExpectedTrue => write!(f, "expected `true` (at {span})"),
@@ -151,6 +149,9 @@ impl fmt::Display for ParseError {
             }
             ParseErrorKind::ParseFloat(error) => {
                 write!(f, "expected float, got {error} (at {span})")
+            }
+            ParseErrorKind::IntegerError(error) => {
+                write!(f, "expected integer, got {error} (at {span})")
             }
             ParseErrorKind::Eof => write!(f, "eof while parsing (at {span})"),
             ParseErrorKind::Custom => {

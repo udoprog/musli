@@ -1,5 +1,149 @@
+use core::fmt;
+
 pub(crate) use self::traits::{Signed, Unsigned};
 use crate::reader::{ParseError, ParseErrorKind, Parser};
+
+/// Error when computing integer.
+#[derive(Debug)]
+pub(crate) enum Error {
+    /// Arithmetic overflow.
+    Overflow,
+    /// Decimal number encountered.
+    Decimal,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Overflow => write!(f, "arithmetic overflow"),
+            Error::Decimal => write!(f, "decimal number"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
+
+/// Fully deconstructed parts of a signed number.
+pub(crate) struct SignedParts<T>
+where
+    T: Signed,
+{
+    /// Indicates if the number is negative.
+    is_negative: bool,
+    /// Parts of the unsigned component of the number.
+    parts: Parts<T::Unsigned>,
+}
+
+impl<T> SignedParts<T>
+where
+    T: Signed,
+{
+    fn compute(self) -> Result<T, Error> {
+        let Self { is_negative, parts } = self;
+
+        let value = parts.compute()?;
+
+        match if is_negative {
+            value.negate()
+        } else {
+            value.signed()
+        } {
+            Some(value) => Ok(value),
+            None => Err(Error::Overflow),
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct Exponent {
+    is_negative: bool,
+    value: u32,
+}
+
+/// The mantissa, or anything after a decimal point.
+pub(crate) struct Mantissa<T> {
+    /// The value of the mantissa.
+    value: T,
+    /// The exponent of the mantissa.
+    exp: u32,
+}
+
+impl<T> Default for Mantissa<T>
+where
+    T: Unsigned,
+{
+    fn default() -> Self {
+        Self {
+            value: T::ZERO,
+            exp: 0u32,
+        }
+    }
+}
+
+/// Fully deconstructed parts of an unsigned number.
+pub(crate) struct Parts<T> {
+    /// The base, or everything before a decimal point.
+    base: T,
+    /// The mantissa, or anything after a decimal point.
+    m: Mantissa<T>,
+    /// The exponent of the number.
+    e: Exponent,
+}
+
+impl<T> Parts<T>
+where
+    T: Unsigned,
+{
+    fn compute(self) -> Result<T, Error> {
+        macro_rules! check {
+            ($expr:expr, $kind:ident) => {
+                match $expr {
+                    Some(value) => value,
+                    None => return Err(Error::$kind),
+                }
+            };
+        }
+
+        let Self { mut base, m, e } = self;
+
+        if e.value == 0 {
+            if !m.value.is_zero() {
+                return Err(Error::Decimal);
+            }
+
+            return Ok(base);
+        }
+
+        if !e.is_negative {
+            // Decoding the specified mantissa would result in a fractional number.
+            let mantissa_exp = check!(e.value.checked_sub(m.exp), Decimal);
+
+            if !base.is_zero() {
+                base = check!(base.checked_pow10(e.value), Overflow);
+            }
+
+            let base = check! {
+                m.value
+                    .checked_pow10(mantissa_exp)
+                    .and_then(|m| base.checked_add(m)),
+                Overflow
+            };
+
+            return Ok(base);
+        }
+
+        if !m.value.is_zero() {
+            return Err(Error::Decimal);
+        }
+
+        for _ in 0..e.value {
+            base = check!(base.div_mod_ten(), Decimal);
+        }
+
+        Ok(base)
+    }
+}
 
 /// Implementation to skip over a well-formed JSON number.
 pub(crate) fn skip_number<'de, P>(p: &mut P) -> Result<(), ParseError>
@@ -50,8 +194,25 @@ where
     Ok(())
 }
 
-#[inline]
-pub(crate) fn decode_unsigned<'de, T, P>(p: &mut P) -> Result<T, ParseError>
+/// Fully parse an unsigned value.
+pub(crate) fn parse_unsigned<'de, T, P>(p: &mut P) -> Result<T, ParseError>
+where
+    T: Unsigned,
+    P: ?Sized + Parser<'de>,
+{
+    let start = p.pos();
+
+    match decode_unsigned(p)?.compute() {
+        Ok(value) => Ok(value),
+        Err(error) => Err(ParseError::spanned(
+            start,
+            p.pos(),
+            ParseErrorKind::IntegerError(error),
+        )),
+    }
+}
+
+pub(crate) fn decode_unsigned<'de, T, P>(p: &mut P) -> Result<Parts<T>, ParseError>
 where
     T: Unsigned,
     P: ?Sized + Parser<'de>,
@@ -60,23 +221,51 @@ where
     decode_unsigned_inner(p, start)
 }
 
+/// Decode a signed integer.
+pub(crate) fn decode_signed<'de, T, P>(p: &mut P) -> Result<SignedParts<T>, ParseError>
+where
+    T: Signed,
+    P: ?Sized + Parser<'de>,
+{
+    let start = p.pos();
+
+    let is_negative = if p.peek_byte()? == Some(b'-') {
+        p.skip(1)?;
+        true
+    } else {
+        false
+    };
+
+    let parts = decode_unsigned_inner::<T::Unsigned, _>(p, start)?;
+    Ok(SignedParts { is_negative, parts })
+}
+
+/// Fully parse a signed value.
+pub(crate) fn parse_signed<'de, T, P>(p: &mut P) -> Result<T, ParseError>
+where
+    T: Signed,
+    P: ?Sized + Parser<'de>,
+{
+    let start = p.pos();
+
+    match decode_signed(p)?.compute() {
+        Ok(value) => Ok(value),
+        Err(error) => Err(ParseError::spanned(
+            start,
+            p.pos(),
+            ParseErrorKind::IntegerError(error),
+        )),
+    }
+}
+
 /// Generically decode a single (whole) integer from a stream of bytes abiding
 /// by JSON convention for format.
-pub(crate) fn decode_unsigned_inner<'de, T, P>(p: &mut P, start: u32) -> Result<T, ParseError>
+fn decode_unsigned_inner<'de, T, P>(p: &mut P, start: u32) -> Result<Parts<T>, ParseError>
 where
     T: Unsigned,
     P: ?Sized + Parser<'de>,
 {
-    macro_rules! check {
-        ($expr:expr, $kind:ident) => {
-            match $expr {
-                Some(value) => value,
-                None => return Err(ParseError::spanned(start, p.pos(), ParseErrorKind::$kind)),
-            }
-        };
-    }
-
-    let mut base = match p.read_byte()? {
+    let base = match p.read_byte()? {
         b'0' => T::ZERO,
         b if is_digit_nonzero(b) => {
             let mut base = T::from_byte(b - b'0');
@@ -96,118 +285,74 @@ where
         }
     };
 
-    let mut mantissa = T::ZERO;
-    let mut mantissa_exp = 0u32;
+    let mut m = Mantissa::<T>::default();
 
-    if p.peek_byte()? == Some(b'.') {
+    if let Some(b'.') = p.peek_byte()? {
         p.skip(1)?;
 
         // NB: we use unchecked operations over mantissa_exp since the mantissa
         // for any supported type would overflow long before this.
-        mantissa_exp += decode_zeros(p)?;
+        m.exp += decode_zeros(p)?;
 
-        // Stored zeros so that the last set of zeros can be ignored.
+        // Stored zeros so that the last segment of zeros can be ignored since
+        // they have no bearing on the value of the integer.
         let mut zeros = 0;
 
         while let Some(true) = p.peek_byte()?.map(is_digit) {
+            // Accrue accumulated zeros.
             if zeros > 0 {
-                mantissa_exp += zeros;
-                mantissa = check! {
-                    mantissa.checked_pow10(zeros),
-                    NumericalOverflow
+                m.exp += zeros;
+                m.value = match m.value.checked_pow10(zeros) {
+                    Some(mantissa) => mantissa,
+                    None => {
+                        return Err(ParseError::spanned(
+                            start,
+                            p.pos(),
+                            ParseErrorKind::IntegerError(Error::Overflow),
+                        ))
+                    }
                 };
             }
 
-            mantissa_exp += 1;
-            mantissa = digit(mantissa, p, start)?;
+            m.exp += 1;
+            m.value = digit(m.value, p, start)?;
             zeros = decode_zeros(p)?;
         }
     }
 
-    if matches!(p.peek_byte()?, Some(b'e') | Some(b'E')) {
+    let e = if matches!(p.peek_byte()?, Some(b'e' | b'E')) {
         p.skip(1)?;
-        base = decode_exponent(p, base, mantissa, mantissa_exp, start)?;
-    } else if !mantissa.is_zero() {
-        return Err(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::ExpectedWholeNumber,
-        ));
-    }
+        decode_exponent(p, start)?
+    } else {
+        Exponent::default()
+    };
 
-    Ok(base)
+    Ok(Parts { base, m, e })
 }
 
-fn decode_exponent<'de, T, P>(
-    p: &mut P,
-    mut base: T,
-    mantissa: T,
-    mantissa_exp: u32,
-    start: u32,
-) -> Result<T, ParseError>
+/// Decode an exponent.
+fn decode_exponent<'de, P>(p: &mut P, start: u32) -> Result<Exponent, ParseError>
 where
-    T: Unsigned,
     P: ?Sized + Parser<'de>,
 {
-    macro_rules! check {
-        ($expr:expr, $kind:ident) => {
-            match $expr {
-                Some(value) => value,
-                None => return Err(ParseError::spanned(start, p.pos(), ParseErrorKind::$kind)),
-            }
-        };
-    }
+    let mut e = Exponent::default();
 
-    macro_rules! overflow {
-        ($expr:expr) => {
-            check!($expr, NumericalOverflow)
-        };
-    }
-
-    let is_negative = match p.peek_byte()? {
+    match p.peek_byte()? {
         Some(b'-') => {
             p.skip(1)?;
-            true
+            e.is_negative = true
         }
         Some(b'+') => {
             p.skip(1)?;
-            false
         }
-        _ => false,
+        _ => (),
     };
 
-    let mut exp = 0u32;
-
     while let Some(true) = p.peek_byte()?.map(is_digit) {
-        exp = digit(exp, p, start)?;
+        e.value = digit(e.value, p, start)?;
     }
 
-    if !is_negative {
-        // Decoding the specified mantissa would result in a fractional number.
-        let mantissa_exp = check!(exp.checked_sub(mantissa_exp), ExpectedWholeNumber);
-
-        if !base.is_zero() {
-            base = overflow!(base.checked_pow10(exp));
-        }
-
-        return Ok(overflow!(mantissa
-            .checked_pow10(mantissa_exp)
-            .and_then(|m| base.checked_add(m))));
-    }
-
-    if !mantissa.is_zero() {
-        return Err(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::ExpectedWholeNumber,
-        ));
-    }
-
-    for _ in 0..exp {
-        base = check!(base.div_mod_ten(), ExpectedWholeNumber);
-    }
-
-    Ok(base)
+    Ok(e)
 }
 
 /// Decode a single digit into `out`.
@@ -223,7 +368,7 @@ where
             return Err(ParseError::spanned(
                 start,
                 p.pos(),
-                ParseErrorKind::NumericalOverflow,
+                ParseErrorKind::IntegerError(Error::Overflow),
             ));
         }
     };
@@ -246,37 +391,6 @@ where
     Ok(count)
 }
 
-/// Decode a signed integer.
-pub(crate) fn decode_signed<'de, T, P>(p: &mut P) -> Result<T, ParseError>
-where
-    T: Signed,
-    P: ?Sized + Parser<'de>,
-{
-    let start = p.pos();
-
-    let is_negative = if p.peek_byte()? == Some(b'-') {
-        p.skip(1)?;
-        true
-    } else {
-        false
-    };
-
-    let unsigned = decode_unsigned_inner::<T::Unsigned, _>(p, start)?;
-
-    match if is_negative {
-        unsigned.negate()
-    } else {
-        unsigned.signed()
-    } {
-        Some(value) => Ok(value),
-        None => Err(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::NumericalOverflow,
-        )),
-    }
-}
-
 // Test if b is numeric.
 #[inline]
 fn is_digit(b: u8) -> bool {
@@ -290,9 +404,10 @@ fn is_digit_nonzero(b: u8) -> bool {
 }
 
 mod traits {
+    use core::fmt;
     use core::ops::{Add, Not};
 
-    pub(crate) trait Unsigned: Sized + Add<Self, Output = Self> {
+    pub(crate) trait Unsigned: Sized + fmt::Debug + Add<Self, Output = Self> {
         type Signed: Signed<Unsigned = Self>;
 
         const ZERO: Self;
@@ -318,7 +433,7 @@ mod traits {
         fn signed(self) -> Option<Self::Signed>;
     }
 
-    pub(crate) trait Signed: Sized {
+    pub(crate) trait Signed: Sized + fmt::Debug {
         type Unsigned: Unsigned<Signed = Self>;
 
         fn negate(self) -> Option<Self::Unsigned>;
