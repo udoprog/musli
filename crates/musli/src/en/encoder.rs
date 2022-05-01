@@ -81,7 +81,9 @@ pub trait PairEncoder {
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type Second: Encoder<Ok = Self::Ok, Error = Self::Error>;
+    type Second<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
 
     /// Insert the pair immediately.
     #[inline]
@@ -93,7 +95,8 @@ pub trait PairEncoder {
         S: Encode<M>,
     {
         self.first().and_then(|e| first.encode(e))?;
-        self.second().and_then(|e| second.encode(e))
+        self.second().and_then(|e| second.encode(e))?;
+        self.end()
     }
 
     /// Return the encoder for the first element in the pair.
@@ -102,7 +105,10 @@ pub trait PairEncoder {
 
     /// Return encoder for the second element in the pair.
     #[must_use = "encoders must be consumed"]
-    fn second(self) -> Result<Self::Second, Self::Error>;
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error>;
+
+    /// Stop encoding this pair.
+    fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
 /// Trait governing how to encode a variant.
@@ -156,10 +162,10 @@ pub trait Encoder: Sized {
     type Ok;
     /// The error raised by an encoder.
     type Error: Error;
-    /// A simple pack that packs a sequence of elements.
-    type Pack: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder returned when encoding an optional value which is present.
     type Some: Encoder<Ok = Self::Ok, Error = Self::Error>;
+    /// A simple pack that packs a sequence of elements.
+    type Pack: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a sequence encoder.
     type Sequence: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a tuple encoder.

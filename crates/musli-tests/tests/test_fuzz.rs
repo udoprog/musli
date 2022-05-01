@@ -20,7 +20,7 @@ fn test_fuzz() {
 
                 let out = musli_tests::utils::$base::encode(&small_struct);
                 let actual =
-                    musli_tests::utils::$base::decode::<musli_tests::models::SmallStruct>(&out[..]);
+                    musli_tests::utils::$base::decode::<musli_tests::models::SmallStruct>(&out);
                 assert_eq!(actual, small_struct);
             }
 
@@ -29,7 +29,7 @@ fn test_fuzz() {
 
                 let out = musli_tests::utils::$base::encode(&large_struct);
                 let actual =
-                    musli_tests::utils::$base::decode::<musli_tests::models::LargeStruct>(&out[..]);
+                    musli_tests::utils::$base::decode::<musli_tests::models::LargeStruct>(&out);
                 assert_eq!(actual, large_struct);
             }
 
@@ -44,4 +44,5 @@ fn test_fuzz() {
     test!(musli_json);
     test!(musli_storage);
     test!(musli_wire);
+    test!(musli_value);
 }

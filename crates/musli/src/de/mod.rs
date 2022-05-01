@@ -22,9 +22,10 @@ mod type_hint;
 
 pub use self::decode::Decode;
 pub use self::decoder::{
-    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
+    Decoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor,
+    VariantDecoder,
 };
-pub use self::type_hint::TypeHint;
+pub use self::type_hint::{LengthHint, NumberHint, TypeHint};
 use crate::mode::Mode;
 
 /// An owned decoder.

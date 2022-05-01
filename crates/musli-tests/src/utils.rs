@@ -1,11 +1,11 @@
 pub mod serde_json {
     use serde::{Deserialize, Serialize};
 
-    pub fn encode<T>(expected: &T) -> Vec<u8>
+    pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Serialize,
     {
-        serde_json::to_vec(expected).unwrap()
+        serde_json::to_vec(value).unwrap()
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T
@@ -22,11 +22,11 @@ pub mod musli_json {
 
     const JSON_ENCODING: JsonEncoding = JsonEncoding::new();
 
-    pub fn encode<T>(expected: &T) -> Vec<u8>
+    pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Encode,
     {
-        JSON_ENCODING.to_vec(expected).unwrap()
+        JSON_ENCODING.to_vec(value).unwrap()
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T
@@ -41,11 +41,11 @@ pub mod serde_rmp {
     use serde::{Deserialize, Serialize};
 
     #[allow(unused)]
-    pub fn encode<T>(expected: &T) -> Vec<u8>
+    pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Serialize,
     {
-        rmp_serde::to_vec(expected).unwrap()
+        rmp_serde::to_vec(value).unwrap()
     }
 
     #[allow(unused)]
@@ -60,11 +60,11 @@ pub mod serde_rmp {
 pub mod serde_bincode {
     use serde::{Deserialize, Serialize};
 
-    pub fn encode<T>(expected: &T) -> Vec<u8>
+    pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Serialize,
     {
-        bincode::serialize(expected).unwrap()
+        bincode::serialize(value).unwrap()
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T
@@ -78,11 +78,11 @@ pub mod serde_bincode {
 pub mod serde_cbor {
     use serde::{Deserialize, Serialize};
 
-    pub fn encode<T>(expected: &T) -> Vec<u8>
+    pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Serialize,
     {
-        serde_cbor::to_vec(expected).unwrap()
+        serde_cbor::to_vec(value).unwrap()
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T
@@ -102,13 +102,13 @@ pub mod musli_wire {
         .with_fixed_integers()
         .with_fixed_lengths();
 
-    pub fn encode<T>(expected: &T) -> Vec<u8>
+    pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Encode,
     {
         // NB: bincode uses a 128-byte pre-allocated vector.
         let mut data = Vec::with_capacity(128);
-        WIRE_ENCODING.encode(&mut data, expected).unwrap();
+        WIRE_ENCODING.encode(&mut data, value).unwrap();
         data
     }
 
@@ -130,13 +130,13 @@ pub mod musli_storage {
             .with_fixed_integers()
             .with_fixed_lengths();
 
-    pub fn encode<T>(expected: &T) -> Vec<u8>
+    pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Encode,
     {
         // NB: bincode uses a 128-byte pre-allocated vector.
         let mut data = Vec::with_capacity(128);
-        STORAGE_ENCODING.encode(&mut data, expected).unwrap();
+        STORAGE_ENCODING.encode(&mut data, value).unwrap();
         data
     }
 
@@ -145,5 +145,23 @@ pub mod musli_storage {
         T: Decode<'de>,
     {
         STORAGE_ENCODING.from_slice(data).unwrap()
+    }
+}
+
+pub mod musli_value {
+    use musli::{Decode, Encode};
+
+    pub fn encode<T>(value: &T) -> ::musli_value::Value
+    where
+        T: Encode,
+    {
+        musli_value::encode(value).unwrap()
+    }
+
+    pub fn decode<'de, T>(data: &'de ::musli_value::Value) -> T
+    where
+        T: Decode<'de>,
+    {
+        musli_value::decode(data).unwrap()
     }
 }

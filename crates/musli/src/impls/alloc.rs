@@ -252,6 +252,7 @@ macro_rules! map {
                     let mut entry = map.next()?;
                     k.encode(entry.first()?)?;
                     v.encode(entry.second()?)?;
+                    entry.end()?;
                 }
 
                 map.end()

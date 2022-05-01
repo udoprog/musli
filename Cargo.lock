@@ -426,6 +426,7 @@ dependencies = [
  "musli",
  "musli-json",
  "musli-storage",
+ "musli-value",
  "musli-wire",
  "rand",
  "rmp-serde",
@@ -433,6 +434,17 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "trybuild",
+]
+
+[[package]]
+name = "musli-value"
+version = "0.0.29"
+dependencies = [
+ "itoa 1.0.1",
+ "lexical",
+ "musli",
+ "musli-common",
+ "ryu",
 ]
 
 [[package]]

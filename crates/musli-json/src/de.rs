@@ -3,9 +3,10 @@ use core::marker;
 use core::mem;
 use core::str;
 
-use musli::de::PackDecoder;
-use musli::de::SequenceDecoder;
-use musli::de::{Decoder, PairDecoder, PairsDecoder, ValueVisitor, VariantDecoder};
+use musli::de::{
+    Decoder, LengthHint, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
+    TypeHint, ValueVisitor, VariantDecoder,
+};
 use musli::error::Error;
 use musli::never::Never;
 
@@ -117,6 +118,20 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be decoded from JSON")
+    }
+
+    #[inline]
+    fn type_hint(&mut self) -> Result<TypeHint, Self::Error> {
+        Ok(match self.parser.peek()? {
+            Token::OpenBrace => TypeHint::Map(LengthHint::Any),
+            Token::OpenBracket => TypeHint::Sequence(LengthHint::Any),
+            Token::String => TypeHint::String(LengthHint::Any),
+            Token::Number => TypeHint::Number(NumberHint::Any),
+            Token::Null => TypeHint::Unit,
+            Token::True => TypeHint::Bool,
+            Token::False => TypeHint::Bool,
+            _ => TypeHint::Any,
+        })
     }
 
     #[inline]

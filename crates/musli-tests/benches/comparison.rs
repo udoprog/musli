@@ -38,9 +38,8 @@ fn criterion_benchmark(c: &mut Criterion) {
             group.bench_function("roundtrip-small", |b| {
                 b.iter(|| {
                     let out = musli_tests::utils::$base::encode(&small_struct);
-                    let actual = musli_tests::utils::$base::decode::<
-                        musli_tests::models::SmallStruct,
-                    >(&out[..]);
+                    let actual =
+                        musli_tests::utils::$base::decode::<musli_tests::models::SmallStruct>(&out);
                     // assert_eq!(actual, small_struct);
                     actual
                 })
@@ -48,9 +47,8 @@ fn criterion_benchmark(c: &mut Criterion) {
             group.bench_function("roundtrip-large", |b| {
                 b.iter(|| {
                     let out = musli_tests::utils::$base::encode(&large_struct);
-                    let actual = musli_tests::utils::$base::decode::<
-                        musli_tests::models::LargeStruct,
-                    >(&out[..]);
+                    let actual =
+                        musli_tests::utils::$base::decode::<musli_tests::models::LargeStruct>(&out);
                     // assert_eq!(actual, large_struct);
                     actual
                 })
@@ -65,6 +63,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     benches!(musli_json);
     benches!(musli_wire);
     benches!(musli_storage);
+    benches!(musli_value);
 }
 
 criterion_group!(benches, criterion_benchmark);

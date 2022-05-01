@@ -266,7 +266,7 @@ where
     type Ok = ();
     type Error = W::Error;
     type First<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
-    type Second = Self;
+    type Second<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -274,8 +274,13 @@ where
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
-        Ok(self)
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
     }
 }
 

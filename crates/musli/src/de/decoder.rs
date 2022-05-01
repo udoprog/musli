@@ -54,6 +54,27 @@ pub trait ValueVisitor<'de>: Sized {
     }
 }
 
+/// A visitor capable of processing arbitrary number values.
+pub trait NumberVisitor: Sized {
+    /// The output of the visitor.
+    type Ok;
+    /// An error type.
+    type Error: Error;
+
+    /// Format an error indicating what was expected by this visitor.
+    ///
+    /// Override to be more specific about the type that failed.
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
+    /// Visit a handful of components
+    fn visit_components(self, _: u128, _: u128, _: u32, _: u32) -> Result<Self::Ok, Self::Error> {
+        Err(Self::Error::message(BadVisitorType::new(
+            expecting::NumberComponents,
+            &NumberExpecting(self),
+        )))
+    }
+}
+
 /// A pack that can construct encoders.
 pub trait PackDecoder<'de> {
     /// Error type raised by this unpack.
@@ -177,6 +198,8 @@ pub trait VariantDecoder<'de> {
 pub trait Decoder<'de>: Sized {
     /// Error type raised by the decoder.
     type Error: Error;
+    /// Decoder for a value that is present.
+    type Some: Decoder<'de, Error = Self::Error>;
     /// Pack decoder implementation.
     type Pack: PackDecoder<'de, Error = Self::Error>;
     /// Sequence decoder implementation.
@@ -185,8 +208,6 @@ pub trait Decoder<'de>: Sized {
     type Tuple: PackDecoder<'de, Error = Self::Error>;
     /// Map decoder implementation.
     type Map: PairsDecoder<'de, Error = Self::Error>;
-    /// Decoder for a value that is present.
-    type Some: Decoder<'de, Error = Self::Error>;
     /// Decoder for a struct.
     ///
     /// The caller receives a [PairsDecoder] which when advanced with
@@ -240,8 +261,8 @@ pub trait Decoder<'de>: Sized {
     /// detailed (`a 32-bit unsigned integer`) to vague (`a number`).
     ///
     /// This is used to construct dynamic containers of types.
-    fn type_hint(&self) -> TypeHint {
-        TypeHint::Any
+    fn type_hint(&mut self) -> Result<TypeHint, Self::Error> {
+        Ok(TypeHint::Any)
     }
 
     /// Decode a unit or something that is empty.
@@ -751,6 +772,19 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
+    /// Decode an unknown number using a visitor that can handle arbitrary
+    /// precision numbers.
+    #[inline]
+    fn decode_number<V>(self, _: V) -> Result<V::Ok, V::Error>
+    where
+        V: NumberVisitor<Error = Self::Error>,
+    {
+        Err(Self::Error::message(InvalidType::new(
+            expecting::Number,
+            &ExpectingWrapper(self),
+        )))
+    }
+
     /// Decode a fixed-length array.
     ///
     /// # Examples
@@ -1217,6 +1251,18 @@ struct ReferenceVisistorExpecting<T>(T);
 impl<'de, T> Expecting for ReferenceVisistorExpecting<T>
 where
     T: ValueVisitor<'de>,
+{
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expecting(f)
+    }
+}
+
+#[repr(transparent)]
+struct NumberExpecting<T>(T);
+
+impl<T> Expecting for NumberExpecting<T>
+where
+    T: NumberVisitor,
 {
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.expecting(f)

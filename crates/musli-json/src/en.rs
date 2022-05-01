@@ -297,7 +297,7 @@ where
     where
         Self: 'this;
 
-    type Second = JsonEncoder<M, W>;
+    type Second<'this> = JsonEncoder<M, W::Mut<'this>> where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -309,9 +309,14 @@ where
     }
 
     #[inline]
-    fn second(mut self) -> Result<Self::Second, Self::Error> {
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
         self.writer.write_byte(b':')?;
-        Ok(JsonEncoder::new(self.writer))
+        Ok(JsonEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
     }
 }
 

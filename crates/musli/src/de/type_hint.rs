@@ -1,3 +1,5 @@
+use core::fmt;
+
 /// A number hint.
 #[derive(Debug, Clone, Copy)]
 pub enum NumberHint {
@@ -33,6 +35,28 @@ pub enum NumberHint {
     F64,
 }
 
+impl fmt::Display for NumberHint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NumberHint::Any => write!(f, "any"),
+            NumberHint::U8 => write!(f, "u8"),
+            NumberHint::U16 => write!(f, "u16"),
+            NumberHint::U32 => write!(f, "u32"),
+            NumberHint::U64 => write!(f, "u64"),
+            NumberHint::U128 => write!(f, "u128"),
+            NumberHint::I8 => write!(f, "i8"),
+            NumberHint::I16 => write!(f, "i16"),
+            NumberHint::I32 => write!(f, "i32"),
+            NumberHint::I64 => write!(f, "i64"),
+            NumberHint::I128 => write!(f, "i128"),
+            NumberHint::Usize => write!(f, "usize"),
+            NumberHint::Isize => write!(f, "isize"),
+            NumberHint::F32 => write!(f, "f32"),
+            NumberHint::F64 => write!(f, "f64"),
+        }
+    }
+}
+
 /// A length hint.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -43,13 +67,23 @@ pub enum LengthHint {
     Exact(usize),
 }
 
+impl LengthHint {
+    /// Coerce into a size hint.
+    pub fn size_hint(self) -> usize {
+        match self {
+            LengthHint::Any => 0,
+            LengthHint::Exact(len) => len,
+        }
+    }
+}
+
 /// A type hint.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum TypeHint {
     /// Any type.
     Any,
-    /// A unit type.
+    /// A unit type or an empty value.
     Unit,
     /// A boolean type.
     Bool,
@@ -61,18 +95,27 @@ pub enum TypeHint {
     Bytes(LengthHint),
     /// A string with the given length.
     String(LengthHint),
-    /// A sequence.
-    Sequence,
-    /// A tuple of a statically known length.
-    Tuple(usize),
-    /// A map.
+    /// A sequence with a length hint.
+    Sequence(LengthHint),
+    /// A map with a length hint.
     Map(LengthHint),
-    /// A struct with an unknown length.
-    Struct(LengthHint),
-    /// A tuple struct with an unknown length.
-    TupleStruct(LengthHint),
-    /// A unit struct.
-    UnitStruct,
     /// A variant.
     Variant,
+}
+
+impl fmt::Display for TypeHint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TypeHint::Any => write!(f, "any"),
+            TypeHint::Unit => write!(f, "unit"),
+            TypeHint::Bool => write!(f, "bool"),
+            TypeHint::Char => write!(f, "char"),
+            TypeHint::Number(_) => write!(f, "number"),
+            TypeHint::Bytes(_) => write!(f, "bytes"),
+            TypeHint::String(_) => write!(f, "string"),
+            TypeHint::Sequence(_) => write!(f, "sequence"),
+            TypeHint::Map(_) => write!(f, "map"),
+            TypeHint::Variant => write!(f, "variant"),
+        }
+    }
 }

@@ -364,7 +364,7 @@ where
     type Ok = ();
     type Error = W::Error;
     type First<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
-    type Second = Self;
+    type Second<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -372,8 +372,13 @@ where
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
-        Ok(self)
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+        Ok(WireEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
     }
 }
 

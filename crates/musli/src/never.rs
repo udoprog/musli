@@ -254,7 +254,7 @@ where
     type First<'this> = Self
     where
         Self: 'this;
-    type Second = Self;
+    type Second<'this> = Self where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -262,7 +262,12 @@ where
     }
 
     #[inline]
-    fn second(self) -> Result<Self::Second, Self::Error> {
+    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
