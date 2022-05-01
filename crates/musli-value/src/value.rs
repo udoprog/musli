@@ -445,7 +445,7 @@ where
     type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;
 
     #[inline]
-    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, Self::Error> {
         Ok(self.value.decoder())
     }
 }

@@ -822,7 +822,7 @@ impl<'a> Expander<'a> {
                 impl #fmt::Debug for #tag_visitor_output {
                     #[inline]
                     fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
-                        match self { #(#patterns),* }
+                        match self { #(#patterns,)* #tag_visitor_output::Err(field) => field.fmt(f) }
                     }
                 }
             }
@@ -1278,7 +1278,7 @@ impl<'a> Expander<'a> {
                 let mut path = syn::Path::from(tag_visitor_output.clone());
                 path.segments.push(syn::PathSegment::from(variant.clone()));
 
-                string_patterns.push(quote!(#tag => Ok(#path)));
+                string_patterns.push(quote!(#tag => #path));
                 output_variants.push(variant.clone());
 
                 syn::Expr::Path(syn::ExprPath {
@@ -1320,10 +1320,15 @@ impl<'a> Expander<'a> {
 
                 let patterns = patterns
                     .iter()
-                    .map(|(tag, decode)| (quote!(Ok(#tag)), decode.clone()))
+                    .map(|(tag, decode)| (quote!(#tag), decode.clone()))
                     .collect::<Vec<_>>();
 
-                Some((decode_tag, quote!(Err(tag)), patterns, Some(output_enum)))
+                Some((
+                    decode_tag,
+                    quote!(#tag_visitor_output::Err(tag)),
+                    patterns,
+                    Some(output_enum),
+                ))
             }
             TagMethod::Default => {
                 let decode_t_decode = mode.decode_t_decode();
@@ -1350,49 +1355,24 @@ impl<'a> Expander<'a> {
         string_patterns: &[TokenStream],
         thing_decoder_t_decode: &syn::ExprPath,
     ) -> Option<(TokenStream, TokenStream)> {
-        let value_visitor_t = &self.tokens.value_visitor_t;
-        let phantom_data = &self.tokens.phantom_data;
-        let fmt = &self.tokens.fmt;
-        let error_t = &self.tokens.error_t;
         let decoder_t = &self.tokens.decoder_t;
         let decoder_var = &self.tokens.decoder_var;
+        let visit_string_fn = &self.tokens.visit_string_fn;
 
         // Declare a tag visitor, allowing string tags to be decoded by
         // decoders that owns the string.
         let decode_tag = quote! {{
-            struct TagVisitor<E>(#phantom_data<E>);
-
-            impl<'de, E> #value_visitor_t<'de> for TagVisitor<E> where E: #error_t {
-                type Target = str;
-                type Ok = Result<#output, Box<str>>;
-                type Error = E;
-
-                #[inline]
-                fn expecting(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
-                    write!(f, "string tag")
-                }
-
-                #[inline]
-                fn visit_borrowed(self, string: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
-                    self.visit_any(string)
-                }
-
-                #[inline]
-                fn visit_any(self, string: &Self::Target) -> Result<Self::Ok, Self::Error> {
-                    Ok(match string {
-                        #(#string_patterns,)*
-                        _ => Err(string.into()),
-                    })
-                }
-            }
-
             let index_decoder = #thing_decoder_t_decode(&mut #decoder_var)?;
-            #decoder_t::decode_string(index_decoder, TagVisitor::<D::Error>(#phantom_data))?
+
+            #decoder_t::decode_string(index_decoder, #visit_string_fn(|string| {
+                Ok::<#output, D::Error>(match string { #(#string_patterns,)* _ => #output::Err(string.into())})
+            }))?
         }};
 
         let output_enum = quote! {
             enum #output {
                 #(#output_variants,)*
+                Err(String),
             }
         };
 

@@ -2,8 +2,8 @@
 //!
 //! [Müsli]: https://docs.rs/musli
 
-mod bytes_visitor_fn;
-mod string_visitor_fn;
+mod visit_bytes_fn;
+mod visit_string_fn;
 
-pub use self::bytes_visitor_fn::bytes_visitor_fn;
-pub use self::string_visitor_fn::string_visitor_fn;
+pub use self::visit_bytes_fn::visit_bytes_fn;
+pub use self::visit_string_fn::visit_string_fn;

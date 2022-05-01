@@ -5,7 +5,7 @@ use crate::de::ValueVisitor;
 use crate::error::Error;
 
 /// Construct an anonymous bytes visitor from a function.
-pub fn bytes_visitor_fn<'de, T, O, E>(
+pub fn visit_bytes_fn<'de, T, O, E>(
     function: T,
 ) -> impl ValueVisitor<'de, Target = [u8], Ok = O, Error = E>
 where

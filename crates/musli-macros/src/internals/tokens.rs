@@ -20,11 +20,10 @@ pub(crate) struct Tokens {
     pub(crate) pair_encoder_t: syn::ExprPath,
     pub(crate) pairs_decoder_t: syn::ExprPath,
     pub(crate) pairs_encoder_t: syn::ExprPath,
-    pub(crate) phantom_data: syn::ExprPath,
-    pub(crate) value_visitor_t: syn::ExprPath,
     pub(crate) sequence_encoder_t: syn::ExprPath,
     pub(crate) default_mode: syn::ExprPath,
     pub(crate) mode_t: syn::ExprPath,
+    pub(crate) visit_string_fn: syn::ExprPath,
 }
 
 impl Tokens {
@@ -48,11 +47,10 @@ impl Tokens {
             pair_encoder_t: path(span, prefix, ["en", "PairEncoder"]),
             pairs_decoder_t: path(span, prefix, ["de", "PairsDecoder"]),
             pairs_encoder_t: path(span, prefix, ["en", "PairsEncoder"]),
-            phantom_data: core_path(span, ["marker", "PhantomData"]),
-            value_visitor_t: path(span, prefix, ["de", "ValueVisitor"]),
             sequence_encoder_t: path(span, prefix, ["en", "SequenceEncoder"]),
             default_mode: path(span, prefix, ["mode", "DefaultMode"]),
             mode_t: path(span, prefix, ["mode", "Mode"]),
+            visit_string_fn: path(span, prefix, ["utils", "visit_string_fn"]),
         }
     }
 }

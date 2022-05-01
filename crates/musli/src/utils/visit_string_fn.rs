@@ -5,7 +5,7 @@ use crate::de::ValueVisitor;
 use crate::error::Error;
 
 /// Construct an anonymous string visitor from a function.
-pub fn string_visitor_fn<'de, T, O, E>(
+pub fn visit_string_fn<'de, T, O, E>(
     function: T,
 ) -> impl ValueVisitor<'de, Target = str, Ok = O, Error = E>
 where

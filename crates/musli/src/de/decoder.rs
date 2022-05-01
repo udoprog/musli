@@ -246,12 +246,12 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         let mut buffer = decoder.decode_buffer::<M>()?;
     ///
-    ///         let mut st = buffer.as_decoder()?.decode_struct(2)?;
+    ///         let mut st = buffer.as_decoder()?.decode_map()?;
     ///
     ///         let mut discriminator = None::<u32>;
     ///
     ///         while let Some(mut e) = st.next()? {
-    ///             let found = e.first()?.decode_string(musli::utils::string_visitor_fn(|string| {
+    ///             let found = e.first()?.decode_string(musli::utils::visit_string_fn(|string| {
     ///                 Ok(string == "type")
     ///             }))?;
     ///
@@ -1165,7 +1165,7 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut st = decoder.decode_struct(2)?;
+    ///         let mut st = decoder.decode_map()?;
     ///         let mut string = None;
     ///         let mut integer = None;
     ///
