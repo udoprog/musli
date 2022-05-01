@@ -2,6 +2,7 @@ use core::fmt;
 
 /// A number hint.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum NumberHint {
     /// Any numerical type of unknown kind.
     Any,

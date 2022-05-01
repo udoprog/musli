@@ -1,8 +1,8 @@
 use core::marker;
 
 use musli::de::{
-    Decode, Decoder, LengthHint, NumberHint, PairDecoder, PairsDecoder, SequenceDecoder, TypeHint,
-    ValueVisitor, VariantDecoder,
+    Decode, Decoder, LengthHint, NumberHint, NumberVisitor, PairDecoder, PairsDecoder,
+    SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::en::{Encode, Encoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
@@ -14,7 +14,7 @@ use crate::de::ValueDecoder;
 /// complex or simple.
 ///
 /// [Müsli]: https://github.com/udoprog/musli
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Value {
     /// The default unit value.
@@ -60,7 +60,7 @@ impl Value {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum Number {
     /// `u8`
@@ -164,6 +164,9 @@ where
                 Ok(Value::Char(c))
             }
             TypeHint::Number(number) => Ok(match number {
+                NumberHint::Any => {
+                    Value::Number(decoder.decode_number(ValueNumberVisitor(marker::PhantomData))?)
+                }
                 NumberHint::U8 => Value::Number(Number::U8(decoder.decode_u8()?)),
                 NumberHint::U16 => Value::Number(Number::U16(decoder.decode_u16()?)),
                 NumberHint::U32 => Value::Number(Number::U32(decoder.decode_u32()?)),
@@ -272,6 +275,91 @@ where
     #[inline]
     fn visit_any(self, string: &str) -> Result<Self::Ok, Self::Error> {
         Ok(Value::String(string.to_owned()))
+    }
+}
+
+struct ValueNumberVisitor<E>(marker::PhantomData<E>);
+
+impl<E> NumberVisitor for ValueNumberVisitor<E>
+where
+    E: Error,
+{
+    type Ok = Number;
+    type Error = E;
+
+    #[inline]
+    fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "any supported number")
+    }
+
+    #[inline]
+    fn visit_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::U8(value))
+    }
+
+    #[inline]
+    fn visit_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::U16(value))
+    }
+
+    #[inline]
+    fn visit_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::U32(value))
+    }
+
+    #[inline]
+    fn visit_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::U64(value))
+    }
+
+    #[inline]
+    fn visit_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::U128(value))
+    }
+
+    #[inline]
+    fn visit_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::I8(value))
+    }
+
+    #[inline]
+    fn visit_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::I16(value))
+    }
+
+    #[inline]
+    fn visit_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::I32(value))
+    }
+
+    #[inline]
+    fn visit_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::I64(value))
+    }
+
+    #[inline]
+    fn visit_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::I128(value))
+    }
+
+    #[inline]
+    fn visit_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::F32(value))
+    }
+
+    #[inline]
+    fn visit_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::F64(value))
+    }
+
+    #[inline]
+    fn visit_usize(self, value: usize) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::Usize(value))
+    }
+
+    #[inline]
+    fn visit_isize(self, value: isize) -> Result<Self::Ok, Self::Error> {
+        Ok(Number::Isize(value))
     }
 }
 

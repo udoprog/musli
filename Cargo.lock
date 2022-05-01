@@ -396,6 +396,7 @@ dependencies = [
  "lexical",
  "musli",
  "musli-common",
+ "musli-value",
  "ryu",
 ]
 

@@ -1,6 +1,7 @@
 use core::fmt;
 
-pub(crate) use self::traits::{Signed, Unsigned};
+use self::traits::FromUnsigned;
+pub(crate) use self::traits::{Float, Signed, Unsigned};
 use crate::reader::{ParseError, ParseErrorKind, Parser};
 
 /// Error when computing integer.
@@ -25,22 +26,27 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 /// Fully deconstructed parts of a signed number.
+#[non_exhaustive]
+#[derive(Clone, Copy)]
 pub(crate) struct SignedParts<T>
 where
     T: Signed,
 {
-    /// Indicates if the number is negative.
-    is_negative: bool,
-    /// Parts of the unsigned component of the number.
-    parts: Parts<T::Unsigned>,
+    /// If the number is negative.
+    pub(crate) is_negative: bool,
+    /// The unsigned component of the number.
+    pub(crate) unsigned: Parts<T::Unsigned>,
 }
 
 impl<T> SignedParts<T>
 where
     T: Signed,
 {
-    fn compute(self) -> Result<T, Error> {
-        let Self { is_negative, parts } = self;
+    pub(crate) fn compute(self) -> Result<T, Error> {
+        let Self {
+            is_negative,
+            unsigned: parts,
+        } = self;
 
         let value = parts.compute()?;
 
@@ -53,20 +59,59 @@ where
             None => Err(Error::Overflow),
         }
     }
-}
 
-#[derive(Default)]
-pub(crate) struct Exponent {
-    is_negative: bool,
-    value: u32,
+    pub(crate) fn compute_float<F>(self) -> F
+    where
+        F: Float,
+        F: FromUnsigned<T::Unsigned>,
+    {
+        let Self {
+            is_negative,
+            unsigned: parts,
+        } = self;
+        let value = parts.compute_float::<F>();
+
+        if is_negative {
+            value.negate()
+        } else {
+            value
+        }
+    }
 }
 
 /// The mantissa, or anything after a decimal point.
+#[derive(Clone, Copy)]
 pub(crate) struct Mantissa<T> {
     /// The value of the mantissa.
     value: T,
     /// The exponent of the mantissa.
-    exp: u32,
+    exp: i32,
+}
+
+impl<T> Mantissa<T>
+where
+    T: Unsigned,
+{
+    fn to_float<F>(self) -> Mantissa<F>
+    where
+        F: FromUnsigned<T>,
+    {
+        Mantissa {
+            value: self.value.to_float::<F>(),
+            exp: self.exp,
+        }
+    }
+}
+
+impl<F> Mantissa<F>
+where
+    F: Float,
+{
+    /// Compute as float with a negative exponent.
+    #[inline]
+    fn compute_float(self, e: i32) -> F {
+        self.value.pow10(e - self.exp)
+    }
 }
 
 impl<T> Default for Mantissa<T>
@@ -76,26 +121,28 @@ where
     fn default() -> Self {
         Self {
             value: T::ZERO,
-            exp: 0u32,
+            exp: 0i32,
         }
     }
 }
 
 /// Fully deconstructed parts of an unsigned number.
+#[non_exhaustive]
+#[derive(Clone, Copy)]
 pub(crate) struct Parts<T> {
     /// The base, or everything before a decimal point.
-    base: T,
+    pub(crate) base: T,
     /// The mantissa, or anything after a decimal point.
-    m: Mantissa<T>,
+    pub(crate) m: Mantissa<T>,
     /// The exponent of the number.
-    e: Exponent,
+    pub(crate) e: i32,
 }
 
 impl<T> Parts<T>
 where
     T: Unsigned,
 {
-    fn compute(self) -> Result<T, Error> {
+    pub(crate) fn compute(self) -> Result<T, Error> {
         macro_rules! check {
             ($expr:expr, $kind:ident) => {
                 match $expr {
@@ -107,7 +154,7 @@ where
 
         let Self { mut base, m, e } = self;
 
-        if e.value == 0 {
+        if e == 0 {
             if !m.value.is_zero() {
                 return Err(Error::Decimal);
             }
@@ -115,12 +162,12 @@ where
             return Ok(base);
         }
 
-        if !e.is_negative {
+        if e >= 0 {
             // Decoding the specified mantissa would result in a fractional number.
-            let mantissa_exp = check!(e.value.checked_sub(m.exp), Decimal);
+            let mantissa_exp = check!(e.checked_sub(m.exp).filter(|n| *n >= 0), Decimal) as u32;
 
             if !base.is_zero() {
-                base = check!(base.checked_pow10(e.value), Overflow);
+                base = check!(base.checked_pow10(e as u32), Overflow);
             }
 
             let base = check! {
@@ -130,18 +177,21 @@ where
                 Overflow
             };
 
-            return Ok(base);
+            Ok(base)
+        } else if !m.value.is_zero() {
+            Err(Error::Decimal)
+        } else {
+            Ok(check!(base.checked_neg_pow10(-e as u32), Decimal))
         }
+    }
 
-        if !m.value.is_zero() {
-            return Err(Error::Decimal);
-        }
-
-        for _ in 0..e.value {
-            base = check!(base.div_mod_ten(), Decimal);
-        }
-
-        Ok(base)
+    pub(crate) fn compute_float<F>(self) -> F
+    where
+        F: Float,
+        F: FromUnsigned<T>,
+    {
+        let Self { base, m, e } = self;
+        base.to_float::<F>().pow10(e) + m.to_float::<F>().compute_float(e)
     }
 }
 
@@ -237,7 +287,10 @@ where
     };
 
     let parts = decode_unsigned_inner::<T::Unsigned, _>(p, start)?;
-    Ok(SignedParts { is_negative, parts })
+    Ok(SignedParts {
+        is_negative,
+        unsigned: parts,
+    })
 }
 
 /// Fully parse a signed value.
@@ -302,7 +355,7 @@ where
             // Accrue accumulated zeros.
             if zeros > 0 {
                 m.exp += zeros;
-                m.value = match m.value.checked_pow10(zeros) {
+                m.value = match m.value.checked_pow10(zeros as u32) {
                     Some(mantissa) => mantissa,
                     None => {
                         return Err(ParseError::spanned(
@@ -324,23 +377,24 @@ where
         p.skip(1)?;
         decode_exponent(p, start)?
     } else {
-        Exponent::default()
+        0
     };
 
     Ok(Parts { base, m, e })
 }
 
 /// Decode an exponent.
-fn decode_exponent<'de, P>(p: &mut P, start: u32) -> Result<Exponent, ParseError>
+fn decode_exponent<'de, P>(p: &mut P, start: u32) -> Result<i32, ParseError>
 where
     P: ?Sized + Parser<'de>,
 {
-    let mut e = Exponent::default();
+    let mut is_negative = false;
+    let mut e = 0u32;
 
     match p.peek_byte()? {
         Some(b'-') => {
             p.skip(1)?;
-            e.is_negative = true
+            is_negative = true
         }
         Some(b'+') => {
             p.skip(1)?;
@@ -349,10 +403,17 @@ where
     };
 
     while let Some(true) = p.peek_byte()?.map(is_digit) {
-        e.value = digit(e.value, p, start)?;
+        e = digit(e, p, start)?;
     }
 
-    Ok(e)
+    match if is_negative { e.negate() } else { e.signed() } {
+        Some(value) => Ok(value),
+        None => Err(ParseError::spanned(
+            start,
+            p.pos(),
+            ParseErrorKind::IntegerError(Error::Overflow),
+        )),
+    }
 }
 
 /// Decode a single digit into `out`.
@@ -377,7 +438,7 @@ where
 }
 
 /// Decode sequence of zeros.
-fn decode_zeros<'de, P>(p: &mut P) -> Result<u32, ParseError>
+fn decode_zeros<'de, P>(p: &mut P) -> Result<i32, ParseError>
 where
     P: ?Sized + Parser<'de>,
 {
@@ -416,7 +477,11 @@ mod traits {
 
         fn is_zero(&self) -> bool;
 
+        /// Calculate `self * 10 ** e`.
         fn checked_pow10(self, exp: u32) -> Option<Self>;
+
+        /// Calculate `self / 10 ** e`.
+        fn checked_neg_pow10(self, e: u32) -> Option<Self>;
 
         fn checked_mul10(self) -> Option<Self>;
 
@@ -424,19 +489,31 @@ mod traits {
 
         fn checked_mul(self, other: Self) -> Option<Self>;
 
-        fn div_mod_ten(self) -> Option<Self>;
-
         fn checked_pow(self, exp: u32) -> Option<Self>;
 
         fn negate(self) -> Option<Self::Signed>;
 
         fn signed(self) -> Option<Self::Signed>;
+
+        fn to_float<F>(self) -> F
+        where
+            F: FromUnsigned<Self>;
     }
 
     pub(crate) trait Signed: Sized + fmt::Debug {
         type Unsigned: Unsigned<Signed = Self>;
 
         fn negate(self) -> Option<Self::Unsigned>;
+    }
+
+    pub(crate) trait FromUnsigned<T> {
+        fn from_unsigned(value: T) -> Self;
+    }
+
+    pub(crate) trait Float: Sized + Add<Self, Output = Self> {
+        fn negate(self) -> Self;
+
+        fn pow10(self, e: i32) -> Self;
     }
 
     macro_rules! count {
@@ -497,15 +574,27 @@ mod traits {
                 }
 
                 #[inline]
-                fn checked_pow10(self, exp: u32) -> Option<Self> {
+                fn checked_pow10(self, e: u32) -> Option<Self> {
                     static POWS: [$unsigned; count!(() $($pows)*)] = [
                         $($pows),*
                     ];
 
-                    if let Some(exp) = POWS.get(exp as usize) {
-                        self.checked_mul(*exp)
+                    if let Some(e) = POWS.get(e as usize) {
+                        self.checked_mul(*e)
                     } else {
-                        self.checked_mul(10.checked_pow(exp)?)
+                        self.checked_mul(10.checked_pow(e)?)
+                    }
+                }
+
+                #[inline]
+                fn checked_neg_pow10(self, e: u32) -> Option<Self> {
+                    const ONE: $unsigned = 1;
+                    let div = ONE.checked_pow10(e)?;
+
+                    if self % div != 0 {
+                        None
+                    } else {
+                        Some(self / div)
                     }
                 }
 
@@ -522,15 +611,6 @@ mod traits {
                 #[inline]
                 fn checked_mul(self, other: Self) -> Option<Self> {
                     <$unsigned>::checked_mul(self, other)
-                }
-
-                #[inline]
-                fn div_mod_ten(self) -> Option<Self> {
-                    if self % 10 == 0 {
-                        Some(self / 10)
-                    } else {
-                        None
-                    }
                 }
 
                 #[inline]
@@ -554,6 +634,11 @@ mod traits {
                     } else {
                         Some(self as $signed)
                     }
+                }
+
+                #[inline]
+                fn to_float<F>(self) -> F where F: FromUnsigned<Self> {
+                    F::from_unsigned(self)
                 }
             }
 
@@ -682,4 +767,53 @@ mod traits {
             10000000000000000000,
         ]
     );
+
+    macro_rules! float {
+        ($float:ty) => {
+            impl Float for $float {
+                #[inline]
+                fn negate(self) -> Self {
+                    -self
+                }
+
+                #[inline]
+                fn pow10(self, e: i32) -> Self {
+                    self * <$float>::powi(10.0, e)
+                }
+            }
+
+            impl FromUnsigned<u8> for $float {
+                fn from_unsigned(value: u8) -> Self {
+                    value as $float
+                }
+            }
+
+            impl FromUnsigned<u16> for $float {
+                fn from_unsigned(value: u16) -> Self {
+                    value as $float
+                }
+            }
+
+            impl FromUnsigned<u32> for $float {
+                fn from_unsigned(value: u32) -> Self {
+                    value as $float
+                }
+            }
+
+            impl FromUnsigned<u64> for $float {
+                fn from_unsigned(value: u64) -> Self {
+                    value as $float
+                }
+            }
+
+            impl FromUnsigned<u128> for $float {
+                fn from_unsigned(value: u128) -> Self {
+                    value as $float
+                }
+            }
+        };
+    }
+
+    float!(f32);
+    float!(f64);
 }

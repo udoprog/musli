@@ -18,14 +18,17 @@
 
 mod decode;
 mod decoder;
+mod number_visitor;
 mod type_hint;
+mod value_visitor;
 
 pub use self::decode::Decode;
 pub use self::decoder::{
-    Decoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor,
-    VariantDecoder,
+    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder,
 };
+pub use self::number_visitor::NumberVisitor;
 pub use self::type_hint::{LengthHint, NumberHint, TypeHint};
+pub use self::value_visitor::ValueVisitor;
 use crate::mode::Mode;
 
 /// An owned decoder.

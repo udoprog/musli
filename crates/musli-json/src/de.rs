@@ -4,8 +4,8 @@ use core::mem;
 use core::str;
 
 use musli::de::{
-    Decoder, LengthHint, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
-    TypeHint, ValueVisitor, VariantDecoder,
+    Decoder, LengthHint, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
+    SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
 use musli::never::Never;
@@ -228,6 +228,14 @@ where
     }
 
     #[inline]
+    fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
+    where
+        V: NumberVisitor<Error = Self::Error>,
+    {
+        self.parser.parse_number(visitor)
+    }
+
+    #[inline]
     fn decode_option(mut self) -> Result<Option<Self::Some>, Self::Error> {
         if self.parser.peek()?.is_null() {
             self.parse_null()?;
@@ -419,6 +427,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be decoded from a object key")
+    }
+
+    #[inline]
+    fn type_hint(&mut self) -> Result<TypeHint, Self::Error> {
+        JsonDecoder::new(self.scratch, &mut self.parser).type_hint()
     }
 
     #[inline]

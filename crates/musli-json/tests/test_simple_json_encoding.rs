@@ -17,14 +17,14 @@ const CONFIG: JsonEncoding<my_modes::Json> = JsonEncoding::new();
 #[musli(mode = my_modes::Json, default_field_tag = "name")]
 struct SimpleJsonStruct<'a> {
     name: &'a str,
-    age: u32,
+    age: f32,
 }
 
 #[test]
 fn test_simple_encoding() {
     let expected = vec![SimpleJsonStruct {
         name: "Aristotle",
-        age: 61,
+        age: 61.1415,
     }];
 
     let out = CONFIG.to_vec(&expected).unwrap();
@@ -36,6 +36,11 @@ fn test_simple_encoding() {
     println!("{}", std::str::from_utf8(&out[..]).unwrap());
     let actual: Vec<SimpleJsonStruct<'_>> = musli_json::from_slice(&out[..]).unwrap();
     assert_eq!(expected, actual);
+
+    let value: musli_value::Value = musli_json::from_slice(b"10.00001e-121").unwrap();
+    let out = musli_json::to_vec(&value).unwrap();
+    println!("{}", std::str::from_utf8(&out[..]).unwrap());
+    dbg!(value);
 
     // assert_eq!(expected, actual);
 }
