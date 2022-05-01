@@ -27,13 +27,14 @@ enum NeverMarker {}
 ///
 /// impl Decoder<'_> for MyDecoder {
 ///     type Error = String;
-///     type Pack = Never<Self>;
-///     type Sequence = Never<Self>;
-///     type Tuple = Never<Self>;
-///     type Map = Never<Self>;
-///     type Some = Never<Self>;
-///     type Struct = Never<Self>;
-///     type Variant = Never<Self>;
+///     type Buffer = Never<Self::Error>;
+///     type Pack = Never<Self::Error>;
+///     type Sequence = Never<Self::Error>;
+///     type Tuple = Never<Self::Error>;
+///     type Map = Never<Self::Error>;
+///     type Some = Never<Self::Error>;
+///     type Struct = Never<Self::Error>;
+///     type Variant = Never<Self::Error>;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
@@ -50,12 +51,12 @@ pub struct Never<T> {
     _marker: marker::PhantomData<T>,
 }
 
-impl<'de, T> Decoder<'de> for Never<T>
+impl<'de, E> Decoder<'de> for Never<E>
 where
-    T: Decoder<'de>,
+    E: Error,
 {
-    type Error = T::Error;
-    type Buffer = NeverDecoder<T::Error>;
+    type Error = E;
+    type Buffer = Self;
     type Pack = Self;
     type Sequence = Self;
     type Tuple = Self;
@@ -70,67 +71,27 @@ where
     }
 }
 
-impl<T> AsDecoder for Never<T>
+impl<E> AsDecoder for Never<E>
 where
-    T: Decoder<'static>,
+    E: Error,
 {
-    type Error = T::Error;
+    type Error = E;
 
-    type Decoder<'this> = NeverDecoder<T::Error>
+    type Decoder<'this> = Never<E>
     where
         Self: 'this;
 
     #[inline]
-    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, Self::Error> {
         match self._never {}
     }
 }
 
-/// A fake [Decoder] implementation that can never be instantiated.
-#[non_exhaustive]
-pub struct NeverDecoder<E> {
-    _never: NeverMarker,
-    _marker: marker::PhantomData<E>,
-}
-
-impl<'de, E> Decoder<'de> for NeverDecoder<E>
+impl<'de, E> PairDecoder<'de> for Never<E>
 where
     E: Error,
 {
     type Error = E;
-    type Buffer = Self;
-    type Some = Never<Self>;
-    type Pack = Never<Self>;
-    type Sequence = Never<Self>;
-    type Tuple = Never<Self>;
-    type Map = Never<Self>;
-    type Struct = Never<Self>;
-    type Variant = Never<Self>;
-
-    #[inline]
-    fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self._never {}
-    }
-}
-
-impl<E> AsDecoder for NeverDecoder<E>
-where
-    E: Error,
-{
-    type Error = E;
-    type Decoder<'this> = Never<NeverDecoder<E>> where Self: 'this;
-
-    #[inline]
-    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
-        match self._never {}
-    }
-}
-
-impl<'de, T> PairDecoder<'de> for Never<T>
-where
-    T: Decoder<'de>,
-{
-    type Error = T::Error;
 
     type First<'this> = Self
     where
@@ -154,11 +115,11 @@ where
     }
 }
 
-impl<'de, T> VariantDecoder<'de> for Never<T>
+impl<'de, E> VariantDecoder<'de> for Never<E>
 where
-    T: Decoder<'de>,
+    E: Error,
 {
-    type Error = T::Error;
+    type Error = E;
 
     type Tag<'this> = Self
     where
@@ -187,11 +148,11 @@ where
     }
 }
 
-impl<'de, T> PairsDecoder<'de> for Never<T>
+impl<'de, E> PairsDecoder<'de> for Never<E>
 where
-    T: Decoder<'de>,
+    E: Error,
 {
-    type Error = T::Error;
+    type Error = E;
 
     type Decoder<'this> = Self
     where
@@ -208,11 +169,11 @@ where
     }
 }
 
-impl<'de, T> SequenceDecoder<'de> for Never<T>
+impl<'de, E> SequenceDecoder<'de> for Never<E>
 where
-    T: Decoder<'de>,
+    E: Error,
 {
-    type Error = T::Error;
+    type Error = E;
 
     type Decoder<'this> = Self
     where
@@ -229,11 +190,11 @@ where
     }
 }
 
-impl<'de, T> PackDecoder<'de> for Never<T>
+impl<'de, E> PackDecoder<'de> for Never<E>
 where
-    T: Decoder<'de>,
+    E: Error,
 {
-    type Error = T::Error;
+    type Error = E;
 
     type Decoder<'this> = Self
     where

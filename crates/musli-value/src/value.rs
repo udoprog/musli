@@ -55,8 +55,22 @@ impl Value {
         }
     }
 
+    /// Construct a [AsValueDecoder] implementation out of this value which
+    /// emits the specified error `E`.
+    #[inline]
+    pub fn into_value_decoder<E>(self) -> AsValueDecoder<E>
+    where
+        E: Error + From<ValueError>,
+    {
+        AsValueDecoder::new(self)
+    }
+
     /// Get a decoder associated with a value.
-    pub(crate) fn decoder(&self) -> ValueDecoder<'_> {
+    #[inline]
+    pub(crate) fn decoder<E>(&self) -> ValueDecoder<'_, E>
+    where
+        E: Error + From<ValueError>,
+    {
         ValueDecoder::new(self)
     }
 }
@@ -406,12 +420,32 @@ where
     }
 }
 
-impl AsDecoder for Value {
-    type Error = ValueError;
-    type Decoder<'this> = ValueDecoder<'this> where Self: 'this;
+/// Value's [AsDecoder] implementation.
+pub struct AsValueDecoder<E> {
+    value: Value,
+    _marker: marker::PhantomData<E>,
+}
+
+impl<E> AsValueDecoder<E> {
+    /// Construct a new buffered value decoder.
+    #[inline]
+    pub fn new(value: Value) -> Self {
+        Self {
+            value,
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<E> AsDecoder for AsValueDecoder<E>
+where
+    E: Error + From<ValueError>,
+{
+    type Error = E;
+    type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;
 
     #[inline]
     fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
-        Ok(self.decoder())
+        Ok(self.value.decoder())
     }
 }

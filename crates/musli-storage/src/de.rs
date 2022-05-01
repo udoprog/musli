@@ -6,7 +6,7 @@ use musli::de::{
     Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
-use musli::never::NeverDecoder;
+use musli::never::Never;
 use musli_common::reader::PosReader;
 
 /// A very simple decoder suitable for storage decoding.
@@ -55,7 +55,7 @@ where
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Buffer = NeverDecoder<R::Error>;
+    type Buffer = Never<R::Error>;
     type Pack = Self;
     type Some = Self;
     type Sequence = LimitedStorageDecoder<R, I, L>;
@@ -125,6 +125,7 @@ where
                 self.0.expecting(f)
             }
 
+            #[cfg(feature = "std")]
             #[inline]
             fn visit_owned(self, bytes: Vec<u8>) -> Result<Self::Ok, Self::Error> {
                 let string = String::from_utf8(bytes).map_err(Self::Error::custom)?;

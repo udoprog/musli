@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use rand::prelude::*;
 
-const SMALL_ITERATIONS: usize = 100_000;
+const SMALL_ITERATIONS: usize = 10_000;
 const LARGE_ITERATIONS: usize = 1_000;
 
 #[test]

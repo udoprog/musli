@@ -1,24 +1,30 @@
 use core::fmt;
+use core::marker;
 use core::slice;
 
 use musli::de::{
     AsDecoder, Decoder, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
     TypeHint, ValueVisitor, VariantDecoder,
 };
+use musli::error::Error;
 use musli::mode::Mode;
 
 use crate::error::ValueError;
 use crate::value::{Number, Value};
 
 /// Encoder for a single value.
-pub struct ValueDecoder<'a> {
+pub struct ValueDecoder<'a, E = ValueError> {
     value: &'a Value,
+    _marker: marker::PhantomData<E>,
 }
 
-impl<'a> ValueDecoder<'a> {
+impl<'a, E> ValueDecoder<'a, E> {
     #[inline]
     pub(crate) const fn new(value: &'a Value) -> Self {
-        Self { value }
+        Self {
+            value,
+            _marker: marker::PhantomData,
+        }
     }
 }
 
@@ -28,22 +34,25 @@ macro_rules! ensure {
             $pat => $block,
             value => {
                 let $hint = value.type_hint();
-                return Err(ValueError::$ident $tt);
+                return Err(E::from(ValueError::$ident $tt));
             }
         }
     };
 }
 
-impl<'de> Decoder<'de> for ValueDecoder<'de> {
-    type Error = ValueError;
+impl<'de, E> Decoder<'de> for ValueDecoder<'de, E>
+where
+    E: Error + From<ValueError>,
+{
+    type Error = E;
     type Buffer = Self;
     type Some = Self;
-    type Pack = IterValueDecoder<'de>;
-    type Sequence = IterValueDecoder<'de>;
-    type Tuple = IterValueDecoder<'de>;
-    type Map = IterValuePairsDecoder<'de>;
-    type Struct = IterValuePairsDecoder<'de>;
-    type Variant = IterValueVariantDecoder<'de>;
+    type Pack = IterValueDecoder<'de, E>;
+    type Sequence = IterValueDecoder<'de, E>;
+    type Tuple = IterValueDecoder<'de, E>;
+    type Map = IterValuePairsDecoder<'de, E>;
+    type Struct = IterValuePairsDecoder<'de, E>;
+    type Variant = IterValueVariantDecoder<'de, E>;
 
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "cannot be decoded from value")
@@ -150,7 +159,7 @@ impl<'de> Decoder<'de> for ValueDecoder<'de> {
     #[inline]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
         ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
-            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| ValueError::ArrayOutOfBounds)
+            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| E::from(ValueError::ArrayOutOfBounds))
         })
     }
 
@@ -225,34 +234,42 @@ impl<'de> Decoder<'de> for ValueDecoder<'de> {
     }
 }
 
-impl<'a> AsDecoder for ValueDecoder<'a> {
-    type Error = ValueError;
-    type Decoder<'this> = ValueDecoder<'this> where Self: 'this;
+impl<'a, E> AsDecoder for ValueDecoder<'a, E>
+where
+    E: Error + From<ValueError>,
+{
+    type Error = E;
+    type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;
 
     #[inline]
-    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, Self::Error> {
         Ok(ValueDecoder::new(self.value))
     }
 }
 
 /// A decoder over a simple value iterator.
-pub struct IterValueDecoder<'de> {
+pub struct IterValueDecoder<'de, E> {
     iter: slice::Iter<'de, Value>,
+    _marker: marker::PhantomData<E>,
 }
 
-impl<'de> IterValueDecoder<'de> {
+impl<'de, E> IterValueDecoder<'de, E> {
     #[inline]
     fn new(values: &'de [Value]) -> Self {
         Self {
             iter: values.iter(),
+            _marker: marker::PhantomData,
         }
     }
 }
 
-impl<'de> PackDecoder<'de> for IterValueDecoder<'de> {
-    type Error = ValueError;
+impl<'de, E> PackDecoder<'de> for IterValueDecoder<'de, E>
+where
+    E: Error + From<ValueError>,
+{
+    type Error = E;
 
-    type Decoder<'this> = ValueDecoder<'de>
+    type Decoder<'this> = ValueDecoder<'de, E>
     where
         Self: 'this;
 
@@ -260,15 +277,18 @@ impl<'de> PackDecoder<'de> for IterValueDecoder<'de> {
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         match self.iter.next() {
             Some(value) => Ok(ValueDecoder::new(value)),
-            None => Err(ValueError::ExpectedPackValue),
+            None => Err(E::from(ValueError::ExpectedPackValue)),
         }
     }
 }
 
-impl<'de> SequenceDecoder<'de> for IterValueDecoder<'de> {
-    type Error = ValueError;
+impl<'de, E> SequenceDecoder<'de> for IterValueDecoder<'de, E>
+where
+    E: Error + From<ValueError>,
+{
+    type Error = E;
 
-    type Decoder<'this> = ValueDecoder<'de>
+    type Decoder<'this> = ValueDecoder<'de, E>
     where
         Self: 'this;
 
@@ -287,23 +307,28 @@ impl<'de> SequenceDecoder<'de> for IterValueDecoder<'de> {
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairsDecoder<'de> {
+pub struct IterValuePairsDecoder<'de, E> {
     iter: slice::Iter<'de, (Value, Value)>,
+    _marker: marker::PhantomData<E>,
 }
 
-impl<'de> IterValuePairsDecoder<'de> {
+impl<'de, E> IterValuePairsDecoder<'de, E> {
     #[inline]
     fn new(values: &'de [(Value, Value)]) -> Self {
         Self {
             iter: values.iter(),
+            _marker: marker::PhantomData,
         }
     }
 }
 
-impl<'de> PairsDecoder<'de> for IterValuePairsDecoder<'de> {
-    type Error = ValueError;
+impl<'de, E> PairsDecoder<'de> for IterValuePairsDecoder<'de, E>
+where
+    E: Error + From<ValueError>,
+{
+    type Error = E;
 
-    type Decoder<'this> = IterValuePairDecoder<'de>
+    type Decoder<'this> = IterValuePairDecoder<'de, E>
     where
         Self: 'this;
 
@@ -319,25 +344,32 @@ impl<'de> PairsDecoder<'de> for IterValuePairsDecoder<'de> {
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairDecoder<'de> {
+pub struct IterValuePairDecoder<'de, E> {
     pair: &'de (Value, Value),
+    _marker: marker::PhantomData<E>,
 }
 
-impl<'de> IterValuePairDecoder<'de> {
+impl<'de, E> IterValuePairDecoder<'de, E> {
     #[inline]
     const fn new(pair: &'de (Value, Value)) -> Self {
-        Self { pair }
+        Self {
+            pair,
+            _marker: marker::PhantomData,
+        }
     }
 }
 
-impl<'de> PairDecoder<'de> for IterValuePairDecoder<'de> {
-    type Error = ValueError;
+impl<'de, E> PairDecoder<'de> for IterValuePairDecoder<'de, E>
+where
+    E: Error + From<ValueError>,
+{
+    type Error = E;
 
-    type First<'this> = ValueDecoder<'de>
+    type First<'this> = ValueDecoder<'de, E>
     where
         Self: 'this;
 
-    type Second = ValueDecoder<'de>;
+    type Second = ValueDecoder<'de, E>;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
@@ -356,25 +388,32 @@ impl<'de> PairDecoder<'de> for IterValuePairDecoder<'de> {
 }
 
 /// A decoder over a simple value pair as a variant.
-pub struct IterValueVariantDecoder<'de> {
+pub struct IterValueVariantDecoder<'de, E> {
     pair: &'de (Value, Value),
+    _marker: marker::PhantomData<E>,
 }
 
-impl<'de> IterValueVariantDecoder<'de> {
+impl<'de, E> IterValueVariantDecoder<'de, E> {
     #[inline]
     const fn new(pair: &'de (Value, Value)) -> Self {
-        Self { pair }
+        Self {
+            pair,
+            _marker: marker::PhantomData,
+        }
     }
 }
 
-impl<'de> VariantDecoder<'de> for IterValueVariantDecoder<'de> {
-    type Error = ValueError;
+impl<'de, E> VariantDecoder<'de> for IterValueVariantDecoder<'de, E>
+where
+    E: Error + From<ValueError>,
+{
+    type Error = E;
 
-    type Tag<'this> = ValueDecoder<'de>
+    type Tag<'this> = ValueDecoder<'de, E>
     where
         Self: 'this;
 
-    type Variant<'this> = ValueDecoder<'de>
+    type Variant<'this> = ValueDecoder<'de, E>
     where
         Self: 'this;
 

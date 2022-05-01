@@ -8,14 +8,14 @@ use crate::mode::Mode;
 /// Trait that allows a type to be repeatedly coerced into a decoder.
 pub trait AsDecoder {
     /// Error type raised by calling `as_decoder`.
-    type Error;
+    type Error: Error;
     /// The decoder we reborrow as.
-    type Decoder<'this>: Decoder<'this>
+    type Decoder<'this>: Decoder<'this, Error = Self::Error>
     where
         Self: 'this;
 
     /// Borrow self as a new decoder.
-    fn as_decoder(&mut self) -> Result<Self::Decoder<'_>, Self::Error>;
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, Self::Error>;
 }
 
 /// A pack that can construct encoders.
@@ -142,7 +142,7 @@ pub trait Decoder<'de>: Sized {
     /// Error type raised by the decoder.
     type Error: Error;
     /// The type returned when the decoder is buffered.
-    type Buffer: AsDecoder;
+    type Buffer: AsDecoder<Error = Self::Error>;
     /// Decoder for a value that is present.
     type Some: Decoder<'de, Error = Self::Error>;
     /// Pack decoder implementation.
@@ -180,13 +180,14 @@ pub trait Decoder<'de>: Sized {
     ///
     /// impl Decoder<'_> for MyDecoder {
     ///     type Error = String;
-    ///     type Pack = Never<Self>;
-    ///     type Sequence = Never<Self>;
-    ///     type Tuple = Never<Self>;
-    ///     type Map = Never<Self>;
-    ///     type Some = Never<Self>;
-    ///     type Struct = Never<Self>;
-    ///     type Variant = Never<Self>;
+    ///     type Buffer = Never<Self::Error>;
+    ///     type Pack = Never<Self::Error>;
+    ///     type Sequence = Never<Self::Error>;
+    ///     type Tuple = Never<Self::Error>;
+    ///     type Map = Never<Self::Error>;
+    ///     type Some = Never<Self::Error>;
+    ///     type Struct = Never<Self::Error>;
+    ///     type Variant = Never<Self::Error>;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")
@@ -224,34 +225,48 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Decode, Decoder, Mode};
+    /// use musli::de::{AsDecoder, PairsDecoder, PairDecoder};
+    /// use musli::error::Error;
     ///
     /// #[derive(Decode)]
     /// struct Variant2 {
+    ///     name: String,
+    ///     age: u32,
     /// }
     ///
-    /// struct MyVariantType {
+    /// enum MyVariantType {
     ///     Variant1,
     ///     Variant2(Variant2),
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for UnitType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyVariantType where M: Mode {
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         let buffer = decoder.decode_buffer()?;
+    ///         let mut buffer = decoder.decode_buffer::<M>()?;
     ///
-    ///         let st = buffer.as_decoder().decode_struct();
+    ///         let mut st = buffer.as_decoder()?.decode_struct(2)?;
     ///
-    ///         while let Some(e) = st.next() {
-    ///             let found = e.first()?.decode_string(musli::utils::value_visitor_fn(|string: &str| {
-    ///                 string == "type"
-    ///             }));
+    ///         let mut discriminator = None::<u32>;
     ///
-    ///             dbg!(found);
+    ///         while let Some(mut e) = st.next()? {
+    ///             let found = e.first()?.decode_string(musli::utils::string_visitor_fn(|string| {
+    ///                 Ok(string == "type")
+    ///             }))?;
+    ///
+    ///             if found {
+    ///                 discriminator = Some(e.second().and_then(Decode::<M>::decode)?);
+    ///                 break;
+    ///             }
     ///         }
     ///
-    ///         Ok(todo!())
+    ///         match discriminator {
+    ///             Some(0) => Ok(MyVariantType::Variant1),
+    ///             Some(1) => Ok(MyVariantType::Variant2(buffer.as_decoder().and_then(Decode::<M>::decode)?)),
+    ///             Some(other) => Err(D::Error::invalid_variant_tag("MyVariantType", other)),
+    ///             None => Err(D::Error::missing_variant_tag("MyVariantType")),
+    ///         }
     ///     }
     /// }
     /// ```

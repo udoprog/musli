@@ -16,7 +16,7 @@ mod en;
 mod error;
 mod value;
 
-pub use self::value::Value;
+pub use self::value::{AsValueDecoder, Value};
 pub use error::ValueError;
 
 use en::ValueEncoder;

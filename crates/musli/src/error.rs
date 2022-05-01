@@ -8,7 +8,7 @@
 use core::fmt;
 
 /// Trait governing errors raised during encodeing or decoding.
-pub trait Error: 'static + Send + Sync + Sized {
+pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     /// Construct a custom error.
     fn custom<T>(error: T) -> Self
     where
@@ -59,6 +59,12 @@ pub trait Error: 'static + Send + Sync + Sized {
             "invalid variant tag: {}: {:?}",
             type_name, tag
         ))
+    }
+
+    /// Indicate that a variant tag could not be determined.
+    #[inline]
+    fn missing_variant_tag(type_name: &'static str) -> Self {
+        Self::message(format_args!("missing variant tag: {}", type_name))
     }
 
     /// Encountered an unsupported variant field.

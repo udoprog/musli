@@ -3,16 +3,14 @@ use core::marker;
 
 use crate::de::ValueVisitor;
 use crate::error::Error;
-use crate::no_std::ToOwned;
 
-/// Construct an anonymous value visitor from a function.
-pub fn value_visitor_fn<'de, T, O, E, U>(
+/// Construct an anonymous bytes visitor from a function.
+pub fn bytes_visitor_fn<'de, T, O, E>(
     function: T,
-) -> impl ValueVisitor<'de, Target = U, Ok = O, Error = E>
+) -> impl ValueVisitor<'de, Target = [u8], Ok = O, Error = E>
 where
-    T: FnOnce(&U) -> Result<O, E>,
+    T: FnOnce(&[u8]) -> Result<O, E>,
     E: Error,
-    U: ToOwned,
 {
     FromFn {
         function,
@@ -20,18 +18,17 @@ where
     }
 }
 
-struct FromFn<T, O, E, U> {
+struct FromFn<T, O, E> {
     function: T,
-    _marker: marker::PhantomData<(O, E, U)>,
+    _marker: marker::PhantomData<(O, E)>,
 }
 
-impl<'de, T, O, E, U> ValueVisitor<'de> for FromFn<T, O, E, U>
+impl<'de, T, O, E> ValueVisitor<'de> for FromFn<T, O, E>
 where
-    T: FnOnce(&U) -> Result<O, E>,
+    T: FnOnce(&[u8]) -> Result<O, E>,
     E: Error,
-    U: ToOwned,
 {
-    type Target = U;
+    type Target = [u8];
     type Ok = O;
     type Error = E;
 

@@ -8,8 +8,9 @@ use musli::de::{
     SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
+#[cfg(feature = "std")]
 use musli::mode::Mode;
-use musli::never::{Never, NeverDecoder};
+use musli::never::Never;
 
 use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
@@ -109,10 +110,10 @@ where
 {
     type Error = ParseError;
     #[cfg(not(feature = "std"))]
-    type Buffer = Never<Self>;
+    type Buffer = Never<Self::Error>;
     #[cfg(feature = "std")]
-    type Buffer = musli_value::Value;
-    type Pack = Never<Self>;
+    type Buffer = musli_value::AsValueDecoder<Self::Error>;
+    type Pack = Never<Self::Error>;
     type Sequence = JsonSequenceDecoder<'a, P>;
     type Tuple = JsonSequenceDecoder<'a, P>;
     type Map = JsonObjectDecoder<'a, P>;
@@ -146,7 +147,8 @@ where
         M: Mode,
     {
         use musli::de::Decode;
-        Decode::<M>::decode(self)
+        let value: musli_value::Value = Decode::<M>::decode(self)?;
+        Ok(value.into_value_decoder())
     }
 
     #[inline]
@@ -431,14 +433,14 @@ where
     P: Parser<'de>,
 {
     type Error = ParseError;
-    type Buffer = NeverDecoder<ParseError>;
-    type Pack = Never<Self>;
-    type Sequence = Never<Self>;
-    type Tuple = Never<Self>;
-    type Map = Never<Self>;
-    type Some = Never<Self>;
+    type Buffer = Never<Self::Error>;
+    type Pack = Never<Self::Error>;
+    type Sequence = Never<Self::Error>;
+    type Tuple = Never<Self::Error>;
+    type Map = Never<Self::Error>;
+    type Some = Never<Self::Error>;
     type Struct = JsonObjectDecoder<'a, P>;
-    type Variant = Never<Self>;
+    type Variant = Never<Self::Error>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

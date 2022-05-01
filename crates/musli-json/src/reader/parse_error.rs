@@ -65,6 +65,8 @@ pub(crate) enum ParseErrorKind {
     ExpectedValue(Token),
     ParseFloat(lexical::Error),
     IntegerError(integer::Error),
+    #[cfg(feature = "std")]
+    ValueError(musli_value::ValueError),
     Eof,
     Custom,
 }
@@ -153,6 +155,10 @@ impl fmt::Display for ParseError {
             ParseErrorKind::IntegerError(error) => {
                 write!(f, "expected integer, got {error} (at {span})")
             }
+            #[cfg(feature = "std")]
+            ParseErrorKind::ValueError(error) => {
+                write!(f, "value error: {error} (at {span})")
+            }
             ParseErrorKind::Eof => write!(f, "eof while parsing (at {span})"),
             ParseErrorKind::Custom => {
                 #[cfg(feature = "std")]
@@ -199,3 +205,14 @@ impl Error for ParseError {
 
 #[cfg(feature = "std")]
 impl std::error::Error for ParseError {}
+
+#[cfg(feature = "std")]
+impl From<musli_value::ValueError> for ParseError {
+    fn from(error: musli_value::ValueError) -> Self {
+        ParseError {
+            span: Span::empty(),
+            kind: ParseErrorKind::ValueError(error),
+            custom: None,
+        }
+    }
+}
