@@ -1,10 +1,9 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 
-use crate::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild, VariantBuild};
 use crate::expander::Result;
 use crate::internals::attr::{EnumTagging, Packing};
-use crate::internals::symbol::*;
+use crate::internals::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild, VariantBuild};
 
 pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
     let span = e.input.ident.span();
@@ -182,13 +181,7 @@ fn encode_fields(e: &Build<'_>, var: &syn::Ident, fields: &[FieldBuild]) -> Resu
 /// Encode an internally tagged enum.
 fn encode_enum(e: &Build<'_>, var: &syn::Ident, data: &EnumBuild<'_>) -> Result<TokenStream> {
     if let Some(&(span, Packing::Transparent)) = data.packing_span {
-        e.cx.error_span(
-            span,
-            format!(
-                "#[{}({})] cannot be used to encode enums",
-                ATTR, TRANSPARENT
-            ),
-        );
+        e.encode_transparent_enum_diagnostics(span);
         return Err(());
     }
 

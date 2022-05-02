@@ -28,6 +28,39 @@ pub(crate) struct Build<'a> {
 }
 
 impl Build<'_> {
+    /// Emit diagnostics for when we try to implement `Decode` for an enum which
+    /// is marked as `#[musli(transparent)]`.
+    pub(crate) fn encode_transparent_enum_diagnostics(&self, span: Span) {
+        self.cx.error_span(
+            span,
+            format!(
+                "#[{}({})] cannot be used to encode enums",
+                ATTR, TRANSPARENT
+            ),
+        );
+    }
+
+    /// Emit diagnostics indicating that we tried to implement decode for a
+    /// packed enum.
+    pub(crate) fn decode_packed_enum_diagnostics(&self, span: Span) {
+        self.cx.error_span(
+            span,
+            format!("#[{}({})] cannot be used to decode enums", ATTR, PACKED),
+        );
+    }
+
+    /// Emit diagnostics indicating that we tried to use a `#[musli(default)]`
+    /// annotation on a packed container.
+    pub(crate) fn packed_default_diagnostics(&self, span: Span) {
+        self.cx.error_span(
+            span,
+            format!(
+                "#[{}({})] fields cannot be used in an packed container",
+                ATTR, DEFAULT
+            ),
+        );
+    }
+
     /// Emit diagnostics for a transparent encode / decode that failed because
     /// the wrong number of fields existed.
     pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[FieldBuild]) {

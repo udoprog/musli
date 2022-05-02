@@ -1,4 +1,5 @@
 pub mod attr;
+pub(crate) mod build;
 mod ctxt;
 mod mode;
 pub(crate) mod symbol;

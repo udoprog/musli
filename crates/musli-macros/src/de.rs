@@ -2,11 +2,10 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
-use crate::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild};
 use crate::expander::field_int;
 use crate::expander::{Result, TagMethod};
 use crate::internals::attr::Packing;
-use crate::internals::symbol::*;
+use crate::internals::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild};
 
 pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     let span = e.input.ident.span();
@@ -22,6 +21,9 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         return Err(());
     }
 
+    // Figure out which lifetime to use for what. We use the first lifetime in
+    // the type (if any is available) as the decoder lifetime. Else we generate
+    // a new anonymous lifetime `'de` to use for the `Decode` impl.
     let mut impl_generics = e.input.generics.clone();
     let type_ident = &e.input.ident;
 
@@ -86,10 +88,7 @@ fn decode_enum(
     data: &EnumBuild,
 ) -> Result<TokenStream> {
     if let Some(&(span, Packing::Packed)) = data.packing_span {
-        e.cx.error_span(
-            span,
-            format!("#[{}({})] cannot be used to decode enums", ATTR, PACKED),
-        );
+        e.decode_packed_enum_diagnostics(span);
         return Err(());
     }
 
@@ -393,13 +392,7 @@ fn decode_packed(
 
     for f in fields {
         if let Some(span) = f.default_attr {
-            e.cx.error_span(
-                span,
-                format!(
-                    "#[{}({})] fields cannot be used in an packed container",
-                    ATTR, DEFAULT
-                ),
-            );
+            e.packed_default_diagnostics(span);
         }
 
         let (span, decode_path) = &f.decode_path;

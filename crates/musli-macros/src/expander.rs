@@ -1,8 +1,8 @@
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
-use crate::build::Build;
 use crate::internals::attr::{self, DefaultTag, TypeAttr};
+use crate::internals::build::Build;
 use crate::internals::symbol::*;
 use crate::internals::tokens::Tokens;
 use crate::internals::{Ctxt, Mode, ModePath};
@@ -223,7 +223,7 @@ impl<'a> Expander<'a> {
         let mut builds = Vec::new();
 
         if modes.is_empty() {
-            builds.push(crate::build::setup(
+            builds.push(crate::internals::build::setup(
                 self,
                 ExpansionMode::Generic {
                     mode_ident: &mode_ident,
@@ -231,13 +231,16 @@ impl<'a> Expander<'a> {
             )?);
         } else {
             for mode_ident in modes {
-                builds.push(crate::build::setup(
+                builds.push(crate::internals::build::setup(
                     self,
                     ExpansionMode::Moded { mode_ident },
                 )?);
             }
 
-            builds.push(crate::build::setup(self, ExpansionMode::Default)?);
+            builds.push(crate::internals::build::setup(
+                self,
+                ExpansionMode::Default,
+            )?);
         }
 
         Ok(builds)
