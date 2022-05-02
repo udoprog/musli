@@ -5,10 +5,11 @@ use quote::quote_spanned;
 
 use crate::expander::field_int;
 use crate::expander::{
-    Data, EnumData, Expander, ExpansionMode, FieldData, Result, StructData, TagMethod, VariantData,
+    Data, EnumData, Expander, FieldData, Result, StructData, TagMethod, VariantData,
 };
 use crate::internals::attr::{DefaultTag, EnumTagging, Packing};
 use crate::internals::tokens::Tokens;
+use crate::internals::Expansion;
 use crate::internals::{symbol::*, ModePath};
 use crate::{
     expander::Taggable,
@@ -20,7 +21,7 @@ pub(crate) struct Build<'a> {
     pub(crate) cx: &'a Ctxt,
     pub(crate) type_name: &'a syn::LitStr,
     pub(crate) tokens: &'a Tokens,
-    pub(crate) expansion: ExpansionMode<'a>,
+    pub(crate) expansion: Expansion<'a>,
     pub(crate) data: BuildData<'a>,
     pub(crate) decode_t_decode: TokenStream,
     pub(crate) encode_t_encode: TokenStream,
@@ -149,7 +150,7 @@ pub(crate) struct FieldBuild<'a> {
 /// Setup a build.
 ///
 /// Handles mode decoding, and construction of parameters which might give rise to errors.
-pub(crate) fn setup<'a>(e: &'a Expander, expansion: ExpansionMode<'a>) -> Result<Build<'a>> {
+pub(crate) fn setup<'a>(e: &'a Expander, expansion: Expansion<'a>) -> Result<Build<'a>> {
     let mode = expansion.as_mode(&e.tokens);
 
     e.validate_attributes(mode)?;
