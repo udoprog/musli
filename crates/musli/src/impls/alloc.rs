@@ -197,6 +197,7 @@ macro_rules! sequence {
                     out.$insert(T::decode(value)?);
                 }
 
+                $access.end()?;
                 Ok(out)
             }
         }
@@ -280,6 +281,7 @@ macro_rules! map {
                     out.insert(key, value);
                 }
 
+                $access.end()?;
                 Ok(out)
             }
         }

@@ -167,6 +167,11 @@ where
     fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         match self._never {}
     }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        match self._never {}
+    }
 }
 
 impl<'de, E> SequenceDecoder<'de> for Never<E>
@@ -188,6 +193,11 @@ where
     fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         match self._never {}
     }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        match self._never {}
+    }
 }
 
 impl<'de, E> PackDecoder<'de> for Never<E>
@@ -202,6 +212,11 @@ where
 
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }

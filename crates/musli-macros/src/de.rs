@@ -481,6 +481,7 @@ fn decode_tagged(
             #body
         }
 
+        #pairs_decoder_t::end(type_decoder)?;
         #path { #(#assigns),* }
     })
 }
@@ -528,8 +529,8 @@ fn decode_untagged(
     path: syn::Path,
     fields: &[FieldData],
 ) -> Option<TokenStream> {
-    let pack_decoder_t = &e.tokens.pack_decoder_t;
     let decoder_t = &e.tokens.decoder_t;
+    let pack_decoder_t = &e.tokens.pack_decoder_t;
 
     let mut assign = Vec::new();
 
@@ -570,7 +571,9 @@ fn decode_untagged(
         Some(quote_spanned! {
             span =>
             let mut unpack = #decoder_t::decode_pack(#decoder_var)?;
-            #path { #(#assign),* }
+            let output = #path { #(#assign),* };
+            #pack_decoder_t::end(unpack)?;
+            output
         })
     }
 }

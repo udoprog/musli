@@ -280,6 +280,11 @@ where
             None => Err(E::from(ValueError::ExpectedPackValue)),
         }
     }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 impl<'de, E> SequenceDecoder<'de> for IterValueDecoder<'de, E>
@@ -303,6 +308,11 @@ where
             Some(value) => Ok(Some(ValueDecoder::new(value))),
             None => Ok(None),
         }
+    }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 
@@ -340,6 +350,11 @@ where
     #[inline]
     fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         Ok(self.iter.next().map(IterValuePairDecoder::new))
+    }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 

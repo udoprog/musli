@@ -31,6 +31,11 @@ pub trait PackDecoder<'de> {
     /// Return decoder to unpack the next element.
     #[must_use = "decoders must be consumed"]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error>;
+
+    /// Stop decoding the current pack.
+    ///
+    /// This is required to call after a pack has finished decoding.
+    fn end(self) -> Result<(), Self::Error>;
 }
 
 /// Trait governing how to decode a sequence.
@@ -49,6 +54,11 @@ pub trait SequenceDecoder<'de> {
     /// Decode the next element.
     #[must_use = "decoders must be consumed"]
     fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error>;
+
+    /// Stop decoding the current sequence.
+    ///
+    /// This is required to call after a sequence has finished decoding.
+    fn end(self) -> Result<(), Self::Error>;
 }
 
 /// Trait governing how to decode a sequence of pairs.
@@ -67,9 +77,16 @@ pub trait PairsDecoder<'de> {
     /// Get a size hint of known remaining elements.
     fn size_hint(&self) -> Option<usize>;
 
-    /// Decode the next key. This returns `Ok(None)` where there are no more elements to decode.
+    /// Decode the next key. This returns `Ok(None)` where there are no more
+    /// elements to decode.
     #[must_use = "decoders must be consumed"]
     fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error>;
+
+    /// End the pair decoder.
+    ///
+    /// If there are any remaining elements in the sequence of pairs, this
+    /// indicates that they should be flushed.
+    fn end(self) -> Result<(), Self::Error>;
 }
 
 /// Trait governing how to decode a field.
@@ -260,6 +277,8 @@ pub trait Decoder<'de>: Sized {
     ///                 break;
     ///             }
     ///         }
+    ///
+    ///         st.end()?;
     ///
     ///         match discriminator {
     ///             Some(0) => Ok(MyVariantType::Variant1),
@@ -1013,6 +1032,7 @@ pub trait Decoder<'de>: Sized {
     ///         let mut unpack = decoder.decode_pack()?;
     ///         let field = unpack.next().and_then(Decode::<M>::decode)?;
     ///         let data = unpack.next().and_then(Decode::<M>::decode)?;
+    ///         unpack.end()?;
     ///
     ///         Ok(Self {
     ///             field,
@@ -1053,6 +1073,8 @@ pub trait Decoder<'de>: Sized {
     ///             data.push(<String as Decode<M>>::decode(decoder)?);
     ///         }
     ///
+    ///         seq.end()?;
+    ///
     ///         Ok(Self {
     ///             data
     ///         })
@@ -1067,9 +1089,7 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Return a helper to decode a tuple.
-    ///
-    /// A tuple is a fixed-length sequence.
+    /// Decode a fixed-length sequence of elements of length `len`.
     ///
     /// # Examples
     ///
@@ -1090,19 +1110,23 @@ pub trait Decoder<'de>: Sized {
     ///         let mut tuple = decoder.decode_tuple(2)?;
     ///         let string = tuple.next().and_then(<String as Decode<M>>::decode)?;
     ///         let integer = tuple.next().and_then(<u32 as Decode<M>>::decode)?;
+    ///         tuple.end()?;
     ///         Ok(Self(string, integer))
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+    fn decode_tuple(self, #[allow(unused)] len: usize) -> Result<Self::Tuple, Self::Error> {
         Err(Self::Error::message(expecting::invalid_type(
             &expecting::Tuple,
             &ExpectingWrapper(self),
         )))
     }
 
-    /// Decode a map.
+    /// Decode a map of unknown length.
+    ///
+    /// The length of the map must somehow be determined from the underlying
+    /// format.
     ///
     /// # Examples
     ///
@@ -1130,6 +1154,8 @@ pub trait Decoder<'de>: Sized {
     ///             data.insert(key, value);
     ///         }
     ///
+    ///         map.end()?;
+    ///
     ///         Ok(Self {
     ///             data
     ///         })
@@ -1144,7 +1170,13 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Return a helper to decode a struct with named fields.
+    /// Decode a struct which has an expected `len` number of elements.
+    ///
+    /// The `len` indicates how many fields the decoder is *expecting* depending
+    /// on how many fields are present in the underlying struct being decoded,
+    /// butit should only be considered advisory.
+    ///
+    /// The size of a struct might therefore change from one session to another.
     ///
     /// # Examples
     ///
@@ -1185,6 +1217,8 @@ pub trait Decoder<'de>: Sized {
     ///                 }
     ///             }
     ///         }
+    ///
+    ///         st.end()?;
     ///
     ///         Ok(Self {
     ///             string: string.ok_or_else(|| D::Error::expected_tag("Struct", "string"))?,

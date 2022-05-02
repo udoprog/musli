@@ -603,6 +603,11 @@ where
             }
         }
     }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 pub struct JsonObjectPairDecoder<'a, P> {
@@ -672,6 +677,7 @@ pub struct JsonSequenceDecoder<'a, P> {
     len: Option<usize>,
     first: bool,
     parser: P,
+    terminated: bool,
 }
 
 impl<'de, 'a, P> JsonSequenceDecoder<'a, P>
@@ -702,6 +708,7 @@ where
             len,
             first: true,
             parser,
+            terminated: false,
         })
     }
 }
@@ -739,6 +746,7 @@ where
                 }
                 Token::CloseBracket => {
                     self.parser.skip(1)?;
+                    self.terminated = true;
                     return Ok(None);
                 }
                 _ => {
@@ -748,6 +756,24 @@ where
                 }
             }
         }
+    }
+
+    #[inline]
+    fn end(mut self) -> Result<(), Self::Error> {
+        if !self.terminated {
+            let actual = self.parser.peek()?;
+
+            if !matches!(actual, Token::CloseBracket) {
+                return Err(ParseError::at(
+                    self.parser.pos(),
+                    ParseErrorKind::ExpectedCloseBracket(actual),
+                ));
+            }
+
+            self.terminated = true;
+        }
+
+        Ok(())
     }
 }
 
@@ -777,6 +803,7 @@ where
                 }
                 Token::CloseBracket => {
                     self.parser.skip(1)?;
+                    self.terminated = true;
 
                     return Err(Self::Error::message(format_args!(
                         "encountered short array, but found {token}"
@@ -789,6 +816,24 @@ where
                 }
             }
         }
+    }
+
+    #[inline]
+    fn end(mut self) -> Result<(), Self::Error> {
+        if !self.terminated {
+            let actual = self.parser.peek()?;
+
+            if !matches!(actual, Token::CloseBracket) {
+                return Err(ParseError::at(
+                    self.parser.pos(),
+                    ParseErrorKind::ExpectedCloseBracket(actual),
+                ));
+            }
+
+            self.terminated = true;
+        }
+
+        Ok(())
     }
 }
 

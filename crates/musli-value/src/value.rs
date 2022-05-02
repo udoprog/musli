@@ -213,25 +213,28 @@ where
                     out.push(Decode::<M>::decode(item)?);
                 }
 
+                seq.end()?;
                 Ok(Value::Sequence(out))
             }
             TypeHint::Map(len) => {
                 let mut out = Vec::with_capacity(len.size_hint());
 
-                let mut seq = decoder.decode_map()?;
+                let mut map = decoder.decode_map()?;
 
-                while let Some(mut item) = seq.next()? {
+                while let Some(mut item) = map.next()? {
                     let first = Decode::<M>::decode(item.first()?)?;
                     let second = Decode::<M>::decode(item.second()?)?;
                     out.push((first, second));
                 }
 
+                map.end()?;
                 Ok(Value::Map(out))
             }
             TypeHint::Variant => {
                 let mut variant = decoder.decode_variant()?;
                 let first = Decode::<M>::decode(variant.tag()?)?;
                 let second = Decode::<M>::decode(variant.variant()?)?;
+                variant.end()?;
                 Ok(Value::Variant(Box::new((first, second))))
             }
             hint => Err(D::Error::message(format_args!(

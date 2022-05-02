@@ -36,6 +36,7 @@ where
         let mut unpack = decoder.decode_pack()?;
         let tag = unpack.next().and_then(<Tag as Decode<M>>::decode)?;
         let value = unpack.next().and_then(<T as Decode<M>>::decode)?;
+        unpack.end()?;
         Ok(Self { tag, value })
     }
 }

@@ -460,6 +460,11 @@ where
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
     }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 impl<'de, R, I, L> RemainingWireDecoder<R, I, L>
@@ -496,6 +501,16 @@ where
 
         self.remaining -= 1;
         Ok(Some(WireDecoder::new(self.decoder.reader.pos_borrow_mut())))
+    }
+
+    #[inline]
+    fn end(mut self) -> Result<(), Self::Error> {
+        // Skip remaining elements.
+        while let Some(mut item) = SequenceDecoder::next(&mut self)? {
+            item.skip_any()?;
+        }
+
+        Ok(())
     }
 }
 
@@ -583,6 +598,16 @@ where
 
         self.remaining -= 1;
         Ok(Some(WireDecoder::new(self.decoder.reader.pos_borrow_mut())))
+    }
+
+    #[inline]
+    fn end(mut self) -> Result<(), Self::Error> {
+        // Skip remaining elements.
+        while let Some(mut item) = PairsDecoder::next(&mut self)? {
+            item.skip_any()?;
+        }
+
+        Ok(())
     }
 }
 

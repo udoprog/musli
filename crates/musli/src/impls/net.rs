@@ -135,6 +135,7 @@ where
         let mut unpack = decoder.decode_pack()?;
         let ip = unpack.next().and_then(<Ipv4Addr as Decode<M>>::decode)?;
         let port = unpack.next().and_then(<u16 as Decode<M>>::decode)?;
+        unpack.end()?;
         Ok(SocketAddrV4::new(ip, port))
     }
 }
@@ -171,6 +172,7 @@ where
         let port = unpack.next().and_then(<u16 as Decode<M>>::decode)?;
         let flowinfo = unpack.next().and_then(<u32 as Decode<M>>::decode)?;
         let scope_id = unpack.next().and_then(<u32 as Decode<M>>::decode)?;
+        unpack.end()?;
         Ok(Self::new(ip, port, flowinfo, scope_id))
     }
 }

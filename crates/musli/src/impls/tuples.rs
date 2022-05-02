@@ -64,6 +64,7 @@ macro_rules! declare {
                 let mut unpack = decoder.decode_tuple(count!($ident0 $($ident)*))?;
                 let $ident0 = unpack.next().and_then(<$ty0>::decode)?;
                 $(let $ident = unpack.next().and_then(<$ty>::decode)?;)*
+                unpack.end()?;
                 Ok(($ident0, $($ident),*))
             }
         }
@@ -91,6 +92,7 @@ macro_rules! declare {
                 let mut unpack = decoder.decode_pack()?;
                 let $ident0 = unpack.next().and_then(<$ty0>::decode)?;
                 $(let $ident = unpack.next().and_then(<$ty>::decode)?;)*
+                unpack.end()?;
                 Ok(Packed(($ident0, $($ident),*)))
             }
         }

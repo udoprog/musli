@@ -883,7 +883,13 @@ pub trait Encoder: Sized {
         )))
     }
 
-    /// Encode a sequence with a known length.
+    /// Encode a sequence with a known length `len`.
+    ///
+    /// A sequence encodes one element following another and must in some way
+    /// encode the length of the sequence in the underlying format. It is
+    /// decoded with [Decoder::decode_sequence].
+    ///
+    /// [Decoder::decode_sequence]: crate::de::Decoder::decode_sequence
     ///
     /// # Examples
     ///
@@ -911,14 +917,22 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_sequence(self, _: usize) -> Result<Self::Sequence, Self::Error> {
+    fn encode_sequence(self, #[allow(unused)] len: usize) -> Result<Self::Sequence, Self::Error> {
         Err(Self::Error::message(expecting::invalid_type(
             &expecting::Sequence,
             &ExpectingWrapper::new(self),
         )))
     }
 
-    /// Encode a tuple.
+    /// Encode a tuple with a known length `len`.
+    ///
+    /// This is almost identical to [Encoder::encode_sequence] except that we
+    /// know that we are encoding a fixed-length container of length `len`, and
+    /// assuming the size of that container doesn't change in size it can be
+    /// decoded using [Decoder::decode_tuple] again without the underlying
+    /// format having to encode the size of the container.
+    ///
+    /// [Decoder::decode_tuple]: crate::de::Decoder::decode_tuple
     ///
     /// # Examples
     ///
@@ -941,16 +955,18 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+    fn encode_tuple(self, #[allow(unused)] len: usize) -> Result<Self::Tuple, Self::Error> {
         Err(Self::Error::message(expecting::invalid_type(
             &expecting::Tuple,
             &ExpectingWrapper::new(self),
         )))
     }
 
-    /// Encode a map with a known length.
+    /// Encode a map with a known length `len`.
+    ///
+    ///
     #[inline]
-    fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
+    fn encode_map(self, #[allow(unused)] len: usize) -> Result<Self::Map, Self::Error> {
         Err(Self::Error::message(expecting::invalid_type(
             &expecting::Map,
             &ExpectingWrapper::new(self),

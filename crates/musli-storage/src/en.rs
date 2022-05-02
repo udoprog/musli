@@ -193,7 +193,7 @@ where
 
     #[inline]
     fn encode_tuple(self, _: usize) -> Result<Self::Sequence, Self::Error> {
-        // NB: tuple has statically known fixed length.
+        // NB: A tuple has statically known fixed length.
         Ok(self)
     }
 

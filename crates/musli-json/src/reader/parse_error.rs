@@ -52,6 +52,7 @@ pub(crate) enum ParseErrorKind {
     ExpectedOpenBrace(Token),
     ExpectedCloseBrace(Token),
     ExpectedOpenBracket(Token),
+    ExpectedCloseBracket(Token),
     InvalidEscape,
     BufferUnderflow,
     BufferOverflow,
@@ -131,6 +132,9 @@ impl fmt::Display for ParseError {
             }
             ParseErrorKind::ExpectedOpenBracket(actual) => {
                 write!(f, "expected opening bracket, found {actual} (at {span})")
+            }
+            ParseErrorKind::ExpectedCloseBracket(actual) => {
+                write!(f, "expected closing bracket, found {actual} (at {span})")
             }
             ParseErrorKind::InvalidEscape => write!(f, "invalid string escape (at {span})"),
             ParseErrorKind::BufferUnderflow => write!(f, "buffer underflow (at {span})"),
