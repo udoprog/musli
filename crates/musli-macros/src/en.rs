@@ -46,33 +46,6 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
 }
 
 /// Encode a transparent element.
-fn encode_transparent(
-    e: &Build<'_>,
-    var: &syn::Ident,
-    span: Span,
-    fields: &[FieldBuild],
-) -> Result<TokenStream> {
-    let f = match fields {
-        [f] => f,
-        _ => {
-            e.transparent_diagnostics(span, fields);
-            return Err(());
-        }
-    };
-
-    let accessor = match &f.ident {
-        Some(ident) => quote_spanned!(f.span => &self.#ident),
-        None => quote_spanned!(f.span => &self.0),
-    };
-
-    let (span, encode_path) = &f.encode_path;
-
-    Ok(quote_spanned! {
-        *span => #encode_path(#accessor, #var)
-    })
-}
-
-/// Encode a transparent element.
 fn encode_transparent_variant(
     e: &Build<'_>,
     var: &syn::Ident,
@@ -103,17 +76,36 @@ fn encode_transparent_variant(
 
 /// Encode a struct.
 fn encode_struct(e: &Build<'_>, var: &syn::Ident, st: &StructBuild<'_>) -> Result<TokenStream> {
-    let fields = encode_fields(e, var, &st.fields)?;
-
     match st.packing {
-        Packing::Transparent => encode_transparent(e, var, e.input.ident.span(), &st.fields),
+        Packing::Transparent => {
+            let f = match &st.fields[..] {
+                [f] => f,
+                _ => {
+                    e.transparent_diagnostics(st.span, &st.fields);
+                    return Err(());
+                }
+            };
+
+            let accessor = match &f.ident {
+                Some(ident) => quote_spanned!(f.span => &self.#ident),
+                None => quote_spanned!(f.span => &self.0),
+            };
+
+            let (span, encode_path) = &f.encode_path;
+
+            Ok(quote_spanned! {
+                *span => #encode_path(#accessor, #var)
+            })
+        }
         Packing::Tagged => {
-            let encoder_t = &e.tokens.encoder_t;
-            let pairs_encoder_t = &e.tokens.pairs_encoder_t;
+            let fields = encode_fields(e, var, &st.fields)?;
 
             let len = length_test(st.fields.len(), &fields.tests);
             let decls = fields.test_decls();
             let encoders = &fields.encoders;
+
+            let encoder_t = &e.tokens.encoder_t;
+            let pairs_encoder_t = &e.tokens.pairs_encoder_t;
 
             Ok(quote! {
                 #(#decls)*
@@ -123,10 +115,13 @@ fn encode_struct(e: &Build<'_>, var: &syn::Ident, st: &StructBuild<'_>) -> Resul
             })
         }
         Packing::Packed => {
-            let encoder_t = &e.tokens.encoder_t;
-            let sequence_encoder_t = &e.tokens.sequence_encoder_t;
+            let fields = encode_fields(e, var, &st.fields)?;
+
             let decls = fields.tests.iter().map(|t| &t.decl);
             let encoders = &fields.encoders;
+
+            let encoder_t = &e.tokens.encoder_t;
+            let sequence_encoder_t = &e.tokens.sequence_encoder_t;
 
             Ok(quote! {{
                 let mut pack = #encoder_t::encode_pack(#var)?;
