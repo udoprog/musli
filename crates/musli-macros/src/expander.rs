@@ -8,6 +8,8 @@ use crate::internals::symbol::*;
 use crate::internals::tokens::Tokens;
 use crate::internals::{Ctxt, Mode, ModePath};
 
+pub(crate) type Result<T, E = ()> = std::result::Result<T, E>;
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TagMethod {
     /// The default tag method.
@@ -226,7 +228,7 @@ impl<'a> Expander<'a> {
     }
 
     /// Expand Encode implementation.
-    pub(crate) fn expand_encode(&self) -> Option<TokenStream> {
+    pub(crate) fn expand_encode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
 
         if modes.is_empty() {
@@ -253,11 +255,11 @@ impl<'a> Expander<'a> {
             self,
             ExpansionMode::Default,
         )?);
-        Some(out)
+        Ok(out)
     }
 
     /// Expand Decode implementation.
-    pub(crate) fn expand_decode(&self) -> Option<TokenStream> {
+    pub(crate) fn expand_decode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
 
         if modes.is_empty() {
@@ -284,7 +286,7 @@ impl<'a> Expander<'a> {
             self,
             ExpansionMode::Default,
         )?);
-        Some(out)
+        Ok(out)
     }
 }
 
@@ -310,6 +312,24 @@ impl ExpanderWithMode<'_> {
             );
         }
     }
+
+    /// Validate set of legal attributes.
+    pub(crate) fn validate_attributes(&self) -> Result<()> {
+        match &self.data {
+            Data::Struct(..) => {
+                if let Some(&(span, _)) = self.type_attr.enum_tagging_span(self.mode) {
+                    self.cx.error_span(
+                        span,
+                        format_args!("#[{}({})] is only supported on enums", ATTR, TAG),
+                    );
+                }
+            }
+            Data::Enum(..) => (),
+            Data::Union => (),
+        }
+
+        Ok(())
+    }
 }
 
 /// Expand the given configuration to the appropriate tag expression and
@@ -321,11 +341,9 @@ pub(crate) fn expand_tag(
     default_field_tag: DefaultTag,
     index: usize,
     ident: Option<&syn::LitStr>,
-) -> Option<(syn::Expr, TagMethod)> {
+) -> Result<(syn::Expr, TagMethod)> {
     let (lit, tag_method) = match (rename, default_field_tag, ident) {
-        (Some((_, rename)), _, _) => {
-            return Some((rename_lit(rename), determine_tag_method(rename)))
-        }
+        (Some((_, rename)), _, _) => return Ok((rename_lit(rename), determine_tag_method(rename))),
         (None, DefaultTag::Index, _) => (usize_int(index, span).into(), TagMethod::Default),
         (None, DefaultTag::Name, None) => {
             cx.error_span(
@@ -335,7 +353,7 @@ pub(crate) fn expand_tag(
                     ATTR, TAG
                 ),
             );
-            return None;
+            return Err(());
         }
         (None, DefaultTag::Name, Some(ident)) => (ident.clone().into(), TagMethod::String),
     };
@@ -345,7 +363,7 @@ pub(crate) fn expand_tag(
         lit,
     });
 
-    Some((tag, tag_method))
+    Ok((tag, tag_method))
 }
 
 /// Process rename literal to ensure it's always typed.

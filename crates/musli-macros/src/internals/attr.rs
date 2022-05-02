@@ -12,16 +12,16 @@ use syn::spanned::Spanned;
 use syn::Ident;
 
 #[derive(Debug, Clone)]
-pub enum Tagging {
+pub enum EnumTagging {
     /// Externally tagged.
     External,
     /// The type is internally tagged by the field given by the expression.
     Internal(syn::Expr),
 }
 
-impl Default for Tagging {
+impl Default for EnumTagging {
     fn default() -> Self {
-        Tagging::External
+        EnumTagging::External
     }
 }
 
@@ -39,9 +39,9 @@ impl Default for DefaultTag {
 }
 
 /// If the type is tagged or not.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Packing {
-    Tagged(Tagging),
+    Tagged,
     Packed,
     Transparent,
 }
@@ -49,8 +49,7 @@ pub enum Packing {
 impl fmt::Display for Packing {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Packing::Tagged(Tagging::External) => write!(f, "tagged"),
-            Packing::Tagged(Tagging::Internal(..)) => write!(f, "internally tagged"),
+            Packing::Tagged => write!(f, "tagged"),
             Packing::Packed => write!(f, "packed"),
             Packing::Transparent => write!(f, "transparent"),
         }
@@ -59,7 +58,7 @@ impl fmt::Display for Packing {
 
 impl Default for Packing {
     fn default() -> Self {
-        Self::Tagged(Tagging::External)
+        Self::Tagged
     }
 }
 
@@ -73,24 +72,38 @@ struct InnerTypeAttr {
     default_variant_tag: DefaultTag,
     /// `#[musli(default_field_tag = "..")]`.
     default_field_tag: DefaultTag,
+    /// If `#[musli(tag = <expr> [, content = <expr>]*)]` is specified.
+    enum_tagging: Option<(Span, EnumTagging)>,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
     packing: Option<(Span, Packing)>,
 }
 
 impl InnerTypeAttr {
+    /// Update how an enum is tagged.
+    fn set_enum_tagging(&mut self, cx: &Ctxt, span: Span, enum_tagging: EnumTagging) {
+        if self.set_packing(cx, span, Packing::Tagged) {
+            self.enum_tagging = Some((span, enum_tagging));
+        }
+    }
+
     /// Update packing of type.
-    fn set_packing(&mut self, cx: &Ctxt, span: Span, packing: Packing) {
+    fn set_packing(&mut self, cx: &Ctxt, span: Span, packing: Packing) -> bool {
         if let Some((_, existing)) = &self.packing {
-            cx.error_span(
-                span,
-                format!(
-                    "#[{}({})] cannot be combined with #[{}({})]",
-                    ATTR, packing, ATTR, existing
-                ),
-            );
+            if *existing != packing {
+                cx.error_span(
+                    span,
+                    format!(
+                        "#[{}({})] cannot be combined with #[{}({})]",
+                        ATTR, packing, ATTR, existing
+                    ),
+                );
+
+                return false;
+            }
         }
 
         self.packing = Some((span, packing));
+        true
     }
 
     fn set_crate(&mut self, cx: &Ctxt, span: Span, path: syn::ExprPath) {
@@ -118,6 +131,18 @@ impl TypeAttr {
         mode.ident
             .and_then(|m| self.modes.get(m)?.packing.as_ref())
             .or(self.root.packing.as_ref())
+    }
+
+    /// Indicates the state of enum tagging.
+    pub(crate) fn enum_tagging_span(&self, mode: Mode<'_>) -> Option<&(Span, EnumTagging)> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.enum_tagging.as_ref())
+            .or(self.root.enum_tagging.as_ref())
+    }
+
+    /// Indicates the state of enum tagging.
+    pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<&EnumTagging> {
+        self.enum_tagging_span(mode).map(|t| &t.1)
     }
 
     /// Indicates the packing state of the type.
@@ -374,11 +399,7 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                     // parse #[musli(tag = <expr>)]
                     Attribute::KeyValue(path, value) if path == TAG => {
                         if let Some(expr) = value_as_expr(cx, TAG, value) {
-                            attr.set_packing(
-                                cx,
-                                path.span(),
-                                Packing::Tagged(Tagging::Internal(expr)),
-                            );
+                            attr.set_enum_tagging(cx, path.span(), EnumTagging::Internal(expr));
                         }
                     }
                     // parse #[musli(crate = <path>)]

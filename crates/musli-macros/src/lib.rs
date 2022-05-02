@@ -25,7 +25,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     let dump = std::env::var("MUSLI_DUMP").ok();
 
     match expander.expand_encode() {
-        Some(tokens) => {
+        Ok(tokens) => {
             if let Some(dump) = dump {
                 if expander.input.ident.to_string().contains(&dump) {
                     println!("{}", tokens);
@@ -34,7 +34,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
 
             tokens.into()
         }
-        None => to_compile_errors(expander.into_errors()).into(),
+        Err(()) => to_compile_errors(expander.into_errors()).into(),
     }
 }
 
@@ -47,7 +47,7 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
     let dump = std::env::var("MUSLI_DUMP").ok();
 
     match expander.expand_decode() {
-        Some(tokens) => {
+        Ok(tokens) => {
             if let Some(dump) = dump {
                 if expander.input.ident.to_string().contains(&dump) {
                     println!("{}", tokens);
@@ -56,7 +56,7 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
 
             tokens.into()
         }
-        None => to_compile_errors(expander.into_errors()).into(),
+        Err(()) => to_compile_errors(expander.into_errors()).into(),
     }
 }
 

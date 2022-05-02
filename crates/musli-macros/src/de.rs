@@ -4,8 +4,8 @@ use syn::spanned::Spanned;
 
 use crate::expander::{expand_tag, field_int};
 use crate::expander::{
-    Data, EnumData, Expander, ExpanderWithMode, ExpansionMode, FieldData, StructData, TagMethod,
-    TagMethods,
+    Data, EnumData, Expander, ExpanderWithMode, ExpansionMode, FieldData, Result, StructData,
+    TagMethod, TagMethods,
 };
 use crate::internals::attr::{DefaultTag, Packing};
 use crate::internals::symbol::*;
@@ -13,7 +13,7 @@ use crate::internals::symbol::*;
 pub(crate) fn expand_decode_entry(
     e: &Expander,
     expansion: ExpansionMode<'_>,
-) -> Option<TokenStream> {
+) -> Result<TokenStream> {
     let e = ExpanderWithMode {
         input: e.input,
         cx: &e.cx,
@@ -31,8 +31,25 @@ pub(crate) fn expand_decode_entry(
 fn expand_decode_moded(
     e: ExpanderWithMode<'_>,
     expansion: ExpansionMode<'_>,
-) -> Option<TokenStream> {
+) -> Result<TokenStream> {
+    e.validate_attributes()?;
+
     let span = e.input.ident.span();
+
+    let root_decoder_var = syn::Ident::new("root_decoder", Span::call_site());
+
+    let body = match &e.data {
+        Data::Struct(data) => decode_struct(e, &root_decoder_var, data)?,
+        Data::Enum(data) => decode_enum(e, &root_decoder_var, data)?,
+        Data::Union => {
+            e.cx.error_span(span, "musli: unions are not supported");
+            return Err(());
+        }
+    };
+
+    if e.cx.has_errors() {
+        return Err(());
+    }
 
     let mut impl_generics = e.input.generics.clone();
     let type_ident = &e.input.ident;
@@ -48,21 +65,6 @@ fn expand_decode_moded(
         impl_generics.params.push(lt.clone().into());
     }
 
-    let root_decoder_var = syn::Ident::new("root_decoder", Span::call_site());
-
-    let body = match &e.data {
-        Data::Struct(data) => decode_struct(e, &root_decoder_var, data)?,
-        Data::Enum(data) => decode_enum(e, &root_decoder_var, data)?,
-        Data::Union => {
-            e.cx.error_span(span, "musli: unions are not supported");
-            return None;
-        }
-    };
-
-    if e.cx.has_errors() {
-        return None;
-    }
-
     let decode_t = &e.tokens.decode_t;
     let decoder_t = &e.tokens.decoder_t;
     let original_generics = &e.input.generics;
@@ -70,7 +72,7 @@ fn expand_decode_moded(
     let (impl_generics, mode_ident, where_clause) =
         expansion.as_impl_generics(impl_generics, &e.tokens);
 
-    Some(quote_spanned! {
+    Ok(quote_spanned! {
         span =>
         #[automatically_derived]
         impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #original_generics #where_clause {
@@ -89,12 +91,12 @@ fn decode_struct(
     e: ExpanderWithMode<'_>,
     decoder_var: &syn::Ident,
     data: &StructData,
-) -> Option<TokenStream> {
+) -> Result<TokenStream> {
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
     let tag_type = e.type_attr.tag_type(e.mode);
 
     let body = match e.type_attr.packing(e.mode).cloned().unwrap_or_default() {
-        Packing::Tagged(..) => decode_tagged(
+        Packing::Tagged => decode_tagged(
             e,
             data.span,
             decoder_var,
@@ -109,7 +111,7 @@ fn decode_struct(
         Packing::Transparent => decode_transparent(e, data.span, decoder_var, path, &data.fields)?,
     };
 
-    Some(quote! {
+    Ok(quote! {
         Ok({ #body })
     })
 }
@@ -118,7 +120,7 @@ fn decode_enum(
     e: ExpanderWithMode<'_>,
     root_decoder_var: &syn::Ident,
     data: &EnumData,
-) -> Option<TokenStream> {
+) -> Result<TokenStream> {
     let decoder_t = &e.tokens.decoder_t;
     let error_t = &e.tokens.error_t;
     let type_ident = &e.input.ident;
@@ -135,12 +137,12 @@ fn decode_enum(
                 ATTR, PACKED
             ),
         );
-        return None;
+        return Err(());
     }
 
     if data.variants.is_empty() {
         // Special case: Uninhabitable type. Since this cannot be reached, generate the never type.
-        return Some(quote! {
+        return Ok(quote! {
             Err(<D::Error as #error_t>::uninhabitable(#type_name))
         });
     }
@@ -196,7 +198,7 @@ fn decode_enum(
             .unwrap_or_else(|| e.type_attr.default_field_tag(e.mode));
 
         let decode = match v.attr.packing(e.mode).unwrap_or(&type_packing) {
-            Packing::Tagged(..) => decode_tagged(
+            Packing::Tagged => decode_tagged(
                 e,
                 v.span,
                 &body_decoder_var,
@@ -314,7 +316,7 @@ fn decode_enum(
         })
         .collect::<Vec<_>>();
 
-    Some(quote! {
+    Ok(quote! {
         let mut #variant_decoder_var = #decoder_t::decode_variant(#root_decoder_var)?;
         #output_enum
         #output_enum_debug_impl
@@ -344,7 +346,7 @@ fn decode_tagged(
     fields: &[FieldData],
     variant_tag: Option<&syn::Ident>,
     default_field_tag: DefaultTag,
-) -> Option<TokenStream> {
+) -> Result<TokenStream> {
     let struct_decoder_var = syn::Ident::new("struct_decoder", span);
 
     let decoder_t = &e.tokens.decoder_t;
@@ -471,7 +473,7 @@ fn decode_tagged(
         }
     };
 
-    Some(quote! {
+    Ok(quote! {
         #(#decls;)*
         #output_enum
         let mut type_decoder = #decoder_t::decode_struct(#parent_decoder_var, #fields_len)?;
@@ -493,7 +495,7 @@ fn decode_transparent(
     decoder_var: &syn::Ident,
     path: syn::Path,
     fields: &[FieldData],
-) -> Option<TokenStream> {
+) -> Result<TokenStream> {
     let ident = fields.iter().next();
 
     let (accessor, field) = match ident {
@@ -507,13 +509,13 @@ fn decode_transparent(
         }
         _ => {
             e.transparent_diagnostics(span, fields);
-            return None;
+            return Err(());
         }
     };
 
     let (span, decode_path) = field.attr.decode_path(e.mode, span);
 
-    Some(quote_spanned! {
+    Ok(quote_spanned! {
         span =>
         #path {
             #accessor: #decode_path(#decoder_var)?
@@ -528,7 +530,7 @@ fn decode_untagged(
     decoder_var: &syn::Ident,
     path: syn::Path,
     fields: &[FieldData],
-) -> Option<TokenStream> {
+) -> Result<TokenStream> {
     let decoder_t = &e.tokens.decoder_t;
     let pack_decoder_t = &e.tokens.pack_decoder_t;
 
@@ -566,9 +568,9 @@ fn decode_untagged(
     }
 
     if assign.is_empty() {
-        Some(quote_spanned!(span => #path {}))
+        Ok(quote_spanned!(span => #path {}))
     } else {
-        Some(quote_spanned! {
+        Ok(quote_spanned! {
             span =>
             let mut unpack = #decoder_t::decode_pack(#decoder_var)?;
             let output = #path { #(#assign),* };
@@ -588,7 +590,7 @@ fn handle_tag_decode(
     string_patterns: &[TokenStream],
     patterns: &[(syn::Expr, TokenStream)],
     thing_decoder_t_decode: &syn::ExprPath,
-) -> Option<(
+) -> Result<(
     TokenStream,
     TokenStream,
     Vec<(TokenStream, TokenStream)>,
@@ -610,7 +612,7 @@ fn handle_tag_decode(
                 .map(|(tag, decode)| (quote!(#tag), decode.clone()))
                 .collect::<Vec<_>>();
 
-            Some((
+            Ok((
                 decode_tag,
                 quote!(#tag_visitor_output::Err(tag)),
                 patterns,
@@ -630,7 +632,7 @@ fn handle_tag_decode(
                 .map(|(tag, decode)| (quote!(#tag), decode.clone()))
                 .collect::<Vec<_>>();
 
-            Some((decode_tag, quote!(tag), patterns, None))
+            Ok((decode_tag, quote!(tag), patterns, None))
         }
     }
 }
@@ -670,7 +672,7 @@ fn string_variant_tag_decode(
     output_variants: &[syn::Ident],
     string_patterns: &[TokenStream],
     thing_decoder_t_decode: &syn::ExprPath,
-) -> Option<(TokenStream, TokenStream)> {
+) -> Result<(TokenStream, TokenStream)> {
     let decoder_t = &e.tokens.decoder_t;
     let visit_string_fn = &e.tokens.visit_string_fn;
 
@@ -691,5 +693,5 @@ fn string_variant_tag_decode(
         }
     };
 
-    Some((decode_tag, output_enum))
+    Ok((decode_tag, output_enum))
 }
