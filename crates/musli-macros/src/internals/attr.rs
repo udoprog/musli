@@ -13,16 +13,8 @@ use syn::Ident;
 
 #[derive(Debug, Clone)]
 pub enum EnumTagging {
-    /// Externally tagged.
-    External,
     /// The type is internally tagged by the field given by the expression.
     Internal(syn::Expr),
-}
-
-impl Default for EnumTagging {
-    fn default() -> Self {
-        EnumTagging::External
-    }
 }
 
 /// The kind of tag to use.

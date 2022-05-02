@@ -53,6 +53,16 @@ where
     DEFAULT.to_vec(value)
 }
 
+/// Encode the given value to a [String] using the [DEFAULT] configuration.
+#[cfg(feature = "std")]
+#[inline]
+pub fn to_string<T>(value: &T) -> Result<String, VecWriterError>
+where
+    T: ?Sized + Encode<DefaultMode>,
+{
+    DEFAULT.to_string(value)
+}
+
 /// Encode the given value to a fixed-size bytes using the [DEFAULT]
 /// configuration.
 #[inline]
@@ -187,7 +197,7 @@ where
         Ok(data)
     }
 
-    /// Encode the given value to a [Vec] using the current configuration.
+    /// Encode the given value to a [String] using the current configuration.
     #[cfg(feature = "std")]
     #[inline]
     pub fn to_string<T>(self, value: &T) -> Result<String, VecWriterError>

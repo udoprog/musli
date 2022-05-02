@@ -332,38 +332,91 @@ impl ExpanderWithMode<'_> {
     }
 }
 
-/// Expand the given configuration to the appropriate tag expression and
-/// [TagMethod].
-pub(crate) fn expand_tag(
-    cx: &Ctxt,
-    span: Span,
-    rename: Option<&(Span, syn::Expr)>,
-    default_field_tag: DefaultTag,
-    index: usize,
-    ident: Option<&syn::LitStr>,
-) -> Result<(syn::Expr, TagMethod)> {
-    let (lit, tag_method) = match (rename, default_field_tag, ident) {
-        (Some((_, rename)), _, _) => return Ok((rename_lit(rename), determine_tag_method(rename))),
-        (None, DefaultTag::Index, _) => (usize_int(index, span).into(), TagMethod::Default),
-        (None, DefaultTag::Name, None) => {
-            cx.error_span(
-                span,
-                format!(
-                    "#[{}({} = \"name\")] is not supported with unnamed fields",
-                    ATTR, TAG
-                ),
-            );
-            return Err(());
-        }
-        (None, DefaultTag::Name, Some(ident)) => (ident.clone().into(), TagMethod::String),
-    };
+/// A thing that determines how it's tagged.
+pub(crate) trait Taggable {
+    /// The span of the taggable item.
+    fn span(&self) -> Span;
+    /// The rename configuration the taggable item currently has.
+    fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)>;
+    /// The index of the taggable item.
+    fn index(&self) -> usize;
+    /// The string name of the taggable item.
+    fn name(&self) -> Option<&syn::LitStr>;
 
-    let tag = syn::Expr::Lit(syn::ExprLit {
-        attrs: Vec::new(),
-        lit,
-    });
+    /// Expand the given configuration to the appropriate tag expression and
+    /// [TagMethod].
+    fn expand_tag(
+        &self,
+        e: ExpanderWithMode<'_>,
+        default_field_tag: DefaultTag,
+    ) -> Result<(syn::Expr, TagMethod)>
+    where
+        Self: Sized,
+    {
+        let (lit, tag_method) = match (self.rename(e.mode), default_field_tag, self.name()) {
+            (Some((_, rename)), _, _) => {
+                return Ok((rename_lit(rename), determine_tag_method(rename)))
+            }
+            (None, DefaultTag::Index, _) => (
+                usize_int(self.index(), self.span()).into(),
+                TagMethod::Default,
+            ),
+            (None, DefaultTag::Name, None) => {
+                e.cx.error_span(
+                    self.span(),
+                    format!(
+                        "#[{}({} = \"name\")] is not supported with unnamed fields",
+                        ATTR, TAG
+                    ),
+                );
+                return Err(());
+            }
+            (None, DefaultTag::Name, Some(ident)) => (ident.clone().into(), TagMethod::String),
+        };
 
-    Ok((tag, tag_method))
+        let tag = syn::Expr::Lit(syn::ExprLit {
+            attrs: Vec::new(),
+            lit,
+        });
+
+        Ok((tag, tag_method))
+    }
+}
+
+impl Taggable for FieldData<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+
+    fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+        self.attr.rename(mode)
+    }
+
+    fn index(&self) -> usize {
+        self.index
+    }
+
+    fn name(&self) -> Option<&syn::LitStr> {
+        self.name.as_ref()
+    }
+}
+
+impl Taggable for VariantData<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+
+    fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+        self.attr.rename(mode)
+    }
+
+    fn index(&self) -> usize {
+        self.index
+    }
+
+    fn name(&self) -> Option<&syn::LitStr> {
+        Some(&self.name)
+    }
 }
 
 /// Process rename literal to ensure it's always typed.

@@ -2,10 +2,10 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
-use crate::expander::{expand_tag, field_int};
+use crate::expander::field_int;
 use crate::expander::{
     Data, EnumData, Expander, ExpanderWithMode, ExpansionMode, FieldData, Result, StructData,
-    TagMethod, TagMethods,
+    TagMethod, TagMethods, Taggable,
 };
 use crate::internals::attr::{DefaultTag, Packing};
 use crate::internals::symbol::*;
@@ -159,7 +159,6 @@ fn decode_enum(
     let mut fallback = None;
     // Keep track of variant index manually since fallback variants do not
     // count.
-    let mut variant_index = 0;
     let mut tag_methods = TagMethods::new(&e.cx);
 
     for v in data.variants.iter() {
@@ -215,20 +214,13 @@ fn decode_enum(
             }
         };
 
-        let (tag, tag_method) = expand_tag(
-            &e.cx,
-            v.span,
-            v.attr.rename(e.mode),
-            e.type_attr.default_variant_tag(e.mode),
-            variant_index,
-            Some(&v.name),
-        )?;
+        let (tag, tag_method) = v.expand_tag(e, e.type_attr.default_variant_tag(e.mode))?;
 
         tag_methods.insert(v.span, tag_method);
 
         let output_tag = handle_output_tag(
             v.span,
-            variant_index,
+            v.index,
             tag_method,
             &tag,
             &tag_visitor_output,
@@ -238,7 +230,6 @@ fn decode_enum(
 
         output_names.push(&v.name);
         patterns.push((output_tag, decode));
-        variant_index += 1;
     }
 
     let tag_type = e
@@ -365,26 +356,19 @@ fn decode_tagged(
 
     let mut tag_methods = TagMethods::new(&e.cx);
 
-    for field in fields {
-        let (tag, tag_method) = expand_tag(
-            &e.cx,
-            field.span,
-            field.attr.rename(e.mode),
-            default_field_tag,
-            field.index,
-            field.name.as_ref(),
-        )?;
+    for f in fields {
+        let (tag, tag_method) = f.expand_tag(e, default_field_tag)?;
 
-        tag_methods.insert(field.span, tag_method);
+        tag_methods.insert(f.span, tag_method);
 
-        let (span, decode_path) = field.attr.decode_path(e.mode, field.span);
-        let var = syn::Ident::new(&format!("v{}", field.index), span);
+        let (span, decode_path) = f.attr.decode_path(e.mode, f.span);
+        let var = syn::Ident::new(&format!("v{}", f.index), span);
         decls.push(quote_spanned!(span => let mut #var = None;));
         let decode = quote_spanned!(span => #var = Some(#decode_path(#struct_decoder_var)?));
 
         let output_tag = handle_output_tag(
             span,
-            field.index,
+            f.index,
             tag_method,
             &tag,
             &tag_visitor_output,
@@ -394,15 +378,15 @@ fn decode_tagged(
 
         patterns.push((output_tag, decode));
 
-        let field_ident = match &field.ident {
+        let field_ident = match &f.ident {
             Some(ident) => quote!(#ident),
             None => {
-                let field_index = field_int(field.index, field.span);
+                let field_index = field_int(f.index, f.span);
                 quote!(#field_index)
             }
         };
 
-        let fallback = if let Some(span) = field.attr.default_attr(e.mode) {
+        let fallback = if let Some(span) = f.attr.default_attr(e.mode) {
             quote_spanned!(span => #default_t)
         } else {
             quote!(return Err(<D::Error as #error_t>::expected_tag(#type_name, #tag)))
