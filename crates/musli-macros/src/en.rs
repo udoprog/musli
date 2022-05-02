@@ -149,16 +149,16 @@ fn encode_fields(e: &Build<'_>, var: &syn::Ident, fields: &[FieldBuild]) -> Resu
 }
 
 /// Encode an internally tagged enum.
-fn encode_enum(e: &Build<'_>, var: &syn::Ident, data: &EnumBuild<'_>) -> Result<TokenStream> {
-    if let Some(&(span, Packing::Transparent)) = data.packing_span {
+fn encode_enum(e: &Build<'_>, var: &syn::Ident, en: &EnumBuild<'_>) -> Result<TokenStream> {
+    if let Some(&(span, Packing::Transparent)) = en.packing_span {
         e.encode_transparent_enum_diagnostics(span);
         return Err(());
     }
 
-    let mut variants = Vec::with_capacity(data.variants.len());
+    let mut variants = Vec::with_capacity(en.variants.len());
 
-    for v in &data.variants {
-        if let Ok((pattern, encode)) = encode_variant(e, var, v) {
+    for v in &en.variants {
+        if let Ok((pattern, encode)) = encode_variant(e, var, en, v) {
             variants.push(quote_spanned!(v.span => #pattern => { #encode }));
         }
     }
@@ -166,12 +166,12 @@ fn encode_enum(e: &Build<'_>, var: &syn::Ident, data: &EnumBuild<'_>) -> Result<
     // Special case: uninhabitable types.
     Ok(if variants.is_empty() {
         quote_spanned! {
-            data.span =>
+            en.span =>
             match *self {}
         }
     } else {
         quote_spanned! {
-            data.span =>
+            en.span =>
             match self {
                 #(#variants),*
             }
@@ -183,6 +183,7 @@ fn encode_enum(e: &Build<'_>, var: &syn::Ident, data: &EnumBuild<'_>) -> Result<
 fn encode_variant(
     e: &Build<'_>,
     var: &syn::Ident,
+    en: &EnumBuild,
     v: &VariantBuild,
 ) -> Result<(TokenStream, TokenStream)> {
     if let Packing::Transparent = v.packing {
@@ -235,7 +236,7 @@ fn encode_variant(
         return Ok((v.constructor(), encode));
     }
 
-    if let Some(EnumTagging::Internal(field_tag)) = v.enum_tagging {
+    if let Some(EnumTagging::Internal(field_tag)) = en.enum_tagging {
         let pairs_encoder_t = &e.tokens.pairs_encoder_t;
         let encoder_t = &e.tokens.encoder_t;
         let mode_ident = e.mode_ident;

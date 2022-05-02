@@ -101,6 +101,7 @@ pub(crate) struct StructBuild<'a> {
 
 pub(crate) struct EnumBuild<'a> {
     pub(crate) span: Span,
+    pub(crate) enum_tagging: Option<&'a EnumTagging>,
     pub(crate) variants: Vec<VariantBuild<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
     pub(crate) variant_tag_method: TagMethod,
@@ -114,7 +115,6 @@ pub(crate) struct VariantBuild<'a> {
     pub(crate) name: &'a syn::LitStr,
     pub(crate) fields: Vec<FieldBuild<'a>>,
     pub(crate) packing: Packing,
-    pub(crate) enum_tagging: Option<&'a EnumTagging>,
     pub(crate) enum_packing: Packing,
     pub(crate) tag: syn::Expr,
     pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
@@ -223,6 +223,7 @@ fn setup_enum<'a>(
     // Keep track of variant index manually since fallback variants do not
     // count.
     let mut tag_methods = TagMethods::new(&e.cx);
+    let enum_tagging = e.type_attr.enum_tagging(mode);
 
     for v in &data.variants {
         variants.push(setup_variant(e, mode, v, &mut fallback, &mut tag_methods)?);
@@ -230,6 +231,7 @@ fn setup_enum<'a>(
 
     Ok(EnumBuild {
         span: data.span,
+        enum_tagging,
         variants,
         fallback,
         variant_tag_method: tag_methods.pick(),
@@ -259,7 +261,6 @@ fn setup_variant<'a>(
         .default_field_tag(mode)
         .or_else(|| e.type_attr.default_field_tag(mode));
 
-    let enum_tagging = e.type_attr.enum_tagging(mode);
     let enum_packing = e.type_attr.packing(mode).cloned().unwrap_or_default();
 
     let (tag, tag_method) = data.expand_tag(e, mode, e.type_attr.default_variant_tag(mode))?;
@@ -317,7 +318,6 @@ fn setup_variant<'a>(
         name: &data.name,
         fields,
         packing: variant_packing,
-        enum_tagging,
         enum_packing,
         tag,
         tag_type,

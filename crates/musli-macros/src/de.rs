@@ -103,6 +103,8 @@ fn decode_enum(
         });
     }
 
+    if let Some(..) = en.enum_tagging {}
+
     let decoder_t = &e.tokens.decoder_t;
     let variant_tag = syn::Ident::new("variant_tag", en.span);
     let variant_decoder_var = syn::Ident::new("variant_decoder", en.span);
