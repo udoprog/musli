@@ -32,7 +32,7 @@ pub(crate) struct Mode<'a> {
 
 impl<'a> Mode<'a> {
     /// Get the mode identifier.
-    pub(crate) fn mode_ident(&self) -> ModePath<'_> {
+    pub(crate) fn mode_ident(&self) -> ModePath<'a> {
         self.mode_path
     }
 

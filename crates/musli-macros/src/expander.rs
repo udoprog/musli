@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
@@ -429,37 +427,4 @@ pub(crate) fn usize_int(index: usize, span: Span) -> syn::LitInt {
 /// Integer used for tuple initialization.
 pub(crate) fn field_int(index: usize, span: Span) -> syn::LitInt {
     syn::LitInt::new(&index.to_string(), span)
-}
-
-pub(crate) struct TagMethods<'a> {
-    cx: &'a Ctxt,
-    methods: BTreeSet<TagMethod>,
-}
-
-impl<'a> TagMethods<'a> {
-    pub(crate) fn new(cx: &'a Ctxt) -> Self {
-        Self {
-            cx,
-            methods: BTreeSet::new(),
-        }
-    }
-
-    /// Insert a tag method and error in case it's invalid.
-    pub(crate) fn insert(&mut self, span: Span, method: Option<TagMethod>) {
-        let before = self.methods.len();
-
-        if let Some(method) = method {
-            self.methods.insert(method);
-
-            if before == 1 && self.methods.len() > 1 {
-                self.cx
-                    .error_span(span, format!("#[{}({})] conflicting tag kind", ATTR, TAG));
-            }
-        }
-    }
-
-    /// Pick a tag method to use.
-    pub(crate) fn pick(self) -> TagMethod {
-        self.methods.into_iter().next().unwrap_or_default()
-    }
 }

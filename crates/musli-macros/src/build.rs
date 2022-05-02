@@ -1,14 +1,15 @@
+use std::collections::BTreeSet;
+
 use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
 
 use crate::expander::field_int;
 use crate::expander::{
-    Data, EnumData, Expander, ExpansionMode, FieldData, Result, StructData, TagMethod, TagMethods,
-    VariantData,
+    Data, EnumData, Expander, ExpansionMode, FieldData, Result, StructData, TagMethod, VariantData,
 };
-use crate::internals::attr::{DefaultTag, EnumTagging, Packing, TypeAttr};
-use crate::internals::symbol::*;
+use crate::internals::attr::{DefaultTag, EnumTagging, Packing};
 use crate::internals::tokens::Tokens;
+use crate::internals::{symbol::*, ModePath};
 use crate::{
     expander::Taggable,
     internals::{Ctxt, Mode},
@@ -17,13 +18,13 @@ use crate::{
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: &'a Ctxt,
-    pub(crate) type_attr: &'a TypeAttr,
     pub(crate) type_name: &'a syn::LitStr,
     pub(crate) tokens: &'a Tokens,
-    pub(crate) mode: Mode<'a>,
     pub(crate) expansion: ExpansionMode<'a>,
     pub(crate) data: BuildData<'a>,
+    pub(crate) decode_t_decode: TokenStream,
     pub(crate) encode_t_encode: TokenStream,
+    pub(crate) mode_ident: ModePath<'a>,
 }
 
 impl Build<'_> {
@@ -59,6 +60,7 @@ pub(crate) enum BuildData<'a> {
 pub(crate) struct StructBuild<'a> {
     pub(crate) span: Span,
     pub(crate) fields: Vec<FieldBuild<'a>>,
+    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
     pub(crate) packing: Packing,
     pub(crate) path: syn::Path,
     pub(crate) field_tag_method: TagMethod,
@@ -69,6 +71,8 @@ pub(crate) struct EnumBuild<'a> {
     pub(crate) variants: Vec<VariantBuild<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
     pub(crate) variant_tag_method: TagMethod,
+    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
 
 pub(crate) struct VariantBuild<'a> {
@@ -110,6 +114,8 @@ pub(crate) struct FieldBuild<'a> {
 }
 
 /// Setup a build.
+///
+/// Handles mode decoding, and construction of parameters which might give rise to errors.
 pub(crate) fn setup<'a>(e: &'a Expander, expansion: ExpansionMode<'a>) -> Result<Build<'a>> {
     let mode = expansion.as_mode(&e.tokens);
 
@@ -127,13 +133,13 @@ pub(crate) fn setup<'a>(e: &'a Expander, expansion: ExpansionMode<'a>) -> Result
     Ok(Build {
         input: e.input,
         cx: &e.cx,
-        type_attr: &e.type_attr,
         type_name: &e.type_name,
         tokens: &e.tokens,
-        mode,
         expansion,
         data,
+        decode_t_decode: mode.decode_t_decode(),
         encode_t_encode: mode.encode_t_encode(),
+        mode_ident: mode.mode_ident(),
     })
 }
 
@@ -145,6 +151,7 @@ fn setup_struct<'a>(
     let mut fields = Vec::with_capacity(data.fields.len());
 
     let default_field_tag = e.type_attr.default_field_tag(mode);
+    let tag_type = e.type_attr.tag_type(mode);
     let packing = e.type_attr.packing(mode).cloned().unwrap_or_default();
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
     let mut tag_methods = TagMethods::new(&e.cx);
@@ -164,6 +171,7 @@ fn setup_struct<'a>(
     Ok(StructBuild {
         span: data.span,
         fields,
+        tag_type,
         packing,
         path,
         field_tag_method: tag_methods.pick(),
@@ -177,6 +185,8 @@ fn setup_enum<'a>(
 ) -> Result<EnumBuild<'a>> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
+    let tag_type = e.type_attr.tag_type(mode);
+    let packing_span = e.type_attr.packing_span(mode);
     // Keep track of variant index manually since fallback variants do not
     // count.
     let mut tag_methods = TagMethods::new(&e.cx);
@@ -190,6 +200,8 @@ fn setup_enum<'a>(
         variants,
         fallback,
         variant_tag_method: tag_methods.pick(),
+        tag_type,
+        packing_span,
     })
 }
 
@@ -334,4 +346,37 @@ fn setup_field<'a>(
         access,
         packing,
     })
+}
+
+struct TagMethods<'a> {
+    cx: &'a Ctxt,
+    methods: BTreeSet<TagMethod>,
+}
+
+impl<'a> TagMethods<'a> {
+    fn new(cx: &'a Ctxt) -> Self {
+        Self {
+            cx,
+            methods: BTreeSet::new(),
+        }
+    }
+
+    /// Insert a tag method and error in case it's invalid.
+    fn insert(&mut self, span: Span, method: Option<TagMethod>) {
+        let before = self.methods.len();
+
+        if let Some(method) = method {
+            self.methods.insert(method);
+
+            if before == 1 && self.methods.len() > 1 {
+                self.cx
+                    .error_span(span, format!("#[{}({})] conflicting tag kind", ATTR, TAG));
+            }
+        }
+    }
+
+    /// Pick a tag method to use.
+    fn pick(self) -> TagMethod {
+        self.methods.into_iter().next().unwrap_or_default()
+    }
 }

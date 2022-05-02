@@ -15,7 +15,7 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let body = match &e.data {
         BuildData::Struct(data) => encode_struct(&e, &var, data)?,
-        BuildData::Enum(data) => encode_tagged_enum(&e, &var, data)?,
+        BuildData::Enum(data) => encode_enum(&e, &var, data)?,
     };
 
     if e.cx.has_errors() {
@@ -180,15 +180,14 @@ fn encode_fields(e: &Build<'_>, var: &syn::Ident, fields: &[FieldBuild]) -> Resu
 }
 
 /// Encode an internally tagged enum.
-fn encode_tagged_enum(
-    e: &Build<'_>,
-    var: &syn::Ident,
-    data: &EnumBuild<'_>,
-) -> Result<TokenStream> {
-    if let Some(&(span, Packing::Transparent)) = e.type_attr.packing_span(e.mode) {
+fn encode_enum(e: &Build<'_>, var: &syn::Ident, data: &EnumBuild<'_>) -> Result<TokenStream> {
+    if let Some(&(span, Packing::Transparent)) = data.packing_span {
         e.cx.error_span(
             span,
-            format!("#[{}({})] cannot be used on enums", ATTR, TRANSPARENT),
+            format!(
+                "#[{}({})] cannot be used to encode enums",
+                ATTR, TRANSPARENT
+            ),
         );
         return Err(());
     }
@@ -260,7 +259,7 @@ fn encode_variant(
     if let Some(EnumTagging::Internal(field_tag)) = v.enum_tagging {
         let pairs_encoder_t = &e.tokens.pairs_encoder_t;
         let encoder_t = &e.tokens.encoder_t;
-        let mode_ident = e.mode.mode_ident();
+        let mode_ident = e.mode_ident;
 
         let tag = &v.tag;
 

@@ -59,15 +59,13 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
 }
 
 fn decode_struct(e: &Build<'_>, decoder_var: &syn::Ident, st: &StructBuild) -> Result<TokenStream> {
-    let tag_type = e.type_attr.tag_type(e.mode);
-
-    let body = match e.type_attr.packing(e.mode).cloned().unwrap_or_default() {
+    let body = match st.packing {
         Packing::Tagged => decode_tagged(
             e,
             st.span,
             decoder_var,
             &e.type_name,
-            tag_type,
+            st.tag_type,
             &st.path,
             &st.fields,
             None,
@@ -87,46 +85,38 @@ fn decode_enum(
     root_decoder_var: &syn::Ident,
     data: &EnumBuild,
 ) -> Result<TokenStream> {
-    let decoder_t = &e.tokens.decoder_t;
-    let error_t = &e.tokens.error_t;
-    let type_name = &e.type_name;
-    let variant_tag = syn::Ident::new("variant_tag", data.span);
-    let variant_decoder_var = syn::Ident::new("variant_decoder", data.span);
-    let body_decoder_var = syn::Ident::new("body_decoder", data.span);
-
-    if let Some(&(span, Packing::Packed)) = e.type_attr.packing_span(e.mode) {
+    if let Some(&(span, Packing::Packed)) = data.packing_span {
         e.cx.error_span(
             span,
-            format!(
-                "`Decode` cannot be implemented on enums which are #[{}({})]",
-                ATTR, PACKED
-            ),
+            format!("#[{}({})] cannot be used to decode enums", ATTR, PACKED),
         );
         return Err(());
     }
 
+    let error_t = &e.tokens.error_t;
+    let type_name = &e.type_name;
+
+    // Trying to decode an uninhabitable type.
     if data.variants.is_empty() {
-        // Special case: Uninhabitable type. Since this cannot be reached, generate the never type.
         return Ok(quote! {
             Err(<D::Error as #error_t>::uninhabitable(#type_name))
         });
     }
 
+    let decoder_t = &e.tokens.decoder_t;
+    let variant_tag = syn::Ident::new("variant_tag", data.span);
+    let variant_decoder_var = syn::Ident::new("variant_decoder", data.span);
+    let body_decoder_var = syn::Ident::new("body_decoder", data.span);
+
     let tag_visitor_output = syn::Ident::new("VariantTagVisitorOutput", data.span);
     let mut outputs = Vec::with_capacity(data.variants.len());
-    // Collect variant names so that we can generate a debug implementation.
-    let mut output_names = Vec::with_capacity(data.variants.len());
-
     let mut patterns = Vec::with_capacity(data.variants.len());
 
     for v in data.variants.iter() {
+        // Default variants are specially picked when decoding.
         if v.is_default {
             continue;
         }
-
-        let path = &v.path;
-
-        let tag_type = v.tag_type;
 
         let decode = match v.packing {
             Packing::Tagged => decode_tagged(
@@ -134,19 +124,19 @@ fn decode_enum(
                 v.span,
                 &body_decoder_var,
                 &v.name,
-                tag_type,
-                path,
+                v.tag_type,
+                &v.path,
                 &v.fields,
                 Some(&variant_tag),
                 v.field_tag_method,
             )?,
-            Packing::Packed => decode_packed(e, v.span, &body_decoder_var, path, &v.fields)?,
+            Packing::Packed => decode_packed(e, v.span, &body_decoder_var, &v.path, &v.fields)?,
             Packing::Transparent => {
-                decode_transparent(e, v.span, &body_decoder_var, path, &v.fields)?
+                decode_transparent(e, v.span, &body_decoder_var, &v.path, &v.fields)?
             }
         };
 
-        let (output_tag, output) = handle_output_tag(
+        let (output_tag, output) = handle_indirect_output_tag(
             v.span,
             v.index,
             data.variant_tag_method,
@@ -155,15 +145,8 @@ fn decode_enum(
         );
 
         outputs.extend(output);
-        output_names.push(&v.name);
         patterns.push((output_tag, decode));
     }
-
-    let tag_type = e
-        .type_attr
-        .tag_type(e.mode)
-        .as_ref()
-        .map(|(_, ty)| quote!(: #ty));
 
     let fallback = match data.fallback {
         Some(ident) => {
@@ -210,6 +193,8 @@ fn decode_enum(
             }
         })
         .collect::<Vec<_>>();
+
+    let tag_type = data.tag_type.as_ref().map(|(_, ty)| quote!(: #ty));
 
     Ok(quote! {
         let mut #variant_decoder_var = #decoder_t::decode_variant(#root_decoder_var)?;
@@ -265,7 +250,7 @@ fn decode_tagged(
         let decode = quote_spanned!(*span => #var = Some(#decode_path(#struct_decoder_var)?));
 
         let (output_tag, output) =
-            handle_output_tag(*span, f.index, field_tag_method, &tag, &tag_visitor_output);
+            handle_indirect_output_tag(*span, f.index, field_tag_method, &tag, &tag_visitor_output);
 
         outputs.extend(output);
         patterns.push((output_tag, decode));
@@ -456,7 +441,7 @@ fn handle_tag_decode(
     thing_decoder_var: &syn::Ident,
     tag_method: TagMethod,
     output: &syn::Ident,
-    outputs: &[Output],
+    outputs: &[IndirectOutput],
     decode_path: &syn::ExprPath,
 ) -> Result<(TokenStream, TokenStream, Option<TokenStream>)> {
     match tag_method {
@@ -467,7 +452,7 @@ fn handle_tag_decode(
             Ok((decode_tag, quote!(#output::Err(tag)), Some(output_enum)))
         }
         TagMethod::Index => {
-            let decode_t_decode = e.mode.decode_t_decode();
+            let decode_t_decode = &e.decode_t_decode;
 
             let decode_tag = quote! {{
                 let index_decoder = #decode_path(&mut #thing_decoder_var)?;
@@ -479,29 +464,43 @@ fn handle_tag_decode(
     }
 }
 
-struct Output<'a> {
+/// Output type used when indirectly encoding a variant or field as type which
+/// might require special handling. Like a string.
+pub(crate) struct IndirectOutput<'a> {
     span: Span,
-    pattern: TokenStream,
+    /// The path of the variant this output should generate.
+    path: syn::Path,
+    /// The identified of the variant this path generates.
     variant: syn::Ident,
+    /// The tag this variant corresponds to.
     tag: &'a syn::Expr,
 }
 
-fn handle_output_tag<'a>(
+impl IndirectOutput<'_> {
+    /// Generate the pattern for this output.
+    pub(crate) fn pattern(&self) -> TokenStream {
+        let tag = self.tag;
+        let path = &self.path;
+        quote_spanned!(self.span => #tag => #path)
+    }
+}
+
+fn handle_indirect_output_tag<'a>(
     span: Span,
     index: usize,
     tag_method: TagMethod,
     tag: &'a syn::Expr,
     tag_visitor_output: &syn::Ident,
-) -> (syn::Expr, Option<Output<'a>>) {
+) -> (syn::Expr, Option<IndirectOutput<'a>>) {
     match tag_method {
         TagMethod::String => {
             let variant = syn::Ident::new(&format!("Variant{}", index), span);
             let mut path = syn::Path::from(tag_visitor_output.clone());
             path.segments.push(syn::PathSegment::from(variant.clone()));
 
-            let output = Output {
+            let output = IndirectOutput {
                 span,
-                pattern: quote_spanned!(span => #tag => #path),
+                path: path.clone(),
                 variant,
                 tag,
             };
@@ -522,13 +521,13 @@ fn string_variant_tag_decode(
     e: &Build<'_>,
     var: &syn::Ident,
     output: &syn::Ident,
-    outputs: &[Output],
+    outputs: &[IndirectOutput],
     decode_path: &syn::ExprPath,
 ) -> Result<(TokenStream, TokenStream)> {
     let decoder_t = &e.tokens.decoder_t;
     let visit_string_fn = &e.tokens.visit_string_fn;
     let fmt = &e.tokens.fmt;
-    let patterns = outputs.iter().map(|o| &o.pattern);
+    let patterns = outputs.iter().map(|o| o.pattern());
 
     // Declare a tag visitor, allowing string tags to be decoded by
     // decoders that owns the string.
