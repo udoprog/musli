@@ -4,7 +4,7 @@ use syn::spanned::Spanned;
 
 use crate::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild};
 use crate::expander::field_int;
-use crate::expander::{Result, TagMethod, TagMethods};
+use crate::expander::{Result, TagMethod};
 use crate::internals::attr::Packing;
 use crate::internals::symbol::*;
 
@@ -71,6 +71,7 @@ fn decode_struct(e: &Build<'_>, decoder_var: &syn::Ident, st: &StructBuild) -> R
             &st.path,
             &st.fields,
             None,
+            st.field_tag_method,
         )?,
         Packing::Packed => decode_packed(e, st.span, decoder_var, &st.path, &st.fields)?,
         Packing::Transparent => decode_transparent(e, st.span, decoder_var, &st.path, &st.fields)?,
@@ -112,15 +113,11 @@ fn decode_enum(
     }
 
     let tag_visitor_output = syn::Ident::new("VariantTagVisitorOutput", data.span);
-    let mut string_patterns = Vec::with_capacity(data.variants.len());
-    let mut output_variants = Vec::with_capacity(data.variants.len());
+    let mut outputs = Vec::with_capacity(data.variants.len());
     // Collect variant names so that we can generate a debug implementation.
     let mut output_names = Vec::with_capacity(data.variants.len());
 
     let mut patterns = Vec::with_capacity(data.variants.len());
-    // Keep track of variant index manually since fallback variants do not
-    // count.
-    let mut tag_methods = TagMethods::new(&e.cx);
 
     for v in data.variants.iter() {
         if v.is_default {
@@ -141,6 +138,7 @@ fn decode_enum(
                 path,
                 &v.fields,
                 Some(&variant_tag),
+                v.field_tag_method,
             )?,
             Packing::Packed => decode_packed(e, v.span, &body_decoder_var, path, &v.fields)?,
             Packing::Transparent => {
@@ -148,20 +146,15 @@ fn decode_enum(
             }
         };
 
-        let (tag, tag_method) = &v.tag;
-
-        tag_methods.insert(v.span, *tag_method);
-
-        let output_tag = handle_output_tag(
+        let (output_tag, output) = handle_output_tag(
             v.span,
             v.index,
-            *tag_method,
-            &tag,
+            data.variant_tag_method,
+            &v.tag,
             &tag_visitor_output,
-            &mut string_patterns,
-            &mut output_variants,
         );
 
+        outputs.extend(output);
         output_names.push(&v.name);
         patterns.push((output_tag, decode));
     }
@@ -190,37 +183,14 @@ fn decode_enum(
         },
     };
 
-    let (decode_tag, unsupported_pattern, patterns, output_enum) = handle_tag_decode(
+    let (decode_tag, unsupported_pattern, output_enum) = handle_tag_decode(
         e,
         &variant_decoder_var,
-        tag_methods.pick(),
+        data.variant_tag_method,
         &tag_visitor_output,
-        &output_variants,
-        &string_patterns,
-        &patterns,
+        &outputs,
         &e.tokens.variant_decoder_t_tag,
     )?;
-
-    // A `std::fmt::Debug` implementation is necessary for the output enum
-    // since it is used to produce diagnostics.
-    let output_enum_debug_impl = output_enum.is_some().then(|| {
-        let fmt = &e.tokens.fmt;
-
-        let mut patterns = Vec::new();
-
-        for (name, variant) in output_names.iter().zip(output_variants.iter()) {
-            patterns.push(quote!(#tag_visitor_output::#variant => #name.fmt(f)));
-        }
-
-        quote! {
-            impl #fmt::Debug for #tag_visitor_output {
-                #[inline]
-                fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
-                    match self { #(#patterns,)* #tag_visitor_output::Err(field) => field.fmt(f) }
-                }
-            }
-        }
-    });
 
     let patterns = patterns
         .into_iter()
@@ -244,7 +214,6 @@ fn decode_enum(
     Ok(quote! {
         let mut #variant_decoder_var = #decoder_t::decode_variant(#root_decoder_var)?;
         #output_enum
-        #output_enum_debug_impl
 
         let #variant_tag #tag_type = #decode_tag;
 
@@ -270,6 +239,7 @@ fn decode_tagged(
     path: &syn::Path,
     fields: &[FieldBuild],
     variant_tag: Option<&syn::Ident>,
+    field_tag_method: TagMethod,
 ) -> Result<TokenStream> {
     let struct_decoder_var = syn::Ident::new("struct_decoder", span);
 
@@ -284,31 +254,20 @@ fn decode_tagged(
     let mut assigns = Vec::with_capacity(fields_len);
 
     let tag_visitor_output = syn::Ident::new("TagVisitorOutput", e.input.ident.span());
-    let mut string_patterns = Vec::with_capacity(fields_len);
-    let mut output_variants = Vec::with_capacity(fields_len);
-
-    let mut tag_methods = TagMethods::new(&e.cx);
+    let mut outputs = Vec::with_capacity(fields_len);
 
     for f in fields {
-        let (tag, tag_method) = &f.tag;
-
-        tag_methods.insert(f.span, *tag_method);
+        let tag = &f.tag;
 
         let (span, decode_path) = &f.decode_path;
         let var = syn::Ident::new(&format!("v{}", f.index), *span);
         decls.push(quote_spanned!(*span => let mut #var = None;));
         let decode = quote_spanned!(*span => #var = Some(#decode_path(#struct_decoder_var)?));
 
-        let output_tag = handle_output_tag(
-            *span,
-            f.index,
-            *tag_method,
-            &tag,
-            &tag_visitor_output,
-            &mut string_patterns,
-            &mut output_variants,
-        );
+        let (output_tag, output) =
+            handle_output_tag(*span, f.index, field_tag_method, &tag, &tag_visitor_output);
 
+        outputs.extend(output);
         patterns.push((output_tag, decode));
 
         let field_ident = match &f.ident {
@@ -331,14 +290,12 @@ fn decode_tagged(
         }));
     }
 
-    let (decode_tag, unsupported_pattern, patterns, output_enum) = handle_tag_decode(
+    let (decode_tag, unsupported_pattern, output_enum) = handle_tag_decode(
         e,
         &struct_decoder_var,
-        tag_methods.pick(),
+        field_tag_method,
         &tag_visitor_output,
-        &output_variants,
-        &string_patterns,
-        &patterns,
+        &outputs,
         &e.tokens.pair_decoder_t_first,
     )?;
 
@@ -498,111 +455,110 @@ fn handle_tag_decode(
     e: &Build<'_>,
     thing_decoder_var: &syn::Ident,
     tag_method: TagMethod,
-    tag_visitor_output: &syn::Ident,
-    output_variants: &[syn::Ident],
-    string_patterns: &[TokenStream],
-    patterns: &[(syn::Expr, TokenStream)],
-    thing_decoder_t_decode: &syn::ExprPath,
-) -> Result<(
-    TokenStream,
-    TokenStream,
-    Vec<(TokenStream, TokenStream)>,
-    Option<TokenStream>,
-)> {
+    output: &syn::Ident,
+    outputs: &[Output],
+    decode_path: &syn::ExprPath,
+) -> Result<(TokenStream, TokenStream, Option<TokenStream>)> {
     match tag_method {
         TagMethod::String => {
-            let (decode_tag, output_enum) = string_variant_tag_decode(
-                e,
-                thing_decoder_var,
-                tag_visitor_output,
-                output_variants,
-                string_patterns,
-                thing_decoder_t_decode,
-            )?;
+            let (decode_tag, output_enum) =
+                string_variant_tag_decode(e, thing_decoder_var, output, outputs, decode_path)?;
 
-            let patterns = patterns
-                .iter()
-                .map(|(tag, decode)| (quote!(#tag), decode.clone()))
-                .collect::<Vec<_>>();
-
-            Ok((
-                decode_tag,
-                quote!(#tag_visitor_output::Err(tag)),
-                patterns,
-                Some(output_enum),
-            ))
+            Ok((decode_tag, quote!(#output::Err(tag)), Some(output_enum)))
         }
-        TagMethod::Default => {
+        TagMethod::Index => {
             let decode_t_decode = e.mode.decode_t_decode();
 
             let decode_tag = quote! {{
-                let index_decoder = #thing_decoder_t_decode(&mut #thing_decoder_var)?;
+                let index_decoder = #decode_path(&mut #thing_decoder_var)?;
                 #decode_t_decode(index_decoder)?
             }};
 
-            let patterns = patterns
-                .iter()
-                .map(|(tag, decode)| (quote!(#tag), decode.clone()))
-                .collect::<Vec<_>>();
-
-            Ok((decode_tag, quote!(tag), patterns, None))
+            Ok((decode_tag, quote!(tag), None))
         }
     }
 }
 
-fn handle_output_tag(
+struct Output<'a> {
+    span: Span,
+    pattern: TokenStream,
+    variant: syn::Ident,
+    tag: &'a syn::Expr,
+}
+
+fn handle_output_tag<'a>(
     span: Span,
     index: usize,
     tag_method: TagMethod,
-    tag: &syn::Expr,
+    tag: &'a syn::Expr,
     tag_visitor_output: &syn::Ident,
-    string_patterns: &mut Vec<TokenStream>,
-    output_variants: &mut Vec<syn::Ident>,
-) -> syn::Expr {
+) -> (syn::Expr, Option<Output<'a>>) {
     match tag_method {
         TagMethod::String => {
             let variant = syn::Ident::new(&format!("Variant{}", index), span);
             let mut path = syn::Path::from(tag_visitor_output.clone());
             path.segments.push(syn::PathSegment::from(variant.clone()));
 
-            string_patterns.push(quote!(#tag => #path));
-            output_variants.push(variant.clone());
+            let output = Output {
+                span,
+                pattern: quote_spanned!(span => #tag => #path),
+                variant,
+                tag,
+            };
 
-            syn::Expr::Path(syn::ExprPath {
+            let expr = syn::Expr::Path(syn::ExprPath {
                 attrs: Vec::new(),
                 qself: None,
                 path,
-            })
+            });
+
+            (expr, Some(output))
         }
-        TagMethod::Default => tag.clone(),
+        TagMethod::Index => (tag.clone(), None),
     }
 }
 
 fn string_variant_tag_decode(
     e: &Build<'_>,
-    decoder_var: &syn::Ident,
+    var: &syn::Ident,
     output: &syn::Ident,
-    output_variants: &[syn::Ident],
-    string_patterns: &[TokenStream],
-    thing_decoder_t_decode: &syn::ExprPath,
+    outputs: &[Output],
+    decode_path: &syn::ExprPath,
 ) -> Result<(TokenStream, TokenStream)> {
     let decoder_t = &e.tokens.decoder_t;
     let visit_string_fn = &e.tokens.visit_string_fn;
+    let fmt = &e.tokens.fmt;
+    let patterns = outputs.iter().map(|o| &o.pattern);
 
     // Declare a tag visitor, allowing string tags to be decoded by
     // decoders that owns the string.
     let decode_tag = quote! {{
-        let index_decoder = #thing_decoder_t_decode(&mut #decoder_var)?;
+        let index_decoder = #decode_path(&mut #var)?;
 
         #decoder_t::decode_string(index_decoder, #visit_string_fn(|string| {
-            Ok::<#output, D::Error>(match string { #(#string_patterns,)* _ => #output::Err(string.into())})
+            Ok::<#output, D::Error>(match string { #(#patterns,)* _ => #output::Err(string.into())})
         }))?
     }};
 
+    let variants = outputs.iter().map(|o| &o.variant);
+
+    let patterns = outputs.iter().map(|o| {
+        let variant = &o.variant;
+        let tag = o.tag;
+        quote_spanned!(o.span => #output::#variant => #fmt::Debug::fmt(&#tag, f))
+    });
+
     let output_enum = quote! {
         enum #output {
-            #(#output_variants,)*
+            #(#variants,)*
             Err(String),
+        }
+
+        impl #fmt::Debug for #output {
+            #[inline]
+            fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
+                match self { #(#patterns,)* #output::Err(field) => field.fmt(f) }
+            }
         }
     };
 

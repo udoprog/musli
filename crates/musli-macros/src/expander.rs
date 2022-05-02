@@ -13,15 +13,15 @@ pub(crate) type Result<T, E = ()> = std::result::Result<T, E>;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TagMethod {
-    /// The default tag method.
-    Default,
     /// Special method that requires generating a visitor.
     String,
+    /// The default tag method.
+    Index,
 }
 
 impl Default for TagMethod {
     fn default() -> Self {
-        Self::Default
+        Self::Index
     }
 }
 
@@ -313,20 +313,20 @@ pub(crate) trait Taggable {
         &self,
         e: &Expander<'_>,
         mode: Mode<'_>,
-        default_field_tag: DefaultTag,
-    ) -> Result<(syn::Expr, TagMethod)>
+        default_tag: Option<DefaultTag>,
+    ) -> Result<(syn::Expr, Option<TagMethod>)>
     where
         Self: Sized,
     {
-        let (lit, tag_method) = match (self.rename(mode), default_field_tag, self.name()) {
+        let (lit, tag_method) = match (self.rename(mode), default_tag, self.name()) {
             (Some((_, rename)), _, _) => {
                 return Ok((rename_lit(rename), determine_tag_method(rename)))
             }
-            (None, DefaultTag::Index, _) => (
+            (None, Some(DefaultTag::Index), _) => (
                 usize_int(self.index(), self.span()).into(),
-                TagMethod::Default,
+                Some(TagMethod::Index),
             ),
-            (None, DefaultTag::Name, None) => {
+            (None, Some(DefaultTag::Name), None) => {
                 e.cx.error_span(
                     self.span(),
                     format!(
@@ -336,7 +336,10 @@ pub(crate) trait Taggable {
                 );
                 return Err(());
             }
-            (None, DefaultTag::Name, Some(ident)) => (ident.clone().into(), TagMethod::String),
+            (None, Some(DefaultTag::Name), Some(ident)) => {
+                (ident.clone().into(), Some(TagMethod::String))
+            }
+            _ => (usize_int(self.index(), self.span()).into(), None),
         };
 
         let tag = syn::Expr::Lit(syn::ExprLit {
@@ -399,18 +402,22 @@ fn rename_lit(expr: &syn::Expr) -> syn::Expr {
 }
 
 /// Try and determine tag method from the given expression.
-fn determine_tag_method(expr: &syn::Expr) -> TagMethod {
+fn determine_tag_method(expr: &syn::Expr) -> Option<TagMethod> {
     let lit = match expr {
         syn::Expr::Lit(lit) => lit,
-        _ => return TagMethod::Default,
+        _ => return None,
     };
 
     match lit {
         syn::ExprLit {
             lit: syn::Lit::Str(..),
             ..
-        } => TagMethod::String,
-        _ => TagMethod::Default,
+        } => Some(TagMethod::String),
+        syn::ExprLit {
+            lit: syn::Lit::Int(..),
+            ..
+        } => Some(TagMethod::Index),
+        _ => None,
     }
 }
 
@@ -438,13 +445,16 @@ impl<'a> TagMethods<'a> {
     }
 
     /// Insert a tag method and error in case it's invalid.
-    pub(crate) fn insert(&mut self, span: Span, method: TagMethod) {
+    pub(crate) fn insert(&mut self, span: Span, method: Option<TagMethod>) {
         let before = self.methods.len();
-        self.methods.insert(method);
 
-        if before == 1 && self.methods.len() > 1 {
-            self.cx
-                .error_span(span, format!("#[{}({})] conflicting tag kind", ATTR, TAG));
+        if let Some(method) = method {
+            self.methods.insert(method);
+
+            if before == 1 && self.methods.len() > 1 {
+                self.cx
+                    .error_span(span, format!("#[{}({})] conflicting tag kind", ATTR, TAG));
+            }
         }
     }
 

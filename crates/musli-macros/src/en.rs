@@ -262,7 +262,7 @@ fn encode_variant(
         let encoder_t = &e.tokens.encoder_t;
         let mode_ident = e.mode.mode_ident();
 
-        let (tag, _) = &v.tag;
+        let tag = &v.tag;
 
         let decls = fields.test_decls();
         let encoders = &fields.encoders;
@@ -318,7 +318,7 @@ fn encode_variant_container(
         let variant_encoder_t = &e.tokens.variant_encoder_t;
 
         let encode_t_encode = &e.encode_t_encode;
-        let (tag, _) = &v.tag;
+        let tag = &v.tag;
 
         Ok(quote_spanned! {
             v.span =>
@@ -356,11 +356,10 @@ fn encode_field(e: &Build<'_>, var: &syn::Ident, f: &FieldBuild) -> Result<Token
 
     match f.packing {
         Packing::Tagged | Packing::Transparent => {
-            let (tag, _) = &f.tag;
-
             let pair_encoder_t = &e.tokens.pair_encoder_t;
             let pairs_encoder_t = &e.tokens.pairs_encoder_t;
             let encode_t_encode = &e.encode_t_encode;
+            let tag = &f.tag;
 
             Ok(quote_spanned! {
                 *span => {

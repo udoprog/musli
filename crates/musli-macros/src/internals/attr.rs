@@ -24,12 +24,6 @@ pub enum DefaultTag {
     Name,
 }
 
-impl Default for DefaultTag {
-    fn default() -> Self {
-        Self::Index
-    }
-}
-
 /// If the type is tagged or not.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Packing {
@@ -61,9 +55,9 @@ struct InnerTypeAttr {
     /// `#[musli(tag_type)]`.
     tag_type: Option<(Span, syn::Type)>,
     /// `#[musli(default_variant_tag = "..")]`.
-    default_variant_tag: DefaultTag,
+    default_variant_tag: Option<DefaultTag>,
     /// `#[musli(default_field_tag = "..")]`.
-    default_field_tag: DefaultTag,
+    default_field_tag: Option<DefaultTag>,
     /// If `#[musli(tag = <expr> [, content = <expr>]*)]` is specified.
     enum_tagging: Option<(Span, EnumTagging)>,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
@@ -143,13 +137,13 @@ impl TypeAttr {
     }
 
     /// Default field tag.
-    pub(crate) fn default_field_tag(&self, mode: Mode<'_>) -> DefaultTag {
+    pub(crate) fn default_field_tag(&self, mode: Mode<'_>) -> Option<DefaultTag> {
         mode.ident
             .and_then(|m| Some(self.modes.get(m)?.default_field_tag))
             .unwrap_or(self.root.default_field_tag)
     }
 
-    pub(crate) fn default_variant_tag(&self, mode: Mode<'_>) -> DefaultTag {
+    pub(crate) fn default_variant_tag(&self, mode: Mode<'_>) -> Option<DefaultTag> {
         mode.ident
             .and_then(|m| Some(self.modes.get(m)?.default_variant_tag))
             .unwrap_or(self.root.default_variant_tag)
@@ -410,8 +404,8 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                     Attribute::KeyValue(path, expr) if path == DEFAULT_VARIANT_TAG => {
                         if let Some(tag) = parse_value_string(cx, DEFAULT_VARIANT_TAG, expr) {
                             attr.default_variant_tag = match tag.value().as_str() {
-                                "index" => DefaultTag::Index,
-                                "name" => DefaultTag::Name,
+                                "index" => Some(DefaultTag::Index),
+                                "name" => Some(DefaultTag::Name),
                                 _ => {
                                     cx.error_spanned_by(
                                         tag,
@@ -426,8 +420,8 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                     Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_TAG => {
                         if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_TAG, expr) {
                             attr.default_field_tag = match tag.value().as_str() {
-                                "index" => DefaultTag::Index,
-                                "name" => DefaultTag::Name,
+                                "index" => Some(DefaultTag::Index),
+                                "name" => Some(DefaultTag::Name),
                                 _ => {
                                     cx.error_spanned_by(
                                         tag,
