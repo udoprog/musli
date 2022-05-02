@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
+use crate::build::Build;
 use crate::internals::attr::{self, DefaultTag, TypeAttr};
 use crate::internals::symbol::*;
 use crate::internals::tokens::Tokens;
@@ -31,8 +32,8 @@ pub(crate) enum ExpansionMode<'a> {
     Moded { mode_ident: &'a syn::ExprPath },
 }
 
-impl ExpansionMode<'_> {
-    pub(crate) fn as_mode<'a>(&'a self, tokens: &'a Tokens) -> Mode<'a> {
+impl<'a> ExpansionMode<'a> {
+    pub(crate) fn as_mode(&self, tokens: &'a Tokens) -> Mode<'a> {
         match *self {
             ExpansionMode::Generic { mode_ident } => Mode {
                 ident: None,
@@ -149,17 +150,6 @@ pub(crate) struct Expander<'a> {
     pub(crate) tokens: Tokens,
 }
 
-#[derive(Clone, Copy)]
-pub(crate) struct ExpanderWithMode<'a> {
-    pub(crate) input: &'a syn::DeriveInput,
-    pub(crate) cx: &'a Ctxt,
-    pub(crate) type_attr: &'a TypeAttr,
-    pub(crate) type_name: &'a syn::LitStr,
-    pub(crate) data: &'a Data<'a>,
-    pub(crate) tokens: &'a Tokens,
-    pub(crate) mode: Mode<'a>,
-}
-
 impl<'a> Expander<'a> {
     pub(crate) fn new(input: &'a syn::DeriveInput) -> Self {
         fn fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Vec<FieldData<'a>> {
@@ -227,97 +217,71 @@ impl<'a> Expander<'a> {
         self.cx.into_errors()
     }
 
-    /// Expand Encode implementation.
-    pub(crate) fn expand_encode(&self) -> Result<TokenStream> {
-        let modes = self.cx.modes();
+    fn setup_builds<'b>(
+        &'b self,
+        modes: &'b [syn::ExprPath],
+        mode_ident: &'b syn::Ident,
+    ) -> Result<Vec<Build<'b>>> {
+        let mut builds = Vec::new();
 
         if modes.is_empty() {
-            let mode_ident = syn::Ident::new("M", self.type_name.span());
-
-            return crate::en::expand_encode_entry(
+            builds.push(crate::build::setup(
                 self,
                 ExpansionMode::Generic {
                     mode_ident: &mode_ident,
                 },
-            );
+            )?);
+        } else {
+            for mode_ident in modes {
+                builds.push(crate::build::setup(
+                    self,
+                    ExpansionMode::Moded { mode_ident },
+                )?);
+            }
+
+            builds.push(crate::build::setup(self, ExpansionMode::Default)?);
         }
+
+        Ok(builds)
+    }
+
+    /// Expand Encode implementation.
+    pub(crate) fn expand_encode(&self) -> Result<TokenStream> {
+        let modes = self.cx.modes();
+        let mode_ident = syn::Ident::new("M", self.type_name.span());
+
+        let builds = self.setup_builds(&modes, &mode_ident)?;
 
         let mut out = TokenStream::new();
 
-        for mode in modes {
-            out.extend(crate::en::expand_encode_entry(
-                self,
-                ExpansionMode::Moded { mode_ident: &mode },
-            )?);
+        for build in builds {
+            out.extend(crate::en::expand_encode_entry(build)?);
         }
 
-        out.extend(crate::en::expand_encode_entry(
-            self,
-            ExpansionMode::Default,
-        )?);
         Ok(out)
     }
 
     /// Expand Decode implementation.
     pub(crate) fn expand_decode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
+        let mode_ident = syn::Ident::new("M", self.type_name.span());
 
-        if modes.is_empty() {
-            let mode_ident = syn::Ident::new("M", self.type_name.span());
-
-            return crate::de::expand_decode_entry(
-                self,
-                ExpansionMode::Generic {
-                    mode_ident: &mode_ident,
-                },
-            );
-        }
+        let builds = self.setup_builds(&modes, &mode_ident)?;
 
         let mut out = TokenStream::new();
 
-        for mode in modes {
-            out.extend(crate::de::expand_decode_entry(
-                self,
-                ExpansionMode::Moded { mode_ident: &mode },
-            )?);
+        for build in builds {
+            out.extend(crate::de::expand_decode_entry(build)?);
         }
 
-        out.extend(crate::de::expand_decode_entry(
-            self,
-            ExpansionMode::Default,
-        )?);
         Ok(out)
-    }
-}
-
-impl ExpanderWithMode<'_> {
-    /// Emit diagnostics for a transparent encode / decode that failed because
-    /// the wrong number of fields existed.
-    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[FieldData]) {
-        if fields.is_empty() {
-            self.cx.error_span(
-                span,
-                format!(
-                    "#[{}({})] types must have a single field",
-                    ATTR, TRANSPARENT
-                ),
-            );
-        } else {
-            self.cx.error_span(
-                span,
-                format!(
-                    "#[{}({})] can only be used on types which have a single field",
-                    ATTR, TRANSPARENT
-                ),
-            );
-        }
     }
 
     /// Validate set of legal attributes.
-    pub(crate) fn validate_attributes(&self) -> Result<()> {
+    pub(crate) fn validate_attributes(&self, mode: Mode<'_>) -> Result<()> {
         match &self.data {
             Data::Struct(..) => {
-                if let Some(&(span, _)) = self.type_attr.enum_tagging_span(self.mode) {
+                if let Some(&(span, _)) = self.type_attr.enum_tagging_span(mode) {
                     self.cx.error_span(
                         span,
                         format_args!("#[{}({})] is only supported on enums", ATTR, TAG),
@@ -347,13 +311,14 @@ pub(crate) trait Taggable {
     /// [TagMethod].
     fn expand_tag(
         &self,
-        e: ExpanderWithMode<'_>,
+        e: &Expander<'_>,
+        mode: Mode<'_>,
         default_field_tag: DefaultTag,
     ) -> Result<(syn::Expr, TagMethod)>
     where
         Self: Sized,
     {
-        let (lit, tag_method) = match (self.rename(e.mode), default_field_tag, self.name()) {
+        let (lit, tag_method) = match (self.rename(mode), default_field_tag, self.name()) {
             (Some((_, rename)), _, _) => {
                 return Ok((rename_lit(rename), determine_tag_method(rename)))
             }

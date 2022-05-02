@@ -1,38 +1,12 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 
-use crate::expander::field_int;
-use crate::expander::{
-    Data, EnumData, Expander, ExpanderWithMode, ExpansionMode, FieldData, Result, StructData,
-    Taggable, VariantData,
-};
-use crate::internals::attr::{DefaultTag, EnumTagging, Packing};
+use crate::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild, VariantBuild};
+use crate::expander::Result;
+use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::symbol::*;
 
-pub(crate) fn expand_encode_entry(
-    e: &Expander,
-    expansion: ExpansionMode<'_>,
-) -> Result<TokenStream> {
-    let e = ExpanderWithMode {
-        input: e.input,
-        cx: &e.cx,
-        type_attr: &e.type_attr,
-        type_name: &e.type_name,
-        data: &e.data,
-        tokens: &e.tokens,
-        mode: expansion.as_mode(&e.tokens),
-    };
-
-    expand_encode_moded(e, expansion)
-}
-
-/// Entrypoint for expanding an `Encode` implementation.
-fn expand_encode_moded(
-    e: ExpanderWithMode<'_>,
-    expansion: ExpansionMode<'_>,
-) -> Result<TokenStream> {
-    e.validate_attributes()?;
-
+pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
     let span = e.input.ident.span();
 
     let type_ident = &e.input.ident;
@@ -40,12 +14,8 @@ fn expand_encode_moded(
     let var = syn::Ident::new("encoder", span);
 
     let body = match &e.data {
-        Data::Struct(data) => encode_struct(e, &var, data)?,
-        Data::Enum(data) => encode_tagged_enum(e, &var, data)?,
-        Data::Union => {
-            e.cx.error_span(span, "musli: unions are not supported");
-            return Err(());
-        }
+        BuildData::Struct(data) => encode_struct(&e, &var, data)?,
+        BuildData::Enum(data) => encode_tagged_enum(&e, &var, data)?,
     };
 
     if e.cx.has_errors() {
@@ -55,8 +25,9 @@ fn expand_encode_moded(
     let encode_t = &e.tokens.encode_t;
     let encoder_t = &e.tokens.encoder_t;
 
-    let (impl_generics, mode_ident, where_clause) =
-        expansion.as_impl_generics(e.input.generics.clone(), &e.tokens);
+    let (impl_generics, mode_ident, where_clause) = e
+        .expansion
+        .as_impl_generics(e.input.generics.clone(), &e.tokens);
 
     let type_generics = &e.input.generics;
 
@@ -77,10 +48,10 @@ fn expand_encode_moded(
 
 /// Encode a transparent element.
 fn encode_transparent(
-    e: ExpanderWithMode<'_>,
+    e: &Build<'_>,
     var: &syn::Ident,
     span: Span,
-    fields: &[FieldData],
+    fields: &[FieldBuild],
 ) -> Result<TokenStream> {
     let f = match fields {
         [f] => f,
@@ -95,19 +66,19 @@ fn encode_transparent(
         None => quote_spanned!(f.span => &self.0),
     };
 
-    let (span, encode_path) = f.attr.encode_path(e.mode, span);
+    let (span, encode_path) = &f.encode_path;
 
     Ok(quote_spanned! {
-        span => #encode_path(#accessor, #var)
+        *span => #encode_path(#accessor, #var)
     })
 }
 
 /// Encode a transparent element.
 fn encode_transparent_variant(
-    e: ExpanderWithMode<'_>,
+    e: &Build<'_>,
     var: &syn::Ident,
     span: Span,
-    fields: &[FieldData],
+    fields: &[FieldBuild],
 ) -> Result<(TokenStream, Vec<TokenStream>)> {
     let f = match fields {
         [f] => f,
@@ -117,10 +88,10 @@ fn encode_transparent_variant(
         }
     };
 
-    let (span, encode_path) = f.attr.encode_path(e.mode, span);
+    let (span, encode_path) = &f.encode_path;
 
     let encode = quote_spanned! {
-        span => #encode_path(this, #var)
+        *span => #encode_path(this, #var)
     };
 
     let accessor = match &f.ident {
@@ -132,54 +103,21 @@ fn encode_transparent_variant(
 }
 
 /// Encode a struct.
-fn encode_struct(
-    e: ExpanderWithMode<'_>,
-    var: &syn::Ident,
-    st: &StructData,
-) -> Result<TokenStream> {
-    let mut field_tests = Vec::with_capacity(st.fields.len());
-    let mut encoders = Vec::with_capacity(st.fields.len());
-    let mut test_variables = Vec::with_capacity(st.fields.len());
-    let packing = e.type_attr.packing(e.mode).cloned().unwrap_or_default();
+fn encode_struct(e: &Build<'_>, var: &syn::Ident, st: &StructBuild<'_>) -> Result<TokenStream> {
+    let fields = encode_fields(e, var, &st.fields)?;
 
-    let default_field_tag = e.type_attr.default_field_tag(e.mode);
-
-    for f in &st.fields {
-        let access = match &f.ident {
-            Some(ident) => quote!(&self.#ident),
-            None => {
-                let n = field_int(f.index, f.span);
-                quote!(&self.#n)
-            }
-        };
-
-        let mut encode = encode_field(e, var, f, &access, &packing, default_field_tag)?;
-
-        if let Some((decl, test)) = do_field_test(e, &access, f) {
-            encode = quote_spanned! {
-                f.span =>
-                if #test {
-                    #encode
-                }
-            };
-
-            field_tests.push(decl);
-            test_variables.push(test);
-        }
-
-        encoders.push(encode);
-    }
-
-    match packing {
+    match st.packing {
         Packing::Transparent => encode_transparent(e, var, e.input.ident.span(), &st.fields),
         Packing::Tagged => {
             let encoder_t = &e.tokens.encoder_t;
             let pairs_encoder_t = &e.tokens.pairs_encoder_t;
 
-            let len = length_test(st.fields.len(), &test_variables);
+            let len = length_test(st.fields.len(), &fields.tests);
+            let decls = fields.test_decls();
+            let encoders = &fields.encoders;
 
             Ok(quote! {
-                #(#field_tests)*
+                #(#decls)*
                 let mut #var = #encoder_t::encode_struct(#var, #len)?;
                 #(#encoders)*
                 #pairs_encoder_t::end(#var)
@@ -188,10 +126,12 @@ fn encode_struct(
         Packing::Packed => {
             let encoder_t = &e.tokens.encoder_t;
             let sequence_encoder_t = &e.tokens.sequence_encoder_t;
+            let decls = fields.tests.iter().map(|t| &t.decl);
+            let encoders = &fields.encoders;
 
             Ok(quote! {{
                 let mut pack = #encoder_t::encode_pack(#var)?;
-                #(#field_tests)*
+                #(#decls)*
                 #(#encoders)*
                 #sequence_encoder_t::end(pack)
             }})
@@ -199,11 +139,51 @@ fn encode_struct(
     }
 }
 
+struct FieldTest {
+    decl: TokenStream,
+    var: syn::Ident,
+}
+
+struct EncodedFields {
+    encoders: Vec<TokenStream>,
+    tests: Vec<FieldTest>,
+}
+
+impl EncodedFields {
+    fn test_decls<'a>(&'a self) -> impl Iterator<Item = &'a TokenStream> {
+        self.tests.iter().map(|t| &t.decl)
+    }
+}
+
+fn encode_fields(e: &Build<'_>, var: &syn::Ident, fields: &[FieldBuild]) -> Result<EncodedFields> {
+    let mut encoders = Vec::with_capacity(fields.len());
+    let mut tests = Vec::with_capacity(fields.len());
+
+    for f in fields {
+        let mut encode = encode_field(e, var, f)?;
+
+        if let Some((decl, var)) = do_field_test(f) {
+            encode = quote_spanned! {
+                f.span =>
+                if #var {
+                    #encode
+                }
+            };
+
+            tests.push(FieldTest { decl, var })
+        }
+
+        encoders.push(encode);
+    }
+
+    Ok(EncodedFields { encoders, tests })
+}
+
 /// Encode an internally tagged enum.
 fn encode_tagged_enum(
-    e: ExpanderWithMode<'_>,
+    e: &Build<'_>,
     var: &syn::Ident,
-    data: &EnumData,
+    data: &EnumBuild<'_>,
 ) -> Result<TokenStream> {
     if let Some(&(span, Packing::Transparent)) = e.type_attr.packing_span(e.mode) {
         e.cx.error_span(
@@ -237,154 +217,108 @@ fn encode_tagged_enum(
 
 /// Setup encoding for a single variant. that is externally tagged.
 fn encode_variant(
-    e: ExpanderWithMode<'_>,
+    e: &Build<'_>,
     var: &syn::Ident,
-    v: &VariantData,
+    v: &VariantBuild,
 ) -> Result<(TokenStream, TokenStream)> {
-    let span = v.span;
-
-    let variant_packing = v
-        .attr
-        .packing(e.mode)
-        .or_else(|| e.type_attr.packing(e.mode))
-        .cloned()
-        .unwrap_or_default();
-
-    let mut path = syn::Path::from(syn::Ident::new("Self", span));
-    path.segments.push(v.ident.clone().into());
-
-    let default_field_tag = v
-        .attr
-        .default_field_tag(e.mode)
-        .unwrap_or_else(|| e.type_attr.default_field_tag(e.mode));
-
-    let enum_tagging = e.type_attr.enum_tagging(e.mode);
-    let enum_packing = e.type_attr.packing(e.mode).cloned().unwrap_or_default();
-
-    if let Packing::Transparent = variant_packing {
+    if let Packing::Transparent = v.packing {
         let (encode, patterns) = encode_transparent_variant(e, var, v.span, &v.fields)?;
-        let encode = encode_variant_container(e, var, v, encode, &enum_packing)?;
+        let encode = encode_variant_container(e, var, v, encode)?;
+        let path = &v.path;
         return Ok((quote!(#path { #(#patterns),* }), encode));
     }
 
-    let mut field_tests = Vec::with_capacity(v.fields.len());
-    let mut encoders = Vec::with_capacity(v.fields.len());
-    let mut patterns = Vec::with_capacity(v.fields.len());
-    let mut test_variables = Vec::with_capacity(v.fields.len());
+    let fields = encode_fields(e, var, &v.fields)?;
 
-    for f in &v.fields {
-        let access = match &f.ident {
-            Some(ident) => {
-                patterns.push(quote!(#ident));
-                quote!(#ident)
-            }
-            None => {
-                let index = field_int(f.index, f.span);
-                let var = syn::Ident::new(&format!("v{}", f.index), f.span);
-                patterns.push(quote!(#index: #var));
-                quote!(#var)
-            }
-        };
-
-        let mut encode = encode_field(e, var, f, &access, &variant_packing, default_field_tag)?;
-
-        if let Some((decl, test)) = do_field_test(e, &access, f) {
-            encode = quote_spanned! {
-                f.span =>
-                if #test {
-                    #encode
-                }
-            };
-
-            field_tests.push(decl);
-            test_variables.push(test);
-        }
-
-        encoders.push(encode);
-    }
-
-    if let Packing::Packed = variant_packing {
+    if let Packing::Packed = v.packing {
         let encoder_t = &e.tokens.encoder_t;
         let sequence_encoder_t = &e.tokens.sequence_encoder_t;
 
-        let encode = if encoders.is_empty() {
+        let encode = if fields.encoders.is_empty() {
             quote_spanned! {
                 v.span =>
                 let pack = #encoder_t::encode_pack(#var)?;
                 #sequence_encoder_t::end(pack)
             }
         } else {
+            let decls = fields.test_decls();
+            let encoders = &fields.encoders;
+
             quote_spanned! {
                 v.span =>
                 let mut pack = #encoder_t::encode_pack(#var)?;
-                #(#field_tests)*
+                #(#decls)*
                 #(#encoders)*
                 #sequence_encoder_t::end(pack)
             }
         };
 
-        let encode = encode_variant_container(e, var, v, encode, &enum_packing)?;
-        return Ok((quote!(#path { #(#patterns),* }), encode));
+        let encode = encode_variant_container(e, var, v, encode)?;
+        return Ok((v.constructor(), encode));
     }
 
-    if let Some(EnumTagging::Internal(field_tag)) = enum_tagging {
+    if let Some(EnumTagging::Internal(field_tag)) = v.enum_tagging {
         let pairs_encoder_t = &e.tokens.pairs_encoder_t;
         let encoder_t = &e.tokens.encoder_t;
         let mode_ident = e.mode.mode_ident();
 
-        let (tag, _) = v.expand_tag(e, e.type_attr.default_variant_tag(e.mode))?;
+        let (tag, _) = &v.tag;
+
+        let decls = fields.test_decls();
+        let encoders = &fields.encoders;
 
         let encode = quote_spanned! {
             v.span =>
             let mut #var = #encoder_t::encode_struct(#var, 0)?;
             #pairs_encoder_t::insert::<#mode_ident, _, _>(&mut #var, #field_tag, #tag)?;
-            #(#field_tests)*
+            #(#decls)*
             #(#encoders)*
             #pairs_encoder_t::end(#var)
         };
 
-        return Ok((quote!(#path { #(#patterns),* }), encode));
+        return Ok((v.constructor(), encode));
     }
 
     let encoder_t = &e.tokens.encoder_t;
     let pairs_encoder_t = &e.tokens.pairs_encoder_t;
 
-    let len = length_test(v.fields.len(), &test_variables);
+    let len = length_test(v.fields.len(), &fields.tests);
 
-    let encode = if encoders.is_empty() {
+    let encode = if fields.encoders.is_empty() {
         quote_spanned! {
             v.span =>
             let #var = #encoder_t::encode_struct(#var, #len)?;
             #pairs_encoder_t::end(#var)
         }
     } else {
+        let decls = fields.test_decls();
+        let encoders = &fields.encoders;
+
         quote_spanned! {
             v.span =>
-            #(#field_tests)*
+            #(#decls)*
             let mut #var = #encoder_t::encode_struct(#var, #len)?;
             #(#encoders)*
             #pairs_encoder_t::end(#var)
         }
     };
 
-    let encode = encode_variant_container(e, var, v, encode, &enum_packing)?;
-    Ok((quote!(#path { #(#patterns),* }), encode))
+    let encode = encode_variant_container(e, var, v, encode)?;
+    Ok((v.constructor(), encode))
 }
 
 fn encode_variant_container(
-    e: ExpanderWithMode<'_>,
+    e: &Build<'_>,
     var: &syn::Ident,
-    v: &VariantData,
+    v: &VariantBuild,
     body: TokenStream,
-    enum_packing: &Packing,
 ) -> Result<TokenStream> {
-    if let Packing::Tagged = &enum_packing {
+    if let Packing::Tagged = v.enum_packing {
         let encoder_t = &e.tokens.encoder_t;
         let variant_encoder_t = &e.tokens.variant_encoder_t;
 
-        let (tag, _) = v.expand_tag(e, e.type_attr.default_variant_tag(e.mode))?;
-
-        let encode_t_encode = e.mode.encode_t_encode();
+        let encode_t_encode = &e.encode_t_encode;
+        let (tag, _) = &v.tag;
 
         Ok(quote_spanned! {
             v.span =>
@@ -402,16 +336,13 @@ fn encode_variant_container(
     }
 }
 
-fn do_field_test(
-    e: ExpanderWithMode<'_>,
-    access: &TokenStream,
-    f: &FieldData,
-) -> Option<(TokenStream, syn::Ident)> {
-    let (skip_span, skip_encoding_if_path) = f.attr.skip_encoding_if(e.mode)?;
+fn do_field_test(f: &FieldBuild) -> Option<(TokenStream, syn::Ident)> {
+    let (skip_span, skip_encoding_if_path) = f.skip_encoding_if.as_ref()?;
     let test = syn::Ident::new(&format!("t{}", f.index), f.span);
+    let access = &f.access;
 
     let decl = quote_spanned! {
-        skip_span =>
+        *skip_span =>
         let #test = !#skip_encoding_if_path(#access);
     };
 
@@ -419,27 +350,20 @@ fn do_field_test(
 }
 
 /// Encode a field.
-fn encode_field(
-    e: ExpanderWithMode<'_>,
-    var: &syn::Ident,
-    f: &FieldData,
-    access: &TokenStream,
-    packing: &Packing,
-    default_field_tag: DefaultTag,
-) -> Result<TokenStream> {
-    let (span, encode_path) = f.attr.encode_path(e.mode, f.span);
+fn encode_field(e: &Build<'_>, var: &syn::Ident, f: &FieldBuild) -> Result<TokenStream> {
+    let (span, encode_path) = &f.encode_path;
+    let access = &f.access;
 
-    match packing {
+    match f.packing {
         Packing::Tagged | Packing::Transparent => {
-            let (tag, _) = f.expand_tag(e, default_field_tag)?;
+            let (tag, _) = &f.tag;
 
             let pair_encoder_t = &e.tokens.pair_encoder_t;
             let pairs_encoder_t = &e.tokens.pairs_encoder_t;
-
-            let encode_t_encode = e.mode.encode_t_encode();
+            let encode_t_encode = &e.encode_t_encode;
 
             Ok(quote_spanned! {
-                span => {
+                *span => {
                     let mut pair_encoder = #pairs_encoder_t::next(&mut #var)?;
                     let field_encoder = #pair_encoder_t::first(&mut pair_encoder)?;
                     #encode_t_encode(&#tag, field_encoder)?;
@@ -453,19 +377,21 @@ fn encode_field(
             let sequence_encoder_t = &e.tokens.sequence_encoder_t;
 
             Ok(quote_spanned! {
-                span =>
+                *span =>
                 #encode_path(#access, #sequence_encoder_t::next(&mut pack)?)?;
             })
         }
     }
 }
 
-fn length_test(count: usize, tests: &[syn::Ident]) -> TokenStream {
+fn length_test(count: usize, tests: &[FieldTest]) -> TokenStream {
     if tests.is_empty() {
         quote!(#count)
     } else {
         let count = count.saturating_sub(tests.len());
-        let tests = tests.iter().map(|v| quote!(if #v { 1 } else { 0 }));
+        let tests = tests
+            .iter()
+            .map(|FieldTest { var, .. }| quote!(if #var { 1 } else { 0 }));
         quote!(#count + #(#tests)+*)
     }
 }

@@ -1,0 +1,312 @@
+use proc_macro2::{Span, TokenStream};
+use quote::quote_spanned;
+
+use crate::expander::field_int;
+use crate::expander::{
+    Data, EnumData, Expander, ExpansionMode, FieldData, Result, StructData, TagMethod, VariantData,
+};
+use crate::internals::attr::{DefaultTag, EnumTagging, Packing, TypeAttr};
+use crate::internals::symbol::*;
+use crate::internals::tokens::Tokens;
+use crate::{
+    expander::Taggable,
+    internals::{Ctxt, Mode},
+};
+
+pub(crate) struct Build<'a> {
+    pub(crate) input: &'a syn::DeriveInput,
+    pub(crate) cx: &'a Ctxt,
+    pub(crate) type_attr: &'a TypeAttr,
+    pub(crate) type_name: &'a syn::LitStr,
+    pub(crate) tokens: &'a Tokens,
+    pub(crate) mode: Mode<'a>,
+    pub(crate) expansion: ExpansionMode<'a>,
+    pub(crate) data: BuildData<'a>,
+    pub(crate) encode_t_encode: TokenStream,
+}
+
+impl Build<'_> {
+    /// Emit diagnostics for a transparent encode / decode that failed because
+    /// the wrong number of fields existed.
+    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[FieldBuild]) {
+        if fields.is_empty() {
+            self.cx.error_span(
+                span,
+                format!(
+                    "#[{}({})] types must have a single field",
+                    ATTR, TRANSPARENT
+                ),
+            );
+        } else {
+            self.cx.error_span(
+                span,
+                format!(
+                    "#[{}({})] can only be used on types which have a single field",
+                    ATTR, TRANSPARENT
+                ),
+            );
+        }
+    }
+}
+
+/// Build model for enums and structs.
+pub(crate) enum BuildData<'a> {
+    Struct(StructBuild<'a>),
+    Enum(EnumBuild<'a>),
+}
+
+pub(crate) struct StructBuild<'a> {
+    pub(crate) span: Span,
+    pub(crate) fields: Vec<FieldBuild<'a>>,
+    pub(crate) packing: Packing,
+    pub(crate) path: syn::Path,
+}
+
+pub(crate) struct EnumBuild<'a> {
+    pub(crate) span: Span,
+    pub(crate) variants: Vec<VariantBuild<'a>>,
+    pub(crate) fallback: Option<&'a syn::Ident>,
+}
+
+pub(crate) struct VariantBuild<'a> {
+    pub(crate) span: Span,
+    pub(crate) index: usize,
+    pub(crate) name: &'a syn::LitStr,
+    pub(crate) fields: Vec<FieldBuild<'a>>,
+    pub(crate) packing: Packing,
+    pub(crate) enum_tagging: Option<&'a EnumTagging>,
+    pub(crate) enum_packing: Packing,
+    pub(crate) tag: (syn::Expr, TagMethod),
+    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) is_default: bool,
+    pub(crate) path: syn::Path,
+    patterns: Vec<TokenStream>,
+}
+
+impl VariantBuild<'_> {
+    /// Generate constructor for this variant.
+    pub(crate) fn constructor(&self) -> TokenStream {
+        let patterns = &self.patterns;
+        let path = &self.path;
+        quote_spanned!(self.span => #path { #(#patterns),* })
+    }
+}
+
+pub(crate) struct FieldBuild<'a> {
+    pub(crate) span: Span,
+    pub(crate) index: usize,
+    pub(crate) ident: Option<&'a syn::Ident>,
+    pub(crate) encode_path: (Span, TokenStream),
+    pub(crate) decode_path: (Span, TokenStream),
+    pub(crate) tag: (syn::Expr, TagMethod),
+    pub(crate) skip_encoding_if: Option<(Span, &'a syn::ExprPath)>,
+    pub(crate) default_attr: Option<Span>,
+    pub(crate) access: TokenStream,
+    pub(crate) packing: Packing,
+}
+
+/// Setup a build.
+pub(crate) fn setup<'a>(e: &'a Expander, expansion: ExpansionMode<'a>) -> Result<Build<'a>> {
+    let mode = expansion.as_mode(&e.tokens);
+
+    e.validate_attributes(mode)?;
+
+    let data = match &e.data {
+        Data::Struct(data) => BuildData::Struct(setup_struct(e, mode, data)?),
+        Data::Enum(data) => BuildData::Enum(setup_enum(e, mode, data)?),
+        Data::Union => {
+            e.cx.error_span(e.input.ident.span(), "musli: not supported for unions");
+            return Err(());
+        }
+    };
+
+    Ok(Build {
+        input: e.input,
+        cx: &e.cx,
+        type_attr: &e.type_attr,
+        type_name: &e.type_name,
+        tokens: &e.tokens,
+        mode,
+        expansion,
+        data,
+        encode_t_encode: mode.encode_t_encode(),
+    })
+}
+
+fn setup_struct<'a>(
+    e: &'a Expander,
+    mode: Mode<'_>,
+    data: &'a StructData<'a>,
+) -> Result<StructBuild<'a>> {
+    let mut fields = Vec::with_capacity(data.fields.len());
+
+    let default_field_tag = e.type_attr.default_field_tag(mode);
+    let packing = e.type_attr.packing(mode).cloned().unwrap_or_default();
+    let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
+
+    for f in &data.fields {
+        fields.push(setup_field(e, mode, f, default_field_tag, packing, None)?);
+    }
+
+    Ok(StructBuild {
+        span: data.span,
+        fields,
+        packing,
+        path,
+    })
+}
+
+fn setup_enum<'a>(
+    e: &'a Expander,
+    mode: Mode<'_>,
+    data: &'a EnumData<'a>,
+) -> Result<EnumBuild<'a>> {
+    let mut variants = Vec::with_capacity(data.variants.len());
+    let mut fallback = None;
+
+    for v in &data.variants {
+        variants.push(setup_variant(e, mode, v, &mut fallback)?);
+    }
+
+    Ok(EnumBuild {
+        span: data.span,
+        variants,
+        fallback,
+    })
+}
+
+fn setup_variant<'a>(
+    e: &'a Expander<'_>,
+    mode: Mode<'_>,
+    data: &'a VariantData<'a>,
+    fallback: &mut Option<&'a syn::Ident>,
+) -> Result<VariantBuild<'a>> {
+    let mut fields = Vec::with_capacity(data.fields.len());
+
+    let variant_packing = data
+        .attr
+        .packing(mode)
+        .or_else(|| e.type_attr.packing(mode))
+        .cloned()
+        .unwrap_or_default();
+
+    let default_field_tag = data
+        .attr
+        .default_field_tag(mode)
+        .unwrap_or_else(|| e.type_attr.default_field_tag(mode));
+
+    let enum_tagging = e.type_attr.enum_tagging(mode);
+    let enum_packing = e.type_attr.packing(mode).cloned().unwrap_or_default();
+
+    let tag = data.expand_tag(e, mode, e.type_attr.default_variant_tag(mode))?;
+
+    let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
+    path.segments.push(data.ident.clone().into());
+
+    let tag_type = data.attr.tag_type(mode);
+
+    let is_default = if data.attr.default_attr(mode).is_some() {
+        if !data.fields.is_empty() {
+            e.cx.error_span(
+                data.span,
+                format!("#[{}({})] variant must be empty", ATTR, DEFAULT),
+            );
+
+            false
+        } else if fallback.is_some() {
+            e.cx.error_span(
+                data.span,
+                format!(
+                    "#[{}({})] only one fallback variant is supported",
+                    ATTR, DEFAULT
+                ),
+            );
+
+            false
+        } else {
+            *fallback = Some(data.ident);
+            true
+        }
+    } else {
+        false
+    };
+
+    let mut patterns = Vec::new();
+
+    for f in &data.fields {
+        fields.push(setup_field(
+            e,
+            mode,
+            f,
+            default_field_tag,
+            variant_packing,
+            Some(&mut patterns),
+        )?);
+    }
+
+    Ok(VariantBuild {
+        span: data.span,
+        index: data.index,
+        name: &data.name,
+        fields,
+        packing: variant_packing,
+        enum_tagging,
+        enum_packing,
+        tag,
+        tag_type,
+        is_default,
+        path,
+        patterns,
+    })
+}
+
+fn setup_field<'a>(
+    e: &'a Expander,
+    mode: Mode<'_>,
+    data: &'a FieldData<'a>,
+    default_field_tag: DefaultTag,
+    packing: Packing,
+    patterns: Option<&mut Vec<TokenStream>>,
+) -> Result<FieldBuild<'a>> {
+    let encode_path = data.attr.encode_path(mode, data.span);
+    let decode_path = data.attr.decode_path(mode, data.span);
+    let tag = data.expand_tag(e, mode, default_field_tag)?;
+    let skip_encoding_if = data.attr.skip_encoding_if(mode);
+    let default_attr = data.attr.default_attr(mode);
+
+    let access = if let Some(patterns) = patterns {
+        match &data.ident {
+            Some(ident) => {
+                patterns.push(quote_spanned!(data.span => #ident));
+                quote_spanned!(data.span => #ident)
+            }
+            None => {
+                let index = field_int(data.index, data.span);
+                let var = syn::Ident::new(&format!("v{}", data.index), data.span);
+                patterns.push(quote_spanned!(data.span => #index: #var));
+                quote_spanned!(data.span => #var)
+            }
+        }
+    } else {
+        match &data.ident {
+            Some(ident) => quote_spanned!(data.span => &self.#ident),
+            None => {
+                let n = field_int(data.index, data.span);
+                quote_spanned!(data.span => &self.#n)
+            }
+        }
+    };
+
+    Ok(FieldBuild {
+        span: data.span,
+        index: data.index,
+        ident: data.ident,
+        encode_path,
+        decode_path,
+        tag,
+        skip_encoding_if,
+        default_attr,
+        access,
+        packing,
+    })
+}

@@ -11,6 +11,7 @@
 
 use proc_macro::TokenStream;
 
+mod build;
 mod de;
 mod en;
 mod expander;
