@@ -15,8 +15,8 @@ use syn::Ident;
 pub enum Tagging {
     /// Externally tagged.
     External,
-    /// Tag by the specified field.
-    Tag(syn::Expr),
+    /// The type is internally tagged by the field given by the expression.
+    Internal(syn::Expr),
 }
 
 impl Default for Tagging {
@@ -50,7 +50,7 @@ impl fmt::Display for Packing {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Packing::Tagged(Tagging::External) => write!(f, "tagged"),
-            Packing::Tagged(Tagging::Tag(..)) => write!(f, "internally tagged"),
+            Packing::Tagged(Tagging::Internal(..)) => write!(f, "internally tagged"),
             Packing::Packed => write!(f, "packed"),
             Packing::Transparent => write!(f, "transparent"),
         }
@@ -374,7 +374,11 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                     // parse #[musli(tag = <expr>)]
                     Attribute::KeyValue(path, value) if path == TAG => {
                         if let Some(expr) = value_as_expr(cx, TAG, value) {
-                            attr.set_packing(cx, path.span(), Packing::Tagged(Tagging::Tag(expr)));
+                            attr.set_packing(
+                                cx,
+                                path.span(),
+                                Packing::Tagged(Tagging::Internal(expr)),
+                            );
                         }
                     }
                     // parse #[musli(crate = <path>)]

@@ -8,7 +8,8 @@ error: #[musli(default)] variant must be empty
   | |_____^
 
 error: #[musli(default)] only one fallback variant is supported
-  --> tests/ui/illegal_fallback_variant_error.rs:18:5
+  --> tests/ui/illegal_fallback_variant_error.rs:17:5
    |
-18 |     Fallback2,
-   |     ^^^^^^^^^
+17 | /     #[musli(default)]
+18 | |     Fallback2,
+   | |_____________^

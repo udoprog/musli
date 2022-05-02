@@ -5,10 +5,26 @@ error: #[musli(transparent)] can only be used on types which have a single field
   |        ^^^^^^^^^^^^^^^^^
 
 error: #[musli(transparent)] can only be used on types which have a single field
+ --> tests/ui/transparent_error.rs:3:18
+  |
+3 | #[derive(Encode, Decode)]
+  |                  ^^^^^^
+  |
+  = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: #[musli(transparent)] can only be used on types which have a single field
   --> tests/ui/transparent_error.rs:12:8
    |
 12 | struct TransparentTuple(u32, u32);
    |        ^^^^^^^^^^^^^^^^
+
+error: #[musli(transparent)] can only be used on types which have a single field
+  --> tests/ui/transparent_error.rs:10:18
+   |
+10 | #[derive(Encode, Decode)]
+   |                  ^^^^^^
+   |
+   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: #[musli(transparent)] types must have a single field
   --> tests/ui/transparent_error.rs:16:8
@@ -17,10 +33,26 @@ error: #[musli(transparent)] types must have a single field
    |        ^^^^^^^^^^^^^^^^^^^^^^
 
 error: #[musli(transparent)] types must have a single field
+  --> tests/ui/transparent_error.rs:14:18
+   |
+14 | #[derive(Encode, Decode)]
+   |                  ^^^^^^
+   |
+   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: #[musli(transparent)] types must have a single field
   --> tests/ui/transparent_error.rs:20:8
    |
 20 | struct TransparentEmptyTuple;
    |        ^^^^^^^^^^^^^^^^^^^^^
+
+error: #[musli(transparent)] types must have a single field
+  --> tests/ui/transparent_error.rs:18:18
+   |
+18 | #[derive(Encode, Decode)]
+   |                  ^^^^^^
+   |
+   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: #[musli(transparent)] can only be used on types which have a single field
   --> tests/ui/transparent_error.rs:24:5
