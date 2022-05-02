@@ -239,7 +239,7 @@ pub(crate) trait Taggable {
                 return Ok((rename_lit(rename), determine_tag_method(rename)))
             }
             (None, Some(DefaultTag::Index), _) => (
-                usize_int(self.index(), self.span()).into(),
+                usize_suffixed(self.index(), self.span()).into(),
                 Some(TagMethod::Index),
             ),
             (None, Some(DefaultTag::Name), None) => {
@@ -247,7 +247,7 @@ pub(crate) trait Taggable {
                     self.span(),
                     format!(
                         "#[{}({} = \"name\")] is not supported with unnamed fields",
-                        ATTR, TAG
+                        ATTR, DEFAULT_FIELD_TAG
                     ),
                 );
                 return Err(());
@@ -255,7 +255,7 @@ pub(crate) trait Taggable {
             (None, Some(DefaultTag::Name), Some(ident)) => {
                 (ident.clone().into(), Some(TagMethod::String))
             }
-            _ => (usize_int(self.index(), self.span()).into(), None),
+            _ => (usize_suffixed(self.index(), self.span()).into(), None),
         };
 
         let tag = syn::Expr::Lit(syn::ExprLit {
@@ -265,6 +265,12 @@ pub(crate) trait Taggable {
 
         Ok((tag, tag_method))
     }
+}
+
+/// Ensure that the given integer is usize-suffixed so that it is treated as the
+/// appropriate type.
+pub(crate) fn usize_suffixed(index: usize, span: Span) -> syn::LitInt {
+    syn::LitInt::new(&format!("{}usize", index), span)
 }
 
 impl Taggable for FieldData<'_> {
@@ -335,14 +341,4 @@ fn determine_tag_method(expr: &syn::Expr) -> Option<TagMethod> {
         } => Some(TagMethod::Index),
         _ => None,
     }
-}
-
-/// Usize-suffixed integer.
-pub(crate) fn usize_int(index: usize, span: Span) -> syn::LitInt {
-    syn::LitInt::new(&format!("{}usize", index), span)
-}
-
-/// Integer used for tuple initialization.
-pub(crate) fn field_int(index: usize, span: Span) -> syn::LitInt {
-    syn::LitInt::new(&index.to_string(), span)
 }

@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
 
-use crate::expander::field_int;
 use crate::expander::{
     Data, EnumData, Expander, FieldData, Result, StructData, TagMethod, VariantData,
 };
@@ -137,13 +136,13 @@ impl VariantBuild<'_> {
 pub(crate) struct FieldBuild<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
-    pub(crate) ident: Option<&'a syn::Ident>,
     pub(crate) encode_path: (Span, TokenStream),
     pub(crate) decode_path: (Span, TokenStream),
     pub(crate) tag: syn::Expr,
     pub(crate) skip_encoding_if: Option<(Span, &'a syn::ExprPath)>,
     pub(crate) default_attr: Option<Span>,
-    pub(crate) access: TokenStream,
+    pub(crate) self_access: TokenStream,
+    pub(crate) field_access: TokenStream,
     pub(crate) packing: Packing,
 }
 
@@ -171,8 +170,8 @@ pub(crate) fn setup<'a>(e: &'a Expander, expansion: Expansion<'a>) -> Result<Bui
         tokens: &e.tokens,
         expansion,
         data,
-        decode_t_decode: mode.decode_t_decode(),
-        encode_t_encode: mode.encode_t_encode(),
+        decode_t_decode: mode.decode_t_decode(Span::call_site()),
+        encode_t_encode: mode.encode_t_encode(Span::call_site()),
         mode_ident: mode.mode_ident(),
     })
 }
@@ -345,7 +344,7 @@ fn setup_field<'a>(
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
     let default_attr = data.attr.default_attr(mode);
 
-    let access = if let Some(patterns) = patterns {
+    let self_access = if let Some(patterns) = patterns {
         match &data.ident {
             Some(ident) => {
                 patterns.push(quote_spanned!(data.span => #ident));
@@ -368,16 +367,24 @@ fn setup_field<'a>(
         }
     };
 
+    let field_access = match &data.ident {
+        Some(ident) => quote_spanned!(data.span => #ident),
+        None => {
+            let field_index = field_int(data.index, data.span);
+            quote_spanned!(data.span => #field_index)
+        }
+    };
+
     Ok(FieldBuild {
         span: data.span,
         index: data.index,
-        ident: data.ident,
         encode_path,
         decode_path,
         tag,
         skip_encoding_if,
         default_attr,
-        access,
+        self_access,
+        field_access,
         packing,
     })
 }
@@ -413,4 +420,9 @@ impl<'a> TagMethods<'a> {
     fn pick(self) -> TagMethod {
         self.methods.into_iter().next().unwrap_or_default()
     }
+}
+
+/// Integer used for tuple initialization.
+pub(crate) fn field_int(index: usize, span: Span) -> syn::LitInt {
+    syn::LitInt::new(&index.to_string(), span)
 }

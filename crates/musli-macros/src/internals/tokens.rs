@@ -1,11 +1,10 @@
-use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use proc_macro2::Span;
 
 pub(crate) struct Tokens {
     pub(crate) decode_t: syn::ExprPath,
     pub(crate) decoder_t: syn::ExprPath,
+    pub(crate) default_function: syn::ExprPath,
     pub(crate) default_mode: syn::ExprPath,
-    pub(crate) default_t: TokenStream,
     pub(crate) encode_t: syn::ExprPath,
     pub(crate) encoder_t: syn::ExprPath,
     pub(crate) error_t: syn::ExprPath,
@@ -29,8 +28,8 @@ impl Tokens {
         Self {
             decode_t: path(span, prefix, ["de", "Decode"]),
             decoder_t: path(span, prefix, ["de", "Decoder"]),
+            default_function: core_path(span, ["default", "Default", "default"]),
             default_mode: path(span, prefix, ["mode", "DefaultMode"]),
-            default_t: quote!(::core::default::Default::default()),
             encode_t: path(span, prefix, ["en", "Encode"]),
             encoder_t: path(span, prefix, ["en", "Encoder"]),
             error_t: path(span, prefix, ["error", "Error"]),

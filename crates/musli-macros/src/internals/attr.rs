@@ -332,7 +332,7 @@ impl FieldAttr {
                 quote_spanned!(*span => #encode_path::<#mode_ident, _>),
             )
         } else {
-            let encode_path = mode.encode_t_encode();
+            let encode_path = mode.encode_t_encode(span);
             (span, encode_path)
         }
     }
@@ -351,7 +351,7 @@ impl FieldAttr {
                 quote_spanned!(*span => #decode_path::<#mode_ident, _>),
             )
         } else {
-            let decode_path = mode.decode_t_decode();
+            let decode_path = mode.decode_t_decode(span);
             (span, decode_path)
         }
     }

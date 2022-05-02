@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned};
+use quote::quote_spanned;
 
 use crate::expander::Result;
 use crate::internals::attr::{EnumTagging, Packing};
@@ -45,35 +45,6 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
     })
 }
 
-/// Encode a transparent element.
-fn encode_transparent_variant(
-    e: &Build<'_>,
-    var: &syn::Ident,
-    span: Span,
-    fields: &[FieldBuild],
-) -> Result<(TokenStream, Vec<TokenStream>)> {
-    let f = match fields {
-        [f] => f,
-        _ => {
-            e.transparent_diagnostics(span, fields);
-            return Err(());
-        }
-    };
-
-    let (span, encode_path) = &f.encode_path;
-
-    let encode = quote_spanned! {
-        *span => #encode_path(this, #var)
-    };
-
-    let accessor = match &f.ident {
-        Some(ident) => quote_spanned!(f.span => #ident: this),
-        None => quote_spanned!(f.span => 0: this),
-    };
-
-    Ok((encode, vec![accessor]))
-}
-
 /// Encode a struct.
 fn encode_struct(e: &Build<'_>, var: &syn::Ident, st: &StructBuild<'_>) -> Result<TokenStream> {
     match st.packing {
@@ -86,28 +57,25 @@ fn encode_struct(e: &Build<'_>, var: &syn::Ident, st: &StructBuild<'_>) -> Resul
                 }
             };
 
-            let accessor = match &f.ident {
-                Some(ident) => quote_spanned!(f.span => &self.#ident),
-                None => quote_spanned!(f.span => &self.0),
-            };
-
+            let access = &f.self_access;
             let (span, encode_path) = &f.encode_path;
 
             Ok(quote_spanned! {
-                *span => #encode_path(#accessor, #var)
+                *span => #encode_path(#access, #var)
             })
         }
         Packing::Tagged => {
             let fields = encode_fields(e, var, &st.fields)?;
 
-            let len = length_test(st.fields.len(), &fields.tests);
+            let len = length_test(st.span, st.fields.len(), &fields.tests);
             let decls = fields.test_decls();
             let encoders = &fields.encoders;
 
             let encoder_t = &e.tokens.encoder_t;
             let pairs_encoder_t = &e.tokens.pairs_encoder_t;
 
-            Ok(quote! {
+            Ok(quote_spanned! {
+                st.span =>
                 #(#decls)*
                 let mut #var = #encoder_t::encode_struct(#var, #len)?;
                 #(#encoders)*
@@ -123,17 +91,20 @@ fn encode_struct(e: &Build<'_>, var: &syn::Ident, st: &StructBuild<'_>) -> Resul
             let encoder_t = &e.tokens.encoder_t;
             let sequence_encoder_t = &e.tokens.sequence_encoder_t;
 
-            Ok(quote! {{
-                let mut pack = #encoder_t::encode_pack(#var)?;
-                #(#decls)*
-                #(#encoders)*
-                #sequence_encoder_t::end(pack)
-            }})
+            Ok(quote_spanned! {
+                st.span => {
+                    let mut pack = #encoder_t::encode_pack(#var)?;
+                    #(#decls)*
+                    #(#encoders)*
+                    #sequence_encoder_t::end(pack)
+                }
+            })
         }
     }
 }
 
 struct FieldTest {
+    span: Span,
     decl: TokenStream,
     var: syn::Ident,
 }
@@ -164,7 +135,11 @@ fn encode_fields(e: &Build<'_>, var: &syn::Ident, fields: &[FieldBuild]) -> Resu
                 }
             };
 
-            tests.push(FieldTest { decl, var })
+            tests.push(FieldTest {
+                span: f.span,
+                decl,
+                var,
+            })
         }
 
         encoders.push(encode);
@@ -182,19 +157,21 @@ fn encode_enum(e: &Build<'_>, var: &syn::Ident, data: &EnumBuild<'_>) -> Result<
 
     let mut variants = Vec::with_capacity(data.variants.len());
 
-    for variant in &data.variants {
-        if let Ok((pattern, encode)) = encode_variant(e, var, variant) {
-            variants.push(quote!(#pattern => { #encode }));
+    for v in &data.variants {
+        if let Ok((pattern, encode)) = encode_variant(e, var, v) {
+            variants.push(quote_spanned!(v.span => #pattern => { #encode }));
         }
     }
 
     // Special case: uninhabitable types.
     Ok(if variants.is_empty() {
-        quote! {
+        quote_spanned! {
+            data.span =>
             match *self {}
         }
     } else {
-        quote! {
+        quote_spanned! {
+            data.span =>
             match self {
                 #(#variants),*
             }
@@ -209,10 +186,24 @@ fn encode_variant(
     v: &VariantBuild,
 ) -> Result<(TokenStream, TokenStream)> {
     if let Packing::Transparent = v.packing {
-        let (encode, patterns) = encode_transparent_variant(e, var, v.span, &v.fields)?;
+        let f = match &v.fields[..] {
+            [f] => f,
+            _ => {
+                e.transparent_diagnostics(v.span, &v.fields);
+                return Err(());
+            }
+        };
+
+        let (span, encode_path) = &f.encode_path;
+        let access = &f.field_access;
+
+        let encode = quote_spanned! {
+            *span => #encode_path(this, #var)
+        };
+
         let encode = encode_variant_container(e, var, v, encode)?;
         let path = &v.path;
-        return Ok((quote!(#path { #(#patterns),* }), encode));
+        return Ok((quote_spanned!(v.span => #path { #access: this }), encode));
     }
 
     let fields = encode_fields(e, var, &v.fields)?;
@@ -269,7 +260,7 @@ fn encode_variant(
     let encoder_t = &e.tokens.encoder_t;
     let pairs_encoder_t = &e.tokens.pairs_encoder_t;
 
-    let len = length_test(v.fields.len(), &fields.tests);
+    let len = length_test(v.span, v.fields.len(), &fields.tests);
 
     let encode = if fields.encoders.is_empty() {
         quote_spanned! {
@@ -326,7 +317,7 @@ fn encode_variant_container(
 fn do_field_test(f: &FieldBuild) -> Option<(TokenStream, syn::Ident)> {
     let (skip_span, skip_encoding_if_path) = f.skip_encoding_if.as_ref()?;
     let test = syn::Ident::new(&format!("t{}", f.index), f.span);
-    let access = &f.access;
+    let access = &f.self_access;
 
     let decl = quote_spanned! {
         *skip_span =>
@@ -339,7 +330,7 @@ fn do_field_test(f: &FieldBuild) -> Option<(TokenStream, syn::Ident)> {
 /// Encode a field.
 fn encode_field(e: &Build<'_>, var: &syn::Ident, f: &FieldBuild) -> Result<TokenStream> {
     let (span, encode_path) = &f.encode_path;
-    let access = &f.access;
+    let access = &f.self_access;
 
     match f.packing {
         Packing::Tagged | Packing::Transparent => {
@@ -370,14 +361,14 @@ fn encode_field(e: &Build<'_>, var: &syn::Ident, f: &FieldBuild) -> Result<Token
     }
 }
 
-fn length_test(count: usize, tests: &[FieldTest]) -> TokenStream {
+fn length_test(span: Span, count: usize, tests: &[FieldTest]) -> TokenStream {
     if tests.is_empty() {
-        quote!(#count)
+        quote_spanned!(span => #count)
     } else {
         let count = count.saturating_sub(tests.len());
         let tests = tests
             .iter()
-            .map(|FieldTest { var, .. }| quote!(if #var { 1 } else { 0 }));
-        quote!(#count + #(#tests)+*)
+            .map(|FieldTest { span, var, .. }| quote_spanned!(*span => if #var { 1 } else { 0 }));
+        quote_spanned!(span => #count + #(#tests)+*)
     }
 }
