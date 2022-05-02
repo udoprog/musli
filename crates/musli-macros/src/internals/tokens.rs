@@ -21,6 +21,7 @@ pub(crate) struct Tokens {
     pub(crate) variant_decoder_t: syn::ExprPath,
     pub(crate) variant_encoder_t: syn::ExprPath,
     pub(crate) visit_string_fn: syn::ExprPath,
+    pub(crate) as_decoder_t: syn::ExprPath,
 }
 
 impl Tokens {
@@ -46,6 +47,7 @@ impl Tokens {
             variant_decoder_t: path(span, prefix, ["de", "VariantDecoder"]),
             variant_encoder_t: path(span, prefix, ["en", "VariantEncoder"]),
             visit_string_fn: path(span, prefix, ["utils", "visit_string_fn"]),
+            as_decoder_t: path(span, prefix, ["de", "AsDecoder"]),
         }
     }
 }

@@ -26,8 +26,7 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     #[inline]
     fn uninhabitable(type_name: &'static str) -> Self {
         Self::message(format_args!(
-            "{}: cannot decode uninhabitable types",
-            type_name
+            "{type_name}: cannot decode uninhabitable types",
         ))
     }
 
@@ -37,7 +36,7 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     where
         T: fmt::Debug,
     {
-        Self::message(format_args!("expected tag: {}: {:?}", type_name, tag))
+        Self::message(format_args!("{type_name}: expected tag: {tag:?}"))
     }
 
     /// Encountered an unsupported number tag.
@@ -46,7 +45,7 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     where
         T: fmt::Debug,
     {
-        Self::message(format_args!("invalid field tag: {}: {:?}", type_name, tag))
+        Self::message(format_args!("{type_name}: invalid field tag: {tag:?}"))
     }
 
     /// Indicate that a variant wasn't supported by tag.
@@ -55,16 +54,22 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     where
         T: fmt::Debug,
     {
-        Self::message(format_args!(
-            "invalid variant tag: {}: {:?}",
-            type_name, tag
-        ))
+        Self::message(format_args!("{type_name}: invalid variant tag: {tag:?}",))
+    }
+
+    /// Missing variant field required to decode.
+    #[inline]
+    fn missing_variant_field<T>(type_name: &'static str, tag: T) -> Self
+    where
+        T: fmt::Debug,
+    {
+        Self::message(format_args!("{type_name}: missing variant field: {tag:?}"))
     }
 
     /// Indicate that a variant tag could not be determined.
     #[inline]
     fn missing_variant_tag(type_name: &'static str) -> Self {
-        Self::message(format_args!("missing variant tag: {}", type_name))
+        Self::message(format_args!("{type_name}: missing variant tag"))
     }
 
     /// Encountered an unsupported variant field.
@@ -75,8 +80,7 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
         T: fmt::Debug,
     {
         Self::message(format_args!(
-            "invalid variant field tag: {}: variant: {:?}, field: {:?}",
-            type_name, tag, variant
+            "{type_name}: invalid variant field tag: variant: {variant:?}, tag: {tag:?}",
         ))
     }
 }

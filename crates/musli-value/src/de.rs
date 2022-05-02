@@ -88,62 +88,62 @@ where
 
     #[inline]
     fn decode_u8(self) -> Result<u8, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(Number::U8(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => Ok(u8::from_number(n)?))
     }
 
     #[inline]
     fn decode_u16(self) -> Result<u16, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(Number::U16(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => Ok(u16::from_number(n)?))
     }
 
     #[inline]
     fn decode_u32(self) -> Result<u32, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(Number::U32(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => Ok(u32::from_number(n)?))
     }
 
     #[inline]
     fn decode_u64(self) -> Result<u64, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(Number::U64(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => Ok(u64::from_number(n)?))
     }
 
     #[inline]
     fn decode_u128(self) -> Result<u128, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(Number::U128(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => Ok(u128::from_number(n)?))
     }
 
     #[inline]
     fn decode_i8(self) -> Result<i8, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(Number::I8(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => Ok(i8::from_number(n)?))
     }
 
     #[inline]
     fn decode_i16(self) -> Result<i16, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(Number::I16(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => Ok(i16::from_number(n)?))
     }
 
     #[inline]
     fn decode_i32(self) -> Result<i32, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(Number::I32(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => Ok(i32::from_number(n)?))
     }
 
     #[inline]
     fn decode_i64(self) -> Result<i64, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(Number::I64(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => Ok(i64::from_number(n)?))
     }
 
     #[inline]
     fn decode_i128(self) -> Result<i128, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(Number::I128(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => Ok(i128::from_number(n)?))
     }
 
     #[inline]
     fn decode_usize(self) -> Result<usize, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(Number::Usize(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => Ok(usize::from_number(n)?))
     }
 
     #[inline]
     fn decode_isize(self) -> Result<isize, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(Number::Isize(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => Ok(isize::from_number(n)?))
     }
 
     #[inline]
@@ -452,3 +452,97 @@ where
         Ok(())
     }
 }
+
+/// Conversion trait for numbers.
+trait FromNumber: Sized {
+    const NUMBER_HINT: NumberHint;
+
+    fn from_number(number: &Number) -> Result<Self, ValueError>;
+}
+
+macro_rules! integer_from {
+    ($ty:ty, $variant:ident) => {
+        impl FromNumber for $ty {
+            const NUMBER_HINT: NumberHint = NumberHint::$variant;
+
+            #[inline]
+            fn from_number(number: &Number) -> Result<Self, ValueError> {
+                let out = match number {
+                    Number::U8(n) => Self::try_from(*n).ok(),
+                    Number::U16(n) => Self::try_from(*n).ok(),
+                    Number::U32(n) => Self::try_from(*n).ok(),
+                    Number::U64(n) => Self::try_from(*n).ok(),
+                    Number::U128(n) => Self::try_from(*n).ok(),
+                    Number::I8(n) => Self::try_from(*n).ok(),
+                    Number::I16(n) => Self::try_from(*n).ok(),
+                    Number::I32(n) => Self::try_from(*n).ok(),
+                    Number::I64(n) => Self::try_from(*n).ok(),
+                    Number::I128(n) => Self::try_from(*n).ok(),
+                    Number::Usize(n) => Self::try_from(*n).ok(),
+                    Number::Isize(n) => Self::try_from(*n).ok(),
+                    Number::F32(v) => Some(*v as $ty),
+                    Number::F64(v) => Some(*v as $ty),
+                };
+
+                match out {
+                    Some(out) => Ok(out),
+                    None => Err(ValueError::ExpectedNumber(
+                        Self::NUMBER_HINT,
+                        TypeHint::Number(number.type_hint()),
+                    )),
+                }
+            }
+        }
+    };
+}
+
+macro_rules! float_from {
+    ($ty:ty, $variant:ident) => {
+        impl FromNumber for $ty {
+            const NUMBER_HINT: NumberHint = NumberHint::$variant;
+
+            #[inline]
+            fn from_number(number: &Number) -> Result<Self, ValueError> {
+                let out = match number {
+                    Number::U8(n) => Some(*n as $ty),
+                    Number::U16(n) => Some(*n as $ty),
+                    Number::U32(n) => Some(*n as $ty),
+                    Number::U64(n) => Some(*n as $ty),
+                    Number::U128(n) => Some(*n as $ty),
+                    Number::I8(n) => Some(*n as $ty),
+                    Number::I16(n) => Some(*n as $ty),
+                    Number::I32(n) => Some(*n as $ty),
+                    Number::I64(n) => Some(*n as $ty),
+                    Number::I128(n) => Some(*n as $ty),
+                    Number::Usize(n) => Some(*n as $ty),
+                    Number::Isize(n) => Some(*n as $ty),
+                    Number::F32(v) => Some(*v as $ty),
+                    Number::F64(v) => Some(*v as $ty),
+                };
+
+                match out {
+                    Some(out) => Ok(out),
+                    None => Err(ValueError::ExpectedNumber(
+                        Self::NUMBER_HINT,
+                        TypeHint::Number(number.type_hint()),
+                    )),
+                }
+            }
+        }
+    };
+}
+
+integer_from!(u8, U8);
+integer_from!(u16, U16);
+integer_from!(u32, U32);
+integer_from!(u64, U64);
+integer_from!(u128, U128);
+integer_from!(i8, I8);
+integer_from!(i16, I16);
+integer_from!(i32, I32);
+integer_from!(i64, I64);
+integer_from!(i128, I128);
+integer_from!(usize, Usize);
+integer_from!(isize, Isize);
+float_from!(f32, F32);
+float_from!(f64, F64);

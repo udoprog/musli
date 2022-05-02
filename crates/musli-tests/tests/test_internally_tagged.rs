@@ -13,5 +13,8 @@ fn test_internally_tagged() {
         number: 42,
     })
     .unwrap();
+
     println!("{}", string);
+    let output: InternallyTagged = musli_json::from_slice(string.as_bytes()).unwrap();
+    println!("{:?}", output);
 }
