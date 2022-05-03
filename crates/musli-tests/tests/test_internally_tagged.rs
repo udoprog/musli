@@ -17,6 +17,24 @@ pub enum InternallyTagged {
     },
 }
 
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(
+    tag = "type",
+    content = "content",
+    default_field_name = "name",
+    default_variant_name = "name"
+)]
+pub enum AdjacentlyTagged {
+    Variant1 {
+        string: String,
+        number: u32,
+    },
+    #[musli(rename = "variant2")]
+    Variant2 {
+        string: String,
+    },
+}
+
 macro_rules! test {
     ($expr:expr $(, json = $json:expr)?) => {{
         let expected = $expr;

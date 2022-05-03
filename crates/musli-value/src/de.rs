@@ -11,6 +11,7 @@ use musli::mode::Mode;
 
 use crate::error::ValueError;
 use crate::value::{Number, Value};
+use crate::AsValueDecoder;
 
 /// Encoder for a single value.
 pub struct ValueDecoder<'a, E = ValueError> {
@@ -45,7 +46,7 @@ where
     E: Error + From<ValueError>,
 {
     type Error = E;
-    type Buffer = Self;
+    type Buffer = AsValueDecoder<E>;
     type Some = Self;
     type Pack = IterValueDecoder<'de, E>;
     type Sequence = IterValueDecoder<'de, E>;
@@ -68,7 +69,7 @@ where
     where
         M: Mode,
     {
-        Ok(self)
+        Ok(AsValueDecoder::new(self.value.clone()))
     }
 
     #[inline]

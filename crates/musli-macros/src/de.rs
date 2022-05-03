@@ -186,63 +186,157 @@ fn decode_enum(
         .as_ref()
         .map(|(_, ty)| quote_spanned!(ty.span() => : #ty));
 
-    if let Some(EnumTagging::Internal { tag: field_tag }) = en.enum_tagging {
+    if let Some(enum_tagging) = en.enum_tagging {
         let mode_ident = &e.mode_ident;
         let pair_decoder_t = &e.tokens.pair_decoder_t;
         let pairs_decoder_t = &e.tokens.pairs_decoder_t;
         let as_decoder_t = &e.tokens.as_decoder_t;
 
-        let patterns = patterns.into_iter().map(|(span, tag, output)| {
-            quote_spanned! {
-                span =>
-                #tag => {
-                    let #body_decoder_var = #as_decoder_t::as_decoder(&buffer)?;
-                    #output
-                }
-            }
-        });
-
-        return Ok(quote_spanned! {
-            en.span => {
-                let buffer = #decoder_t::decode_buffer::<#mode_ident>(#root_decoder_var)?;
-
-                let decoder = #as_decoder_t::as_decoder(&buffer)?;
-                let mut st = #decoder_t::decode_map(decoder)?;
-
-                let discriminator = loop {
-                    let mut entry = match #pairs_decoder_t::next(&mut st)? {
-                        Some(entry) => entry,
-                        None => break None,
-                    };
-
-                    let decoder = #pair_decoder_t::first(&mut entry)?;
-                    let found = #decoder_t::decode_string(decoder, musli::utils::visit_string_fn(|string| {
-                        Ok(string == #field_tag)
-                    }))?;
-
-                    if found {
-                        break Some(#pair_decoder_t::second(entry)?);
+        match enum_tagging {
+            EnumTagging::Internal { tag: field_tag } => {
+                let patterns = patterns.into_iter().map(|(span, tag, output)| {
+                    quote_spanned! {
+                        span =>
+                        #tag => {
+                            let #body_decoder_var = #as_decoder_t::as_decoder(&content)?;
+                            #output
+                        }
                     }
+                });
 
-                    #pair_decoder_t::skip_second(entry)?;
-                };
+                return Ok(quote_spanned! {
+                    en.span => {
+                        #output_enum
 
-                let #variant_decoder_var = match discriminator {
-                    Some(decoder) => decoder,
-                    None => return Err(<D::Error as #error_t>::missing_variant_field(#type_name, #field_tag)),
-                };
+                        let content = #decoder_t::decode_buffer::<#mode_ident>(#root_decoder_var)?;
+                        let mut st = #as_decoder_t::as_decoder(&content).and_then(#decoder_t::decode_map)?;
 
-                #output_enum
-                let #variant_tag #tag_type = #decode_tag;
+                        let #variant_tag #tag_type = {
+                            let field = loop {
+                                let mut entry = match #pairs_decoder_t::next(&mut st)? {
+                                    Some(entry) => entry,
+                                    None => break None,
+                                };
 
-                Ok(match #variant_tag {
-                    #(#patterns,)*
-                    #unsupported_pattern => {
-                        #fallback
+                                let decoder = #pair_decoder_t::first(&mut entry)?;
+
+                                let found = #decoder_t::decode_string(decoder, musli::utils::visit_string_fn(|string| {
+                                    match string {
+                                        #field_tag => {
+                                            Ok(true)
+                                        }
+                                        other => {
+                                            Ok(false)
+                                        }
+                                    }
+                                }))?;
+
+                                if found {
+                                    break Some(#pair_decoder_t::second(entry)?);
+                                } else if !#pair_decoder_t::skip_second(entry)? {
+                                    return Err(<D::Error as #error_t>::invalid_field_tag(#type_name, #field_tag));
+                                }
+                            };
+
+                            let #variant_decoder_var = match field {
+                                Some(decoder) => decoder,
+                                None => return Err(<D::Error as #error_t>::missing_variant_field(#type_name, #field_tag)),
+                            };
+
+                            #decode_tag
+                        };
+
+                        #pairs_decoder_t::end(st)?;
+
+                        Ok(match #variant_tag {
+                            #(#patterns,)*
+                            #unsupported_pattern => {
+                                #fallback
+                            }
+                        })
                     }
-                })
+                });
             }
-        });
+            EnumTagging::Adjacent {
+                tag: field_tag,
+                content: content_tag,
+            } => {
+                let patterns = patterns.into_iter().map(|(span, tag, output)| {
+                    quote_spanned! {
+                        span =>
+                        #tag => {
+                            let #body_decoder_var = #as_decoder_t::as_decoder(&content)?;
+                            #output
+                        }
+                    }
+                });
+
+                return Ok(quote_spanned! {
+                    en.span => {
+                        #output_enum
+
+                        let mut st = #decoder_t::decode_map(#root_decoder_var)?;
+
+                        let (#variant_tag, content) = {
+                            let mut tag = None;
+                            let mut content = None;
+
+                            while tag.is_none() && content.is_none() {
+                                let mut entry = match #pairs_decoder_t::next(&mut st)? {
+                                    Some(entry) => entry,
+                                    None => break,
+                                };
+
+                                let decoder = #pair_decoder_t::first(&mut entry)?;
+
+                                #decoder_t::decode_string(decoder, musli::utils::visit_string_fn(|string| {
+                                    match string {
+                                        #field_tag => {
+                                            let decoder = #pair_decoder_t::second(entry)?;
+                                            tag = Some(#decoder_t::decode_buffer::<#mode_ident>(decoder)?);
+                                            Ok(())
+                                        }
+                                        #content_tag => {
+                                            let decoder = #pair_decoder_t::second(entry)?;
+                                            content = Some(#decoder_t::decode_buffer::<#mode_ident>(decoder)?);
+                                            Ok(())
+                                        }
+                                        other => {
+                                            if !#pair_decoder_t::skip_second(entry)? {
+                                                return Err(<D::Error as #error_t>::invalid_field_tag(#type_name, other));
+                                            }
+
+                                            Ok(())
+                                        }
+                                    }
+                                }))?;
+                            };
+
+                            #pairs_decoder_t::end(st)?;
+
+                            let (#variant_decoder_var, content) = match (tag, content) {
+                                (Some(tag), Some(content)) => (tag, content),
+                                _ => {
+                                    return Err(<D::Error as #error_t>::missing_variant_field(#type_name, #field_tag));
+                                }
+                            };
+
+                            let #variant_decoder_var = #as_decoder_t::as_decoder(&#variant_decoder_var)?;
+                            (#decode_tag, content)
+                        };
+
+                        #pairs_decoder_t::end(st)?;
+
+                        Ok(match #variant_tag {
+                            #(#patterns,)*
+                            #unsupported_pattern => {
+                                #fallback
+                            }
+                        })
+                    }
+                });
+            }
+        }
     }
 
     let patterns = patterns.into_iter().map(|(span, tag, output)| {

@@ -159,7 +159,7 @@ pub trait Decoder<'de>: Sized {
     /// Error type raised by the decoder.
     type Error: Error;
     /// The type returned when the decoder is buffered.
-    type Buffer: AsDecoder<Error = Self::Error>;
+    type Buffer: 'static + AsDecoder<Error = Self::Error>;
     /// Decoder for a value that is present.
     type Some: Decoder<'de, Error = Self::Error>;
     /// Pack decoder implementation.

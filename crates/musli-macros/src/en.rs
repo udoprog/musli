@@ -238,26 +238,69 @@ fn encode_variant(
         return Ok((v.constructor(), encode));
     }
 
-    if let Some(EnumTagging::Internal { tag: field_tag }) = en.enum_tagging {
-        let pairs_encoder_t = &e.tokens.pairs_encoder_t;
-        let encoder_t = &e.tokens.encoder_t;
-        let mode_ident = e.mode_ident;
+    if let Some(enum_tagging) = en.enum_tagging {
+        match enum_tagging {
+            EnumTagging::Internal { tag: field_tag } => {
+                let pairs_encoder_t = &e.tokens.pairs_encoder_t;
+                let encoder_t = &e.tokens.encoder_t;
+                let mode_ident = e.mode_ident;
 
-        let tag = &v.tag;
+                let tag = &v.tag;
 
-        let decls = fields.test_decls();
-        let encoders = &fields.encoders;
+                let decls = fields.test_decls();
+                let encoders = &fields.encoders;
 
-        let encode = quote_spanned! {
-            v.span =>
-            let mut #var = #encoder_t::encode_struct(#var, 0)?;
-            #pairs_encoder_t::insert::<#mode_ident, _, _>(&mut #var, #field_tag, #tag)?;
-            #(#decls)*
-            #(#encoders)*
-            #pairs_encoder_t::end(#var)
-        };
+                let encode = quote_spanned! {
+                    v.span =>
+                    let mut #var = #encoder_t::encode_struct(#var, 0)?;
+                    #pairs_encoder_t::insert::<#mode_ident, _, _>(&mut #var, #field_tag, #tag)?;
+                    #(#decls)*
+                    #(#encoders)*
+                    #pairs_encoder_t::end(#var)
+                };
 
-        return Ok((v.constructor(), encode));
+                return Ok((v.constructor(), encode));
+            }
+            EnumTagging::Adjacent {
+                tag: field_tag,
+                content: content_tag,
+            } => {
+                let pairs_encoder_t = &e.tokens.pairs_encoder_t;
+                let pair_encoder_t = &e.tokens.pair_encoder_t;
+                let encoder_t = &e.tokens.encoder_t;
+                let mode_ident = e.mode_ident;
+
+                let tag = &v.tag;
+
+                let decls = fields.test_decls();
+                let encoders = &fields.encoders;
+
+                let encode_t_encode = &e.encode_t_encode;
+
+                let len = length_test(v.span, v.fields.len(), &fields.tests);
+
+                let encode = quote_spanned! {
+                    v.span =>
+                    let mut struct_encoder = #encoder_t::encode_struct(#var, 2)?;
+                    #pairs_encoder_t::insert::<#mode_ident, _, _>(&mut struct_encoder, #field_tag, #tag)?;
+                    let mut pair = #pairs_encoder_t::next(&mut struct_encoder)?;
+                    let content_tag = #pair_encoder_t::first(&mut pair)?;
+                    #encode_t_encode(#content_tag, content_tag)?;
+
+                    {
+                        let #var = #pair_encoder_t::second(&mut pair)?;
+                        let mut #var = #encoder_t::encode_struct(#var, #len)?;
+                        #(#decls)*
+                        #(#encoders)*
+                    }
+
+                    #pair_encoder_t::end(pair)?;
+                    #pairs_encoder_t::end(struct_encoder)
+                };
+
+                return Ok((v.constructor(), encode));
+            }
+        }
     }
 
     let encoder_t = &e.tokens.encoder_t;
