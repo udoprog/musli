@@ -175,6 +175,28 @@ where
     }
 
     #[inline]
+    fn decode_char(mut self) -> Result<char, Self::Error> {
+        let start = self.parser.pos();
+
+        let string = match self.parser.parse_string(self.scratch, true)? {
+            StringReference::Borrowed(string) => string,
+            StringReference::Scratch(string) => string,
+        };
+
+        let mut it = string.chars();
+        let first = it.next();
+
+        match (first, it.next()) {
+            (Some(c), None) => Ok(c),
+            _ => Err(ParseError::spanned(
+                start,
+                self.parser.pos(),
+                ParseErrorKind::CharEmptyString,
+            )),
+        }
+    }
+
+    #[inline]
     fn decode_u8(mut self) -> Result<u8, Self::Error> {
         integer::parse_unsigned(&mut self.parser)
     }
@@ -263,33 +285,28 @@ where
     }
 
     #[inline]
+    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+    {
+        let mut seq = self.decode_sequence()?;
+        let mut bytes = Vec::with_capacity(seq.size_hint().unwrap_or_default());
+
+        while let Some(item) = SequenceDecoder::next(&mut seq)? {
+            bytes.push(item.decode_u8()?);
+        }
+
+        visitor.visit_owned(bytes)
+    }
+
+    #[inline]
     fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
         V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
-        let actual = self.parser.peek()?;
-
-        if !matches!(actual, Token::String) {
-            return Err(V::Error::message(format_args!(
-                "expected string, but was {actual}"
-            )));
-        }
-
-        self.parser.skip(1)?;
-
         match self.parser.parse_string(self.scratch, true)? {
-            StringReference::Borrowed(borrowed) => {
-                // SAFETY: safety is guaranteed by the implementation of
-                // `parse_string`.
-                let string = unsafe { str::from_utf8_unchecked(borrowed) };
-                visitor.visit_borrowed(string)
-            }
-            StringReference::Scratch(string) => {
-                // SAFETY: safety is guaranteed by the implementation of
-                // `parse_string`.
-                let string = unsafe { str::from_utf8_unchecked(string) };
-                visitor.visit_any(string)
-            }
+            StringReference::Borrowed(borrowed) => visitor.visit_borrowed(borrowed),
+            StringReference::Scratch(string) => visitor.visit_any(string),
         }
     }
 
@@ -329,6 +346,7 @@ impl<'de, 'a, P> JsonKeyDecoder<'a, P>
 where
     P: Parser<'de>,
 {
+    #[inline]
     fn skip_any(self) -> Result<(), ParseError> {
         JsonDecoder::new(self.scratch, self.parser).skip_any()
     }
@@ -349,19 +367,9 @@ where
     where
         V: ValueVisitor<'de, Target = [u8], Error = ParseError>,
     {
-        let actual = self.parser.peek()?;
-
-        if !matches!(actual, Token::String) {
-            return Err(V::Error::message(format_args!(
-                "expected string, but was {actual}"
-            )));
-        }
-
-        self.parser.skip(1)?;
-
         match self.parser.parse_string(self.scratch, true)? {
-            StringReference::Borrowed(bytes) => visitor.visit_borrowed(bytes),
-            StringReference::Scratch(bytes) => visitor.visit_any(bytes),
+            StringReference::Borrowed(string) => visitor.visit_borrowed(string.as_bytes()),
+            StringReference::Scratch(string) => visitor.visit_any(string.as_bytes()),
         }
     }
 }
@@ -723,10 +731,12 @@ where
     where
         Self: 'this;
 
+    #[inline]
     fn size_hint(&self) -> Option<usize> {
         self.len
     }
 
+    #[inline]
     fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
         let first = mem::take(&mut self.first);
 
@@ -787,6 +797,7 @@ where
     where
         Self: 'this;
 
+    #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
         let first = mem::take(&mut self.first);
 

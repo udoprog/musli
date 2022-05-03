@@ -151,14 +151,24 @@ where
     }
 
     #[inline]
-    fn encode_bytes(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
-        let mut seq = self.encode_sequence(bytes.len())?;
+    fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+        let mut buf = itoa::Buffer::new();
+        let mut it = bytes.iter();
+        let last = it.next_back();
 
-        for b in bytes {
-            seq.push::<M, _>(b)?;
+        self.writer.write_byte(b'[')?;
+
+        for b in it {
+            self.writer.write_bytes(buf.format(*b).as_bytes())?;
+            self.writer.write_byte(b',')?;
         }
 
-        seq.end()
+        if let Some(b) = last {
+            self.writer.write_bytes(buf.format(*b).as_bytes())?;
+        }
+
+        self.writer.write_byte(b']')?;
+        Ok(())
     }
 
     #[inline]
@@ -468,6 +478,7 @@ where
             self.writer.write_byte(b',')?;
         }
 
+        self.first = false;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
@@ -488,18 +499,18 @@ where
 
     let mut start = 0;
 
-    for (i, &byte) in bytes.iter().enumerate() {
-        let escape = ESCAPE[byte as usize];
+    for (i, &b) in bytes.iter().enumerate() {
+        let escape = ESCAPE[b as usize];
 
         if escape == 0 {
             continue;
         }
 
         if start < i {
-            writer.write_bytes(&bytes[start..1])?;
+            writer.write_bytes(&bytes[start..i])?;
         }
 
-        write_escape(&mut writer, escape, byte)?;
+        write_escape(&mut writer, escape, b)?;
         start = i + 1;
     }
 

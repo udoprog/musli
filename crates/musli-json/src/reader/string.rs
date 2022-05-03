@@ -38,8 +38,8 @@ static ESCAPE: [bool; 256] = {
 /// A parsed string reference.
 #[doc(hidden)]
 pub enum StringReference<'de, 'scratch> {
-    Borrowed(&'de [u8]),
-    Scratch(&'scratch [u8]),
+    Borrowed(&'de str),
+    Scratch(&'scratch str),
 }
 
 /// Specialized reader implementation from a slice.
@@ -47,9 +47,10 @@ pub(crate) fn parse_string_slice_reader<'de, 'sratch>(
     reader: &mut SliceParser<'de>,
     scratch: &'sratch mut Scratch,
     validate: bool,
+    start: u32,
 ) -> Result<StringReference<'de, 'sratch>, ParseError> {
     // Index of the first byte not yet copied into the scratch space.
-    let mut start = reader.index;
+    let mut open = reader.index;
 
     loop {
         while reader.index < reader.slice.len() && !ESCAPE[reader.slice[reader.index] as usize] {
@@ -65,32 +66,42 @@ pub(crate) fn parse_string_slice_reader<'de, 'sratch>(
                 if scratch.is_empty() {
                     // Fast path: return a slice of the raw JSON without any
                     // copying.
-                    let borrowed = &reader.slice[start..reader.index];
+                    let borrowed = &reader.slice[open..reader.index];
                     reader.index += 1;
+                    check_utf8(borrowed, start, reader.pos())?;
+                    // SAFETY: we've checked each segment to be valid UTF-8.
+                    let borrowed = unsafe { std::str::from_utf8_unchecked(borrowed) };
                     return Ok(StringReference::Borrowed(borrowed));
                 } else {
-                    scratch.extend_from_slice(&reader.slice[start..reader.index]);
+                    let slice = &reader.slice[open..reader.index];
+                    check_utf8(slice, start, reader.pos())?;
+                    scratch.extend_from_slice(slice);
                     reader.index += 1;
-                    return Ok(StringReference::Scratch(scratch.as_bytes()));
+                    // SAFETY: we've checked each segment to be valid UTF-8.
+                    let scratch = unsafe { std::str::from_utf8_unchecked(scratch.as_bytes()) };
+                    return Ok(StringReference::Scratch(scratch));
                 }
             }
             b'\\' => {
-                scratch.extend_from_slice(&reader.slice[start..reader.index]);
+                let slice = &reader.slice[open..reader.index];
+                check_utf8(slice, start, reader.pos())?;
+                scratch.extend_from_slice(slice);
                 reader.index += 1;
 
                 if !parse_escape(reader, validate, scratch)? {
                     return Err(ParseError::spanned(
-                        start as u32,
+                        open as u32,
                         reader.index as u32,
                         ParseErrorKind::BufferOverflow,
                     ));
                 }
 
-                start = reader.index;
+                open = reader.index;
             }
             _ => {
                 if validate {
-                    return Err(ParseError::at(
+                    return Err(ParseError::spanned(
+                        open as u32,
                         reader.pos(),
                         ParseErrorKind::ControlCharacterInString,
                     ));
@@ -102,16 +113,27 @@ pub(crate) fn parse_string_slice_reader<'de, 'sratch>(
     }
 }
 
+/// Check that the given slice is valid UTF-8.
+#[inline]
+fn check_utf8(bytes: &[u8], start: u32, pos: u32) -> Result<(), ParseError> {
+    if std::str::from_utf8(bytes).is_err() {
+        Err(ParseError::spanned(
+            start,
+            pos,
+            ParseErrorKind::InvalidUnicode,
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
-fn parse_escape<'de, P>(
-    parser: &mut P,
+fn parse_escape<'de>(
+    parser: &mut SliceParser<'de>,
     validate: bool,
     scratch: &mut Scratch,
-) -> Result<bool, ParseError>
-where
-    P: Parser<'de>,
-{
+) -> Result<bool, ParseError> {
     let start = parser.pos();
     let b = parser.read_byte()?;
 
@@ -207,7 +229,7 @@ where
                 n => char::from_u32(n as u32).unwrap(),
             };
 
-            scratch.extend_from_slice(c.encode_utf8(&mut [0_u8; 4]).as_bytes())
+            scratch.extend_from_slice(c.encode_utf8(&mut [0u8; 4]).as_bytes())
         }
         _ => {
             return Err(ParseError::spanned(

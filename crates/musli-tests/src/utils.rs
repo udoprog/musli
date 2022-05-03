@@ -98,9 +98,9 @@ pub mod musli_wire {
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
-    const WIRE_ENCODING: WireEncoding<DefaultMode, Fixed, FixedLength> = WireEncoding::new()
+    const WIRE_ENCODING: WireEncoding<DefaultMode, Fixed, FixedLength<u64>> = WireEncoding::new()
         .with_fixed_integers()
-        .with_fixed_lengths();
+        .with_fixed_lengths64();
 
     pub fn encode<T>(value: &T) -> Vec<u8>
     where
@@ -125,10 +125,10 @@ pub mod musli_storage {
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
-    const STORAGE_ENCODING: StorageEncoding<DefaultMode, Fixed, FixedLength> =
+    const STORAGE_ENCODING: StorageEncoding<DefaultMode, Fixed, FixedLength<u64>> =
         StorageEncoding::new()
             .with_fixed_integers()
-            .with_fixed_lengths();
+            .with_fixed_lengths64();
 
     pub fn encode<T>(value: &T) -> Vec<u8>
     where

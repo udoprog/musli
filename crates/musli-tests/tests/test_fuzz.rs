@@ -2,46 +2,72 @@
 
 use std::time::Instant;
 
+use musli_tests::models;
+use musli_tests::utils;
 use rand::prelude::*;
 
-const SMALL_ITERATIONS: usize = 10_000;
-const LARGE_ITERATIONS: usize = 1_000;
+const PRIMITIVES_ITERATIONS: usize = 100;
+const LARGE_ITERATIONS: usize = 100;
 
 #[test]
 fn test_fuzz() {
     let mut rng = StdRng::seed_from_u64(123412327832);
 
+    let mut primitives = Vec::new();
+    let mut large = Vec::new();
+
+    for index in 0..PRIMITIVES_ITERATIONS {
+        primitives.push((index, models::generate_primitives(&mut rng)));
+    }
+
+    for index in 0..LARGE_ITERATIONS {
+        large.push((index, models::generate_large_struct(&mut rng)));
+    }
+
+    #[allow(unused)]
     macro_rules! test {
-        ($base:ident) => {{
+        ($base:ident $(, $range:expr)?) => {{
+            test_primitives!($base $(, $range)*);
+            test_large!($base $(, $range)*);
+        }};
+    }
+
+    #[allow(unused)]
+    macro_rules! test_primitives {
+        ($base:ident $(, $range:expr)?) => {{
+            let name = stringify!($base);
             let start = Instant::now();
 
-            for _ in 0..SMALL_ITERATIONS {
-                let small_struct = musli_tests::models::generate_small_struct(&mut rng);
-
-                let out = musli_tests::utils::$base::encode(&small_struct);
-                let actual =
-                    musli_tests::utils::$base::decode::<musli_tests::models::SmallStruct>(&out);
-                assert_eq!(actual, small_struct);
+            for &(index, ref primitives) in &primitives$([$range])* {
+                let out = utils::$base::encode(primitives);
+                let actual = utils::$base::decode::<models::Primitives>(&out);
+                assert_eq!(actual, *primitives, "{name}: primitives struct {index}");
             }
 
-            for _ in 0..LARGE_ITERATIONS {
-                let large_struct = musli_tests::models::generate_large_struct(&mut rng);
+            let duration = Instant::now().duration_since(start);
+            println!("{name}: {duration:?}: primitives");
+        }};
+    }
 
-                let out = musli_tests::utils::$base::encode(&large_struct);
-                let actual =
-                    musli_tests::utils::$base::decode::<musli_tests::models::LargeStruct>(&out);
-                assert_eq!(actual, large_struct);
+    #[allow(unused)]
+    macro_rules! test_large {
+        ($base:ident $(, $range:expr)?) => {{
+            let name = stringify!($base);
+            let start = Instant::now();
+
+            for &(index, ref large_struct) in &large$([$range])* {
+                let out = utils::$base::encode(large_struct);
+                let actual = utils::$base::decode::<models::LargeStruct>(&out);
+                assert_eq!(actual, *large_struct, "{name}: large struct {index}");
             }
 
-            println!(
-                "{}: {:?}",
-                stringify!($base),
-                Instant::now().duration_since(start)
-            );
+            let duration = Instant::now().duration_since(start);
+            println!("{name}: {duration:?}: large");
         }};
     }
 
     test!(musli_json);
+    test!(serde_json);
     test!(musli_storage);
     test!(musli_wire);
     test!(musli_value);

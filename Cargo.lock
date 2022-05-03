@@ -397,6 +397,7 @@ dependencies = [
  "musli",
  "musli-common",
  "musli-value",
+ "rand",
  "ryu",
 ]
 

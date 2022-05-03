@@ -1,4 +1,4 @@
-use crate::reader::{ParseError, ParseErrorKind, Parser, Scratch, StringReference};
+use crate::reader::{ParseError, ParseErrorKind, Parser, Scratch, StringReference, Token};
 
 /// An efficient [Reader] wrapper around a slice.
 pub struct SliceParser<'de> {
@@ -28,8 +28,19 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         scratch: &'scratch mut Scratch,
         validate: bool,
     ) -> Result<StringReference<'de, 'scratch>, ParseError> {
+        let start = self.pos();
+        let actual = self.peek()?;
+
+        if !matches!(actual, Token::String) {
+            return Err(ParseError::at(
+                start,
+                ParseErrorKind::ExpectedString(actual),
+            ));
+        }
+
+        self.skip(1)?;
         scratch.bytes.clear();
-        crate::reader::string::parse_string_slice_reader(self, scratch, validate)
+        crate::reader::string::parse_string_slice_reader(self, scratch, validate, start)
     }
 
     #[inline]

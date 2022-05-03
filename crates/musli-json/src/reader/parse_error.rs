@@ -59,10 +59,12 @@ pub(crate) enum ParseErrorKind {
     UnexpectedHexEscapeEnd,
     InvalidUnicode,
     InvalidNumeric,
+    CharEmptyString,
     ExpectedNull,
     ExpectedTrue,
     ExpectedFalse,
     ExpectedBool(Token),
+    ExpectedString(Token),
     ExpectedValue(Token),
     ParseFloat(lexical::Error),
     IntegerError(integer::Error),
@@ -144,11 +146,17 @@ impl fmt::Display for ParseError {
             }
             ParseErrorKind::InvalidUnicode => write!(f, "invalid unicode (at {span})"),
             ParseErrorKind::InvalidNumeric => write!(f, "not numeric (at {span})"),
+            ParseErrorKind::CharEmptyString => {
+                write!(f, "expected string with a single character (at {span})")
+            }
             ParseErrorKind::ExpectedNull => write!(f, "expected `null` (at {span})"),
             ParseErrorKind::ExpectedTrue => write!(f, "expected `true` (at {span})"),
             ParseErrorKind::ExpectedFalse => write!(f, "expected `false` (at {span})"),
             ParseErrorKind::ExpectedBool(actual) => {
                 write!(f, "expected boolean, found {actual} (at {span})")
+            }
+            ParseErrorKind::ExpectedString(actual) => {
+                write!(f, "expected string, found {actual} (at {span})")
             }
             ParseErrorKind::ExpectedValue(actual) => {
                 write!(f, "expected value, found {actual} (at {span})")
