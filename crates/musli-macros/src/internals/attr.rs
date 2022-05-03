@@ -11,10 +11,14 @@ use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Ident;
 
-#[derive(Debug, Clone)]
-pub enum EnumTagging {
+#[derive(Clone, Copy)]
+pub enum EnumTagging<'a> {
     /// The type is internally tagged by the field given by the expression.
-    Internal(syn::Expr),
+    Internal { tag: &'a syn::Expr },
+    Adjacent {
+        tag: &'a syn::Expr,
+        content: &'a syn::Expr,
+    },
 }
 
 /// The kind of tag to use.
@@ -58,18 +62,41 @@ struct InnerTypeAttr {
     default_variant_name: Option<DefaultTag>,
     /// `#[musli(default_field_name = "..")]`.
     default_field_name: Option<DefaultTag>,
-    /// If `#[musli(rename = <expr> [, content = <expr>]*)]` is specified.
-    enum_tagging: Option<(Span, EnumTagging)>,
+    /// If `#[musli(tag = <expr>)]` is specified.
+    tag: Option<(Span, syn::Expr)>,
+    /// If `#[musli(content = <expr>)]` is specified.
+    content: Option<(Span, syn::Expr)>,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
     packing: Option<(Span, Packing)>,
 }
 
 impl InnerTypeAttr {
     /// Update how an enum is tagged.
-    fn set_enum_tagging(&mut self, cx: &Ctxt, span: Span, enum_tagging: EnumTagging) {
-        if self.set_packing(cx, span, Packing::Tagged) {
-            self.enum_tagging = Some((span, enum_tagging));
+    fn set_tag(&mut self, cx: &Ctxt, span: Span, expr: syn::Expr) {
+        if self.tag.is_some() {
+            cx.error_span(
+                span,
+                format_args!("#[{ATTR}({TAG})] may only be specified once",),
+            );
+
+            return;
         }
+
+        self.tag = Some((span, expr));
+    }
+
+    /// Update how an enum is tagged.
+    fn set_content(&mut self, cx: &Ctxt, span: Span, expr: syn::Expr) {
+        if self.content.is_some() {
+            cx.error_span(
+                span,
+                format_args!("#[{ATTR}({TAG})] may only be specified once",),
+            );
+
+            return;
+        }
+
+        self.content = Some((span, expr));
     }
 
     /// Update packing of type.
@@ -113,27 +140,44 @@ pub(crate) struct TypeAttr {
 
 impl TypeAttr {
     /// Indicates the packing state of the type.
-    pub(crate) fn packing_span(&self, mode: Mode<'_>) -> Option<&(Span, Packing)> {
+    pub(crate) fn packing_span(&self, mode: Mode<'_>) -> Option<(Span, Packing)> {
         mode.ident
-            .and_then(|m| self.modes.get(m)?.packing.as_ref())
-            .or(self.root.packing.as_ref())
+            .and_then(|m| self.modes.get(m)?.packing)
+            .or(self.root.packing)
+    }
+
+    fn tag(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.tag.as_ref())
+            .or(self.root.tag.as_ref())
+    }
+
+    fn content(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+        mode.ident
+            .and_then(|m| self.modes.get(m)?.content.as_ref())
+            .or(self.root.content.as_ref())
+    }
+
+    pub(crate) fn enum_tagging_span(&self, mode: Mode<'_>) -> Option<Span> {
+        let tag = self.tag(mode);
+        let content = self.content(mode);
+        Some(tag.or(content)?.0)
     }
 
     /// Indicates the state of enum tagging.
-    pub(crate) fn enum_tagging_span(&self, mode: Mode<'_>) -> Option<&(Span, EnumTagging)> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.enum_tagging.as_ref())
-            .or(self.root.enum_tagging.as_ref())
-    }
+    pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
+        let tag = self.tag(mode);
+        let (_, tag) = tag?;
 
-    /// Indicates the state of enum tagging.
-    pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<&EnumTagging> {
-        self.enum_tagging_span(mode).map(|t| &t.1)
+        match self.content(mode) {
+            Some((_, content)) => Some(EnumTagging::Adjacent { tag, content }),
+            _ => Some(EnumTagging::Internal { tag }),
+        }
     }
 
     /// Indicates the packing state of the type.
-    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<&Packing> {
-        Some(&self.packing_span(mode)?.1)
+    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<Packing> {
+        Some(self.packing_span(mode)?.1)
     }
 
     /// Default field tag.
@@ -274,11 +318,13 @@ impl VariantAttr {
     }
 
     /// Indicates if the tagged state of the variant is set.
-    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<&Packing> {
-        mode.ident
+    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<Packing> {
+        let packing = mode
+            .ident
             .and_then(|m| self.modes.get(m)?.packing.as_ref())
-            .or_else(|| self.root.packing.as_ref())
-            .map(|p| &p.1)
+            .or(self.root.packing.as_ref())?;
+
+        Some(packing.1)
     }
 
     /// Default field tag.
@@ -385,7 +431,13 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                     // parse #[musli(tag = <expr>)]
                     Attribute::KeyValue(path, value) if path == TAG => {
                         if let Some(expr) = value_as_expr(cx, TAG, value) {
-                            attr.set_enum_tagging(cx, path.span(), EnumTagging::Internal(expr));
+                            attr.set_tag(cx, path.span(), expr);
+                        }
+                    }
+                    // parse #[musli(content = <expr>)]
+                    Attribute::KeyValue(path, value) if path == CONTENT => {
+                        if let Some(expr) = value_as_expr(cx, CONTENT, value) {
+                            attr.set_content(cx, path.span(), expr);
                         }
                     }
                     // parse #[musli(crate = <path>)]
@@ -409,7 +461,9 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                                 _ => {
                                     cx.error_spanned_by(
                                         tag,
-                                        format_args!("illegal #[{ATTR}({TAG})] value"),
+                                        format_args!(
+                                            "illegal #[{ATTR}({DEFAULT_VARIANT_NAME})] value"
+                                        ),
                                     );
                                     continue;
                                 }
@@ -425,7 +479,9 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                                 _ => {
                                     cx.error_spanned_by(
                                         tag,
-                                        format_args!("illegal #[{ATTR}({TAG})] value"),
+                                        format_args!(
+                                            "illegal #[{ATTR}({DEFAULT_FIELD_NAME})] value"
+                                        ),
                                     );
                                     continue;
                                 }
@@ -768,8 +824,10 @@ impl Parse for TypeAttributes {
 
                         continue;
                     }
-                    // parse #[musli(rename = <expr>)]
+                    // parse #[musli(tag = <expr>)]
                     path if path == TAG => AttributeValue::Expr(content.parse()?),
+                    // parse #[musli(content = <expr>)]
+                    path if path == CONTENT => AttributeValue::Expr(content.parse()?),
                     // parse #[musli(crate = <path>)]
                     path if path == CRATE => AttributeValue::Path(content.parse()?),
                     // parse #[musli(name_type = <type>)]

@@ -11,6 +11,7 @@ pub const WITH: Symbol = Symbol("with");
 pub const DEFAULT_FIELD_NAME: Symbol = Symbol("default_field_name");
 pub const DEFAULT_VARIANT_NAME: Symbol = Symbol("default_variant_name");
 pub const TAG: Symbol = Symbol("tag");
+pub const CONTENT: Symbol = Symbol("content");
 pub const DEFAULT: Symbol = Symbol("default");
 pub const SKIP_ENCODING_IF: Symbol = Symbol("skip_encoding_if");
 pub const PACKED: Symbol = Symbol("packed");

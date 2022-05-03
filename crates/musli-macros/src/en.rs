@@ -6,6 +6,8 @@ use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild, VariantBuild};
 
 pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
+    e.validate_encode()?;
+
     let span = e.input.ident.span();
 
     let type_ident = &e.input.ident;
@@ -150,7 +152,7 @@ fn encode_fields(e: &Build<'_>, var: &syn::Ident, fields: &[FieldBuild]) -> Resu
 
 /// Encode an internally tagged enum.
 fn encode_enum(e: &Build<'_>, var: &syn::Ident, en: &EnumBuild<'_>) -> Result<TokenStream> {
-    if let Some(&(span, Packing::Transparent)) = en.packing_span {
+    if let Some((span, Packing::Transparent)) = en.packing_span {
         e.encode_transparent_enum_diagnostics(span);
         return Err(());
     }
@@ -236,7 +238,7 @@ fn encode_variant(
         return Ok((v.constructor(), encode));
     }
 
-    if let Some(EnumTagging::Internal(field_tag)) = en.enum_tagging {
+    if let Some(EnumTagging::Internal { tag: field_tag }) = en.enum_tagging {
         let pairs_encoder_t = &e.tokens.pairs_encoder_t;
         let encoder_t = &e.tokens.encoder_t;
         let mode_ident = e.mode_ident;

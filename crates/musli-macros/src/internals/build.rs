@@ -25,6 +25,7 @@ pub(crate) struct Build<'a> {
     pub(crate) decode_t_decode: TokenStream,
     pub(crate) encode_t_encode: TokenStream,
     pub(crate) mode_ident: ModePath<'a>,
+    pub(crate) enum_tagging_span: Option<Span>,
 }
 
 impl Build<'_> {
@@ -72,6 +73,36 @@ impl Build<'_> {
             );
         }
     }
+
+    /// Validate encode attributes.
+    pub(crate) fn validate_encode(&self) -> Result<()> {
+        self.validate()
+    }
+
+    /// Validate set of legal attributes.
+    pub(crate) fn validate_decode(&self) -> Result<()> {
+        self.validate()
+    }
+
+    fn validate(&self) -> Result<()> {
+        match &self.data {
+            BuildData::Struct(..) => {
+                if let Some(span) = self.enum_tagging_span {
+                    self.cx.error_span(
+                        span,
+                        format_args!(
+                            "#[{ATTR}({TAG})] and #[{ATTR}({CONTENT})] are only supported on enums"
+                        ),
+                    );
+
+                    return Err(());
+                }
+            }
+            BuildData::Enum(..) => (),
+        }
+
+        Ok(())
+    }
 }
 
 /// Build model for enums and structs.
@@ -91,12 +122,12 @@ pub(crate) struct StructBuild<'a> {
 
 pub(crate) struct EnumBuild<'a> {
     pub(crate) span: Span,
-    pub(crate) enum_tagging: Option<&'a EnumTagging>,
+    pub(crate) enum_tagging: Option<EnumTagging<'a>>,
     pub(crate) variants: Vec<VariantBuild<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
     pub(crate) variant_tag_method: TagMethod,
     pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
-    pub(crate) packing_span: Option<&'a (Span, Packing)>,
+    pub(crate) packing_span: Option<(Span, Packing)>,
 }
 
 pub(crate) struct VariantBuild<'a> {
@@ -142,8 +173,6 @@ pub(crate) struct FieldBuild<'a> {
 pub(crate) fn setup<'a>(e: &'a Expander, expansion: Expansion<'a>) -> Result<Build<'a>> {
     let mode = expansion.as_mode(&e.tokens);
 
-    e.validate_attributes(mode)?;
-
     let data = match &e.data {
         Data::Struct(data) => BuildData::Struct(setup_struct(e, mode, data)?),
         Data::Enum(data) => BuildData::Enum(setup_enum(e, mode, data)?),
@@ -163,6 +192,7 @@ pub(crate) fn setup<'a>(e: &'a Expander, expansion: Expansion<'a>) -> Result<Bui
         decode_t_decode: mode.decode_t_decode(Span::call_site()),
         encode_t_encode: mode.encode_t_encode(Span::call_site()),
         mode_ident: mode.mode_ident(),
+        enum_tagging_span: e.type_attr.enum_tagging_span(mode),
     })
 }
 
@@ -175,7 +205,7 @@ fn setup_struct<'a>(
 
     let default_field_name = e.type_attr.default_field_name(mode);
     let tag_type = e.type_attr.tag_type(mode);
-    let packing = e.type_attr.packing(mode).cloned().unwrap_or_default();
+    let packing = e.type_attr.packing(mode).unwrap_or_default();
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
     let mut tag_methods = TagMethods::new(&e.cx);
 
@@ -209,11 +239,23 @@ fn setup_enum<'a>(
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
     let tag_type = e.type_attr.tag_type(mode);
-    let packing_span = e.type_attr.packing_span(mode);
     // Keep track of variant index manually since fallback variants do not
     // count.
     let mut tag_methods = TagMethods::new(&e.cx);
     let enum_tagging = e.type_attr.enum_tagging(mode);
+
+    let packing_span = e.type_attr.packing_span(mode);
+
+    if enum_tagging.is_some() {
+        match packing_span {
+            Some((_, Packing::Tagged)) => (),
+            Some((span, packing)) => {
+                e.cx.error_span(span, format_args!("#[{ATTR}({packing})] cannot be combined with #[{ATTR}({TAG})] or #[{ATTR}({CONTENT})]"));
+                return Err(());
+            }
+            _ => (),
+        }
+    }
 
     for v in &data.variants {
         variants.push(setup_variant(e, mode, v, &mut fallback, &mut tag_methods)?);
@@ -243,7 +285,6 @@ fn setup_variant<'a>(
         .attr
         .packing(mode)
         .or_else(|| e.type_attr.packing(mode))
-        .cloned()
         .unwrap_or_default();
 
     let default_field_name = data
@@ -251,7 +292,7 @@ fn setup_variant<'a>(
         .default_field_name(mode)
         .or_else(|| e.type_attr.default_field_name(mode));
 
-    let enum_packing = e.type_attr.packing(mode).cloned().unwrap_or_default();
+    let enum_packing = e.type_attr.packing(mode).unwrap_or_default();
 
     let (tag, tag_method) = data.expand_tag(e, mode, e.type_attr.default_variant_name(mode))?;
     tag_methods.insert(data.span, tag_method);

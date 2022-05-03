@@ -7,6 +7,8 @@ use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild};
 
 pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
+    e.validate_decode()?;
+
     let span = e.input.ident.span();
 
     let root_decoder_var = syn::Ident::new("root_decoder", Span::call_site());
@@ -87,7 +89,7 @@ fn decode_enum(
     root_decoder_var: &syn::Ident,
     en: &EnumBuild,
 ) -> Result<TokenStream> {
-    if let Some(&(span, Packing::Packed)) = en.packing_span {
+    if let Some((span, Packing::Packed)) = en.packing_span {
         e.decode_packed_enum_diagnostics(span);
         return Err(());
     }
@@ -184,7 +186,7 @@ fn decode_enum(
         .as_ref()
         .map(|(_, ty)| quote_spanned!(ty.span() => : #ty));
 
-    if let Some(EnumTagging::Internal(field_tag)) = en.enum_tagging {
+    if let Some(EnumTagging::Internal { tag: field_tag }) = en.enum_tagging {
         let mode_ident = &e.mode_ident;
         let pair_decoder_t = &e.tokens.pair_decoder_t;
         let pairs_decoder_t = &e.tokens.pairs_decoder_t;

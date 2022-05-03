@@ -192,24 +192,6 @@ impl<'a> Expander<'a> {
 
         Ok(out)
     }
-
-    /// Validate set of legal attributes.
-    pub(crate) fn validate_attributes(&self, mode: Mode<'_>) -> Result<()> {
-        match &self.data {
-            Data::Struct(..) => {
-                if let Some(&(span, _)) = self.type_attr.enum_tagging_span(mode) {
-                    self.cx.error_span(
-                        span,
-                        format_args!("#[{}({})] is only supported on enums", ATTR, TAG),
-                    );
-                }
-            }
-            Data::Enum(..) => (),
-            Data::Union => (),
-        }
-
-        Ok(())
-    }
 }
 
 /// A thing that determines how it's tagged.
