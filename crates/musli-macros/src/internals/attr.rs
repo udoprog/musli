@@ -52,13 +52,13 @@ impl Default for Packing {
 struct InnerTypeAttr {
     /// `#[musli(crate = <path>)]`.
     krate: Option<(Span, syn::ExprPath)>,
-    /// `#[musli(tag_type)]`.
+    /// `#[musli(name_type)]`.
     tag_type: Option<(Span, syn::Type)>,
-    /// `#[musli(default_variant_tag = "..")]`.
-    default_variant_tag: Option<DefaultTag>,
-    /// `#[musli(default_field_tag = "..")]`.
-    default_field_tag: Option<DefaultTag>,
-    /// If `#[musli(tag = <expr> [, content = <expr>]*)]` is specified.
+    /// `#[musli(default_variant_name = "..")]`.
+    default_variant_name: Option<DefaultTag>,
+    /// `#[musli(default_field_name = "..")]`.
+    default_field_name: Option<DefaultTag>,
+    /// If `#[musli(rename = <expr> [, content = <expr>]*)]` is specified.
     enum_tagging: Option<(Span, EnumTagging)>,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
     packing: Option<(Span, Packing)>,
@@ -78,7 +78,7 @@ impl InnerTypeAttr {
             if *existing != packing {
                 cx.error_span(
                     span,
-                    format!(
+                    format_args!(
                         "#[{}({})] cannot be combined with #[{}({})]",
                         ATTR, packing, ATTR, existing
                     ),
@@ -96,7 +96,7 @@ impl InnerTypeAttr {
         if let Some((span, _)) = self.krate {
             cx.error_span(
                 span,
-                format!("#[{}({})] cannot be used multiple times", ATTR, CRATE),
+                format_args!("#[{}({})] cannot be used multiple times", ATTR, CRATE),
             );
         }
 
@@ -137,16 +137,16 @@ impl TypeAttr {
     }
 
     /// Default field tag.
-    pub(crate) fn default_field_tag(&self, mode: Mode<'_>) -> Option<DefaultTag> {
+    pub(crate) fn default_field_name(&self, mode: Mode<'_>) -> Option<DefaultTag> {
         mode.ident
-            .and_then(|m| Some(self.modes.get(m)?.default_field_tag))
-            .unwrap_or(self.root.default_field_tag)
+            .and_then(|m| Some(self.modes.get(m)?.default_field_name))
+            .unwrap_or(self.root.default_field_name)
     }
 
-    pub(crate) fn default_variant_tag(&self, mode: Mode<'_>) -> Option<DefaultTag> {
+    pub(crate) fn default_variant_name(&self, mode: Mode<'_>) -> Option<DefaultTag> {
         mode.ident
-            .and_then(|m| Some(self.modes.get(m)?.default_variant_tag))
-            .unwrap_or(self.root.default_variant_tag)
+            .and_then(|m| Some(self.modes.get(m)?.default_variant_name))
+            .unwrap_or(self.root.default_variant_name)
     }
 
     /// Get the tag type of the type.
@@ -191,7 +191,7 @@ impl InnerFieldAttr {
         if self.encode_path.is_some() {
             cx.error_spanned_by(
                 encode_path,
-                format!("#[{}] multiple encode methods specified", ATTR),
+                format_args!("#[{}] multiple encode methods specified", ATTR),
             );
         } else {
             self.encode_path = Some((span, encode_path));
@@ -202,7 +202,7 @@ impl InnerFieldAttr {
         if self.decode_path.is_some() {
             cx.error_spanned_by(
                 decode_path,
-                format!("#[{}] multiple decode methods specified", ATTR),
+                format_args!("#[{}] multiple decode methods specified", ATTR),
             );
         } else {
             self.decode_path = Some((span, decode_path));
@@ -213,7 +213,7 @@ impl InnerFieldAttr {
         if self.skip_encoding_if.is_some() {
             cx.error_spanned_by(
                 skip_encoding_if,
-                format!("#[{}] multiple skip_encoding_if methods specified", ATTR),
+                format_args!("#[{}] multiple skip_encoding_if methods specified", ATTR),
             );
         } else {
             self.skip_encoding_if = Some((span, skip_encoding_if));
@@ -223,7 +223,7 @@ impl InnerFieldAttr {
 
 #[derive(Default)]
 struct InternalVariantAttr {
-    /// `#[musli(tag_type)]`.
+    /// `#[musli(name_type)]`.
     tag_type: Option<(Span, syn::Type)>,
     /// Rename a field to the given expression.
     rename: Option<(Span, syn::Expr)>,
@@ -231,8 +231,8 @@ struct InternalVariantAttr {
     packing: Option<(Span, Packing)>,
     /// `#[musli(default)]`.
     default: Option<Span>,
-    /// `#[musli(default_field_tag = "..")]`.
-    default_field_tag: Option<DefaultTag>,
+    /// `#[musli(default_field_name = "..")]`.
+    default_field_name: Option<DefaultTag>,
 }
 
 impl InternalVariantAttr {
@@ -241,7 +241,7 @@ impl InternalVariantAttr {
         if let Some((_, existing)) = &self.packing {
             cx.error_span(
                 span,
-                format!(
+                format_args!(
                     "#[{}({})] cannot be combined with #[{}({})]",
                     ATTR, packing, ATTR, existing
                 ),
@@ -282,10 +282,10 @@ impl VariantAttr {
     }
 
     /// Default field tag.
-    pub(crate) fn default_field_tag(&self, mode: Mode<'_>) -> Option<DefaultTag> {
+    pub(crate) fn default_field_name(&self, mode: Mode<'_>) -> Option<DefaultTag> {
         mode.ident
-            .and_then(|m| self.modes.get(m)?.default_field_tag)
-            .or_else(|| self.root.default_field_tag)
+            .and_then(|m| self.modes.get(m)?.default_field_name)
+            .or_else(|| self.root.default_field_name)
     }
 
     /// Get the tag type of the type.
@@ -394,38 +394,38 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                             attr.set_crate(cx, path.span(), path);
                         }
                     }
-                    // parse #[musli(tag_type = <type>)]
-                    Attribute::KeyValue(path, value) if path == TAG_TYPE => {
-                        if let Some(ty) = value_as_type(cx, TAG_TYPE, value) {
+                    // parse #[musli(name_type = <type>)]
+                    Attribute::KeyValue(path, value) if path == NAME_TYPE => {
+                        if let Some(ty) = value_as_type(cx, NAME_TYPE, value) {
                             attr.tag_type = Some((path.span(), ty));
                         }
                     }
-                    // parse #[musli(default_variant_tag = "..")]
-                    Attribute::KeyValue(path, expr) if path == DEFAULT_VARIANT_TAG => {
-                        if let Some(tag) = parse_value_string(cx, DEFAULT_VARIANT_TAG, expr) {
-                            attr.default_variant_tag = match tag.value().as_str() {
+                    // parse #[musli(default_variant_name = "..")]
+                    Attribute::KeyValue(path, expr) if path == DEFAULT_VARIANT_NAME => {
+                        if let Some(tag) = parse_value_string(cx, DEFAULT_VARIANT_NAME, expr) {
+                            attr.default_variant_name = match tag.value().as_str() {
                                 "index" => Some(DefaultTag::Index),
                                 "name" => Some(DefaultTag::Name),
                                 _ => {
                                     cx.error_spanned_by(
                                         tag,
-                                        format!("illegal #[{}({})] value", ATTR, TAG),
+                                        format_args!("illegal #[{ATTR}({TAG})] value"),
                                     );
                                     continue;
                                 }
                             };
                         }
                     }
-                    // parse #[musli(default_field_tag = "..")]
-                    Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_TAG => {
-                        if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_TAG, expr) {
-                            attr.default_field_tag = match tag.value().as_str() {
+                    // parse #[musli(default_field_name = "..")]
+                    Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_NAME => {
+                        if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_NAME, expr) {
+                            attr.default_field_name = match tag.value().as_str() {
                                 "index" => Some(DefaultTag::Index),
                                 "name" => Some(DefaultTag::Name),
                                 _ => {
                                     cx.error_spanned_by(
                                         tag,
-                                        format!("illegal #[{}({})] value", ATTR, TAG),
+                                        format_args!("illegal #[{ATTR}({TAG})] value"),
                                     );
                                     continue;
                                 }
@@ -441,7 +441,11 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                         attr.set_packing(cx, path.span(), Packing::Transparent);
                     }
                     meta => {
-                        cx.error_span(meta.span(), format!("unsupported #[{}] attribute", ATTR));
+                        let path = format_path(meta.path());
+                        cx.error_span(
+                            meta.span(),
+                            format_args!("#[{ATTR}({path})] unsupported type attribute"),
+                        );
                     }
                 }
             }
@@ -495,11 +499,11 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
                             attr.set_skip_encoding_if(cx, path.span(), path.clone());
                         }
                     }
-                    // parse #[musli(tag = <expr>)]
-                    Attribute::KeyValue(path, value) if path == TAG => {
+                    // parse #[musli(rename = <expr>)]
+                    Attribute::KeyValue(path, value) if path == RENAME => {
                         let span = path.span();
 
-                        if let Some(expr) = value_as_expr(cx, TAG, value) {
+                        if let Some(expr) = value_as_expr(cx, RENAME, value) {
                             if let Some((span, _)) = &attr.rename {
                                 cx.error_span(*span, "conflicting attribute");
                             } else {
@@ -512,14 +516,18 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
                         if let Some(span) = attr.default {
                             cx.error_span(
                                 span,
-                                format!("#[{}({})] was previously defined here", ATTR, DEFAULT),
+                                format_args!("#[{ATTR}({DEFAULT})] was previously defined here"),
                             );
                         } else {
                             attr.default = Some(path.span());
                         }
                     }
                     meta => {
-                        cx.error_span(meta.span(), format!("unsupported #[{}] attribute", ATTR));
+                        let path = format_path(meta.path());
+                        cx.error_span(
+                            meta.span(),
+                            format_args!("#[{ATTR}({path})] unsupported field attribute"),
+                        );
                     }
                 }
             }
@@ -545,17 +553,17 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
             for attribute in attributes.attributes {
                 match attribute {
-                    // parse #[musli(tag_type = <type>)]
-                    Attribute::KeyValue(path, value) if path == TAG_TYPE => {
-                        if let Some(ty) = value_as_type(cx, TAG_TYPE, value) {
+                    // parse #[musli(name_type = <type>)]
+                    Attribute::KeyValue(path, value) if path == NAME_TYPE => {
+                        if let Some(ty) = value_as_type(cx, NAME_TYPE, value) {
                             attr.tag_type = Some((path.span(), ty));
                         }
                     }
-                    // parse #[musli(tag = <expr>)]
-                    Attribute::KeyValue(path, value) if path == TAG => {
+                    // parse #[musli(rename = <expr>)]
+                    Attribute::KeyValue(path, value) if path == RENAME => {
                         let span = path.span();
 
-                        if let Some(expr) = value_as_expr(cx, TAG, value) {
+                        if let Some(expr) = value_as_expr(cx, RENAME, value) {
                             if let Some((span, _)) = &attr.rename {
                                 cx.error_span(*span, "conflicting attribute");
                             } else {
@@ -563,16 +571,18 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                             }
                         }
                     }
-                    // parse #[musli(default_field_tag = "..")]
-                    Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_TAG => {
-                        if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_TAG, expr) {
-                            attr.default_field_tag = Some(match tag.value().as_str() {
+                    // parse #[musli(default_field_name = "..")]
+                    Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_NAME => {
+                        if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_NAME, expr) {
+                            attr.default_field_name = Some(match tag.value().as_str() {
                                 "index" => DefaultTag::Index,
                                 "name" => DefaultTag::Name,
                                 _ => {
                                     cx.error_spanned_by(
                                         tag,
-                                        format!("illegal #[{}({})] value", ATTR, TAG),
+                                        format_args!(
+                                            "illegal #[{ATTR}({DEFAULT_FIELD_NAME})] value"
+                                        ),
                                     );
                                     continue;
                                 }
@@ -592,7 +602,11 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                         attr.default = Some(path.span());
                     }
                     meta => {
-                        cx.error_span(meta.span(), format!("unsupported #[{}] attribute", ATTR));
+                        let path = format_path(meta.path());
+                        cx.error_span(
+                            meta.span(),
+                            format_args!("#[{ATTR}({path})] unsupported variant attribute"),
+                        );
                     }
                 }
             }
@@ -609,7 +623,7 @@ fn value_as_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<s
         _ => {
             cx.error_span(
                 value.span(),
-                format!("#[{} = ...] should be a simple path", attr),
+                format_args!("#[{ATTR}({attr} = ..)] should be a simple path"),
             );
             None
         }
@@ -623,7 +637,7 @@ fn value_as_expr<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<s
         _ => {
             cx.error_span(
                 value.span(),
-                format!("#[{} = ...] should be a simple path", attr),
+                format_args!("#[{ATTR}({attr} = ..)] should be a simple path"),
             );
             None
         }
@@ -635,7 +649,10 @@ fn parse_value_string(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<
     match value {
         AttributeValue::Lit(syn::Lit::Str(string)) => Some(string),
         expr => {
-            cx.error_span(expr.span(), format!("#[{} = ...] should be a string", attr));
+            cx.error_span(
+                expr.span(),
+                format_args!("#[{} = ...] should be a string", attr),
+            );
             None
         }
     }
@@ -646,7 +663,10 @@ fn value_as_type(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::
     match value {
         AttributeValue::Type(ty) => Some(ty),
         expr => {
-            cx.error_span(expr.span(), format!("#[{} = ...] should be a type", attr));
+            cx.error_span(
+                expr.span(),
+                format_args!("#[{} = ...] should be a type", attr),
+            );
             None
         }
     }
@@ -700,6 +720,16 @@ enum Attribute {
     KeyValue(syn::Path, AttributeValue),
 }
 
+impl Attribute {
+    /// Extract the path of the attribute.
+    fn path(&self) -> &syn::Path {
+        match self {
+            Attribute::Path(path) => path,
+            Attribute::KeyValue(path, _) => path,
+        }
+    }
+}
+
 impl Spanned for Attribute {
     fn span(&self) -> Span {
         match self {
@@ -738,18 +768,22 @@ impl Parse for TypeAttributes {
 
                         continue;
                     }
-                    // parse #[musli(tag = <expr>)]
+                    // parse #[musli(rename = <expr>)]
                     path if path == TAG => AttributeValue::Expr(content.parse()?),
                     // parse #[musli(crate = <path>)]
                     path if path == CRATE => AttributeValue::Path(content.parse()?),
-                    // parse #[musli(tag_type = <type>)]
-                    path if path == TAG_TYPE => AttributeValue::Type(content.parse()?),
-                    // parse #[musli(default_variant_tag = "..")]
-                    path if path == DEFAULT_VARIANT_TAG => AttributeValue::Lit(content.parse()?),
-                    // parse #[musli(default_field_tag = "..")]
-                    path if path == DEFAULT_FIELD_TAG => AttributeValue::Lit(content.parse()?),
+                    // parse #[musli(name_type = <type>)]
+                    path if path == NAME_TYPE => AttributeValue::Type(content.parse()?),
+                    // parse #[musli(default_variant_name = "..")]
+                    path if path == DEFAULT_VARIANT_NAME => AttributeValue::Lit(content.parse()?),
+                    // parse #[musli(default_field_name = "..")]
+                    path if path == DEFAULT_FIELD_NAME => AttributeValue::Lit(content.parse()?),
                     path => {
-                        return Err(syn::Error::new(path.span(), "unsupported attribute"));
+                        let p = format_path(path);
+                        return Err(syn::Error::new(
+                            path.span(),
+                            format_args!("#[{ATTR}({p})] unsupported type attribute"),
+                        ));
                     }
                 };
 
@@ -800,14 +834,18 @@ impl Parse for VariantAttributes {
 
                         continue;
                     }
-                    // parse #[musli(tag_type = <type>)]
-                    path if path == TAG_TYPE => AttributeValue::Type(content.parse()?),
-                    // parse #[musli(tag = <expr>)]
-                    path if path == TAG => AttributeValue::Expr(content.parse()?),
-                    // parse #[musli(default_field_tag = <expr>)]
-                    path if path == DEFAULT_FIELD_TAG => AttributeValue::Lit(content.parse()?),
+                    // parse #[musli(name_type = <type>)]
+                    path if path == NAME_TYPE => AttributeValue::Type(content.parse()?),
+                    // parse #[musli(rename = <expr>)]
+                    path if path == RENAME => AttributeValue::Expr(content.parse()?),
+                    // parse #[musli(default_field_name = <expr>)]
+                    path if path == DEFAULT_FIELD_NAME => AttributeValue::Lit(content.parse()?),
                     path => {
-                        return Err(syn::Error::new(path.span(), "unsupported attribute"));
+                        let p = format_path(path);
+                        return Err(syn::Error::new(
+                            path.span(),
+                            format_args!("#[{ATTR}({p})] unsupported variant attribute"),
+                        ));
                     }
                 };
 
@@ -862,10 +900,14 @@ impl Parse for FieldAttributes {
                     path if path == WITH => AttributeValue::Path(content.parse()?),
                     // parse #[musli(skip_encoding_if)]
                     path if path == SKIP_ENCODING_IF => AttributeValue::Path(content.parse()?),
-                    // parse #[musli(tag = <expr>)]
-                    path if path == TAG => AttributeValue::Expr(content.parse()?),
+                    // parse #[musli(rename = <expr>)]
+                    path if path == RENAME => AttributeValue::Expr(content.parse()?),
                     path => {
-                        return Err(syn::Error::new(path.span(), "unsupported attribute"));
+                        let p = format_path(path);
+                        return Err(syn::Error::new(
+                            path.span(),
+                            format_args!("#[{ATTR}({p})] unsupported field attribute"),
+                        ));
                     }
                 };
 
@@ -884,5 +926,32 @@ impl Parse for FieldAttributes {
             mode,
             attributes,
         })
+    }
+}
+
+/// Format implementation of a path which ignores anything except the
+/// identifier components.
+fn format_path(path: &syn::Path) -> impl fmt::Display + '_ {
+    FormatPath { path }
+}
+
+struct FormatPath<'a> {
+    path: &'a syn::Path,
+}
+
+impl<'a> fmt::Display for FormatPath<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut it = self.path.segments.iter();
+        let last = it.next_back();
+
+        for part in it {
+            write!(f, "{}::", part.ident)?;
+        }
+
+        if let Some(part) = last {
+            write!(f, "{}", part.ident)?;
+        }
+
+        Ok(())
     }
 }

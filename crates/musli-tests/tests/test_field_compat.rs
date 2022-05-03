@@ -28,7 +28,7 @@ pub struct SimpleStructFrom {
     pub interior: u32,
     pub option: Option<u32>,
     pub other: OtherStruct,
-    #[musli(tag = 4)]
+    #[musli(rename = 4)]
     pub other_enum: OtherEnum,
 }
 
@@ -39,7 +39,7 @@ pub struct SimpleStructTo {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct SimpleStructEnum {
-    #[musli(tag = 4)]
+    #[musli(rename = 4)]
     pub value: OtherEnum,
 }
 

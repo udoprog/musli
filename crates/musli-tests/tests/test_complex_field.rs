@@ -19,9 +19,9 @@ const CUSTOM_TAG2: FieldVariantTag = FieldVariantTag { name: "field2" };
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct StructCustomFieldAsStruct {
-    #[musli(tag = CUSTOM_TAG1)]
+    #[musli(rename = CUSTOM_TAG1)]
     field1: u32,
-    #[musli(tag = CUSTOM_TAG2)]
+    #[musli(rename = CUSTOM_TAG2)]
     field2: u32,
 }
 
@@ -39,11 +39,11 @@ fn test_custom_struct_tag() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(tag_type = [u8; 4])]
+#[musli(name_type = [u8; 4])]
 pub struct StructCustomTag {
-    #[musli(tag = [1, 2, 3, 4])]
+    #[musli(rename = [1, 2, 3, 4])]
     field1: u32,
-    #[musli(tag = [2, 3, 4, 5])]
+    #[musli(rename = [2, 3, 4, 5])]
     field2: u32,
 }
 
@@ -56,9 +56,9 @@ fn test_custom_tag() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(tag_type = BytesTag)]
+#[musli(name_type = BytesTag)]
 struct StructWithBytesTag {
-    #[musli(tag = BytesTag(b"name in bytes"))]
+    #[musli(rename = BytesTag(b"name in bytes"))]
     string: String,
 }
 
@@ -70,13 +70,13 @@ fn test_struct_with_bytes_tag() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(tag_type = BytesTag)]
+#[musli(name_type = BytesTag)]
 enum EnumWithBytesTag {
-    #[musli(tag = BytesTag(b"a"))]
+    #[musli(rename = BytesTag(b"a"))]
     Variant1 { string: String },
-    #[musli(tag = BytesTag(b"b"), tag_type = BytesTag)]
+    #[musli(rename = BytesTag(b"b"), name_type = BytesTag)]
     Variant2 {
-        #[musli(tag = BytesTag(b"c"))]
+        #[musli(rename = BytesTag(b"c"))]
         string: String,
     },
 }

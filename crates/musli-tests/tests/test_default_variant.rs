@@ -9,7 +9,7 @@ pub enum SeveralVariants {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub enum OnlyFallback {
-    #[musli(tag = 42)]
+    #[musli(rename = 42)]
     Variant4,
     #[musli(default)]
     Fallback,

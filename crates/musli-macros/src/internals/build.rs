@@ -33,10 +33,7 @@ impl Build<'_> {
     pub(crate) fn encode_transparent_enum_diagnostics(&self, span: Span) {
         self.cx.error_span(
             span,
-            format!(
-                "#[{}({})] cannot be used to encode enums",
-                ATTR, TRANSPARENT
-            ),
+            format_args!("#[{ATTR}({TRANSPARENT})] cannot be used to encode enums",),
         );
     }
 
@@ -45,7 +42,7 @@ impl Build<'_> {
     pub(crate) fn decode_packed_enum_diagnostics(&self, span: Span) {
         self.cx.error_span(
             span,
-            format!("#[{}({})] cannot be used to decode enums", ATTR, PACKED),
+            format_args!("#[{ATTR}({PACKED})] cannot be used to decode enums"),
         );
     }
 
@@ -54,10 +51,7 @@ impl Build<'_> {
     pub(crate) fn packed_default_diagnostics(&self, span: Span) {
         self.cx.error_span(
             span,
-            format!(
-                "#[{}({})] fields cannot be used in an packed container",
-                ATTR, DEFAULT
-            ),
+            format_args!("#[{ATTR}({DEFAULT})] fields cannot be used in an packed container",),
         );
     }
 
@@ -67,17 +61,13 @@ impl Build<'_> {
         if fields.is_empty() {
             self.cx.error_span(
                 span,
-                format!(
-                    "#[{}({})] types must have a single field",
-                    ATTR, TRANSPARENT
-                ),
+                format_args!("#[{ATTR}({TRANSPARENT})] types must have a single field",),
             );
         } else {
             self.cx.error_span(
                 span,
-                format!(
-                    "#[{}({})] can only be used on types which have a single field",
-                    ATTR, TRANSPARENT
+                format_args!(
+                    "#[{ATTR}({TRANSPARENT})] can only be used on types which have a single field",
                 ),
             );
         }
@@ -183,7 +173,7 @@ fn setup_struct<'a>(
 ) -> Result<StructBuild<'a>> {
     let mut fields = Vec::with_capacity(data.fields.len());
 
-    let default_field_tag = e.type_attr.default_field_tag(mode);
+    let default_field_name = e.type_attr.default_field_name(mode);
     let tag_type = e.type_attr.tag_type(mode);
     let packing = e.type_attr.packing(mode).cloned().unwrap_or_default();
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
@@ -194,7 +184,7 @@ fn setup_struct<'a>(
             e,
             mode,
             f,
-            default_field_tag,
+            default_field_name,
             packing,
             None,
             &mut tag_methods,
@@ -256,14 +246,14 @@ fn setup_variant<'a>(
         .cloned()
         .unwrap_or_default();
 
-    let default_field_tag = data
+    let default_field_name = data
         .attr
-        .default_field_tag(mode)
-        .or_else(|| e.type_attr.default_field_tag(mode));
+        .default_field_name(mode)
+        .or_else(|| e.type_attr.default_field_name(mode));
 
     let enum_packing = e.type_attr.packing(mode).cloned().unwrap_or_default();
 
-    let (tag, tag_method) = data.expand_tag(e, mode, e.type_attr.default_variant_tag(mode))?;
+    let (tag, tag_method) = data.expand_tag(e, mode, e.type_attr.default_variant_name(mode))?;
     tag_methods.insert(data.span, tag_method);
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
@@ -275,17 +265,14 @@ fn setup_variant<'a>(
         if !data.fields.is_empty() {
             e.cx.error_span(
                 data.span,
-                format!("#[{}({})] variant must be empty", ATTR, DEFAULT),
+                format_args!("#[{ATTR}({DEFAULT})] variant must be empty"),
             );
 
             false
         } else if fallback.is_some() {
             e.cx.error_span(
                 data.span,
-                format!(
-                    "#[{}({})] only one fallback variant is supported",
-                    ATTR, DEFAULT
-                ),
+                format_args!("#[{ATTR}({DEFAULT})] only one fallback variant is supported",),
             );
 
             false
@@ -305,7 +292,7 @@ fn setup_variant<'a>(
             e,
             mode,
             f,
-            default_field_tag,
+            default_field_name,
             variant_packing,
             Some(&mut patterns),
             &mut field_tag_methods,
@@ -332,14 +319,14 @@ fn setup_field<'a>(
     e: &'a Expander,
     mode: Mode<'_>,
     data: &'a FieldData<'a>,
-    default_field_tag: Option<DefaultTag>,
+    default_field_name: Option<DefaultTag>,
     packing: Packing,
     patterns: Option<&mut Vec<TokenStream>>,
     tag_methods: &mut TagMethods,
 ) -> Result<FieldBuild<'a>> {
     let encode_path = data.attr.encode_path(mode, data.span);
     let decode_path = data.attr.decode_path(mode, data.span);
-    let (tag, tag_method) = data.expand_tag(e, mode, default_field_tag)?;
+    let (tag, tag_method) = data.expand_tag(e, mode, default_field_name)?;
     tag_methods.insert(data.span, tag_method);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
     let default_attr = data.attr.default_attr(mode);
@@ -411,7 +398,7 @@ impl<'a> TagMethods<'a> {
 
             if before == 1 && self.methods.len() > 1 {
                 self.cx
-                    .error_span(span, format!("#[{}({})] conflicting tag kind", ATTR, TAG));
+                    .error_span(span, format_args!("#[{ATTR}({TAG})] conflicting tag kind"));
             }
         }
     }

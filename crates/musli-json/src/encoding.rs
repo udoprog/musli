@@ -122,7 +122,7 @@ where
     /// }
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
-    /// #[musli(mode = Json, default_field_tag = "name")]
+    /// #[musli(mode = Json, default_field_name = "name")]
     /// struct Struct<'a> {
     ///     name: &'a str,
     ///     age: u32,

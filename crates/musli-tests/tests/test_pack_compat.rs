@@ -31,25 +31,25 @@ struct SmallPackCompat {
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct IgnoreLarge {
     prefix: u32,
-    #[musli(tag = 1)]
+    #[musli(rename = 1)]
     small_pack: SmallPack,
-    #[musli(tag = 3)]
+    #[musli(rename = 3)]
     suffix: u32,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct IgnoreSmall {
     prefix: u32,
-    #[musli(tag = 2)]
+    #[musli(rename = 2)]
     large_pack: LargePack,
-    #[musli(tag = 3)]
+    #[musli(rename = 3)]
     suffix: u32,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct IgnoreBoth {
     prefix: u32,
-    #[musli(tag = 3)]
+    #[musli(rename = 3)]
     suffix: u32,
 }
 

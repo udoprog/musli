@@ -245,9 +245,8 @@ pub(crate) trait Taggable {
             (None, Some(DefaultTag::Name), None) => {
                 e.cx.error_span(
                     self.span(),
-                    format!(
-                        "#[{}({} = \"name\")] is not supported with unnamed fields",
-                        ATTR, DEFAULT_FIELD_TAG
+                    format_args!(
+                        "#[{ATTR}({DEFAULT_FIELD_NAME} = \"name\")] is not supported with unnamed fields",
                     ),
                 );
                 return Err(());

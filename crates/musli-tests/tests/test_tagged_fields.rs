@@ -8,9 +8,9 @@ pub struct StructFrom {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct StructTo {
-    #[musli(tag = 1)]
+    #[musli(rename = 1)]
     number: u32,
-    #[musli(tag = 0)]
+    #[musli(rename = 0)]
     string: String,
 }
 

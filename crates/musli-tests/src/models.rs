@@ -5,7 +5,7 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
-#[musli(default_field_tag = "name")]
+#[musli(default_field_name = "name")]
 pub struct SmallStruct {
     a: u32,
     b: u64,
@@ -25,7 +25,7 @@ pub enum MediumEnum {
 }
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
-#[musli(default_field_tag = "name")]
+#[musli(default_field_name = "name")]
 pub struct LargeStruct {
     elements: Vec<SmallStruct>,
     medium: Vec<MediumEnum>,

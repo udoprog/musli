@@ -14,7 +14,7 @@ mod my_modes {
 const CONFIG: JsonEncoding<my_modes::Json> = JsonEncoding::new();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(mode = my_modes::Json, default_field_tag = "name")]
+#[musli(mode = my_modes::Json, default_field_name = "name")]
 struct SimpleJsonStruct<'a> {
     name: &'a str,
     age: f32,

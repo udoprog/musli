@@ -28,8 +28,8 @@
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_tag = "index")]
-//! #[musli(mode = Json, default_field_tag = "name")]
+//! #[musli(default_field_name = "index")]
+//! #[musli(mode = Json, default_field_name = "name")]
 //! struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
@@ -46,7 +46,7 @@
 //! # enum Json {}
 //! # impl musli::mode::Mode for Json {}
 //! # #[derive(Encode, Decode)]
-//! # #[musli(mode = Json, default_field_tag = "name")]
+//! # #[musli(mode = Json, default_field_name = "name")]
 //! # struct Person<'a> { name: &'a str, age: u32 }
 //! use musli_json::JsonEncoding;
 //!
@@ -70,7 +70,7 @@
 //!
 //! * *Container attributes* are attributes which apply to the `struct` or
 //!   `enum`. Like the uses of `#[musli(packed)]` and
-//!   `#[musli(default_variant_tag = "name")]` here:
+//!   `#[musli(default_variant_name = "name")]` here:
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -82,7 +82,7 @@
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_variant_tag = "name")]
+//! #[musli(default_variant_name = "name")]
 //! enum Enum {
 //!     /* the body of the struct */
 //! }
@@ -95,9 +95,9 @@
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_variant_tag = "name")]
+//! #[musli(default_variant_name = "name")]
 //! enum Enum {
-//!     #[musli(tag = "Other")]
+//!     #[musli(rename = "Other")]
 //!     Something {
 //!         /* variant body */
 //!     }
@@ -106,23 +106,23 @@
 //!
 //! * *Field attributes* are attributes which apply to each individual field
 //!   either in a `struct` or an `enum` variant. Like the uses of
-//!   `#[musli(tag)]` here:
+//!   `#[musli(rename)]` here:
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_tag = "name")]
+//! #[musli(default_field_name = "name")]
 //! struct Struct {
-//!     #[musli(tag = "other")]
+//!     #[musli(rename = "other")]
 //!     something: String,
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_tag = "name")]
+//! #[musli(default_field_name = "name")]
 //! enum Enum {
 //!     Variant {
-//!         #[musli(tag = "other")]
+//!         #[musli(rename = "other")]
 //!         something: String,
 //!     }
 //! }
@@ -130,54 +130,26 @@
 //!
 //! ## Container attributes
 //!
-//! * `#[musli(tag_type = ..)]` indicates which type any contained `#[musli(tag
-//!   = ..)]` attributes should have. Tags can usually be inferred, but
-//!   specifying this field ensures that all tags have a well-defined type.
-//!
-//! ```
-//! use musli::{Encode, Decode};
-//!
-//! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-//! #[musli(transparent)]
-//! struct CustomTag<'a>(&'a [u8]);
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(tag_type = CustomTag)]
-//! struct Struct {
-//!     #[musli(tag = CustomTag(b"name in bytes"))]
-//!     name: String,
-//! }
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(tag_type = CustomTag)]
-//! enum EnumWithCustomTag {
-//!     #[musli(tag = CustomTag(b"variant one"))]
-//!     Variant1 {
-//!         /* .. */
-//!     },
-//! }
-//! ```
-//!
-//! * `#[musli(default_field_tag = "..")]` determines how the default tag for a
+//! * `#[musli(default_field_name = "..")]` determines how the default tag for a
 //!   field is determined. It can take either `"name"` or `"index"`.
 //!
-//!   `#[musli(default_field_tag = "index")]` will use the index of the field.
+//!   `#[musli(default_field_name = "index")]` will use the index of the field.
 //!   This is the default.
 //!
-//!   `#[musli(default_field_tag = "name")]` will use the name of the field.
+//!   `#[musli(default_field_name = "name")]` will use the name of the field.
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_tag = "name")]
+//! #[musli(default_field_name = "name")]
 //! struct Struct {
 //!     field1: u32,
 //!     field2: u32,
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_tag = "name")]
+//! #[musli(default_field_name = "name")]
 //! enum Enum {
 //!     Variant1 {
 //!         field1: u32,
@@ -188,19 +160,19 @@
 //! }
 //! ```
 //!
-//! * `#[musli(default_variant_tag = "..")]` determines how the default tag for
+//! * `#[musli(default_variant_name = "..")]` determines how the default tag for
 //!   a variant is determined. It can take either `"name"` or `"index"`.
 //!
-//!   `#[musli(default_variant_tag = "index")]` will use the index of the
+//!   `#[musli(default_variant_name = "index")]` will use the index of the
 //!   variant. This is the default.
 //!
-//!   `#[musli(default_variant_tag = "name")]` will use the name of the variant.
+//!   `#[musli(default_variant_name = "name")]` will use the name of the variant.
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_variant_tag = "name")]
+//! #[musli(default_variant_name = "name")]
 //! enum Enum {
 //!     Variant1 {
 //!         field1: u32,
@@ -263,38 +235,73 @@
 //! # Ok(()) }
 //! ```
 //!
+//! * `#[musli(name_type = ..)]` indicates which type any contained `#[musli(tag
+//!   = ..)]` attributes should have. Tags can usually be inferred, but
+//!   specifying this field ensures that all tags have a well-defined type.
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
+//! #[musli(transparent)]
+//! struct CustomTag<'a>(&'a [u8]);
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(name_type = CustomTag)]
+//! struct Struct {
+//!     #[musli(rename = CustomTag(b"name in bytes"))]
+//!     name: String,
+//! }
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(name_type = CustomTag)]
+//! enum EnumWithCustomTag {
+//!     #[musli(rename = CustomTag(b"variant one"))]
+//!     Variant1 {
+//!         /* .. */
+//!     },
+//! }
+//! ```
+//!
+//! ## Enum attributes
+//!
+//! * `#[musli(tag = ..)]` Use the internally tagged enum representation for
+//!   this enum, with the given tag. See [enum
+//!   representations](#enum-representations) for details on this
+//!   representation.
+//!
 //! ## Variant attributes
 //!
-//! * `#[musli(tag = ..)]` allows for renaming a variant from its default value.
+//! * `#[musli(rename = ..)]` allows for renaming a variant from its default value.
 //!   It can take any value (including complex ones) that can be serialized with
 //!   the current encoding, such as:
 //!
-//!   * `#[musli(tag = 1)]`
-//!   * `#[musli(tag = "Hello World")]`
-//!   * `#[musli(tag = b"box\0")]`
-//!   * `#[musli(tag = SomeStruct { field: 42 })]` (if `SomeStruct` implements
+//!   * `#[musli(rename = 1)]`
+//!   * `#[musli(rename = "Hello World")]`
+//!   * `#[musli(rename = b"box\0")]`
+//!   * `#[musli(rename = SomeStruct { field: 42 })]` (if `SomeStruct` implements
 //!     `Encode` and `Decode` as appropriate).
 //!
 //!   If the type of the tag is ambiguous it can be explicitly specified through
-//!   the `#[musli(tag_type)]` container attribute (see above).
+//!   the `#[musli(name_type)]` container attribute (see above).
 //!
-//! * `#[musli(default_field_tag = "..")]` determines how the default tag for a
+//! * `#[musli(default_field_name = "..")]` determines how the default tag for a
 //!   field in the current variant is determined. This overrides the tagging
 //!   convention specified on the *container* and can take either `"name"` or
 //!   `"index"`.
 //!
-//!   `#[musli(default_field_tag = "index")]` will use the index of the field.
+//!   `#[musli(default_field_name = "index")]` will use the index of the field.
 //!   This is the default.
 //!
-//!   `#[musli(default_field_tag = "name")]` will use the name of the field.
+//!   `#[musli(default_field_name = "name")]` will use the name of the field.
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_tag = "index")]
+//! #[musli(default_field_name = "index")]
 //! enum Enum {
-//!     #[musli(default_field_tag = "name")]
+//!     #[musli(default_field_name = "name")]
 //!     Variant {
 //!         field1: u32,
 //!     },
@@ -308,7 +315,7 @@
 //!   field. It will cause that field to define how that variant is encoded or
 //!   decoded transparently without being treated as a field.
 //!
-//! * `#[musli(tag_type = ..)]` indicates which type any contained `#[musli(tag
+//! * `#[musli(name_type = ..)]` indicates which type any contained `#[musli(tag
 //!   = ..)]` attributes should have. Tags can usually be inferred, but
 //!   specifying this field ensures that all tags have a well-defined type.
 //!
@@ -323,11 +330,11 @@
 //! struct CustomTag<'a>(&'a [u8]);
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(tag_type = usize)]
+//! #[musli(name_type = usize)]
 //! enum Enum {
-//!     #[musli(tag_type = CustomTag)]
+//!     #[musli(name_type = CustomTag)]
 //!     Variant {
-//!         #[musli(tag = CustomTag(b"name in bytes"))]
+//!         #[musli(rename = CustomTag(b"name in bytes"))]
 //!         name: String,
 //!     }
 //! }
@@ -341,9 +348,9 @@
 //!
 //! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 //! enum Animal {
-//!     #[musli(tag = "cat")]
+//!     #[musli(rename = "cat")]
 //!     Cat,
-//!     #[musli(tag = "dog")]
+//!     #[musli(rename = "dog")]
 //!     Dog,
 //!     #[musli(default)]
 //!     Unknown,
@@ -352,18 +359,18 @@
 //!
 //! ## Field attributes
 //!
-//! * `#[musli(tag = ..)]` allows for renaming a field from its default value.
+//! * `#[musli(rename = ..)]` allows for renaming a field from its default value.
 //!   It can take any value (including complex ones) that can be serialized with
 //!   the current encoding, such as:
 //!
-//!   * `#[musli(tag = 1)]`
-//!   * `#[musli(tag = "Hello World")]`
-//!   * `#[musli(tag = b"box\0")]`
-//!   * `#[musli(tag = SomeStruct { field: 42 })]` (if `SomeStruct` implements
+//!   * `#[musli(rename = 1)]`
+//!   * `#[musli(rename = "Hello World")]`
+//!   * `#[musli(rename = b"box\0")]`
+//!   * `#[musli(rename = SomeStruct { field: 42 })]` (if `SomeStruct` implements
 //!     `Encode` and `Decode` as appropriate).
 //!
 //!   If the type of the tag is ambiguous it can be explicitly specified through
-//!   the `#[musli(tag_type)]` variant or container attributes (see above).
+//!   the `#[musli(name_type)]` variant or container attributes (see above).
 //!
 //! * `#[musli(with = <path>)]` specifies the path to a module to use instead of
 //!   the fields default [Encode] or [Decode] implementations.
@@ -459,7 +466,78 @@
 //! }
 //! ```
 //!
+//! # Enum representations
+//!
+//! Müsli supports the following enum representations, which mimics the ones
+//! supported by *serde*:
+//!
+//! * Externally tagged (*default*).
+//! * Internally tagged when `#[musli(tag)]` is specified on the enum.
+//! * Adjacently tagged when both `#[musli(tag)]` and `#[musli(content)]` are
+//!   specified.
+//!
+//! ```rust
+//! # use musli::{Encode, Decode};
+//! # #[derive(Encode, Decode)] struct Params;
+//! # #[derive(Encode, Decode)] struct Value;
+//! #[derive(Encode, Decode)]
+//! enum Message {
+//!     Request { id: String, method: String, params: Params },
+//!     Response { id: String, result: Value },
+//! }
+//! ```
+//!
+//! ## Externally tagged
+//!
+//! When an enum is externally tagged it is represented by a single field
+//! indicating the variant of the enum.
+//!
+//! ```json
+//! {"Request": {"id": "...", "method": "...", "params": {...}}}
+//! ```
+//!
+//! This is the most portable representation and is supported by most formats.
+//! It has special support in the [Encoder] and [Decoder] traits through
+//! [Encoder::encode_variant] and [Decoder::decode_variant].
+//!
+//! Conceptually this can be considered as a "pair", where the variant tag can
+//! be extracted from the format before the variant is decoded.
+//!
+//! ## Internally tagged
+//!
+//! ```rust
+//! # use musli::{Encode, Decode};
+//! # #[derive(Encode, Decode)] struct Params;
+//! # #[derive(Encode, Decode)] struct Value;
+//! #[derive(Encode, Decode)]
+//! #[musli(tag = "type")]
+//! enum Message {
+//!     Request { id: String, method: String, params: Params },
+//!     Response { id: String, result: Value },
+//! }
+//! ```
+//!
+//! In JSON, the `Message::Request` would be represented as:
+//!
+//! ```json
+//! {"type": "Request", "id": "...", "method": "...", "params": {...}}
+//! ```
+//!
+//! This is only supported by formats which are *self descriptive*, which is a
+//! requirement for the format to be buffered through [Decoder::decode_buffer].
+//!
+//! It is necessary to buffer the value, since we need to inspect the fields of
+//! a map for the field corresponding to the `tag`, and then use this to
+//! determine which decoder implementation to call.
+//!
 //! [default mode]: crate::mode::DefaultMode
 //! [DefaultMode]: crate::mode::DefaultMode
 //! [Encode]: crate::Encode
 //! [Decode]: crate::Decode
+//! [Encoder]: crate::Encoder
+//! [Encoder::encode_variant]: crate::Encoder::encode_variant
+//! [Decoder]: crate::Decoder
+//! [Decoder::decode_variant]: crate::Decoder::decode_variant
+//! [Decoder::decode_buffer]: crate::Decoder::decode_buffer
+
+// Parts of this documentation
