@@ -1,6 +1,6 @@
 [package]
 name = "musli-json"
-version = "0.0.30"
+version = "0.0.31"
 edition = "2021"
 readme = "README.md"
 license = "MIT/Apache-2.0"
@@ -19,9 +19,9 @@ std = ["musli/std", "musli-common/std", "musli-value"]
 test = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.30" }
-musli-common = { path = "../musli-common", version = "0.0.30" }
-musli-value = { path = "../musli-value", version = "0.0.30", optional = true }
+musli = { path = "../musli", version = "0.0.31" }
+musli-common = { path = "../musli-common", version = "0.0.31" }
+musli-value = { path = "../musli-value", version = "0.0.31", optional = true }
 
 itoa = "1.0.1"
 ryu = "1.0.9"
