@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
 
 use crate::expander::Result;
-use crate::internals::attr::{EnumTagging, Packing};
+use crate::internals::attr::{EnumTag, EnumTagging, Packing};
 use crate::internals::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild, VariantBuild};
 
 pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
@@ -240,7 +240,11 @@ fn encode_variant(
 
     if let Some(enum_tagging) = en.enum_tagging {
         match enum_tagging {
-            EnumTagging::Internal { tag: field_tag } => {
+            EnumTagging::Internal {
+                tag: EnumTag {
+                    value: field_tag, ..
+                },
+            } => {
                 let pairs_encoder_t = &e.tokens.pairs_encoder_t;
                 let encoder_t = &e.tokens.encoder_t;
                 let mode_ident = e.mode_ident;
@@ -262,7 +266,9 @@ fn encode_variant(
                 return Ok((v.constructor(), encode));
             }
             EnumTagging::Adjacent {
-                tag: field_tag,
+                tag: EnumTag {
+                    value: field_tag, ..
+                },
                 content: content_tag,
             } => {
                 let pairs_encoder_t = &e.tokens.pairs_encoder_t;
@@ -282,10 +288,10 @@ fn encode_variant(
                 let encode = quote_spanned! {
                     v.span =>
                     let mut struct_encoder = #encoder_t::encode_struct(#var, 2)?;
-                    #pairs_encoder_t::insert::<#mode_ident, _, _>(&mut struct_encoder, #field_tag, #tag)?;
+                    #pairs_encoder_t::insert::<#mode_ident, _, _>(&mut struct_encoder, &#field_tag, #tag)?;
                     let mut pair = #pairs_encoder_t::next(&mut struct_encoder)?;
                     let content_tag = #pair_encoder_t::first(&mut pair)?;
-                    #encode_t_encode(#content_tag, content_tag)?;
+                    #encode_t_encode(&#content_tag, content_tag)?;
 
                     {
                         let content_struct = #pair_encoder_t::second(&mut pair)?;

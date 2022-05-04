@@ -305,7 +305,7 @@ fn rename_lit(expr: &syn::Expr) -> syn::Expr {
 }
 
 /// Try and determine tag method from the given expression.
-fn determine_tag_method(expr: &syn::Expr) -> Option<TagMethod> {
+pub(crate) fn determine_tag_method(expr: &syn::Expr) -> Option<TagMethod> {
     let lit = match expr {
         syn::Expr::Lit(lit) => lit,
         _ => return None,

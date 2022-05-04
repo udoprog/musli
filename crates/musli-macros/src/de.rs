@@ -1,9 +1,9 @@
 use proc_macro2::{Span, TokenStream};
-use quote::quote_spanned;
+use quote::{quote_spanned, ToTokens};
 use syn::spanned::Spanned;
 
 use crate::expander::{Result, TagMethod};
-use crate::internals::attr::{EnumTagging, Packing};
+use crate::internals::attr::{EnumTag, EnumTagging, Packing};
 use crate::internals::build::{Build, BuildData, EnumBuild, FieldBuild, StructBuild};
 
 pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
@@ -197,7 +197,13 @@ fn decode_enum(
         let as_decoder_t = &e.tokens.as_decoder_t;
 
         match enum_tagging {
-            EnumTagging::Internal { tag: field_tag } => {
+            EnumTagging::Internal {
+                tag:
+                    EnumTag {
+                        value: field_tag,
+                        method: field_tag_method,
+                    },
+            } => {
                 let patterns = patterns.into_iter().map(|(span, tag, output)| {
                     quote_spanned! {
                         span =>
@@ -208,6 +214,12 @@ fn decode_enum(
                     }
                 });
 
+                let decode_outcome = decode_outcome(
+                    e,
+                    en.span,
+                    field_tag_method,
+                    [(field_tag, syn::Ident::new("Tag", en.span))],
+                );
                 let output_match = decode_output_match(en.span, &variant_tag, patterns, fallback);
 
                 return Ok(quote_spanned! {
@@ -230,13 +242,7 @@ fn decode_enum(
                                 };
 
                                 let decoder = #pair_decoder_t::first(&mut entry)?;
-
-                                let outcome = #decoder_t::decode_string(decoder, musli::utils::visit_string_fn(|string| {
-                                    match string {
-                                        #field_tag => Ok(Outcome::Tag),
-                                        other => Ok(Outcome::Other(string.to_owned())),
-                                    }
-                                }))?;
+                                let outcome = #decode_outcome;
 
                                 match outcome {
                                     Outcome::Tag => {
@@ -263,7 +269,15 @@ fn decode_enum(
                     }
                 });
             }
-            EnumTagging::Adjacent { tag, content } => {
+            EnumTagging::Adjacent {
+                tag:
+                    EnumTag {
+                        value: tag,
+                        method: tag_method,
+                        ..
+                    },
+                content,
+            } => {
                 let patterns = patterns.into_iter().map(|(span, tag, output)| {
                     quote_spanned! {
                         span =>
@@ -272,6 +286,16 @@ fn decode_enum(
                         }
                     }
                 });
+
+                let decode_outcome = decode_outcome(
+                    e,
+                    en.span,
+                    tag_method,
+                    [
+                        (tag, syn::Ident::new("Tag", en.span)),
+                        (content, syn::Ident::new("Content", en.span)),
+                    ],
+                );
 
                 let output_match = decode_output_match(en.span, &variant_tag, patterns, fallback);
 
@@ -297,14 +321,7 @@ fn decode_enum(
                             };
 
                             let decoder = #pair_decoder_t::first(&mut entry)?;
-
-                            let outcome = #decoder_t::decode_string(decoder, musli::utils::visit_string_fn(|string| {
-                                Ok(match string {
-                                    #tag => Outcome::Tag,
-                                    #content => Outcome::Content,
-                                    other => Outcome::Other(other.to_owned()),
-                                })
-                            }))?;
+                            let outcome = #decode_outcome;
 
                             match outcome {
                                 Outcome::Tag => {
@@ -372,6 +389,45 @@ fn decode_enum(
 
         Ok(#output_match)
     })
+}
+
+fn decode_outcome<P, T>(
+    e: &Build<'_>,
+    span: Span,
+    tag_method: Option<TagMethod>,
+    patterns: P,
+) -> TokenStream
+where
+    P: IntoIterator<Item = (T, syn::Ident)>,
+    T: ToTokens,
+{
+    let decode_t_decode = &e.decode_t_decode;
+    let decoder_t = &e.tokens.decoder_t;
+
+    let patterns = patterns
+        .into_iter()
+        .map(|(pat, outcome)| quote_spanned!(span => #pat => Outcome::#outcome));
+
+    match tag_method {
+        Some(TagMethod::String) => quote_spanned! {
+            span =>
+            #decoder_t::decode_string(decoder, musli::utils::visit_string_fn(|string| {
+                Ok(match string {
+                    #(#patterns,)*
+                    other => Outcome::Other(string.to_owned()),
+                })
+            }))?
+        },
+        _ => {
+            quote_spanned! {
+                span =>
+                match #decode_t_decode(decoder)? {
+                    #(#patterns,)*
+                    other => Outcome::Other(other),
+                }
+            }
+        }
+    }
 }
 
 fn decode_output_match<P>(

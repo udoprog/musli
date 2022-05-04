@@ -1,6 +1,8 @@
 use core::fmt;
 use std::collections::HashMap;
 
+use crate::expander::determine_tag_method;
+use crate::expander::TagMethod;
 use crate::internals::symbol::*;
 use crate::internals::Ctxt;
 use crate::internals::Mode;
@@ -11,12 +13,19 @@ use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Ident;
 
+/// The value and method to encode / decode a tag.
 #[derive(Clone, Copy)]
-pub enum EnumTagging<'a> {
+pub(crate) struct EnumTag<'a> {
+    pub(crate) value: &'a syn::Expr,
+    pub(crate) method: Option<TagMethod>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum EnumTagging<'a> {
     /// The type is internally tagged by the field given by the expression.
-    Internal { tag: &'a syn::Expr },
+    Internal { tag: EnumTag<'a> },
     Adjacent {
-        tag: &'a syn::Expr,
+        tag: EnumTag<'a>,
         content: &'a syn::Expr,
     },
 }
@@ -168,6 +177,12 @@ impl TypeAttr {
     pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
         let tag = self.tag(mode);
         let (_, tag) = tag?;
+
+        let tag_method = determine_tag_method(tag);
+        let tag = EnumTag {
+            value: tag,
+            method: tag_method,
+        };
 
         match self.content(mode) {
             Some((_, content)) => Some(EnumTagging::Adjacent { tag, content }),
