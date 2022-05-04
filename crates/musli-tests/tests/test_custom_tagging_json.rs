@@ -36,11 +36,11 @@ pub enum AdjacentlyTagged {
 }
 
 macro_rules! test {
-    ($expr:expr $(, json = $json:expr)?) => {{
-        let expected = $expr;
+    ($ty:ident :: $variant:ident $body:tt $(, json = $json:expr)?) => {{
+        let expected = $ty::$variant $body;
         let string = musli_json::to_string(&expected).unwrap();
         $(assert_eq!(string, $json);)*
-        let output: InternallyTagged = musli_json::from_slice(string.as_bytes()).unwrap();
+        let output: $ty = musli_json::from_slice(string.as_bytes()).unwrap();
         assert_eq!(output, expected);
     }};
 }
@@ -67,5 +67,30 @@ fn test_internally_tagged() {
             string: String::from("\"\u{0000}")
         },
         json = "{\"type\":\"variant2\",\"string\":\"\\\"\\u0000\"}"
+    };
+}
+
+#[test]
+fn test_adjacently_tagged() {
+    test! {
+        AdjacentlyTagged::Variant1 {
+            string: String::from("Hello"),
+            number: 42,
+        },
+        json = "{\"type\":\"Variant1\",\"content\":{\"string\":\"Hello\",\"number\":42}}"
+    };
+
+    test! {
+        AdjacentlyTagged::Variant2 {
+            string: String::from("Hello")
+        },
+        json = "{\"type\":\"variant2\",\"content\":{\"string\":\"Hello\"}}"
+    };
+
+    test! {
+        AdjacentlyTagged::Variant2 {
+            string: String::from("\"\u{0000}")
+        },
+        json = "{\"type\":\"variant2\",\"content\":{\"string\":\"\\\"\\u0000\"}}"
     };
 }

@@ -288,10 +288,11 @@ fn encode_variant(
                     #encode_t_encode(#content_tag, content_tag)?;
 
                     {
-                        let #var = #pair_encoder_t::second(&mut pair)?;
-                        let mut #var = #encoder_t::encode_struct(#var, #len)?;
+                        let content_struct = #pair_encoder_t::second(&mut pair)?;
+                        let mut #var = #encoder_t::encode_struct(content_struct, #len)?;
                         #(#decls)*
                         #(#encoders)*
+                        #pairs_encoder_t::end(#var)?;
                     }
 
                     #pair_encoder_t::end(pair)?;
