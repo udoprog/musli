@@ -20,13 +20,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                 b.iter(|| utils::$base::encode(&large_struct))
             });
 
-            let primitives_data = utils::$base::encode(&primitives_struct);
-            let large_data = utils::$base::encode(&large_struct);
-
             group.bench_function("decode-primitives", |b| {
+                let primitives_data = utils::$base::encode(&primitives_struct);
                 b.iter(|| utils::$base::decode::<Primitives>(&primitives_data))
             });
             group.bench_function("decode-large", |b| {
+                let large_data = utils::$base::encode(&large_struct);
                 b.iter(|| utils::$base::decode::<musli_tests::models::LargeStruct>(&large_data))
             });
 
@@ -49,14 +48,16 @@ fn criterion_benchmark(c: &mut Criterion) {
         }};
     }
 
+    benches!(serde_dlhn);
     benches!(serde_json);
     benches!(serde_bincode);
     benches!(serde_rmp);
-    // benches!(serde_cbor);
     benches!(musli_json);
     benches!(musli_wire);
     benches!(musli_storage);
     benches!(musli_value);
+    // fixme:
+    // benches!(serde_cbor);
 }
 
 criterion_group!(benches, criterion_benchmark);

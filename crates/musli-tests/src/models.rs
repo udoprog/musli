@@ -13,17 +13,19 @@ pub struct Primitives {
     unsigned16: u16,
     unsigned32: u32,
     unsigned64: u64,
+    #[cfg(any(model_128, model_all))]
     unsigned128: u128,
     signed8: i8,
     signed16: i16,
     signed32: i32,
     signed64: i64,
+    #[cfg(any(model_128, model_all))]
     signed128: i128,
     unsignedsize: usize,
     signedsize: isize,
-    #[cfg(model_floats)]
+    #[cfg(any(model_floats, model_all))]
     float32: f32,
-    #[cfg(model_floats)]
+    #[cfg(any(model_floats, model_all))]
     float64: f64,
     string: String,
     bytes: Vec<u8>,
@@ -33,6 +35,7 @@ pub struct Primitives {
 pub enum MediumEnum {
     #[musli(transparent)]
     Variant1(String),
+    #[cfg(any(model_128, model_all))]
     #[musli(transparent)]
     Variant2(u128),
     #[musli(transparent)]
@@ -55,17 +58,19 @@ pub fn generate_primitives(rng: &mut StdRng) -> Primitives {
         unsigned16: rng.gen(),
         unsigned32: rng.gen(),
         unsigned64: rng.gen(),
+        #[cfg(any(model_128, model_all))]
         unsigned128: rng.gen(),
         signed8: rng.gen(),
         signed16: rng.gen(),
         signed32: rng.gen(),
         signed64: rng.gen(),
+        #[cfg(any(model_128, model_all))]
         signed128: rng.gen(),
         unsignedsize: rng.gen(),
         signedsize: rng.gen(),
-        #[cfg(model_floats)]
+        #[cfg(any(model_floats, model_all))]
         float32: rng.gen(),
-        #[cfg(model_floats)]
+        #[cfg(any(model_floats, model_all))]
         float64: rng.gen(),
         string: generate_string(rng),
         bytes: generate_bytes(rng),
@@ -95,6 +100,7 @@ pub fn generate_bytes(rng: &mut StdRng) -> Vec<u8> {
 pub fn generate_medium_enum(rng: &mut StdRng) -> MediumEnum {
     match rng.gen_range(0..=2) {
         0 => MediumEnum::Variant1(generate_string(rng)),
+        #[cfg(any(model_128, model_all))]
         1 => MediumEnum::Variant2(rng.gen()),
         _ => MediumEnum::Variant3(rng.gen()),
     }

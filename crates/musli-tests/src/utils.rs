@@ -1,3 +1,27 @@
+pub mod serde_dlhn {
+    use dlhn::de::Deserializer;
+    use dlhn::ser::Serializer;
+    use serde::{Deserialize, Serialize};
+
+    pub fn encode<T>(value: &T) -> Vec<u8>
+    where
+        T: Serialize,
+    {
+        let mut buf = Vec::new();
+        let mut serializer = Serializer::new(&mut buf);
+        value.serialize(&mut serializer).unwrap();
+        buf
+    }
+
+    pub fn decode<T>(mut data: &[u8]) -> T
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        let mut deserializer = Deserializer::new(&mut data);
+        T::deserialize(&mut deserializer).unwrap()
+    }
+}
+
 pub mod serde_json {
     use serde::{Deserialize, Serialize};
 
