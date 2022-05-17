@@ -6,19 +6,21 @@ use syn::{Ident, Path};
 pub struct Symbol(&'static str);
 
 pub const ATTR: Symbol = Symbol("musli");
+pub const BOUND: Symbol = Symbol("bound");
+pub const DECODE_BOUND: Symbol = Symbol("decode_bound");
+pub const CONTENT: Symbol = Symbol("content");
 pub const CRATE: Symbol = Symbol("crate");
-pub const WITH: Symbol = Symbol("with");
 pub const DEFAULT_FIELD_NAME: Symbol = Symbol("default_field_name");
 pub const DEFAULT_VARIANT_NAME: Symbol = Symbol("default_variant_name");
-pub const TAG: Symbol = Symbol("tag");
-pub const CONTENT: Symbol = Symbol("content");
 pub const DEFAULT: Symbol = Symbol("default");
-pub const SKIP_ENCODING_IF: Symbol = Symbol("skip_encoding_if");
-pub const PACKED: Symbol = Symbol("packed");
-pub const TRANSPARENT: Symbol = Symbol("transparent");
-pub const NAME_TYPE: Symbol = Symbol("name_type");
 pub const MODE: Symbol = Symbol("mode");
+pub const NAME_TYPE: Symbol = Symbol("name_type");
+pub const PACKED: Symbol = Symbol("packed");
 pub const RENAME: Symbol = Symbol("rename");
+pub const SKIP_ENCODING_IF: Symbol = Symbol("skip_encoding_if");
+pub const TAG: Symbol = Symbol("tag");
+pub const TRANSPARENT: Symbol = Symbol("transparent");
+pub const WITH: Symbol = Symbol("with");
 
 impl PartialEq<Symbol> for Ident {
     fn eq(&self, word: &Symbol) -> bool {

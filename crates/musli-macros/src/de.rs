@@ -43,8 +43,19 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     let decoder_t = &e.tokens.decoder_t;
     let original_generics = &e.input.generics;
 
-    let (impl_generics, mode_ident, where_clause) =
+    let (impl_generics, mode_ident, mut where_clause) =
         e.expansion.as_impl_generics(impl_generics, &e.tokens);
+
+    if !e.bounds.is_empty() && !e.decode_bounds.is_empty() {
+        let where_clause = where_clause.get_or_insert_with(|| syn::WhereClause {
+            where_token: <syn::Token![where]>::default(),
+            predicates: Default::default(),
+        });
+
+        where_clause
+            .predicates
+            .extend(e.bounds.iter().chain(e.decode_bounds.iter()).cloned());
+    }
 
     Ok(quote_spanned! {
         span =>

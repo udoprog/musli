@@ -26,9 +26,18 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
     let encode_t = &e.tokens.encode_t;
     let encoder_t = &e.tokens.encoder_t;
 
-    let (impl_generics, mode_ident, where_clause) = e
+    let (impl_generics, mode_ident, mut where_clause) = e
         .expansion
         .as_impl_generics(e.input.generics.clone(), &e.tokens);
+
+    if !e.bounds.is_empty() {
+        let where_clause = where_clause.get_or_insert_with(|| syn::WhereClause {
+            where_token: <syn::Token![where]>::default(),
+            predicates: Default::default(),
+        });
+
+        where_clause.predicates.extend(e.bounds.iter().cloned());
+    }
 
     let type_generics = &e.input.generics;
 

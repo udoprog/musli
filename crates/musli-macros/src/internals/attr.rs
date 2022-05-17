@@ -77,6 +77,10 @@ struct InnerTypeAttr {
     content: Option<(Span, syn::Expr)>,
     /// `#[musli(packed)]` or `#[musli(transparent)]`.
     packing: Option<(Span, Packing)>,
+    /// Bounds in a where predicate.
+    bounds: Vec<syn::WherePredicate>,
+    /// Bounds to require for a `Decode` implementation.
+    decode_bounds: Vec<syn::WherePredicate>,
 }
 
 impl InnerTypeAttr {
@@ -228,6 +232,20 @@ impl TypeAttr {
                 path: path.into(),
             }
         }
+    }
+
+    /// Get the where clause that is associated with the type.
+    pub(crate) fn bounds(&self, mode: Mode<'_>) -> &[syn::WherePredicate] {
+        mode.ident
+            .and_then(|m| Some(&self.modes.get(m)?.bounds))
+            .unwrap_or(&self.root.bounds)
+    }
+
+    /// Get bounds to require for a `Decode` implementation.
+    pub(crate) fn decode_bounds(&self, mode: Mode<'_>) -> &[syn::WherePredicate] {
+        mode.ident
+            .and_then(|m| Some(&self.modes.get(m)?.decode_bounds))
+            .unwrap_or(&self.root.decode_bounds)
     }
 }
 
@@ -503,6 +521,18 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                             };
                         }
                     }
+                    // parse #[musli(bound = ..)]
+                    Attribute::KeyValue(path, expr) if path == BOUND => {
+                        if let Some(bound) = parse_bound(cx, BOUND, expr) {
+                            attr.bounds.push(bound);
+                        }
+                    }
+                    // parse #[musli(decode_bound = ..)]
+                    Attribute::KeyValue(path, expr) if path == DECODE_BOUND => {
+                        if let Some(bound) = parse_bound(cx, DECODE_BOUND, expr) {
+                            attr.decode_bounds.push(bound);
+                        }
+                    }
                     // parse #[musli(packed)]
                     Attribute::Path(path) if path == PACKED => {
                         attr.set_packing(cx, path.span(), Packing::Packed);
@@ -729,6 +759,23 @@ fn parse_value_string(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<
     }
 }
 
+/// Get aan attribute value as a bound.
+fn parse_bound(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::WherePredicate> {
+    match value {
+        AttributeValue::Bound(clause) => Some(clause),
+        expr => {
+            cx.error_span(
+                expr.span(),
+                format_args!(
+                    "#[{} = ...] should be a where predicate like `T: Encode`",
+                    attr
+                ),
+            );
+            None
+        }
+    }
+}
+
 /// Get expression as a type.
 fn value_as_type(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Type> {
     match value {
@@ -773,6 +820,8 @@ pub enum AttributeValue {
     Expr(syn::Expr),
     /// A literal value.
     Lit(syn::Lit),
+    /// A collection of bounds.
+    Bound(syn::WherePredicate),
 }
 
 impl Spanned for AttributeValue {
@@ -782,6 +831,7 @@ impl Spanned for AttributeValue {
             AttributeValue::Type(value) => value.span(),
             AttributeValue::Expr(value) => value.span(),
             AttributeValue::Lit(value) => value.span(),
+            AttributeValue::Bound(value) => value.span(),
         }
     }
 }
@@ -851,6 +901,10 @@ impl Parse for TypeAttributes {
                     path if path == DEFAULT_VARIANT_NAME => AttributeValue::Lit(content.parse()?),
                     // parse #[musli(default_field_name = "..")]
                     path if path == DEFAULT_FIELD_NAME => AttributeValue::Lit(content.parse()?),
+                    // parse #[musli(bounds = "..")]
+                    path if path == BOUND => AttributeValue::Bound(content.parse()?),
+                    // parse #[musli(decode_bounds = "..")]
+                    path if path == DECODE_BOUND => AttributeValue::Bound(content.parse()?),
                     path => {
                         let p = format_path(path);
                         return Err(syn::Error::new(
