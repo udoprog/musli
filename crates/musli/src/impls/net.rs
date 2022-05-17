@@ -70,7 +70,7 @@ where
 
         match self {
             IpAddr::V4(v4) => variant.insert::<M, _, _>(0usize, v4),
-            IpAddr::V6(v6) => variant.insert::<M, _, _>(0usize, v6),
+            IpAddr::V6(v6) => variant.insert::<M, _, _>(1usize, v6),
         }
     }
 }
