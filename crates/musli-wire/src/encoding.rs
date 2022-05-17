@@ -243,7 +243,7 @@ where
     pub fn encode<W, T>(self, mut writer: W, value: &T) -> Result<(), W::Error>
     where
         W: Writer,
-        T: ?Sized + Encode<DefaultMode>,
+        T: ?Sized + Encode<M>,
     {
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut writer))
     }
@@ -255,7 +255,7 @@ where
     pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
     where
         W: io::Write,
-        T: ?Sized + Encode<DefaultMode>,
+        T: ?Sized + Encode<M>,
     {
         let mut writer = musli_common::io::wrap(write);
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut writer))
@@ -266,7 +266,7 @@ where
     #[inline]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, VecWriterError>
     where
-        T: ?Sized + Encode<DefaultMode>,
+        T: ?Sized + Encode<M>,
     {
         let mut data = Vec::new();
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut data))?;
@@ -281,7 +281,7 @@ where
         value: &T,
     ) -> Result<FixedBytes<N>, FixedBytesWriterError>
     where
-        T: ?Sized + Encode<DefaultMode>,
+        T: ?Sized + Encode<M>,
     {
         let mut bytes = FixedBytes::new();
         T::encode(value, WireEncoder::<_, I, L, P>::new(&mut bytes))?;
@@ -294,7 +294,7 @@ where
     pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
-        T: Decode<'de, DefaultMode>,
+        T: Decode<'de, M>,
     {
         T::decode(WireDecoder::<_, I, L>::new(reader.with_position()))
     }
@@ -304,7 +304,7 @@ where
     #[inline]
     pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, SliceReaderError>
     where
-        T: Decode<'de, DefaultMode>,
+        T: Decode<'de, M>,
     {
         T::decode(WireDecoder::<_, I, L>::new(
             SliceReader::new(bytes).with_position(),

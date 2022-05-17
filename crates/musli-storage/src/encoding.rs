@@ -277,7 +277,7 @@ where
     pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
     where
         R: Reader<'de>,
-        T: Decode<'de>,
+        T: Decode<'de, M>,
     {
         let reader = reader.with_position();
         T::decode(StorageDecoder::<_, I, L>::new(reader))
@@ -288,7 +288,7 @@ where
     #[inline]
     pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, SliceReaderError>
     where
-        T: Decode<'de>,
+        T: Decode<'de, M>,
     {
         let reader = SliceReader::new(bytes).with_position();
         T::decode(StorageDecoder::<_, I, L>::new(reader))
