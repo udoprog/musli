@@ -1,20 +1,19 @@
 use core::fmt;
 
 use crate::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
-use crate::tag::VARIANT;
-use crate::tag::{Kind, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
-use crate::tag::{Tag, ABSENT, FALSE, PRESENT, TRUE};
-use musli::de::NumberHint;
+use crate::tag::{
+    Kind, Tag, ABSENT, CHAR, F32, F64, FALSE, I128, I16, I32, I64, I8, PRESENT, TRUE, U128, U16,
+    U32, U64, U8, UNIT, VARIANT,
+};
 use musli::de::{
-    Decoder, LengthHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, TypeHint,
-    ValueVisitor, VariantDecoder,
+    Decoder, LengthHint, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
+    SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
 use musli::never::Never;
 use musli_common::encoding::Variable;
 use musli_common::int::continuation as c;
-use musli_common::reader::{Limit, PosReader};
-use musli_storage::de::StorageDecoder;
+use musli_common::reader::PosReader;
 use musli_storage::integer_encoding::UsizeEncoding;
 
 /// A very simple decoder.
@@ -24,6 +23,29 @@ pub struct SelfDecoder<R> {
 
 impl<R> SelfDecoder<R> {
     /// Construct a new fixed width message encoder.
+    #[inline]
+    pub(crate) fn new(reader: R) -> Self {
+        Self { reader }
+    }
+}
+
+pub struct SelfPackDecoder<R> {
+    reader: R,
+    end: usize,
+}
+
+impl<R> SelfPackDecoder<R> {
+    #[inline]
+    pub(crate) fn new(reader: R, end: usize) -> Self {
+        Self { reader, end }
+    }
+}
+
+pub struct SelfTupleDecoder<R> {
+    reader: R,
+}
+
+impl<R> SelfTupleDecoder<R> {
     #[inline]
     pub(crate) fn new(reader: R) -> Self {
         Self { reader }
@@ -54,7 +76,7 @@ where
 
                 self.reader.skip(len)?;
             }
-            Kind::Sequence => {
+            Kind::Sequence | Kind::Pack => {
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
@@ -89,64 +111,30 @@ where
         Ok(())
     }
 
-    #[inline]
-    fn decode_sequence_len(&mut self) -> Result<usize, R::Error> {
-        let tag = Tag::from_byte(self.reader.read_byte()?);
-
-        match tag.kind() {
-            Kind::Sequence => Ok(if let Some(len) = tag.data() {
-                len as usize
-            } else {
-                Variable::decode_usize(self.reader.borrow_mut())?
-            }),
-            _ => Err(R::Error::message(Expected {
-                expected: Kind::Sequence,
-                actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
-            })),
-        }
-    }
-
-    #[inline]
-    fn decode_map_len(&mut self) -> Result<usize, R::Error> {
-        let tag = Tag::from_byte(self.reader.read_byte()?);
-
-        match tag.kind() {
-            Kind::Map => Ok(if let Some(len) = tag.data() {
-                len as usize
-            } else {
-                Variable::decode_usize(self.reader.borrow_mut())?
-            }),
-            _ => Err(R::Error::message(Expected {
-                expected: Kind::Sequence,
-                actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
-            })),
-        }
-    }
-
     // Standard function for decoding a pair sequence.
     #[inline]
     fn shared_decode_map(mut self) -> Result<RemainingSelfDecoder<R>, R::Error> {
-        let len = self.decode_map_len()?;
+        let pos = self.reader.pos();
+        let len = self.decode_prefix(Kind::Map, pos)?;
         Ok(RemainingSelfDecoder::new(len, self))
     }
 
     // Standard function for decoding a pair sequence.
     #[inline]
     fn shared_decode_sequence(mut self) -> Result<RemainingSelfDecoder<R>, R::Error> {
-        let len = self.decode_sequence_len()?;
+        let pos = self.reader.pos();
+        let len = self.decode_prefix(Kind::Sequence, pos)?;
         Ok(RemainingSelfDecoder::new(len, self))
     }
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_prefix(&mut self, pos: usize) -> Result<usize, R::Error> {
+    fn decode_prefix(&mut self, kind: Kind, pos: usize) -> Result<usize, R::Error> {
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        if tag.kind() != Kind::Bytes {
+        if tag.kind() != kind {
             return Err(R::Error::message(Expected {
-                expected: Kind::Bytes,
+                expected: kind,
                 actual: tag,
                 pos,
             }));
@@ -176,17 +164,17 @@ where
 {
     type Error = R::Error;
     type Buffer = Never<R::Error>;
-    type Pack = SelfDecoder<Limit<R>>;
+    type Pack = SelfPackDecoder<R>;
     type Some = Self;
     type Sequence = RemainingSelfDecoder<R>;
-    type Tuple = Self;
+    type Tuple = SelfTupleDecoder<R>;
     type Map = RemainingSelfDecoder<R>;
     type Struct = RemainingSelfDecoder<R>;
     type Variant = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "type supported by the wire decoder")
+        write!(f, "type supported by the descriptive decoder")
     }
 
     #[inline]
@@ -233,12 +221,30 @@ where
                     .unwrap_or_default();
                 Ok(TypeHint::Bytes(hint))
             }
+            Kind::Pack => {
+                let len = match tag.data() {
+                    Some(data) => data as usize,
+                    None => return Err(Self::Error::message("cannot determine length of pack")),
+                };
+
+                Ok(TypeHint::Pack(len))
+            }
+            Kind::String => {
+                let hint = tag
+                    .data()
+                    .map(|d| LengthHint::Exact(d as usize))
+                    .unwrap_or_default();
+                Ok(TypeHint::String(hint))
+            }
             Kind::Variant => Ok(TypeHint::Variant),
             Kind::Marker => Ok(match tag.data() {
                 Some(TRUE | FALSE) => TypeHint::Bool,
+                Some(VARIANT) => TypeHint::Variant,
+                Some(PRESENT | ABSENT) => TypeHint::Option,
+                Some(CHAR) => TypeHint::Char,
+                Some(UNIT) => TypeHint::Unit,
                 _ => TypeHint::Any,
             }),
-            _ => Ok(TypeHint::Any),
         }
     }
 
@@ -251,14 +257,14 @@ where
     #[inline]
     fn decode_pack(mut self) -> Result<Self::Pack, Self::Error> {
         let pos = self.reader.pos();
-        let len = self.decode_prefix(pos)?;
-        Ok(SelfDecoder::new(self.reader.limit(len)))
+        let len = self.decode_prefix(Kind::Pack, pos)?;
+        Ok(SelfPackDecoder::new(self.reader, len))
     }
 
     #[inline]
     fn decode_array<const N: usize>(mut self) -> Result<[u8; N], Self::Error> {
         let pos = self.reader.pos();
-        let len = self.decode_prefix(pos)?;
+        let len = self.decode_prefix(Kind::Bytes, pos)?;
 
         if len != N {
             return Err(Self::Error::message(BadLength {
@@ -276,11 +282,21 @@ where
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
+        let pos = self.reader.pos();
+        let len = self.decode_prefix(Kind::Bytes, pos)?;
+        self.reader.read_bytes(len, visitor)
+    }
+
+    #[inline]
+    fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
+    where
+        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
+    {
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        if tag.kind() != Kind::Bytes {
+        if tag.kind() != Kind::String {
             return Err(Self::Error::message(Expected {
-                expected: Kind::Bytes,
+                expected: Kind::String,
                 actual: tag,
                 pos: self.reader.pos().saturating_sub(1),
             }));
@@ -292,15 +308,7 @@ where
             Variable::decode_usize(self.reader.borrow_mut())?
         };
 
-        self.reader.read_bytes(len, visitor)
-    }
-
-    #[inline]
-    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
-    where
-        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
-    {
-        return self.decode_bytes(Visitor(visitor));
+        return self.reader.read_bytes(len, Visitor(visitor));
 
         struct Visitor<V>(V);
 
@@ -356,12 +364,53 @@ where
     }
 
     #[inline]
-    fn decode_char(self) -> Result<char, Self::Error> {
-        let num = self.decode_u32()?;
+    fn decode_char(mut self) -> Result<char, Self::Error> {
+        const CHAR_TAG: Tag = Tag::new(Kind::Marker, CHAR);
+
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        if tag != CHAR_TAG {
+            return Err(R::Error::message(format_args!(
+                "expected {CHAR_TAG:?}, got {tag:?}"
+            )));
+        }
+
+        let num = c::decode(self.reader.borrow_mut())?;
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
             None => Err(Self::Error::message(BadCharacter(num))),
+        }
+    }
+
+    #[inline]
+    fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
+    where
+        V: NumberVisitor<Error = Self::Error>,
+    {
+        let tag = Tag::from_byte(self.reader.read_byte()?);
+
+        match tag.kind() {
+            Kind::Number => match tag.data() {
+                Some(U8) => visitor.visit_u8(self.decode_u8()?),
+                Some(U16) => visitor.visit_u16(self.decode_u16()?),
+                Some(U32) => visitor.visit_u32(self.decode_u32()?),
+                Some(U64) => visitor.visit_u64(self.decode_u64()?),
+                Some(U128) => visitor.visit_u128(self.decode_u128()?),
+                Some(I8) => visitor.visit_i8(self.decode_i8()?),
+                Some(I16) => visitor.visit_i16(self.decode_i16()?),
+                Some(I32) => visitor.visit_i32(self.decode_i32()?),
+                Some(I64) => visitor.visit_i64(self.decode_i64()?),
+                Some(I128) => visitor.visit_i128(self.decode_i128()?),
+                Some(F32) => visitor.visit_f32(self.decode_f32()?),
+                Some(F64) => visitor.visit_f64(self.decode_f64()?),
+                _ => Err(Self::Error::message(format_args!(
+                    "unsupported number tag, got {tag:?}"
+                ))),
+            },
+            _ => Err(Self::Error::message(format_args!(
+                "expected number, but got {tag:?}"
+            ))),
         }
     }
 
@@ -466,7 +515,8 @@ where
 
     #[inline]
     fn decode_tuple(mut self, len: usize) -> Result<Self::Tuple, Self::Error> {
-        let actual = self.decode_sequence_len()?;
+        let pos = self.reader.pos();
+        let actual = self.decode_prefix(Kind::Sequence, pos)?;
 
         if len != actual {
             return Err(Self::Error::message(format_args!(
@@ -474,7 +524,7 @@ where
             )));
         }
 
-        Ok(self)
+        Ok(SelfTupleDecoder::new(self.reader))
     }
 
     #[inline]
@@ -503,16 +553,39 @@ where
     }
 }
 
-impl<'de, R> PackDecoder<'de> for SelfDecoder<R>
+impl<'de, R> PackDecoder<'de> for SelfPackDecoder<R>
 where
     R: PosReader<'de>,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, Variable, Variable> where Self: 'this;
+    type Decoder<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
-        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+        self.end = match self.end.checked_sub(1) {
+            Some(end) => end,
+            None => return Err(Self::Error::message("tried to decode past the pack")),
+        };
+
+        Ok(SelfDecoder::new(self.reader.pos_borrow_mut()))
+    }
+
+    #[inline]
+    fn end(self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+impl<'de, R> PackDecoder<'de> for SelfTupleDecoder<R>
+where
+    R: PosReader<'de>,
+{
+    type Error = R::Error;
+    type Decoder<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
+
+    #[inline]
+    fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+        Ok(SelfDecoder::new(self.reader.pos_borrow_mut()))
     }
 
     #[inline]
