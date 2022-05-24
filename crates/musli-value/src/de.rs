@@ -8,6 +8,9 @@ use musli::de::{
 };
 use musli::error::Error;
 use musli::mode::Mode;
+use musli_common::reader::{Reader, SliceReader, WithPosition};
+use musli_storage::de::StorageDecoder;
+use musli_storage::Variable;
 
 use crate::error::ValueError;
 use crate::value::{Number, Value};
@@ -48,7 +51,7 @@ where
     type Error = E;
     type Buffer = AsValueDecoder<E>;
     type Some = Self;
-    type Pack = IterValueDecoder<'de, E>;
+    type Pack = StorageDecoder<WithPosition<SliceReader<'de, Self::Error>>, Variable, Variable>;
     type Sequence = IterValueDecoder<'de, E>;
     type Tuple = IterValueDecoder<'de, E>;
     type Map = IterValuePairsDecoder<'de, E>;
@@ -196,8 +199,8 @@ where
 
     #[inline]
     fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
-        ensure!(self, hint, ExpectedPack(hint), Value::Pack(pack) => {
-            Ok(IterValueDecoder::new(pack))
+        ensure!(self, hint, ExpectedPack(hint), Value::Bytes(pack) => {
+            Ok(StorageDecoder::new(SliceReader::new(pack).with_position()))
         })
     }
 

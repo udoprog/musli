@@ -7,6 +7,7 @@ use musli::error::Error;
 use musli_common::fixed_bytes::FixedBytes;
 use musli_common::writer::Writer;
 use musli_storage::en::StorageEncoder;
+use musli_storage::Variable;
 
 /// A very simple encoder.
 pub struct WireEncoder<W, I, L, const P: usize>
@@ -298,7 +299,7 @@ where
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, I, L> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {

@@ -12,6 +12,7 @@ use musli::never::Never;
 use musli_common::int::continuation as c;
 use musli_common::reader::{Limit, PosReader};
 use musli_storage::de::StorageDecoder;
+use musli_storage::Variable;
 
 /// A very simple decoder.
 pub struct WireDecoder<R, I, L>
@@ -454,7 +455,7 @@ where
     L: TypedUsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, Variable, Variable> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {

@@ -11,6 +11,7 @@ use musli_common::encoding::Variable;
 use musli_common::fixed_bytes::FixedBytes;
 use musli_common::int::continuation as c;
 use musli_common::writer::Writer;
+use musli_storage::en::StorageEncoder;
 use musli_storage::integer_encoding::UsizeEncoding;
 
 /// A very simple encoder.
@@ -272,7 +273,7 @@ where
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = SelfEncoder<&'this mut FixedBytes<P, W::Error>, P> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
@@ -281,12 +282,12 @@ where
             None => return Err(Self::Error::message("overflow")),
         };
 
-        Ok(SelfEncoder::new(self.pack_buf.borrow_mut()))
+        Ok(StorageEncoder::new(self.pack_buf.borrow_mut()))
     }
 
     #[inline]
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
-        encode_prefix(self.writer.borrow_mut(), Kind::Pack, self.count)?;
+        encode_prefix(self.writer.borrow_mut(), Kind::Bytes, self.pack_buf.len())?;
         self.writer.write_bytes(self.pack_buf.as_slice())?;
         Ok(())
     }

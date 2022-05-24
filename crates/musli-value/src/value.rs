@@ -1,8 +1,8 @@
 use core::marker;
 
 use musli::de::{
-    AsDecoder, Decode, Decoder, LengthHint, NumberHint, NumberVisitor, PackDecoder, PairDecoder,
-    PairsDecoder, SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
+    AsDecoder, Decode, Decoder, LengthHint, NumberHint, NumberVisitor, PairDecoder, PairsDecoder,
+    SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::en::{Encode, Encoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
@@ -32,8 +32,6 @@ pub enum Value {
     String(String),
     /// A unit value.
     Sequence(Vec<Value>),
-    /// A packed value.
-    Pack(Box<[Value]>),
     /// A pair stored in the value.
     Map(Vec<(Value, Value)>),
     /// A variant pair. The first value identifies the variant, the second value
@@ -54,7 +52,6 @@ impl Value {
             Value::Bytes(bytes) => TypeHint::Bytes(LengthHint::Exact(bytes.len())),
             Value::String(string) => TypeHint::String(LengthHint::Exact(string.len())),
             Value::Sequence(sequence) => TypeHint::Sequence(LengthHint::Exact(sequence.len())),
-            Value::Pack(pack) => TypeHint::Pack(pack.len()),
             Value::Map(map) => TypeHint::Map(LengthHint::Exact(map.len())),
             Value::Variant(..) => TypeHint::Variant,
             Value::Option(..) => TypeHint::Option,
@@ -209,20 +206,7 @@ where
                 }
             }),
             TypeHint::Bytes(..) => decoder.decode_bytes(BytesVisitor(marker::PhantomData)),
-            TypeHint::String(_) => decoder.decode_string(StringVisitor(marker::PhantomData)),
-            TypeHint::Pack(len) => {
-                let mut out = Vec::with_capacity(len);
-
-                let mut pack = decoder.decode_pack()?;
-
-                for _ in 0..len {
-                    let item = pack.next()?;
-                    out.push(Decode::<M>::decode(item)?);
-                }
-
-                pack.end()?;
-                Ok(Value::Pack(Box::from(out)))
-            }
+            TypeHint::String(..) => decoder.decode_string(StringVisitor(marker::PhantomData)),
             TypeHint::Sequence(len) => {
                 let mut out = Vec::with_capacity(len.size_hint());
 
@@ -419,15 +403,6 @@ where
             Value::Number(n) => Encode::<M>::encode(n, encoder),
             Value::Bytes(bytes) => encoder.encode_bytes(bytes),
             Value::String(string) => encoder.encode_string(string),
-            Value::Pack(values) => {
-                let mut pack = encoder.encode_pack()?;
-
-                for value in values.iter() {
-                    Encode::<M>::encode(value, pack.next()?)?;
-                }
-
-                pack.end()
-            }
             Value::Sequence(values) => {
                 let mut sequence = encoder.encode_sequence(values.len())?;
 

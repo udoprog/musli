@@ -14,6 +14,7 @@ use musli::never::Never;
 use musli_common::encoding::Variable;
 use musli_common::int::continuation as c;
 use musli_common::reader::PosReader;
+use musli_storage::de::StorageDecoder;
 use musli_storage::integer_encoding::UsizeEncoding;
 
 /// A very simple decoder.
@@ -31,13 +32,16 @@ impl<R> SelfDecoder<R> {
 
 pub struct SelfPackDecoder<R> {
     reader: R,
-    end: usize,
+    remaining: usize,
 }
 
 impl<R> SelfPackDecoder<R> {
     #[inline]
     pub(crate) fn new(reader: R, end: usize) -> Self {
-        Self { reader, end }
+        Self {
+            reader,
+            remaining: end,
+        }
     }
 }
 
@@ -76,7 +80,7 @@ where
 
                 self.reader.skip(len)?;
             }
-            Kind::Sequence | Kind::Pack => {
+            Kind::Sequence => {
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
@@ -221,14 +225,6 @@ where
                     .unwrap_or_default();
                 Ok(TypeHint::Bytes(hint))
             }
-            Kind::Pack => {
-                let len = match tag.data() {
-                    Some(data) => data as usize,
-                    None => return Err(Self::Error::message("cannot determine length of pack")),
-                };
-
-                Ok(TypeHint::Pack(len))
-            }
             Kind::String => {
                 let hint = tag
                     .data()
@@ -245,6 +241,7 @@ where
                 Some(UNIT) => TypeHint::Unit,
                 _ => TypeHint::Any,
             }),
+            _ => Ok(TypeHint::Any),
         }
     }
 
@@ -257,7 +254,7 @@ where
     #[inline]
     fn decode_pack(mut self) -> Result<Self::Pack, Self::Error> {
         let pos = self.reader.pos();
-        let len = self.decode_prefix(Kind::Pack, pos)?;
+        let len = self.decode_prefix(Kind::Bytes, pos)?;
         Ok(SelfPackDecoder::new(self.reader, len))
     }
 
@@ -558,16 +555,16 @@ where
     R: PosReader<'de>,
 {
     type Error = R::Error;
-    type Decoder<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, Variable, Variable> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
-        self.end = match self.end.checked_sub(1) {
-            Some(end) => end,
+        self.remaining = match self.remaining.checked_sub(1) {
+            Some(remaining) => remaining,
             None => return Err(Self::Error::message("tried to decode past the pack")),
         };
 
-        Ok(SelfDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
     }
 
     #[inline]

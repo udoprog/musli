@@ -252,12 +252,12 @@ impl<'de> Reader<'de> for &'de [u8] {
 }
 
 /// An efficient [Reader] wrapper around a slice.
-pub struct SliceReader<'de> {
+pub struct SliceReader<'de, E = SliceReaderError> {
     range: Range<*const u8>,
-    _marker: marker::PhantomData<&'de [u8]>,
+    _marker: marker::PhantomData<(&'de [u8], E)>,
 }
 
-impl<'de> SliceReader<'de> {
+impl<'de, E> SliceReader<'de, E> {
     /// Construct a new instance around the specified slice.
     #[inline]
     pub fn new(slice: &'de [u8]) -> Self {
@@ -268,8 +268,11 @@ impl<'de> SliceReader<'de> {
     }
 }
 
-impl<'de> Reader<'de> for SliceReader<'de> {
-    type Error = SliceReaderError;
+impl<'de, E> Reader<'de> for SliceReader<'de, E>
+where
+    E: Error,
+{
+    type Error = E;
 
     type Mut<'this> = &'this mut Self where Self: 'this;
 
@@ -322,11 +325,14 @@ impl<'de> Reader<'de> for SliceReader<'de> {
 }
 
 #[inline]
-fn bounds_check_add(range: &Range<*const u8>, len: usize) -> Result<*const u8, SliceReaderError> {
+fn bounds_check_add<E>(range: &Range<*const u8>, len: usize) -> Result<*const u8, E>
+where
+    E: Error,
+{
     let outcome = range.start.wrapping_add(len);
 
     if outcome > range.end || outcome < range.start {
-        Err(SliceReaderError::custom("buffer underflow"))
+        Err(E::custom("buffer underflow"))
     } else {
         Ok(outcome)
     }

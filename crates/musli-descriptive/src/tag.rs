@@ -83,7 +83,7 @@ pub enum Kind {
     /// A marker value.
     Marker = 0b110_00000,
     /// A bytes pack.
-    Pack = 0b111_00000,
+    Unsupported = 0b111_00000,
 }
 
 /// A type tag.
