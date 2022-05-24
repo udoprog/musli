@@ -1,6 +1,6 @@
 [package]
 name = "musli-value"
-version = "0.0.34"
+version = "0.0.35"
 edition = "2021"
 readme = "README.md"
 license = "MIT/Apache-2.0"
@@ -18,9 +18,9 @@ default = []
 test = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.34" }
-musli-common = { path = "../musli-common", version = "0.0.34" }
-musli-storage = { path = "../musli-storage", version = "0.0.34", default_features = false }
+musli = { path = "../musli", version = "0.0.35" }
+musli-common = { path = "../musli-common", version = "0.0.35" }
+musli-storage = { path = "../musli-storage", version = "0.0.35", default_features = false }
 
 itoa = "1.0.1"
 ryu = "1.0.9"
