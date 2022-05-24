@@ -16,6 +16,10 @@ pub const TRUE: u8 = 0b00011;
 pub const FALSE: u8 = 0b00010;
 /// The marker indicating that the value is a variant.
 pub const VARIANT: u8 = 0b00100;
+/// A single character.
+pub const CHAR: u8 = 0b00101;
+/// A unit type.
+pub const UNIT: u8 = 0b00110;
 
 /// 8-bit unsigned number.
 pub const U8: u8 = 0b00001;
@@ -72,12 +76,14 @@ pub enum Kind {
     Map = 0b010_00000,
     /// A sequence of raw bytes.
     Bytes = 0b011_00000,
+    /// A string.
+    String = 0b100_00000,
     /// A variant.
-    Variant = 0b100_00000,
+    Variant = 0b101_00000,
     /// A marker value.
-    Marker = 0b101_00000,
-    /// An unknown tag.
-    Unknown = 0b111_00000,
+    Marker = 0b110_00000,
+    /// A bytes pack.
+    Pack = 0b111_00000,
 }
 
 /// A type tag.

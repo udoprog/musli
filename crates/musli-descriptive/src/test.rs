@@ -54,10 +54,14 @@ macro_rules! rt {
 
     ($ty:ty, $expr:expr) => {{
         let value: $ty = $expr;
-        let out = $crate::to_vec(&value).expect(concat!("self: ", stringify!($ty), ": failed to encode"));
-        let decoded: $ty = $crate::from_slice(&out[..]).expect(concat!("self: ", stringify!($ty), ": failed to decode"));
-        // assert!(buf.is_empty(), concat!("self: ", stringify!($ty), ": decoded buffer should be empty.\nwas: {:?}\noriginal: {:?}\n"), buf, &out[..]);
-        assert_eq!(decoded, $expr, concat!("self: ", stringify!($ty), ": roundtrip does not match"));
+        let out = $crate::to_vec(&value).expect(concat!("descriptive: ", stringify!($ty), ": failed to encode"));
+        let decoded: $ty = $crate::from_slice(&out[..]).expect(concat!("descriptive: ", stringify!($ty), ": failed to decode"));
+        // assert!(buf.is_empty(), concat!("descriptive: ", stringify!($ty), ": decoded buffer should be empty.\nwas: {:?}\noriginal: {:?}\n"), buf, &out[..]);
+        assert_eq!(decoded, $expr, concat!("descriptive: ", stringify!($ty), ": roundtrip does not match"));
+
+        let value_decode: musli_value::Value = $crate::from_slice(&out).expect(concat!("descriptive: ", stringify!($ty), ": failed to decode into value type"));
+        let value_decoded: $ty = musli_value::decode(&value_decode).expect(concat!("descriptive: ", stringify!($ty), ": failed to decode from value type"));
+        assert_eq!(value_decoded, $expr, concat!("descriptive: ", stringify!($ty), ": value roundtrip does not match"));
         decoded
     }};
 }

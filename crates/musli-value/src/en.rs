@@ -20,6 +20,20 @@ impl ValueOutput for &mut Vec<Value> {
     }
 }
 
+/// Writer which writes an optional value that is present.
+pub struct SomeValueWriter<O> {
+    output: O,
+}
+
+impl<O> ValueOutput for SomeValueWriter<O>
+where
+    O: ValueOutput,
+{
+    fn write(self, value: Value) {
+        self.output.write(Value::Option(Some(Box::new(value))));
+    }
+}
+
 /// Encoder for a single value.
 pub struct ValueEncoder<O> {
     output: O,
@@ -38,7 +52,7 @@ where
 {
     type Ok = ();
     type Error = ValueError;
-    type Some = Self;
+    type Some = ValueEncoder<SomeValueWriter<O>>;
     type Pack = SequenceValueEncoder<O>;
     type Sequence = SequenceValueEncoder<O>;
     type Tuple = SequenceValueEncoder<O>;
@@ -184,11 +198,14 @@ where
 
     #[inline]
     fn encode_some(self) -> Result<Self::Some, Self::Error> {
-        Ok(self)
+        Ok(ValueEncoder::new(SomeValueWriter {
+            output: self.output,
+        }))
     }
 
     #[inline]
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
+        self.output.write(Value::Option(None));
         Ok(())
     }
 

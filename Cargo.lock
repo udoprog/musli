@@ -420,6 +420,7 @@ dependencies = [
  "musli",
  "musli-common",
  "musli-storage",
+ "musli-value",
 ]
 
 [[package]]

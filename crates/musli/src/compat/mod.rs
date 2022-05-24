@@ -7,9 +7,9 @@ mod packed;
 
 pub use self::packed::Packed;
 
-use crate::en::SequenceEncoder;
+use crate::de::{Decode, Decoder, SequenceDecoder};
+use crate::en::{Encode, Encoder, SequenceEncoder};
 use crate::mode::Mode;
-use crate::{Decode, Decoder, Encode, Encoder};
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
@@ -72,7 +72,9 @@ where
     where
         D: Decoder<'de>,
     {
-        Ok(Self(decoder.decode_unit()?))
+        let seq = decoder.decode_sequence()?;
+        seq.end()?;
+        Ok(Self(()))
     }
 }
 
