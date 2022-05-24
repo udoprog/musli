@@ -11,6 +11,9 @@ mod private {
 pub trait ByteOrder:
     Clone + Copy + Debug + Eq + Hash + Ord + PartialEq + PartialOrd + private::Sealed
 {
+    /// Read a single byte.
+    fn read_u8(bytes: [u8; 1]) -> u8;
+
     /// Read a 16-bit unsigned integer.
     fn read_u16(bytes: [u8; 2]) -> u16;
 
@@ -34,6 +37,9 @@ pub trait ByteOrder:
 
     /// Read a 128-bit signed integer.
     fn read_i128(bytes: [u8; 16]) -> i128;
+
+    /// Write a single byte.
+    fn write_u8(value: u8) -> [u8; 1];
 
     /// Write a 16-bit unsigned integer.
     fn write_u16(value: u16) -> [u8; 2];
@@ -65,6 +71,11 @@ pub trait ByteOrder:
 pub enum LittleEndian {}
 
 impl ByteOrder for LittleEndian {
+    #[inline]
+    fn read_u8(bytes: [u8; 1]) -> u8 {
+        bytes[0]
+    }
+
     #[inline]
     fn read_u16(bytes: [u8; 2]) -> u16 {
         u16::from_le_bytes(bytes)
@@ -103,6 +114,11 @@ impl ByteOrder for LittleEndian {
     #[inline]
     fn read_i128(bytes: [u8; 16]) -> i128 {
         i128::from_le_bytes(bytes)
+    }
+
+    #[inline]
+    fn write_u8(value: u8) -> [u8; 1] {
+        [value]
     }
 
     #[inline]
@@ -152,6 +168,11 @@ pub enum BigEndian {}
 
 impl ByteOrder for BigEndian {
     #[inline]
+    fn read_u8(bytes: [u8; 1]) -> u8 {
+        bytes[0]
+    }
+
+    #[inline]
     fn read_u16(bytes: [u8; 2]) -> u16 {
         u16::from_be_bytes(bytes)
     }
@@ -189,6 +210,11 @@ impl ByteOrder for BigEndian {
     #[inline]
     fn read_i128(bytes: [u8; 16]) -> i128 {
         i128::from_be_bytes(bytes)
+    }
+
+    #[inline]
+    fn write_u8(value: u8) -> [u8; 1] {
+        [value]
     }
 
     #[inline]

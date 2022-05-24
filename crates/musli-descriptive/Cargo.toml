@@ -1,0 +1,24 @@
+[package]
+name = "musli-descriptive"
+version = "0.0.33"
+edition = "2021"
+readme = "README.md"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/udoprog/musli"
+homepage = "https://github.com/udoprog/musli"
+documentation = "https://docs.rs/musli"
+description = """
+A fully self-descriptive format for Müsli.
+"""
+keywords = ["serialization", "no_std"]
+categories = ["encoding"]
+
+[features]
+default = ["std"]
+std = ["musli/std", "musli-common/std", "musli-storage/std"]
+test = ["std"]
+
+[dependencies]
+musli = { path = "../musli", version = "0.0.33", default_features = false }
+musli-common = { path = "../musli-common", version = "0.0.33", default_features = false }
+musli-storage = { path = "../musli-storage", version = "0.0.33", default_features = false }

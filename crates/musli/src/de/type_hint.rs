@@ -78,6 +78,12 @@ impl LengthHint {
     }
 }
 
+impl Default for LengthHint {
+    fn default() -> Self {
+        LengthHint::Any
+    }
+}
+
 /// A type hint.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -102,6 +108,8 @@ pub enum TypeHint {
     Map(LengthHint),
     /// A variant.
     Variant,
+    /// An optional value.
+    Option,
 }
 
 impl fmt::Display for TypeHint {
@@ -117,6 +125,7 @@ impl fmt::Display for TypeHint {
             TypeHint::Sequence(_) => write!(f, "sequence"),
             TypeHint::Map(_) => write!(f, "map"),
             TypeHint::Variant => write!(f, "variant"),
+            TypeHint::Option => write!(f, "option"),
         }
     }
 }

@@ -37,6 +37,8 @@ pub enum Value {
     /// A variant pair. The first value identifies the variant, the second value
     /// contains the value of the variant.
     Variant(Box<(Value, Value)>),
+    /// An optional value.
+    Option(Option<Box<Value>>),
 }
 
 impl Value {
@@ -52,6 +54,7 @@ impl Value {
             Value::Sequence(sequence) => TypeHint::Sequence(LengthHint::Exact(sequence.len())),
             Value::Map(map) => TypeHint::Map(LengthHint::Exact(map.len())),
             Value::Variant(..) => TypeHint::Variant,
+            Value::Option(..) => TypeHint::Option,
         }
     }
 
@@ -237,6 +240,10 @@ where
                 variant.end()?;
                 Ok(Value::Variant(Box::new((first, second))))
             }
+            TypeHint::Option => match decoder.decode_option()? {
+                Some(decoder) => Ok(Value::Option(Some(Box::new(Decode::<M>::decode(decoder)?)))),
+                None => Ok(Value::Option(None)),
+            },
             hint => Err(D::Error::message(format_args!(
                 "Value: unsupported type {hint}"
             ))),
@@ -419,6 +426,13 @@ where
                 let encoder = encoder.encode_variant()?;
                 encoder.insert::<M, _, _>(tag, variant)
             }
+            Value::Option(option) => match option {
+                Some(value) => {
+                    let encoder = encoder.encode_some()?;
+                    Encode::<M>::encode(&**value, encoder)
+                }
+                None => encoder.encode_none(),
+            },
         }
     }
 }

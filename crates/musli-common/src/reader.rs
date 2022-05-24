@@ -62,6 +62,9 @@ pub trait Reader<'de> {
     /// Skip over the given number of bytes.
     fn skip(&mut self, n: usize) -> Result<(), Self::Error>;
 
+    /// Peek the next value.
+    fn peek(&mut self) -> Result<Option<u8>, Self::Error>;
+
     /// Read a slice into the given buffer.
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
@@ -231,6 +234,11 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
+    fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
+        Ok(self.get(0).copied())
+    }
+
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         if self.len() < buf.len() {
             return Err(SliceReaderError::custom("buffer underflow"));
@@ -288,6 +296,16 @@ impl<'de> Reader<'de> for SliceReader<'de> {
             self.range.start = outcome;
             visitor.visit_borrowed(bytes)
         }
+    }
+
+    #[inline]
+    fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
+        if self.range.start == self.range.end {
+            return Ok(None);
+        }
+
+        // SAFETY: we've checked that the elements are in bound above.
+        unsafe { Ok(Some(ptr::read(self.range.start))) }
     }
 
     #[inline]
@@ -367,6 +385,11 @@ where
         let ok = self.reader.read_bytes(n, visitor)?;
         self.pos += n;
         Ok(ok)
+    }
+
+    #[inline]
+    fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
+        self.reader.peek()
     }
 
     #[inline]
@@ -460,6 +483,11 @@ where
     }
 
     #[inline]
+    fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
+        self.reader.peek()
+    }
+
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         self.bounds_check(buf.len())?;
         self.reader.read(buf)
@@ -521,6 +549,11 @@ where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         (**self).read_bytes(n, visitor)
+    }
+
+    #[inline]
+    fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
+        (**self).peek()
     }
 
     #[inline]

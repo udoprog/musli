@@ -85,7 +85,7 @@ pub trait Signed:
 }
 
 macro_rules! implement {
-    ($signed:ty, $unsigned:ty, $type_flag:expr) => {
+    ($signed:ty, $unsigned:ty) => {
         impl Signed for $signed {
             const BITS: u32 = <$signed>::BITS;
 
@@ -146,8 +146,8 @@ macro_rules! implement {
 }
 
 macro_rules! implement_io {
-    ($signed:ty, $unsigned:ty, $type_flag:expr, $read:ident, $write:ident) => {
-        implement!($signed, $unsigned, $type_flag);
+    ($signed:ty, $unsigned:ty, $read:ident, $write:ident) => {
+        implement!($signed, $unsigned);
 
         impl ByteOrderIo for $unsigned {
             #[inline]
@@ -171,8 +171,9 @@ macro_rules! implement_io {
     };
 }
 
-implement_io!(i16, u16, Fixed16, read_u16, write_u16);
-implement_io!(i32, u32, Fixed32, read_u32, write_u32);
-implement_io!(i64, u64, Fixed64, read_u64, write_u64);
-implement_io!(i128, u128, Fixed128, read_u128, write_u128);
-implement!(isize, usize, Fixed32);
+implement_io!(i8, u8, read_u8, write_u8);
+implement_io!(i16, u16, read_u16, write_u16);
+implement_io!(i32, u32, read_u32, write_u32);
+implement_io!(i64, u64, read_u64, write_u64);
+implement_io!(i128, u128, read_u128, write_u128);
+implement!(isize, usize);

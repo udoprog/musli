@@ -68,6 +68,7 @@ The available formats and their capabilities are:
 | [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ |
 | [musli-storage]                    | ✔ | ✔ | ✗ |
 | [musli-wire]                       | ✔ | ✔ | ✔ |
+| [musli-descriptive]                | ✔ | ✔ | ✔ |
 
 `recorder?` determines whether fields must occur in exactly the order in
 which they are specified. So reordering fields in such a struct would cause
@@ -208,6 +209,7 @@ unrecognized data.
 [json-serde-value]: https://docs.rs/serde_json/latest/serde_json/enum.Value.html
 [musli-storage]: https://docs.rs/musli-storage
 [musli-wire]: https://docs.rs/musli-wire
+[musli-descriptive]: https://docs.rs/musli-descriptive
 [protobuf]: https://developers.google.com/protocol-buffers
 [serde]: https://serde.rs
 
