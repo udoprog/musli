@@ -207,22 +207,8 @@ where
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
-        let tag = Tag::from_byte(self.reader.read_byte()?);
-
-        if tag.kind() != Kind::Prefix {
-            return Err(Self::Error::message(Expected {
-                expected: Kind::Prefix,
-                actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
-            }));
-        }
-
-        let len = if let Some(len) = tag.data() {
-            len as usize
-        } else {
-            L::decode_usize(self.reader.borrow_mut())?
-        };
-
+        let pos = self.reader.pos();
+        let len = self.decode_prefix(pos)?;
         self.reader.read_bytes(len, visitor)
     }
 

@@ -110,13 +110,7 @@ where
     #[inline]
     fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
         let len = vectors.iter().map(|v| v.len()).sum();
-
-        let (tag, embedded) = Tag::with_len(Kind::Prefix, len);
-        self.writer.write_byte(tag.byte())?;
-
-        if !embedded {
-            L::encode_usize(&mut self.writer, len)?;
-        }
+        encode_prefix::<W, L>(&mut self.writer, len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(bytes)?;
