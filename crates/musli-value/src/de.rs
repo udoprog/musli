@@ -186,15 +186,17 @@ where
 
     #[inline]
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
-        match self.value {
-            Value::Unit => Ok(None),
-            value => Ok(Some(ValueDecoder::new(value))),
-        }
+        ensure!(self, hint, ExpectedOption(hint), Value::Option(option) => {
+            Ok(match option {
+                Some(some) => Some(ValueDecoder::new(&**some)),
+                None => None
+            })
+        })
     }
 
     #[inline]
     fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
-        ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(pack) => {
+        ensure!(self, hint, ExpectedPack(hint), Value::Pack(pack) => {
             Ok(IterValueDecoder::new(pack))
         })
     }

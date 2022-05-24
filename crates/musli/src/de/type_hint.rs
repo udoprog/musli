@@ -100,6 +100,8 @@ pub enum TypeHint {
     Number(NumberHint),
     /// A byte array.
     Bytes(LengthHint),
+    /// A pack of values which has an exact length.
+    Pack(usize),
     /// A string with the given length.
     String(LengthHint),
     /// A sequence with a length hint.
@@ -121,6 +123,7 @@ impl fmt::Display for TypeHint {
             TypeHint::Char => write!(f, "char"),
             TypeHint::Number(_) => write!(f, "number"),
             TypeHint::Bytes(_) => write!(f, "bytes"),
+            TypeHint::Pack(_) => write!(f, "pack"),
             TypeHint::String(_) => write!(f, "string"),
             TypeHint::Sequence(_) => write!(f, "sequence"),
             TypeHint::Map(_) => write!(f, "map"),

@@ -2,14 +2,14 @@ use core::fmt;
 
 use crate::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use crate::tag::{
-    Kind, Tag, ABSENT, F32, F64, FALSE, I128, I16, I32, I64, I8, ISIZE, PRESENT, TRUE, U128, U16,
-    U32, U64, U8, USIZE, VARIANT,
+    Kind, Tag, ABSENT, CHAR, F32, F64, FALSE, I128, I16, I32, I64, I8, ISIZE, PRESENT, TRUE, U128,
+    U16, U32, U64, U8, UNIT, USIZE, VARIANT,
 };
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli_common::encoding::Variable;
 use musli_common::fixed_bytes::FixedBytes;
+use musli_common::int::continuation as c;
 use musli_common::writer::Writer;
-use musli_storage::en::StorageEncoder;
 use musli_storage::integer_encoding::UsizeEncoding;
 
 /// A very simple encoder.
@@ -61,12 +61,13 @@ where
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "type supported by the wire encoder")
+        write!(f, "type supported by the descriptive encoder")
     }
 
     #[inline]
     fn encode_unit(mut self) -> Result<Self::Ok, Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
+        self.writer
+            .write_byte(Tag::new(Kind::Marker, UNIT).byte())?;
         Ok(())
     }
 
@@ -82,7 +83,7 @@ where
 
     #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
-        encode_bytes_tag::<W>(&mut self.writer, bytes.len())?;
+        encode_prefix(self.writer.borrow_mut(), Kind::Bytes, bytes.len())?;
         self.writer.write_bytes(bytes)?;
         Ok(())
     }
@@ -90,7 +91,7 @@ where
     #[inline]
     fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
         let len = vectors.iter().map(|v| v.len()).sum();
-        encode_bytes_tag::<W>(&mut self.writer, len)?;
+        encode_prefix(self.writer.borrow_mut(), Kind::Bytes, len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(bytes)?;
@@ -100,18 +101,20 @@ where
     }
 
     #[inline]
-    fn encode_string(self, string: &str) -> Result<Self::Ok, Self::Error> {
-        self.encode_bytes(string.as_bytes())
+    fn encode_string(mut self, string: &str) -> Result<Self::Ok, Self::Error> {
+        encode_prefix(self.writer.borrow_mut(), Kind::String, string.len())?;
+        self.writer.write_bytes(string.as_bytes())?;
+        Ok(())
     }
 
     #[inline]
     fn encode_usize(mut self, value: usize) -> Result<Self::Ok, Self::Error> {
-        encode_typed_unsigned(&mut self.writer, USIZE, value)
+        encode_typed_unsigned(self.writer.borrow_mut(), USIZE, value)
     }
 
     #[inline]
     fn encode_isize(mut self, value: isize) -> Result<Self::Ok, Self::Error> {
-        encode_typed_signed(&mut self.writer, ISIZE, value)
+        encode_typed_signed(self.writer.borrow_mut(), ISIZE, value)
     }
 
     #[inline]
@@ -121,68 +124,70 @@ where
     }
 
     #[inline]
-    fn encode_char(self, value: char) -> Result<Self::Ok, Self::Error> {
-        self.encode_u32(value as u32)
+    fn encode_char(mut self, value: char) -> Result<Self::Ok, Self::Error> {
+        const CHAR_TAG: Tag = Tag::new(Kind::Marker, CHAR);
+        self.writer.write_byte(CHAR_TAG.byte())?;
+        c::encode(self.writer.borrow_mut(), value as u32)
     }
 
     #[inline]
     fn encode_u8(mut self, value: u8) -> Result<Self::Ok, Self::Error> {
-        encode_typed_unsigned(&mut self.writer, U8, value)
+        encode_typed_unsigned(self.writer.borrow_mut(), U8, value)
     }
 
     #[inline]
     fn encode_u16(mut self, value: u16) -> Result<Self::Ok, Self::Error> {
-        encode_typed_unsigned(&mut self.writer, U16, value)
+        encode_typed_unsigned(self.writer.borrow_mut(), U16, value)
     }
 
     #[inline]
     fn encode_u32(mut self, value: u32) -> Result<Self::Ok, Self::Error> {
-        encode_typed_unsigned(&mut self.writer, U32, value)
+        encode_typed_unsigned(self.writer.borrow_mut(), U32, value)
     }
 
     #[inline]
     fn encode_u64(mut self, value: u64) -> Result<Self::Ok, Self::Error> {
-        encode_typed_unsigned(&mut self.writer, U64, value)
+        encode_typed_unsigned(self.writer.borrow_mut(), U64, value)
     }
 
     #[inline]
     fn encode_u128(mut self, value: u128) -> Result<Self::Ok, Self::Error> {
-        encode_typed_unsigned(&mut self.writer, U128, value)
+        encode_typed_unsigned(self.writer.borrow_mut(), U128, value)
     }
 
     #[inline]
     fn encode_i8(mut self, value: i8) -> Result<Self::Ok, Self::Error> {
-        encode_typed_signed(&mut self.writer, I8, value)
+        encode_typed_signed(self.writer.borrow_mut(), I8, value)
     }
 
     #[inline]
     fn encode_i16(mut self, value: i16) -> Result<Self::Ok, Self::Error> {
-        encode_typed_signed(&mut self.writer, I16, value)
+        encode_typed_signed(self.writer.borrow_mut(), I16, value)
     }
 
     #[inline]
     fn encode_i32(mut self, value: i32) -> Result<Self::Ok, Self::Error> {
-        encode_typed_signed(&mut self.writer, I32, value)
+        encode_typed_signed(self.writer.borrow_mut(), I32, value)
     }
 
     #[inline]
     fn encode_i64(mut self, value: i64) -> Result<Self::Ok, Self::Error> {
-        encode_typed_signed(&mut self.writer, I64, value)
+        encode_typed_signed(self.writer.borrow_mut(), I64, value)
     }
 
     #[inline]
     fn encode_i128(mut self, value: i128) -> Result<Self::Ok, Self::Error> {
-        encode_typed_signed(&mut self.writer, I128, value)
+        encode_typed_signed(self.writer.borrow_mut(), I128, value)
     }
 
     #[inline]
     fn encode_f32(mut self, value: f32) -> Result<Self::Ok, Self::Error> {
-        encode_typed_unsigned(&mut self.writer, F32, value.to_bits())
+        encode_typed_unsigned(self.writer.borrow_mut(), F32, value.to_bits())
     }
 
     #[inline]
     fn encode_f64(mut self, value: f64) -> Result<Self::Ok, Self::Error> {
-        encode_typed_unsigned(&mut self.writer, F64, value.to_bits())
+        encode_typed_unsigned(self.writer.borrow_mut(), F64, value.to_bits())
     }
 
     #[inline]
@@ -205,7 +210,7 @@ where
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
-            Variable::encode_usize(&mut self.writer, len)?;
+            Variable::encode_usize(self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -217,7 +222,7 @@ where
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
-            Variable::encode_usize(&mut self.writer, len)?;
+            Variable::encode_usize(self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -229,7 +234,7 @@ where
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
-            Variable::encode_usize(&mut self.writer, len)?;
+            Variable::encode_usize(self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -241,7 +246,7 @@ where
         self.writer.write_byte(tag.byte())?;
 
         if !embedded {
-            Variable::encode_usize(&mut self.writer, len)?;
+            Variable::encode_usize(self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -261,16 +266,16 @@ where
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
+    type Encoder<'this> = SelfEncoder<&'this mut FixedBytes<P, W::Error>, P> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(StorageEncoder::new(&mut self.pack_buf))
+        Ok(SelfEncoder::new(self.pack_buf.borrow_mut()))
     }
 
     #[inline]
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
-        encode_bytes_tag::<W>(&mut self.writer, self.pack_buf.len())?;
+        encode_prefix(self.writer.borrow_mut(), Kind::Pack, self.pack_buf.len())?;
         self.writer.write_bytes(self.pack_buf.as_slice())?;
         Ok(())
     }
@@ -374,11 +379,11 @@ impl fmt::Display for Overflow {
 
 /// Encode a length prefix.
 #[inline]
-fn encode_bytes_tag<W>(writer: &mut W, len: usize) -> Result<(), W::Error>
+fn encode_prefix<W>(mut writer: W, kind: Kind, len: usize) -> Result<(), W::Error>
 where
     W: Writer,
 {
-    let (tag, embedded) = Tag::with_len(Kind::Bytes, len);
+    let (tag, embedded) = Tag::with_len(kind, len);
     writer.write_byte(tag.byte())?;
 
     if !embedded {
