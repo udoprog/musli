@@ -1,10 +1,7 @@
 use core::fmt;
 
 use crate::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
-use crate::tag::{
-    Kind, Tag, ABSENT, CHAR, F32, F64, FALSE, I128, I16, I32, I64, I8, PRESENT, TRUE, U128, U16,
-    U32, U64, U8, UNIT, VARIANT,
-};
+use crate::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
 use musli::de::{
     Decoder, LengthHint, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
     SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
@@ -70,7 +67,13 @@ where
                     let _ = c::decode::<_, u128>(self.reader.borrow_mut())?;
                 }
             }
-            Kind::Marker => (),
+            Kind::Mark => match tag.mark() {
+                Mark::Variant => {
+                    self.skip_any()?;
+                    self.skip_any()?;
+                }
+                _ => (),
+            },
             Kind::Bytes => {
                 let len = if let Some(len) = tag.data() {
                     len as usize
@@ -102,10 +105,6 @@ where
                     self.skip_any()?;
                     self.skip_any()?;
                 }
-            }
-            Kind::Variant => {
-                self.skip_any()?;
-                self.skip_any()?;
             }
             kind => {
                 return Err(R::Error::message(format_args!("unsupported kind {kind:?}")));
@@ -232,13 +231,12 @@ where
                     .unwrap_or_default();
                 Ok(TypeHint::String(hint))
             }
-            Kind::Variant => Ok(TypeHint::Variant),
-            Kind::Marker => Ok(match tag.data() {
-                Some(TRUE | FALSE) => TypeHint::Bool,
-                Some(VARIANT) => TypeHint::Variant,
-                Some(PRESENT | ABSENT) => TypeHint::Option,
-                Some(CHAR) => TypeHint::Char,
-                Some(UNIT) => TypeHint::Unit,
+            Kind::Mark => Ok(match tag.mark() {
+                Mark::True | Mark::False => TypeHint::Bool,
+                Mark::Variant => TypeHint::Variant,
+                Mark::Some | Mark::None => TypeHint::Option,
+                Mark::Char => TypeHint::Char,
+                Mark::Unit => TypeHint::Unit,
                 _ => TypeHint::Any,
             }),
             _ => Ok(TypeHint::Any),
@@ -264,10 +262,8 @@ where
         let len = self.decode_prefix(Kind::Bytes, pos)?;
 
         if len != N {
-            return Err(Self::Error::message(BadLength {
-                actual: len,
-                expected: N,
-                pos,
+            return Err(Self::Error::message(format_args! {
+                "bad length, got {len} but expect {N} (at {pos})"
             }));
         }
 
@@ -289,22 +285,8 @@ where
     where
         V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
-        let tag = Tag::from_byte(self.reader.read_byte()?);
-
-        if tag.kind() != Kind::String {
-            return Err(Self::Error::message(Expected {
-                expected: Kind::String,
-                actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
-            }));
-        }
-
-        let len = if let Some(len) = tag.data() {
-            len as usize
-        } else {
-            Variable::decode_usize(self.reader.borrow_mut())?
-        };
-
+        let pos = self.reader.pos();
+        let len = self.decode_prefix(Kind::String, pos)?;
         return self.reader.read_bytes(len, Visitor(visitor));
 
         struct Visitor<V>(V);
@@ -345,30 +327,31 @@ where
 
     #[inline]
     fn decode_bool(mut self) -> Result<bool, Self::Error> {
-        const FALSE_TAG: Tag = Tag::new(Kind::Marker, FALSE);
-        const TRUE_TAG: Tag = Tag::new(Kind::Marker, TRUE);
+        const FALSE: Tag = Tag::from_mark(Mark::False);
+        const TRUE: Tag = Tag::from_mark(Mark::True);
 
+        let pos = self.reader.pos();
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         match tag {
-            FALSE_TAG => Ok(false),
-            TRUE_TAG => Ok(true),
-            tag => Err(Self::Error::message(BadBoolean {
-                actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
+            FALSE => Ok(false),
+            TRUE => Ok(true),
+            tag => Err(Self::Error::message(format_args! {
+                "bad boolean, got {tag:?} (at {pos})"
             })),
         }
     }
 
     #[inline]
     fn decode_char(mut self) -> Result<char, Self::Error> {
-        const CHAR_TAG: Tag = Tag::new(Kind::Marker, CHAR);
+        const CHAR: Tag = Tag::from_mark(Mark::Char);
 
+        let pos = self.reader.pos();
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        if tag != CHAR_TAG {
+        if tag != CHAR {
             return Err(R::Error::message(format_args!(
-                "expected {CHAR_TAG:?}, got {tag:?}"
+                "expected {CHAR:?}, got {tag:?} (at {pos})"
             )));
         }
 
@@ -376,7 +359,9 @@ where
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(Self::Error::message(BadCharacter(num))),
+            None => Err(Self::Error::message(format_args!(
+                "bad character (at {pos}"
+            ))),
         }
     }
 
@@ -490,17 +475,17 @@ where
     #[inline]
     fn decode_option(mut self) -> Result<Option<Self::Some>, Self::Error> {
         // Options are encoded as empty or sequences with a single element.
-        const NONE: Tag = Tag::new(Kind::Marker, ABSENT);
-        const SOME: Tag = Tag::new(Kind::Marker, PRESENT);
+        const NONE: Tag = Tag::from_mark(Mark::None);
+        const SOME: Tag = Tag::from_mark(Mark::Some);
 
+        let pos = self.reader.pos();
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
         match tag {
             NONE => Ok(None),
             SOME => Ok(Some(self)),
-            tag => Err(Self::Error::message(ExpectedOption {
-                tag,
-                pos: self.reader.pos().saturating_sub(1),
+            tag => Err(Self::Error::message(format_args! {
+                "expected option, was {tag:?} (at {pos})"
             })),
         }
     }
@@ -536,11 +521,13 @@ where
 
     #[inline]
     fn decode_variant(mut self) -> Result<Self::Variant, Self::Error> {
+        const VARIANT: Tag = Tag::from_mark(Mark::Variant);
+
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
-        if tag != Tag::new(Kind::Marker, VARIANT) {
+        if tag != VARIANT {
             return Err(Self::Error::message(Expected {
-                expected: Kind::Marker,
+                expected: Kind::Mark,
                 actual: tag,
                 pos: self.reader.pos().saturating_sub(1),
             }));
@@ -740,59 +727,5 @@ impl fmt::Display for Expected {
         } = *self;
 
         write!(f, "Expected {expected:?} but was {actual:?} (at {pos})",)
-    }
-}
-
-struct BadBoolean {
-    actual: Tag,
-    pos: usize,
-}
-
-impl fmt::Display for BadBoolean {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { actual, pos } = *self;
-        write!(f, "Bad boolean tag {actual:?} (at {pos})")
-    }
-}
-
-struct BadCharacter(u32);
-
-impl fmt::Display for BadCharacter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Bad character number 0x{:02x}", self.0)
-    }
-}
-
-struct ExpectedOption {
-    tag: Tag,
-    pos: usize,
-}
-
-impl fmt::Display for ExpectedOption {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { tag, pos } = *self;
-
-        write!(f, "expected option marker, was {tag:?} (at {pos})",)
-    }
-}
-
-struct BadLength {
-    actual: usize,
-    expected: usize,
-    pos: usize,
-}
-
-impl fmt::Display for BadLength {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            actual,
-            expected,
-            pos,
-        } = *self;
-
-        write!(
-            f,
-            "Bad length, got {actual} but expect {expected} (at {pos})"
-        )
     }
 }

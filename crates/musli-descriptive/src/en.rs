@@ -2,8 +2,7 @@ use core::fmt;
 
 use crate::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use crate::tag::{
-    Kind, Tag, ABSENT, CHAR, F32, F64, FALSE, I128, I16, I32, I64, I8, ISIZE, PRESENT, TRUE, U128,
-    U16, U32, U64, U8, UNIT, USIZE, VARIANT,
+    Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, ISIZE, U128, U16, U32, U64, U8, USIZE,
 };
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
@@ -73,8 +72,7 @@ where
 
     #[inline]
     fn encode_unit(mut self) -> Result<Self::Ok, Self::Error> {
-        self.writer
-            .write_byte(Tag::new(Kind::Marker, UNIT).byte())?;
+        self.writer.write_byte(Tag::from_mark(Mark::Unit).byte())?;
         Ok(())
     }
 
@@ -126,14 +124,17 @@ where
 
     #[inline]
     fn encode_bool(mut self, value: bool) -> Result<Self::Ok, Self::Error> {
+        const TRUE: Tag = Tag::from_mark(Mark::True);
+        const FALSE: Tag = Tag::from_mark(Mark::False);
+
         self.writer
-            .write_byte(Tag::new(Kind::Marker, if value { TRUE } else { FALSE }).byte())
+            .write_byte(if value { TRUE } else { FALSE }.byte())
     }
 
     #[inline]
     fn encode_char(mut self, value: char) -> Result<Self::Ok, Self::Error> {
-        const CHAR_TAG: Tag = Tag::new(Kind::Marker, CHAR);
-        self.writer.write_byte(CHAR_TAG.byte())?;
+        const CHAR: Tag = Tag::from_mark(Mark::Char);
+        self.writer.write_byte(CHAR.byte())?;
         c::encode(self.writer.borrow_mut(), value as u32)
     }
 
@@ -199,70 +200,46 @@ where
 
     #[inline]
     fn encode_some(mut self) -> Result<Self::Some, Self::Error> {
-        self.writer
-            .write_byte(Tag::new(Kind::Marker, PRESENT).byte())?;
+        const SOME: Tag = Tag::from_mark(Mark::Some);
+        self.writer.write_byte(SOME.byte())?;
         Ok(self)
     }
 
     #[inline]
     fn encode_none(mut self) -> Result<Self::Ok, Self::Error> {
-        self.writer
-            .write_byte(Tag::new(Kind::Marker, ABSENT).byte())?;
+        const NONE: Tag = Tag::from_mark(Mark::None);
+        self.writer.write_byte(NONE.byte())?;
         Ok(())
     }
 
     #[inline]
     fn encode_sequence(mut self, len: usize) -> Result<Self::Sequence, Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(tag.byte())?;
-
-        if !embedded {
-            Variable::encode_usize(self.writer.borrow_mut(), len)?;
-        }
-
+        encode_prefix(self.writer.borrow_mut(), Kind::Sequence, len)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_tuple(mut self, len: usize) -> Result<Self::Sequence, Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(tag.byte())?;
-
-        if !embedded {
-            Variable::encode_usize(self.writer.borrow_mut(), len)?;
-        }
-
+        encode_prefix(self.writer.borrow_mut(), Kind::Sequence, len)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_map(mut self, len: usize) -> Result<Self::Map, Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Map, len);
-        self.writer.write_byte(tag.byte())?;
-
-        if !embedded {
-            Variable::encode_usize(self.writer.borrow_mut(), len)?;
-        }
-
+        encode_prefix(self.writer.borrow_mut(), Kind::Map, len)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_struct(mut self, len: usize) -> Result<Self::Struct, Self::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Map, len);
-        self.writer.write_byte(tag.byte())?;
-
-        if !embedded {
-            Variable::encode_usize(self.writer.borrow_mut(), len)?;
-        }
-
+        encode_prefix(self.writer.borrow_mut(), Kind::Map, len)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_variant(mut self) -> Result<Self::Variant, Self::Error> {
-        self.writer
-            .write_byte(Tag::new(Kind::Marker, VARIANT).byte())?;
+        const VARIANT: Tag = Tag::from_mark(Mark::Variant);
+        self.writer.write_byte(VARIANT.byte())?;
         Ok(self)
     }
 }
@@ -378,14 +355,6 @@ where
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
         Ok(())
-    }
-}
-
-struct Overflow;
-
-impl fmt::Display for Overflow {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "integer overflow")
     }
 }
 

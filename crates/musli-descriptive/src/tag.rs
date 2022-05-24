@@ -6,20 +6,27 @@ use core::mem;
 use musli::mode::Mode;
 use musli::{Decode, Decoder};
 
-/// The marker indicating an absent value.
-pub const ABSENT: u8 = 0b00000;
-/// The marker indicating a value that is present.
-pub const PRESENT: u8 = 0b00001;
-/// The marker indicating the value true.
-pub const TRUE: u8 = 0b00011;
-/// The marker indicating the value false.
-pub const FALSE: u8 = 0b00010;
-/// The marker indicating that the value is a variant.
-pub const VARIANT: u8 = 0b00100;
-/// A single character.
-pub const CHAR: u8 = 0b00101;
-/// A unit type.
-pub const UNIT: u8 = 0b00110;
+/// Variant corresponding to marks.
+#[derive(Debug)]
+#[repr(u8)]
+pub enum Mark {
+    /// The marker indicating an absent value.
+    None = 0b000,
+    /// The marker indicating a value that is present.
+    Some = 0b001,
+    /// The marker indicating the value true.
+    True = 0b011,
+    /// The marker indicating the value false.
+    False = 0b010,
+    /// The marker indicating that the value is a variant.
+    Variant = 0b100,
+    /// A single character.
+    Char = 0b101,
+    /// A unit type.
+    Unit = 0b110,
+    /// A reserved mark.
+    Reserved0 = 0b111,
+}
 
 /// 8-bit unsigned number.
 pub const U8: u8 = 0b00001;
@@ -60,6 +67,7 @@ pub const ISIZE: u8 = I64;
 
 /// Data masked into the data type.
 pub(crate) const DATA_MASK: u8 = 0b000_11111;
+pub(crate) const MARK_MASK: u8 = 0b00000_111;
 /// The maximum length that can be inlined in the tag without adding additional
 /// data to the wire format.
 pub const MAX_INLINE_LEN: usize = (DATA_MASK - 1) as usize;
@@ -78,12 +86,12 @@ pub enum Kind {
     Bytes = 0b011_00000,
     /// A string.
     String = 0b100_00000,
-    /// A variant.
-    Variant = 0b101_00000,
     /// A marker value.
-    Marker = 0b110_00000,
-    /// A bytes pack.
-    Unsupported = 0b111_00000,
+    Mark = 0b110_00000,
+    /// Reserved.
+    Reserved0 = 0b101_00000,
+    /// Reserved.
+    Reserved1 = 0b111_00000,
 }
 
 /// A type tag.
@@ -109,6 +117,22 @@ impl Tag {
         Self {
             repr: kind as u8 | data,
         }
+    }
+
+    /// Construct a tag corresponding to a mark.
+    #[inline]
+    pub const fn from_mark(mark: Mark) -> Self {
+        Self {
+            repr: Kind::Mark as u8 | mark as u8,
+        }
+    }
+
+    /// Access the mark this byte corresponds to.
+    #[inline]
+    pub const fn mark(&self) -> Mark {
+        // SAFETY: The representation used by `Mark` is exhaustive over all
+        // emitted bit-patterns.
+        unsafe { mem::transmute(self.repr & MARK_MASK) }
     }
 
     /// Construct a new empty tag of the given [Kind].
