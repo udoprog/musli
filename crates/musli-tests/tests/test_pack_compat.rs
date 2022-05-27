@@ -2,8 +2,9 @@
 
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
+use musli_wire::int::Variable;
 use musli_wire::tag::MAX_INLINE_LEN;
-use musli_wire::{Variable, WireEncoding};
+use musli_wire::Encoding;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct Inner;
@@ -55,11 +56,11 @@ struct IgnoreBoth {
 
 #[test]
 fn test_packed_compat() {
-    const ENCODING: WireEncoding<DefaultMode, Variable, Variable, 128> =
-        WireEncoding::new().with_max_pack();
+    const ENCODING: Encoding<DefaultMode, Variable, Variable, 128> =
+        Encoding::new().with_max_pack();
 
     let data = ENCODING
-        .to_vec(&SmallPackCompat {
+        .to_buffer(&SmallPackCompat {
             prefix: 42,
             small_pack: SmallPack {
                 small: [0; MAX_INLINE_LEN],
@@ -69,7 +70,7 @@ fn test_packed_compat() {
         })
         .unwrap();
 
-    let actual: IgnoreSmall = ENCODING.from_slice(&data).unwrap();
+    let actual: IgnoreSmall = ENCODING.from_slice(data.as_slice()).unwrap();
     assert_eq!(
         actual,
         IgnoreSmall {
@@ -79,7 +80,7 @@ fn test_packed_compat() {
         }
     );
 
-    let actual: IgnoreLarge = ENCODING.from_slice(&data).unwrap();
+    let actual: IgnoreLarge = ENCODING.from_slice(data.as_slice()).unwrap();
     assert_eq!(
         actual,
         IgnoreLarge {
@@ -91,7 +92,7 @@ fn test_packed_compat() {
         }
     );
 
-    let actual: IgnoreBoth = ENCODING.from_slice(&data).unwrap();
+    let actual: IgnoreBoth = ENCODING.from_slice(data.as_slice()).unwrap();
     assert_eq!(
         actual,
         IgnoreBoth {

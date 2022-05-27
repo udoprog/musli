@@ -54,9 +54,8 @@ macro_rules! rt {
 
     ($ty:ty, $expr:expr) => {{
         let value: $ty = $expr;
-        let out = $crate::to_vec(&value).expect(concat!("wire: ", stringify!($ty), ": failed to encode"));
-        let decoded: $ty = $crate::from_slice(&out[..]).expect(concat!("wire: ", stringify!($ty), ": failed to decode"));
-        // assert!(buf.is_empty(), concat!("wire: ", stringify!($ty), ": decoded buffer should be empty.\nwas: {:?}\noriginal: {:?}\n"), buf, &out[..]);
+        let out = $crate::to_buffer(&value).expect(concat!("wire: ", stringify!($ty), ": failed to encode"));
+        let decoded: $ty = $crate::from_slice(out.as_slice()).expect(concat!("wire: ", stringify!($ty), ": failed to decode"));
         assert_eq!(decoded, $expr, concat!("wire: ", stringify!($ty), ": roundtrip does not match"));
         decoded
     }};
@@ -69,8 +68,8 @@ where
     T: Debug + PartialEq + Encode<DefaultMode>,
     O: for<'de> Decode<'de, DefaultMode>,
 {
-    let out = crate::to_vec(&value).expect("failed to encode");
-    let mut buf = &out[..];
+    let out = crate::to_buffer(&value).expect("failed to encode");
+    let mut buf = out.as_slice();
     let value: O = crate::decode(&mut buf).expect("failed to decode");
     assert!(buf.is_empty());
     value

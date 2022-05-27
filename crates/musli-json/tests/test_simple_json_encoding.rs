@@ -1,5 +1,5 @@
 use musli::{Decode, Encode};
-use musli_json::JsonEncoding;
+use musli_json::Encoding;
 use rand::prelude::*;
 
 // M marker indicating that some attributes should only apply when we're
@@ -12,7 +12,7 @@ mod my_modes {
     impl Mode for Json {}
 }
 
-const CONFIG: JsonEncoding<my_modes::Json> = JsonEncoding::new();
+const CONFIG: Encoding<my_modes::Json> = Encoding::new();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(mode = my_modes::Json, default_field_name = "name")]

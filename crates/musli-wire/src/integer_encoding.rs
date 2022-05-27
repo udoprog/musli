@@ -2,26 +2,23 @@ use core::fmt::{Debug, Display};
 
 use crate::tag::{Kind, Tag, DATA_MASK};
 use musli::error::Error;
-use musli_common::encoding::{Fixed, FixedLength, Variable};
 use musli_common::int::continuation as c;
 use musli_common::int::zigzag as zig;
-use musli_common::int::{ByteOrder, ByteOrderIo, Signed, Unsigned};
+use musli_common::int::{ByteOrder, ByteOrderIo, Fixed, FixedUsize, Signed, Unsigned, Variable};
 use musli_common::reader::Reader;
 use musli_common::writer::Writer;
 
 mod private {
     pub trait Sealed {}
-    impl<B> Sealed for musli_common::encoding::Fixed<B> {}
-    impl<L, B> Sealed for musli_common::encoding::FixedLength<L, B> {}
-    impl Sealed for musli_common::encoding::Variable {}
+    impl<B> Sealed for musli_common::int::Fixed<B> {}
+    impl<L, B> Sealed for musli_common::int::FixedUsize<L, B> {}
+    impl Sealed for musli_common::int::Variable {}
 }
 
 /// Trait which governs how integers are encoded in a binary format.
 ///
 /// The two common implementations of this is [Variable] and [Fixed].
-pub trait TypedIntegerEncoding:
-    musli_storage::integer_encoding::IntegerEncoding + private::Sealed
-{
+pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sealed {
     /// Governs how unsigned integers are encoded into a [Writer].
     fn encode_typed_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
     where
@@ -51,9 +48,7 @@ pub trait TypedIntegerEncoding:
 
 /// Encoding formats which ensure that variably sized types (like `usize`,
 /// `isize`) are encoded in a format which is platform-neutral.
-pub trait TypedUsizeEncoding:
-    musli_storage::integer_encoding::UsizeEncoding + private::Sealed
-{
+pub trait WireUsizeEncoding: musli_common::int::UsizeEncoding + private::Sealed {
     /// Governs how usize lengths are encoded into a [Writer].
     fn encode_typed_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
     where
@@ -65,7 +60,7 @@ pub trait TypedUsizeEncoding:
         R: Reader<'de>;
 }
 
-impl TypedIntegerEncoding for Variable {
+impl WireIntegerEncoding for Variable {
     #[inline]
     fn encode_typed_unsigned<W, T>(mut writer: W, value: T) -> Result<(), W::Error>
     where
@@ -121,7 +116,7 @@ impl TypedIntegerEncoding for Variable {
     }
 }
 
-impl TypedUsizeEncoding for Variable {
+impl WireUsizeEncoding for Variable {
     #[inline]
     fn encode_typed_usize<W>(mut writer: W, value: usize) -> Result<(), W::Error>
     where
@@ -154,7 +149,7 @@ impl TypedUsizeEncoding for Variable {
     }
 }
 
-impl<B> TypedIntegerEncoding for Fixed<B>
+impl<B> WireIntegerEncoding for Fixed<B>
 where
     B: ByteOrder,
 {
@@ -165,7 +160,7 @@ where
         T: ByteOrderIo,
     {
         writer.write_byte(Tag::new(Kind::Prefix, T::BYTES).byte())?;
-        value.write_bytes::<_, B>(writer)
+        value.write_bytes_unsigned::<_, B>(writer)
     }
 
     #[inline]
@@ -178,7 +173,7 @@ where
             return Err(R::Error::custom("expected fixed integer"));
         }
 
-        T::read_bytes::<_, B>(reader)
+        T::read_bytes_unsigned::<_, B>(reader)
     }
 
     #[inline]
@@ -189,7 +184,7 @@ where
         T::Unsigned: ByteOrderIo,
     {
         writer.write_byte(Tag::new(Kind::Prefix, T::Unsigned::BYTES).byte())?;
-        value.unsigned().write_bytes::<_, B>(writer)
+        value.unsigned().write_bytes_unsigned::<_, B>(writer)
     }
 
     #[inline]
@@ -203,11 +198,11 @@ where
             return Err(R::Error::custom("expected fixed integer"));
         }
 
-        Ok(T::Unsigned::read_bytes::<_, B>(reader)?.signed())
+        Ok(T::Unsigned::read_bytes_unsigned::<_, B>(reader)?.signed())
     }
 }
 
-impl<L, B> TypedUsizeEncoding for FixedLength<L, B>
+impl<L, B> WireUsizeEncoding for FixedUsize<L, B>
 where
     B: ByteOrder,
     usize: TryFrom<L>,
@@ -222,7 +217,7 @@ where
     {
         writer.write_byte(Tag::new(Kind::Prefix, L::BYTES).byte())?;
         let value: L = value.try_into().map_err(W::Error::custom)?;
-        value.write_bytes::<_, B>(writer)
+        value.write_bytes_unsigned::<_, B>(writer)
     }
 
     #[inline]
@@ -234,6 +229,6 @@ where
             return Err(R::Error::custom("expected fixed integer"));
         }
 
-        usize::try_from(L::read_bytes::<_, B>(reader)?).map_err(R::Error::custom)
+        usize::try_from(L::read_bytes_unsigned::<_, B>(reader)?).map_err(R::Error::custom)
     }
 }

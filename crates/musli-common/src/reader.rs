@@ -13,6 +13,8 @@ use core::slice;
 use musli::de::ValueVisitor;
 use musli::error::Error;
 
+use crate::error::BufferError;
+
 /// A reader where the current position is exactly known.
 pub trait PosReader<'de>: Reader<'de> {
     /// The exact position of a reader.
@@ -166,41 +168,8 @@ pub trait Reader<'de> {
     }
 }
 
-decl_message_repr!(SliceReaderErrorRepr, "error reading from slice");
-
-/// An error raised while decoding a slice.
-#[derive(Debug)]
-pub struct SliceReaderError(SliceReaderErrorRepr);
-
-impl fmt::Display for SliceReaderError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl Error for SliceReaderError {
-    #[inline]
-    fn custom<T>(message: T) -> Self
-    where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
-    {
-        Self(SliceReaderErrorRepr::collect(message))
-    }
-
-    #[inline]
-    fn message<T>(message: T) -> Self
-    where
-        T: fmt::Display,
-    {
-        Self(SliceReaderErrorRepr::collect(message))
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for SliceReaderError {}
-
 impl<'de> Reader<'de> for &'de [u8] {
-    type Error = SliceReaderError;
+    type Error = BufferError;
     type Mut<'this> = &'this mut &'de [u8] where Self: 'this;
 
     #[inline]
@@ -211,7 +180,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn skip(&mut self, n: usize) -> Result<(), Self::Error> {
         if self.len() < n {
-            return Err(SliceReaderError::custom("buffer underflow"));
+            return Err(BufferError::custom("buffer underflow"));
         }
 
         let (_, tail) = self.split_at(n);
@@ -225,7 +194,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         if self.len() < n {
-            return Err(SliceReaderError::custom("buffer underflow"));
+            return Err(BufferError::custom("buffer underflow"));
         }
 
         let (head, tail) = self.split_at(n);
@@ -241,7 +210,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         if self.len() < buf.len() {
-            return Err(SliceReaderError::custom("buffer underflow"));
+            return Err(BufferError::custom("buffer underflow"));
         }
 
         let (head, tail) = self.split_at(buf.len());
@@ -252,7 +221,7 @@ impl<'de> Reader<'de> for &'de [u8] {
 }
 
 /// An efficient [Reader] wrapper around a slice.
-pub struct SliceReader<'de, E = SliceReaderError> {
+pub struct SliceReader<'de, E = BufferError> {
     range: Range<*const u8>,
     _marker: marker::PhantomData<(&'de [u8], E)>,
 }

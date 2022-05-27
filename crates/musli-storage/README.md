@@ -34,18 +34,18 @@ struct Version2 {
     age: Option<u32>,
 }
 
-let version2 = musli_storage::to_vec(&Version2 {
+let version2 = musli_storage::to_buffer(&Version2 {
     name: String::from("Aristotle"),
     age: Some(62),
 })?;
 
-assert!(musli_storage::decode::<_, Version1>(&version2[..]).is_err());
+assert!(musli_storage::decode::<_, Version1>(version2.as_slice()).is_err());
 
-let version1 = musli_storage::to_vec(&Version1 {
+let version1 = musli_storage::to_buffer(&Version1 {
     name: String::from("Aristotle"),
 })?;
 
-let version2: Version2 = musli_storage::decode(&version1[..])?;
+let version2: Version2 = musli_storage::decode(version1.as_slice())?;
 
 assert_eq!(version2, Version2 {
     name: String::from("Aristotle"),
@@ -56,14 +56,15 @@ assert_eq!(version2, Version2 {
 ## Configuring
 
 To tweak the behavior of the storage format you can use the
-[StorageEncoding] type:
+[Encoding] type:
 
 ```rust
-use musli_storage::{Fixed, Variable, StorageEncoding};
+use musli_storage::Encoding;
+use musli_storage::int::{Fixed, Variable};
 use musli::mode::DefaultMode;
 use musli::{Encode, Decode};
 
-const CONFIG: StorageEncoding<DefaultMode, Fixed, Variable> = StorageEncoding::new()
+const CONFIG: Encoding<DefaultMode, Fixed, Variable> = Encoding::new()
     .with_fixed_integers();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -85,9 +86,9 @@ let actual = CONFIG.decode(&out[..])?;
 assert_eq!(expected, actual);
 ```
 
-[default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
+[default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 [musli-wire]: https://docs.rs/musli-wire
 [Müsli]: https://docs.rs/musli
-[StorageEncoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
+[Encoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 
 License: MIT/Apache-2.0

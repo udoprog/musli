@@ -1,21 +1,20 @@
 use core::fmt::{Debug, Display};
 use core::hash::Hash;
 
+use crate::int::continuation as c;
+use crate::int::zigzag as zig;
+use crate::int::{ByteOrder, ByteOrderIo, Fixed, FixedUsize, Signed, Unsigned, Variable};
+use crate::reader::Reader;
+use crate::writer::Writer;
 use musli::error::Error;
-use musli_common::encoding::{Fixed, FixedLength, Variable};
-use musli_common::int::continuation as c;
-use musli_common::int::zigzag as zig;
-use musli_common::int::{ByteOrder, ByteOrderIo, Signed, Unsigned};
-use musli_common::reader::Reader;
-use musli_common::writer::Writer;
 
 mod private {
-    use musli_common::int::{ByteOrder, Unsigned};
+    use crate::int::{ByteOrder, Unsigned};
 
     pub trait Sealed {}
-    impl<B> Sealed for musli_common::encoding::Fixed<B> where B: ByteOrder {}
-    impl Sealed for musli_common::encoding::Variable {}
-    impl<L, B> Sealed for musli_common::encoding::FixedLength<L, B>
+    impl<B> Sealed for crate::int::Fixed<B> where B: ByteOrder {}
+    impl Sealed for crate::int::Variable {}
+    impl<L, B> Sealed for crate::int::FixedUsize<L, B>
     where
         L: Unsigned,
         B: ByteOrder,
@@ -140,7 +139,7 @@ where
         W: Writer,
         T: ByteOrderIo,
     {
-        value.write_bytes::<_, B>(writer)
+        value.write_bytes_unsigned::<_, B>(writer)
     }
 
     #[inline]
@@ -149,7 +148,7 @@ where
         R: Reader<'de>,
         T: ByteOrderIo,
     {
-        T::read_bytes::<_, B>(reader)
+        T::read_bytes_unsigned::<_, B>(reader)
     }
 
     #[inline]
@@ -159,7 +158,7 @@ where
         T: Signed,
         T::Unsigned: ByteOrderIo,
     {
-        value.unsigned().write_bytes::<_, B>(writer)
+        value.unsigned().write_bytes_unsigned::<_, B>(writer)
     }
 
     #[inline]
@@ -169,11 +168,11 @@ where
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>,
     {
-        Ok(T::Unsigned::read_bytes::<_, B>(reader)?.signed())
+        Ok(T::Unsigned::read_bytes_unsigned::<_, B>(reader)?.signed())
     }
 }
 
-impl<L, B> UsizeEncoding for FixedLength<L, B>
+impl<L, B> UsizeEncoding for FixedUsize<L, B>
 where
     B: ByteOrder,
     usize: TryFrom<L>,
@@ -188,7 +187,7 @@ where
         W: Writer,
     {
         let value: L = value.try_into().map_err(W::Error::custom)?;
-        value.write_bytes::<_, B>(writer)
+        value.write_bytes_unsigned::<_, B>(writer)
     }
 
     #[inline]
@@ -196,6 +195,6 @@ where
     where
         R: Reader<'de>,
     {
-        usize::try_from(L::read_bytes::<_, B>(reader)?).map_err(R::Error::custom)
+        usize::try_from(L::read_bytes_unsigned::<_, B>(reader)?).map_err(R::Error::custom)
     }
 }

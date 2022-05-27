@@ -41,23 +41,23 @@ pub mod serde_json {
 }
 
 pub mod musli_json {
-    use ::musli_json::JsonEncoding;
+    use ::musli_json::Encoding;
     use musli::{Decode, Encode};
 
-    const JSON_ENCODING: JsonEncoding = JsonEncoding::new();
+    const ENCODING: Encoding = Encoding::new();
 
     pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Encode,
     {
-        JSON_ENCODING.to_vec(value).unwrap()
+        ENCODING.to_buffer(value).unwrap().into_vec()
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T
     where
         T: Decode<'de>,
     {
-        JSON_ENCODING.from_slice(data).unwrap()
+        ENCODING.from_slice(data).unwrap()
     }
 }
 
@@ -117,72 +117,88 @@ pub mod serde_cbor {
     }
 }
 
-pub mod musli_wire {
-    use ::musli_wire::{Fixed, FixedLength, WireEncoding};
+pub mod musli_storage {
+    use ::musli_storage::int::{Fixed, FixedUsize};
+    use ::musli_storage::Encoding;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
-    const WIRE_ENCODING: WireEncoding<DefaultMode, Fixed, FixedLength<u64>> = WireEncoding::new()
-        .with_fixed_integers()
-        .with_fixed_lengths64();
+    const ENCODING: Encoding<DefaultMode, Fixed, FixedUsize<u64>> =
+        Encoding::new().with_fixed_integers().with_fixed_lengths64();
 
     pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Encode,
     {
-        // NB: bincode uses a 128-byte pre-allocated vector.
-        let mut data = Vec::with_capacity(128);
-        WIRE_ENCODING.encode(&mut data, value).unwrap();
-        data
+        ENCODING.to_buffer(value).unwrap().into_vec()
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T
     where
         T: Decode<'de>,
     {
-        WIRE_ENCODING.decode(data).unwrap()
+        ENCODING.from_slice(data).unwrap()
     }
 }
 
-pub mod musli_storage {
-    use ::musli_storage::{Fixed, FixedLength, StorageEncoding};
+pub mod musli_wire {
+    use ::musli_wire::int::{Fixed, FixedUsize};
+    use ::musli_wire::Encoding;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
-    const STORAGE_ENCODING: StorageEncoding<DefaultMode, Fixed, FixedLength<u64>> =
-        StorageEncoding::new()
-            .with_fixed_integers()
-            .with_fixed_lengths64();
+    const ENCODING: Encoding<DefaultMode, Fixed, FixedUsize<u64>> =
+        Encoding::new().with_fixed_integers().with_fixed_lengths64();
 
     pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Encode,
     {
-        // NB: bincode uses a 128-byte pre-allocated vector.
-        let mut data = Vec::with_capacity(128);
-        STORAGE_ENCODING.encode(&mut data, value).unwrap();
-        data
+        ENCODING.to_buffer(value).unwrap().into_vec()
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T
     where
         T: Decode<'de>,
     {
-        STORAGE_ENCODING.from_slice(data).unwrap()
+        ENCODING.decode(data).unwrap()
+    }
+}
+
+pub mod musli_descriptive {
+    use ::musli_descriptive::Encoding;
+    use musli::mode::DefaultMode;
+    use musli::{Decode, Encode};
+
+    const ENCODING: Encoding<DefaultMode> = Encoding::new();
+
+    pub fn encode<T>(value: &T) -> Vec<u8>
+    where
+        T: Encode,
+    {
+        ENCODING.to_buffer(value).unwrap().into_vec()
+    }
+
+    pub fn decode<'de, T>(data: &'de [u8]) -> T
+    where
+        T: Decode<'de>,
+    {
+        ENCODING.decode(data).unwrap()
     }
 }
 
 pub mod musli_value {
+    use ::musli_value::Value;
     use musli::{Decode, Encode};
 
-    pub fn encode<T>(value: &T) -> ::musli_value::Value
+    pub fn encode<T>(value: &T) -> Value
     where
         T: Encode,
     {
         musli_value::encode(value).unwrap()
     }
 
-    pub fn decode<'de, T>(data: &'de ::musli_value::Value) -> T
+    pub fn decode<'de, T>(data: &'de Value) -> T
     where
         T: Decode<'de>,
     {

@@ -17,6 +17,10 @@ use crate::no_std::ToOwned;
 /// scenarios, even if one involves erroring. A type like
 /// [Cow][std::borrow::Cow] is an example of a type which can comfortably handle
 /// both.
+///
+/// [Decoder]: crate::de::Decoder
+/// [Decoder::decode_bytes]: crate::de::Decoder::decode_bytes
+/// [Decoder::decode_string]: crate::de::Decoder::decode_string
 pub trait ValueVisitor<'de>: Sized {
     /// The value being visited.
     type Target: ?Sized + ToOwned;

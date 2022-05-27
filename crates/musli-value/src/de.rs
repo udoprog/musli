@@ -10,7 +10,7 @@ use musli::error::Error;
 use musli::mode::Mode;
 use musli_common::reader::{Reader, SliceReader, WithPosition};
 use musli_storage::de::StorageDecoder;
-use musli_storage::Variable;
+use musli_storage::int::Variable;
 
 use crate::error::ValueError;
 use crate::value::{Number, Value};

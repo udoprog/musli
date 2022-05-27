@@ -1,19 +1,19 @@
 use core::{fmt, marker};
 
-use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
+use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
 use crate::tag::{Kind, Tag};
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
 use musli_common::fixed_bytes::FixedBytes;
 use musli_common::writer::Writer;
 use musli_storage::en::StorageEncoder;
-use musli_storage::Variable;
+use musli_storage::int::Variable;
 
 /// A very simple encoder.
 pub struct WireEncoder<W, I, L, const P: usize>
 where
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     writer: W,
     _marker: marker::PhantomData<(I, L)>,
@@ -21,8 +21,8 @@ where
 
 impl<W, I, L, const P: usize> WireEncoder<W, I, L, P>
 where
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
@@ -37,8 +37,8 @@ where
 pub struct WirePackEncoder<W, I, L, const P: usize>
 where
     W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     writer: W,
     pack_buf: FixedBytes<P, W::Error>,
@@ -48,8 +48,8 @@ where
 impl<W, I, L, const P: usize> WirePackEncoder<W, I, L, P>
 where
     W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
@@ -65,8 +65,8 @@ where
 impl<W, I, L, const P: usize> Encoder for WireEncoder<W, I, L, P>
 where
     W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
@@ -288,8 +288,8 @@ where
 impl<W, I, L, const P: usize> SequenceEncoder for WirePackEncoder<W, I, L, P>
 where
     W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
@@ -311,8 +311,8 @@ where
 impl<W, I, L, const P: usize> SequenceEncoder for WireEncoder<W, I, L, P>
 where
     W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
@@ -332,8 +332,8 @@ where
 impl<W, I, L, const P: usize> PairsEncoder for WireEncoder<W, I, L, P>
 where
     W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
@@ -353,8 +353,8 @@ where
 impl<W, I, L, const P: usize> PairEncoder for WireEncoder<W, I, L, P>
 where
     W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
@@ -380,8 +380,8 @@ where
 impl<W, I, L, const P: usize> VariantEncoder for WireEncoder<W, I, L, P>
 where
     W: Writer,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
@@ -417,7 +417,7 @@ impl fmt::Display for Overflow {
 fn encode_prefix<W, L>(writer: &mut W, len: usize) -> Result<(), W::Error>
 where
     W: Writer,
-    L: TypedUsizeEncoding,
+    L: WireUsizeEncoding,
 {
     let (tag, embedded) = Tag::with_len(Kind::Prefix, len);
     writer.write_byte(tag.byte())?;

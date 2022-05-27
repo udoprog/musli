@@ -101,6 +101,7 @@ fn main() -> io::Result<()> {
     test!(serde_json);
     test!(musli_storage);
     test!(musli_wire);
+    test!(musli_descriptive);
     test!(musli_value);
     Ok(())
 }

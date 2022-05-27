@@ -70,7 +70,7 @@ pub(crate) fn parse_string_slice_reader<'de, 'sratch>(
                     reader.index += 1;
                     check_utf8(borrowed, start, reader.pos())?;
                     // SAFETY: we've checked each segment to be valid UTF-8.
-                    let borrowed = unsafe { std::str::from_utf8_unchecked(borrowed) };
+                    let borrowed = unsafe { core::str::from_utf8_unchecked(borrowed) };
                     return Ok(StringReference::Borrowed(borrowed));
                 } else {
                     let slice = &reader.slice[open..reader.index];
@@ -78,7 +78,7 @@ pub(crate) fn parse_string_slice_reader<'de, 'sratch>(
                     scratch.extend_from_slice(slice);
                     reader.index += 1;
                     // SAFETY: we've checked each segment to be valid UTF-8.
-                    let scratch = unsafe { std::str::from_utf8_unchecked(scratch.as_bytes()) };
+                    let scratch = unsafe { core::str::from_utf8_unchecked(scratch.as_bytes()) };
                     return Ok(StringReference::Scratch(scratch));
                 }
             }
@@ -116,7 +116,7 @@ pub(crate) fn parse_string_slice_reader<'de, 'sratch>(
 /// Check that the given slice is valid UTF-8.
 #[inline]
 fn check_utf8(bytes: &[u8], start: u32, pos: u32) -> Result<(), ParseError> {
-    if std::str::from_utf8(bytes).is_err() {
+    if core::str::from_utf8(bytes).is_err() {
         Err(ParseError::spanned(
             start,
             pos,

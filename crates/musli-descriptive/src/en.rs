@@ -6,12 +6,10 @@ use crate::tag::{
 };
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
-use musli_common::encoding::Variable;
 use musli_common::fixed_bytes::FixedBytes;
-use musli_common::int::continuation as c;
+use musli_common::int::{continuation as c, UsizeEncoding, Variable};
 use musli_common::writer::Writer;
 use musli_storage::en::StorageEncoder;
-use musli_storage::integer_encoding::UsizeEncoding;
 
 /// A very simple encoder.
 pub struct SelfEncoder<W, const P: usize> {

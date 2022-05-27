@@ -33,12 +33,12 @@ struct Version2 {
     age: Option<u32>,
 }
 
-let version2 = musli_wire::to_vec(&Version2 {
+let version2 = musli_wire::to_buffer(&Version2 {
     name: String::from("Aristotle"),
     age: Some(62),
 })?;
 
-let version1: Version1 = musli_wire::decode(&version2[..])?;
+let version1: Version1 = musli_wire::decode(version2.as_slice())?;
 
 assert_eq!(version1, Version1 {
     name: String::from("Aristotle"),
@@ -47,16 +47,16 @@ assert_eq!(version1, Version1 {
 
 ## Configuring
 
-To configure the behavior of the wire format you can use the [WireEncoding]
+To configure the behavior of the wire format you can use the [Encoding]
 type:
 
 ```rust
-use musli_wire::WireEncoding;
-use musli_wire::{Fixed, Variable};
+use musli_wire::Encoding;
+use musli_wire::int::{Fixed, Variable};
 use musli::{Encode, Decode};
 use musli::mode::DefaultMode;
 
-const CONFIG: WireEncoding<DefaultMode, Fixed, Variable, 128> = WireEncoding::new()
+const CONFIG: Encoding<DefaultMode, Fixed, Variable, 128> = Encoding::new()
     .with_fixed_integers()
     .with_max_pack::<128>();
 
@@ -86,12 +86,12 @@ to figure out exactly how much should be skipped over.
 
 Packed items are prefix-length encoded, and have a limited size. Its exact
 length is defined by [MAX_INLINE_LEN] and can be modified with
-[WireEncoding::with_max_pack].
+[Encoding::with_max_pack].
 
-[default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.WireEncoding.html
+[default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 [MAX_INLINE_LEN]: https://docs.rs/musli-wire/latest/musli_wire/tag/constant.MAX_INLINE_LEN.html
 [Müsli]: https://docs.rs/musli
-[WireEncoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_wire/encoding/struct.WireEncoding.html#method.with_max_pack
-[WireEncoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.WireEncoding.html
+[Encoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_wire/encoding/struct.Encoding.html#method.with_max_pack
+[Encoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 
 License: MIT/Apache-2.0

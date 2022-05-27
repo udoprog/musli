@@ -2,9 +2,12 @@
 //!
 //! To adapt [std::io::Write] types, see the [wrap][crate::io::wrap] function.
 
-use core::fmt;
-
 use musli::error::Error;
+
+use crate::error::BufferError;
+
+/// Maximum size used by a fixed length [Buffer].
+pub const MAX_FIXED_BYTES_LEN: usize = 128;
 
 /// The trait governing how a writer works.
 pub trait Writer {
@@ -19,6 +22,8 @@ pub trait Writer {
     /// the above is a typical example of when that can go wrong. This ensures
     /// that each call to `borrow_mut` dereferences the [Reader] at each step to
     /// avoid constructing a large muted type, like `&mut &mut &mut VecWriter`.
+    ///
+    /// [Reader]: crate::reader::Reader
     type Mut<'this>: Writer<Error = Self::Error>
     where
         Self: 'this;
@@ -70,43 +75,80 @@ where
     }
 }
 
-decl_message_repr!(VecWriterErrorRepr, "failed to write to vector");
+/// A buffer that roughly corresponds to a vector. For no-std environments this
+/// has a fixed size and will error in case the size overflows.
+#[derive(Default)]
+pub struct Buffer {
+    #[cfg(feature = "std")]
+    buf: Vec<u8>,
+    #[cfg(not(feature = "std"))]
+    buf: FixedBytes<MAX_FIXED_BYTES_LEN, BufferError>,
+}
 
-/// An error raised while decoding a slice.
-#[derive(Debug)]
-pub struct VecWriterError(VecWriterErrorRepr);
+impl Buffer {
+    /// Constructs a new, empty `Buffer` with the specified capacity.
+    ///
+    /// Only available for `std` environment.
+    #[cfg(feature = "std")]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            buf: Vec::with_capacity(capacity),
+        }
+    }
 
-impl fmt::Display for VecWriterError {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+    /// Construct a new empty buffer.
+    pub const fn new() -> Self {
+        Self {
+            #[cfg(feature = "std")]
+            buf: Vec::new(),
+            #[cfg(not(feature = "std"))]
+            buf: FixedBytes::new(),
+        }
+    }
+
+    /// Get the buffer as a slice.
+    pub fn as_slice(&self) -> &[u8] {
+        self.buf.as_slice()
+    }
+
+    /// Coerce into the backing vector in a std environment.
+    #[cfg(feature = "std")]
+    pub fn into_vec(self) -> Vec<u8> {
+        self.buf
     }
 }
 
-impl Error for VecWriterError {
+impl Writer for Buffer {
+    type Error = BufferError;
+    type Mut<'this> = &'this mut Self where Self: 'this;
+
     #[inline]
-    fn custom<T>(message: T) -> Self
-    where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
-    {
-        Self(VecWriterErrorRepr::collect(message))
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
     }
 
     #[inline]
-    fn message<T>(message: T) -> Self
-    where
-        T: fmt::Display,
-    {
-        Self(VecWriterErrorRepr::collect(message))
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+        self.buf.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    #[inline]
+    fn write_byte(&mut self, b: u8) -> Result<(), Self::Error> {
+        self.buf.push(b);
+        Ok(())
+    }
+
+    #[inline]
+    fn write_array<const N: usize>(&mut self, array: [u8; N]) -> Result<(), Self::Error> {
+        self.buf.extend_from_slice(&array[..]);
+        Ok(())
     }
 }
-
-#[cfg(feature = "std")]
-impl std::error::Error for VecWriterError {}
 
 #[cfg(feature = "std")]
 impl Writer for Vec<u8> {
-    type Error = VecWriterError;
+    type Error = BufferError;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]

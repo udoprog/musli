@@ -8,11 +8,9 @@ use musli::de::{
 };
 use musli::error::Error;
 use musli::never::Never;
-use musli_common::encoding::Variable;
-use musli_common::int::continuation as c;
+use musli_common::int::{continuation as c, UsizeEncoding, Variable};
 use musli_common::reader::PosReader;
 use musli_storage::de::StorageDecoder;
-use musli_storage::integer_encoding::UsizeEncoding;
 
 /// A very simple decoder.
 pub struct SelfDecoder<R> {

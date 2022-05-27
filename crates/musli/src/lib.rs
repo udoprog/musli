@@ -106,12 +106,12 @@
 //! }
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let version2 = musli_wire::to_vec(&Version2 {
+//! let version2 = musli_wire::to_buffer(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
 //!
-//! let version1: Version1 = musli_wire::decode(&version2[..])?;
+//! let version1: Version1 = musli_wire::decode(version2.as_slice())?;
 //!
 //! assert_eq!(version1, Version1 {
 //!     name: String::from("Aristotle"),
@@ -130,18 +130,18 @@
 //! # #[derive(Debug, PartialEq, Encode, Decode)]
 //! # struct Version2 { name: String, #[musli(default)] age: Option<u32> }
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let version2 = musli_storage::to_vec(&Version2 {
+//! let version2 = musli_storage::to_buffer(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
 //!
-//! assert!(musli_storage::decode::<_, Version1>(&version2[..]).is_err());
+//! assert!(musli_storage::decode::<_, Version1>(version2.as_slice()).is_err());
 //!
-//! let version1 = musli_storage::to_vec(&Version1 {
+//! let version1 = musli_storage::to_buffer(&Version1 {
 //!     name: String::from("Aristotle"),
 //! })?;
 //!
-//! let version2: Version2 = musli_storage::decode(&version1[..])?;
+//! let version2: Version2 = musli_storage::decode(version1.as_slice())?;
 //!
 //! assert_eq!(version2, Version2 {
 //!     name: String::from("Aristotle"),

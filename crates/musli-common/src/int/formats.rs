@@ -1,4 +1,4 @@
-//! Helpers for determining integer encoding at compile time.
+//! Marker traits used for determining the format of an integer.
 
 use core::marker;
 
@@ -22,6 +22,6 @@ pub struct Fixed<B = NetworkEndian> {
 /// endianness of `B`.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
-pub struct FixedLength<L = u32, B = NetworkEndian> {
+pub struct FixedUsize<L = u32, B = NetworkEndian> {
     _marker: marker::PhantomData<(L, B)>,
 }

@@ -1,17 +1,17 @@
 //! A container which can store up to a fixed number of uninitialized bytes on
 //! the stack and read into and from it.
 
-use core::fmt;
 use core::marker;
 use core::mem::MaybeUninit;
 use core::ptr;
 
 use musli::error::Error;
 
+use crate::error::BufferError;
 use crate::writer::Writer;
 
 /// A fixed-size bytes storage which keeps track of how much has been initialized.
-pub struct FixedBytes<const N: usize, E = FixedBytesWriterError> {
+pub struct FixedBytes<const N: usize, E = BufferError> {
     /// Data storage.
     data: [MaybeUninit<u8>; N],
     /// How many bytes have been initialized.
@@ -126,39 +126,6 @@ impl<const N: usize, E> Default for FixedBytes<N, E> {
         Self::new()
     }
 }
-
-decl_message_repr!(FixedBytesWriterErrorRepr, "failed to write to fixed bytes");
-
-/// An error raised while decoding a slice.
-#[derive(Debug)]
-pub struct FixedBytesWriterError(FixedBytesWriterErrorRepr);
-
-impl fmt::Display for FixedBytesWriterError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl Error for FixedBytesWriterError {
-    #[inline]
-    fn custom<T>(message: T) -> Self
-    where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
-    {
-        Self(FixedBytesWriterErrorRepr::collect(message))
-    }
-
-    #[inline]
-    fn message<T>(message: T) -> Self
-    where
-        T: fmt::Display,
-    {
-        Self(FixedBytesWriterErrorRepr::collect(message))
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for FixedBytesWriterError {}
 
 impl<const N: usize, E> Writer for FixedBytes<N, E>
 where

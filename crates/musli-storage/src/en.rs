@@ -1,9 +1,12 @@
 use core::fmt;
 use core::marker;
 
-use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli_common::int::{IntegerEncoding, UsizeEncoding, Variable};
 use musli_common::writer::Writer;
+
+/// The alias for a [StorageEncoder] that is used for packs.
+pub type PackEncoder<W> = StorageEncoder<W, Variable, Variable>;
 
 /// A vaery simple encoder suitable for storage encoding.
 pub struct StorageEncoder<W, I, L>

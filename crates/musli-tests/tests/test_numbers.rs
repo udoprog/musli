@@ -21,8 +21,9 @@ fn test_signed_unpacked() {
         e: 10000000000,
     });
 
-    let out = musli_tests::wire::to_vec(&out).expect("failed to encode");
-    let unpacked: Unpacked = musli_tests::storage::decode(&out[..]).expect("failed to decode");
+    let out = musli_tests::wire::to_buffer(&out).expect("failed to encode");
+    let unpacked: Unpacked =
+        musli_tests::storage::decode(out.as_slice()).expect("failed to decode");
 
     assert_eq! {
         unpacked,

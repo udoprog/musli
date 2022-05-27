@@ -24,13 +24,14 @@ fn struct_named_fields() {
         number: 42,
     });
 
-    let out = musli_tests::wire::to_vec(&Named {
+    let out = musli_tests::wire::to_buffer(&Named {
         string: String::from("foo"),
         number: 42,
     })
     .expect("failed to encode");
 
-    let unpacked: Unpacked = musli_tests::storage::decode(&out[..]).expect("failed to decode");
+    let unpacked: Unpacked =
+        musli_tests::storage::decode(out.as_slice()).expect("failed to decode");
 
     assert_eq!(
         unpacked,
@@ -67,13 +68,14 @@ fn struct_indexed_fields() {
         number: 42,
     });
 
-    let out = musli_tests::wire::to_vec(&Indexed {
+    let out = musli_tests::wire::to_buffer(&Indexed {
         string: String::from("foo"),
         number: 42,
     })
     .expect("failed to encode");
 
-    let unpacked: Unpacked = musli_tests::storage::decode(&out[..]).expect("failed to decode");
+    let unpacked: Unpacked =
+        musli_tests::storage::decode(out.as_slice()).expect("failed to decode");
 
     assert_eq!(
         unpacked,

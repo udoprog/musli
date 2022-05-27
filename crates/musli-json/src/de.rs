@@ -284,6 +284,7 @@ where
         }
     }
 
+    #[cfg(feature = "std")]
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where

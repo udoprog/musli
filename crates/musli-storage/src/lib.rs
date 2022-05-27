@@ -33,18 +33,18 @@
 //! }
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let version2 = musli_storage::to_vec(&Version2 {
+//! let version2 = musli_storage::to_buffer(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
 //!
-//! assert!(musli_storage::decode::<_, Version1>(&version2[..]).is_err());
+//! assert!(musli_storage::decode::<_, Version1>(version2.as_slice()).is_err());
 //!
-//! let version1 = musli_storage::to_vec(&Version1 {
+//! let version1 = musli_storage::to_buffer(&Version1 {
 //!     name: String::from("Aristotle"),
 //! })?;
 //!
-//! let version2: Version2 = musli_storage::decode(&version1[..])?;
+//! let version2: Version2 = musli_storage::decode(version1.as_slice())?;
 //!
 //! assert_eq!(version2, Version2 {
 //!     name: String::from("Aristotle"),
@@ -56,14 +56,15 @@
 //! # Configuring
 //!
 //! To tweak the behavior of the storage format you can use the
-//! [StorageEncoding] type:
+//! [Encoding] type:
 //!
 //! ```rust
-//! use musli_storage::{Fixed, Variable, StorageEncoding};
+//! use musli_storage::Encoding;
+//! use musli_storage::int::{Fixed, Variable};
 //! use musli::mode::DefaultMode;
 //! use musli::{Encode, Decode};
 //!
-//! const CONFIG: StorageEncoding<DefaultMode, Fixed, Variable> = StorageEncoding::new()
+//! const CONFIG: Encoding<DefaultMode, Fixed, Variable> = Encoding::new()
 //!     .with_fixed_integers();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
@@ -87,10 +88,10 @@
 //! # Ok(()) }
 //! ```
 //!
-//! [default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
+//! [default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 //! [musli-wire]: https://docs.rs/musli-wire
 //! [Müsli]: https://docs.rs/musli
-//! [StorageEncoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.StorageEncoding.html
+//! [Encoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 
 #![feature(generic_associated_types)]
 #![deny(missing_docs)]
@@ -101,15 +102,13 @@ pub mod de;
 #[doc(hidden)]
 pub mod en;
 pub mod encoding;
-#[doc(hidden)]
-pub mod integer_encoding;
 #[cfg(feature = "test")]
 pub mod test;
 
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, StorageEncoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
 #[cfg(feature = "std")]
-pub use self::encoding::{to_vec, to_writer};
+pub use self::encoding::{to_buffer, to_writer};
 #[cfg(feature = "test")]
 pub use self::test::transcode;
-pub use musli_common::encoding::{Fixed, FixedLength, Variable};
-pub use musli_common::fixed_bytes::FixedBytes;
+#[doc(inline)]
+pub use musli_common::*;

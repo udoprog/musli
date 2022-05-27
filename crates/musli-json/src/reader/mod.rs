@@ -1,4 +1,4 @@
-//! [Reader] trait and utilities used for musli-json.
+//! [Parser] trait and utilities used for musli-json.
 
 pub(crate) mod integer;
 mod parse_error;

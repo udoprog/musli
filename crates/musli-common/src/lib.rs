@@ -18,13 +18,10 @@
 #![feature(generic_associated_types)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[macro_use]
-mod macros;
-
 pub mod buffered_writer;
-pub mod encoding;
+pub mod error;
 pub mod fixed_bytes;
 pub mod int;
-pub mod io;
 pub mod reader;
+pub mod wrap;
 pub mod writer;

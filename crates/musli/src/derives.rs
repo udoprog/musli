@@ -48,10 +48,10 @@
 //! # #[derive(Encode, Decode)]
 //! # #[musli(mode = Json, default_field_name = "name")]
 //! # struct Person<'a> { name: &'a str, age: u32 }
-//! use musli_json::JsonEncoding;
+//! use musli_json::Encoding;
 //!
-//! const JSON_ENCODING: JsonEncoding<Json> = JsonEncoding::new();
-//! const DEFAULT_ENCODING: JsonEncoding = JsonEncoding::new();
+//! const JSON_ENCODING: Encoding<Json> = Encoding::new();
+//! const DEFAULT_ENCODING: Encoding = Encoding::new();
 //!
 //! let named = JSON_ENCODING.to_string(&Person { name: "Aristotle", age: 62 })?;
 //! assert_eq!(named, "{\"name\":\"Aristotle\",\"age\":62}");
@@ -196,8 +196,8 @@
 //! struct Struct(u32);
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let data = musli_wire::to_vec(&Struct(42))?;
-//! assert_eq!(data, vec![Tag::new(Kind::Continuation, 42).byte()]);
+//! let data = musli_wire::to_buffer(&Struct(42))?;
+//! assert_eq!(data.as_slice(), vec![Tag::new(Kind::Continuation, 42).byte()]);
 //! # Ok(()) }
 //! ```
 //!
@@ -225,13 +225,13 @@
 //! }
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let data = musli_storage::to_vec(&Struct {
+//! let data = musli_storage::to_buffer(&Struct {
 //!     field1: 1,
 //!     field2: 2,
 //!     field3: 3,
 //! })?;
 //!
-//! assert_eq!(data, vec![1, 2, 3]);
+//! assert_eq!(data.as_slice(), vec![1, 2, 3]);
 //! # Ok(()) }
 //! ```
 //!

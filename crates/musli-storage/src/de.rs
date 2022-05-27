@@ -1,12 +1,12 @@
 use core::fmt;
 use core::marker;
 
-use crate::integer_encoding::{IntegerEncoding, UsizeEncoding};
 use musli::de::{
     Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
 use musli::never::Never;
+use musli_common::int::{IntegerEncoding, UsizeEncoding};
 use musli_common::reader::PosReader;
 
 /// A very simple decoder suitable for storage decoding.

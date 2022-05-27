@@ -8,10 +8,14 @@
 
 mod byteorder;
 pub mod continuation;
+mod encoding;
+mod formats;
 mod traits;
 pub mod zigzag;
 
 pub use self::byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, NetworkEndian};
+pub use self::encoding::{IntegerEncoding, UsizeEncoding};
+pub use self::formats::{Fixed, FixedUsize, Variable};
 pub use self::traits::{ByteOrderIo, Signed, Unsigned};
 
 #[cfg(test)]

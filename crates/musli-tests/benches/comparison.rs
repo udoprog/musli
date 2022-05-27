@@ -54,6 +54,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     benches!(serde_rmp);
     benches!(musli_json);
     benches!(musli_wire);
+    benches!(musli_descriptive);
     benches!(musli_storage);
     benches!(musli_value);
     // fixme:

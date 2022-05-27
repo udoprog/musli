@@ -4,7 +4,8 @@ use std::time::Instant;
 use criterion::black_box;
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
-use musli_storage::{Fixed, FixedLength, StorageEncoding};
+use musli_storage::int::{Fixed, FixedUsize};
+use musli_storage::Encoding;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
@@ -84,9 +85,8 @@ where
     bincode::deserialize(data).unwrap()
 }
 
-const ENCODING: StorageEncoding<DefaultMode, Fixed, FixedLength> = StorageEncoding::new()
-    .with_fixed_integers()
-    .with_fixed_lengths();
+const ENCODING: Encoding<DefaultMode, Fixed, FixedUsize> =
+    Encoding::new().with_fixed_integers().with_fixed_lengths();
 
 #[inline(never)]
 fn encode_musli<T>(expected: &T) -> Vec<u8>

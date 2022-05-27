@@ -1,7 +1,7 @@
 use core::fmt;
 use core::marker;
 
-use crate::integer_encoding::{TypedIntegerEncoding, TypedUsizeEncoding};
+use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
 use crate::tag::Kind;
 use crate::tag::Tag;
 use musli::de::{
@@ -9,16 +9,15 @@ use musli::de::{
 };
 use musli::error::Error;
 use musli::never::Never;
-use musli_common::int::continuation as c;
 use musli_common::reader::{Limit, PosReader};
 use musli_storage::de::StorageDecoder;
-use musli_storage::Variable;
+use musli_storage::int::{continuation as c, Variable};
 
 /// A very simple decoder.
 pub struct WireDecoder<R, I, L>
 where
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     reader: R,
     _marker: marker::PhantomData<(I, L)>,
@@ -26,8 +25,8 @@ where
 
 impl<R, I, L> WireDecoder<R, I, L>
 where
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
@@ -42,8 +41,8 @@ where
 impl<'de, R, I, L> WireDecoder<R, I, L>
 where
     R: PosReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any(&mut self) -> Result<(), R::Error> {
@@ -145,8 +144,8 @@ where
 #[doc(hidden)]
 pub struct RemainingWireDecoder<R, I, L>
 where
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     remaining: usize,
     decoder: WireDecoder<R, I, L>,
@@ -155,8 +154,8 @@ where
 impl<'de, R, I, L> Decoder<'de> for WireDecoder<R, I, L>
 where
     R: PosReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Error = R::Error;
     type Buffer = Never<R::Error>;
@@ -437,8 +436,8 @@ where
 impl<'de, R, I, L> PackDecoder<'de> for WireDecoder<R, I, L>
 where
     R: PosReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Error = R::Error;
     type Decoder<'this> = StorageDecoder<R::PosMut<'this>, Variable, Variable> where Self: 'this;
@@ -457,8 +456,8 @@ where
 impl<'de, R, I, L> RemainingWireDecoder<R, I, L>
 where
     R: PosReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     #[inline]
     fn new(remaining: usize, decoder: WireDecoder<R, I, L>) -> Self {
@@ -469,8 +468,8 @@ where
 impl<'de, R, I, L> SequenceDecoder<'de> for RemainingWireDecoder<R, I, L>
 where
     R: PosReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Error = R::Error;
     type Decoder<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
@@ -504,8 +503,8 @@ where
 impl<'a, 'de, R, I, L> PairDecoder<'de> for WireDecoder<R, I, L>
 where
     R: PosReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Error = R::Error;
     type First<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
@@ -531,8 +530,8 @@ where
 impl<'a, 'de, R, I, L> VariantDecoder<'de> for WireDecoder<R, I, L>
 where
     R: PosReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Error = R::Error;
     type Tag<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
@@ -563,8 +562,8 @@ where
 impl<'de, R, I, L> PairsDecoder<'de> for RemainingWireDecoder<R, I, L>
 where
     R: PosReader<'de>,
-    I: TypedIntegerEncoding,
-    L: TypedUsizeEncoding,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
 {
     type Error = R::Error;
 

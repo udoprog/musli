@@ -35,12 +35,12 @@
 //! }
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let version2 = musli_descriptive::to_vec(&Version2 {
+//! let version2 = musli_descriptive::to_buffer(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
 //!
-//! let version1: Version1 = musli_descriptive::decode(&version2[..])?;
+//! let version1: Version1 = musli_descriptive::decode(version2.as_slice())?;
 //!
 //! assert_eq!(version1, Version1 {
 //!     name: String::from("Aristotle"),
@@ -50,15 +50,15 @@
 //!
 //! # Configuring
 //!
-//! To configure the behavior of the wire format you can use the [SelfEncoding]
+//! To configure the behavior of the wire format you can use the [Encoding]
 //! type:
 //!
 //! ```rust
-//! use musli_descriptive::SelfEncoding;
+//! use musli_descriptive::Encoding;
 //! use musli::{Encode, Decode};
 //! use musli::mode::DefaultMode;
 //!
-//! const CONFIG: SelfEncoding<DefaultMode, 128> = SelfEncoding::new()
+//! const CONFIG: Encoding<DefaultMode, 128> = Encoding::new()
 //!     .with_max_pack::<128>();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
@@ -87,11 +87,11 @@
 //! Each field is prefix *typed* with a single byte tag that describes exactly
 //! the type which is contained in the field.
 //!
-//! [default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.SelfEncoding.html
+//! [default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 //! [MAX_INLINE_LEN]: https://docs.rs/musli-wire/latest/musli_descriptive/tag/constant.MAX_INLINE_LEN.html
 //! [Müsli]: https://docs.rs/musli
-//! [SelfEncoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_descriptive/encoding/struct.SelfEncoding.html#method.with_max_pack
-//! [SelfEncoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.SelfEncoding.html
+//! [Encoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_descriptive/encoding/struct.Encoding.html#method.with_max_pack
+//! [Encoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 //! [Value]: https://docs.rs/musli-value
 
 #![feature(generic_associated_types)]
@@ -107,9 +107,10 @@ pub mod tag;
 #[macro_use]
 pub mod test;
 
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, SelfEncoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
 #[cfg(feature = "std")]
-pub use self::encoding::{to_vec, to_writer};
+pub use self::encoding::{to_buffer, to_writer};
 #[cfg(feature = "test")]
 pub use self::test::{transcode, Typed};
-pub use musli_common::fixed_bytes::FixedBytes;
+#[doc(inline)]
+pub use musli_common::*;

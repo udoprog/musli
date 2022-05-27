@@ -23,6 +23,8 @@ mod en;
 pub mod encoding;
 pub mod reader;
 
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, JsonEncoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
 #[cfg(feature = "std")]
-pub use self::encoding::{to_string, to_vec, to_writer};
+pub use self::encoding::{to_buffer, to_string, to_writer};
+#[doc(inline)]
+pub use musli_common::*;
