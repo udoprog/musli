@@ -2,6 +2,8 @@
 //!
 //! To adapt [std::io::Write] types, see the [wrap][crate::io::wrap] function.
 
+use core::ops::Deref;
+
 use musli::error::Error;
 
 use crate::error::BufferError;
@@ -115,6 +117,14 @@ impl Buffer {
     #[cfg(feature = "std")]
     pub fn into_vec(self) -> Vec<u8> {
         self.buf
+    }
+}
+
+impl Deref for Buffer {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
     }
 }
 

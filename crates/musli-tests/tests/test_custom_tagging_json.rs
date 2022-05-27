@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]

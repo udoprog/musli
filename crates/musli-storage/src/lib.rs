@@ -105,9 +105,9 @@ pub mod encoding;
 #[cfg(feature = "test")]
 pub mod test;
 
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
+pub use self::encoding::{decode, encode, from_slice, to_buffer, to_fixed_bytes, Encoding};
 #[cfg(feature = "std")]
-pub use self::encoding::{to_buffer, to_writer};
+pub use self::encoding::{to_vec, to_writer};
 #[cfg(feature = "test")]
 pub use self::test::transcode;
 #[doc(inline)]

@@ -137,20 +137,18 @@ where
     ///     age: u32,
     /// }
     ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let expected = Struct {
     ///     name: "Aristotle",
     ///     age: 61,
     /// };
     ///
-    /// let out = CONFIG.to_vec(&expected)?;
-    /// println!("{}", String::from_utf8(out)?);
+    /// let out = CONFIG.to_buffer(&expected).unwrap();
+    /// println!("{}", core::str::from_utf8(out.as_slice()).unwrap());
     ///
-    /// let out = musli_json::to_string(&expected)?;
-    /// println!("{}", out);
-    /// let actual = musli_json::from_slice(out.as_bytes())?;
+    /// let out = musli_json::to_buffer(&expected).unwrap();
+    /// println!("{}", core::str::from_utf8(out.as_slice()).unwrap());
+    /// let actual = musli_json::from_slice(out.as_slice()).unwrap();
     /// assert_eq!(expected, actual);
-    /// # Ok(()) }
     /// ```
     #[inline]
     pub const fn new() -> Self {

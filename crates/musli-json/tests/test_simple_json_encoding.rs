@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use musli::{Decode, Encode};
 use musli_json::Encoding;
 use rand::prelude::*;

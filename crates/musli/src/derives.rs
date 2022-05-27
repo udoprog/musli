@@ -53,11 +53,11 @@
 //! const JSON_ENCODING: Encoding<Json> = Encoding::new();
 //! const DEFAULT_ENCODING: Encoding = Encoding::new();
 //!
-//! let named = JSON_ENCODING.to_string(&Person { name: "Aristotle", age: 62 })?;
-//! assert_eq!(named, "{\"name\":\"Aristotle\",\"age\":62}");
+//! let named = JSON_ENCODING.to_buffer(&Person { name: "Aristotle", age: 62 })?;
+//! assert_eq!(named.as_slice(), b"{\"name\":\"Aristotle\",\"age\":62}");
 //!
-//! let indexed = DEFAULT_ENCODING.to_string(&Person { name: "Plato", age: 84 })?;
-//! assert_eq!(indexed, "{\"0\":\"Plato\",\"1\":84}");
+//! let indexed = DEFAULT_ENCODING.to_buffer(&Person { name: "Plato", age: 84 })?;
+//! assert_eq!(indexed.as_slice(), b"{\"0\":\"Plato\",\"1\":84}");
 //!
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```

@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use crate::reader::integer::{parse_signed, parse_unsigned};
 use crate::reader::SliceParser;
 
