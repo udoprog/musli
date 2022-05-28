@@ -83,12 +83,15 @@ pub mod serde_rmp {
 
 pub mod serde_bincode {
     use serde::{Deserialize, Serialize};
+    use std::io::Cursor;
 
     pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Serialize,
     {
-        bincode::serialize(value).unwrap()
+        let mut writer = Cursor::new(Vec::new());
+        bincode::serialize_into(&mut writer, value).unwrap();
+        writer.into_inner()
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T

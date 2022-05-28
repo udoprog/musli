@@ -48,7 +48,6 @@ fn criterion_benchmark(c: &mut Criterion) {
         }};
     }
 
-    benches!(serde_dlhn);
     benches!(serde_json);
     benches!(serde_bincode);
     benches!(serde_rmp);
@@ -58,6 +57,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     benches!(musli_storage);
     benches!(musli_value);
     // fixme:
+    // benches!(serde_dlhn);
     // benches!(serde_cbor);
 }
 
