@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
@@ -17,7 +17,7 @@ jobs:
   build_no_default:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
@@ -28,39 +28,31 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
         override: true
         profile: minimal
-    - name: cargo check
-      uses: actions-rs/cargo@v1
-      with:
-        command: check
-        args: --tests --benches
+    - run: cargo check --tests --benches
     - run: cargo test --workspace
 
   test_no_default:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
         override: true
         profile: minimal
-    - name: cargo check
-      uses: actions-rs/cargo@v1
-      with:
-        command: check
-        args: --tests --benches
+    - run: cargo check --tests --benches
     - run: cargo test --workspace --no-default-features
 
   fuzz:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
@@ -71,29 +63,22 @@ jobs:
   miri:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
         override: true
         components: miri
-    - name: cargo miri test
-      uses: actions-rs/cargo@v1
-      with:
-        command: miri
-        args: test
+    - run: cargo miri test
 
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
         override: true
+        profile: minimal
         components: rustfmt
-    - name: cargo miri test
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --check
+    - run: cargo fmt --check
