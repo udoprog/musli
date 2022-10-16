@@ -8,7 +8,6 @@
 //!
 //! [Müsli]: https://github.com/udoprog/musli
 
-#![feature(generic_associated_types)]
 #![deny(missing_docs)]
 
 mod de;

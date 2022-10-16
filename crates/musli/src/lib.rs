@@ -217,7 +217,6 @@
 //! [protobuf]: https://developers.google.com/protocol-buffers
 //! [serde]: https://serde.rs
 
-#![feature(generic_associated_types)]
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 

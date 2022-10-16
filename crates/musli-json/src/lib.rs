@@ -14,7 +14,6 @@
 //!
 //! [Müsli]: https://github.com/udoprog/musli
 
-#![feature(generic_associated_types)]
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 

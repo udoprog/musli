@@ -96,7 +96,6 @@
 //! [Encoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_wire/encoding/struct.Encoding.html#method.with_max_pack
 //! [Encoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 
-#![feature(generic_associated_types)]
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 

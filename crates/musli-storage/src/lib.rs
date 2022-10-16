@@ -93,7 +93,6 @@
 //! [Müsli]: https://docs.rs/musli
 //! [Encoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 
-#![feature(generic_associated_types)]
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 

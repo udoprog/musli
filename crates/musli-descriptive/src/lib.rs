@@ -94,7 +94,6 @@
 //! [Encoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 //! [Value]: https://docs.rs/musli-value
 
-#![feature(generic_associated_types)]
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 

@@ -15,7 +15,6 @@
 //! [Writer]: https://docs.rs/musli-common/latest/musli-common/writer/trait.Writer.html
 
 #![deny(missing_docs)]
-#![feature(generic_associated_types)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod buffered_writer;
