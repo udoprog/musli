@@ -206,9 +206,9 @@
 //! unrecognized data.
 //!
 //! [bincode]: https://docs.rs/bincode
-//! [Decode]: Decode
-//! [derives]: derives
-//! [Encode]: Encode
+//! [Decode]: https://docs.rs/musli/latest/musli/trait.Decode.html
+//! [derives]: https://docs.rs/musli/latest/musli/derives/
+//! [Encode]: https://docs.rs/musli/latest/musli/trait.Encode.html
 //! [GATs]: https://github.com/rust-lang/rust/issues/44265
 //! [json-serde-value]: https://docs.rs/serde_json/latest/serde_json/enum.Value.html
 //! [musli-storage]: https://docs.rs/musli-storage
