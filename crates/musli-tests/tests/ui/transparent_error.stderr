@@ -65,30 +65,23 @@ error: #[musli(transparent)] types must have a single field
 error: #[musli(transparent)] can only be used on types which have a single field
   --> tests/ui/transparent_error.rs:24:5
    |
-24 | /     #[musli(transparent)]
-25 | |     Variant {
-26 | |         first: u32,
-27 | |         second: u32,
-28 | |     },
-   | |_____^
+24 |     #[musli(transparent)]
+   |     ^
 
 error: #[musli(transparent)] can only be used on types which have a single field
   --> tests/ui/transparent_error.rs:29:5
    |
-29 | /     #[musli(transparent)]
-30 | |     TransparentTuple(u32, u32),
-   | |______________________________^
+29 |     #[musli(transparent)]
+   |     ^
 
 error: #[musli(transparent)] types must have a single field
   --> tests/ui/transparent_error.rs:31:5
    |
-31 | /     #[musli(transparent)]
-32 | |     TransparentEmptyStruct,
-   | |__________________________^
+31 |     #[musli(transparent)]
+   |     ^
 
 error: #[musli(transparent)] types must have a single field
   --> tests/ui/transparent_error.rs:33:5
    |
-33 | /     #[musli(transparent)]
-34 | |     TransparentEmptyTuple,
-   | |_________________________^
+33 |     #[musli(transparent)]
+   |     ^
