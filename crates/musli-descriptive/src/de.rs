@@ -65,13 +65,12 @@ where
                     let _ = c::decode::<_, u128>(self.reader.borrow_mut())?;
                 }
             }
-            Kind::Mark => match tag.mark() {
-                Mark::Variant => {
+            Kind::Mark => {
+                if let Mark::Variant = tag.mark() {
                     self.skip_any()?;
                     self.skip_any()?;
                 }
-                _ => (),
-            },
+            }
             Kind::Bytes => {
                 let len = if let Some(len) = tag.data() {
                     len as usize
@@ -619,7 +618,7 @@ where
     }
 }
 
-impl<'a, 'de, R> PairDecoder<'de> for SelfDecoder<R>
+impl<'de, R> PairDecoder<'de> for SelfDecoder<R>
 where
     R: PosReader<'de>,
 {
@@ -644,7 +643,7 @@ where
     }
 }
 
-impl<'a, 'de, R> VariantDecoder<'de> for SelfDecoder<R>
+impl<'de, R> VariantDecoder<'de> for SelfDecoder<R>
 where
     R: PosReader<'de>,
 {

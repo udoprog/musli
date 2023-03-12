@@ -216,7 +216,7 @@ impl TypeAttr {
     pub(crate) fn tag_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
         mode.ident
             .and_then(|m| self.modes.get(m)?.tag_type.as_ref())
-            .or_else(|| self.root.tag_type.as_ref())
+            .or(self.root.tag_type.as_ref())
     }
 
     /// Get the configured crate, or fallback to default.
@@ -224,12 +224,12 @@ impl TypeAttr {
         if let Some((_, krate)) = &self.root.krate {
             krate.clone()
         } else {
-            let path = syn::Path::from(syn::Ident::new(&*ATTR, Span::call_site()));
+            let path = syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()));
 
             syn::ExprPath {
                 attrs: Vec::new(),
                 qself: None,
-                path: path.into(),
+                path,
             }
         }
     }
@@ -340,14 +340,14 @@ impl VariantAttr {
     pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
         mode.ident
             .and_then(|m| self.modes.get(m)?.default)
-            .or_else(|| self.root.default)
+            .or(self.root.default)
     }
 
     /// Test if the `#[musli(rename)]` tag is specified.
     pub(crate) fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
         mode.ident
             .and_then(|m| self.modes.get(m)?.rename.as_ref())
-            .or_else(|| self.root.rename.as_ref())
+            .or(self.root.rename.as_ref())
     }
 
     /// Indicates if the tagged state of the variant is set.
@@ -364,7 +364,7 @@ impl VariantAttr {
     pub(crate) fn default_field_name(&self, mode: Mode<'_>) -> Option<DefaultTag> {
         mode.ident
             .and_then(|m| self.modes.get(m)?.default_field_name)
-            .or_else(|| self.root.default_field_name)
+            .or(self.root.default_field_name)
     }
 
     /// Get the tag type of the type.
@@ -372,7 +372,7 @@ impl VariantAttr {
         mode.ident
             .and_then(|m| self.modes.get(m))
             .map(|a| a.tag_type.as_ref())
-            .unwrap_or_else(|| self.root.tag_type.as_ref())
+            .unwrap_or(self.root.tag_type.as_ref())
     }
 }
 
@@ -387,14 +387,14 @@ impl FieldAttr {
     pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
         mode.ident
             .and_then(|m| self.modes.get(m)?.default)
-            .or_else(|| self.root.default)
+            .or(self.root.default)
     }
 
     /// Test if the `#[musli(rename)]` tag is specified.
     pub(crate) fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
         mode.ident
             .and_then(|m| self.modes.get(m)?.rename.as_ref())
-            .or_else(|| self.root.rename.as_ref())
+            .or(self.root.rename.as_ref())
     }
 
     /// Expand encode of the given field.
@@ -402,7 +402,7 @@ impl FieldAttr {
         let encode_path = mode
             .ident
             .and_then(|m| self.modes.get(m)?.encode_path.as_ref())
-            .or_else(|| self.root.encode_path.as_ref());
+            .or(self.root.encode_path.as_ref());
 
         if let Some((span, encode_path)) = encode_path {
             let mode_ident = mode.mode_ident();
@@ -421,7 +421,7 @@ impl FieldAttr {
         let decode_path = mode
             .ident
             .and_then(|m| self.modes.get(m)?.decode_path.as_ref())
-            .or_else(|| self.root.decode_path.as_ref());
+            .or(self.root.decode_path.as_ref());
 
         if let Some((span, decode_path)) = decode_path {
             let mode_ident = mode.mode_ident();
@@ -440,7 +440,7 @@ impl FieldAttr {
         let (span, path) = mode
             .ident
             .and_then(|m| self.modes.get(m)?.skip_encoding_if.as_ref())
-            .or_else(|| self.root.skip_encoding_if.as_ref())?;
+            .or(self.root.skip_encoding_if.as_ref())?;
 
         Some((*span, path))
     }
@@ -718,7 +718,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 }
 
 /// Get expression path.
-fn value_as_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::ExprPath> {
+fn value_as_path(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::ExprPath> {
     match value {
         AttributeValue::Path(path) => Some(path),
         _ => {
@@ -732,7 +732,7 @@ fn value_as_path<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<s
 }
 
 /// Get expression from value.
-fn value_as_expr<'a>(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Expr> {
+fn value_as_expr(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Expr> {
     match value {
         AttributeValue::Expr(expr) => Some(expr),
         _ => {

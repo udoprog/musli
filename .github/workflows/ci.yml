@@ -7,6 +7,13 @@ on:
       - main
 
 jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: rustup toolchain install 1.68 --profile minimal --component clippy
+    - run: cargo +1.68 clippy --workspace --all-features --all-targets -- --deny warnings
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -45,4 +52,4 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - run: rustup toolchain install stable --profile minimal --component rustfmt
-    - run: cargo +stable fmt --check
+    - run: cargo fmt --check --all

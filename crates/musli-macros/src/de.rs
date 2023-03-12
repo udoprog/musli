@@ -44,7 +44,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     let original_generics = &e.input.generics;
 
     let (impl_generics, mode_ident, mut where_clause) =
-        e.expansion.as_impl_generics(impl_generics, &e.tokens);
+        e.expansion.as_impl_generics(impl_generics, e.tokens);
 
     if !e.bounds.is_empty() && !e.decode_bounds.is_empty() {
         let where_clause = where_clause.get_or_insert_with(|| syn::WhereClause {
@@ -60,6 +60,8 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     Ok(quote_spanned! {
         span =>
         #[automatically_derived]
+        #[allow(clippy::init_numbered_fields)]
+        #[allow(clippy::let_unit_value)]
         impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #original_generics #where_clause {
             #[inline]
             fn decode<D>(#root_decoder_var: D) -> Result<Self, D::Error>
@@ -78,7 +80,7 @@ fn decode_struct(e: &Build<'_>, decoder_var: &syn::Ident, st: &StructBuild) -> R
             e,
             st.span,
             decoder_var,
-            &e.type_name,
+            e.type_name,
             st.tag_type,
             &st.path,
             &st.fields,
@@ -138,7 +140,7 @@ fn decode_enum(
                 e,
                 v.span,
                 &body_decoder_var,
-                &v.name,
+                v.name,
                 v.tag_type,
                 &v.path,
                 &v.fields,
@@ -499,7 +501,7 @@ fn decode_tagged(
         let decode = quote_spanned!(*span => #var = Some(#decode_path(#struct_decoder_var)?));
 
         let (output_tag, output) =
-            handle_indirect_output_tag(*span, f.index, field_tag_method, &tag, &tag_visitor_output);
+            handle_indirect_output_tag(*span, f.index, field_tag_method, tag, &tag_visitor_output);
 
         outputs.extend(output);
         patterns.push((f.span, output_tag, decode));

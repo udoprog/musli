@@ -500,7 +500,7 @@ where
     }
 }
 
-impl<'a, 'de, R, I, L> PairDecoder<'de> for WireDecoder<R, I, L>
+impl<'de, R, I, L> PairDecoder<'de> for WireDecoder<R, I, L>
 where
     R: PosReader<'de>,
     I: WireIntegerEncoding,
@@ -527,7 +527,7 @@ where
     }
 }
 
-impl<'a, 'de, R, I, L> VariantDecoder<'de> for WireDecoder<R, I, L>
+impl<'de, R, I, L> VariantDecoder<'de> for WireDecoder<R, I, L>
 where
     R: PosReader<'de>,
     I: WireIntegerEncoding,

@@ -1,5 +1,7 @@
 //! Type flags available for `musli-wire`.
 
+#![allow(clippy::unusual_byte_groupings)]
+
 use core::fmt;
 use core::mem;
 

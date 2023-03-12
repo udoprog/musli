@@ -190,10 +190,7 @@ where
     #[inline]
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
         ensure!(self, hint, ExpectedOption(hint), Value::Option(option) => {
-            Ok(match option {
-                Some(some) => Some(ValueDecoder::new(&**some)),
-                None => None
-            })
+            Ok(option.as_ref().map(|some| ValueDecoder::new(some)))
         })
     }
 

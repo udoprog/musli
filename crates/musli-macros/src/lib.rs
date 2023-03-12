@@ -9,6 +9,8 @@
 //!
 //! [Müsli]: <https://docs.rs/musli>
 
+#![allow(clippy::too_many_arguments)]
+
 use proc_macro::TokenStream;
 
 mod de;

@@ -1,3 +1,5 @@
+#![allow(clippy::identity_op, clippy::just_underscores_and_digits)]
+
 use core::fmt;
 
 /// Tokens.

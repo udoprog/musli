@@ -66,7 +66,7 @@ where
     where
         D: Decoder<'de>,
     {
-        let () = decoder.decode_unit()?;
+        decoder.decode_unit()?;
         Ok(marker::PhantomData)
     }
 }
