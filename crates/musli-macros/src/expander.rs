@@ -78,8 +78,8 @@ impl<'a> Expander<'a> {
                     name: field
                         .ident
                         .as_ref()
-                        .map(|ident| syn::LitStr::new(&ident.to_string(), ident.span()).into()),
-                    attr: attr::field_attrs(&cx, &field.attrs),
+                        .map(|ident| syn::LitStr::new(&ident.to_string(), ident.span())),
+                    attr: attr::field_attrs(cx, &field.attrs),
                     ident: field.ident.as_ref(),
                 })
                 .collect()
@@ -143,9 +143,7 @@ impl<'a> Expander<'a> {
         if modes.is_empty() {
             builds.push(crate::internals::build::setup(
                 self,
-                Expansion::Generic {
-                    mode_ident: &mode_ident,
-                },
+                Expansion::Generic { mode_ident },
             )?);
         } else {
             for mode_ident in modes {

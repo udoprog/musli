@@ -59,10 +59,11 @@ impl fmt::Display for NumberHint {
 }
 
 /// A length hint.
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum LengthHint {
     /// The length isn't known.
+    #[default]
     Any,
     /// The length is exactly known.
     Exact(usize),
@@ -75,12 +76,6 @@ impl LengthHint {
             LengthHint::Any => 0,
             LengthHint::Exact(len) => len,
         }
-    }
-}
-
-impl Default for LengthHint {
-    fn default() -> Self {
-        LengthHint::Any
     }
 }
 

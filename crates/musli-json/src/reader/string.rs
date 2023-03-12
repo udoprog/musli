@@ -1,3 +1,5 @@
+#![allow(clippy::zero_prefixed_literal)]
+
 use crate::reader::{ParseError, ParseErrorKind, Parser, SliceParser};
 
 use crate::reader::Scratch;
@@ -129,8 +131,8 @@ fn check_utf8(bytes: &[u8], start: u32, pos: u32) -> Result<(), ParseError> {
 
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
-fn parse_escape<'de>(
-    parser: &mut SliceParser<'de>,
+fn parse_escape(
+    parser: &mut SliceParser<'_>,
     validate: bool,
     scratch: &mut Scratch,
 ) -> Result<bool, ParseError> {
@@ -202,7 +204,7 @@ fn parse_escape<'de>(
 
                     let n2 = parser.parse_hex_escape()?;
 
-                    if n2 < 0xDC00 || n2 > 0xDFFF {
+                    if !(0xDC00..=0xDFFF).contains(&n2) {
                         return Err(ParseError::spanned(
                             start,
                             parser.pos(),
@@ -366,7 +368,7 @@ where
 
                     let n2 = p.parse_hex_escape()?;
 
-                    if n2 < 0xDC00 || n2 > 0xDFFF {
+                    if !(0xDC00..=0xDFFF).contains(&n2) {
                         return Err(ParseError::spanned(
                             start,
                             p.pos(),

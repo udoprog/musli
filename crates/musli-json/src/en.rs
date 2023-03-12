@@ -248,7 +248,7 @@ where
     }
 }
 
-impl<'a, M, W> PairsEncoder for JsonObjectEncoder<M, W>
+impl<M, W> PairsEncoder for JsonObjectEncoder<M, W>
 where
     M: Mode,
     W: Writer,
@@ -295,7 +295,7 @@ impl<M, W> JsonObjectPairEncoder<M, W> {
     }
 }
 
-impl<'a, M, W> PairEncoder for JsonObjectPairEncoder<M, W>
+impl<M, W> PairEncoder for JsonObjectPairEncoder<M, W>
 where
     M: Mode,
     W: Writer,
@@ -351,7 +351,7 @@ where
     }
 }
 
-impl<'a, M, W> VariantEncoder for JsonVariantEncoder<M, W>
+impl<M, W> VariantEncoder for JsonVariantEncoder<M, W>
 where
     M: Mode,
     W: Writer,

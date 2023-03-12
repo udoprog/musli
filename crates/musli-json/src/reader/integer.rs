@@ -92,12 +92,12 @@ impl<T> Mantissa<T>
 where
     T: Unsigned,
 {
-    fn to_float<F>(self) -> Mantissa<F>
+    fn into_float<F>(self) -> Mantissa<F>
     where
         F: FromUnsigned<T>,
     {
         Mantissa {
-            value: self.value.to_float::<F>(),
+            value: self.value.into_float::<F>(),
             exp: self.exp,
         }
     }
@@ -191,7 +191,7 @@ where
         F: FromUnsigned<T>,
     {
         let Self { base, m, e } = self;
-        base.to_float::<F>().pow10(e) + m.to_float::<F>().compute_float(e)
+        base.into_float::<F>().pow10(e) + m.into_float::<F>().compute_float(e)
     }
 }
 
@@ -455,13 +455,13 @@ where
 // Test if b is numeric.
 #[inline]
 fn is_digit(b: u8) -> bool {
-    b'0' <= b && b <= b'9'
+    b.is_ascii_digit()
 }
 
 // Test if b is numeric.
 #[inline]
 fn is_digit_nonzero(b: u8) -> bool {
-    b'1' <= b && b <= b'9'
+    (b'1'..=b'9').contains(&b)
 }
 
 mod traits {
@@ -495,7 +495,7 @@ mod traits {
 
         fn signed(self) -> Option<Self::Signed>;
 
-        fn to_float<F>(self) -> F
+        fn into_float<F>(self) -> F
         where
             F: FromUnsigned<Self>;
     }
@@ -637,7 +637,7 @@ mod traits {
                 }
 
                 #[inline]
-                fn to_float<F>(self) -> F where F: FromUnsigned<Self> {
+                fn into_float<F>(self) -> F where F: FromUnsigned<Self> {
                     F::from_unsigned(self)
                 }
             }

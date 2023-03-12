@@ -204,7 +204,7 @@ impl<'de> Reader<'de> for &'de [u8] {
 
     #[inline]
     fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
-        Ok(self.get(0).copied())
+        Ok(self.first().copied())
     }
 
     #[inline]

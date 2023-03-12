@@ -152,19 +152,19 @@ pub trait Parser<'de>: private::Sealed {
                 return visitor.visit_i8(value as i8);
             }
 
-            if value >= i16::MAX as i128 && value <= i16::MAX as i128 {
+            if value >= i16::MIN as i128 && value <= i16::MAX as i128 {
                 return visitor.visit_i16(value as i16);
             }
 
-            if value >= i32::MAX as i128 && value <= i32::MAX as i128 {
+            if value >= i32::MIN as i128 && value <= i32::MAX as i128 {
                 return visitor.visit_i32(value as i32);
             }
 
-            if value >= i64::MAX as i128 && value <= i64::MAX as i128 {
+            if value >= i64::MIN as i128 && value <= i64::MAX as i128 {
                 return visitor.visit_i64(value as i64);
             }
 
-            if value >= isize::MAX as i128 && value <= isize::MAX as i128 {
+            if value >= isize::MIN as i128 && value <= isize::MAX as i128 {
                 return visitor.visit_isize(value as isize);
             }
 

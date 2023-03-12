@@ -37,7 +37,7 @@ impl<'a> Expansion<'a> {
     ) -> (syn::Generics, syn::ExprPath, Option<syn::WhereClause>) {
         match *self {
             Expansion::Generic { mode_ident } => {
-                let mut impl_generics = generics.clone();
+                let mut impl_generics = generics;
 
                 impl_generics
                     .params

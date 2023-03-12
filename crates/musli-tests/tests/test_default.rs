@@ -38,13 +38,7 @@ fn test_decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
 
     let struct_with_option: StructWithOption = musli_tests::wire::decode(data.as_slice())?;
 
-    assert_eq!(
-        struct_with_option,
-        StructWithOption {
-            name: name.clone(),
-            age: None,
-        }
-    );
+    assert_eq!(struct_with_option, StructWithOption { name, age: None });
 
     Ok(())
 }

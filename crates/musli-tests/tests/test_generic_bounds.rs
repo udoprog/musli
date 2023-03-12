@@ -8,9 +8,10 @@ pub struct GenericWithBound<T> {
 
 #[test]
 fn test_generic_with_bound() {
-    let value = GenericWithBound {
-        value: String::from("Hello"),
-    };
-
-    musli_tests::rt!(GenericWithBound<String>, value.clone());
+    musli_tests::rt!(
+        GenericWithBound<String>,
+        GenericWithBound {
+            value: String::from("Hello"),
+        }
+    );
 }

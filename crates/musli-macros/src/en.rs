@@ -28,7 +28,7 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let (impl_generics, mode_ident, mut where_clause) = e
         .expansion
-        .as_impl_generics(e.input.generics.clone(), &e.tokens);
+        .as_impl_generics(e.input.generics.clone(), e.tokens);
 
     if !e.bounds.is_empty() {
         let where_clause = where_clause.get_or_insert_with(|| syn::WhereClause {
@@ -126,7 +126,7 @@ struct EncodedFields {
 }
 
 impl EncodedFields {
-    fn test_decls<'a>(&'a self) -> impl Iterator<Item = &'a TokenStream> {
+    fn test_decls(&self) -> impl Iterator<Item = &TokenStream> {
         self.tests.iter().map(|t| &t.decl)
     }
 }

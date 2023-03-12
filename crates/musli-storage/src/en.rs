@@ -79,7 +79,7 @@ where
 
     #[inline]
     fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
-        let len = vectors.into_iter().map(|v| v.len()).sum();
+        let len = vectors.iter().map(|v| v.len()).sum();
         L::encode_usize(self.writer.borrow_mut(), len)?;
 
         for bytes in vectors {
