@@ -187,8 +187,6 @@ pub trait Decoder<'de>: Sized {
     /// expecting to decode some specific kind of value.
     ///
     /// ```
-    /// #![feature(generic_associated_types)]
-    ///
     /// use std::fmt;
     ///
     /// use musli::de::Decoder;

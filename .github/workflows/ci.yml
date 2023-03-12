@@ -1,17 +1,18 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: beta
-        override: true
-        profile: minimal
+    - run: rustup toolchain install stable --profile minimal
+    - run: rustup default stable
     - run: cargo build --workspace --tests --benches --examples --lib
     - run: cargo build --workspace --tests --benches --examples --lib --no-default-features
 
@@ -19,11 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: beta
-        override: true
-        profile: minimal
+    - run: rustup toolchain install stable --profile minimal
+    - run: rustup default stable
     - run: cargo check --tests --benches
     - run: cargo test --workspace
     - run: cargo test --workspace --no-default-features
@@ -32,32 +30,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: beta
-        override: true
-        profile: minimal
-    - run: cargo run --release --bin fuzz_test
+    - run: rustup toolchain install stable --profile minimal
+    - run: cargo +stable run --release --bin fuzz_test
 
   miri:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: beta
-        override: true
-        components: miri
-    - run: cargo miri test
+    - run: rustup toolchain install nightly --profile minimal --component miri
+    - run: cargo +nightly miri test
 
   rustfmt:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: beta
-        override: true
-        profile: minimal
-        components: rustfmt
-    - run: cargo fmt --check
+    - run: rustup toolchain install stable --profile minimal --component rustfmt
+    - run: cargo +stable fmt --check

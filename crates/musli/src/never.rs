@@ -16,8 +16,6 @@ enum NeverMarker {}
 /// implement a particular function.
 ///
 /// ```
-/// #![feature(generic_associated_types)]
-///
 /// use std::fmt;
 ///
 /// use musli::de::Decoder;
