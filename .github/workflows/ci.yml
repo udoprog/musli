@@ -38,7 +38,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - run: rustup toolchain install nightly --profile minimal --component miri
-    - run: cargo +nightly miri test
+    - run: cargo +nightly miri test --workspace --exclude musli-common
 
   rustfmt:
     runs-on: ubuntu-latest
