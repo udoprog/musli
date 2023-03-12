@@ -11,23 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - run: rustup toolchain install 1.68 --profile minimal
-    - run: rustup default 1.68
-    - run: cargo build --workspace --all-targets
-    - run: cargo build --workspace --all-targets --no-default-features
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - run: rustup toolchain install 1.68 --profile minimal --component clippy
-    - run: cargo +1.68 clippy --workspace --all-features --all-targets -- --deny warnings
-
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - run: rustup toolchain install stable --profile minimal
+    - uses: dtolnay/rust-toolchain@1.68
     - run: cargo build --workspace --all-targets
     - run: cargo build --workspace --all-targets --no-default-features
 
@@ -35,27 +19,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - run: rustup toolchain install stable --profile minimal
+    - uses: dtolnay/rust-toolchain@stable
     - run: cargo test --workspace --all-targets
     - run: cargo test --workspace --all-targets --no-default-features
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@1.68
+      with:
+        components: clippy
+    - run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+    - run: cargo fmt --check --all
 
   fuzz:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - run: rustup toolchain install stable --profile minimal
+    - uses: dtolnay/rust-toolchain@stable
     - run: cargo run --release --bin fuzz_test
 
   miri:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - run: rustup toolchain install nightly --profile minimal --component miri
-    - run: cargo +nightly miri test --workspace --exclude musli-common
-
-  rustfmt:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - run: rustup toolchain install stable --profile minimal --component rustfmt
-    - run: cargo fmt --check --all
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: miri
+    - run: cargo miri test --workspace --exclude musli-common
