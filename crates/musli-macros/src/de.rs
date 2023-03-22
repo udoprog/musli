@@ -31,7 +31,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     let (lt, exists) = if let Some(existing) = impl_generics.lifetimes().next() {
         (existing.clone(), true)
     } else {
-        let lt = syn::LifetimeDef::new(syn::Lifetime::new("'de", e.input.span()));
+        let lt = syn::LifetimeParam::new(syn::Lifetime::new("'de", e.input.span()));
         (lt, false)
     };
 

@@ -16,17 +16,17 @@ musli-storage = { path = "../musli-storage", features = ["test"], default_featur
 musli-json = { path = "../musli-json", features = ["test"], default_features = false }
 musli-value = { path = "../musli-value", features = ["test"], default_features = false }
 
-anyhow = "1.0.57"
+anyhow = "1.0.70"
 rand = "0.8.5"
-rmp-serde = "1.1.0"
-serde = { version = "1.0.137", features = ["derive"] }
-criterion = { version = "0.3.5", features = ["html_reports"] }
+rmp-serde = "1.1.1"
+serde = { version = "1.0.158", features = ["derive"] }
+criterion = { version = "0.4.0", features = ["html_reports"] }
 bincode = "1.3.3"
-serde_json = "1.0.81"
+serde_json = "1.0.94"
 serde_cbor = "0.11.2"
-dlhn = "0.1.0"
+dlhn = "0.1.2"
 
-trybuild = "1.0.61"
+trybuild = "1.0.80"
 
 [[bench]]
 name = "comparison"

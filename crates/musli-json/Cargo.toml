@@ -25,9 +25,9 @@ musli = { path = "../musli", version = "0.0.37" }
 musli-common = { path = "../musli-common", version = "0.0.37" }
 musli-value = { path = "../musli-value", version = "0.0.37", optional = true }
 
-itoa = "1.0.1"
-ryu = "1.0.9"
-lexical = "6.1.0"
+itoa = "1.0.6"
+ryu = "1.0.13"
+lexical = "6.1.1"
 
 [dev-dependencies]
 rand = "0.8.5"

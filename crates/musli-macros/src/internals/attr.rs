@@ -8,6 +8,7 @@ use crate::internals::Ctxt;
 use crate::internals::Mode;
 use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
+use quote::ToTokens;
 use syn::parse;
 use syn::parse::Parse;
 use syn::spanned::Spanned;
@@ -795,11 +796,11 @@ fn parse_musli_attrs<T>(cx: &Ctxt, attr: &syn::Attribute) -> Option<T>
 where
     T: Parse,
 {
-    if attr.path != ATTR {
+    if attr.path() != ATTR {
         return None;
     }
 
-    let attributes: T = match syn::parse2(attr.tokens.clone()) {
+    let attributes: T = match syn::parse2(attr.meta.to_token_stream()) {
         Ok(attributes) => attributes,
         Err(e) => {
             cx.syn_error(e);
@@ -824,7 +825,7 @@ pub enum AttributeValue {
     Bound(syn::WherePredicate),
 }
 
-impl Spanned for AttributeValue {
+impl AttributeValue {
     fn span(&self) -> Span {
         match self {
             AttributeValue::Path(value) => value.span(),
@@ -851,7 +852,7 @@ impl Attribute {
     }
 }
 
-impl Spanned for Attribute {
+impl Attribute {
     fn span(&self) -> Span {
         match self {
             Attribute::Path(path) => path.span(),
@@ -870,6 +871,9 @@ impl Parse for TypeAttributes {
     fn parse(input: parse::ParseStream) -> syn::Result<Self> {
         let mut mode = None;
         let mut attributes = Vec::new();
+
+        // Skip over `musli` attribute.
+        let _ = input.parse::<syn::Path>();
 
         let content;
         let parens = syn::parenthesized!(content in input);
@@ -943,6 +947,9 @@ impl Parse for VariantAttributes {
         let mut mode = None;
         let mut attributes = Vec::new();
 
+        // Skip over `musli` attribute.
+        let _ = input.parse::<syn::Path>();
+
         let content;
         let parens = syn::parenthesized!(content in input);
 
@@ -1004,6 +1011,9 @@ impl Parse for FieldAttributes {
     fn parse(input: parse::ParseStream) -> syn::Result<Self> {
         let mut mode = None;
         let mut attributes = Vec::new();
+
+        // Skip over `musli` attribute.
+        let _ = input.parse::<syn::Path>();
 
         let content;
         let parens = syn::parenthesized!(content in input);
