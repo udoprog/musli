@@ -1,6 +1,6 @@
 [package]
 name = "musli-json"
-version = "0.0.37"
+version = "0.0.38"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.65"
@@ -21,9 +21,9 @@ std = ["musli/std", "musli-common/std", "musli-value"]
 test = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.37" }
-musli-common = { path = "../musli-common", version = "0.0.37" }
-musli-value = { path = "../musli-value", version = "0.0.37", optional = true }
+musli = { path = "../musli", version = "0.0.38" }
+musli-common = { path = "../musli-common", version = "0.0.38" }
+musli-value = { path = "../musli-value", version = "0.0.38", optional = true }
 
 itoa = "1.0.6"
 ryu = "1.0.13"

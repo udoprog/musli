@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "musli"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "musli-json",
  "musli-macros",
@@ -436,7 +436,7 @@ dependencies = [
 
 [[package]]
 name = "musli-common"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "musli",
  "rand",
@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "musli-descriptive"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "musli",
  "musli-common",
@@ -454,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "musli-json"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "itoa",
  "lexical",
@@ -467,7 +467,7 @@ dependencies = [
 
 [[package]]
 name = "musli-macros"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -476,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "musli-storage"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "musli",
  "musli-common",
@@ -506,7 +506,7 @@ dependencies = [
 
 [[package]]
 name = "musli-value"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "itoa",
  "lexical",
@@ -518,7 +518,7 @@ dependencies = [
 
 [[package]]
 name = "musli-wire"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "musli",
  "musli-common",
