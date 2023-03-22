@@ -20,7 +20,7 @@ default = ["std"]
 std = []
 
 [dependencies]
-musli-macros = { path = "../musli-macros", version = "0.0.37" }
+musli-macros = { version = "=0.0.37", path = "../musli-macros" }
 
 [dev-dependencies]
 musli-wire = { path = "../musli-wire", default_features = false }
