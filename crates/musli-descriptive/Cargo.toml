@@ -3,7 +3,7 @@ name = "musli-descriptive"
 version = "0.0.37"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.68"
+rust-version = "1.65"
 description = """
 A fully self-descriptive format for Müsli.
 """
