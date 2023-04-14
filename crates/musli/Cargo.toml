@@ -23,6 +23,6 @@ std = []
 musli-macros = { version = "=0.0.38", path = "../musli-macros" }
 
 [dev-dependencies]
-musli-wire = { path = "../musli-wire", default_features = false }
-musli-storage = { path = "../musli-storage", default_features = false }
-musli-json = { path = "../musli-json", default_features = false }
+musli-wire = { path = "../musli-wire", default-features = false }
+musli-storage = { path = "../musli-storage", default-features = false }
+musli-json = { path = "../musli-json", default-features = false }

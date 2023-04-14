@@ -9,12 +9,12 @@ default = ["std"]
 std = ["musli/std", "musli-wire/std", "musli-storage/std", "musli-json/std"]
 
 [dependencies]
-musli = { path = "../musli", default_features = false }
-musli-wire = { path = "../musli-wire", features = ["test"], default_features = false }
-musli-descriptive = { path = "../musli-descriptive", features = ["test"], default_features = false }
-musli-storage = { path = "../musli-storage", features = ["test"], default_features = false }
-musli-json = { path = "../musli-json", features = ["test"], default_features = false }
-musli-value = { path = "../musli-value", features = ["test"], default_features = false }
+musli = { path = "../musli", default-features = false }
+musli-wire = { path = "../musli-wire", features = ["test"], default-features = false }
+musli-descriptive = { path = "../musli-descriptive", features = ["test"], default-features = false }
+musli-storage = { path = "../musli-storage", features = ["test"], default-features = false }
+musli-json = { path = "../musli-json", features = ["test"], default-features = false }
+musli-value = { path = "../musli-value", features = ["test"], default-features = false }
 
 anyhow = "1.0.70"
 rand = "0.8.5"

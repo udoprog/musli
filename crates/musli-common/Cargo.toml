@@ -20,7 +20,7 @@ default = ["std"]
 std = ["musli/std"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.38", default_features = false }
+musli = { path = "../musli", version = "0.0.38", default-features = false }
 
 [dev-dependencies]
 rand = "0.8.5"
