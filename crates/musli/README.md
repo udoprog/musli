@@ -10,8 +10,6 @@ Müsli is a flexible and generic binary serialization framework.
 The central components of the framework are the [Encode] and [Decode]
 derives. They are thoroughly documented in the [derives] module.
 
-**Müsli currently depends on [GATs] and is nightly-only**
-
 I've chosen to internally use the term "encoding", "encode", and "decode"
 because it's common terminology when talking about binary formats. It's also
 distinct from [serde]'s use of "serialization" allowing for the ease of
