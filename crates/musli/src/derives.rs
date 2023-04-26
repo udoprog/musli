@@ -1,14 +1,14 @@
-//! # The `Encode` and `Decode` derives
+//! # The [`Encode`] and [`Decode`] derives
 //!
-//! The `Encode` and `Decode` derives allows for automatically implementing
-//! [Encode] and [Decode].
+//! The [`Encode`] and [`Decode`] derives allows for automatically implementing
+//! [`Encode`] and [`Decode`].
 //!
 //! They come with a number of options for customizing their implementation,
 //! detailed below. But first we need to talk about *modes*.
 //!
 //! #### Modes
 //!
-//! If you've paid close attention to the [Encode] and [Decode] traits you
+//! If you've paid close attention to the [`Encode`] and [`Decode`] traits you
 //! might've noticed that they have an extra parameter called `M` for "mode".
 //!
 //! This allows a single type to have *more than one* implementation of encoding
@@ -23,9 +23,7 @@
 //! use musli::{Encode, Decode, Mode};
 //!
 //! enum Json {}
-//!
-//! impl Mode for Json {
-//! }
+//! impl Mode for Json {}
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(default_field_name = "index")]
@@ -39,7 +37,7 @@
 //! What this means is that if we want to serialize `Person` using named fields,
 //! we can simply turn on the `Json` mode for our given serializer. If we want
 //! to revert back to the default behavior and use indexed fields we can instead
-//! use [DefaultMode].
+//! use [`DefaultMode`].
 //!
 //! ```
 //! # use musli::{Encode, Decode};
@@ -130,13 +128,14 @@
 //!
 //! ## Container attributes
 //!
-//! * `#[musli(default_field_name = "..")]` determines how the default tag for a
-//!   field is determined. It can take either `"name"` or `"index"`.
+//! #### `#[musli(default_field_name = "..")]`
 //!
-//!   `#[musli(default_field_name = "index")]` will use the index of the field.
+//! This determines how the default tag for a field is determined. It can take
+//! either `"name"` or `"index"`.
+//!
+//! * `#[musli(default_field_name = "index")]` will use the index of the field.
 //!   This is the default.
-//!
-//!   `#[musli(default_field_name = "name")]` will use the name of the field.
+//! * `#[musli(default_field_name = "name")]` will use the name of the field.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -160,13 +159,15 @@
 //! }
 //! ```
 //!
-//! * `#[musli(default_variant_name = "..")]` determines how the default tag for
-//!   a variant is determined. It can take either `"name"` or `"index"`.
+//! #### `#[musli(default_variant_name = "..")]`
 //!
-//!   `#[musli(default_variant_name = "index")]` will use the index of the
+//! This determines how the default tag for a variant is determined. It can take
+//! either `"name"` or `"index"`.
+//!
+//! * `#[musli(default_variant_name = "index")]` will use the index of the
 //!   variant. This is the default.
-//!
-//!   `#[musli(default_variant_name = "name")]` will use the name of the variant.
+//! * `#[musli(default_variant_name = "name")]` will use the name of the
+//!   variant.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -183,9 +184,11 @@
 //! }
 //! ```
 //!
-//! * `#[musli(transparent)]` can only be used on types which have a single
-//!   field. It will cause that field to define how that variant is encoded or
-//!   decoded transparently without being treated as a field.
+//! #### `#[musli(transparent)]`
+//!
+//! This can only be used on types which have a single field. It will cause that
+//! field to define how that variant is encoded or decoded transparently without
+//! being treated as a field.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -201,17 +204,18 @@
 //! # Ok(()) }
 //! ```
 //!
-//! * `#[musli(packed)]` this attribute will disable all *tagging* and the
-//!   structure will simply be encoded with one field following another in the
-//!   order in which they are defined.
+//! #### `#[musli(packed)]`
 //!
-//!   A caveat of *packed* structures is that they cannot be safely versioned
-//!   and the two systems communicating through them need to be using strictly
-//!   synchronized representations.
+//! This attribute will disable all *tagging* and the structure will simply be
+//! encoded with one field following another in the order in which they are
+//! defined.
 //!
-//!   This attribute is useful for performing simple decoding over "raw" bytes
-//!   when combined with an encoder which does minimal prefixing and packs
-//!   fields.
+//! A caveat of *packed* structures is that they cannot be safely versioned and
+//! the two systems communicating through them need to be using strictly
+//! synchronized representations.
+//!
+//! This attribute is useful for performing simple decoding over "raw" bytes
+//! when combined with an encoder which does minimal prefixing and packs fields.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -235,9 +239,11 @@
 //! # Ok(()) }
 //! ```
 //!
-//! * `#[musli(name_type = ..)]` indicates which type any contained `#[musli(tag
-//!   = ..)]` attributes should have. Tags can usually be inferred, but
-//!   specifying this field ensures that all tags have a well-defined type.
+//! #### `#[musli(name_type = ..)]`
+//!
+//! This indicates which type any contained `#[musli(tag = ..)]` attributes
+//! should have. Tags can usually be inferred, but specifying this field ensures
+//! that all tags have a well-defined type.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -263,16 +269,18 @@
 //! }
 //! ```
 //!
-//! * `#[musli(bound = ..)]` and `#[musli(decode_bound = ..)]` can be used to
-//!   apply bounds to an [Encode] or [Decode] implementation.
+//! #### `#[musli(bound = ..)]` and `#[musli(decode_bound = ..)]`
 //!
-//!   These are necessary to use when a generic container is used to ensure that
-//!   the given parameter implements the necessary bounds.
+//! These attributes can be used to apply bounds to an [`Encode`] or [`Decode`]
+//! implementation.
 //!
-//!   `#[musli(bound = ..)]` applies to all implementations while
-//!   `#[musli(decode_bound = ..)]` only applies to the [Decode] implementation.
-//!   The latter allows for using the decode lifetime parameter (which defaults
-//!   to `'de`).
+//! These are necessary to use when a generic container is used to ensure that
+//! the given parameter implements the necessary bounds.
+//!
+//! `#[musli(bound = ..)]` applies to all implementations while
+//! `#[musli(decode_bound = ..)]` only applies to the [`Decode`] implementation.
+//! The latter allows for using the decode lifetime parameter (which defaults to
+//! `'de`).
 //!
 //! ```
 //! use musli::{Decode, Encode};
@@ -286,35 +294,38 @@
 //!
 //! ## Enum attributes
 //!
-//! * `#[musli(tag = ..)]` Use the internally tagged enum representation for
-//!   this enum, with the given tag. See [enum
-//!   representations](#enum-representations) for details on this
-//!   representation.
+//! #### `#[musli(tag = ..)]`
+//!
+//! This attribute causes the enum to be internally tagged, with the given tag.
+//! See [enum representations](#enum-representations) for details on this
+//! representation.
 //!
 //! ## Variant attributes
 //!
-//! * `#[musli(rename = ..)]` allows for renaming a variant from its default value.
-//!   It can take any value (including complex ones) that can be serialized with
-//!   the current encoding, such as:
+//! #### `#[musli(rename = ..)]`
 //!
-//!   * `#[musli(rename = 1)]`
-//!   * `#[musli(rename = "Hello World")]`
-//!   * `#[musli(rename = b"box\0")]`
-//!   * `#[musli(rename = SomeStruct { field: 42 })]` (if `SomeStruct` implements
-//!     `Encode` and `Decode` as appropriate).
+//! This allows for renaming a variant from its default value.
+//! It can take any value (including complex ones) that can be serialized with
+//! the current encoding, such as:
 //!
-//!   If the type of the tag is ambiguous it can be explicitly specified through
-//!   the `#[musli(name_type)]` container attribute (see above).
+//! * `#[musli(rename = 1)]`
+//! * `#[musli(rename = "Hello World")]`
+//! * `#[musli(rename = b"box\0")]`
+//! * `#[musli(rename = SomeStruct { field: 42 })]` (if `SomeStruct` implements
+//!   [`Encode`] and [`Decode`] as appropriate).
 //!
-//! * `#[musli(default_field_name = "..")]` determines how the default tag for a
-//!   field in the current variant is determined. This overrides the tagging
-//!   convention specified on the *container* and can take either `"name"` or
-//!   `"index"`.
+//! If the type of the tag is ambiguous it can be explicitly specified through
+//! the `#[musli(name_type)]` container attribute (see above).
 //!
-//!   `#[musli(default_field_name = "index")]` will use the index of the field.
+//! #### `#[musli(default_field_name = "..")]`
+//!
+//! This determines how the default tag for a field in the current variant is
+//! determined. This overrides the tagging convention specified on the
+//! *container* and can take either `"name"` or `"index"`.
+//!
+//! * `#[musli(default_field_name = "index")]` will use the index of the field.
 //!   This is the default.
-//!
-//!   `#[musli(default_field_name = "name")]` will use the name of the field.
+//! * `#[musli(default_field_name = "name")]` will use the name of the field.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -332,16 +343,20 @@
 //! }
 //! ```
 //!
-//! * `#[musli(transparent)]` can only be used on variants which have a single
-//!   field. It will cause that field to define how that variant is encoded or
-//!   decoded transparently without being treated as a field.
+//! #### `#[musli(transparent)]`
 //!
-//! * `#[musli(name_type = ..)]` indicates which type any contained `#[musli(tag
-//!   = ..)]` attributes should have. Tags can usually be inferred, but
-//!   specifying this field ensures that all tags have a well-defined type.
+//! This can only be used on variants which have a single field. It will cause
+//! that field to define how that variant is encoded or decoded transparently
+//! without being treated as a field.
 //!
-//!   This attribute takes priority over the one with the same name on the
-//!   container.
+//! #### `#[musli(name_type = ..)]`
+//!
+//! This indicates which type any contained `#[musli(tag = ..)]` attributes
+//! should have. Tags can usually be inferred, but specifying this field ensures
+//! that all tags have a well-defined type.
+//!
+//! This attribute takes priority over the one with the same name on the
+//! container.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -361,8 +376,10 @@
 //! }
 //! ```
 //!
-//! * `#[musli(default)]` defines the variant that will be used in case no other
-//!   variant matches. Only one such variant can be defined.
+//! #### `#[musli(default)]`
+//!
+//! This defines the variant that will be used in case no other variant matches.
+//! Only one such variant can be defined.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -380,27 +397,30 @@
 //!
 //! ## Field attributes
 //!
-//! * `#[musli(rename = ..)]` allows for renaming a field from its default value.
-//!   It can take any value (including complex ones) that can be serialized with
-//!   the current encoding, such as:
+//! #### `#[musli(rename = ..)]`
 //!
-//!   * `#[musli(rename = 1)]`
-//!   * `#[musli(rename = "Hello World")]`
-//!   * `#[musli(rename = b"box\0")]`
-//!   * `#[musli(rename = SomeStruct { field: 42 })]` (if `SomeStruct` implements
-//!     `Encode` and `Decode` as appropriate).
+//! This allows for renaming a field from its default value. It can take any
+//! value (including complex ones) that can be serialized with the current
+//! encoding, such as:
 //!
-//!   If the type of the tag is ambiguous it can be explicitly specified through
-//!   the `#[musli(name_type)]` variant or container attributes (see above).
+//! * `#[musli(rename = 1)]`
+//! * `#[musli(rename = "Hello World")]`
+//! * `#[musli(rename = b"box\0")]`
+//! * `#[musli(rename = SomeStruct { field: 42 })]` (if `SomeStruct` implements
+//!   [`Encode`] and [`Decode`] as appropriate).
 //!
-//! * `#[musli(with = <path>)]` specifies the path to a module to use instead of
-//!   the fields default [Encode] or [Decode] implementations.
+//! If the type of the tag is ambiguous it can be explicitly specified through
+//! the `#[musli(name_type)]` variant or container attributes (see above).
 //!
-//!   It expects the following functions to be defined, assuming the type of the
-//!   field is `Field`.
+//! #### `#[musli(with = <path>)]`
 //!
-//!   `encode` for encoding the field, which should match the following
-//!   signature:
+//! This specifies the path to a module to use instead of the fields default
+//! [`Encode`] or [`Decode`] implementations.
+//!
+//! It expects the following functions to be defined, assuming the type of the
+//! field is `Field`.
+//!
+//! `encode` for encoding the field, which should match the following signature:
 //!
 //! ```rust,ignore
 //! fn encode<M, E>(field: &Field, encoder: E) -> Result<E::Ok, E::Error>
@@ -409,8 +429,7 @@
 //!     E: Encoder;
 //! ```
 //!
-//!   `encode` for decoding the field, which should match the following
-//!   signature:
+//! `encode` for decoding the field, which should match the following signature:
 //!
 //! ```rust,ignore
 //! fn decode<'de, M, D>(decoder: D) -> Result<Field, D::Error>
@@ -419,8 +438,23 @@
 //!     D: Decoder<'de>;
 //! ```
 //!
+//! Finally this can receive generic arguments like `#[musli(with =
+//! crate::path::<_>)]`, in case the receiving decode and encode functions
+//! receive *extra* generic arguments (beyond `M` and `D`), such as:
+//!
+//! ```rust,ignore
+//! fn decode<'de, M, D, T>(decoder: D) -> Result<Set<T>, D::Error>
+//! where
+//!     M: Mode,
+//!     D: Decoder<'de>,
+//!     T: Decode<'de>;
+//! ```
+//!
+//! Full example:
+//!
 //! ```
 //! # mod types {
+//! use std::collections::HashSet;
 //! use musli::{Encode, Decode};
 //!
 //! pub struct CustomUuid(u128);
@@ -428,7 +462,9 @@
 //! #[derive(Encode, Decode)]
 //! struct Struct {
 //!     #[musli(with = self::custom_uuid)]
-//!     name: CustomUuid,
+//!     id: CustomUuid,
+//!     #[musli(with = self::custom_set::<_>)]
+//!     numbers: HashSet<u32>,
 //! }
 //!
 //! mod custom_uuid {
@@ -454,12 +490,40 @@
 //!         Ok(CustomUuid(<u128 as Decode<M>>::decode(decoder)?))
 //!     }
 //! }
+//!
+//! mod custom_set {
+//!     use std::collections::HashSet;
+//!     use std::hash::Hash;
+//!
+//!     use musli::en::{Encode, Encoder};
+//!     use musli::de::{Decode, Decoder};
+//!     use musli::mode::Mode;
+//!
+//!     pub fn encode<M, E, T>(set: &HashSet<T>, encoder: E) -> Result<E::Ok, E::Error>
+//!     where
+//!         M: Mode,
+//!         E: Encoder,
+//!         T: Encode<M> + Eq + Hash,
+//!     {
+//!         HashSet::<T>::encode(set, encoder)
+//!     }
+//!
+//!     pub fn decode<'de, M, D, T>(decoder: D) -> Result<HashSet<T>, D::Error>
+//!     where
+//!         M: Mode,
+//!         D: Decoder<'de>,
+//!         T: Decode<'de> + Eq + Hash,
+//!     {
+//!         HashSet::<T>::decode(decoder)
+//!     }
+//! }
 //! # }
 //! ```
 //!
-//! * `#[musli(default)]` constructs the field using [Default::default] in case
-//!   it's not available. This is only used when a field is missing during
-//!   decoding.
+//! #### `#[musli(default)]`
+//!
+//! This constructs the field using [Default::default] in case it's not
+//! available. This is only used when a field is missing during decoding.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -472,9 +536,10 @@
 //! }
 //! ```
 //!
-//! * `#[musli(skip_encoding_if = <path>)]` adds a condition to skip encoding a
-//!   field entirely if the condition is true. This is very commonly used to
-//!   skip over encoding `Option<T>` fields.
+//! #### `#[musli(skip_encoding_if = <path>)]`
+//!
+//! This adds a condition to skip encoding a field entirely if the condition is
+//! true. This is very commonly used to skip over encoding `Option<T>` fields.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -518,8 +583,8 @@
 //! ```
 //!
 //! This is the most portable representation and is supported by most formats.
-//! It has special support in the [Encoder] and [Decoder] traits through
-//! [Encoder::encode_variant] and [Decoder::decode_variant].
+//! It has special support in the [`Encoder`] and [`Decoder`] traits through
+//! [`Encoder::encode_variant`] and [`Decoder::decode_variant`].
 //!
 //! Conceptually this can be considered as a "pair", where the variant tag can
 //! be extracted from the format before the variant is decoded.
@@ -545,20 +610,20 @@
 //! ```
 //!
 //! This is only supported by formats which are *self descriptive*, which is a
-//! requirement for the format to be buffered through [Decoder::decode_buffer].
+//! requirement for the format to be buffered through [`Decoder::decode_buffer`].
 //!
 //! It is necessary to buffer the value, since we need to inspect the fields of
 //! a map for the field corresponding to the `tag`, and then use this to
 //! determine which decoder implementation to call.
 //!
 //! [default mode]: crate::mode::DefaultMode
-//! [DefaultMode]: crate::mode::DefaultMode
-//! [Encode]: crate::Encode
-//! [Decode]: crate::Decode
-//! [Encoder]: crate::Encoder
-//! [Encoder::encode_variant]: crate::Encoder::encode_variant
-//! [Decoder]: crate::Decoder
-//! [Decoder::decode_variant]: crate::Decoder::decode_variant
-//! [Decoder::decode_buffer]: crate::Decoder::decode_buffer
+//! [`DefaultMode`]: crate::mode::DefaultMode
+//! [`Encode`]: crate::Encode
+//! [`Decode`]: crate::Decode
+//! [`Encoder`]: crate::Encoder
+//! [`Encoder::encode_variant`]: crate::Encoder::encode_variant
+//! [`Decoder`]: crate::Decoder
+//! [`Decoder::decode_variant`]: crate::Decoder::decode_variant
+//! [`Decoder::decode_buffer`]: crate::Decoder::decode_buffer
 
 // Parts of this documentation

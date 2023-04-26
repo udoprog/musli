@@ -23,13 +23,13 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let expander = expander::Expander::new(&input);
 
-    let dump = std::env::var("MUSLI_DUMP").ok();
+    let dump = std::env::var("MUSLI_DUMP_ENCODE").ok();
 
     match expander.expand_encode() {
         Ok(tokens) => {
-            if let Some(dump) = dump {
-                if expander.input.ident.to_string().contains(&dump) {
-                    println!("{}", tokens);
+            if let Some((dump, out)) = dump.as_ref().and_then(|d| d.split_once('=')) {
+                if input.ident.to_string().contains(dump) {
+                    let _ = std::fs::write(out, format!("{}", tokens));
                 }
             }
 
@@ -45,13 +45,13 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let expander = expander::Expander::new(&input);
 
-    let dump = std::env::var("MUSLI_DUMP").ok();
+    let dump = std::env::var("MUSLI_DUMP_DECODE").ok();
 
     match expander.expand_decode() {
         Ok(tokens) => {
-            if let Some(dump) = dump {
-                if expander.input.ident.to_string().contains(&dump) {
-                    println!("{}", tokens);
+            if let Some((dump, out)) = dump.as_ref().and_then(|d| d.split_once('=')) {
+                if input.ident.to_string().contains(dump) {
+                    let _ = std::fs::write(out, format!("{}", tokens));
                 }
             }
 
