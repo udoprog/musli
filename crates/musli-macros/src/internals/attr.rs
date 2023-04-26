@@ -1,18 +1,19 @@
-use core::fmt;
 use std::collections::HashMap;
+use std::fmt;
+use std::mem;
+
+use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
+use syn::parse;
+use syn::parse::Parse;
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use syn::Token;
 
 use crate::expander::determine_tag_method;
 use crate::expander::TagMethod;
 use crate::internals::symbol::*;
-use crate::internals::Ctxt;
-use crate::internals::Mode;
-use proc_macro2::{Span, TokenStream};
-use quote::quote_spanned;
-use quote::ToTokens;
-use syn::parse;
-use syn::parse::Parse;
-use syn::spanned::Spanned;
-use syn::Ident;
+use crate::internals::{Ctxt, Mode, ModePath};
 
 /// The value and method to encode / decode a tag.
 #[derive(Clone, Copy)]
@@ -406,11 +407,14 @@ impl FieldAttr {
             .or(self.root.encode_path.as_ref());
 
         if let Some((span, encode_path)) = encode_path {
+            let mut encode_path = encode_path.clone();
             let mode_ident = mode.mode_ident();
-            (
-                *span,
-                quote_spanned!(*span => #encode_path::<#mode_ident, _>),
-            )
+
+            if let Some(last) = encode_path.path.segments.last_mut() {
+                adjust_mode_path(last, mode_ident);
+            }
+
+            (*span, encode_path.to_token_stream())
         } else {
             let encode_path = mode.encode_t_encode(span);
             (span, encode_path)
@@ -425,11 +429,14 @@ impl FieldAttr {
             .or(self.root.decode_path.as_ref());
 
         if let Some((span, decode_path)) = decode_path {
+            let mut decode_path = decode_path.clone();
             let mode_ident = mode.mode_ident();
-            (
-                *span,
-                quote_spanned!(*span => #decode_path::<#mode_ident, _>),
-            )
+
+            if let Some(last) = decode_path.path.segments.last_mut() {
+                adjust_mode_path(last, mode_ident);
+            }
+
+            (*span, decode_path.to_token_stream())
         } else {
             let decode_path = mode.decode_t_decode(span);
             (span, decode_path)
@@ -444,6 +451,51 @@ impl FieldAttr {
             .or(self.root.skip_encoding_if.as_ref())?;
 
         Some((*span, path))
+    }
+}
+
+/// Adjust a mode path.
+fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath) {
+    let insert_args = |args: &mut Punctuated<_, _>| {
+        args.insert(
+            0,
+            syn::GenericArgument::Type(syn::Type::Verbatim(mode_ident.to_token_stream())),
+        );
+
+        args.insert(
+            1,
+            syn::GenericArgument::Type(syn::Type::Infer(syn::TypeInfer {
+                underscore_token: <Token![_]>::default(),
+            })),
+        );
+    };
+
+    match &mut last.arguments {
+        syn::PathArguments::None => {
+            let mut args = syn::AngleBracketedGenericArguments {
+                colon2_token: Some(<Token![::]>::default()),
+                lt_token: <Token![<]>::default(),
+                args: Punctuated::default(),
+                gt_token: <Token![>]>::default(),
+            };
+
+            insert_args(&mut args.args);
+            last.arguments = syn::PathArguments::AngleBracketed(args);
+        }
+        syn::PathArguments::AngleBracketed(args) => {
+            insert_args(&mut args.args);
+        }
+        syn::PathArguments::Parenthesized(args) => {
+            args.inputs
+                .insert(0, syn::Type::Verbatim(mode_ident.to_token_stream()));
+
+            args.inputs.insert(
+                1,
+                syn::Type::Infer(syn::TypeInfer {
+                    underscore_token: <Token![_]>::default(),
+                }),
+            );
+        }
     }
 }
 
@@ -575,23 +627,33 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
                 match attribute {
                     // parse #[musli(with = <path>)]
                     Attribute::KeyValue(path, value) if path == WITH => {
-                        if let Some(path) = value_as_path(cx, WITH, value) {
+                        if let Some(mut path) = value_as_path(cx, WITH, value) {
+                            let arguments = match path.path.segments.last_mut() {
+                                Some(path) => {
+                                    mem::replace(&mut path.arguments, syn::PathArguments::None)
+                                }
+                                None => syn::PathArguments::None,
+                            };
+
                             let mut encode_path = path.clone();
 
-                            encode_path
-                                .path
-                                .segments
-                                .push(Ident::new("encode", Span::call_site()).into());
-
-                            attr.set_encode_path(cx, path.span(), encode_path);
+                            encode_path.path.segments.push({
+                                let mut segment: syn::PathSegment =
+                                    syn::Ident::new("encode", Span::call_site()).into();
+                                segment.arguments = arguments.clone();
+                                segment
+                            });
 
                             let mut decode_path = path.clone();
 
-                            decode_path
-                                .path
-                                .segments
-                                .push(Ident::new("decode", Span::call_site()).into());
+                            decode_path.path.segments.push({
+                                let mut segment: syn::PathSegment =
+                                    syn::Ident::new("decode", Span::call_site()).into();
+                                segment.arguments = arguments.clone();
+                                segment
+                            });
 
+                            attr.set_encode_path(cx, path.span(), encode_path);
                             attr.set_decode_path(cx, path.span(), decode_path);
                         }
                     }
@@ -881,13 +943,13 @@ impl Parse for TypeAttributes {
         while !content.is_empty() {
             let path: syn::Path = content.parse()?;
 
-            if let Some(..) = content.parse::<Option<syn::Token![=]>>()? {
+            if let Some(..) = content.parse::<Option<Token![=]>>()? {
                 let value = match &path {
                     // parse #[musli(mode = <ident>)]
                     path if path == MODE => {
                         mode = Some(content.parse()?);
 
-                        if content.parse::<Option<syn::Token![,]>>()?.is_none() {
+                        if content.parse::<Option<Token![,]>>()?.is_none() {
                             break;
                         }
 
@@ -923,7 +985,7 @@ impl Parse for TypeAttributes {
                 attributes.push(Attribute::Path(path));
             }
 
-            if content.parse::<Option<syn::Token![,]>>()?.is_none() {
+            if content.parse::<Option<Token![,]>>()?.is_none() {
                 break;
             }
         }
@@ -956,13 +1018,13 @@ impl Parse for VariantAttributes {
         while !content.is_empty() {
             let path: syn::Path = content.parse()?;
 
-            if let Some(..) = content.parse::<Option<syn::Token![=]>>()? {
+            if let Some(..) = content.parse::<Option<Token![=]>>()? {
                 let value = match &path {
                     // parse #[musli(mode = <ident>)]
                     path if path == MODE => {
                         mode = Some(content.parse()?);
 
-                        if content.parse::<Option<syn::Token![,]>>()?.is_none() {
+                        if content.parse::<Option<Token![,]>>()?.is_none() {
                             break;
                         }
 
@@ -988,7 +1050,7 @@ impl Parse for VariantAttributes {
                 attributes.push(Attribute::Path(path));
             }
 
-            if content.parse::<Option<syn::Token![,]>>()?.is_none() {
+            if content.parse::<Option<Token![,]>>()?.is_none() {
                 break;
             }
         }
@@ -1021,13 +1083,13 @@ impl Parse for FieldAttributes {
         while !content.is_empty() {
             let path: syn::Path = content.parse()?;
 
-            if let Some(..) = content.parse::<Option<syn::Token![=]>>()? {
+            if let Some(..) = content.parse::<Option<Token![=]>>()? {
                 let value = match &path {
                     // parse #[musli(mode = <ident>)]
                     path if path == MODE => {
                         mode = Some(content.parse()?);
 
-                        if content.parse::<Option<syn::Token![,]>>()?.is_none() {
+                        if content.parse::<Option<Token![,]>>()?.is_none() {
                             break;
                         }
 
@@ -1053,7 +1115,7 @@ impl Parse for FieldAttributes {
                 attributes.push(Attribute::Path(path));
             }
 
-            if content.parse::<Option<syn::Token![,]>>()?.is_none() {
+            if content.parse::<Option<Token![,]>>()?.is_none() {
                 break;
             }
         }
