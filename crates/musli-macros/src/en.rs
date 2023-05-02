@@ -36,7 +36,9 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
             predicates: Default::default(),
         });
 
-        where_clause.predicates.extend(e.bounds.iter().cloned());
+        where_clause
+            .predicates
+            .extend(e.bounds.iter().map(|(_, v)| v.clone()));
     }
 
     let type_generics = &e.input.generics;

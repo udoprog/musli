@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use proc_macro2::Span;
-use quote::ToTokens;
 
 struct Inner {
     modes: HashSet<syn::Path>,
@@ -33,18 +32,6 @@ impl Ctxt {
     /// Test if context contains errors.
     pub(crate) fn has_errors(&self) -> bool {
         !self.inner.borrow().errors.is_empty()
-    }
-
-    /// Report an error with a span.
-    pub(crate) fn error_spanned_by<S, T>(&self, spanned: S, message: T)
-    where
-        S: ToTokens,
-        T: fmt::Display,
-    {
-        self.inner
-            .borrow_mut()
-            .errors
-            .push(syn::Error::new_spanned(spanned, message));
     }
 
     /// Report an error with a span.

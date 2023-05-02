@@ -3,9 +3,6 @@ use std::fmt;
 use std::mem;
 
 use proc_macro2::Span;
-use quote::ToTokens;
-use syn::parse;
-use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
@@ -40,8 +37,9 @@ pub enum DefaultTag {
 }
 
 /// If the type is tagged or not.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Packing {
+    #[default]
     Tagged,
     Packed,
     Transparent,
@@ -57,100 +55,82 @@ impl fmt::Display for Packing {
     }
 }
 
-impl Default for Packing {
-    fn default() -> Self {
-        Self::Tagged
-    }
-}
-
-#[derive(Default)]
-struct InnerTypeAttr {
-    /// `#[musli(crate = <path>)]`.
-    krate: Option<(Span, syn::Path)>,
-    /// `#[musli(name_type)]`.
-    tag_type: Option<(Span, syn::Type)>,
-    /// `#[musli(default_variant_name = "..")]`.
-    default_variant_name: Option<DefaultTag>,
-    /// `#[musli(default_field_name = "..")]`.
-    default_field_name: Option<DefaultTag>,
-    /// If `#[musli(tag = <expr>)]` is specified.
-    tag: Option<(Span, syn::Expr)>,
-    /// If `#[musli(content = <expr>)]` is specified.
-    content: Option<(Span, syn::Expr)>,
-    /// `#[musli(packed)]` or `#[musli(transparent)]`.
-    packing: Option<(Span, Packing)>,
-    /// Bounds in a where predicate.
-    bounds: Vec<syn::WherePredicate>,
-    /// Bounds to require for a `Decode` implementation.
-    decode_bounds: Vec<syn::WherePredicate>,
-}
-
-impl InnerTypeAttr {
-    /// Update how an enum is tagged.
-    fn set_tag(&mut self, cx: &Ctxt, span: Span, expr: syn::Expr) {
-        if self.tag.is_some() {
-            cx.error_span(
-                span,
-                format_args!("#[{ATTR}({TAG})] may only be specified once",),
-            );
-
-            return;
-        }
-
-        self.tag = Some((span, expr));
-    }
-
-    /// Update how an enum is tagged.
-    fn set_content(&mut self, cx: &Ctxt, span: Span, expr: syn::Expr) {
-        if self.content.is_some() {
-            cx.error_span(
-                span,
-                format_args!("#[{ATTR}({TAG})] may only be specified once",),
-            );
-
-            return;
-        }
-
-        self.content = Some((span, expr));
-    }
-
-    /// Update packing of type.
-    fn set_packing(&mut self, cx: &Ctxt, span: Span, packing: Packing) -> bool {
-        if let Some((_, existing)) = &self.packing {
-            if *existing != packing {
-                cx.error_span(
-                    span,
+macro_rules! merge {
+    ($self:expr, $cx:expr, $new:expr, $field:ident) => {{
+        for $field in $new.$field {
+            if $self.$field.is_some() {
+                $cx.error_span(
+                    $field.0,
                     format_args!(
-                        "#[{}({})] cannot be combined with #[{}({})]",
-                        ATTR, packing, ATTR, existing
+                        "#[{}] multiple {} attributes specified",
+                        ATTR,
+                        stringify!($field)
                     ),
                 );
-
-                return false;
+            } else {
+                $self.$field = Some($field);
             }
         }
+    }};
+}
 
-        self.packing = Some((span, packing));
-        true
-    }
-
-    fn set_crate(&mut self, cx: &Ctxt, span: Span, path: syn::Path) {
-        if let Some((span, _)) = self.krate {
-            cx.error_span(
-                span,
-                format_args!("#[{}({})] cannot be used multiple times", ATTR, CRATE),
-            );
+macro_rules! layer {
+    ($new:ident, $layer:ident {
+        $($(#[$($single_meta:meta)*])* $single:ident: $single_ty:ty,)* $(,)?
+        @multiple
+        $($(#[$($multiple_meta:meta)*])* $multiple:ident: $multiple_ty:ty,)* $(,)?
+    }) => {
+        #[derive(Default)]
+        struct $new {
+            $($(#[$($single_meta)*])* $single: Vec<(Span, $single_ty)>,)*
+            $($(#[$($multiple_meta)*])* $multiple: Vec<(Span, $multiple_ty)>,)*
         }
 
-        self.krate = Some((span, path));
+        #[derive(Default)]
+        struct $layer {
+            $($(#[$($single_meta)*])* $single: Option<(Span, $single_ty)>,)*
+            $($(#[$($multiple_meta)*])* $multiple: Vec<(Span, $multiple_ty)>,)*
+        }
+
+        impl $layer {
+            /// Merge attributes.
+            fn merge_with(&mut self, cx: &Ctxt, new: $new) {
+                $(merge!(self, cx, new, $single);)*
+                $(self.$multiple.extend(new.$multiple);)*
+            }
+        }
+    }
+}
+
+layer! {
+    TypeLayerNew, TypeLayer {
+        /// `#[musli(crate = <path>)]`.
+        krate: syn::Path,
+        /// `#[musli(name_type)]`.
+        name_type: syn::Type,
+        /// `#[musli(default_variant_name = "..")]`.
+        default_variant_name: DefaultTag,
+        /// `#[musli(default_field_name = "..")]`.
+        default_field_name: DefaultTag,
+        /// If `#[musli(tag = <expr>)]` is specified.
+        tag: syn::Expr,
+        /// If `#[musli(content = <expr>)]` is specified.
+        content: syn::Expr,
+        /// `#[musli(packed)]` or `#[musli(transparent)]`.
+        packing: Packing,
+        @multiple
+        /// Bounds in a where predicate.
+        bounds: syn::WherePredicate,
+        /// Bounds to require for a `Decode` implementation.
+        decode_bounds: syn::WherePredicate,
     }
 }
 
 #[derive(Default)]
 pub(crate) struct TypeAttr {
-    root: InnerTypeAttr,
+    root: TypeLayer,
     /// Nested configuartions for modes.
-    modes: HashMap<syn::Path, InnerTypeAttr>,
+    modes: HashMap<syn::Path, TypeLayer>,
 }
 
 impl TypeAttr {
@@ -206,19 +186,21 @@ impl TypeAttr {
         mode.ident
             .and_then(|m| Some(self.modes.get(m)?.default_field_name))
             .unwrap_or(self.root.default_field_name)
+            .map(|(_, v)| v)
     }
 
     pub(crate) fn default_variant_name(&self, mode: Mode<'_>) -> Option<DefaultTag> {
         mode.ident
             .and_then(|m| Some(self.modes.get(m)?.default_variant_name))
             .unwrap_or(self.root.default_variant_name)
+            .map(|(_, v)| v)
     }
 
     /// Get the tag type of the type.
-    pub(crate) fn tag_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
+    pub(crate) fn name_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
         mode.ident
-            .and_then(|m| self.modes.get(m)?.tag_type.as_ref())
-            .or(self.root.tag_type.as_ref())
+            .and_then(|m| self.modes.get(m)?.name_type.as_ref())
+            .or(self.root.name_type.as_ref())
     }
 
     /// Get the configured crate, or fallback to default.
@@ -231,104 +213,177 @@ impl TypeAttr {
     }
 
     /// Get the where clause that is associated with the type.
-    pub(crate) fn bounds(&self, mode: Mode<'_>) -> &[syn::WherePredicate] {
+    pub(crate) fn bounds(&self, mode: Mode<'_>) -> &[(Span, syn::WherePredicate)] {
         mode.ident
             .and_then(|m| Some(&self.modes.get(m)?.bounds))
             .unwrap_or(&self.root.bounds)
     }
 
     /// Get bounds to require for a `Decode` implementation.
-    pub(crate) fn decode_bounds(&self, mode: Mode<'_>) -> &[syn::WherePredicate] {
+    pub(crate) fn decode_bounds(&self, mode: Mode<'_>) -> &[(Span, syn::WherePredicate)] {
         mode.ident
             .and_then(|m| Some(&self.modes.get(m)?.decode_bounds))
             .unwrap_or(&self.root.decode_bounds)
     }
 }
 
-#[derive(Default)]
-struct InnerFieldAttr {
-    /// Module to use when decoding.
-    encode_path: Option<(Span, syn::Path)>,
-    /// Path to use when decoding.
-    decode_path: Option<(Span, syn::Path)>,
-    /// Method to check if we want to skip encoding.
-    skip_encoding_if: Option<(Span, syn::Path)>,
-    /// Rename a field to the given literal.
-    rename: Option<(Span, syn::Expr)>,
-    /// Use a default value for the field if it's not available.
-    default: Option<Span>,
-}
+pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
+    let mut attr = TypeAttr::default();
 
-impl InnerFieldAttr {
-    fn set_encode_path(&mut self, cx: &Ctxt, span: Span, encode_path: syn::Path) {
-        if self.encode_path.is_some() {
-            cx.error_spanned_by(
-                encode_path,
-                format_args!("#[{}] multiple encode methods specified", ATTR),
-            );
-        } else {
-            self.encode_path = Some((span, encode_path));
+    for a in attrs {
+        if a.path() != ATTR {
+            continue;
         }
+
+        let mut new = TypeLayerNew::default();
+        let mut mode = None::<syn::Path>;
+
+        let result = a.parse_nested_meta(|meta| {
+            // parse #[musli(mode = <path>)]
+            if meta.path == MODE {
+                meta.input.parse::<Token![=]>()?;
+                mode = Some(meta.input.parse()?);
+                return Ok(());
+            }
+
+            // parse #[musli(tag = <expr>)]
+            if meta.path == TAG {
+                meta.input.parse::<Token![=]>()?;
+                new.tag.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(content = <expr>)]
+            if meta.path == CONTENT {
+                meta.input.parse::<Token![=]>()?;
+                new.content.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(crate = <path>)]
+            if meta.path == CRATE {
+                meta.input.parse::<Token![=]>()?;
+                new.krate.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(name_type = <type>)]
+            if meta.path == NAME_TYPE {
+                meta.input.parse::<Token![=]>()?;
+                new.name_type.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(default_variant_name = "..")]
+            if meta.path == DEFAULT_VARIANT_NAME {
+                meta.input.parse::<Token![=]>()?;
+                let string = meta.input.parse::<syn::LitStr>()?;
+
+                new.default_variant_name
+                    .push(match string.value().as_str() {
+                        "index" => (meta.path.span(), DefaultTag::Index),
+                        "name" => (meta.path.span(), DefaultTag::Name),
+                        _ => {
+                            return Err(syn::Error::new_spanned(
+                                string,
+                                format_args!("#[{ATTR}({DEFAULT_VARIANT_NAME})] Bad value"),
+                            ));
+                        }
+                    });
+
+                return Ok(());
+            }
+
+            // parse #[musli(default_field_name = "..")]
+            if meta.path == DEFAULT_FIELD_NAME {
+                meta.input.parse::<Token![=]>()?;
+                let string = meta.input.parse::<syn::LitStr>()?;
+
+                new.default_field_name.push(match string.value().as_str() {
+                    "index" => (meta.path.span(), DefaultTag::Index),
+                    "name" => (meta.path.span(), DefaultTag::Name),
+                    _ => {
+                        return Err(syn::Error::new_spanned(
+                            string,
+                            format_args!("#[{ATTR}({DEFAULT_FIELD_NAME})]: Bad value."),
+                        ));
+                    }
+                });
+
+                return Ok(());
+            }
+
+            // parse #[musli(bound = "..")]
+            if meta.path == BOUND {
+                meta.input.parse::<Token![=]>()?;
+                new.bounds.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(decode_bound = "..")]
+            if meta.path == DECODE_BOUND {
+                meta.input.parse::<Token![=]>()?;
+                new.decode_bounds
+                    .push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(packed)]
+            if meta.path == PACKED {
+                new.packing.push((meta.path.span(), Packing::Packed));
+                return Ok(());
+            }
+
+            // parse #[musli(transparent)]
+            if meta.path == TRANSPARENT {
+                new.packing.push((meta.path.span(), Packing::Transparent));
+                return Ok(());
+            }
+
+            Err(syn::Error::new_spanned(
+                meta.path,
+                format_args!("#[{ATTR}] Unsupported type attribute"),
+            ))
+        });
+
+        if let Err(error) = result {
+            cx.syn_error(error);
+        }
+
+        let attr = match mode {
+            Some(mode) => {
+                cx.register_mode(mode.clone());
+                attr.modes.entry(mode).or_default()
+            }
+            None => &mut attr.root,
+        };
+
+        attr.merge_with(cx, new);
     }
 
-    fn set_decode_path(&mut self, cx: &Ctxt, span: Span, decode_path: syn::Path) {
-        if self.decode_path.is_some() {
-            cx.error_spanned_by(
-                decode_path,
-                format_args!("#[{}] multiple decode methods specified", ATTR),
-            );
-        } else {
-            self.decode_path = Some((span, decode_path));
-        }
-    }
-
-    fn set_skip_encoding_if(&mut self, cx: &Ctxt, span: Span, skip_encoding_if: syn::Path) {
-        if self.skip_encoding_if.is_some() {
-            cx.error_spanned_by(
-                skip_encoding_if,
-                format_args!("#[{}] multiple skip_encoding_if methods specified", ATTR),
-            );
-        } else {
-            self.skip_encoding_if = Some((span, skip_encoding_if));
-        }
-    }
+    attr
 }
 
-#[derive(Default)]
-struct InternalVariantAttr {
-    /// `#[musli(name_type)]`.
-    tag_type: Option<(Span, syn::Type)>,
-    /// Rename a field to the given expression.
-    rename: Option<(Span, syn::Expr)>,
-    /// `#[musli(packed)]` or `#[musli(transparent)]`.
-    packing: Option<(Span, Packing)>,
-    /// `#[musli(default)]`.
-    default: Option<Span>,
-    /// `#[musli(default_field_name = "..")]`.
-    default_field_name: Option<DefaultTag>,
-}
-
-impl InternalVariantAttr {
-    /// Update packing of type.
-    fn set_packing(&mut self, cx: &Ctxt, span: Span, packing: Packing) {
-        if let Some((_, existing)) = &self.packing {
-            cx.error_span(
-                span,
-                format_args!(
-                    "#[{}({})] cannot be combined with #[{}({})]",
-                    ATTR, packing, ATTR, existing
-                ),
-            );
-        }
-
-        self.packing = Some((span, packing));
+layer! {
+    VariantLayerNew, VariantLayer {
+        /// `#[musli(name_type)]`.
+        name_type: syn::Type,
+        /// Rename a field to the given expression.
+        rename: syn::Expr,
+        /// `#[musli(packed)]` or `#[musli(transparent)]`.
+        packing: Packing,
+        /// `#[musli(default)]`.
+        default: (),
+        /// `#[musli(default_field_name = "..")]`.
+        default_field_name: DefaultTag,
+        @multiple
     }
 }
 
 #[derive(Default)]
 pub(crate) struct VariantAttr {
-    root: InternalVariantAttr,
-    modes: HashMap<syn::Path, InternalVariantAttr>,
+    root: VariantLayer,
+    modes: HashMap<syn::Path, VariantLayer>,
 }
 
 impl VariantAttr {
@@ -337,6 +392,7 @@ impl VariantAttr {
         mode.ident
             .and_then(|m| self.modes.get(m)?.default)
             .or(self.root.default)
+            .map(|(s, ())| s)
     }
 
     /// Test if the `#[musli(rename)]` tag is specified.
@@ -361,29 +417,142 @@ impl VariantAttr {
         mode.ident
             .and_then(|m| self.modes.get(m)?.default_field_name)
             .or(self.root.default_field_name)
+            .map(|(_, v)| v)
     }
 
     /// Get the tag type of the type.
-    pub(crate) fn tag_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
+    pub(crate) fn name_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
         mode.ident
             .and_then(|m| self.modes.get(m))
-            .map(|a| a.tag_type.as_ref())
-            .unwrap_or(self.root.tag_type.as_ref())
+            .map(|a| a.name_type.as_ref())
+            .unwrap_or(self.root.name_type.as_ref())
+    }
+}
+
+/// Parse variant attributes.
+pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr {
+    let mut attr = VariantAttr::default();
+
+    for a in attrs {
+        if a.path() != ATTR {
+            continue;
+        }
+
+        let mut new = VariantLayerNew::default();
+        let mut mode = None::<syn::Path>;
+
+        let result = a.parse_nested_meta(|meta| {
+            // parse #[musli(mode = <path>)]
+            if meta.path == MODE {
+                meta.input.parse::<Token![=]>()?;
+                mode = Some(meta.input.parse()?);
+                return Ok(());
+            }
+
+            // parse #[musli(name_type = <type>)]
+            if meta.path == NAME_TYPE {
+                meta.input.parse::<Token![=]>()?;
+                new.name_type.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(rename = <expr>)]
+            if meta.path == RENAME {
+                meta.input.parse::<Token![=]>()?;
+                new.rename.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(default)]
+            if meta.path == DEFAULT {
+                new.default.push((meta.path.span(), ()));
+                return Ok(());
+            }
+
+            // parse #[musli(default_field_name = "..")]
+            if meta.path == DEFAULT_FIELD_NAME {
+                meta.input.parse::<Token![=]>()?;
+                let string = meta.input.parse::<syn::LitStr>()?;
+
+                new.default_field_name.push(match string.value().as_str() {
+                    "index" => (meta.path.span(), DefaultTag::Index),
+                    "name" => (meta.path.span(), DefaultTag::Name),
+                    _ => {
+                        return Err(syn::Error::new_spanned(
+                            string,
+                            format_args!("#[{ATTR}({DEFAULT_FIELD_NAME})]: Bad value."),
+                        ));
+                    }
+                });
+
+                return Ok(());
+            }
+
+            // parse #[musli(packed)]
+            if meta.path == PACKED {
+                new.packing.push((meta.path.span(), Packing::Packed));
+                return Ok(());
+            }
+
+            // parse #[musli(transparent)]
+            if meta.path == TRANSPARENT {
+                new.packing.push((meta.path.span(), Packing::Transparent));
+                return Ok(());
+            }
+
+            Err(syn::Error::new_spanned(
+                meta.path,
+                format_args!("#[{ATTR}] Unsupported type attribute"),
+            ))
+        });
+
+        if let Err(error) = result {
+            cx.syn_error(error);
+        }
+
+        let attr = match mode {
+            Some(mode) => {
+                cx.register_mode(mode.clone());
+                attr.modes.entry(mode).or_default()
+            }
+            None => &mut attr.root,
+        };
+
+        attr.merge_with(cx, new);
+    }
+
+    attr
+}
+
+layer! {
+    FieldNew, FieldLayer {
+        /// Module to use when decoding.
+        encode_path: syn::Path,
+        /// Path to use when decoding.
+        decode_path: syn::Path,
+        /// Method to check if we want to skip encoding.
+        skip_encoding_if: syn::Path,
+        /// Rename a field to the given literal.
+        rename: syn::Expr,
+        /// Use a default value for the field if it's not available.
+        default: (),
+        @multiple
     }
 }
 
 #[derive(Default)]
-pub(crate) struct FieldAttr {
-    root: InnerFieldAttr,
-    modes: HashMap<syn::Path, InnerFieldAttr>,
+pub(crate) struct Field {
+    root: FieldLayer,
+    modes: HashMap<syn::Path, FieldLayer>,
 }
 
-impl FieldAttr {
+impl Field {
     /// Test if the `#[musli(default)]` tag is specified.
     pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
         mode.ident
             .and_then(|m| self.modes.get(m)?.default)
             .or(self.root.default)
+            .map(|(span, ())| span)
     }
 
     /// Test if the `#[musli(rename)]` tag is specified.
@@ -448,6 +617,104 @@ impl FieldAttr {
     }
 }
 
+/// Parse field attributes.
+pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
+    let mut attr = Field::default();
+
+    for a in attrs {
+        if a.path() != ATTR {
+            continue;
+        }
+
+        let mut new = FieldNew::default();
+        let mut mode = None::<syn::Path>;
+
+        let result = a.parse_nested_meta(|meta| {
+            // parse #[musli(mode = <path>)]
+            if meta.path == MODE {
+                meta.input.parse::<Token![=]>()?;
+                mode = Some(meta.input.parse()?);
+                return Ok(());
+            }
+
+            // parse parse #[musli(with = <path>)]
+            if meta.path == WITH {
+                meta.input.parse::<Token![=]>()?;
+                let mut path = meta.input.parse::<syn::Path>()?;
+
+                let arguments = match path.segments.last_mut() {
+                    Some(path) => mem::replace(&mut path.arguments, syn::PathArguments::None),
+                    None => syn::PathArguments::None,
+                };
+
+                let mut encode_path = path.clone();
+
+                encode_path.segments.push({
+                    let mut segment =
+                        syn::PathSegment::from(syn::Ident::new("encode", Span::call_site()));
+                    segment.arguments = arguments.clone();
+                    segment
+                });
+
+                let mut decode_path = path.clone();
+
+                decode_path.segments.push({
+                    let mut segment =
+                        syn::PathSegment::from(syn::Ident::new("decode", Span::call_site()));
+                    segment.arguments = arguments.clone();
+                    segment
+                });
+
+                new.encode_path.push((path.span(), encode_path));
+                new.decode_path.push((path.span(), decode_path));
+                return Ok(());
+            }
+
+            // parse #[musli(skip_encoding_if = <path>)]
+            if meta.path == SKIP_ENCODING_IF {
+                meta.input.parse::<Token![=]>()?;
+                new.skip_encoding_if
+                    .push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(rename = <expr>)]
+            if meta.path == RENAME {
+                meta.input.parse::<Token![=]>()?;
+                new.rename.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(default)]
+            if meta.path == DEFAULT {
+                new.default.push((meta.path.span(), ()));
+                return Ok(());
+            }
+
+            Err(syn::Error::new_spanned(
+                meta.path,
+                format_args!("#[{ATTR}] Unsupported field attribute"),
+            ))
+        });
+
+        if let Err(error) = result {
+            cx.syn_error(error);
+        }
+
+        let attr = match mode {
+            Some(mode) => {
+                cx.register_mode(mode.clone());
+                attr.modes.entry(mode).or_default()
+            }
+            None => &mut attr.root,
+        };
+
+        attr.merge_with(cx, new);
+    }
+
+    attr
+}
+
 /// Adjust a mode path.
 fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath) {
     let insert_args = |args: &mut Punctuated<_, _>| {
@@ -498,665 +765,5 @@ fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath) {
                 }),
             );
         }
-    }
-}
-
-pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
-    let mut attr = TypeAttr::default();
-
-    for a in attrs {
-        if let Some(attributes) = parse_musli_attrs::<TypeAttributes>(cx, a) {
-            let mut attr = match attributes.mode {
-                Some(mode) => {
-                    cx.register_mode(mode.clone());
-                    attr.modes.entry(mode).or_default()
-                }
-                None => &mut attr.root,
-            };
-
-            for attribute in attributes.attributes {
-                match attribute {
-                    // parse #[musli(tag = <expr>)]
-                    Attribute::KeyValue(path, value) if path == TAG => {
-                        if let Some(expr) = value_as_expr(cx, TAG, value) {
-                            attr.set_tag(cx, path.span(), expr);
-                        }
-                    }
-                    // parse #[musli(content = <expr>)]
-                    Attribute::KeyValue(path, value) if path == CONTENT => {
-                        if let Some(expr) = value_as_expr(cx, CONTENT, value) {
-                            attr.set_content(cx, path.span(), expr);
-                        }
-                    }
-                    // parse #[musli(crate = <path>)]
-                    Attribute::KeyValue(path, value) if path == CRATE => {
-                        if let Some(path) = value_as_path(cx, CRATE, value) {
-                            attr.set_crate(cx, path.span(), path);
-                        }
-                    }
-                    // parse #[musli(name_type = <type>)]
-                    Attribute::KeyValue(path, value) if path == NAME_TYPE => {
-                        if let Some(ty) = value_as_type(cx, NAME_TYPE, value) {
-                            attr.tag_type = Some((path.span(), ty));
-                        }
-                    }
-                    // parse #[musli(default_variant_name = "..")]
-                    Attribute::KeyValue(path, expr) if path == DEFAULT_VARIANT_NAME => {
-                        if let Some(tag) = parse_value_string(cx, DEFAULT_VARIANT_NAME, expr) {
-                            attr.default_variant_name = match tag.value().as_str() {
-                                "index" => Some(DefaultTag::Index),
-                                "name" => Some(DefaultTag::Name),
-                                _ => {
-                                    cx.error_spanned_by(
-                                        tag,
-                                        format_args!(
-                                            "illegal #[{ATTR}({DEFAULT_VARIANT_NAME})] value"
-                                        ),
-                                    );
-                                    continue;
-                                }
-                            };
-                        }
-                    }
-                    // parse #[musli(default_field_name = "..")]
-                    Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_NAME => {
-                        if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_NAME, expr) {
-                            attr.default_field_name = match tag.value().as_str() {
-                                "index" => Some(DefaultTag::Index),
-                                "name" => Some(DefaultTag::Name),
-                                _ => {
-                                    cx.error_spanned_by(
-                                        tag,
-                                        format_args!(
-                                            "illegal #[{ATTR}({DEFAULT_FIELD_NAME})] value"
-                                        ),
-                                    );
-                                    continue;
-                                }
-                            };
-                        }
-                    }
-                    // parse #[musli(bound = ..)]
-                    Attribute::KeyValue(path, expr) if path == BOUND => {
-                        if let Some(bound) = parse_bound(cx, BOUND, expr) {
-                            attr.bounds.push(bound);
-                        }
-                    }
-                    // parse #[musli(decode_bound = ..)]
-                    Attribute::KeyValue(path, expr) if path == DECODE_BOUND => {
-                        if let Some(bound) = parse_bound(cx, DECODE_BOUND, expr) {
-                            attr.decode_bounds.push(bound);
-                        }
-                    }
-                    // parse #[musli(packed)]
-                    Attribute::Path(path) if path == PACKED => {
-                        attr.set_packing(cx, path.span(), Packing::Packed);
-                    }
-                    // parse #[musli(flatten)]
-                    Attribute::Path(path) if path == TRANSPARENT => {
-                        attr.set_packing(cx, path.span(), Packing::Transparent);
-                    }
-                    meta => {
-                        let path = format_path(meta.path());
-                        cx.error_span(
-                            meta.span(),
-                            format_args!("#[{ATTR}({path})] unsupported type attribute"),
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    attr
-}
-
-/// Parse field attributes.
-pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
-    let mut attr = FieldAttr::default();
-
-    for a in attrs {
-        if let Some(attributes) = parse_musli_attrs::<FieldAttributes>(cx, a) {
-            let mut attr = match attributes.mode {
-                Some(mode) => {
-                    cx.register_mode(mode.clone());
-                    attr.modes.entry(mode).or_default()
-                }
-                None => &mut attr.root,
-            };
-
-            for attribute in attributes.attributes {
-                match attribute {
-                    // parse #[musli(with = <path>)]
-                    Attribute::KeyValue(path, value) if path == WITH => {
-                        if let Some(mut path) = value_as_path(cx, WITH, value) {
-                            let arguments = match path.segments.last_mut() {
-                                Some(path) => {
-                                    mem::replace(&mut path.arguments, syn::PathArguments::None)
-                                }
-                                None => syn::PathArguments::None,
-                            };
-
-                            let mut encode_path = path.clone();
-
-                            encode_path.segments.push({
-                                let mut segment = syn::PathSegment::from(syn::Ident::new(
-                                    "encode",
-                                    Span::call_site(),
-                                ));
-                                segment.arguments = arguments.clone();
-                                segment
-                            });
-
-                            let mut decode_path = path.clone();
-
-                            decode_path.segments.push({
-                                let mut segment = syn::PathSegment::from(syn::Ident::new(
-                                    "decode",
-                                    Span::call_site(),
-                                ));
-                                segment.arguments = arguments.clone();
-                                segment
-                            });
-
-                            attr.set_encode_path(cx, path.span(), encode_path);
-                            attr.set_decode_path(cx, path.span(), decode_path);
-                        }
-                    }
-                    // parse #[musli(skip_encoding_if)]
-                    Attribute::KeyValue(path, expr) if path == SKIP_ENCODING_IF => {
-                        if let Some(path) = value_as_path(cx, SKIP_ENCODING_IF, expr) {
-                            attr.set_skip_encoding_if(cx, path.span(), path.clone());
-                        }
-                    }
-                    // parse #[musli(rename = <expr>)]
-                    Attribute::KeyValue(path, value) if path == RENAME => {
-                        let span = path.span();
-
-                        if let Some(expr) = value_as_expr(cx, RENAME, value) {
-                            if let Some((span, _)) = &attr.rename {
-                                cx.error_span(*span, "conflicting attribute");
-                            } else {
-                                attr.rename = Some((span, expr));
-                            }
-                        }
-                    }
-                    // parse #[musli(default)]
-                    Attribute::Path(path) if path == DEFAULT => {
-                        if let Some(span) = attr.default {
-                            cx.error_span(
-                                span,
-                                format_args!("#[{ATTR}({DEFAULT})] was previously defined here"),
-                            );
-                        } else {
-                            attr.default = Some(path.span());
-                        }
-                    }
-                    meta => {
-                        let path = format_path(meta.path());
-                        cx.error_span(
-                            meta.span(),
-                            format_args!("#[{ATTR}({path})] unsupported field attribute"),
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    attr
-}
-
-/// Parse variant attributes.
-pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr {
-    let mut attr = VariantAttr::default();
-
-    for a in attrs {
-        if let Some(attributes) = parse_musli_attrs::<VariantAttributes>(cx, a) {
-            let mut attr = match attributes.mode {
-                Some(mode) => {
-                    cx.register_mode(mode.clone());
-                    attr.modes.entry(mode).or_default()
-                }
-                None => &mut attr.root,
-            };
-
-            for attribute in attributes.attributes {
-                match attribute {
-                    // parse #[musli(name_type = <type>)]
-                    Attribute::KeyValue(path, value) if path == NAME_TYPE => {
-                        if let Some(ty) = value_as_type(cx, NAME_TYPE, value) {
-                            attr.tag_type = Some((path.span(), ty));
-                        }
-                    }
-                    // parse #[musli(rename = <expr>)]
-                    Attribute::KeyValue(path, value) if path == RENAME => {
-                        let span = path.span();
-
-                        if let Some(expr) = value_as_expr(cx, RENAME, value) {
-                            if let Some((span, _)) = &attr.rename {
-                                cx.error_span(*span, "conflicting attribute");
-                            } else {
-                                attr.rename = Some((span, expr));
-                            }
-                        }
-                    }
-                    // parse #[musli(default_field_name = "..")]
-                    Attribute::KeyValue(path, expr) if path == DEFAULT_FIELD_NAME => {
-                        if let Some(tag) = parse_value_string(cx, DEFAULT_FIELD_NAME, expr) {
-                            attr.default_field_name = Some(match tag.value().as_str() {
-                                "index" => DefaultTag::Index,
-                                "name" => DefaultTag::Name,
-                                _ => {
-                                    cx.error_spanned_by(
-                                        tag,
-                                        format_args!(
-                                            "illegal #[{ATTR}({DEFAULT_FIELD_NAME})] value"
-                                        ),
-                                    );
-                                    continue;
-                                }
-                            });
-                        }
-                    }
-                    // parse #[musli(transparent)]
-                    Attribute::Path(path) if path == TRANSPARENT => {
-                        attr.set_packing(cx, path.span(), Packing::Transparent);
-                    }
-                    // parse #[musli(packed)]
-                    Attribute::Path(path) if path == PACKED => {
-                        attr.set_packing(cx, path.span(), Packing::Packed);
-                    }
-                    // parse #[musli(default)]
-                    Attribute::Path(path) if path == DEFAULT => {
-                        attr.default = Some(path.span());
-                    }
-                    meta => {
-                        let path = format_path(meta.path());
-                        cx.error_span(
-                            meta.span(),
-                            format_args!("#[{ATTR}({path})] unsupported variant attribute"),
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    attr
-}
-
-/// Get expression path.
-fn value_as_path(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Path> {
-    match value {
-        AttributeValue::Path(path) => Some(path),
-        _ => {
-            cx.error_span(
-                value.span(),
-                format_args!("#[{ATTR}({attr} = ..)] should be a simple path"),
-            );
-            None
-        }
-    }
-}
-
-/// Get expression from value.
-fn value_as_expr(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Expr> {
-    match value {
-        AttributeValue::Expr(expr) => Some(expr),
-        _ => {
-            cx.error_span(
-                value.span(),
-                format_args!("#[{ATTR}({attr} = ..)] should be a simple path"),
-            );
-            None
-        }
-    }
-}
-
-/// Get expression as string.
-fn parse_value_string(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::LitStr> {
-    match value {
-        AttributeValue::Lit(syn::Lit::Str(string)) => Some(string),
-        expr => {
-            cx.error_span(
-                expr.span(),
-                format_args!("#[{} = ...] should be a string", attr),
-            );
-            None
-        }
-    }
-}
-
-/// Get aan attribute value as a bound.
-fn parse_bound(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::WherePredicate> {
-    match value {
-        AttributeValue::Bound(clause) => Some(clause),
-        expr => {
-            cx.error_span(
-                expr.span(),
-                format_args!(
-                    "#[{} = ...] should be a where predicate like `T: Encode`",
-                    attr
-                ),
-            );
-            None
-        }
-    }
-}
-
-/// Get expression as a type.
-fn value_as_type(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Type> {
-    match value {
-        AttributeValue::Type(ty) => Some(ty),
-        expr => {
-            cx.error_span(
-                expr.span(),
-                format_args!("#[{} = ...] should be a type", attr),
-            );
-            None
-        }
-    }
-}
-
-/// Parse musli attributes.
-fn parse_musli_attrs<T>(cx: &Ctxt, attr: &syn::Attribute) -> Option<T>
-where
-    T: Parse,
-{
-    if attr.path() != ATTR {
-        return None;
-    }
-
-    let attributes: T = match syn::parse2(attr.meta.to_token_stream()) {
-        Ok(attributes) => attributes,
-        Err(e) => {
-            cx.syn_error(e);
-            return None;
-        }
-    };
-
-    Some(attributes)
-}
-
-/// The flexible value of an attribute.
-pub enum AttributeValue {
-    /// A path.
-    Path(syn::Path),
-    /// A type.
-    Type(syn::Type),
-    /// A literal value.
-    Expr(syn::Expr),
-    /// A literal value.
-    Lit(syn::Lit),
-    /// A collection of bounds.
-    Bound(syn::WherePredicate),
-}
-
-impl AttributeValue {
-    fn span(&self) -> Span {
-        match self {
-            AttributeValue::Path(value) => value.span(),
-            AttributeValue::Type(value) => value.span(),
-            AttributeValue::Expr(value) => value.span(),
-            AttributeValue::Lit(value) => value.span(),
-            AttributeValue::Bound(value) => value.span(),
-        }
-    }
-}
-
-enum Attribute {
-    Path(syn::Path),
-    KeyValue(syn::Path, AttributeValue),
-}
-
-impl Attribute {
-    /// Extract the path of the attribute.
-    fn path(&self) -> &syn::Path {
-        match self {
-            Attribute::Path(path) => path,
-            Attribute::KeyValue(path, _) => path,
-        }
-    }
-}
-
-impl Attribute {
-    fn span(&self) -> Span {
-        match self {
-            Attribute::Path(path) => path.span(),
-            Attribute::KeyValue(path, _) => path.span(),
-        }
-    }
-}
-
-struct TypeAttributes {
-    _parens: syn::token::Paren,
-    mode: Option<syn::Path>,
-    attributes: Vec<Attribute>,
-}
-
-impl Parse for TypeAttributes {
-    fn parse(input: parse::ParseStream) -> syn::Result<Self> {
-        let mut mode = None;
-        let mut attributes = Vec::new();
-
-        // Skip over `musli` attribute.
-        let _ = input.parse::<syn::Path>();
-
-        let content;
-        let parens = syn::parenthesized!(content in input);
-
-        while !content.is_empty() {
-            let path: syn::Path = content.parse()?;
-
-            if let Some(..) = content.parse::<Option<Token![=]>>()? {
-                let value = match &path {
-                    // parse #[musli(mode = <ident>)]
-                    path if path == MODE => {
-                        mode = Some(content.parse()?);
-
-                        if content.parse::<Option<Token![,]>>()?.is_none() {
-                            break;
-                        }
-
-                        continue;
-                    }
-                    // parse #[musli(tag = <expr>)]
-                    path if path == TAG => AttributeValue::Expr(content.parse()?),
-                    // parse #[musli(content = <expr>)]
-                    path if path == CONTENT => AttributeValue::Expr(content.parse()?),
-                    // parse #[musli(crate = <path>)]
-                    path if path == CRATE => AttributeValue::Path(content.parse()?),
-                    // parse #[musli(name_type = <type>)]
-                    path if path == NAME_TYPE => AttributeValue::Type(content.parse()?),
-                    // parse #[musli(default_variant_name = "..")]
-                    path if path == DEFAULT_VARIANT_NAME => AttributeValue::Lit(content.parse()?),
-                    // parse #[musli(default_field_name = "..")]
-                    path if path == DEFAULT_FIELD_NAME => AttributeValue::Lit(content.parse()?),
-                    // parse #[musli(bounds = "..")]
-                    path if path == BOUND => AttributeValue::Bound(content.parse()?),
-                    // parse #[musli(decode_bounds = "..")]
-                    path if path == DECODE_BOUND => AttributeValue::Bound(content.parse()?),
-                    path => {
-                        let p = format_path(path);
-                        return Err(syn::Error::new(
-                            path.span(),
-                            format_args!("#[{ATTR}({p})] unsupported type attribute"),
-                        ));
-                    }
-                };
-
-                attributes.push(Attribute::KeyValue(path, value));
-            } else {
-                attributes.push(Attribute::Path(path));
-            }
-
-            if content.parse::<Option<Token![,]>>()?.is_none() {
-                break;
-            }
-        }
-
-        Ok(Self {
-            _parens: parens,
-            mode,
-            attributes,
-        })
-    }
-}
-
-struct VariantAttributes {
-    _parens: syn::token::Paren,
-    mode: Option<syn::Path>,
-    attributes: Vec<Attribute>,
-}
-
-impl Parse for VariantAttributes {
-    fn parse(input: parse::ParseStream) -> syn::Result<Self> {
-        let mut mode = None;
-        let mut attributes = Vec::new();
-
-        // Skip over `musli` attribute.
-        let _ = input.parse::<syn::Path>();
-
-        let content;
-        let parens = syn::parenthesized!(content in input);
-
-        while !content.is_empty() {
-            let path: syn::Path = content.parse()?;
-
-            if let Some(..) = content.parse::<Option<Token![=]>>()? {
-                let value = match &path {
-                    // parse #[musli(mode = <ident>)]
-                    path if path == MODE => {
-                        mode = Some(content.parse()?);
-
-                        if content.parse::<Option<Token![,]>>()?.is_none() {
-                            break;
-                        }
-
-                        continue;
-                    }
-                    // parse #[musli(name_type = <type>)]
-                    path if path == NAME_TYPE => AttributeValue::Type(content.parse()?),
-                    // parse #[musli(rename = <expr>)]
-                    path if path == RENAME => AttributeValue::Expr(content.parse()?),
-                    // parse #[musli(default_field_name = <expr>)]
-                    path if path == DEFAULT_FIELD_NAME => AttributeValue::Lit(content.parse()?),
-                    path => {
-                        let p = format_path(path);
-                        return Err(syn::Error::new(
-                            path.span(),
-                            format_args!("#[{ATTR}({p})] unsupported variant attribute"),
-                        ));
-                    }
-                };
-
-                attributes.push(Attribute::KeyValue(path, value));
-            } else {
-                attributes.push(Attribute::Path(path));
-            }
-
-            if content.parse::<Option<Token![,]>>()?.is_none() {
-                break;
-            }
-        }
-
-        Ok(Self {
-            _parens: parens,
-            mode,
-            attributes,
-        })
-    }
-}
-
-struct FieldAttributes {
-    _parens: syn::token::Paren,
-    mode: Option<syn::Path>,
-    attributes: Vec<Attribute>,
-}
-
-impl Parse for FieldAttributes {
-    fn parse(input: parse::ParseStream) -> syn::Result<Self> {
-        let mut mode = None;
-        let mut attributes = Vec::new();
-
-        // Skip over `musli` attribute.
-        let _ = input.parse::<syn::Path>();
-
-        let content;
-        let parens = syn::parenthesized!(content in input);
-
-        while !content.is_empty() {
-            let path: syn::Path = content.parse()?;
-
-            if let Some(..) = content.parse::<Option<Token![=]>>()? {
-                let value = match &path {
-                    // parse #[musli(mode = <ident>)]
-                    path if path == MODE => {
-                        mode = Some(content.parse()?);
-
-                        if content.parse::<Option<Token![,]>>()?.is_none() {
-                            break;
-                        }
-
-                        continue;
-                    }
-                    // parse #[musli(with)]
-                    path if path == WITH => AttributeValue::Path(content.parse()?),
-                    // parse #[musli(skip_encoding_if)]
-                    path if path == SKIP_ENCODING_IF => AttributeValue::Path(content.parse()?),
-                    // parse #[musli(rename = <expr>)]
-                    path if path == RENAME => AttributeValue::Expr(content.parse()?),
-                    path => {
-                        let p = format_path(path);
-                        return Err(syn::Error::new(
-                            path.span(),
-                            format_args!("#[{ATTR}({p})] unsupported field attribute"),
-                        ));
-                    }
-                };
-
-                attributes.push(Attribute::KeyValue(path, value));
-            } else {
-                attributes.push(Attribute::Path(path));
-            }
-
-            if content.parse::<Option<Token![,]>>()?.is_none() {
-                break;
-            }
-        }
-
-        Ok(Self {
-            _parens: parens,
-            mode,
-            attributes,
-        })
-    }
-}
-
-/// Format implementation of a path which ignores anything except the
-/// identifier components.
-fn format_path(path: &syn::Path) -> impl fmt::Display + '_ {
-    FormatPath { path }
-}
-
-struct FormatPath<'a> {
-    path: &'a syn::Path,
-}
-
-impl<'a> fmt::Display for FormatPath<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut it = self.path.segments.iter();
-        let last = it.next_back();
-
-        for part in it {
-            write!(f, "{}::", part.ident)?;
-        }
-
-        if let Some(part) = last {
-            write!(f, "{}", part.ident)?;
-        }
-
-        Ok(())
     }
 }

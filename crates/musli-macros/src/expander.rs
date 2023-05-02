@@ -28,7 +28,7 @@ pub(crate) struct FieldData<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) name: Option<syn::LitStr>,
-    pub(crate) attr: attr::FieldAttr,
+    pub(crate) attr: attr::Field,
     pub(crate) ident: Option<&'a syn::Ident>,
 }
 

@@ -21,8 +21,8 @@ pub(crate) struct Build<'a> {
     pub(crate) cx: &'a Ctxt,
     pub(crate) type_name: &'a syn::LitStr,
     pub(crate) tokens: &'a Tokens,
-    pub(crate) bounds: &'a [syn::WherePredicate],
-    pub(crate) decode_bounds: &'a [syn::WherePredicate],
+    pub(crate) bounds: &'a [(Span, syn::WherePredicate)],
+    pub(crate) decode_bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) expansion: Expansion<'a>,
     pub(crate) data: BuildData<'a>,
     pub(crate) decode_t_decode: syn::Path,
@@ -209,7 +209,7 @@ fn setup_struct<'a>(
     let mut fields = Vec::with_capacity(data.fields.len());
 
     let default_field_name = e.type_attr.default_field_name(mode);
-    let tag_type = e.type_attr.tag_type(mode);
+    let tag_type = e.type_attr.name_type(mode);
     let packing = e.type_attr.packing(mode).unwrap_or_default();
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
     let mut tag_methods = TagMethods::new(&e.cx);
@@ -243,7 +243,7 @@ fn setup_enum<'a>(
 ) -> Result<EnumBuild<'a>> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
-    let tag_type = e.type_attr.tag_type(mode);
+    let tag_type = e.type_attr.name_type(mode);
     // Keep track of variant index manually since fallback variants do not
     // count.
     let mut tag_methods = TagMethods::new(&e.cx);
@@ -305,7 +305,7 @@ fn setup_variant<'a>(
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
 
-    let tag_type = data.attr.tag_type(mode);
+    let tag_type = data.attr.name_type(mode);
 
     let is_default = if data.attr.default_attr(mode).is_some() {
         if !data.fields.is_empty() {

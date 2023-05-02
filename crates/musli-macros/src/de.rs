@@ -52,9 +52,12 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
             predicates: Default::default(),
         });
 
-        where_clause
-            .predicates
-            .extend(e.bounds.iter().chain(e.decode_bounds.iter()).cloned());
+        where_clause.predicates.extend(
+            e.bounds
+                .iter()
+                .chain(e.decode_bounds.iter())
+                .map(|(_, v)| v.clone()),
+        );
     }
 
     Ok(quote_spanned! {
