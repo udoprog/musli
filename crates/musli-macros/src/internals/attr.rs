@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::mem;
 
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::Span;
 use quote::ToTokens;
 use syn::parse;
 use syn::parse::Parse;
@@ -66,7 +66,7 @@ impl Default for Packing {
 #[derive(Default)]
 struct InnerTypeAttr {
     /// `#[musli(crate = <path>)]`.
-    krate: Option<(Span, syn::ExprPath)>,
+    krate: Option<(Span, syn::Path)>,
     /// `#[musli(name_type)]`.
     tag_type: Option<(Span, syn::Type)>,
     /// `#[musli(default_variant_name = "..")]`.
@@ -134,7 +134,7 @@ impl InnerTypeAttr {
         true
     }
 
-    fn set_crate(&mut self, cx: &Ctxt, span: Span, path: syn::ExprPath) {
+    fn set_crate(&mut self, cx: &Ctxt, span: Span, path: syn::Path) {
         if let Some((span, _)) = self.krate {
             cx.error_span(
                 span,
@@ -150,7 +150,7 @@ impl InnerTypeAttr {
 pub(crate) struct TypeAttr {
     root: InnerTypeAttr,
     /// Nested configuartions for modes.
-    modes: HashMap<syn::ExprPath, InnerTypeAttr>,
+    modes: HashMap<syn::Path, InnerTypeAttr>,
 }
 
 impl TypeAttr {
@@ -222,17 +222,11 @@ impl TypeAttr {
     }
 
     /// Get the configured crate, or fallback to default.
-    pub(crate) fn crate_or_default(&self) -> syn::ExprPath {
+    pub(crate) fn crate_or_default(&self) -> syn::Path {
         if let Some((_, krate)) = &self.root.krate {
             krate.clone()
         } else {
-            let path = syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()));
-
-            syn::ExprPath {
-                attrs: Vec::new(),
-                qself: None,
-                path,
-            }
+            syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()))
         }
     }
 
@@ -254,11 +248,11 @@ impl TypeAttr {
 #[derive(Default)]
 struct InnerFieldAttr {
     /// Module to use when decoding.
-    encode_path: Option<(Span, syn::ExprPath)>,
+    encode_path: Option<(Span, syn::Path)>,
     /// Path to use when decoding.
-    decode_path: Option<(Span, syn::ExprPath)>,
+    decode_path: Option<(Span, syn::Path)>,
     /// Method to check if we want to skip encoding.
-    skip_encoding_if: Option<(Span, syn::ExprPath)>,
+    skip_encoding_if: Option<(Span, syn::Path)>,
     /// Rename a field to the given literal.
     rename: Option<(Span, syn::Expr)>,
     /// Use a default value for the field if it's not available.
@@ -266,7 +260,7 @@ struct InnerFieldAttr {
 }
 
 impl InnerFieldAttr {
-    fn set_encode_path(&mut self, cx: &Ctxt, span: Span, encode_path: syn::ExprPath) {
+    fn set_encode_path(&mut self, cx: &Ctxt, span: Span, encode_path: syn::Path) {
         if self.encode_path.is_some() {
             cx.error_spanned_by(
                 encode_path,
@@ -277,7 +271,7 @@ impl InnerFieldAttr {
         }
     }
 
-    fn set_decode_path(&mut self, cx: &Ctxt, span: Span, decode_path: syn::ExprPath) {
+    fn set_decode_path(&mut self, cx: &Ctxt, span: Span, decode_path: syn::Path) {
         if self.decode_path.is_some() {
             cx.error_spanned_by(
                 decode_path,
@@ -288,7 +282,7 @@ impl InnerFieldAttr {
         }
     }
 
-    fn set_skip_encoding_if(&mut self, cx: &Ctxt, span: Span, skip_encoding_if: syn::ExprPath) {
+    fn set_skip_encoding_if(&mut self, cx: &Ctxt, span: Span, skip_encoding_if: syn::Path) {
         if self.skip_encoding_if.is_some() {
             cx.error_spanned_by(
                 skip_encoding_if,
@@ -334,7 +328,7 @@ impl InternalVariantAttr {
 #[derive(Default)]
 pub(crate) struct VariantAttr {
     root: InternalVariantAttr,
-    modes: HashMap<syn::ExprPath, InternalVariantAttr>,
+    modes: HashMap<syn::Path, InternalVariantAttr>,
 }
 
 impl VariantAttr {
@@ -381,7 +375,7 @@ impl VariantAttr {
 #[derive(Default)]
 pub(crate) struct FieldAttr {
     root: InnerFieldAttr,
-    modes: HashMap<syn::ExprPath, InnerFieldAttr>,
+    modes: HashMap<syn::Path, InnerFieldAttr>,
 }
 
 impl FieldAttr {
@@ -400,7 +394,7 @@ impl FieldAttr {
     }
 
     /// Expand encode of the given field.
-    pub(crate) fn encode_path(&self, mode: Mode<'_>, span: Span) -> (Span, TokenStream) {
+    pub(crate) fn encode_path(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
         let encode_path = mode
             .ident
             .and_then(|m| self.modes.get(m)?.encode_path.as_ref())
@@ -410,11 +404,11 @@ impl FieldAttr {
             let mut encode_path = encode_path.clone();
             let mode_ident = mode.mode_ident();
 
-            if let Some(last) = encode_path.path.segments.last_mut() {
+            if let Some(last) = encode_path.segments.last_mut() {
                 adjust_mode_path(last, mode_ident);
             }
 
-            (*span, encode_path.to_token_stream())
+            (*span, encode_path)
         } else {
             let encode_path = mode.encode_t_encode(span);
             (span, encode_path)
@@ -422,7 +416,7 @@ impl FieldAttr {
     }
 
     /// Expand decode of the given field.
-    pub(crate) fn decode_path(&self, mode: Mode<'_>, span: Span) -> (Span, TokenStream) {
+    pub(crate) fn decode_path(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
         let decode_path = mode
             .ident
             .and_then(|m| self.modes.get(m)?.decode_path.as_ref())
@@ -432,11 +426,11 @@ impl FieldAttr {
             let mut decode_path = decode_path.clone();
             let mode_ident = mode.mode_ident();
 
-            if let Some(last) = decode_path.path.segments.last_mut() {
+            if let Some(last) = decode_path.segments.last_mut() {
                 adjust_mode_path(last, mode_ident);
             }
 
-            (*span, decode_path.to_token_stream())
+            (*span, decode_path)
         } else {
             let decode_path = mode.decode_t_decode(span);
             (span, decode_path)
@@ -444,7 +438,7 @@ impl FieldAttr {
     }
 
     /// Get skip encoding if.
-    pub(crate) fn skip_encoding_if(&self, mode: Mode<'_>) -> Option<(Span, &syn::ExprPath)> {
+    pub(crate) fn skip_encoding_if(&self, mode: Mode<'_>) -> Option<(Span, &syn::Path)> {
         let (span, path) = mode
             .ident
             .and_then(|m| self.modes.get(m)?.skip_encoding_if.as_ref())
@@ -459,7 +453,10 @@ fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath) {
     let insert_args = |args: &mut Punctuated<_, _>| {
         args.insert(
             0,
-            syn::GenericArgument::Type(syn::Type::Verbatim(mode_ident.to_token_stream())),
+            syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                qself: None,
+                path: mode_ident.as_path(),
+            })),
         );
 
         args.insert(
@@ -486,8 +483,13 @@ fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath) {
             insert_args(&mut args.args);
         }
         syn::PathArguments::Parenthesized(args) => {
-            args.inputs
-                .insert(0, syn::Type::Verbatim(mode_ident.to_token_stream()));
+            args.inputs.insert(
+                0,
+                syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    path: mode_ident.as_path(),
+                }),
+            );
 
             args.inputs.insert(
                 1,
@@ -628,7 +630,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
                     // parse #[musli(with = <path>)]
                     Attribute::KeyValue(path, value) if path == WITH => {
                         if let Some(mut path) = value_as_path(cx, WITH, value) {
-                            let arguments = match path.path.segments.last_mut() {
+                            let arguments = match path.segments.last_mut() {
                                 Some(path) => {
                                     mem::replace(&mut path.arguments, syn::PathArguments::None)
                                 }
@@ -637,18 +639,22 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> FieldAttr {
 
                             let mut encode_path = path.clone();
 
-                            encode_path.path.segments.push({
-                                let mut segment: syn::PathSegment =
-                                    syn::Ident::new("encode", Span::call_site()).into();
+                            encode_path.segments.push({
+                                let mut segment = syn::PathSegment::from(syn::Ident::new(
+                                    "encode",
+                                    Span::call_site(),
+                                ));
                                 segment.arguments = arguments.clone();
                                 segment
                             });
 
                             let mut decode_path = path.clone();
 
-                            decode_path.path.segments.push({
-                                let mut segment: syn::PathSegment =
-                                    syn::Ident::new("decode", Span::call_site()).into();
+                            decode_path.segments.push({
+                                let mut segment = syn::PathSegment::from(syn::Ident::new(
+                                    "decode",
+                                    Span::call_site(),
+                                ));
                                 segment.arguments = arguments.clone();
                                 segment
                             });
@@ -781,7 +787,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 }
 
 /// Get expression path.
-fn value_as_path(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::ExprPath> {
+fn value_as_path(cx: &Ctxt, attr: Symbol, value: AttributeValue) -> Option<syn::Path> {
     match value {
         AttributeValue::Path(path) => Some(path),
         _ => {
@@ -876,7 +882,7 @@ where
 /// The flexible value of an attribute.
 pub enum AttributeValue {
     /// A path.
-    Path(syn::ExprPath),
+    Path(syn::Path),
     /// A type.
     Type(syn::Type),
     /// A literal value.
@@ -925,7 +931,7 @@ impl Attribute {
 
 struct TypeAttributes {
     _parens: syn::token::Paren,
-    mode: Option<syn::ExprPath>,
+    mode: Option<syn::Path>,
     attributes: Vec<Attribute>,
 }
 
@@ -1000,7 +1006,7 @@ impl Parse for TypeAttributes {
 
 struct VariantAttributes {
     _parens: syn::token::Paren,
-    mode: Option<syn::ExprPath>,
+    mode: Option<syn::Path>,
     attributes: Vec<Attribute>,
 }
 
@@ -1065,7 +1071,7 @@ impl Parse for VariantAttributes {
 
 struct FieldAttributes {
     _parens: syn::token::Paren,
-    mode: Option<syn::ExprPath>,
+    mode: Option<syn::Path>,
     attributes: Vec<Attribute>,
 }
 

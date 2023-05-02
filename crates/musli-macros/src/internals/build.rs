@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
+use syn::Token;
 
 use crate::expander::{
     Data, EnumData, Expander, FieldData, Result, StructData, TagMethod, VariantData,
@@ -24,8 +25,8 @@ pub(crate) struct Build<'a> {
     pub(crate) decode_bounds: &'a [syn::WherePredicate],
     pub(crate) expansion: Expansion<'a>,
     pub(crate) data: BuildData<'a>,
-    pub(crate) decode_t_decode: TokenStream,
-    pub(crate) encode_t_encode: TokenStream,
+    pub(crate) decode_t_decode: syn::Path,
+    pub(crate) encode_t_encode: syn::Path,
     pub(crate) mode_ident: ModePath<'a>,
     pub(crate) enum_tagging_span: Option<Span>,
 }
@@ -159,13 +160,13 @@ impl VariantBuild<'_> {
 pub(crate) struct FieldBuild<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
-    pub(crate) encode_path: (Span, TokenStream),
-    pub(crate) decode_path: (Span, TokenStream),
+    pub(crate) encode_path: (Span, syn::Path),
+    pub(crate) decode_path: (Span, syn::Path),
     pub(crate) tag: syn::Expr,
-    pub(crate) skip_encoding_if: Option<(Span, &'a syn::ExprPath)>,
+    pub(crate) skip_encoding_if: Option<(Span, &'a syn::Path)>,
     pub(crate) default_attr: Option<Span>,
-    pub(crate) self_access: TokenStream,
-    pub(crate) field_access: TokenStream,
+    pub(crate) self_access: syn::Expr,
+    pub(crate) field_access: syn::Member,
     pub(crate) packing: Packing,
 }
 
@@ -376,35 +377,54 @@ fn setup_field<'a>(
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
     let default_attr = data.attr.default_attr(mode);
 
+    let member = match data.ident {
+        Some(ident) => syn::Member::Named(ident.clone()),
+        None => syn::Member::Unnamed(syn::Index {
+            index: data.index as u32,
+            span: data.span,
+        }),
+    };
+
     let self_access = if let Some(patterns) = patterns {
-        match &data.ident {
+        match data.ident {
             Some(ident) => {
                 patterns.push(quote_spanned!(data.span => #ident));
-                quote_spanned!(data.span => #ident)
+                syn::Expr::Path(syn::ExprPath {
+                    attrs: Vec::new(),
+                    qself: None,
+                    path: ident.clone().into(),
+                })
             }
             None => {
                 let index = field_int(data.index, data.span);
                 let var = syn::Ident::new(&format!("v{}", data.index), data.span);
                 patterns.push(quote_spanned!(data.span => #index: #var));
-                quote_spanned!(data.span => #var)
+
+                syn::Expr::Path(syn::ExprPath {
+                    attrs: Vec::new(),
+                    qself: None,
+                    path: var.into(),
+                })
             }
         }
     } else {
-        match &data.ident {
-            Some(ident) => quote_spanned!(data.span => &self.#ident),
-            None => {
-                let n = field_int(data.index, data.span);
-                quote_spanned!(data.span => &self.#n)
-            }
-        }
-    };
+        let expr = syn::Expr::Field(syn::ExprField {
+            attrs: Vec::new(),
+            base: Box::new(syn::Expr::Path(syn::ExprPath {
+                attrs: Vec::new(),
+                qself: None,
+                path: <Token![self]>::default().into(),
+            })),
+            dot_token: <Token![.]>::default(),
+            member: member.clone(),
+        });
 
-    let field_access = match &data.ident {
-        Some(ident) => quote_spanned!(data.span => #ident),
-        None => {
-            let field_index = field_int(data.index, data.span);
-            quote_spanned!(data.span => #field_index)
-        }
+        syn::Expr::Reference(syn::ExprReference {
+            attrs: Vec::new(),
+            and_token: <Token![&]>::default(),
+            mutability: None,
+            expr: Box::new(expr),
+        })
     };
 
     Ok(FieldBuild {
@@ -416,7 +436,7 @@ fn setup_field<'a>(
         skip_encoding_if,
         default_attr,
         self_access,
-        field_access,
+        field_access: member,
         packing,
     })
 }

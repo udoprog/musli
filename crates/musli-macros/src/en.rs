@@ -256,7 +256,7 @@ fn encode_variant(
             } => {
                 let pairs_encoder_t = &e.tokens.pairs_encoder_t;
                 let encoder_t = &e.tokens.encoder_t;
-                let mode_ident = e.mode_ident;
+                let mode_ident = e.mode_ident.as_path();
 
                 let tag = &v.tag;
 
@@ -283,7 +283,7 @@ fn encode_variant(
                 let pairs_encoder_t = &e.tokens.pairs_encoder_t;
                 let pair_encoder_t = &e.tokens.pair_encoder_t;
                 let encoder_t = &e.tokens.encoder_t;
-                let mode_ident = e.mode_ident;
+                let mode_ident = e.mode_ident.as_path();
 
                 let tag = &v.tag;
 

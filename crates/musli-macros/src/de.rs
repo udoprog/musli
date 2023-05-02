@@ -204,7 +204,7 @@ fn decode_enum(
         .map(|(_, ty)| quote_spanned!(ty.span() => : #ty));
 
     if let Some(enum_tagging) = en.enum_tagging {
-        let mode_ident = &e.mode_ident;
+        let mode_ident = e.mode_ident.as_path();
         let pair_decoder_t = &e.tokens.pair_decoder_t;
         let pairs_decoder_t = &e.tokens.pairs_decoder_t;
         let as_decoder_t = &e.tokens.as_decoder_t;

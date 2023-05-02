@@ -1,31 +1,31 @@
 use proc_macro2::Span;
 
 pub(crate) struct Tokens {
-    pub(crate) decode_t: syn::ExprPath,
-    pub(crate) decoder_t: syn::ExprPath,
-    pub(crate) default_function: syn::ExprPath,
-    pub(crate) default_mode: syn::ExprPath,
-    pub(crate) encode_t: syn::ExprPath,
-    pub(crate) encoder_t: syn::ExprPath,
-    pub(crate) error_t: syn::ExprPath,
-    pub(crate) fmt: syn::ExprPath,
-    pub(crate) mode_t: syn::ExprPath,
-    pub(crate) pack_decoder_t: syn::ExprPath,
-    pub(crate) pair_decoder_t_first: syn::ExprPath,
-    pub(crate) pair_decoder_t: syn::ExprPath,
-    pub(crate) pair_encoder_t: syn::ExprPath,
-    pub(crate) pairs_decoder_t: syn::ExprPath,
-    pub(crate) pairs_encoder_t: syn::ExprPath,
-    pub(crate) sequence_encoder_t: syn::ExprPath,
-    pub(crate) variant_decoder_t_tag: syn::ExprPath,
-    pub(crate) variant_decoder_t: syn::ExprPath,
-    pub(crate) variant_encoder_t: syn::ExprPath,
-    pub(crate) visit_string_fn: syn::ExprPath,
-    pub(crate) as_decoder_t: syn::ExprPath,
+    pub(crate) decode_t: syn::Path,
+    pub(crate) decoder_t: syn::Path,
+    pub(crate) default_function: syn::Path,
+    pub(crate) default_mode: syn::Path,
+    pub(crate) encode_t: syn::Path,
+    pub(crate) encoder_t: syn::Path,
+    pub(crate) error_t: syn::Path,
+    pub(crate) fmt: syn::Path,
+    pub(crate) mode_t: syn::Path,
+    pub(crate) pack_decoder_t: syn::Path,
+    pub(crate) pair_decoder_t_first: syn::Path,
+    pub(crate) pair_decoder_t: syn::Path,
+    pub(crate) pair_encoder_t: syn::Path,
+    pub(crate) pairs_decoder_t: syn::Path,
+    pub(crate) pairs_encoder_t: syn::Path,
+    pub(crate) sequence_encoder_t: syn::Path,
+    pub(crate) variant_decoder_t_tag: syn::Path,
+    pub(crate) variant_decoder_t: syn::Path,
+    pub(crate) variant_encoder_t: syn::Path,
+    pub(crate) visit_string_fn: syn::Path,
+    pub(crate) as_decoder_t: syn::Path,
 }
 
 impl Tokens {
-    pub(crate) fn new(span: Span, prefix: &syn::ExprPath) -> Self {
+    pub(crate) fn new(span: Span, prefix: &syn::Path) -> Self {
         Self {
             decode_t: path(span, prefix, ["de", "Decode"]),
             decoder_t: path(span, prefix, ["de", "Decoder"]),
@@ -52,23 +52,17 @@ impl Tokens {
     }
 }
 
-fn path<const N: usize>(
-    span: Span,
-    prefix: &syn::ExprPath,
-    segments: [&'static str; N],
-) -> syn::ExprPath {
+fn path<const N: usize>(span: Span, prefix: &syn::Path, segments: [&'static str; N]) -> syn::Path {
     let mut path = prefix.clone();
 
     for segment in segments {
-        path.path
-            .segments
-            .push(syn::Ident::new(segment, span).into());
+        path.segments.push(syn::Ident::new(segment, span).into());
     }
 
     path
 }
 
-fn core_path<const N: usize>(span: Span, segments: [&'static str; N]) -> syn::ExprPath {
+fn core_path<const N: usize>(span: Span, segments: [&'static str; N]) -> syn::Path {
     let core = syn::Ident::new("core", span);
     let mut path = syn::Path::from(core);
 
@@ -76,9 +70,5 @@ fn core_path<const N: usize>(span: Span, segments: [&'static str; N]) -> syn::Ex
         path.segments.push(syn::Ident::new(segment, span).into());
     }
 
-    syn::ExprPath {
-        attrs: Vec::new(),
-        qself: None,
-        path,
-    }
+    path
 }

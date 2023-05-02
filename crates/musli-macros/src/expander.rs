@@ -135,7 +135,7 @@ impl<'a> Expander<'a> {
 
     fn setup_builds<'b>(
         &'b self,
-        modes: &'b [syn::ExprPath],
+        modes: &'b [syn::Path],
         mode_ident: &'b syn::Ident,
     ) -> Result<Vec<Build<'b>>> {
         let mut builds = Vec::new();

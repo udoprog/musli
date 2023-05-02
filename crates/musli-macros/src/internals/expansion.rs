@@ -5,7 +5,7 @@ use crate::internals::{Mode, ModePath};
 pub(crate) enum Expansion<'a> {
     Generic { mode_ident: &'a syn::Ident },
     Default,
-    Moded { mode_ident: &'a syn::ExprPath },
+    Moded { mode_ident: &'a syn::Path },
 }
 
 impl<'a> Expansion<'a> {
@@ -34,7 +34,7 @@ impl<'a> Expansion<'a> {
         &self,
         generics: syn::Generics,
         tokens: &Tokens,
-    ) -> (syn::Generics, syn::ExprPath, Option<syn::WhereClause>) {
+    ) -> (syn::Generics, syn::Path, Option<syn::WhereClause>) {
         match *self {
             Expansion::Generic { mode_ident } => {
                 let mut impl_generics = generics;
@@ -43,11 +43,7 @@ impl<'a> Expansion<'a> {
                     .params
                     .push(syn::TypeParam::from(mode_ident.clone()).into());
 
-                let path = syn::ExprPath {
-                    attrs: Vec::new(),
-                    qself: None,
-                    path: syn::Path::from(mode_ident.clone()),
-                };
+                let path = syn::Path::from(mode_ident.clone());
 
                 let mut where_clause = syn::WhereClause {
                     where_token: <syn::Token![where]>::default(),
@@ -61,7 +57,7 @@ impl<'a> Expansion<'a> {
                     paren_token: Default::default(),
                     modifier: syn::TraitBoundModifier::None,
                     lifetimes: Default::default(),
-                    path: tokens.mode_t.path.clone(),
+                    path: tokens.mode_t.clone(),
                 }));
 
                 where_clause
