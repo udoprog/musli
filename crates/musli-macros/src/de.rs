@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote_spanned, ToTokens};
 use syn::spanned::Spanned;
+use syn::Token;
 
 use crate::expander::{Result, TagMethod};
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
@@ -48,7 +49,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     if !e.bounds.is_empty() && !e.decode_bounds.is_empty() {
         let where_clause = where_clause.get_or_insert_with(|| syn::WhereClause {
-            where_token: <syn::Token![where]>::default(),
+            where_token: <Token![where]>::default(),
             predicates: Default::default(),
         });
 
@@ -729,10 +730,19 @@ pub(crate) struct IndirectOutput<'a> {
 
 impl IndirectOutput<'_> {
     /// Generate the pattern for this output.
-    pub(crate) fn pattern(&self) -> TokenStream {
-        let tag = self.tag;
-        let path = &self.path;
-        quote_spanned!(self.span => #tag => #path)
+    pub(crate) fn as_arm(&self) -> syn::Arm {
+        syn::Arm {
+            attrs: Vec::new(),
+            pat: syn::Pat::Verbatim(self.tag.to_token_stream()),
+            guard: None,
+            fat_arrow_token: <Token![=>]>::default(),
+            body: Box::new(syn::Expr::Path(syn::ExprPath {
+                attrs: Vec::new(),
+                qself: None,
+                path: self.path.clone(),
+            })),
+            comma: None,
+        }
     }
 }
 
@@ -778,7 +788,7 @@ fn string_variant_tag_decode(
     let decoder_t = &e.tokens.decoder_t;
     let visit_string_fn = &e.tokens.visit_string_fn;
     let fmt = &e.tokens.fmt;
-    let patterns = outputs.iter().map(|o| o.pattern());
+    let patterns = outputs.iter().map(|o| o.as_arm());
 
     // Declare a tag visitor, allowing string tags to be decoded by
     // decoders that owns the string.

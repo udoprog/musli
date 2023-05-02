@@ -145,7 +145,7 @@ pub(crate) struct VariantBuild<'a> {
     pub(crate) field_tag_method: TagMethod,
     pub(crate) is_default: bool,
     pub(crate) path: syn::Path,
-    patterns: Vec<TokenStream>,
+    patterns: Vec<syn::FieldValue>,
 }
 
 impl VariantBuild<'_> {
@@ -367,7 +367,7 @@ fn setup_field<'a>(
     data: &'a FieldData<'a>,
     default_field_name: Option<DefaultTag>,
     packing: Packing,
-    patterns: Option<&mut Vec<TokenStream>>,
+    patterns: Option<&mut Vec<syn::FieldValue>>,
     tag_methods: &mut TagMethods,
 ) -> Result<FieldBuild<'a>> {
     let encode_path = data.attr.encode_path(mode, data.span);
@@ -388,7 +388,17 @@ fn setup_field<'a>(
     let self_access = if let Some(patterns) = patterns {
         match data.ident {
             Some(ident) => {
-                patterns.push(quote_spanned!(data.span => #ident));
+                patterns.push(syn::FieldValue {
+                    attrs: Vec::new(),
+                    member: syn::Member::Named(ident.clone()),
+                    colon_token: None,
+                    expr: syn::Expr::Path(syn::ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: syn::Path::from(ident.clone()),
+                    }),
+                });
+
                 syn::Expr::Path(syn::ExprPath {
                     attrs: Vec::new(),
                     qself: None,
@@ -396,9 +406,18 @@ fn setup_field<'a>(
                 })
             }
             None => {
-                let index = field_int(data.index, data.span);
-                let var = syn::Ident::new(&format!("v{}", data.index), data.span);
-                patterns.push(quote_spanned!(data.span => #index: #var));
+                let var = quote::format_ident!("v{}", data.index);
+
+                patterns.push(syn::FieldValue {
+                    attrs: Vec::new(),
+                    member: syn::Member::Unnamed(syn::Index::from(data.index)),
+                    colon_token: Some(<Token![:]>::default()),
+                    expr: syn::Expr::Path(syn::ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: syn::Path::from(var.clone()),
+                    }),
+                });
 
                 syn::Expr::Path(syn::ExprPath {
                     attrs: Vec::new(),
@@ -472,9 +491,4 @@ impl<'a> TagMethods<'a> {
     fn pick(self) -> TagMethod {
         self.methods.into_iter().next().unwrap_or_default()
     }
-}
-
-/// Integer used for tuple initialization.
-pub(crate) fn field_int(index: usize, span: Span) -> syn::LitInt {
-    syn::LitInt::new(&index.to_string(), span)
 }
