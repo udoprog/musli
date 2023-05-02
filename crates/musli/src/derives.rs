@@ -269,7 +269,7 @@
 //! }
 //! ```
 //!
-//! #### `#[musli(bound = ..)]` and `#[musli(decode_bound = ..)]`
+//! #### `#[musli(bound = {..})]` and `#[musli(decode_bound = {..})]`
 //!
 //! These attributes can be used to apply bounds to an [`Encode`] or [`Decode`]
 //! implementation.
@@ -277,8 +277,8 @@
 //! These are necessary to use when a generic container is used to ensure that
 //! the given parameter implements the necessary bounds.
 //!
-//! `#[musli(bound = ..)]` applies to all implementations while
-//! `#[musli(decode_bound = ..)]` only applies to the [`Decode`] implementation.
+//! `#[musli(bound = {..})]` applies to all implementations while
+//! `#[musli(decode_bound = {..})]` only applies to the [`Decode`] implementation.
 //! The latter allows for using the decode lifetime parameter (which defaults to
 //! `'de`).
 //!
@@ -286,7 +286,7 @@
 //! use musli::{Decode, Encode};
 //!
 //! #[derive(Clone, Debug, PartialEq, Encode, Decode)]
-//! #[musli(bound = T: Encode<M>, decode_bound = T: Decode<'de, M>)]
+//! #[musli(bound = {T: Encode<M>}, decode_bound = {T: Decode<'de, M>})]
 //! pub struct GenericWithBound<T> {
 //!     value: T,
 //! }

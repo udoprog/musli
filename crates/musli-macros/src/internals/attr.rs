@@ -3,6 +3,7 @@ use std::fmt;
 use std::mem;
 
 use proc_macro2::Span;
+use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
@@ -313,18 +314,17 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // parse #[musli(bound = "..")]
+            // parse #[musli(bound = {..})]
             if meta.path == BOUND {
                 meta.input.parse::<Token![=]>()?;
-                new.bounds.push((meta.path.span(), meta.input.parse()?));
+                parse_bounds(&meta, &mut new.bounds)?;
                 return Ok(());
             }
 
-            // parse #[musli(decode_bound = "..")]
+            // parse #[musli(decode_bound = {..})]
             if meta.path == DECODE_BOUND {
                 meta.input.parse::<Token![=]>()?;
-                new.decode_bounds
-                    .push((meta.path.span(), meta.input.parse()?));
+                parse_bounds(&meta, &mut new.decode_bounds)?;
                 return Ok(());
             }
 
@@ -362,6 +362,21 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
     }
 
     attr
+}
+
+fn parse_bounds(
+    meta: &syn::meta::ParseNestedMeta,
+    out: &mut Vec<(Span, syn::WherePredicate)>,
+) -> syn::Result<()> {
+    let content;
+    syn::braced!(content in meta.input);
+    let where_clauses = content.parse_terminated(syn::WherePredicate::parse, Token![,])?;
+
+    for where_clause in where_clauses {
+        out.push((meta.path.span(), where_clause));
+    }
+
+    Ok(())
 }
 
 layer! {
