@@ -676,7 +676,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 decode_path.segments.push({
                     let mut segment =
                         syn::PathSegment::from(syn::Ident::new("decode", Span::call_site()));
-                    segment.arguments = arguments.clone();
+                    segment.arguments = arguments;
                     segment
                 });
 
