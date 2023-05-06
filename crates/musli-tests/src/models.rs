@@ -47,7 +47,7 @@ pub enum MediumEnum {
 pub struct LargeStruct {
     elements: Vec<Primitives>,
     medium: Vec<MediumEnum>,
-    map: HashMap<u32, u64>,
+    map: HashMap<String, u64>,
 }
 
 pub fn generate_primitives(rng: &mut StdRng) -> Primitives {
@@ -122,7 +122,7 @@ pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
     let mut map = HashMap::new();
 
     for _ in 0..342 {
-        map.insert(rng.gen(), rng.gen());
+        map.insert(generate_string(rng), rng.gen());
     }
 
     LargeStruct {

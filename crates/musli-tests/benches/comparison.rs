@@ -56,9 +56,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     benches!(musli_descriptive);
     benches!(musli_storage);
     benches!(musli_value);
-    // fixme:
-    // benches!(serde_dlhn);
-    // benches!(serde_cbor);
+    #[cfg(not(any(model_128, model_all)))]
+    benches!(serde_dlhn);
+    benches!(serde_cbor);
 }
 
 criterion_group!(benches, criterion_benchmark);
