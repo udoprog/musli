@@ -108,7 +108,6 @@ where
 }
 
 /// Setting up encoding with parameters.
-#[derive(Clone, Copy)]
 pub struct Encoding<M = DefaultMode, I = Variable, L = Variable, const P: usize = MAX_INLINE_LEN>
 where
     I: WireIntegerEncoding,
@@ -322,4 +321,26 @@ where
             SliceReader::new(bytes).with_position(),
         ))
     }
+}
+
+impl<M, I, L, const P: usize> Clone for Encoding<M, I, L, P>
+where
+    M: Mode,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<M, I, L, const P: usize> Copy for Encoding<M, I, L, P>
+where
+    M: Mode,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
+{
 }

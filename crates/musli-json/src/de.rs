@@ -113,7 +113,7 @@ where
     type Buffer = Never<Self::Error>;
     #[cfg(feature = "std")]
     type Buffer = musli_value::AsValueDecoder<Self::Error>;
-    type Pack = Never<Self::Error>;
+    type Pack = JsonSequenceDecoder<'a, P>;
     type Sequence = JsonSequenceDecoder<'a, P>;
     type Tuple = JsonSequenceDecoder<'a, P>;
     type Map = JsonObjectDecoder<'a, P>;
@@ -274,16 +274,6 @@ where
         self.parser.parse_number(visitor)
     }
 
-    #[inline]
-    fn decode_option(mut self) -> Result<Option<Self::Some>, Self::Error> {
-        if self.parser.peek()?.is_null() {
-            self.parse_null()?;
-            Ok(None)
-        } else {
-            Ok(Some(self))
-        }
-    }
-
     #[cfg(feature = "std")]
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
@@ -309,6 +299,21 @@ where
             StringReference::Borrowed(borrowed) => visitor.visit_borrowed(borrowed),
             StringReference::Scratch(string) => visitor.visit_any(string),
         }
+    }
+
+    #[inline]
+    fn decode_option(mut self) -> Result<Option<Self::Some>, Self::Error> {
+        if self.parser.peek()?.is_null() {
+            self.parse_null()?;
+            Ok(None)
+        } else {
+            Ok(Some(self))
+        }
+    }
+
+    #[inline]
+    fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
+        JsonSequenceDecoder::new(self.scratch, None, self.parser)
     }
 
     #[inline]

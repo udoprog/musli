@@ -56,7 +56,7 @@ impl fmt::Display for Repr {
     }
 }
 
-/// An error raised while decoding a slice.
+/// An error raised while working with a buffer.
 #[derive(Debug)]
 pub struct BufferError(Repr);
 

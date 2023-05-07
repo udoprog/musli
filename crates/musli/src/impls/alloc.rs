@@ -288,11 +288,7 @@ macro_rules! map {
     }
 }
 
-map!(
-    BTreeMap<K: Ord, V>,
-    map,
-    BTreeMap::new()
-);
+map!(BTreeMap<K: Ord, V>, map, BTreeMap::new());
 map!(
     HashMap<K: Eq + Hash, V, S: BuildHasher + Default>,
     map,

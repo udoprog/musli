@@ -29,7 +29,7 @@ where
 {
     type Error = W::Error;
     type Ok = ();
-    type Pack = Never<Self>;
+    type Pack = JsonArrayEncoder<M, W>;
     type Some = Self;
     type Sequence = JsonArrayEncoder<M, W>;
     type Tuple = JsonArrayEncoder<M, W>;
@@ -197,6 +197,11 @@ where
     #[inline]
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
         self.encode_unit()
+    }
+
+    #[inline]
+    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
+        JsonArrayEncoder::new(self.writer)
     }
 
     #[inline]

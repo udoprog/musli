@@ -93,6 +93,16 @@ where
     DEFAULT.decode(reader)
 }
 
+/// Decode the given type `T` from the given string using the [DEFAULT]
+/// configuration.
+#[inline]
+pub fn from_str<'de, T>(string: &'de str) -> Result<T, ParseError>
+where
+    T: Decode<'de, DefaultMode>,
+{
+    DEFAULT.from_str(string)
+}
+
 /// Decode the given type `T` from the given slice using the [DEFAULT]
 /// configuration.
 #[inline]
@@ -104,7 +114,6 @@ where
 }
 
 /// Setting up encoding with parameters.
-#[derive(Clone, Copy)]
 pub struct Encoding<M = DefaultMode> {
     _marker: marker::PhantomData<M>,
 }
@@ -249,6 +258,16 @@ where
         T::decode(JsonDecoder::new(&mut scratch, &mut reader))
     }
 
+    /// Decode the given type `T` from the given string using the current
+    /// configuration.
+    #[inline]
+    pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, ParseError>
+    where
+        T: Decode<'de, M>,
+    {
+        self.from_slice(string.as_bytes())
+    }
+
     /// Decode the given type `T` from the given slice using the current
     /// configuration.
     #[inline]
@@ -261,3 +280,14 @@ where
         T::decode(JsonDecoder::new(&mut scratch, &mut reader))
     }
 }
+
+impl<M> Clone for Encoding<M> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<M> Copy for Encoding<M> {}

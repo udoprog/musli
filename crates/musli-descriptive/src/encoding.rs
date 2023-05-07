@@ -106,7 +106,6 @@ where
 }
 
 /// Setting up encoding with parameters.
-#[derive(Clone, Copy)]
 pub struct Encoding<M = DefaultMode, const P: usize = MAX_INLINE_LEN> {
     _marker: marker::PhantomData<M>,
 }
@@ -251,3 +250,17 @@ where
         ))
     }
 }
+
+impl<M, const P: usize> Clone for Encoding<M, P>
+where
+    M: Mode,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<M, const P: usize> Copy for Encoding<M, P> where M: Mode {}
