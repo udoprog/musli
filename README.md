@@ -31,8 +31,8 @@ visitor pattern. Instead the encoding interacts with the framework through
 encoding interfaces that describe "what it wants" and leverages GATs to make
 the API efficient and ergonomic.
 
-Another major aspect where Müsli differs is in the conept of [modes]. This
-is a larger topic and is covered further down.
+Another major aspect where Müsli differs is in the conept of
+[modes](#modes). This is a larger topic and is covered further down.
 
 <br>
 
@@ -41,8 +41,8 @@ is a larger topic and is covered further down.
 Add the following to your `Cargo.toml`:
 
 ```toml
-musli = "0.0.39"
-musli-wire = "0.0.39"
+musli = "0.0.40"
+musli-wire = "0.0.40"
 ```
 
 <br>
@@ -62,8 +62,8 @@ fields.
 
 The available formats and their capabilities are:
 
-| | reorder? | missing? | unknown? | | self? |
-|-|-----------------|-----------------|--------------------|
+| | reorder? | missing? | unknown? | self? |
+|-|-|-|-|-|
 | [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
 | [musli-storage]                    | ✔ | ✔ | ✗ | ✗ |
 | [musli-wire]                       | ✔ | ✔ | ✔ | ✗ |

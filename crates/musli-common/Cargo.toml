@@ -1,6 +1,6 @@
 [package]
 name = "musli-common"
-version = "0.0.39"
+version = "0.0.40"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.65"
@@ -20,7 +20,7 @@ default = ["std"]
 std = ["musli/std"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.39", default-features = false }
+musli = { path = "../musli", version = "0.0.40", default-features = false }
 
 [dev-dependencies]
 rand = "0.8.5"
