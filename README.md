@@ -31,6 +31,9 @@ visitor pattern. Instead the encoding interacts with the framework through
 encoding interfaces that describe "what it wants" and leverages GATs to make
 the API efficient and ergonomic.
 
+Another major aspect where Müsli differs is in the conept of [modes]. This
+is a larger topic and is covered further down.
+
 <br>
 
 ## Usage
@@ -59,23 +62,31 @@ fields.
 
 The available formats and their capabilities are:
 
-| | reorder? | missing? | unknown? |
+| | reorder? | missing? | unknown? | | self? |
 |-|-----------------|-----------------|--------------------|
-| [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ |
-| [musli-storage]                    | ✔ | ✔ | ✗ |
-| [musli-wire]                       | ✔ | ✔ | ✔ |
-| [musli-descriptive]                | ✔ | ✔ | ✔ |
+| [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
+| [musli-storage]                    | ✔ | ✔ | ✗ | ✗ |
+| [musli-wire]                       | ✔ | ✔ | ✔ | ✗ |
+| [musli-descriptive]                | ✔ | ✔ | ✔ | ✔ |
 
-`recorder?` determines whether fields must occur in exactly the order in
+`reorder?` determines whether fields must occur in exactly the order in
 which they are specified. So reordering fields in such a struct would cause
-an error. This is only suitable for byte-oriented IPC where data models are
-strictly synchronized.
+either an error or some kind of undefined behavior. This is only suitable
+for byte-oriented IPC where data models are strictly synchronized.
 
-`missing?` determines if the reader can handle missing fields, as
-exemplified above. This is suitable for on-disk storage.
+`missing?` determines if reading can handle missing fields, as exemplified
+above. This is suitable for on-disk storage.
 
 `unknown?` determines if the format can skip over unknown fields. This is
-suitable for network communication.
+suitable for network communication. At this point you've reached *upgrade
+stability*. Some level of introspection is possible on this level, because
+it must contain enough information about fields to know what to skip which
+usually allows for reasoning about basic types.
+
+`self?` determines if the format is self-descriptive. Allowing field names
+and variants to be fully reconstructed from the serialized data. These
+formats do not require models to decode, and can make use of generic
+containers such as [musli-value].
 
 For every feature you drop, the format becomes more compact and efficient.
 `musli-storage` `#[musli(packed)]` for example is roughly as compact and
@@ -142,6 +153,60 @@ assert_eq!(version2, Version2 {
 
 <br>
 
+## Modes
+
+In Müsli the same model can be serialized in different ways. Instead of
+requiring the use of multiple models, we instead support each model
+implementing different *modes*.
+
+A mode allows for different encoding attributes to apply depending on which
+mode something is performed in. A mode can apply to *any* musli parameter
+giving you a lot of flexibility.
+
+If a mode is not specified, an implementation will apply to all modes (`M:
+Mode`), if at least one mode is specified it will be implemented for all
+modes which are present in a model and [`DefaultMode`]. This way, an
+encoding which uses `DefaultMode` (which it does by default) should always
+work.
+
+```rust
+use musli::mode::{DefaultMode, Mode};
+use musli::{Decode, Encode};
+use musli_json::Encoding;
+
+enum Alt {}
+impl Mode for Alt {}
+
+#[derive(Debug, PartialEq, Decode, Encode)]
+#[musli(mode = Alt, packed)]
+#[musli(default_field_name = "name")]
+struct Word<'a> {
+    text: &'a str,
+    teineigo: bool,
+}
+
+let CONFIG: Encoding<DefaultMode> = Encoding::new();
+let ALT_CONFIG: Encoding<Alt> = Encoding::new();
+
+let word = Word {
+    text: "あります",
+    teineigo: true,
+};
+
+let out = CONFIG.to_string(&word)?;
+assert_eq!(out, r#"{"text":"あります","teineigo":true}"#);
+let word2 = CONFIG.from_str(&out[..])?;
+assert_eq!(word, word2);
+
+let out = ALT_CONFIG.to_string(&word)?;
+assert_eq!(out, r#"["あります",true]"#);
+let word2 = ALT_CONFIG.from_str(&out[..])?;
+assert_eq!(word, word2);
+
+```
+
+<br>
+
 ## Unsafety
 
 This library currently has two instances of unsafe:
@@ -197,6 +262,7 @@ fields. This is an area where Müsli's current encoding indeed is expected to
 lag behind since it needs to perform a fair bit of work to walk over
 unrecognized data.
 
+[`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
 [bincode]: https://docs.rs/bincode
 [Decode]: https://docs.rs/musli/latest/musli/trait.Decode.html
 [derives]: https://docs.rs/musli/latest/musli/derives/
@@ -206,5 +272,6 @@ unrecognized data.
 [musli-storage]: https://docs.rs/musli-storage
 [musli-wire]: https://docs.rs/musli-wire
 [musli-descriptive]: https://docs.rs/musli-descriptive
+[musli-value]: https://docs.rs/musli-value
 [protobuf]: https://developers.google.com/protocol-buffers
 [serde]: https://serde.rs

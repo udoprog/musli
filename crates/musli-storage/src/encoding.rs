@@ -105,7 +105,6 @@ where
 }
 
 /// Setting up encoding with parameters.
-#[derive(Clone, Copy)]
 pub struct Encoding<M = DefaultMode, I = Variable, L = Variable>
 where
     M: Mode,
@@ -311,4 +310,26 @@ where
         let reader = SliceReader::new(bytes).with_position();
         T::decode(StorageDecoder::<_, I, L>::new(reader))
     }
+}
+
+impl<M, I, L> Clone for Encoding<M, I, L>
+where
+    M: Mode,
+    I: IntegerEncoding,
+    L: UsizeEncoding,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<M, I, L> Copy for Encoding<M, I, L>
+where
+    M: Mode,
+    I: IntegerEncoding,
+    L: UsizeEncoding,
+{
 }

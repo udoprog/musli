@@ -25,4 +25,4 @@ musli-macros = { version = "=0.0.39", path = "../musli-macros" }
 [dev-dependencies]
 musli-wire = { path = "../musli-wire", default-features = false }
 musli-storage = { path = "../musli-storage", default-features = false }
-musli-json = { path = "../musli-json", default-features = false }
+musli-json = { path = "../musli-json", default-features = false, features = ["std"] }
