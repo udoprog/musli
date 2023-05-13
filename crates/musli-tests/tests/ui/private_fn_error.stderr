@@ -1,0 +1,17 @@
+error[E0603]: function `decode` is private
+  --> tests/ui/private_fn_error.rs:5:26
+   |
+5  |     #[musli(with = self::array::<_, 4>)]
+   |                          ^^^^^ private function
+   |
+note: the function `decode` is defined here
+  --> tests/ui/private_fn_error.rs:22:5
+   |
+22 | /     fn decode<'de, M, D, T, const N: usize>(decoder: D) -> Result<[T; N], D::Error>
+23 | |     where
+24 | |         M: Mode,
+25 | |         D: Decoder<'de>,
+26 | |     {
+27 | |         todo!()
+28 | |     }
+   | |_____^

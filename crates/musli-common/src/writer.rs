@@ -7,6 +7,8 @@ use core::ops::Deref;
 use musli::error::Error;
 
 use crate::error::BufferError;
+#[cfg(not(feature = "std"))]
+use crate::fixed_bytes::FixedBytes;
 
 /// Maximum size used by a fixed length [Buffer].
 pub const MAX_FIXED_BYTES_LEN: usize = 128;

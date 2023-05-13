@@ -657,16 +657,18 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 meta.input.parse::<Token![=]>()?;
                 let mut path = meta.input.parse::<syn::Path>()?;
 
-                let arguments = match path.segments.last_mut() {
-                    Some(path) => mem::replace(&mut path.arguments, syn::PathArguments::None),
-                    None => syn::PathArguments::None,
+                let (span, arguments) = match path.segments.last_mut() {
+                    Some(s) => (
+                        s.span(),
+                        mem::replace(&mut s.arguments, syn::PathArguments::None),
+                    ),
+                    None => (path.span(), syn::PathArguments::None),
                 };
 
                 let mut encode_path = path.clone();
 
                 encode_path.segments.push({
-                    let mut segment =
-                        syn::PathSegment::from(syn::Ident::new("encode", Span::call_site()));
+                    let mut segment = syn::PathSegment::from(syn::Ident::new("encode", span));
                     segment.arguments = arguments.clone();
                     segment
                 });
@@ -674,8 +676,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 let mut decode_path = path.clone();
 
                 decode_path.segments.push({
-                    let mut segment =
-                        syn::PathSegment::from(syn::Ident::new("decode", Span::call_site()));
+                    let mut segment = syn::PathSegment::from(syn::Ident::new("decode", span));
                     segment.arguments = arguments;
                     segment
                 });

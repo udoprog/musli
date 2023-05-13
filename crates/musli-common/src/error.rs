@@ -24,7 +24,7 @@ impl Repr {
     where
         T: fmt::Display,
     {
-        Self
+        Self()
     }
 }
 
