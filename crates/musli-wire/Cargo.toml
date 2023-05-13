@@ -1,6 +1,6 @@
 [package]
 name = "musli-wire"
-version = "0.0.40"
+version = "0.0.41"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.65"
@@ -21,6 +21,6 @@ std = ["musli/std", "musli-common/std", "musli-storage/std"]
 test = ["std"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.40", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.40", default-features = false }
-musli-storage = { path = "../musli-storage", version = "0.0.40", default-features = false }
+musli = { path = "../musli", version = "0.0.41", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.41", default-features = false }
+musli-storage = { path = "../musli-storage", version = "0.0.41", default-features = false }
