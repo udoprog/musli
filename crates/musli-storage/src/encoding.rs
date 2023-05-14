@@ -1,11 +1,11 @@
 //! Module that defines [Encoding] whith allows for customization of the
 //! encoding format, and the [DEFAULT] encoding configuration.
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 use core::marker;
 #[cfg(feature = "std")]
 use std::io;
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
 
 use musli::de::Decode;
 use musli::en::Encode;

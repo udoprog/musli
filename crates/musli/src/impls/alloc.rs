@@ -1,15 +1,15 @@
+use core::ffi::CStr;
 use core::fmt;
 #[cfg(feature = "std")]
 use core::hash::{BuildHasher, Hash};
 use core::marker;
-use core::ffi::CStr;
 
-use alloc::ffi::CString;
 use alloc::borrow::{Cow, ToOwned};
-use alloc::string::String;
-use alloc::collections::{BTreeMap, BinaryHeap, VecDeque};
-use alloc::vec::Vec;
 use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BinaryHeap, VecDeque};
+use alloc::ffi::CString;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};

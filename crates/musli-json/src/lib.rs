@@ -14,12 +14,12 @@
 //! [Müsli]: https://github.com/udoprog/musli
 
 #![deny(missing_docs)]
-
 #![no_std]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg_attr(test, macro_use)]
 #[cfg(feature = "std")]
 extern crate std;
 
@@ -28,10 +28,10 @@ mod en;
 pub mod encoding;
 pub mod reader;
 
-pub use self::encoding::{decode, encode, from_slice, to_buffer, to_fixed_bytes, Encoding};
 #[cfg(feature = "alloc")]
 pub use self::encoding::to_string;
 #[cfg(feature = "std")]
 pub use self::encoding::to_writer;
+pub use self::encoding::{decode, encode, from_slice, to_buffer, to_fixed_bytes, Encoding};
 #[doc(inline)]
 pub use musli_common::*;

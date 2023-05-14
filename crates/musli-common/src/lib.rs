@@ -16,6 +16,7 @@
 #![deny(missing_docs)]
 #![no_std]
 
+#[cfg_attr(test, macro_use)]
 #[cfg(feature = "std")]
 extern crate std;
 

@@ -7,10 +7,10 @@ use core::ops::Deref;
 use musli::error::Error;
 
 use crate::error::BufferError;
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
 #[cfg(not(feature = "alloc"))]
 use crate::fixed_bytes::FixedBytes;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 /// Maximum size used by a fixed length [Buffer].
 pub const MAX_FIXED_BYTES_LEN: usize = 128;

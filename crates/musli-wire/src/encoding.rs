@@ -3,10 +3,10 @@
 
 use core::marker;
 
-#[cfg(feature = "std")]
-use std::io;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use std::io;
 
 use musli::de::Decode;
 use musli::en::Encode;

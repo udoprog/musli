@@ -1,7 +1,7 @@
-#[cfg(not(feature = "alloc"))]
-use musli_common::fixed_bytes::FixedBytes;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+#[cfg(not(feature = "alloc"))]
+use musli_common::fixed_bytes::FixedBytes;
 
 /// Provides the necessary scratch buffer used when decoding JSON.
 #[doc(hidden)]

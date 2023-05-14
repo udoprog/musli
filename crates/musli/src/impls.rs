@@ -4,6 +4,7 @@ mod alloc;
 mod net;
 mod tuples;
 
+use core::ffi::CStr;
 use core::num::{
     NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize, NonZeroU128,
     NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, Wrapping,
@@ -13,7 +14,6 @@ use core::sync::atomic::{
     AtomicU64, AtomicU8, AtomicUsize,
 };
 use core::{fmt, marker};
-use core::ffi::CStr;
 
 use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
 use crate::en::{Encode, Encoder, VariantEncoder};
