@@ -14,7 +14,13 @@
 //! [Writer]: https://docs.rs/musli-common/latest/musli-common/writer/trait.Writer.html
 
 #![deny(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
+
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 pub mod buffered_writer;
 pub mod error;

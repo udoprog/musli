@@ -1,10 +1,22 @@
 use core::marker;
 
+#[cfg(feature = "alloc")]
+use alloc::borrow::ToOwned;
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
+use musli::de::{AsDecoder, Decode, Decoder, NumberHint, NumberVisitor, TypeHint};
+#[cfg(feature = "alloc")]
 use musli::de::{
-    AsDecoder, Decode, Decoder, LengthHint, NumberHint, NumberVisitor, PairDecoder, PairsDecoder,
-    SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
+    LengthHint, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
 };
-use musli::en::{Encode, Encoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{Encode, Encoder};
+#[cfg(feature = "alloc")]
+use musli::en::{PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
 use musli::mode::Mode;
 
@@ -27,17 +39,23 @@ pub enum Value {
     /// A number.
     Number(Number),
     /// An array.
+    #[cfg(feature = "alloc")]
     Bytes(Vec<u8>),
     /// A string in a value.
+    #[cfg(feature = "alloc")]
     String(String),
     /// A unit value.
+    #[cfg(feature = "alloc")]
     Sequence(Vec<Value>),
     /// A pair stored in the value.
+    #[cfg(feature = "alloc")]
     Map(Vec<(Value, Value)>),
     /// A variant pair. The first value identifies the variant, the second value
     /// contains the value of the variant.
+    #[cfg(feature = "alloc")]
     Variant(Box<(Value, Value)>),
     /// An optional value.
+    #[cfg(feature = "alloc")]
     Option(Option<Box<Value>>),
 }
 
@@ -49,11 +67,17 @@ impl Value {
             Value::Bool(..) => TypeHint::Bool,
             Value::Char(..) => TypeHint::Char,
             Value::Number(number) => TypeHint::Number(number.type_hint()),
+            #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => TypeHint::Bytes(LengthHint::Exact(bytes.len())),
+            #[cfg(feature = "alloc")]
             Value::String(string) => TypeHint::String(LengthHint::Exact(string.len())),
+            #[cfg(feature = "alloc")]
             Value::Sequence(sequence) => TypeHint::Sequence(LengthHint::Exact(sequence.len())),
+            #[cfg(feature = "alloc")]
             Value::Map(map) => TypeHint::Map(LengthHint::Exact(map.len())),
+            #[cfg(feature = "alloc")]
             Value::Variant(..) => TypeHint::Variant,
+            #[cfg(feature = "alloc")]
             Value::Option(..) => TypeHint::Option,
         }
     }
@@ -205,8 +229,11 @@ where
                     )))
                 }
             }),
+            #[cfg(feature = "alloc")]
             TypeHint::Bytes(..) => decoder.decode_bytes(BytesVisitor(marker::PhantomData)),
+            #[cfg(feature = "alloc")]
             TypeHint::String(..) => decoder.decode_string(StringVisitor(marker::PhantomData)),
+            #[cfg(feature = "alloc")]
             TypeHint::Sequence(len) => {
                 let mut out = Vec::with_capacity(len.size_hint());
 
@@ -219,6 +246,7 @@ where
                 seq.end()?;
                 Ok(Value::Sequence(out))
             }
+            #[cfg(feature = "alloc")]
             TypeHint::Map(len) => {
                 let mut out = Vec::with_capacity(len.size_hint());
 
@@ -233,6 +261,7 @@ where
                 map.end()?;
                 Ok(Value::Map(out))
             }
+            #[cfg(feature = "alloc")]
             TypeHint::Variant => {
                 let mut variant = decoder.decode_variant()?;
                 let first = Decode::<M>::decode(variant.tag()?)?;
@@ -240,6 +269,7 @@ where
                 variant.end()?;
                 Ok(Value::Variant(Box::new((first, second))))
             }
+            #[cfg(feature = "alloc")]
             TypeHint::Option => match decoder.decode_option()? {
                 Some(decoder) => Ok(Value::Option(Some(Box::new(Decode::<M>::decode(decoder)?)))),
                 None => Ok(Value::Option(None)),
@@ -251,8 +281,10 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 struct BytesVisitor<E>(marker::PhantomData<E>);
 
+#[cfg(feature = "alloc")]
 impl<'de, E> ValueVisitor<'de> for BytesVisitor<E>
 where
     E: Error,
@@ -266,6 +298,7 @@ where
         write!(f, "expecting bytes")
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_owned(self, bytes: Vec<u8>) -> Result<Self::Ok, Self::Error> {
         Ok(Value::Bytes(bytes))
@@ -277,8 +310,10 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 struct StringVisitor<E>(marker::PhantomData<E>);
 
+#[cfg(feature = "alloc")]
 impl<'de, E> ValueVisitor<'de> for StringVisitor<E>
 where
     E: Error,
@@ -401,8 +436,11 @@ where
             Value::Bool(b) => encoder.encode_bool(*b),
             Value::Char(c) => encoder.encode_char(*c),
             Value::Number(n) => Encode::<M>::encode(n, encoder),
+            #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => encoder.encode_bytes(bytes),
+            #[cfg(feature = "alloc")]
             Value::String(string) => encoder.encode_string(string),
+            #[cfg(feature = "alloc")]
             Value::Sequence(values) => {
                 let mut sequence = encoder.encode_sequence(values.len())?;
 
@@ -412,6 +450,7 @@ where
 
                 sequence.end()
             }
+            #[cfg(feature = "alloc")]
             Value::Map(values) => {
                 let mut map = encoder.encode_map(values.len())?;
 
@@ -421,11 +460,13 @@ where
 
                 map.end()
             }
+            #[cfg(feature = "alloc")]
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;
                 let encoder = encoder.encode_variant()?;
                 encoder.insert::<M, _, _>(tag, variant)
             }
+            #[cfg(feature = "alloc")]
             Value::Option(option) => match option {
                 Some(value) => {
                     let encoder = encoder.encode_some()?;

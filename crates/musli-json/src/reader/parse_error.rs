@@ -1,5 +1,10 @@
 use core::fmt;
 
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+#[cfg(feature = "alloc")]
+use alloc::string::ToString;
+
 use musli::error::Error;
 
 use crate::reader::integer;
@@ -68,7 +73,7 @@ pub(crate) enum ParseErrorKind {
     ExpectedValue(Token),
     ParseFloat(lexical::Error),
     IntegerError(integer::Error),
-    #[cfg(feature = "std")]
+    #[cfg(feature = "musli-value")]
     ValueError(musli_value::ValueError),
     Eof,
     Custom,
@@ -80,7 +85,7 @@ pub struct ParseError {
     // Position of the parse error.
     span: Span,
     kind: ParseErrorKind,
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     custom: Option<Box<str>>,
 }
 
@@ -90,7 +95,7 @@ impl ParseError {
         Self {
             span: Span::point(at),
             kind,
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             custom: None,
         }
     }
@@ -100,7 +105,7 @@ impl ParseError {
         Self {
             span: Span::new(start, end),
             kind,
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             custom: None,
         }
     }
@@ -167,20 +172,20 @@ impl fmt::Display for ParseError {
             ParseErrorKind::IntegerError(error) => {
                 write!(f, "expected integer, got {error} (at {span})")
             }
-            #[cfg(feature = "std")]
+            #[cfg(feature = "musli-value")]
             ParseErrorKind::ValueError(error) => {
                 write!(f, "value error: {error} (at {span})")
             }
             ParseErrorKind::Eof => write!(f, "eof while parsing (at {span})"),
             ParseErrorKind::Custom => {
-                #[cfg(feature = "std")]
+                #[cfg(feature = "alloc")]
                 if let Some(custom) = &self.custom {
                     write!(f, "{}", custom)
                 } else {
                     write!(f, "custom error")
                 }
 
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "alloc"))]
                 {
                     write!(f, "custom error")
                 }
@@ -197,7 +202,7 @@ impl Error for ParseError {
         Self {
             kind: ParseErrorKind::Custom,
             span: Span::empty(),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             custom: Some(error.to_string().into()),
         }
     }
@@ -209,7 +214,7 @@ impl Error for ParseError {
         Self {
             kind: ParseErrorKind::Custom,
             span: Span::empty(),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             custom: Some(message.to_string().into()),
         }
     }
@@ -218,7 +223,7 @@ impl Error for ParseError {
 #[cfg(feature = "std")]
 impl std::error::Error for ParseError {}
 
-#[cfg(feature = "std")]
+#[cfg(feature = "musli-value")]
 impl From<musli_value::ValueError> for ParseError {
     fn from(error: musli_value::ValueError) -> Self {
         ParseError {

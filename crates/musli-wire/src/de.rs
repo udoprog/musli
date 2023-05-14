@@ -1,6 +1,11 @@
 use core::fmt;
 use core::marker;
 
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
 use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
 use crate::tag::Kind;
 use crate::tag::Tag;
@@ -233,7 +238,7 @@ where
                 self.0.expecting(f)
             }
 
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             #[inline]
             fn visit_owned(self, bytes: Vec<u8>) -> Result<Self::Ok, Self::Error> {
                 let string = String::from_utf8(bytes).map_err(Self::Error::custom)?;

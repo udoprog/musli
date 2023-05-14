@@ -1,4 +1,6 @@
 pub mod serde_dlhn {
+    use alloc::vec::Vec;
+
     use dlhn::de::Deserializer;
     use dlhn::ser::Serializer;
     use serde::{Deserialize, Serialize};
@@ -23,6 +25,8 @@ pub mod serde_dlhn {
 }
 
 pub mod serde_json {
+    use alloc::vec::Vec;
+
     use serde::{Deserialize, Serialize};
 
     pub fn encode<T>(value: &T) -> Vec<u8>
@@ -41,6 +45,8 @@ pub mod serde_json {
 }
 
 pub mod musli_json {
+    use alloc::vec::Vec;
+
     use ::musli_json::Encoding;
     use musli::{Decode, Encode};
 
@@ -62,6 +68,8 @@ pub mod musli_json {
 }
 
 pub mod serde_rmp {
+    use alloc::vec::Vec;
+
     use serde::{Deserialize, Serialize};
 
     #[allow(unused)]
@@ -82,16 +90,17 @@ pub mod serde_rmp {
 }
 
 pub mod serde_bincode {
+    use alloc::vec::Vec;
+
     use serde::{Deserialize, Serialize};
-    use std::io::Cursor;
 
     pub fn encode<T>(value: &T) -> Vec<u8>
     where
         T: Serialize,
     {
-        let mut writer = Cursor::new(Vec::new());
-        bincode::serialize_into(&mut writer, value).unwrap();
-        writer.into_inner()
+        let mut data = Vec::new();
+        bincode::serialize_into(&mut data, value).unwrap();
+        data
     }
 
     pub fn decode<'de, T>(data: &'de [u8]) -> T
@@ -103,6 +112,8 @@ pub mod serde_bincode {
 }
 
 pub mod serde_cbor {
+    use alloc::vec::Vec;
+
     use serde::{Deserialize, Serialize};
 
     pub fn encode<T>(value: &T) -> Vec<u8>
@@ -121,6 +132,8 @@ pub mod serde_cbor {
 }
 
 pub mod musli_storage {
+    use alloc::vec::Vec;
+
     use ::musli_storage::int::{Fixed, FixedUsize};
     use ::musli_storage::Encoding;
     use musli::mode::DefaultMode;
@@ -145,6 +158,8 @@ pub mod musli_storage {
 }
 
 pub mod musli_wire {
+    use alloc::vec::Vec;
+
     use ::musli_wire::int::{Fixed, FixedUsize};
     use ::musli_wire::Encoding;
     use musli::mode::DefaultMode;
@@ -169,6 +184,8 @@ pub mod musli_wire {
 }
 
 pub mod musli_descriptive {
+    use alloc::vec::Vec;
+
     use ::musli_descriptive::Encoding;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};

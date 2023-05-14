@@ -2,8 +2,10 @@
 //! certain kind of value.
 
 use core::fmt;
-use std::collections::VecDeque;
-use std::marker;
+use core::marker;
+
+use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 
 use crate::compat::Bytes;
 use crate::de::{Decode, Decoder, ValueVisitor};

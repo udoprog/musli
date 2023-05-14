@@ -8,10 +8,15 @@ use core::fmt;
 
 use musli::error::Error;
 
-struct Repr(#[cfg(feature = "std")] Box<str>);
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+#[cfg(feature = "alloc")]
+use alloc::string::ToString;
+
+struct Repr(#[cfg(feature = "alloc")] Box<str>);
 
 impl Repr {
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     fn collect<T>(message: T) -> Self
     where
         T: fmt::Display,
@@ -19,7 +24,7 @@ impl Repr {
         Self(message.to_string().into())
     }
 
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "alloc"))]
     fn collect<T>(_: T) -> Self
     where
         T: fmt::Display,
@@ -28,28 +33,28 @@ impl Repr {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl fmt::Debug for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "alloc"))]
 impl fmt::Debug for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         "buffer overflow / underflow".fmt(f)
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "alloc"))]
 impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         "buffer overflow / underflow".fmt(f)

@@ -17,8 +17,9 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["musli/std", "musli-common/std", "musli-storage/std"]
-test = ["std"]
+std = ["musli/std", "musli-common/std", "musli-storage/std", "alloc"]
+alloc = ["musli/alloc", "musli-common/alloc", "musli-storage/alloc"]
+test = []
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.41", default-features = false }

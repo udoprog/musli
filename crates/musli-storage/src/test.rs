@@ -1,6 +1,7 @@
 //! Helpers for writing tests.
 
 use core::fmt::Debug;
+
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 

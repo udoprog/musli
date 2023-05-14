@@ -17,13 +17,14 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["musli/std", "musli-common/std", "musli-value"]
+std = ["alloc", "musli/std", "musli-common/std", "musli-value"]
+alloc = ["musli/alloc", "musli-common/alloc", "musli-value/alloc"]
 test = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.41" }
-musli-common = { path = "../musli-common", version = "0.0.41" }
-musli-value = { path = "../musli-value", version = "0.0.41", optional = true }
+musli = { path = "../musli", version = "0.0.41", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.41", default-features = false }
+musli-value = { path = "../musli-value", version = "0.0.41", default-features = false, optional = true }
 
 itoa = "1.0.6"
 ryu = "1.0.13"

@@ -1,7 +1,7 @@
 //! Wrapper types which ensures that a given field is encoded or decoded as a
 //! certain kind of value.
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod alloc;
 mod packed;
 

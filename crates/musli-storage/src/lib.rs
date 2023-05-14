@@ -95,7 +95,13 @@
 //! [Encoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 
 #![deny(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
+
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 #[doc(hidden)]
 pub mod de;

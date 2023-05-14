@@ -1,4 +1,13 @@
-use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
+use musli::en::Encoder;
+#[cfg(feature = "alloc")]
+use musli::en::{PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+#[cfg(not(feature = "alloc"))]
+use musli::never::Never;
 
 use crate::error::ValueError;
 use crate::value::{Number, Value};
@@ -9,22 +18,27 @@ trait ValueOutput {
 }
 
 impl ValueOutput for &mut Value {
+    #[inline]
     fn write(self, value: Value) {
         *self = value;
     }
 }
 
+#[cfg(feature = "alloc")]
 impl ValueOutput for &mut Vec<Value> {
+    #[inline]
     fn write(self, value: Value) {
         self.push(value);
     }
 }
 
 /// Writer which writes an optional value that is present.
+#[cfg(feature = "alloc")]
 pub struct SomeValueWriter<O> {
     output: O,
 }
 
+#[cfg(feature = "alloc")]
 impl<O> ValueOutput for SomeValueWriter<O>
 where
     O: ValueOutput,
@@ -52,13 +66,34 @@ where
 {
     type Ok = ();
     type Error = ValueError;
+    #[cfg(feature = "alloc")]
     type Some = ValueEncoder<SomeValueWriter<O>>;
+    #[cfg(not(feature = "alloc"))]
+    type Some = Never<Self>;
+    #[cfg(feature = "alloc")]
     type Pack = SequenceValueEncoder<O>;
+    #[cfg(not(feature = "alloc"))]
+    type Pack = Never<Self>;
+    #[cfg(feature = "alloc")]
     type Sequence = SequenceValueEncoder<O>;
+    #[cfg(not(feature = "alloc"))]
+    type Sequence = Never<Self>;
+    #[cfg(feature = "alloc")]
     type Tuple = SequenceValueEncoder<O>;
+    #[cfg(not(feature = "alloc"))]
+    type Tuple = Never<Self>;
+    #[cfg(feature = "alloc")]
     type Map = MapValueEncoder<O>;
+    #[cfg(not(feature = "alloc"))]
+    type Map = Never<Self>;
+    #[cfg(feature = "alloc")]
     type Struct = MapValueEncoder<O>;
+    #[cfg(not(feature = "alloc"))]
+    type Struct = Never<Self>;
+    #[cfg(feature = "alloc")]
     type Variant = VariantValueEncoder<O>;
+    #[cfg(not(feature = "alloc"))]
+    type Variant = Never<Self>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -166,18 +201,21 @@ where
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_array<const N: usize>(self, array: [u8; N]) -> Result<Self::Ok, Self::Error> {
         self.output.write(Value::Bytes(array.into()));
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_bytes(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
         self.output.write(Value::Bytes(bytes.to_vec()));
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_bytes_vectored(self, input: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
         let mut bytes = Vec::new();
@@ -190,12 +228,14 @@ where
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_string(self, string: &str) -> Result<Self::Ok, Self::Error> {
         self.output.write(Value::String(string.into()));
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_some(self) -> Result<Self::Some, Self::Error> {
         Ok(ValueEncoder::new(SomeValueWriter {
@@ -203,37 +243,44 @@ where
         }))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_none(self) -> Result<Self::Ok, Self::Error> {
         self.output.write(Value::Option(None));
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_sequence(self, _: usize) -> Result<Self::Sequence, Self::Error> {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
         Ok(MapValueEncoder::new(self.output))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         Ok(MapValueEncoder::new(self.output))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
         Ok(VariantValueEncoder::new(self.output))
@@ -241,11 +288,13 @@ where
 }
 
 /// A pack encoder.
+#[cfg(feature = "alloc")]
 pub struct SequenceValueEncoder<O> {
     output: O,
     values: Vec<Value>,
 }
 
+#[cfg(feature = "alloc")]
 impl<O> SequenceValueEncoder<O> {
     #[inline]
     fn new(output: O) -> Self {
@@ -256,6 +305,7 @@ impl<O> SequenceValueEncoder<O> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<O> SequenceEncoder for SequenceValueEncoder<O>
 where
     O: ValueOutput,
@@ -278,11 +328,13 @@ where
 }
 
 /// A pairs encoder.
+#[cfg(feature = "alloc")]
 pub struct MapValueEncoder<O> {
     output: O,
     values: Vec<(Value, Value)>,
 }
 
+#[cfg(feature = "alloc")]
 impl<O> MapValueEncoder<O> {
     #[inline]
     fn new(output: O) -> Self {
@@ -293,6 +345,7 @@ impl<O> MapValueEncoder<O> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<O> PairsEncoder for MapValueEncoder<O>
 where
     O: ValueOutput,
@@ -315,11 +368,13 @@ where
 }
 
 /// A pairs encoder.
+#[cfg(feature = "alloc")]
 pub struct PairValueEncoder<'a> {
     output: &'a mut Vec<(Value, Value)>,
     pair: (Value, Value),
 }
 
+#[cfg(feature = "alloc")]
 impl<'a> PairValueEncoder<'a> {
     #[inline]
     fn new(output: &'a mut Vec<(Value, Value)>) -> Self {
@@ -330,6 +385,7 @@ impl<'a> PairValueEncoder<'a> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a> PairEncoder for PairValueEncoder<'a> {
     type Ok = ();
     type Error = ValueError;
@@ -358,11 +414,13 @@ impl<'a> PairEncoder for PairValueEncoder<'a> {
 }
 
 /// A pairs encoder.
+#[cfg(feature = "alloc")]
 pub struct VariantValueEncoder<O> {
     output: O,
     pair: (Value, Value),
 }
 
+#[cfg(feature = "alloc")]
 impl<O> VariantValueEncoder<O> {
     #[inline]
     fn new(output: O) -> Self {
@@ -373,6 +431,7 @@ impl<O> VariantValueEncoder<O> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<O> VariantEncoder for VariantValueEncoder<O>
 where
     O: ValueOutput,

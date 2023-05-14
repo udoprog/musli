@@ -4,6 +4,8 @@
 use core::marker;
 #[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 use musli::de::Decode;
 use musli::en::Encode;
@@ -31,7 +33,7 @@ use crate::writer::{Buffer, Writer};
 /// [continuation]: musli_common::int::continuation
 pub const DEFAULT: Encoding<DefaultMode, Variable, Variable> = Encoding::new();
 
-/// Encode the given value to the given [Writer] using the [DEFAULT]
+/// Encode the given value to the given [`Writer`] using the [DEFAULT]
 /// configuration.
 #[inline]
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
@@ -64,7 +66,7 @@ where
 }
 
 /// Encode the given value to a [Vec] using the [DEFAULT] configuration.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, BufferError>
 where
@@ -231,7 +233,7 @@ where
         }
     }
 
-    /// Encode the given value to the given [Writer] using the current
+    /// Encode the given value to the given [`Writer`] using the current
     /// configuration.
     #[inline]
     pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), W::Error>
@@ -267,7 +269,7 @@ where
     }
 
     /// Encode the given value to a [Vec] using the current configuration.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, BufferError>
     where

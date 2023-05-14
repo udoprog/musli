@@ -17,11 +17,11 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["musli/std", "musli-common/std", "musli-storage/std"]
-test = ["std"]
+std = ["musli/std", "musli-common/std", "musli-storage/std", "alloc"]
+alloc = ["musli/alloc", "musli-common/alloc", "musli-storage/alloc"]
+test = []
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.41", default-features = false }
 musli-common = { path = "../musli-common", version = "0.0.41", default-features = false }
 musli-storage = { path = "../musli-storage", version = "0.0.41", default-features = false }
-musli-value = { path = "../musli-value", version = "0.0.41", default-features = false }

@@ -1,1 +1,1 @@
-pub(crate) use std::borrow::ToOwned;
+pub(crate) use alloc::borrow::ToOwned;

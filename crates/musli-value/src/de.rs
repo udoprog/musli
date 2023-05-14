@@ -2,13 +2,17 @@ use core::fmt;
 use core::marker;
 use core::slice;
 
+#[cfg(feature = "alloc")]
+use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decoder, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
-    TypeHint, ValueVisitor, VariantDecoder,
+    TypeHint, VariantDecoder,
 };
 use musli::error::Error;
 use musli::mode::Mode;
-use musli_common::reader::{Reader, SliceReader, WithPosition};
+#[cfg(feature = "alloc")]
+use musli_common::reader::Reader;
+use musli_common::reader::{SliceReader, WithPosition};
 use musli_storage::de::StorageDecoder;
 use musli_storage::int::Variable;
 
@@ -160,6 +164,7 @@ where
         ensure!(self, hint, ExpectedNumber(NumberHint::F64, hint), Value::Number(Number::F64(n)) => Ok(*n))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
         ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
@@ -167,6 +172,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
@@ -177,6 +183,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
@@ -187,6 +194,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_option(self) -> Result<Option<Self::Some>, Self::Error> {
         ensure!(self, hint, ExpectedOption(hint), Value::Option(option) => {
@@ -194,6 +202,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
         ensure!(self, hint, ExpectedPack(hint), Value::Bytes(pack) => {
@@ -201,6 +210,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
         ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
@@ -208,6 +218,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
         ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
@@ -215,6 +226,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_map(self) -> Result<Self::Map, Self::Error> {
         ensure!(self, hint, ExpectedMap(hint), Value::Map(map) => {
@@ -222,6 +234,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
         ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
@@ -229,6 +242,7 @@ where
         })
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
         ensure!(self, hint, ExpectedVariant(hint), Value::Variant(st) => {
@@ -251,12 +265,14 @@ where
 }
 
 /// A decoder over a simple value iterator.
+
 pub struct IterValueDecoder<'de, E> {
     iter: slice::Iter<'de, Value>,
     _marker: marker::PhantomData<E>,
 }
 
 impl<'de, E> IterValueDecoder<'de, E> {
+    #[cfg(feature = "alloc")]
     #[inline]
     fn new(values: &'de [Value]) -> Self {
         Self {
@@ -326,6 +342,7 @@ pub struct IterValuePairsDecoder<'de, E> {
 }
 
 impl<'de, E> IterValuePairsDecoder<'de, E> {
+    #[cfg(feature = "alloc")]
     #[inline]
     fn new(values: &'de [(Value, Value)]) -> Self {
         Self {
@@ -412,6 +429,7 @@ pub struct IterValueVariantDecoder<'de, E> {
 }
 
 impl<'de, E> IterValueVariantDecoder<'de, E> {
+    #[cfg(feature = "alloc")]
     #[inline]
     const fn new(pair: &'de (Value, Value)) -> Self {
         Self {

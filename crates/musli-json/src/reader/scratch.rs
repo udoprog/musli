@@ -1,12 +1,14 @@
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "alloc"))]
 use musli_common::fixed_bytes::FixedBytes;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 /// Provides the necessary scratch buffer used when decoding JSON.
 #[doc(hidden)]
 pub struct Scratch {
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     pub(crate) bytes: Vec<u8>,
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "alloc"))]
     pub(crate) bytes: FixedBytes<128>,
 }
 
@@ -20,13 +22,13 @@ impl Scratch {
 
     #[inline]
     pub fn push(&mut self, value: u8) -> bool {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "alloc")]
         {
             self.bytes.push(value);
             true
         }
 
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "alloc"))]
         {
             self.bytes.push(value)
         }
@@ -39,13 +41,13 @@ impl Scratch {
 
     #[inline]
     pub(crate) fn extend_from_slice(&mut self, slice: &[u8]) -> bool {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "alloc")]
         {
             self.bytes.extend_from_slice(slice);
             true
         }
 
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "alloc"))]
         {
             self.bytes.extend_from_slice(slice)
         }

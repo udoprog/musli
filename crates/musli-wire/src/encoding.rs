@@ -2,8 +2,11 @@
 //! encoding format, and the [DEFAULT] encoding configuration.
 
 use core::marker;
+
 #[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 use musli::de::Decode;
 use musli::en::Encode;
@@ -67,7 +70,7 @@ where
 }
 
 /// Encode the given value to a [Vec] using the [DEFAULT] configuration.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, BufferError>
 where
@@ -278,7 +281,7 @@ where
     }
 
     /// Encode the given value to a [Vec] using the current configuration.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, BufferError>
     where

@@ -17,7 +17,8 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = []
+std = ["alloc"]
+alloc = []
 
 [dependencies]
 musli-macros = { version = "=0.0.41", path = "../musli-macros" }

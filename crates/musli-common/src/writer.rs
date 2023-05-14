@@ -7,7 +7,9 @@ use core::ops::Deref;
 use musli::error::Error;
 
 use crate::error::BufferError;
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+#[cfg(not(feature = "alloc"))]
 use crate::fixed_bytes::FixedBytes;
 
 /// Maximum size used by a fixed length [Buffer].
@@ -83,9 +85,9 @@ where
 /// has a fixed size and will error in case the size overflows.
 #[derive(Default)]
 pub struct Buffer {
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     buf: Vec<u8>,
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "alloc"))]
     buf: FixedBytes<MAX_FIXED_BYTES_LEN, BufferError>,
 }
 
@@ -93,7 +95,7 @@ impl Buffer {
     /// Constructs a new, empty `Buffer` with the specified capacity.
     ///
     /// Only available for `std` environment.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             buf: Vec::with_capacity(capacity),
@@ -103,9 +105,9 @@ impl Buffer {
     /// Construct a new empty buffer.
     pub const fn new() -> Self {
         Self {
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             buf: Vec::new(),
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "alloc"))]
             buf: FixedBytes::new(),
         }
     }
@@ -116,7 +118,7 @@ impl Buffer {
     }
 
     /// Coerce into the backing vector in a std environment.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     pub fn into_vec(self) -> Vec<u8> {
         self.buf
     }
@@ -158,7 +160,7 @@ impl Writer for Buffer {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl Writer for Vec<u8> {
     type Error = BufferError;
     type Mut<'this> = &'this mut Self where Self: 'this;

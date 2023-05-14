@@ -1,7 +1,11 @@
 use core::fmt;
 
-use crate::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
-use crate::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
 use musli::de::{
     Decoder, LengthHint, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
     SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
@@ -11,6 +15,9 @@ use musli::never::Never;
 use musli_common::int::{continuation as c, UsizeEncoding, Variable};
 use musli_common::reader::PosReader;
 use musli_storage::de::StorageDecoder;
+
+use crate::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
+use crate::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
 
 /// A very simple decoder.
 pub struct SelfDecoder<R> {
@@ -301,7 +308,7 @@ where
                 self.0.expecting(f)
             }
 
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             #[inline]
             fn visit_owned(self, bytes: Vec<u8>) -> Result<Self::Ok, Self::Error> {
                 let string = String::from_utf8(bytes).map_err(Self::Error::custom)?;

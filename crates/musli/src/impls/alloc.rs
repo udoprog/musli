@@ -1,9 +1,18 @@
 use core::fmt;
-use std::borrow::Cow;
-use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
-use std::ffi::{CStr, CString};
-use std::hash::{BuildHasher, Hash};
-use std::marker;
+#[cfg(feature = "std")]
+use core::hash::{BuildHasher, Hash};
+use core::marker;
+use core::ffi::CStr;
+
+use alloc::ffi::CString;
+use alloc::borrow::{Cow, ToOwned};
+use alloc::string::String;
+use alloc::collections::{BTreeMap, BinaryHeap, VecDeque};
+use alloc::vec::Vec;
+use alloc::boxed::Box;
+
+#[cfg(feature = "std")]
+use std::collections::{HashMap, HashSet};
 
 use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
 use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
@@ -216,6 +225,7 @@ sequence!(
     seq,
     VecDeque::with_capacity(size_hint::cautious(seq.size_hint()))
 );
+#[cfg(feature = "std")]
 sequence!(
     HashSet<T: Eq + Hash, S: BuildHasher + Default>,
     insert,
@@ -289,38 +299,13 @@ macro_rules! map {
 }
 
 map!(BTreeMap<K: Ord, V>, map, BTreeMap::new());
+
+#[cfg(feature = "std")]
 map!(
     HashMap<K: Eq + Hash, V, S: BuildHasher + Default>,
     map,
     HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default())
 );
-
-impl<M> Encode<M> for CStr
-where
-    M: Mode,
-{
-    #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    where
-        E: Encoder,
-    {
-        encoder.encode_bytes(self.to_bytes_with_nul())
-    }
-}
-
-impl<'de, M> Decode<'de, M> for &'de CStr
-where
-    M: Mode,
-{
-    #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    where
-        D: Decoder<'de>,
-    {
-        let bytes = <&[u8] as Decode<M>>::decode(decoder)?;
-        CStr::from_bytes_with_nul(bytes).map_err(D::Error::custom)
-    }
-}
 
 impl<M> Encode<M> for CString
 where

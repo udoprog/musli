@@ -7,6 +7,9 @@
 
 use core::fmt;
 
+#[cfg(feature = "alloc")]
+use alloc::string::{String, ToString};
+
 /// Trait governing errors raised during encodeing or decoding.
 pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     /// Construct a custom error.
@@ -102,7 +105,7 @@ impl Error for std::io::Error {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl Error for String {
     fn custom<T>(message: T) -> Self
     where

@@ -98,7 +98,13 @@
 //! [Value]: https://docs.rs/musli-value
 
 #![deny(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate std;
 
 mod de;
 mod en;
@@ -110,8 +116,10 @@ pub mod tag;
 pub mod test;
 
 pub use self::encoding::{decode, encode, from_slice, to_buffer, to_fixed_bytes, Encoding};
+#[cfg(feature = "alloc")]
+pub use self::encoding::to_vec;
 #[cfg(feature = "std")]
-pub use self::encoding::{to_vec, to_writer};
+pub use self::encoding::to_writer;
 #[cfg(feature = "test")]
 pub use self::test::{transcode, Typed};
 #[doc(inline)]

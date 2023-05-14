@@ -283,7 +283,13 @@
 //! [serde]: https://serde.rs
 
 #![deny(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate std;
 
 pub mod compat;
 pub mod de;
@@ -295,9 +301,9 @@ mod impls;
 mod internal;
 pub mod mode;
 pub mod never;
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "alloc"))]
 mod no_std;
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 #[path = "std.rs"]
 mod no_std;
 pub mod utils;

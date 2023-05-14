@@ -1,10 +1,11 @@
-use crate::tag::{Kind, Tag};
 use musli::error::Error;
 use musli_common::int::continuation as c;
 use musli_common::int::zigzag as zig;
 use musli_common::int::{Signed, Unsigned};
 use musli_common::reader::Reader;
 use musli_common::writer::Writer;
+
+use crate::tag::{Kind, Tag};
 
 #[inline]
 pub(crate) fn encode_typed_unsigned<W, T>(writer: W, bits: u8, value: T) -> Result<(), W::Error>

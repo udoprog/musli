@@ -1,4 +1,4 @@
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod alloc;
 #[cfg(feature = "std")]
 mod net;
@@ -13,6 +13,7 @@ use core::sync::atomic::{
     AtomicU64, AtomicU8, AtomicUsize,
 };
 use core::{fmt, marker};
+use core::ffi::CStr;
 
 use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
 use crate::en::{Encode, Encoder, VariantEncoder};
@@ -489,5 +490,32 @@ where
         D: Decoder<'de>,
     {
         Ok(Wrapping(Decode::<M>::decode(decoder)?))
+    }
+}
+
+impl<M> Encode<M> for CStr
+where
+    M: Mode,
+{
+    #[inline]
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder,
+    {
+        encoder.encode_bytes(self.to_bytes_with_nul())
+    }
+}
+
+impl<'de, M> Decode<'de, M> for &'de CStr
+where
+    M: Mode,
+{
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        let bytes = <&[u8] as Decode<M>>::decode(decoder)?;
+        CStr::from_bytes_with_nul(bytes).map_err(D::Error::custom)
     }
 }

@@ -1,4 +1,10 @@
+#[cfg(feature = "std")]
 use std::collections::HashMap;
+
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 use musli::{Decode, Encode};
 use rand::prelude::*;
@@ -47,6 +53,7 @@ pub enum MediumEnum {
 pub struct LargeStruct {
     elements: Vec<Primitives>,
     medium: Vec<MediumEnum>,
+    #[cfg(feature = "std")]
     map: HashMap<String, u64>,
 }
 
@@ -119,15 +126,18 @@ pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
         medium.push(generate_medium_enum(rng));
     }
 
-    let mut map = HashMap::new();
-
-    for _ in 0..342 {
-        map.insert(generate_string(rng), rng.gen());
-    }
-
     LargeStruct {
         elements,
         medium,
-        map,
+        #[cfg(feature = "std")]
+        map: {
+            let mut map = HashMap::new();
+
+            for _ in 0..342 {
+                map.insert(generate_string(rng), rng.gen());
+            }
+
+            map
+        },
     }
 }

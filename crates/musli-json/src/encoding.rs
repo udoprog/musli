@@ -2,6 +2,12 @@
 //! encoding format, and the [DEFAULT] encoding configuration.
 
 use core::marker;
+
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+
 #[cfg(feature = "std")]
 use std::io;
 
@@ -43,7 +49,7 @@ where
     DEFAULT.to_writer(writer, value)
 }
 
-/// Encode the given value to a [Buffer] using the [DEFAULT] configuration.
+/// Encode the given value to a [`Buffer`] using the [DEFAULT] configuration.
 #[inline]
 pub fn to_buffer<T>(value: &T) -> Result<Buffer, BufferError>
 where
@@ -52,8 +58,8 @@ where
     DEFAULT.to_buffer(value)
 }
 
-/// Encode the given value to a [Vec] using the [DEFAULT] configuration.
-#[cfg(feature = "std")]
+/// Encode the given value to a [`Vec`] using the [DEFAULT] configuration.
+#[cfg(feature = "alloc")]
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, BufferError>
 where
@@ -62,8 +68,8 @@ where
     DEFAULT.to_vec(value)
 }
 
-/// Encode the given value to a [String] using the [DEFAULT] configuration.
-#[cfg(feature = "std")]
+/// Encode the given value to a [`String`] using the [DEFAULT] configuration.
+#[cfg(feature = "alloc")]
 #[inline]
 pub fn to_string<T>(value: &T) -> Result<String, BufferError>
 where
@@ -200,7 +206,7 @@ where
         T::encode(value, JsonEncoder::<M, _>::new(&mut writer))
     }
 
-    /// Encode the given value to a [Buffer] using the current configuration.
+    /// Encode the given value to a [`Buffer`] using the current configuration.
     #[inline]
     pub fn to_buffer<T>(self, value: &T) -> Result<Buffer, BufferError>
     where
@@ -211,8 +217,8 @@ where
         Ok(data)
     }
 
-    /// Encode the given value to a [Vec] using the current configuration.
-    #[cfg(feature = "std")]
+    /// Encode the given value to a [`Vec`] using the current configuration.
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, BufferError>
     where
@@ -221,8 +227,8 @@ where
         Ok(self.to_buffer(value)?.into_vec())
     }
 
-    /// Encode the given value to a [String] using the current configuration.
-    #[cfg(feature = "std")]
+    /// Encode the given value to a [`String`] using the current configuration.
+    #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_string<T>(self, value: &T) -> Result<String, BufferError>
     where

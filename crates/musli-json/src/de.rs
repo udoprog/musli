@@ -3,12 +3,15 @@ use core::marker;
 use core::mem;
 use core::str;
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
 use musli::de::{
     Decoder, LengthHint, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
     SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
-#[cfg(feature = "std")]
+#[cfg(feature = "musli-value")]
 use musli::mode::Mode;
 use musli::never::Never;
 
@@ -109,9 +112,9 @@ where
     P: Parser<'de>,
 {
     type Error = ParseError;
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "musli-value"))]
     type Buffer = Never<Self::Error>;
-    #[cfg(feature = "std")]
+    #[cfg(feature = "musli-value")]
     type Buffer = musli_value::AsValueDecoder<Self::Error>;
     type Pack = JsonSequenceDecoder<'a, P>;
     type Sequence = JsonSequenceDecoder<'a, P>;
@@ -140,7 +143,7 @@ where
         })
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(feature = "musli-value")]
     #[inline]
     fn decode_buffer<M>(self) -> Result<Self::Buffer, Self::Error>
     where
@@ -274,7 +277,7 @@ where
         self.parser.parse_number(visitor)
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
