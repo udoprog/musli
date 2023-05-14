@@ -21,13 +21,9 @@ jobs:
         toolchain: ${{matrix.rust}}
     - run: cargo build --workspace
       if: matrix.rust != 'stable'
-    - run: cargo test --workspace --all-targets
+    - run: cargo test --workspace --all-features --all-targets
       if: matrix.rust == 'stable'
-    - run: cargo test --workspace --all-targets --no-default-features
-      if: matrix.rust == 'stable'
-    - run: cargo test --workspace --doc
-      if: matrix.rust == 'stable'
-    - run: cargo test --workspace --doc --no-default-features
+    - run: cargo test --workspace --all-features --doc
       if: matrix.rust == 'stable'
 
   fuzz:
