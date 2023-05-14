@@ -1,6 +1,6 @@
 [package]
 name = "musli-descriptive"
-version = "0.0.41"
+version = "0.0.42"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.65"
@@ -22,6 +22,6 @@ alloc = ["musli/alloc", "musli-common/alloc", "musli-storage/alloc"]
 test = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.41", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.41", default-features = false }
-musli-storage = { path = "../musli-storage", version = "0.0.41", default-features = false }
+musli = { path = "../musli", version = "0.0.42", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.42", default-features = false }
+musli-storage = { path = "../musli-storage", version = "0.0.42", default-features = false }
