@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    needs: [each_package, rustfmt, fuzz]
+    needs: each_package
     strategy:
       fail-fast: false
       matrix:
@@ -30,7 +30,26 @@ jobs:
     - run: cargo test --workspace --doc --no-default-features
       if: matrix.rust == 'stable'
 
+  fuzz:
+    needs: each_package
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cargo run --release --bin fuzz_test
+
+  miri:
+    needs: each_package
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: miri
+    - run: cargo miri test --workspace --exclude musli-common
+
   each_package:
+    needs: [rustfmt, clippy]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -60,19 +79,3 @@ jobs:
       with:
         components: rustfmt
     - run: cargo fmt --check --all
-
-  fuzz:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@stable
-    - run: cargo run --release --bin fuzz_test
-
-  miri:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@nightly
-      with:
-        components: miri
-    - run: cargo miri test --workspace --exclude musli-common
