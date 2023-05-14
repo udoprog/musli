@@ -17,7 +17,7 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["alloc", "musli/std", "musli-common/std", "musli-value"]
+std = ["musli/std", "musli-common/std", "musli-value", "alloc"]
 alloc = ["musli/alloc", "musli-common/alloc", "musli-value/alloc"]
 test = []
 

@@ -49,15 +49,19 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     benches!(serde_json);
+    #[cfg(feature = "bincode")]
     benches!(serde_bincode);
+    #[cfg(feature = "rmp-serde")]
     benches!(serde_rmp);
     benches!(musli_json);
     benches!(musli_wire);
     benches!(musli_descriptive);
     benches!(musli_storage);
     benches!(musli_value);
+    #[cfg(feature = "dlhn")]
     #[cfg(not(any(model_128, model_all)))]
     benches!(serde_dlhn);
+    #[cfg(feature = "serde_cbor")]
     benches!(serde_cbor);
 }
 

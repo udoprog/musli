@@ -1,3 +1,4 @@
+#[cfg(feature = "dlhn")]
 pub mod serde_dlhn {
     use alloc::vec::Vec;
 
@@ -67,6 +68,7 @@ pub mod musli_json {
     }
 }
 
+#[cfg(feature = "rmp-serde")]
 pub mod serde_rmp {
     use alloc::vec::Vec;
 
@@ -89,6 +91,7 @@ pub mod serde_rmp {
     }
 }
 
+#[cfg(feature = "bincode")]
 pub mod serde_bincode {
     use alloc::vec::Vec;
 
@@ -111,6 +114,7 @@ pub mod serde_bincode {
     }
 }
 
+#[cfg(feature = "serde_cbor")]
 pub mod serde_cbor {
     use alloc::vec::Vec;
 

@@ -1,9 +1,7 @@
 #[cfg(feature = "std")]
 use std::collections::HashMap;
 
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 use musli::{Decode, Encode};
