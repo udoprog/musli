@@ -25,6 +25,7 @@ pub mod serde_dlhn {
     }
 }
 
+#[cfg(feature = "serde-json")]
 pub mod serde_json {
     use alloc::vec::Vec;
 
@@ -45,6 +46,7 @@ pub mod serde_json {
     }
 }
 
+#[cfg(feature = "musli-json")]
 pub mod musli_json {
     use alloc::vec::Vec;
 
@@ -135,6 +137,7 @@ pub mod serde_cbor {
     }
 }
 
+#[cfg(feature = "musli-storage")]
 pub mod musli_storage {
     use alloc::vec::Vec;
 
@@ -161,6 +164,7 @@ pub mod musli_storage {
     }
 }
 
+#[cfg(feature = "musli-wire")]
 pub mod musli_wire {
     use alloc::vec::Vec;
 
@@ -187,6 +191,7 @@ pub mod musli_wire {
     }
 }
 
+#[cfg(feature = "musli-descriptive")]
 pub mod musli_descriptive {
     use alloc::vec::Vec;
 
@@ -211,6 +216,7 @@ pub mod musli_descriptive {
     }
 }
 
+#[cfg(feature = "musli-value")]
 pub mod musli_value {
     use ::musli_value::Value;
     use musli::{Decode, Encode};
@@ -227,5 +233,47 @@ pub mod musli_value {
         T: Decode<'de>,
     {
         musli_value::decode(data).unwrap()
+    }
+}
+
+#[cfg(feature = "bitcode")]
+pub mod serde_bitcode {
+    use alloc::vec::Vec;
+
+    use serde::{Deserialize, Serialize};
+
+    pub fn encode<T>(value: &T) -> Vec<u8>
+    where
+        T: Serialize,
+    {
+        bitcode::serialize(value).unwrap()
+    }
+
+    pub fn decode<T>(data: &[u8]) -> T
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        bitcode::deserialize(data).unwrap()
+    }
+}
+
+#[cfg(feature = "bitcode")]
+pub mod derive_bitcode {
+    use alloc::vec::Vec;
+
+    use bitcode::{Decode, Encode};
+
+    pub fn encode<T>(value: &T) -> Vec<u8>
+    where
+        T: Encode,
+    {
+        bitcode::encode(value).unwrap()
+    }
+
+    pub fn decode<T>(data: &[u8]) -> T
+    where
+        T: Decode,
+    {
+        bitcode::decode(data).unwrap()
     }
 }
