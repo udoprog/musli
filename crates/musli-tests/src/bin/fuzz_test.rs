@@ -6,10 +6,24 @@ use musli_tests::models;
 use musli_tests::utils;
 use rand::prelude::*;
 
+#[cfg(miri)]
+const PRIMITIVE_STRUCTS: usize = 2;
+#[cfg(not(miri))]
 const PRIMITIVE_STRUCTS: usize = 100;
+
+#[cfg(miri)]
+const LARGE_STRUCTS: usize = 2;
+#[cfg(not(miri))]
 const LARGE_STRUCTS: usize = 100;
 
+#[cfg(miri)]
+const PRIMITIVE_ITERATIONS: usize = 2;
+#[cfg(not(miri))]
 const PRIMITIVE_ITERATIONS: usize = 10_000;
+
+#[cfg(miri)]
+const LARGE_ITERATIONS: usize = 2;
+#[cfg(not(miri))]
 const LARGE_ITERATIONS: usize = 30;
 
 fn main() -> io::Result<()> {
@@ -40,22 +54,13 @@ fn main() -> io::Result<()> {
     }
 
     #[allow(unused)]
-    macro_rules! test {
-        ($base:ident $(, $range:expr)?) => {{
-            test_primitives!($base $(, $range)*);
-            test_large!($base $(, $range)*);
-        }};
-    }
-
-    #[allow(unused)]
     macro_rules! test_primitives {
         ($base:ident $(, $range:expr)?) => {{
             let name = concat!(stringify!($base), "/primitives");
 
             if condition(name) {
-                write!(o, "{name}: ... ")?;
+                write!(o, "{name}: ...")?;
                 o.flush()?;
-
                 let start = Instant::now();
 
                 for _ in 0..PRIMITIVE_ITERATIONS {
@@ -97,11 +102,14 @@ fn main() -> io::Result<()> {
         }};
     }
 
-    test!(musli_json);
-    test!(serde_json);
-    test!(musli_storage);
-    test!(musli_wire);
-    test!(musli_descriptive);
-    test!(musli_value);
+    #[allow(unused)]
+    macro_rules! test {
+        ($base:ident $(, $range:expr)?) => {{
+            test_primitives!($base $(, $range)*);
+            test_large!($base $(, $range)*);
+        }};
+    }
+
+    musli_tests::feature_matrix!(test);
     Ok(())
 }

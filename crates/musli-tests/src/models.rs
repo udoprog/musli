@@ -1,3 +1,7 @@
+#![cfg_attr(feature = "bitcode", allow(clippy::assign_op_pattern))]
+
+use core::ops::Range;
+
 #[cfg(feature = "std")]
 use std::collections::HashMap;
 
@@ -8,8 +12,13 @@ use musli::{Decode, Encode};
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
+#[cfg(miri)]
+const STRING_RANGE: Range<usize> = 0..16;
+#[cfg(not(miri))]
+const STRING_RANGE: Range<usize> = 0..256;
+
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
-#[musli(default_field_name = "name")]
+#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
 pub struct Primitives {
     boolean: bool,
     character: char,
@@ -36,6 +45,7 @@ pub struct Primitives {
 }
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
+#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
 pub enum MediumEnum {
     #[musli(transparent)]
     Variant1(String),
@@ -47,7 +57,7 @@ pub enum MediumEnum {
 }
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
-#[musli(default_field_name = "name")]
+#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
 pub struct LargeStruct {
     elements: Vec<Primitives>,
     medium: Vec<MediumEnum>,
@@ -85,7 +95,7 @@ pub fn generate_primitives(rng: &mut StdRng) -> Primitives {
 pub fn generate_string(rng: &mut StdRng) -> String {
     let mut string = String::new();
 
-    for _ in 0..rng.gen_range(0..256) {
+    for _ in 0..rng.gen_range(STRING_RANGE) {
         string.push(rng.gen());
     }
 
@@ -95,7 +105,7 @@ pub fn generate_string(rng: &mut StdRng) -> String {
 pub fn generate_bytes(rng: &mut StdRng) -> Vec<u8> {
     let mut bytes = Vec::new();
 
-    for _ in 0..rng.gen_range(0..256) {
+    for _ in 0..rng.gen_range(STRING_RANGE) {
         bytes.push(rng.gen());
     }
 
@@ -112,15 +122,24 @@ pub fn generate_medium_enum(rng: &mut StdRng) -> MediumEnum {
 }
 
 pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
+    #[cfg(miri)]
+    const PRIMITIVES_RANGE: Range<usize> = 1..3;
+    #[cfg(not(miri))]
+    const PRIMITIVES_RANGE: Range<usize> = 100..500;
+    #[cfg(miri)]
+    const MEDIUM_RANGE: Range<usize> = 1..3;
+    #[cfg(not(miri))]
+    const MEDIUM_RANGE: Range<usize> = 200..500;
+
     let mut elements = Vec::new();
 
-    for _ in 0..rng.gen_range(100..500) {
+    for _ in 0..rng.gen_range(PRIMITIVES_RANGE) {
         elements.push(generate_primitives(rng));
     }
 
     let mut medium = Vec::new();
 
-    for _ in 0..rng.gen_range(200..500) {
+    for _ in 0..rng.gen_range(MEDIUM_RANGE) {
         medium.push(generate_medium_enum(rng));
     }
 
@@ -129,9 +148,14 @@ pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
         medium,
         #[cfg(feature = "std")]
         map: {
+            #[cfg(miri)]
+            const MAP_RANGE: Range<usize> = 1..3;
+            #[cfg(not(miri))]
+            const MAP_RANGE: Range<usize> = 100..500;
+
             let mut map = HashMap::new();
 
-            for _ in 0..342 {
+            for _ in 0..rng.gen_range(MAP_RANGE) {
                 map.insert(generate_string(rng), rng.gen());
             }
 

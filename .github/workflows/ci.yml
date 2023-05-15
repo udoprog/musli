@@ -32,7 +32,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo run --release --bin fuzz_test
+    - run: cargo run --release --bin fuzz_test --all-features
 
   miri:
     needs: each_package
@@ -42,7 +42,8 @@ jobs:
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: miri
-    - run: cargo miri test --workspace --exclude musli-common
+    - run: cargo miri test --workspace --exclude musli-common --all-features
+    - run: cargo miri run --bin fuzz_test --all-features
 
   each_package:
     needs: [rustfmt, clippy]

@@ -5,25 +5,27 @@ edition = "2021"
 publish = false
 
 [features]
-default = ["std", "serde_cbor"]
-std = ["musli/std", "musli-wire/std", "musli-storage/std", "musli-json/std", "rand/std", "rmp-serde", "bincode", "serde_json/std", "dlhn"]
+default = ["std"]
+std = ["musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std"]
+test = ["musli-wire", "musli-storage", "musli-descriptive"]
 
 [dependencies]
 musli = { path = "../musli", default-features = false, features = ["alloc"] }
-musli-wire = { path = "../musli-wire", default-features = false, features = ["alloc", "test"] }
-musli-descriptive = { path = "../musli-descriptive", default-features = false, features = ["alloc", "test"] }
-musli-storage = { path = "../musli-storage", default-features = false, features = ["alloc", "test"] }
-musli-json = { path = "../musli-json", default-features = false, features = ["alloc", "test"] }
-musli-value = { path = "../musli-value", default-features = false, features = ["alloc", "test"] }
+musli-wire = { path = "../musli-wire", default-features = false, features = ["alloc", "test"], optional = true }
+musli-descriptive = { path = "../musli-descriptive", default-features = false, features = ["alloc", "test"], optional = true }
+musli-storage = { path = "../musli-storage", default-features = false, features = ["alloc", "test"], optional = true }
+musli-json = { path = "../musli-json", default-features = false, features = ["alloc", "test"], optional = true }
+musli-value = { path = "../musli-value", default-features = false, features = ["alloc", "test"], optional = true }
 
-anyhow = "1.0.70"
+anyhow = "1.0.71"
 rand = { version = "0.8.5", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.1", optional = true }
-serde = { version = "1.0.160", default-features = false, features = ["derive"] }
+serde = { version = "1.0.163", default-features = false, features = ["derive"] }
 bincode = { version = "1.3.3", default-features = false, optional = true }
-serde_json = { version = "1.0.96", default-features = false, features = ["alloc"] }
+serde_json = { version = "1.0.96", default-features = false, features = ["alloc"], optional = true }
 serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc", "std"], optional = true }
-dlhn = { version = "0.1.2", default-features = false, optional = true }
+dlhn = { version = "0.1.5", default-features = false, optional = true }
+bitcode = { version = "0.4.0", default-features = false, optional = true, features = ["derive", "serde"] }
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports"] }
