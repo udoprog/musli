@@ -11,8 +11,11 @@ use core::convert::Infallible;
 use core::fmt;
 use core::marker;
 
+use crate::no_std::ToOwned;
+
 use crate::de::{
-    AsDecoder, Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder,
+    AsDecoder, Decoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
+    SizeHint, ValueVisitor, VariantDecoder,
 };
 use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use crate::error::Error;
@@ -43,10 +46,10 @@ enum NeverMarker {}
 ///     }
 /// }
 /// ```
-pub struct Never<A, B = Infallible> {
+pub struct Never<A, B = Infallible, C: ?Sized = Infallible> {
     // Field makes type uninhabitable.
     _never: NeverMarker,
-    _marker: marker::PhantomData<(A, B)>,
+    _marker: marker::PhantomData<(A, B, C)>,
 }
 
 impl<'de, E> Decoder<'de> for Never<E>
@@ -158,7 +161,7 @@ where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
+    fn size_hint(&self) -> SizeHint {
         match self._never {}
     }
 
@@ -184,7 +187,7 @@ where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
+    fn size_hint(&self) -> SizeHint {
         match self._never {}
     }
 
@@ -236,6 +239,32 @@ where
     type __UseMusliEncoderAttributeMacro = ();
 
     #[inline]
+    fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self._never {}
+    }
+}
+
+impl<'de, O, E> NumberVisitor<'de> for Never<O, E>
+where
+    E: Error,
+{
+    type Ok = O;
+    type Error = E;
+
+    fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self._never {}
+    }
+}
+
+impl<'de, O, E, T> ValueVisitor<'de> for Never<O, E, T>
+where
+    T: ?Sized + ToOwned,
+    E: Error,
+{
+    type Target = T;
+    type Ok = O;
+    type Error = E;
+
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}
     }

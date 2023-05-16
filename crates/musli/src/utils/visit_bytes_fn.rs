@@ -38,7 +38,7 @@ where
     }
 
     #[inline]
-    fn visit_any(self, string: &Self::Target) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, string: &Self::Target) -> Result<Self::Ok, Self::Error> {
         (self.function)(string)
     }
 }

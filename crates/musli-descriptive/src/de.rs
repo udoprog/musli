@@ -7,8 +7,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, LengthHint, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
-    SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
+    Decoder, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
+    SizeHint, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::error::Error;
 use musli_common::int::{continuation as c, UsizeEncoding, Variable};
@@ -209,28 +209,28 @@ where
             Kind::Sequence => {
                 let hint = tag
                     .data()
-                    .map(|d| LengthHint::Exact(d as usize))
+                    .map(|d| SizeHint::Exact(d as usize))
                     .unwrap_or_default();
                 Ok(TypeHint::Sequence(hint))
             }
             Kind::Map => {
                 let hint = tag
                     .data()
-                    .map(|d| LengthHint::Exact(d as usize))
+                    .map(|d| SizeHint::Exact(d as usize))
                     .unwrap_or_default();
                 Ok(TypeHint::Map(hint))
             }
             Kind::Bytes => {
                 let hint = tag
                     .data()
-                    .map(|d| LengthHint::Exact(d as usize))
+                    .map(|d| SizeHint::Exact(d as usize))
                     .unwrap_or_default();
                 Ok(TypeHint::Bytes(hint))
             }
             Kind::String => {
                 let hint = tag
                     .data()
-                    .map(|d| LengthHint::Exact(d as usize))
+                    .map(|d| SizeHint::Exact(d as usize))
                     .unwrap_or_default();
                 Ok(TypeHint::String(hint))
             }
@@ -321,9 +321,9 @@ where
             }
 
             #[inline]
-            fn visit_any(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 let string = core::str::from_utf8(bytes).map_err(Self::Error::custom)?;
-                self.0.visit_any(string)
+                self.0.visit_ref(string)
             }
         }
     }
@@ -371,7 +371,7 @@ where
     #[inline]
     fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
     where
-        V: NumberVisitor<Error = Self::Error>,
+        V: NumberVisitor<'de, Error = Self::Error>,
     {
         let tag = Tag::from_byte(self.reader.read_byte()?);
 
@@ -538,6 +538,74 @@ where
 
         Ok(self)
     }
+
+    #[inline]
+    fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
+    where
+        V: Visitor<'de, Error = Self::Error>,
+    {
+        let tag = match self.reader.peek()? {
+            Some(b) => Tag::from_byte(b),
+            None => return visitor.visit_any(self, TypeHint::Any),
+        };
+
+        match tag.kind() {
+            Kind::Number => match tag.data() {
+                Some(U8) => visitor.visit_u8(self.decode_u8()?),
+                Some(U16) => visitor.visit_u16(self.decode_u16()?),
+                Some(U32) => visitor.visit_u32(self.decode_u32()?),
+                Some(U64) => visitor.visit_u64(self.decode_u64()?),
+                Some(U128) => visitor.visit_u128(self.decode_u128()?),
+                Some(I8) => visitor.visit_i8(self.decode_i8()?),
+                Some(I16) => visitor.visit_i16(self.decode_i16()?),
+                Some(I32) => visitor.visit_i32(self.decode_i32()?),
+                Some(I64) => visitor.visit_i64(self.decode_i64()?),
+                Some(I128) => visitor.visit_i128(self.decode_i128()?),
+                Some(F32) => visitor.visit_f32(self.decode_f32()?),
+                Some(F64) => visitor.visit_f64(self.decode_f64()?),
+                _ => {
+                    let visitor = visitor.visit_number(NumberHint::Any)?;
+                    visitor.visit_any(self, TypeHint::Number(NumberHint::Any))
+                }
+            },
+            Kind::Sequence => {
+                let sequence = self.shared_decode_sequence()?;
+                visitor.visit_sequence(sequence)
+            }
+            Kind::Map => {
+                let map = self.shared_decode_map()?;
+                visitor.visit_map(map)
+            }
+            Kind::Bytes => {
+                let hint = tag
+                    .data()
+                    .map(|d| SizeHint::Exact(d as usize))
+                    .unwrap_or_default();
+                let visitor = visitor.visit_bytes(hint)?;
+                self.decode_bytes(visitor)
+            }
+            Kind::String => {
+                let hint = tag
+                    .data()
+                    .map(|d| SizeHint::Exact(d as usize))
+                    .unwrap_or_default();
+                let visitor = visitor.visit_string(hint)?;
+                self.decode_string(visitor)
+            }
+            Kind::Mark => match tag.mark() {
+                Mark::True | Mark::False => visitor.visit_bool(self.decode_bool()?),
+                Mark::Variant => visitor.visit_variant(self.decode_variant()?),
+                Mark::Some | Mark::None => visitor.visit_option(self.decode_option()?),
+                Mark::Char => visitor.visit_char(self.decode_char()?),
+                Mark::Unit => {
+                    self.decode_unit()?;
+                    visitor.visit_unit()
+                }
+                _ => visitor.visit_any(self, TypeHint::Any),
+            },
+            _ => visitor.visit_any(self, TypeHint::Any),
+        }
+    }
 }
 
 impl<'de, R> PackDecoder<'de> for SelfPackDecoder<R>
@@ -599,8 +667,8 @@ where
     type Decoder<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Exact(self.remaining)
     }
 
     #[inline]
@@ -690,8 +758,8 @@ where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Exact(self.remaining)
     }
 
     #[inline]

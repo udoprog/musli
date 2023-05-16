@@ -1,6 +1,8 @@
 //! Internal helpers for generating nice expectation messages.
 
-use core::fmt;
+use core::fmt::{self, Display};
+
+use crate::de::{NumberHint, SizeHint};
 
 pub trait Expecting {
     /// Generated the actual message of what we expected.
@@ -17,13 +19,14 @@ pub trait Expecting {
 }
 
 impl Expecting for str {
+    #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use core::fmt::Display;
         self.fmt(f)
     }
 }
 
 impl fmt::Display for &dyn Expecting {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.expecting(f)
     }
@@ -35,11 +38,13 @@ impl<T> fmt::Display for FormatFn<T>
 where
     T: Fn(&mut fmt::Formatter<'_>) -> fmt::Result,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         (self.0)(f)
     }
 }
 
+#[inline]
 fn format_fn<T>(function: T) -> FormatFn<T>
 where
     T: Fn(&mut fmt::Formatter<'_>) -> fmt::Result,
@@ -73,18 +78,40 @@ pub(crate) fn bad_visitor_type<'a>(
     })
 }
 
+macro_rules! expect_with {
+    ($($vis:vis $ident:ident($string:literal, $ty:ty);)*) => {
+        $(
+            $vis struct $ident($vis $ty);
+
+            impl fmt::Display for $ident {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, $string, self.0)
+                }
+            }
+        )*
+    }
+}
+
 macro_rules! expect {
-    ($($vis:vis $ident:ident($string:expr);)*) => {
+    ($($vis:vis $ident:ident($string:literal);)*) => {
         $(
             $vis struct $ident;
 
             impl fmt::Display for $ident {
                 fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                    $string.fmt(f)
+                    write!(f, $string)
                 }
             }
         )*
     }
+}
+
+expect_with! {
+    pub(crate) SequenceWith("sequence with {0}", SizeHint);
+    pub(crate) MapWith("map with {0}", SizeHint);
+    pub(crate) BytesWith("bytes with {0}", SizeHint);
+    pub(crate) StringWith("string with {0}", SizeHint);
+    pub(crate) NumberWith("{0} number", NumberHint);
 }
 
 expect! {

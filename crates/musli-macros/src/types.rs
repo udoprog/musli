@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
@@ -6,12 +6,41 @@ use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::Token;
 
-pub(super) const ENCODER_TYPES: [&str; 8] = [
-    "Error", "Some", "Pack", "Sequence", "Tuple", "Map", "Struct", "Variant",
+#[derive(Debug, Clone, Copy)]
+pub(super) enum Ty {
+    /// `str`.
+    Str,
+    /// `[u8]`.
+    Bytes,
+}
+
+pub(super) const ENCODER_TYPES: [(&str, Option<Ty>); 8] = [
+    ("Error", None),
+    ("Some", None),
+    ("Pack", None),
+    ("Sequence", None),
+    ("Tuple", None),
+    ("Map", None),
+    ("Struct", None),
+    ("Variant", None),
 ];
 
-pub(super) const DECODER_TYPES: [&str; 9] = [
-    "Error", "Buffer", "Some", "Pack", "Sequence", "Tuple", "Map", "Struct", "Variant",
+pub(super) const DECODER_TYPES: [(&str, Option<Ty>); 9] = [
+    ("Error", None),
+    ("Buffer", None),
+    ("Some", None),
+    ("Pack", None),
+    ("Sequence", None),
+    ("Tuple", None),
+    ("Map", None),
+    ("Struct", None),
+    ("Variant", None),
+];
+
+pub(super) const VISITOR_TYPES: [(&str, Option<Ty>); 3] = [
+    ("String", Some(Ty::Str)),
+    ("Bytes", Some(Ty::Bytes)),
+    ("Number", None),
 ];
 
 pub(super) struct Types {
@@ -31,14 +60,14 @@ impl Types {
     pub(crate) fn expand<const N: usize>(
         mut self,
         what: &str,
-        types: &[&str],
+        types: &[(&str, Option<Ty>)],
         arguments: [&str; N],
         hint: &str,
     ) -> syn::Result<TokenStream> {
         let mut missing = types
             .iter()
-            .map(|ident| syn::Ident::new(ident, Span::call_site()))
-            .collect::<BTreeSet<_>>();
+            .map(|(ident, ty)| (syn::Ident::new(ident, Span::call_site()), *ty))
+            .collect::<BTreeMap<_, _>>();
 
         // List of associated types which are specified, but under a `cfg`
         // attribute so its conditions need to be inverted.
@@ -46,12 +75,14 @@ impl Types {
 
         for item in &self.item_impl.items {
             match item {
-                syn::ImplItem::Type(ty) => {
-                    missing.remove(&ty.ident);
+                syn::ImplItem::Type(impl_type) => {
+                    let Some(ty) = missing.remove(&impl_type.ident) else {
+                        continue;
+                    };
 
                     let mut has_cfg = false;
 
-                    for attr in &ty.attrs {
+                    for attr in &impl_type.attrs {
                         if !attr.path().is_ident("cfg") {
                             continue;
                         }
@@ -65,7 +96,7 @@ impl Types {
                             ));
                         }
 
-                        not_attribute_ty.push(ty.clone());
+                        not_attribute_ty.push((impl_type.clone(), ty));
                         has_cfg = true;
                     }
                 }
@@ -73,10 +104,8 @@ impl Types {
             }
         }
 
-        let never = never_type(arguments);
-
-        for mut ty in not_attribute_ty {
-            for attr in &mut ty.attrs {
+        for (mut impl_type, ty) in not_attribute_ty {
+            for attr in &mut impl_type.attrs {
                 if !attr.path().is_ident("cfg") {
                     continue;
                 }
@@ -93,15 +122,17 @@ impl Types {
                 }
             }
 
-            ty.ty = syn::Type::Path(syn::TypePath {
+            impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: never.clone(),
+                path: never_type(arguments, ty),
             });
 
-            self.item_impl.items.push(syn::ImplItem::Type(ty));
+            self.item_impl.items.push(syn::ImplItem::Type(impl_type));
         }
 
-        for ident in missing {
+        for (ident, ty) in missing {
+            let never = never_type(arguments, ty);
+
             let ty = syn::ImplItemType {
                 attrs: Vec::new(),
                 vis: syn::Visibility::Inherited,
@@ -157,7 +188,7 @@ fn not_path() -> syn::Path {
     not_path
 }
 
-fn never_type<const N: usize>(arguments: [&str; N]) -> syn::Path {
+fn never_type<const N: usize>(arguments: [&str; N], ty: Option<Ty>) -> syn::Path {
     let mut never = syn::Path {
         leading_colon: None,
         segments: Punctuated::default(),
@@ -182,6 +213,45 @@ fn never_type<const N: usize>(arguments: [&str; N]) -> syn::Path {
                 qself: None,
                 path: self_type(arg),
             })));
+        }
+
+        if let Some(ty) = ty {
+            match ty {
+                Ty::Str => {
+                    let mut path = syn::Path {
+                        leading_colon: None,
+                        segments: Punctuated::default(),
+                    };
+
+                    path.segments.push(syn::PathSegment::from(syn::Ident::new(
+                        "str",
+                        Span::call_site(),
+                    )));
+
+                    args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                        qself: None,
+                        path,
+                    })));
+                }
+                Ty::Bytes => {
+                    let mut path = syn::Path {
+                        leading_colon: None,
+                        segments: Punctuated::default(),
+                    };
+
+                    path.segments.push(syn::PathSegment::from(syn::Ident::new(
+                        "u8",
+                        Span::call_site(),
+                    )));
+
+                    args.push(syn::GenericArgument::Type(syn::Type::Slice(
+                        syn::TypeSlice {
+                            bracket_token: syn::token::Bracket::default(),
+                            elem: Box::new(syn::Type::Path(syn::TypePath { qself: None, path })),
+                        },
+                    )));
+                }
+            }
         }
 
         s.arguments = syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {

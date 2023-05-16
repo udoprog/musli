@@ -108,6 +108,29 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
+#[proc_macro_attribute]
+pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attr = proc_macro2::TokenStream::from(attr);
+
+    if !attr.is_empty() {
+        return syn::Error::new_spanned(attr, "Arguments not supported")
+            .to_compile_error()
+            .into();
+    }
+
+    let input = syn::parse_macro_input!(input as types::Types);
+
+    match input.expand(
+        "visitor",
+        &types::VISITOR_TYPES,
+        ["Ok", "Error"],
+        "__UseMusliVisitorAttributeMacro",
+    ) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
 fn to_compile_errors(errors: Vec<syn::Error>) -> proc_macro2::TokenStream {
     let mut output = proc_macro2::TokenStream::new();
 

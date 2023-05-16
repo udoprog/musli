@@ -60,7 +60,7 @@ where
             }
 
             #[inline]
-            fn visit_any(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 Ok(bytes.to_vec())
             }
         }

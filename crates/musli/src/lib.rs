@@ -386,3 +386,48 @@ pub use musli_macros::encoder;
 /// ```
 #[doc(inline)]
 pub use musli_macros::decoder;
+
+/// This is an attribute macro that must be used when implementing a
+/// [`Visitor`].
+///
+/// It is required to use because a [`Visitor`] implementation might introduce
+/// new associated types in the future, and this is [not yet supported] on a
+/// language level in Rust. So this attribute macro polyfills any missing types
+/// automatically.
+///
+/// [not yet supported]:
+///     https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+/// [`Visitor`]: crate::de::Visitor
+///
+/// # Examples
+///
+/// ```
+/// use core::fmt;
+/// use core::marker;
+///
+/// use musli::de::Visitor;
+/// use musli::error::Error;
+///
+/// struct AnyVisitor<E> {
+///     _marker: marker::PhantomData<E>,
+/// }
+///
+/// #[musli::visitor]
+/// impl<'de, E> Visitor<'de> for AnyVisitor<E>
+/// where
+///     E: Error,
+/// {
+///     type Ok = ();
+///     type Error = E;
+///
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(
+///             f,
+///             "value that can be decoded into dynamic container"
+///         )
+///     }
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_macros::visitor;

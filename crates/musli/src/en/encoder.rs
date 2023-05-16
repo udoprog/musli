@@ -1080,6 +1080,7 @@ impl<T> Expecting for ExpectingWrapper<T>
 where
     T: Encoder,
 {
+    #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.expecting(f)
     }
