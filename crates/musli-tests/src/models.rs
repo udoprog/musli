@@ -274,6 +274,7 @@ pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
 
     LargeStruct {
         primitives,
+        #[cfg(all(feature = "std", not(feature = "rkyv")))]
         tuples,
         medium,
         #[cfg(all(feature = "std", not(feature = "rkyv")))]
