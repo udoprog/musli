@@ -5,7 +5,7 @@ use crate::reader::{integer, string, ParseError, ParseErrorKind, Scratch, String
 mod private {
     pub trait Sealed {}
     impl<'de> Sealed for crate::reader::SliceParser<'de> {}
-    impl<'de, R> Sealed for &mut R where R: super::Parser<'de> {}
+    impl<'de, R> Sealed for &mut R where R: ?Sized + super::Parser<'de> {}
 }
 
 /// Parser trait for this crate.
@@ -205,7 +205,7 @@ pub trait Parser<'de>: private::Sealed {
 
 impl<'de, P> Parser<'de> for &mut P
 where
-    P: Parser<'de>,
+    P: ?Sized + Parser<'de>,
 {
     type Mut<'this> = P::Mut<'this> where Self: 'this;
 

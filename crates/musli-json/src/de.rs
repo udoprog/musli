@@ -424,12 +424,12 @@ where
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "a string")
+        write!(f, "bytes")
     }
 
     #[inline]
     fn visit_ref(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        integer::parse_unsigned(&mut &mut SliceParser::new(bytes))
+        integer::parse_unsigned(&mut SliceParser::new(bytes))
     }
 }
 
@@ -455,7 +455,7 @@ where
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "a string")
+        write!(f, "bytes")
     }
 
     #[inline]

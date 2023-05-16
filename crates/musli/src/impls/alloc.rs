@@ -56,7 +56,7 @@ where
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "a string")
+                write!(f, "string")
             }
 
             #[inline]
@@ -139,7 +139,7 @@ where
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "a string")
+                write!(f, "string")
             }
 
             #[inline]
