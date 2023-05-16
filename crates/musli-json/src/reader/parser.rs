@@ -135,7 +135,7 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn parse_number<V>(&mut self, visitor: V) -> Result<V::Ok, ParseError>
     where
-        V: NumberVisitor<Error = ParseError>,
+        V: NumberVisitor<'de, Error = ParseError>,
     {
         let signed = integer::decode_signed::<i128, _>(self)?;
 

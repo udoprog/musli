@@ -66,11 +66,11 @@ where
 
             #[inline]
             fn visit_borrowed(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
-                self.visit_any(string)
+                self.visit_ref(string)
             }
 
             #[inline]
-            fn visit_any(self, string: &str) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, string: &str) -> Result<Self::Ok, Self::Error> {
                 Ok(string.to_owned())
             }
         }
@@ -153,7 +153,7 @@ where
             }
 
             #[inline]
-            fn visit_any(self, string: &str) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, string: &str) -> Result<Self::Ok, Self::Error> {
                 Ok(Cow::Owned(string.to_owned()))
             }
         }

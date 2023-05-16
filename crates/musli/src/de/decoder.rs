@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::de::{NumberVisitor, TypeHint, ValueVisitor};
+use crate::de::{NumberVisitor, SizeHint, TypeHint, ValueVisitor, Visitor};
 use crate::error::Error;
 use crate::expecting::{self, Expecting};
 use crate::mode::Mode;
@@ -50,7 +50,7 @@ pub trait SequenceDecoder<'de> {
         Self: 'this;
 
     /// Get a size hint of known remaining elements.
-    fn size_hint(&self) -> Option<usize>;
+    fn size_hint(&self) -> SizeHint;
 
     /// Decode the next element.
     #[must_use = "decoders must be consumed"]
@@ -76,7 +76,7 @@ pub trait PairsDecoder<'de> {
         Self: 'this;
 
     /// Get a size hint of known remaining elements.
-    fn size_hint(&self) -> Option<usize>;
+    fn size_hint(&self) -> SizeHint;
 
     /// Decode the next key. This returns `Ok(None)` where there are no more
     /// elements to decode.
@@ -191,6 +191,8 @@ pub trait Decoder<'de>: Sized {
 
     /// Format the human-readable message that should occur if the decoder was
     /// expecting to decode some specific kind of value.
+    ///
+    /// # Examples
     ///
     /// ```
     /// use std::fmt;
@@ -809,7 +811,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn decode_number<V>(self, _: V) -> Result<V::Ok, V::Error>
     where
-        V: NumberVisitor<Error = Self::Error>,
+        V: NumberVisitor<'de, Error = Self::Error>,
     {
         Err(Self::Error::message(expecting::invalid_type(
             &expecting::Number,
@@ -1143,7 +1145,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut map = decoder.decode_map()?;
-    ///         let mut data = HashMap::with_capacity(map.size_hint().unwrap_or_default());
+    ///         let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
     ///         while let Some(mut entry) = map.next()? {
     ///             let key = entry.first().and_then(<String as Decode<M>>::decode)?;
@@ -1278,6 +1280,21 @@ pub trait Decoder<'de>: Sized {
             &ExpectingWrapper(self),
         )))
     }
+
+    /// Decode dynamically through a [`Visitor`].
+    ///
+    /// If the current encoding does not support dynamic decoding,
+    /// [`Visitor::visit_any`] will be called with the current decoder.
+    #[inline]
+    fn decode_any<V>(self, _: V) -> Result<V::Ok, Self::Error>
+    where
+        V: Visitor<'de, Error = Self::Error>,
+    {
+        Err(Self::Error::message(format_args!(
+            "visitor not supported, expected {}",
+            ExpectingWrapper(self).format()
+        )))
+    }
 }
 
 #[repr(transparent)]
@@ -1287,6 +1304,7 @@ impl<'de, T> Expecting for ExpectingWrapper<T>
 where
     T: Decoder<'de>,
 {
+    #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.expecting(f)
     }

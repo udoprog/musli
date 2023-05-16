@@ -6,7 +6,7 @@ use core::slice;
 use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decoder, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
-    TypeHint, VariantDecoder,
+    SizeHint, TypeHint, VariantDecoder, Visitor,
 };
 use musli::error::Error;
 use musli::mode::Mode;
@@ -21,14 +21,14 @@ use crate::value::{Number, Value};
 use crate::AsValueDecoder;
 
 /// Encoder for a single value.
-pub struct ValueDecoder<'a, E = ValueError> {
-    value: &'a Value,
+pub struct ValueDecoder<'de, E = ValueError> {
+    value: &'de Value,
     _marker: marker::PhantomData<E>,
 }
 
-impl<'a, E> ValueDecoder<'a, E> {
+impl<'de, E> ValueDecoder<'de, E> {
     #[inline]
-    pub(crate) const fn new(value: &'a Value) -> Self {
+    pub(crate) const fn new(value: &'de Value) -> Self {
         Self {
             value,
             _marker: marker::PhantomData,
@@ -250,6 +250,48 @@ where
             Ok(IterValueVariantDecoder::new(st))
         })
     }
+
+    #[inline]
+    fn decode_any<V>(self, visitor: V) -> Result<V::Ok, Self::Error>
+    where
+        V: Visitor<'de, Error = Self::Error>,
+    {
+        match self.value {
+            Value::Unit => visitor.visit_unit(),
+            Value::Bool(value) => visitor.visit_bool(*value),
+            Value::Char(value) => visitor.visit_char(*value),
+            Value::Number(number) => match number {
+                Number::U8(value) => visitor.visit_u8(*value),
+                Number::U16(value) => visitor.visit_u16(*value),
+                Number::U32(value) => visitor.visit_u32(*value),
+                Number::U64(value) => visitor.visit_u64(*value),
+                Number::U128(value) => visitor.visit_u128(*value),
+                Number::I8(value) => visitor.visit_i8(*value),
+                Number::I16(value) => visitor.visit_i16(*value),
+                Number::I32(value) => visitor.visit_i32(*value),
+                Number::I64(value) => visitor.visit_i64(*value),
+                Number::I128(value) => visitor.visit_i128(*value),
+                Number::Usize(value) => visitor.visit_usize(*value),
+                Number::Isize(value) => visitor.visit_isize(*value),
+                Number::F32(value) => visitor.visit_f32(*value),
+                Number::F64(value) => visitor.visit_f64(*value),
+            },
+            Value::Bytes(bytes) => {
+                let visitor = visitor.visit_bytes(SizeHint::Exact(bytes.len()))?;
+                visitor.visit_borrowed(bytes)
+            }
+            Value::String(string) => {
+                let visitor = visitor.visit_string(SizeHint::Exact(string.len()))?;
+                visitor.visit_borrowed(string)
+            }
+            Value::Sequence(values) => visitor.visit_sequence(IterValueDecoder::new(values)),
+            Value::Map(values) => visitor.visit_map(IterValuePairsDecoder::new(values)),
+            Value::Variant(variant) => visitor.visit_variant(IterValueVariantDecoder::new(variant)),
+            Value::Option(option) => {
+                visitor.visit_option(option.as_ref().map(|value| ValueDecoder::new(value)))
+            }
+        }
+    }
 }
 
 impl<'a, E> AsDecoder for ValueDecoder<'a, E>
@@ -318,8 +360,8 @@ where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        self.iter.size_hint().1
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::from(self.iter.size_hint().1)
     }
 
     #[inline]
@@ -364,8 +406,8 @@ where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        self.iter.size_hint().1
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::from(self.iter.size_hint().1)
     }
 
     #[inline]

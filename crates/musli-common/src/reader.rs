@@ -89,11 +89,11 @@ pub trait Reader<'de> {
 
             #[inline]
             fn visit_borrowed(self, bytes: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
-                self.visit_any(bytes)
+                self.visit_ref(bytes)
             }
 
             #[inline]
-            fn visit_any(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
                 self.0.copy_from_slice(bytes);
                 Ok(())
             }
@@ -134,11 +134,11 @@ pub trait Reader<'de> {
 
             #[inline]
             fn visit_borrowed(self, bytes: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
-                self.visit_any(bytes)
+                self.visit_ref(bytes)
             }
 
             #[inline]
-            fn visit_any(mut self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(mut self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
                 self.0.copy_from_slice(bytes);
                 Ok(self.0)
             }

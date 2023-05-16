@@ -7,8 +7,8 @@ use core::str;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, LengthHint, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
-    SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
+    Decoder, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
+    SizeHint, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::error::Error;
 #[cfg(feature = "musli-value")]
@@ -130,9 +130,9 @@ where
     #[inline]
     fn type_hint(&mut self) -> Result<TypeHint, Self::Error> {
         Ok(match self.parser.peek()? {
-            Token::OpenBrace => TypeHint::Map(LengthHint::Any),
-            Token::OpenBracket => TypeHint::Sequence(LengthHint::Any),
-            Token::String => TypeHint::String(LengthHint::Any),
+            Token::OpenBrace => TypeHint::Map(SizeHint::Any),
+            Token::OpenBracket => TypeHint::Sequence(SizeHint::Any),
+            Token::String => TypeHint::String(SizeHint::Any),
             Token::Number => TypeHint::Number(NumberHint::Any),
             Token::Null => TypeHint::Unit,
             Token::True => TypeHint::Bool,
@@ -270,7 +270,7 @@ where
     #[inline]
     fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
     where
-        V: NumberVisitor<Error = Self::Error>,
+        V: NumberVisitor<'de, Error = Self::Error>,
     {
         self.parser.parse_number(visitor)
     }
@@ -282,7 +282,7 @@ where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
         let mut seq = self.decode_sequence()?;
-        let mut bytes = Vec::with_capacity(seq.size_hint().unwrap_or_default());
+        let mut bytes = Vec::with_capacity(seq.size_hint().or_default());
 
         while let Some(item) = SequenceDecoder::next(&mut seq)? {
             bytes.push(item.decode_u8()?);
@@ -298,7 +298,7 @@ where
     {
         match self.parser.parse_string(self.scratch, true)? {
             StringReference::Borrowed(borrowed) => visitor.visit_borrowed(borrowed),
-            StringReference::Scratch(string) => visitor.visit_any(string),
+            StringReference::Scratch(string) => visitor.visit_ref(string),
         }
     }
 
@@ -341,6 +341,27 @@ where
     fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
         JsonVariantDecoder::new(self.scratch, self.parser)
     }
+
+    #[inline]
+    fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
+    where
+        V: Visitor<'de, Error = Self::Error>,
+    {
+        match self.parser.peek()? {
+            Token::OpenBrace => {
+                visitor.visit_map(JsonObjectDecoder::new(self.scratch, None, self.parser)?)
+            }
+            Token::OpenBracket => {
+                visitor.visit_sequence(JsonSequenceDecoder::new(self.scratch, None, self.parser)?)
+            }
+            Token::String => self.decode_string(visitor.visit_string(SizeHint::Any)?),
+            Token::Number => self.decode_number(visitor.visit_number(NumberHint::Any)?),
+            Token::Null => visitor.visit_unit(),
+            Token::True => visitor.visit_bool(true),
+            Token::False => visitor.visit_bool(false),
+            _ => visitor.visit_any(self, TypeHint::Any),
+        }
+    }
 }
 
 /// A JSON object key decoder for Müsli.
@@ -376,7 +397,7 @@ where
     {
         match self.parser.parse_string(self.scratch, true)? {
             StringReference::Borrowed(string) => visitor.visit_borrowed(string.as_bytes()),
-            StringReference::Scratch(string) => visitor.visit_any(string.as_bytes()),
+            StringReference::Scratch(string) => visitor.visit_ref(string.as_bytes()),
         }
     }
 }
@@ -407,7 +428,7 @@ where
     }
 
     #[inline]
-    fn visit_any(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
         integer::parse_unsigned(&mut &mut SliceParser::new(bytes))
     }
 }
@@ -438,7 +459,7 @@ where
     }
 
     #[inline]
-    fn visit_any(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
         integer::parse_signed(&mut SliceParser::new(bytes))
     }
 }
@@ -528,6 +549,18 @@ where
     {
         JsonDecoder::new(self.scratch, self.parser).decode_string(visitor)
     }
+
+    #[inline]
+    fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
+    where
+        V: Visitor<'de, Error = Self::Error>,
+    {
+        match self.parser.peek()? {
+            Token::String => self.decode_string(visitor.visit_string(SizeHint::Any)?),
+            Token::Number => self.decode_number(visitor.visit_number(NumberHint::Any)?),
+            _ => visitor.visit_any(self, TypeHint::Any),
+        }
+    }
 }
 
 pub struct JsonObjectDecoder<'a, P> {
@@ -580,8 +613,8 @@ where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        self.len
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::from(self.len)
     }
 
     #[inline]
@@ -733,8 +766,8 @@ where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        self.len
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::from(self.len)
     }
 
     #[inline]

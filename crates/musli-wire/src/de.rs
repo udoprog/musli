@@ -10,7 +10,8 @@ use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
 use crate::tag::Kind;
 use crate::tag::Tag;
 use musli::de::{
-    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
+    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, SizeHint, ValueVisitor,
+    VariantDecoder,
 };
 use musli::error::Error;
 use musli_common::reader::{Limit, PosReader};
@@ -251,9 +252,9 @@ where
             }
 
             #[inline]
-            fn visit_any(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 let string = core::str::from_utf8(bytes).map_err(Self::Error::custom)?;
-                self.0.visit_any(string)
+                self.0.visit_ref(string)
             }
         }
     }
@@ -479,8 +480,8 @@ where
     type Decoder<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Exact(self.remaining)
     }
 
     #[inline]
@@ -576,8 +577,8 @@ where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Exact(self.remaining)
     }
 
     #[inline]

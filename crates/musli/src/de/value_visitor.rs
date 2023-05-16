@@ -1,6 +1,7 @@
 use core::borrow::Borrow;
 use core::fmt;
 
+use crate::de::{Decoder, TypeHint};
 use crate::error::Error;
 use crate::expecting::{self, Expecting};
 use crate::no_std::ToOwned;
@@ -37,33 +38,47 @@ pub trait ValueVisitor<'de>: Sized {
     /// Visit an owned value.
     #[inline]
     fn visit_owned(self, value: <Self::Target as ToOwned>::Owned) -> Result<Self::Ok, Self::Error> {
-        self.visit_any(value.borrow())
+        self.visit_ref(value.borrow())
     }
 
     /// Visit a string that is borrowed directly from the source data.
     #[inline]
     fn visit_borrowed(self, value: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
-        self.visit_any(value)
+        self.visit_ref(value)
     }
 
-    /// Visit a string that is provided from the decoder in any manner possible.
-    /// Which might require additional decoding work.
+    /// Visit a value reference that is provided from the decoder in any manner
+    /// possible. Which might require additional decoding work.
     #[inline]
-    fn visit_any(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
         Err(Self::Error::message(expecting::bad_visitor_type(
             &expecting::AnyValue,
-            &ValueVisitorExpecting(self),
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Fallback used when the type is either not implemented for this visitor
+    /// or the underlying format doesn't know which type to decode.
+    #[inline]
+    fn visit_any<D>(self, _: D, hint: TypeHint) -> Result<Self::Ok, Self::Error>
+    where
+        D: Decoder<'de, Error = Self::Error>,
+    {
+        Err(Self::Error::message(expecting::invalid_type(
+            &hint,
+            &ExpectingWrapper(self),
         )))
     }
 }
 
 #[repr(transparent)]
-struct ValueVisitorExpecting<T>(T);
+struct ExpectingWrapper<T>(T);
 
-impl<'de, T> Expecting for ValueVisitorExpecting<T>
+impl<'de, T> Expecting for ExpectingWrapper<T>
 where
     T: ValueVisitor<'de>,
 {
+    #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.expecting(f)
     }

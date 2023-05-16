@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use musli::de::{AsDecoder, Decode, Decoder, NumberHint, NumberVisitor, TypeHint};
 #[cfg(feature = "alloc")]
 use musli::de::{
-    LengthHint, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
+    PairDecoder, PairsDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
@@ -68,13 +68,13 @@ impl Value {
             Value::Char(..) => TypeHint::Char,
             Value::Number(number) => TypeHint::Number(number.type_hint()),
             #[cfg(feature = "alloc")]
-            Value::Bytes(bytes) => TypeHint::Bytes(LengthHint::Exact(bytes.len())),
+            Value::Bytes(bytes) => TypeHint::Bytes(SizeHint::Exact(bytes.len())),
             #[cfg(feature = "alloc")]
-            Value::String(string) => TypeHint::String(LengthHint::Exact(string.len())),
+            Value::String(string) => TypeHint::String(SizeHint::Exact(string.len())),
             #[cfg(feature = "alloc")]
-            Value::Sequence(sequence) => TypeHint::Sequence(LengthHint::Exact(sequence.len())),
+            Value::Sequence(sequence) => TypeHint::Sequence(SizeHint::Exact(sequence.len())),
             #[cfg(feature = "alloc")]
-            Value::Map(map) => TypeHint::Map(LengthHint::Exact(map.len())),
+            Value::Map(map) => TypeHint::Map(SizeHint::Exact(map.len())),
             #[cfg(feature = "alloc")]
             Value::Variant(..) => TypeHint::Variant,
             #[cfg(feature = "alloc")]
@@ -184,100 +184,190 @@ impl Number {
     }
 }
 
+struct AnyVisitor<M, E>(marker::PhantomData<(M, E)>);
+
+#[musli::visitor]
+impl<'de, M, E> Visitor<'de> for AnyVisitor<M, E>
+where
+    M: Mode,
+    E: Error,
+{
+    type Ok = Value;
+    type Error = E;
+
+    type String = StringVisitor<E>;
+    type Bytes = BytesVisitor<E>;
+    type Number = ValueNumberVisitor<E>;
+
+    #[inline]
+    fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "value that can be decoded into dynamic container")
+    }
+
+    #[inline]
+    fn visit_unit(self) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Unit)
+    }
+
+    #[inline]
+    fn visit_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Bool(value))
+    }
+
+    #[inline]
+    fn visit_char(self, value: char) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Char(value))
+    }
+
+    #[inline]
+    fn visit_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::U8(value)))
+    }
+
+    #[inline]
+    fn visit_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::U16(value)))
+    }
+
+    #[inline]
+    fn visit_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::U32(value)))
+    }
+
+    #[inline]
+    fn visit_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::U64(value)))
+    }
+
+    #[inline]
+    fn visit_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::U128(value)))
+    }
+
+    #[inline]
+    fn visit_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::I8(value)))
+    }
+
+    #[inline]
+    fn visit_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::I16(value)))
+    }
+
+    #[inline]
+    fn visit_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::I32(value)))
+    }
+
+    #[inline]
+    fn visit_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::I64(value)))
+    }
+
+    #[inline]
+    fn visit_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::I128(value)))
+    }
+
+    #[inline]
+    fn visit_usize(self, value: usize) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::Usize(value)))
+    }
+
+    #[inline]
+    fn visit_isize(self, value: isize) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::Isize(value)))
+    }
+
+    #[inline]
+    fn visit_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::F32(value)))
+    }
+
+    #[inline]
+    fn visit_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::Number(Number::F64(value)))
+    }
+
+    #[inline]
+    fn visit_option<D>(self, decoder: Option<D>) -> Result<Self::Ok, Self::Error>
+    where
+        D: Decoder<'de, Error = Self::Error>,
+    {
+        match decoder {
+            Some(decoder) => Ok(Value::Option(Some(Box::new(Decode::<M>::decode(decoder)?)))),
+            None => Ok(Value::Option(None)),
+        }
+    }
+
+    #[inline]
+    fn visit_sequence<D>(self, mut seq: D) -> Result<Self::Ok, Self::Error>
+    where
+        D: SequenceDecoder<'de, Error = Self::Error>,
+    {
+        let mut out = Vec::with_capacity(seq.size_hint().or_default());
+
+        while let Some(item) = seq.next()? {
+            out.push(Decode::<M>::decode(item)?);
+        }
+
+        seq.end()?;
+        Ok(Value::Sequence(out))
+    }
+
+    #[inline]
+    fn visit_map<D>(self, mut map: D) -> Result<Self::Ok, Self::Error>
+    where
+        D: PairsDecoder<'de, Error = Self::Error>,
+    {
+        let mut out = Vec::with_capacity(map.size_hint().or_default());
+
+        while let Some(mut item) = map.next()? {
+            let first = Decode::<M>::decode(item.first()?)?;
+            let second = Decode::<M>::decode(item.second()?)?;
+            out.push((first, second));
+        }
+
+        map.end()?;
+        Ok(Value::Map(out))
+    }
+
+    #[inline]
+    fn visit_bytes(self, _: SizeHint) -> Result<Self::Bytes, Self::Error> {
+        Ok(BytesVisitor(marker::PhantomData))
+    }
+
+    #[inline]
+    fn visit_string(self, _: SizeHint) -> Result<Self::String, Self::Error> {
+        Ok(StringVisitor(marker::PhantomData))
+    }
+
+    #[inline]
+    fn visit_number(self, _: NumberHint) -> Result<Self::Number, Self::Error> {
+        Ok(ValueNumberVisitor(marker::PhantomData))
+    }
+
+    #[inline]
+    fn visit_variant<D>(self, mut variant: D) -> Result<Self::Ok, Self::Error>
+    where
+        D: VariantDecoder<'de, Error = Self::Error>,
+    {
+        let first = Decode::<M>::decode(variant.tag()?)?;
+        let second = Decode::<M>::decode(variant.variant()?)?;
+        variant.end()?;
+        Ok(Value::Variant(Box::new((first, second))))
+    }
+}
+
 impl<'de, M> Decode<'de, M> for Value
 where
     M: Mode,
 {
-    fn decode<D>(mut decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        match decoder.type_hint()? {
-            TypeHint::Unit => {
-                decoder.decode_unit()?;
-                Ok(Value::Unit)
-            }
-            TypeHint::Bool => {
-                let b = decoder.decode_bool()?;
-                Ok(Value::Bool(b))
-            }
-            TypeHint::Char => {
-                let c = decoder.decode_char()?;
-                Ok(Value::Char(c))
-            }
-            TypeHint::Number(number) => Ok(match number {
-                NumberHint::Any => {
-                    Value::Number(decoder.decode_number(ValueNumberVisitor(marker::PhantomData))?)
-                }
-                NumberHint::U8 => Value::Number(Number::U8(decoder.decode_u8()?)),
-                NumberHint::U16 => Value::Number(Number::U16(decoder.decode_u16()?)),
-                NumberHint::U32 => Value::Number(Number::U32(decoder.decode_u32()?)),
-                NumberHint::U64 => Value::Number(Number::U64(decoder.decode_u64()?)),
-                NumberHint::U128 => Value::Number(Number::U128(decoder.decode_u128()?)),
-                NumberHint::I8 => Value::Number(Number::I8(decoder.decode_i8()?)),
-                NumberHint::I16 => Value::Number(Number::I16(decoder.decode_i16()?)),
-                NumberHint::I32 => Value::Number(Number::I32(decoder.decode_i32()?)),
-                NumberHint::I64 => Value::Number(Number::I64(decoder.decode_i64()?)),
-                NumberHint::I128 => Value::Number(Number::I128(decoder.decode_i128()?)),
-                NumberHint::Usize => Value::Number(Number::Usize(decoder.decode_usize()?)),
-                NumberHint::Isize => Value::Number(Number::Isize(decoder.decode_isize()?)),
-                NumberHint::F32 => Value::Number(Number::F32(decoder.decode_f32()?)),
-                NumberHint::F64 => Value::Number(Number::F64(decoder.decode_f64()?)),
-                hint => {
-                    return Err(D::Error::message(format_args!(
-                        "Value: unsupported number type {hint}"
-                    )))
-                }
-            }),
-            #[cfg(feature = "alloc")]
-            TypeHint::Bytes(..) => decoder.decode_bytes(BytesVisitor(marker::PhantomData)),
-            #[cfg(feature = "alloc")]
-            TypeHint::String(..) => decoder.decode_string(StringVisitor(marker::PhantomData)),
-            #[cfg(feature = "alloc")]
-            TypeHint::Sequence(len) => {
-                let mut out = Vec::with_capacity(len.size_hint());
-
-                let mut seq = decoder.decode_sequence()?;
-
-                while let Some(item) = seq.next()? {
-                    out.push(Decode::<M>::decode(item)?);
-                }
-
-                seq.end()?;
-                Ok(Value::Sequence(out))
-            }
-            #[cfg(feature = "alloc")]
-            TypeHint::Map(len) => {
-                let mut out = Vec::with_capacity(len.size_hint());
-
-                let mut map = decoder.decode_map()?;
-
-                while let Some(mut item) = map.next()? {
-                    let first = Decode::<M>::decode(item.first()?)?;
-                    let second = Decode::<M>::decode(item.second()?)?;
-                    out.push((first, second));
-                }
-
-                map.end()?;
-                Ok(Value::Map(out))
-            }
-            #[cfg(feature = "alloc")]
-            TypeHint::Variant => {
-                let mut variant = decoder.decode_variant()?;
-                let first = Decode::<M>::decode(variant.tag()?)?;
-                let second = Decode::<M>::decode(variant.variant()?)?;
-                variant.end()?;
-                Ok(Value::Variant(Box::new((first, second))))
-            }
-            #[cfg(feature = "alloc")]
-            TypeHint::Option => match decoder.decode_option()? {
-                Some(decoder) => Ok(Value::Option(Some(Box::new(Decode::<M>::decode(decoder)?)))),
-                None => Ok(Value::Option(None)),
-            },
-            hint => Err(D::Error::message(format_args!(
-                "Value: unsupported type {hint}"
-            ))),
-        }
+        decoder.decode_any(AnyVisitor::<M, D::Error>(marker::PhantomData))
     }
 }
 
@@ -295,7 +385,7 @@ where
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "expecting bytes")
+        write!(f, "bytes")
     }
 
     #[cfg(feature = "alloc")]
@@ -305,7 +395,7 @@ where
     }
 
     #[inline]
-    fn visit_any(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
         Ok(Value::Bytes(bytes.to_vec()))
     }
 }
@@ -324,7 +414,7 @@ where
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "expecting bytes")
+        write!(f, "bytes")
     }
 
     #[inline]
@@ -333,18 +423,18 @@ where
     }
 
     #[inline]
-    fn visit_any(self, string: &str) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, string: &str) -> Result<Self::Ok, Self::Error> {
         Ok(Value::String(string.to_owned()))
     }
 }
 
 struct ValueNumberVisitor<E>(marker::PhantomData<E>);
 
-impl<E> NumberVisitor for ValueNumberVisitor<E>
+impl<'de, E> NumberVisitor<'de> for ValueNumberVisitor<E>
 where
     E: Error,
 {
-    type Ok = Number;
+    type Ok = Value;
     type Error = E;
 
     #[inline]
@@ -354,72 +444,72 @@ where
 
     #[inline]
     fn visit_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::U8(value))
+        Ok(Value::Number(Number::U8(value)))
     }
 
     #[inline]
     fn visit_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::U16(value))
+        Ok(Value::Number(Number::U16(value)))
     }
 
     #[inline]
     fn visit_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::U32(value))
+        Ok(Value::Number(Number::U32(value)))
     }
 
     #[inline]
     fn visit_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::U64(value))
+        Ok(Value::Number(Number::U64(value)))
     }
 
     #[inline]
     fn visit_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::U128(value))
+        Ok(Value::Number(Number::U128(value)))
     }
 
     #[inline]
     fn visit_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::I8(value))
+        Ok(Value::Number(Number::I8(value)))
     }
 
     #[inline]
     fn visit_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::I16(value))
+        Ok(Value::Number(Number::I16(value)))
     }
 
     #[inline]
     fn visit_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::I32(value))
+        Ok(Value::Number(Number::I32(value)))
     }
 
     #[inline]
     fn visit_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::I64(value))
+        Ok(Value::Number(Number::I64(value)))
     }
 
     #[inline]
     fn visit_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::I128(value))
+        Ok(Value::Number(Number::I128(value)))
     }
 
     #[inline]
     fn visit_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::F32(value))
+        Ok(Value::Number(Number::F32(value)))
     }
 
     #[inline]
     fn visit_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::F64(value))
+        Ok(Value::Number(Number::F64(value)))
     }
 
     #[inline]
     fn visit_usize(self, value: usize) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::Usize(value))
+        Ok(Value::Number(Number::Usize(value)))
     }
 
     #[inline]
     fn visit_isize(self, value: isize) -> Result<Self::Ok, Self::Error> {
-        Ok(Number::Isize(value))
+        Ok(Value::Number(Number::Isize(value)))
     }
 }
 
