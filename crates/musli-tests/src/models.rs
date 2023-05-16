@@ -30,7 +30,7 @@ macro_rules! ranges {
 ranges! {
     const STRING_RANGE: Range<usize> = 0..256, 0..16;
     const MAP_RANGE: Range<usize> = 100..500, 1..3;
-    const PRIMITIVES_RANGE: Range<usize> = 100..500, 1..3;
+    const LARGE_MEMBER_RANGE: Range<usize> = 100..500, 1..3;
     const MEDIUM_RANGE: Range<usize> = 200..500, 1..3;
 }
 
@@ -86,6 +86,38 @@ impl PartialEq<Primitives> for &ArchivedPrimitives {
     archive(compare(PartialEq), check_bytes),
     archive_attr(derive(Debug))
 )]
+#[musli(mode = Packed, packed)]
+pub struct Tuples {
+    u0: (),
+    ua: (bool,),
+    ub: (bool, u8),
+    uc: (bool, u8, u32),
+    ud: (bool, u8, u32, u64),
+    ue: (bool, u8, u32, u64, f32),
+    i0: (),
+    ia: (bool,),
+    ib: (bool, i8),
+    ic: (bool, i8, i32),
+    id: (bool, i8, i32, i64),
+    ie: (bool, i8, i32, i64, f32),
+}
+
+#[cfg(feature = "rkyv")]
+impl PartialEq<Tuples> for &ArchivedTuples {
+    #[inline]
+    fn eq(&self, other: &Tuples) -> bool {
+        *other == **self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
+#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(
+    feature = "rkyv",
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
+    archive(compare(PartialEq), check_bytes),
+    archive_attr(derive(Debug))
+)]
 #[musli(mode = Packed)]
 pub enum MediumEnum {
     #[musli(transparent)]
@@ -121,7 +153,9 @@ impl PartialEq<MediumEnum> for &ArchivedMediumEnum {
 )]
 #[musli(mode = Packed, packed)]
 pub struct LargeStruct {
-    elements: Vec<Primitives>,
+    primitives: Vec<Primitives>,
+    #[cfg(all(feature = "std", not(feature = "rkyv")))]
+    tuples: Vec<(Tuples, Tuples)>,
     medium: Vec<MediumEnum>,
     #[cfg(all(feature = "std", not(feature = "rkyv")))]
     string_keys: HashMap<String, u64>,
@@ -167,6 +201,23 @@ pub fn generate_primitives(rng: &mut StdRng) -> Primitives {
     }
 }
 
+pub fn generate_tuples(rng: &mut StdRng) -> Tuples {
+    Tuples {
+        u0: (),
+        ua: (rng.gen(),),
+        ub: (rng.gen(), rng.gen()),
+        uc: (rng.gen(), rng.gen(), rng.gen()),
+        ud: (rng.gen(), rng.gen(), rng.gen(), rng.gen()),
+        ue: (rng.gen(), rng.gen(), rng.gen(), rng.gen(), rng.gen()),
+        i0: (),
+        ia: (rng.gen(),),
+        ib: (rng.gen(), rng.gen()),
+        ic: (rng.gen(), rng.gen(), rng.gen()),
+        id: (rng.gen(), rng.gen(), rng.gen(), rng.gen()),
+        ie: (rng.gen(), rng.gen(), rng.gen(), rng.gen(), rng.gen()),
+    }
+}
+
 pub fn generate_string(rng: &mut StdRng) -> String {
     let mut string = String::new();
 
@@ -203,10 +254,16 @@ pub fn generate_medium_enum(rng: &mut StdRng) -> MediumEnum {
 }
 
 pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
-    let mut elements = Vec::new();
+    let mut primitives = Vec::new();
 
-    for _ in 0..rng.gen_range(PRIMITIVES_RANGE) {
-        elements.push(generate_primitives(rng));
+    for _ in 0..rng.gen_range(LARGE_MEMBER_RANGE) {
+        primitives.push(generate_primitives(rng));
+    }
+
+    let mut tuples = Vec::new();
+
+    for _ in 0..rng.gen_range(LARGE_MEMBER_RANGE) {
+        tuples.push((generate_tuples(rng), generate_tuples(rng)));
     }
 
     let mut medium = Vec::new();
@@ -216,7 +273,8 @@ pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
     }
 
     LargeStruct {
-        elements,
+        primitives,
+        tuples,
         medium,
         #[cfg(all(feature = "std", not(feature = "rkyv")))]
         string_keys: {
