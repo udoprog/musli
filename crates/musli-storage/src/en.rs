@@ -33,6 +33,7 @@ where
     }
 }
 
+#[musli::encoder]
 impl<W, I, L> Encoder for StorageEncoder<W, I, L>
 where
     W: Writer,

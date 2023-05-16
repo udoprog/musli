@@ -2,7 +2,6 @@ use core::{fmt, marker};
 
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::mode::Mode;
-use musli::never::Never;
 use musli_common::writer::Writer;
 
 /// A JSON encoder for Müsli.
@@ -22,6 +21,7 @@ impl<M, W> JsonEncoder<M, W> {
     }
 }
 
+#[musli::encoder]
 impl<M, W> Encoder for JsonEncoder<M, W>
 where
     M: Mode,
@@ -410,19 +410,13 @@ macro_rules! format_integer {
     }};
 }
 
+#[musli::encoder]
 impl<W> Encoder for JsonObjectKeyEncoder<W>
 where
     W: Writer,
 {
     type Ok = ();
     type Error = W::Error;
-    type Pack = Never<Self>;
-    type Some = Never<Self>;
-    type Sequence = Never<Self>;
-    type Tuple = Never<Self>;
-    type Map = Never<Self>;
-    type Struct = Never<Self>;
-    type Variant = Never<Self>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

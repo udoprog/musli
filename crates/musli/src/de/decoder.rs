@@ -183,6 +183,12 @@ pub trait Decoder<'de>: Sized {
     /// [PairDecoder::second] is the content of the variant.
     type Variant: VariantDecoder<'de, Error = Self::Error>;
 
+    /// This is a type argument used to hint to any future implementor that they
+    /// should be using the [`#[musli::decoder]`][crate::decoder] attribute
+    /// macro when implementing [`Decoder`].
+    #[doc(hidden)]
+    type __UseMusliDecoderAttributeMacro;
+
     /// Format the human-readable message that should occur if the decoder was
     /// expecting to decode some specific kind of value.
     ///
@@ -190,20 +196,12 @@ pub trait Decoder<'de>: Sized {
     /// use std::fmt;
     ///
     /// use musli::de::Decoder;
-    /// use musli::never::Never;
     ///
     /// struct MyDecoder;
     ///
+    /// #[musli::decoder]
     /// impl Decoder<'_> for MyDecoder {
     ///     type Error = String;
-    ///     type Buffer = Never<Self::Error>;
-    ///     type Pack = Never<Self::Error>;
-    ///     type Sequence = Never<Self::Error>;
-    ///     type Tuple = Never<Self::Error>;
-    ///     type Map = Never<Self::Error>;
-    ///     type Some = Never<Self::Error>;
-    ///     type Struct = Never<Self::Error>;
-    ///     type Variant = Never<Self::Error>;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")

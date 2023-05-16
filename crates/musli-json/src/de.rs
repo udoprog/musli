@@ -13,7 +13,6 @@ use musli::de::{
 use musli::error::Error;
 #[cfg(feature = "musli-value")]
 use musli::mode::Mode;
-use musli::never::Never;
 
 use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
@@ -107,13 +106,12 @@ where
     }
 }
 
+#[musli::decoder]
 impl<'de, 'a, P> Decoder<'de> for JsonDecoder<'a, P>
 where
     P: Parser<'de>,
 {
     type Error = ParseError;
-    #[cfg(not(feature = "musli-value"))]
-    type Buffer = Never<Self::Error>;
     #[cfg(feature = "musli-value")]
     type Buffer = musli_value::AsValueDecoder<Self::Error>;
     type Pack = JsonSequenceDecoder<'a, P>;
@@ -445,19 +443,13 @@ where
     }
 }
 
+#[musli::decoder]
 impl<'de, 'a, P> Decoder<'de> for JsonKeyDecoder<'a, P>
 where
     P: Parser<'de>,
 {
     type Error = ParseError;
-    type Buffer = Never<Self::Error>;
-    type Pack = Never<Self::Error>;
-    type Sequence = Never<Self::Error>;
-    type Tuple = Never<Self::Error>;
-    type Map = Never<Self::Error>;
-    type Some = Never<Self::Error>;
     type Struct = JsonObjectDecoder<'a, P>;
-    type Variant = Never<Self::Error>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

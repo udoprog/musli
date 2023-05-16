@@ -48,6 +48,7 @@ macro_rules! ensure {
     };
 }
 
+#[musli::decoder]
 impl<'de, E> Decoder<'de> for ValueDecoder<'de, E>
 where
     E: Error + From<ValueError>,
