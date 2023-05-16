@@ -72,5 +72,7 @@ macro_rules! feature_matrix {
         $call!(serde_bitcode);
         #[cfg(feature = "bitcode")]
         $call!(derive_bitcode);
+        #[cfg(feature = "rkyv")]
+        $call!(rkyv);
     };
 }

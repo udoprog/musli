@@ -307,3 +307,28 @@ pub mod derive_bitcode {
         bitcode::decode(data).unwrap()
     }
 }
+
+#[cfg(feature = "rkyv")]
+pub mod rkyv {
+    use rkyv::ser::serializers::AllocSerializer;
+    use rkyv::ser::Serializer;
+    use rkyv::validation::validators::DefaultValidator;
+    use rkyv::{Archive, CheckBytes, Serialize};
+
+    pub fn encode<T>(value: &T) -> rkyv::AlignedVec
+    where
+        T: Serialize<AllocSerializer<0>>,
+    {
+        let mut serializer = AllocSerializer::<0>::default();
+        serializer.serialize_value(&*value).unwrap();
+        serializer.into_serializer().into_inner()
+    }
+
+    pub fn decode<'de, T>(data: &'de [u8]) -> &'de T::Archived
+    where
+        T: Archive,
+        T::Archived: CheckBytes<DefaultValidator<'de>>,
+    {
+        rkyv::check_archived_root::<T>(data).unwrap()
+    }
+}

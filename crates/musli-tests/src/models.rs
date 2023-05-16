@@ -14,13 +14,32 @@ use serde::{Deserialize, Serialize};
 
 use crate::mode::Packed;
 
-#[cfg(miri)]
-const STRING_RANGE: Range<usize> = 0..16;
-#[cfg(not(miri))]
-const STRING_RANGE: Range<usize> = 0..256;
+macro_rules! ranges {
+    ($(const $ident:ident: Range<usize> = $range:expr, $miri:expr;)*) => {
+        $(
+            #[cfg(miri)]
+            const $ident: Range<usize> = $miri;
+            #[cfg(not(miri))]
+            const $ident: Range<usize> = $range;
+        )*
+    }
+}
+
+ranges! {
+    const STRING_RANGE: Range<usize> = 0..256, 0..16;
+    const MAP_RANGE: Range<usize> = 100..500, 1..3;
+    const PRIMITIVES_RANGE: Range<usize> = 100..500, 1..3;
+    const MEDIUM_RANGE: Range<usize> = 200..500, 1..3;
+}
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(
+    feature = "rkyv",
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
+    archive(compare(PartialEq), check_bytes),
+    archive_attr(derive(Debug))
+)]
 #[musli(mode = Packed, packed)]
 pub struct Primitives {
     boolean: bool,
@@ -37,7 +56,9 @@ pub struct Primitives {
     signed64: i64,
     #[cfg(any(model_128, model_all))]
     signed128: i128,
+    #[cfg(not(feature = "rkyv"))]
     unsignedsize: usize,
+    #[cfg(not(feature = "rkyv"))]
     signedsize: isize,
     #[cfg(any(model_floats, model_all))]
     float32: f32,
@@ -47,8 +68,23 @@ pub struct Primitives {
     bytes: Vec<u8>,
 }
 
+#[cfg(feature = "rkyv")]
+impl PartialEq<Primitives> for &ArchivedPrimitives {
+    #[inline]
+    fn eq(&self, other: &Primitives) -> bool {
+        *other == **self
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(
+    feature = "rkyv",
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
+    archive(compare(PartialEq), check_bytes),
+    archive_attr(derive(Debug))
+)]
+#[musli(mode = Packed)]
 pub enum MediumEnum {
     #[musli(transparent)]
     Variant1(String),
@@ -57,16 +93,46 @@ pub enum MediumEnum {
     Variant2(u128),
     #[musli(transparent)]
     Variant3(u64),
+    Variant4 {
+        a: u32,
+        primitives: Primitives,
+        b: u64,
+    },
+    Variant5,
+}
+
+#[cfg(feature = "rkyv")]
+impl PartialEq<MediumEnum> for &ArchivedMediumEnum {
+    #[inline]
+    fn eq(&self, other: &MediumEnum) -> bool {
+        *other == **self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(
+    feature = "rkyv",
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
+    archive(compare(PartialEq), check_bytes),
+    archive_attr(derive(Debug))
+)]
 #[musli(mode = Packed, packed)]
 pub struct LargeStruct {
     elements: Vec<Primitives>,
     medium: Vec<MediumEnum>,
+    #[cfg(all(feature = "std", not(feature = "rkyv")))]
+    string_keys: HashMap<String, u64>,
     #[cfg(feature = "std")]
-    map: HashMap<String, u64>,
+    number_keys: HashMap<u32, u64>,
+}
+
+#[cfg(feature = "rkyv")]
+impl PartialEq<LargeStruct> for &ArchivedLargeStruct {
+    #[inline]
+    fn eq(&self, other: &LargeStruct) -> bool {
+        *other == **self
+    }
 }
 
 pub fn generate_primitives(rng: &mut StdRng) -> Primitives {
@@ -85,7 +151,9 @@ pub fn generate_primitives(rng: &mut StdRng) -> Primitives {
         signed64: rng.gen(),
         #[cfg(any(model_128, model_all))]
         signed128: rng.gen(),
+        #[cfg(not(feature = "rkyv"))]
         unsignedsize: rng.gen(),
+        #[cfg(not(feature = "rkyv"))]
         signedsize: rng.gen(),
         #[cfg(any(model_floats, model_all))]
         float32: rng.gen(),
@@ -117,24 +185,21 @@ pub fn generate_bytes(rng: &mut StdRng) -> Vec<u8> {
 }
 
 pub fn generate_medium_enum(rng: &mut StdRng) -> MediumEnum {
-    match rng.gen_range(0..=2) {
+    match rng.gen_range(0..=4) {
         0 => MediumEnum::Variant1(generate_string(rng)),
         #[cfg(any(model_128, model_all))]
         1 => MediumEnum::Variant2(rng.gen()),
-        _ => MediumEnum::Variant3(rng.gen()),
+        2 => MediumEnum::Variant3(rng.gen()),
+        3 => MediumEnum::Variant4 {
+            a: rng.gen(),
+            primitives: generate_primitives(rng),
+            b: rng.gen(),
+        },
+        _ => MediumEnum::Variant5,
     }
 }
 
 pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
-    #[cfg(miri)]
-    const PRIMITIVES_RANGE: Range<usize> = 1..3;
-    #[cfg(not(miri))]
-    const PRIMITIVES_RANGE: Range<usize> = 100..500;
-    #[cfg(miri)]
-    const MEDIUM_RANGE: Range<usize> = 1..3;
-    #[cfg(not(miri))]
-    const MEDIUM_RANGE: Range<usize> = 200..500;
-
     let mut elements = Vec::new();
 
     for _ in 0..rng.gen_range(PRIMITIVES_RANGE) {
@@ -150,17 +215,22 @@ pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
     LargeStruct {
         elements,
         medium,
-        #[cfg(feature = "std")]
-        map: {
-            #[cfg(miri)]
-            const MAP_RANGE: Range<usize> = 1..3;
-            #[cfg(not(miri))]
-            const MAP_RANGE: Range<usize> = 100..500;
-
+        #[cfg(all(feature = "std", not(feature = "rkyv")))]
+        string_keys: {
             let mut map = HashMap::new();
 
             for _ in 0..rng.gen_range(MAP_RANGE) {
                 map.insert(generate_string(rng), rng.gen());
+            }
+
+            map
+        },
+        #[cfg(feature = "std")]
+        number_keys: {
+            let mut map = HashMap::new();
+
+            for _ in 0..rng.gen_range(MAP_RANGE) {
+                map.insert(rng.gen(), rng.gen());
             }
 
             map

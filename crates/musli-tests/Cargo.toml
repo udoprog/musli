@@ -6,7 +6,7 @@ publish = false
 
 [features]
 default = ["std"]
-std = ["musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std"]
+std = ["musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std", "rkyv?/std"]
 test = ["musli-wire", "musli-storage", "musli-descriptive"]
 
 [dependencies]
@@ -26,6 +26,7 @@ serde_json = { version = "1.0.96", default-features = false, features = ["alloc"
 serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc", "std"], optional = true }
 dlhn = { version = "0.1.5", default-features = false, optional = true }
 bitcode = { version = "0.4.0", default-features = false, optional = true, features = ["derive", "serde"] }
+rkyv = { version = "0.7.42", default-features = false, optional = true, features = ["alloc", "size_32", "validation"] }
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports"] }

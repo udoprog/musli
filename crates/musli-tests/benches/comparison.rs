@@ -30,7 +30,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let out = utils::$base::encode(&primitives_struct);
                 let actual = utils::$base::decode::<Primitives>(&out);
                 debug_assert_ne!(actual, primitives_struct);
-                actual
+                criterion::black_box(actual);
+                out
             })
         };
     }
@@ -43,7 +44,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let out = utils::$base::encode(&large_struct);
                 let actual = utils::$base::decode::<LargeStruct>(&out);
                 debug_assert_eq!(actual, large_struct);
-                actual
+                criterion::black_box(actual);
+                out
             })
         };
     }
