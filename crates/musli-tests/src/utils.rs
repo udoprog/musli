@@ -25,7 +25,7 @@ pub mod serde_dlhn {
     }
 }
 
-#[cfg(feature = "serde-json")]
+#[cfg(feature = "serde_json")]
 pub mod serde_json {
     use alloc::vec::Vec;
 
@@ -134,6 +134,36 @@ pub mod serde_cbor {
         T: Deserialize<'de>,
     {
         serde_cbor::from_slice(data).unwrap()
+    }
+}
+
+#[cfg(feature = "musli-storage")]
+pub mod musli_storage_packed {
+    use alloc::vec::Vec;
+
+    use ::musli_storage::int::{Fixed, FixedUsize};
+    use ::musli_storage::Encoding;
+    use musli::{Decode, Encode};
+
+    use crate::mode::Packed;
+
+    const ENCODING: Encoding<Packed, Fixed, FixedUsize<u64>> = Encoding::new()
+        .with_fixed_integers()
+        .with_fixed_lengths64()
+        .with_mode::<Packed>();
+
+    pub fn encode<T>(value: &T) -> Vec<u8>
+    where
+        T: Encode<Packed>,
+    {
+        ENCODING.to_buffer(value).unwrap().into_vec()
+    }
+
+    pub fn decode<'de, T>(data: &'de [u8]) -> T
+    where
+        T: Decode<'de, Packed>,
+    {
+        ENCODING.from_slice(data).unwrap()
     }
 }
 

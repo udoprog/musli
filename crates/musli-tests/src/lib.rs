@@ -5,6 +5,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod mode;
 pub mod models;
 pub mod utils;
 
@@ -45,7 +46,7 @@ macro_rules! rt {
 #[macro_export]
 macro_rules! feature_matrix {
     ($call:path) => {
-        #[cfg(feature = "serde-json")]
+        #[cfg(feature = "serde_json")]
         $call!(serde_json);
         #[cfg(feature = "bincode")]
         $call!(serde_bincode);
@@ -59,6 +60,8 @@ macro_rules! feature_matrix {
         $call!(musli_descriptive);
         #[cfg(feature = "musli-storage")]
         $call!(musli_storage);
+        #[cfg(feature = "musli-storage")]
+        $call!(musli_storage_packed);
         #[cfg(feature = "musli-value")]
         $call!(musli_value);
         #[cfg(all(feature = "dlhn", not(any(model_128, model_all))))]

@@ -12,6 +12,8 @@ use musli::{Decode, Encode};
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::mode::Packed;
+
 #[cfg(miri)]
 const STRING_RANGE: Range<usize> = 0..16;
 #[cfg(not(miri))]
@@ -19,6 +21,7 @@ const STRING_RANGE: Range<usize> = 0..256;
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[musli(mode = Packed, packed)]
 pub struct Primitives {
     boolean: bool,
     character: char,
@@ -58,6 +61,7 @@ pub enum MediumEnum {
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[musli(mode = Packed, packed)]
 pub struct LargeStruct {
     elements: Vec<Primitives>,
     medium: Vec<MediumEnum>,

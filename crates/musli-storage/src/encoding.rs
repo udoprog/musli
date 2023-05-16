@@ -165,7 +165,7 @@ where
     L: UsizeEncoding,
 {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T, Variable, L>
+    pub const fn with_mode<T>(self) -> Encoding<T, I, L>
     where
         T: Mode,
     {
