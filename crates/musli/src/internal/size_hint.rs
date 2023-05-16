@@ -1,3 +1,4 @@
+#[cfg(any(feature = "std", feature = "alloc"))]
 use crate::de::SizeHint;
 
 #[cfg(any(feature = "std", feature = "alloc"))]

@@ -9,10 +9,10 @@ use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use musli::de::{AsDecoder, Decode, Decoder, NumberHint, NumberVisitor, TypeHint};
+use musli::de::{AsDecoder, Decode, Decoder, NumberHint, NumberVisitor, TypeHint, Visitor};
 #[cfg(feature = "alloc")]
 use musli::de::{
-    PairDecoder, PairsDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder, Visitor,
+    PairDecoder, PairsDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
 };
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
@@ -195,8 +195,11 @@ where
     type Ok = Value;
     type Error = E;
 
+    #[cfg(feature = "alloc")]
     type String = StringVisitor<E>;
+    #[cfg(feature = "alloc")]
     type Bytes = BytesVisitor<E>;
+    #[cfg(feature = "alloc")]
     type Number = ValueNumberVisitor<E>;
 
     #[inline]
@@ -289,6 +292,7 @@ where
         Ok(Value::Number(Number::F64(value)))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_option<D>(self, decoder: Option<D>) -> Result<Self::Ok, Self::Error>
     where
@@ -300,6 +304,7 @@ where
         }
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_sequence<D>(self, mut seq: D) -> Result<Self::Ok, Self::Error>
     where
@@ -315,6 +320,7 @@ where
         Ok(Value::Sequence(out))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_map<D>(self, mut map: D) -> Result<Self::Ok, Self::Error>
     where
@@ -332,21 +338,25 @@ where
         Ok(Value::Map(out))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_bytes(self, _: SizeHint) -> Result<Self::Bytes, Self::Error> {
         Ok(BytesVisitor(marker::PhantomData))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_string(self, _: SizeHint) -> Result<Self::String, Self::Error> {
         Ok(StringVisitor(marker::PhantomData))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_number(self, _: NumberHint) -> Result<Self::Number, Self::Error> {
         Ok(ValueNumberVisitor(marker::PhantomData))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_variant<D>(self, mut variant: D) -> Result<Self::Ok, Self::Error>
     where

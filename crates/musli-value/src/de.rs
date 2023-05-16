@@ -276,17 +276,23 @@ where
                 Number::F32(value) => visitor.visit_f32(*value),
                 Number::F64(value) => visitor.visit_f64(*value),
             },
+            #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => {
                 let visitor = visitor.visit_bytes(SizeHint::Exact(bytes.len()))?;
                 visitor.visit_borrowed(bytes)
             }
+            #[cfg(feature = "alloc")]
             Value::String(string) => {
                 let visitor = visitor.visit_string(SizeHint::Exact(string.len()))?;
                 visitor.visit_borrowed(string)
             }
+            #[cfg(feature = "alloc")]
             Value::Sequence(values) => visitor.visit_sequence(IterValueDecoder::new(values)),
+            #[cfg(feature = "alloc")]
             Value::Map(values) => visitor.visit_map(IterValuePairsDecoder::new(values)),
+            #[cfg(feature = "alloc")]
             Value::Variant(variant) => visitor.visit_variant(IterValueVariantDecoder::new(variant)),
+            #[cfg(feature = "alloc")]
             Value::Option(option) => {
                 visitor.visit_option(option.as_ref().map(|value| ValueDecoder::new(value)))
             }

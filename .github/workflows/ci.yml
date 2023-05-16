@@ -51,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [musli, musli-common, musli-storage, musli-descriptive, musli-wire, musli-json]
+        package: [musli, musli-common, musli-storage, musli-descriptive, musli-wire, musli-json, musli-value]
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@stable
