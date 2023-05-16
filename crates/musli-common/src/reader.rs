@@ -20,7 +20,7 @@ pub trait PosReader<'de>: Reader<'de> {
     /// The exact position of a reader.
     fn pos(&self) -> usize;
 
-    /// Reborrowed type.
+    /// Type borrowed from self.
     ///
     /// Why oh why would we want to do this over having a simple `&'this mut T`?
     ///
@@ -33,7 +33,7 @@ pub trait PosReader<'de>: Reader<'de> {
     where
         Self: 'this;
 
-    /// Reborrow the current reader.
+    /// Borrow the current reader.
     fn pos_borrow_mut(&mut self) -> Self::PosMut<'_>;
 }
 
@@ -45,7 +45,7 @@ pub trait Reader<'de> {
     /// Error type raised by the current reader.
     type Error: Error;
 
-    /// Reborrowed type.
+    /// Type borrowed from self.
     ///
     /// Why oh why would we want to do this over having a simple `&'this mut T`?
     ///
@@ -58,7 +58,7 @@ pub trait Reader<'de> {
     where
         Self: 'this;
 
-    /// Reborrow the current reader.
+    /// Borrow the current reader.
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Skip over the given number of bytes.

@@ -28,7 +28,7 @@
 //! encoding interfaces that describe "what it wants" and leverages GATs to make
 //! the API efficient and ergonomic.
 //!
-//! Another major aspect where Müsli differs is in the conept of
+//! Another major aspect where Müsli differs is in the concept of
 //! [modes](#modes). This is a larger topic and is covered further down.
 //!
 //! <br>
@@ -263,7 +263,7 @@
 //!                         time:   [802.38 ps 803.95 ps 805.65 ps]
 //! ```
 //!
-//! Note that these bencmarks include no "waste", like extra unrecognized
+//! Note that these benchmarks include no "waste", like extra unrecognized
 //! fields. This is an area where Müsli's current encoding indeed is expected to
 //! lag behind since it needs to perform a fair bit of work to walk over
 //! unrecognized data.
