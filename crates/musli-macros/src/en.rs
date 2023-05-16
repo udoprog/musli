@@ -163,7 +163,7 @@ fn encode_fields(e: &Build<'_>, var: &syn::Ident, fields: &[FieldBuild]) -> Resu
 
 /// Encode an internally tagged enum.
 fn encode_enum(e: &Build<'_>, var: &syn::Ident, en: &EnumBuild<'_>) -> Result<TokenStream> {
-    if let Some((span, Packing::Transparent)) = en.packing_span {
+    if let Some(&(span, Packing::Transparent)) = en.packing_span {
         e.encode_transparent_enum_diagnostics(span);
         return Err(());
     }

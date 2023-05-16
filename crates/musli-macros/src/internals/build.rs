@@ -130,7 +130,7 @@ pub(crate) struct EnumBuild<'a> {
     pub(crate) fallback: Option<&'a syn::Ident>,
     pub(crate) variant_tag_method: TagMethod,
     pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
-    pub(crate) packing_span: Option<(Span, Packing)>,
+    pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
 
 pub(crate) struct VariantBuild<'a> {
@@ -163,7 +163,7 @@ pub(crate) struct FieldBuild<'a> {
     pub(crate) encode_path: (Span, syn::Path),
     pub(crate) decode_path: (Span, syn::Path),
     pub(crate) tag: syn::Expr,
-    pub(crate) skip_encoding_if: Option<(Span, &'a syn::Path)>,
+    pub(crate) skip_encoding_if: Option<&'a (Span, syn::Path)>,
     pub(crate) default_attr: Option<Span>,
     pub(crate) self_access: syn::Expr,
     pub(crate) field_access: syn::Member,
@@ -208,9 +208,13 @@ fn setup_struct<'a>(
 ) -> Result<StructBuild<'a>> {
     let mut fields = Vec::with_capacity(data.fields.len());
 
-    let default_field_name = e.type_attr.default_field_name(mode);
+    let default_field_name = e.type_attr.default_field_name(mode).map(|&(_, v)| v);
     let tag_type = e.type_attr.name_type(mode);
-    let packing = e.type_attr.packing(mode).unwrap_or_default();
+    let packing = e
+        .type_attr
+        .packing(mode)
+        .map(|&(_, p)| p)
+        .unwrap_or_default();
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
     let mut tag_methods = TagMethods::new(&e.cx);
 
@@ -249,12 +253,12 @@ fn setup_enum<'a>(
     let mut tag_methods = TagMethods::new(&e.cx);
     let enum_tagging = e.type_attr.enum_tagging(mode);
 
-    let packing_span = e.type_attr.packing_span(mode);
+    let packing_span = e.type_attr.packing(mode);
 
     if enum_tagging.is_some() {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
-            Some((span, packing)) => {
+            Some(&(span, packing)) => {
                 e.cx.error_span(span, format_args!("#[{ATTR}({packing})] cannot be combined with #[{ATTR}({TAG})] or #[{ATTR}({CONTENT})]"));
                 return Err(());
             }
@@ -290,16 +294,26 @@ fn setup_variant<'a>(
         .attr
         .packing(mode)
         .or_else(|| e.type_attr.packing(mode))
+        .map(|&(_, v)| v)
         .unwrap_or_default();
 
     let default_field_name = data
         .attr
         .default_field_name(mode)
-        .or_else(|| e.type_attr.default_field_name(mode));
+        .or_else(|| e.type_attr.default_field_name(mode))
+        .map(|&(_, v)| v);
 
-    let enum_packing = e.type_attr.packing(mode).unwrap_or_default();
+    let enum_packing = e
+        .type_attr
+        .packing(mode)
+        .map(|&(_, p)| p)
+        .unwrap_or_default();
 
-    let (tag, tag_method) = data.expand_tag(e, mode, e.type_attr.default_variant_name(mode))?;
+    let (tag, tag_method) = data.expand_tag(
+        e,
+        mode,
+        e.type_attr.default_variant_name(mode).map(|&(_, v)| v),
+    )?;
     tag_methods.insert(data.span, tag_method);
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
@@ -370,12 +384,12 @@ fn setup_field<'a>(
     patterns: Option<&mut Vec<syn::FieldValue>>,
     tag_methods: &mut TagMethods,
 ) -> Result<FieldBuild<'a>> {
-    let encode_path = data.attr.encode_path(mode, data.span);
-    let decode_path = data.attr.decode_path(mode, data.span);
+    let encode_path = data.attr.encode_path_expanded(mode, data.span);
+    let decode_path = data.attr.decode_path_expanded(mode, data.span);
     let (tag, tag_method) = data.expand_tag(e, mode, default_field_name)?;
     tag_methods.insert(data.span, tag_method);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
-    let default_attr = data.attr.default_attr(mode);
+    let default_attr = data.attr.default_field(mode).map(|&(s, ())| s);
 
     let member = match data.ident {
         Some(ident) => syn::Member::Named(ident.clone()),

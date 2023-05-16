@@ -106,7 +106,7 @@ fn decode_enum(
     root_decoder_var: &syn::Ident,
     en: &EnumBuild,
 ) -> Result<TokenStream> {
-    if let Some((span, Packing::Packed)) = en.packing_span {
+    if let Some(&(span, Packing::Packed)) = en.packing_span {
         e.decode_packed_enum_diagnostics(span);
         return Err(());
     }

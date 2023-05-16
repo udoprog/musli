@@ -76,11 +76,45 @@ macro_rules! merge {
 }
 
 macro_rules! layer {
-    ($new:ident, $layer:ident {
+    ($attr:ident, $new:ident, $layer:ident {
         $($(#[$($single_meta:meta)*])* $single:ident: $single_ty:ty,)* $(,)?
         @multiple
         $($(#[$($multiple_meta:meta)*])* $multiple:ident: $multiple_ty:ty,)* $(,)?
     }) => {
+        #[derive(Default)]
+        pub(crate) struct $attr {
+            root: $layer,
+            modes: HashMap<syn::Path, $layer>,
+        }
+
+        impl $attr {
+            fn by_mode<A, O>(&self, mode: Mode<'_>, access: A) -> Option<&O>
+            where
+                A: Copy + Fn(&$layer) -> Option<&O>,
+                O: ?Sized,
+            {
+                if let Some(value) = mode.ident.and_then(|m| self.modes.get(m).and_then(access)) {
+                    Some(value)
+                } else {
+                    access(&self.root)
+                }
+            }
+
+            $(
+                #[allow(unused)]
+                pub(crate) fn $single(&self, mode: Mode<'_>) -> Option<&(Span, $single_ty)> {
+                    self.by_mode(mode, |m| m.$single.as_ref())
+                }
+            )*
+
+            $(
+                #[allow(unused)]
+                pub(crate) fn $multiple(&self, mode: Mode<'_>) -> &[(Span, $multiple_ty)] {
+                    self.by_mode(mode, |m| (!m.$multiple.is_empty()).then_some(&m.$multiple[..])).unwrap_or_default()
+                }
+            )*
+        }
+
         #[derive(Default)]
         struct $new {
             $($(#[$($single_meta)*])* $single: Vec<(Span, $single_ty)>,)*
@@ -104,7 +138,7 @@ macro_rules! layer {
 }
 
 layer! {
-    TypeLayerNew, TypeLayer {
+    TypeAttr, TypeLayerNew, TypeLayer {
         /// `#[musli(crate = <path>)]`.
         krate: syn::Path,
         /// `#[musli(name_type)]`.
@@ -127,33 +161,7 @@ layer! {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct TypeAttr {
-    root: TypeLayer,
-    /// Nested configuartions for modes.
-    modes: HashMap<syn::Path, TypeLayer>,
-}
-
 impl TypeAttr {
-    /// Indicates the packing state of the type.
-    pub(crate) fn packing_span(&self, mode: Mode<'_>) -> Option<(Span, Packing)> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.packing)
-            .or(self.root.packing)
-    }
-
-    fn tag(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.tag.as_ref())
-            .or(self.root.tag.as_ref())
-    }
-
-    fn content(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.content.as_ref())
-            .or(self.root.content.as_ref())
-    }
-
     pub(crate) fn enum_tagging_span(&self, mode: Mode<'_>) -> Option<Span> {
         let tag = self.tag(mode);
         let content = self.content(mode);
@@ -162,8 +170,7 @@ impl TypeAttr {
 
     /// Indicates the state of enum tagging.
     pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
-        let tag = self.tag(mode);
-        let (_, tag) = tag?;
+        let (_, tag) = self.tag(mode)?;
 
         let tag_method = determine_tag_method(tag);
         let tag = EnumTag {
@@ -177,33 +184,6 @@ impl TypeAttr {
         }
     }
 
-    /// Indicates the packing state of the type.
-    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<Packing> {
-        Some(self.packing_span(mode)?.1)
-    }
-
-    /// Default field tag.
-    pub(crate) fn default_field_name(&self, mode: Mode<'_>) -> Option<DefaultTag> {
-        mode.ident
-            .and_then(|m| Some(self.modes.get(m)?.default_field_name))
-            .unwrap_or(self.root.default_field_name)
-            .map(|(_, v)| v)
-    }
-
-    pub(crate) fn default_variant_name(&self, mode: Mode<'_>) -> Option<DefaultTag> {
-        mode.ident
-            .and_then(|m| Some(self.modes.get(m)?.default_variant_name))
-            .unwrap_or(self.root.default_variant_name)
-            .map(|(_, v)| v)
-    }
-
-    /// Get the tag type of the type.
-    pub(crate) fn name_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.name_type.as_ref())
-            .or(self.root.name_type.as_ref())
-    }
-
     /// Get the configured crate, or fallback to default.
     pub(crate) fn crate_or_default(&self) -> syn::Path {
         if let Some((_, krate)) = &self.root.krate {
@@ -211,20 +191,6 @@ impl TypeAttr {
         } else {
             syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()))
         }
-    }
-
-    /// Get the where clause that is associated with the type.
-    pub(crate) fn bounds(&self, mode: Mode<'_>) -> &[(Span, syn::WherePredicate)] {
-        mode.ident
-            .and_then(|m| Some(&self.modes.get(m)?.bounds))
-            .unwrap_or(&self.root.bounds)
-    }
-
-    /// Get bounds to require for a `Decode` implementation.
-    pub(crate) fn decode_bounds(&self, mode: Mode<'_>) -> &[(Span, syn::WherePredicate)] {
-        mode.ident
-            .and_then(|m| Some(&self.modes.get(m)?.decode_bounds))
-            .unwrap_or(&self.root.decode_bounds)
     }
 }
 
@@ -380,7 +346,7 @@ fn parse_bounds(
 }
 
 layer! {
-    VariantLayerNew, VariantLayer {
+    VariantAttr, VariantLayerNew, VariantLayer {
         /// `#[musli(name_type)]`.
         name_type: syn::Type,
         /// Rename a field to the given expression.
@@ -388,59 +354,18 @@ layer! {
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
         /// `#[musli(default)]`.
-        default: (),
+        default_field: (),
         /// `#[musli(default_field_name = "..")]`.
         default_field_name: DefaultTag,
         @multiple
     }
 }
 
-#[derive(Default)]
-pub(crate) struct VariantAttr {
-    root: VariantLayer,
-    modes: HashMap<syn::Path, VariantLayer>,
-}
-
 impl VariantAttr {
     /// Test if the `#[musli(default)]` tag is specified.
     pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.default)
-            .or(self.root.default)
-            .map(|(s, ())| s)
-    }
-
-    /// Test if the `#[musli(rename)]` tag is specified.
-    pub(crate) fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.rename.as_ref())
-            .or(self.root.rename.as_ref())
-    }
-
-    /// Indicates if the tagged state of the variant is set.
-    pub(crate) fn packing(&self, mode: Mode<'_>) -> Option<Packing> {
-        let packing = mode
-            .ident
-            .and_then(|m| self.modes.get(m)?.packing.as_ref())
-            .or(self.root.packing.as_ref())?;
-
-        Some(packing.1)
-    }
-
-    /// Default field tag.
-    pub(crate) fn default_field_name(&self, mode: Mode<'_>) -> Option<DefaultTag> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.default_field_name)
-            .or(self.root.default_field_name)
-            .map(|(_, v)| v)
-    }
-
-    /// Get the tag type of the type.
-    pub(crate) fn name_type(&self, mode: Mode<'_>) -> Option<&(Span, syn::Type)> {
-        mode.ident
-            .and_then(|m| self.modes.get(m))
-            .map(|a| a.name_type.as_ref())
-            .unwrap_or(self.root.name_type.as_ref())
+        self.by_mode(mode, |m| m.default_field.as_ref())
+            .map(|&(s, ())| s)
     }
 }
 
@@ -480,7 +405,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
             // parse #[musli(default)]
             if meta.path == DEFAULT {
-                new.default.push((meta.path.span(), ()));
+                new.default_field.push((meta.path.span(), ()));
                 return Ok(());
             }
 
@@ -540,7 +465,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 }
 
 layer! {
-    FieldNew, FieldLayer {
+    Field, FieldNew, FieldLayer {
         /// Module to use when decoding.
         encode_path: syn::Path,
         /// Path to use when decoding.
@@ -550,39 +475,15 @@ layer! {
         /// Rename a field to the given literal.
         rename: syn::Expr,
         /// Use a default value for the field if it's not available.
-        default: (),
+        default_field: (),
         @multiple
     }
 }
 
-#[derive(Default)]
-pub(crate) struct Field {
-    root: FieldLayer,
-    modes: HashMap<syn::Path, FieldLayer>,
-}
-
 impl Field {
-    /// Test if the `#[musli(default)]` tag is specified.
-    pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.default)
-            .or(self.root.default)
-            .map(|(span, ())| span)
-    }
-
-    /// Test if the `#[musli(rename)]` tag is specified.
-    pub(crate) fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
-        mode.ident
-            .and_then(|m| self.modes.get(m)?.rename.as_ref())
-            .or(self.root.rename.as_ref())
-    }
-
     /// Expand encode of the given field.
-    pub(crate) fn encode_path(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
-        let encode_path = mode
-            .ident
-            .and_then(|m| self.modes.get(m)?.encode_path.as_ref())
-            .or(self.root.encode_path.as_ref());
+    pub(crate) fn encode_path_expanded(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
+        let encode_path = self.by_mode(mode, |l| l.encode_path.as_ref());
 
         if let Some((span, encode_path)) = encode_path {
             let mut encode_path = encode_path.clone();
@@ -600,11 +501,8 @@ impl Field {
     }
 
     /// Expand decode of the given field.
-    pub(crate) fn decode_path(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
-        let decode_path = mode
-            .ident
-            .and_then(|m| self.modes.get(m)?.decode_path.as_ref())
-            .or(self.root.decode_path.as_ref());
+    pub(crate) fn decode_path_expanded(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
+        let decode_path = self.by_mode(mode, |l| l.decode_path.as_ref());
 
         if let Some((span, decode_path)) = decode_path {
             let mut decode_path = decode_path.clone();
@@ -619,16 +517,6 @@ impl Field {
             let decode_path = mode.decode_t_decode(span);
             (span, decode_path)
         }
-    }
-
-    /// Get skip encoding if.
-    pub(crate) fn skip_encoding_if(&self, mode: Mode<'_>) -> Option<(Span, &syn::Path)> {
-        let (span, path) = mode
-            .ident
-            .and_then(|m| self.modes.get(m)?.skip_encoding_if.as_ref())
-            .or(self.root.skip_encoding_if.as_ref())?;
-
-        Some((*span, path))
     }
 }
 
@@ -703,7 +591,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 
             // parse #[musli(default)]
             if meta.path == DEFAULT {
-                new.default.push((meta.path.span(), ()));
+                new.default_field.push((meta.path.span(), ()));
                 return Ok(());
             }
 
