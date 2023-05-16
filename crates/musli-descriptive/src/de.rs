@@ -11,7 +11,6 @@ use musli::de::{
     SequenceDecoder, TypeHint, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
-use musli::never::Never;
 use musli_common::int::{continuation as c, UsizeEncoding, Variable};
 use musli_common::reader::PosReader;
 use musli_storage::de::StorageDecoder;
@@ -165,12 +164,12 @@ pub struct RemainingSelfDecoder<R> {
     decoder: SelfDecoder<R>,
 }
 
+#[musli::decoder]
 impl<'de, R> Decoder<'de> for SelfDecoder<R>
 where
     R: PosReader<'de>,
 {
     type Error = R::Error;
-    type Buffer = Never<R::Error>;
     type Pack = SelfPackDecoder<R>;
     type Some = Self;
     type Sequence = RemainingSelfDecoder<R>;

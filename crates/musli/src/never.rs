@@ -1,7 +1,15 @@
 //! Module that provides a never type which conveniently implements all the
 //! encoder and decoder traits so that it can be used as a placeholder.
+//!
+//! This is a private module of musli, and is not intended for use outside of
+//! the implementation attributes:
+//!
+//! * [`#[musli::encoder]`][crate::encoder].
+//! * [`#[musli::decoder]`][crate::decoder].
 
-use core::{fmt, marker};
+use core::convert::Infallible;
+use core::fmt;
+use core::marker;
 
 use crate::de::{
     AsDecoder, Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder,
@@ -19,20 +27,12 @@ enum NeverMarker {}
 /// use std::fmt;
 ///
 /// use musli::de::Decoder;
-/// use musli::never::Never;
 ///
 /// struct MyDecoder;
 ///
+/// #[musli::decoder]
 /// impl Decoder<'_> for MyDecoder {
 ///     type Error = String;
-///     type Buffer = Never<Self::Error>;
-///     type Pack = Never<Self::Error>;
-///     type Sequence = Never<Self::Error>;
-///     type Tuple = Never<Self::Error>;
-///     type Map = Never<Self::Error>;
-///     type Some = Never<Self::Error>;
-///     type Struct = Never<Self::Error>;
-///     type Variant = Never<Self::Error>;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
@@ -43,10 +43,10 @@ enum NeverMarker {}
 ///     }
 /// }
 /// ```
-pub struct Never<T> {
+pub struct Never<A, B = Infallible> {
     // Field makes type uninhabitable.
     _never: NeverMarker,
-    _marker: marker::PhantomData<T>,
+    _marker: marker::PhantomData<(A, B)>,
 }
 
 impl<'de, E> Decoder<'de> for Never<E>
@@ -62,6 +62,7 @@ where
     type Some = Self;
     type Struct = Self;
     type Variant = Self;
+    type __UseMusliDecoderAttributeMacro = ();
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -219,12 +220,12 @@ where
     }
 }
 
-impl<T> Encoder for Never<T>
+impl<O, E> Encoder for Never<O, E>
 where
-    T: Encoder,
+    E: Error,
 {
-    type Ok = T::Ok;
-    type Error = T::Error;
+    type Ok = O;
+    type Error = E;
     type Pack = Self;
     type Some = Self;
     type Sequence = Self;
@@ -232,6 +233,7 @@ where
     type Map = Self;
     type Struct = Self;
     type Variant = Self;
+    type __UseMusliEncoderAttributeMacro = ();
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -239,12 +241,12 @@ where
     }
 }
 
-impl<T> SequenceEncoder for Never<T>
+impl<O, E> SequenceEncoder for Never<O, E>
 where
-    T: Encoder,
+    E: Error,
 {
-    type Ok = T::Ok;
-    type Error = T::Error;
+    type Ok = O;
+    type Error = E;
 
     type Encoder<'this> = Self
     where
@@ -261,12 +263,12 @@ where
     }
 }
 
-impl<T> PairsEncoder for Never<T>
+impl<O, E> PairsEncoder for Never<O, E>
 where
-    T: Encoder,
+    E: Error,
 {
-    type Ok = T::Ok;
-    type Error = T::Error;
+    type Ok = O;
+    type Error = E;
     type Encoder<'this> = Self where Self: 'this;
 
     #[inline]
@@ -279,12 +281,12 @@ where
     }
 }
 
-impl<T> PairEncoder for Never<T>
+impl<O, E> PairEncoder for Never<O, E>
 where
-    T: Encoder,
+    E: Error,
 {
-    type Ok = T::Ok;
-    type Error = T::Error;
+    type Ok = O;
+    type Error = E;
     type First<'this> = Self
     where
         Self: 'this;
@@ -306,12 +308,12 @@ where
     }
 }
 
-impl<T> VariantEncoder for Never<T>
+impl<O, E> VariantEncoder for Never<O, E>
 where
-    T: Encoder,
+    E: Error,
 {
-    type Ok = T::Ok;
-    type Error = T::Error;
+    type Ok = O;
+    type Error = E;
     type Tag<'this> = Self
     where
         Self: 'this;

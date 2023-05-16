@@ -10,7 +10,6 @@ use musli::de::{
     Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
-use musli::never::Never;
 use musli_common::int::{IntegerEncoding, UsizeEncoding};
 use musli_common::reader::PosReader;
 
@@ -53,6 +52,7 @@ where
     decoder: StorageDecoder<R, I, L>,
 }
 
+#[musli::decoder]
 impl<'de, R, I, L> Decoder<'de> for StorageDecoder<R, I, L>
 where
     R: PosReader<'de>,
@@ -60,7 +60,6 @@ where
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Buffer = Never<R::Error>;
     type Pack = Self;
     type Some = Self;
     type Sequence = LimitedStorageDecoder<R, I, L>;

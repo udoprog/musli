@@ -6,8 +6,6 @@ use alloc::vec::Vec;
 use musli::en::Encoder;
 #[cfg(feature = "alloc")]
 use musli::en::{PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
-#[cfg(not(feature = "alloc"))]
-use musli::never::Never;
 
 use crate::error::ValueError;
 use crate::value::{Number, Value};
@@ -60,6 +58,7 @@ impl<O> ValueEncoder<O> {
     }
 }
 
+#[musli::encoder]
 impl<O> Encoder for ValueEncoder<O>
 where
     O: ValueOutput,
@@ -68,32 +67,18 @@ where
     type Error = ValueError;
     #[cfg(feature = "alloc")]
     type Some = ValueEncoder<SomeValueWriter<O>>;
-    #[cfg(not(feature = "alloc"))]
-    type Some = Never<Self>;
     #[cfg(feature = "alloc")]
     type Pack = SequenceValueEncoder<O>;
-    #[cfg(not(feature = "alloc"))]
-    type Pack = Never<Self>;
     #[cfg(feature = "alloc")]
     type Sequence = SequenceValueEncoder<O>;
-    #[cfg(not(feature = "alloc"))]
-    type Sequence = Never<Self>;
     #[cfg(feature = "alloc")]
     type Tuple = SequenceValueEncoder<O>;
-    #[cfg(not(feature = "alloc"))]
-    type Tuple = Never<Self>;
     #[cfg(feature = "alloc")]
     type Map = MapValueEncoder<O>;
-    #[cfg(not(feature = "alloc"))]
-    type Map = Never<Self>;
     #[cfg(feature = "alloc")]
     type Struct = MapValueEncoder<O>;
-    #[cfg(not(feature = "alloc"))]
-    type Struct = Never<Self>;
     #[cfg(feature = "alloc")]
     type Variant = VariantValueEncoder<O>;
-    #[cfg(not(feature = "alloc"))]
-    type Variant = Never<Self>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

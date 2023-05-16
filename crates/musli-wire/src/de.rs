@@ -13,7 +13,6 @@ use musli::de::{
     Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::error::Error;
-use musli::never::Never;
 use musli_common::reader::{Limit, PosReader};
 use musli_storage::de::StorageDecoder;
 use musli_storage::int::{continuation as c, Variable};
@@ -156,6 +155,7 @@ where
     decoder: WireDecoder<R, I, L>,
 }
 
+#[musli::decoder]
 impl<'de, R, I, L> Decoder<'de> for WireDecoder<R, I, L>
 where
     R: PosReader<'de>,
@@ -163,7 +163,6 @@ where
     L: WireUsizeEncoding,
 {
     type Error = R::Error;
-    type Buffer = Never<R::Error>;
     type Pack = WireDecoder<Limit<R>, I, L>;
     type Some = Self;
     type Sequence = RemainingWireDecoder<R, I, L>;

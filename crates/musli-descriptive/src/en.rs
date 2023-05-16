@@ -48,6 +48,7 @@ where
     }
 }
 
+#[musli::encoder]
 impl<W, const P: usize> Encoder for SelfEncoder<W, P>
 where
     W: Writer,

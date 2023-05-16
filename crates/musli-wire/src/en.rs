@@ -62,6 +62,7 @@ where
     }
 }
 
+#[musli::encoder]
 impl<W, I, L, const P: usize> Encoder for WireEncoder<W, I, L, P>
 where
     W: Writer,

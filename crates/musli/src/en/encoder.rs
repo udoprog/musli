@@ -177,6 +177,12 @@ pub trait Encoder: Sized {
     /// Encoder for a struct variant.
     type Variant: VariantEncoder<Ok = Self::Ok, Error = Self::Error>;
 
+    /// This is a type argument used to hint to any future implementor that they
+    /// should be using the [`#[musli::encoder]`][crate::encoder] attribute
+    /// macro when implementing [`Encoder`].
+    #[doc(hidden)]
+    type __UseMusliEncoderAttributeMacro;
+
     /// An expectation error. Every other implementation defers to this to
     /// report that something unexpected happened.
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;

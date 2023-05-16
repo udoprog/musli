@@ -300,6 +300,7 @@ mod expecting;
 mod impls;
 mod internal;
 pub mod mode;
+#[doc(hidden)]
 pub mod never;
 #[cfg(not(feature = "alloc"))]
 mod no_std;
@@ -311,3 +312,77 @@ pub mod utils;
 pub use self::de::{Decode, Decoder};
 pub use self::en::{Encode, Encoder};
 pub use self::mode::Mode;
+
+/// This is an attribute macro that must be used when implementing a
+/// [`Encoder`].
+///
+/// It is required to use because a [`Encoder`] implementation might introduce
+/// new associated types in the future, and this [not yet supported] on a
+/// language level in Rust. So this attribute macro polyfills any missing types
+/// automatically.
+///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::en::Encoder;
+///
+/// struct MyEncoder<'a> {
+///     value: &'a mut Option<u32>,
+/// }
+///
+/// #[musli::encoder]
+/// impl Encoder for MyEncoder<'_> {
+///     type Ok = ();
+///     type Error = String;
+///
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(f, "32-bit unsigned integers")
+///     }
+///
+///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
+///         *self.value = Some(value);
+///         Ok(())
+///     }
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_macros::encoder;
+
+/// This is an attribute macro that must be used when implementing a
+/// [`Decoder`].
+///
+/// It is required to use because a [`Decoder`] implementation might introduce
+/// new associated types in the future, and this is [not yet supported] on a
+/// language level in Rust. So this attribute macro polyfills any missing types
+/// automatically.
+///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::de::Decoder;
+///
+/// struct MyDecoder;
+///
+/// #[musli::decoder]
+/// impl Decoder<'_> for MyDecoder {
+///     type Error = String;
+///
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(f, "32-bit unsigned integers")
+///     }
+///
+///     fn decode_u32(self) -> Result<u32, Self::Error> {
+///         Ok(42)
+///     }
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_macros::decoder;

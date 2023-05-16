@@ -16,6 +16,7 @@ mod de;
 mod en;
 mod expander;
 mod internals;
+mod types;
 
 /// Please refer to the main [musli documentation](https://docs.rs/musli).
 #[proc_macro_derive(Encode, attributes(musli))]
@@ -58,6 +59,52 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
             tokens.into()
         }
         Err(()) => to_compile_errors(expander.into_errors()).into(),
+    }
+}
+
+#[proc_macro_attribute]
+pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attr = proc_macro2::TokenStream::from(attr);
+
+    if !attr.is_empty() {
+        return syn::Error::new_spanned(attr, "Arguments not supported")
+            .to_compile_error()
+            .into();
+    }
+
+    let input = syn::parse_macro_input!(input as types::Types);
+
+    match input.expand(
+        "decoder",
+        &types::DECODER_TYPES,
+        ["Error"],
+        "__UseMusliDecoderAttributeMacro",
+    ) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+#[proc_macro_attribute]
+pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attr = proc_macro2::TokenStream::from(attr);
+
+    if !attr.is_empty() {
+        return syn::Error::new_spanned(attr, "Arguments not supported")
+            .to_compile_error()
+            .into();
+    }
+
+    let input = syn::parse_macro_input!(input as types::Types);
+
+    match input.expand(
+        "encoder",
+        &types::ENCODER_TYPES,
+        ["Ok", "Error"],
+        "__UseMusliEncoderAttributeMacro",
+    ) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
     }
 }
 
