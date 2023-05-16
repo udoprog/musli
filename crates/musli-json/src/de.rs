@@ -347,6 +347,8 @@ where
     where
         V: Visitor<'de, Error = Self::Error>,
     {
+        self.parser.skip_whitespace()?;
+
         match self.parser.peek()? {
             Token::OpenBrace => {
                 visitor.visit_map(JsonObjectDecoder::new(self.scratch, None, self.parser)?)
@@ -356,9 +358,18 @@ where
             }
             Token::String => self.decode_string(visitor.visit_string(SizeHint::Any)?),
             Token::Number => self.decode_number(visitor.visit_number(NumberHint::Any)?),
-            Token::Null => visitor.visit_unit(),
-            Token::True => visitor.visit_bool(true),
-            Token::False => visitor.visit_bool(false),
+            Token::Null => {
+                self.parse_null()?;
+                visitor.visit_unit()
+            }
+            Token::True => {
+                self.parse_true()?;
+                visitor.visit_bool(true)
+            }
+            Token::False => {
+                self.parse_false()?;
+                visitor.visit_bool(false)
+            }
             _ => visitor.visit_any(self, TypeHint::Any),
         }
     }
@@ -639,8 +650,10 @@ where
                     self.parser.skip(1)?;
                     return Ok(None);
                 }
-                _ => {
-                    return Err(Self::Error::message("expected value, or closing brace `}`"));
+                token => {
+                    return Err(Self::Error::message(format_args!(
+                        "expected value, or closing brace `}}` {token:?}"
+                    )));
                 }
             }
         }
@@ -732,8 +745,6 @@ where
         len: Option<usize>,
         mut parser: P,
     ) -> Result<Self, ParseError> {
-        parser.skip_whitespace()?;
-
         let actual = parser.peek()?;
 
         if !matches!(actual, Token::OpenBracket) {
@@ -814,6 +825,7 @@ where
                 ));
             }
 
+            self.parser.skip(1)?;
             self.terminated = true;
         }
 
@@ -875,6 +887,7 @@ where
                 ));
             }
 
+            self.parser.skip(1)?;
             self.terminated = true;
         }
 

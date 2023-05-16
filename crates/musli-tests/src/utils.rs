@@ -320,7 +320,7 @@ pub mod rkyv {
         T: Serialize<AllocSerializer<0>>,
     {
         let mut serializer = AllocSerializer::<0>::default();
-        serializer.serialize_value(&*value).unwrap();
+        serializer.serialize_value(value).unwrap();
         serializer.into_serializer().into_inner()
     }
 

@@ -167,7 +167,7 @@ where
     type Pack = WireDecoder<Limit<R>, I, L>;
     type Some = Self;
     type Sequence = RemainingWireDecoder<R, I, L>;
-    type Tuple = Self;
+    type Tuple = TupleWireDecoder<R, I, L>;
     type Map = RemainingWireDecoder<R, I, L>;
     type Struct = RemainingWireDecoder<R, I, L>;
     type Variant = Self;
@@ -409,7 +409,7 @@ where
             )));
         }
 
-        Ok(self)
+        Ok(TupleWireDecoder::new(self.reader, len))
     }
 
     #[inline]
@@ -674,5 +674,64 @@ impl fmt::Display for BadLength {
             f,
             "Bad length, got {actual} but expect {expected} (at {pos})"
         )
+    }
+}
+
+/// A tuple wire decoder.
+pub struct TupleWireDecoder<R, I, L>
+where
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
+{
+    reader: R,
+    remaining: usize,
+    _marker: marker::PhantomData<(I, L)>,
+}
+
+impl<R, I, L> TupleWireDecoder<R, I, L>
+where
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
+{
+    /// Construct a new fixed width message encoder.
+    #[inline]
+    pub(crate) fn new(reader: R, remaining: usize) -> Self {
+        Self {
+            reader,
+            remaining,
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<'de, R, I, L> PackDecoder<'de> for TupleWireDecoder<R, I, L>
+where
+    R: PosReader<'de>,
+    I: WireIntegerEncoding,
+    L: WireUsizeEncoding,
+{
+    type Error = R::Error;
+    type Decoder<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+
+    #[inline]
+    fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+        if self.remaining == 0 {
+            return Err(Self::Error::message(format_args!(
+                "No more tuple elements to decode"
+            )));
+        }
+
+        self.remaining -= 1;
+        Ok(WireDecoder::new(self.reader.pos_borrow_mut()))
+    }
+
+    #[inline]
+    fn end(mut self) -> Result<(), Self::Error> {
+        while self.remaining > 0 {
+            WireDecoder::<_, I, L>::new(self.reader.pos_borrow_mut()).skip_any()?;
+            self.remaining -= 1;
+        }
+
+        Ok(())
     }
 }

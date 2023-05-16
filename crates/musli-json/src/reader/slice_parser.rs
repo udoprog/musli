@@ -77,12 +77,10 @@ impl<'de> Parser<'de> for SliceParser<'de> {
 
     #[inline]
     fn skip_whitespace(&mut self) -> Result<(), ParseError> {
-        while self
-            .slice
-            .get(self.index)
-            .map(u8::is_ascii_whitespace)
-            .unwrap_or_default()
-        {
+        while matches!(
+            self.slice.get(self.index),
+            Some(b' ' | b'\n' | b'\t' | b'\r')
+        ) {
             self.index += 1;
         }
 

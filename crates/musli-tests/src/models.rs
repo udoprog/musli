@@ -2,7 +2,7 @@
 
 use core::ops::Range;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(any(feature = "rkyv", feature = "dlhn"))))]
 use std::collections::HashMap;
 
 use alloc::string::String;
@@ -123,8 +123,9 @@ pub struct LargeStruct {
     medium: Vec<MediumEnum>,
     #[cfg(all(feature = "std", not(feature = "rkyv")))]
     string_keys: HashMap<String, u64>,
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "dlhn")))]
     number_keys: HashMap<u32, u64>,
+    number_vec: Vec<(u32, u64)>,
 }
 
 #[cfg(feature = "rkyv")]
@@ -225,7 +226,7 @@ pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
 
             map
         },
-        #[cfg(feature = "std")]
+        #[cfg(all(feature = "std", not(feature = "dlhn")))]
         number_keys: {
             let mut map = HashMap::new();
 
@@ -234,6 +235,15 @@ pub fn generate_large_struct(rng: &mut StdRng) -> LargeStruct {
             }
 
             map
+        },
+        number_vec: {
+            let mut vec = Vec::new();
+
+            for _ in 0..rng.gen_range(MAP_RANGE) {
+                vec.push((rng.gen(), rng.gen()));
+            }
+
+            vec
         },
     }
 }

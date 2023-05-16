@@ -238,7 +238,7 @@ where
     }
 
     #[inline]
-    fn encode_tuple(mut self, len: usize) -> Result<Self::Sequence, Self::Error> {
+    fn encode_tuple(mut self, len: usize) -> Result<Self::Tuple, Self::Error> {
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(tag.byte())?;
 
