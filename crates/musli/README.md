@@ -41,8 +41,8 @@ Another major aspect where Müsli differs is in the concept of
 Add the following to your `Cargo.toml`:
 
 ```toml
-musli = "0.0.42"
-musli-wire = "0.0.42"
+musli = "0.0.43"
+musli-wire = "0.0.43"
 ```
 
 <br>
