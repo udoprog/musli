@@ -14,11 +14,13 @@ use crate::mode::Mode;
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
 /// In contrast to the typical values that are encoded as sequences such as
-/// [Vec], this can take a sequence by reference.
+/// [`Vec`], this can take a sequence by reference.
 ///
 /// We must use a wrapper like this, because we can't provide an implementation
 /// for `&[T]` since it would conflict with `&[u8]` which is specialized to
 /// encode and decode as a byte array.
+///
+/// [`Vec`]: std::vec::Vec
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct Sequence<T>(pub T);
@@ -81,11 +83,14 @@ where
 /// Ensures that the given value `T` is encoded as bytes.
 ///
 /// This is useful for values which have a generic implementation to be encoded
-/// as a sequence, such as [Vec] and [VecDeque][std::collections::VecDeque].
+/// as a sequence, such as [`Vec`] and [`VecDeque`].
 ///
 /// We must use a wrapper like this, because we can't provide an implementation
 /// for `Vec<T>` since it would conflict with `Vec<u8>` which is generalized to
 /// encode as a sequence.
+///
+/// [`Vec`]: std::vec::Vec
+/// [`VecDeque`]: std::collections::VecDeque
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct Bytes<T>(pub T);

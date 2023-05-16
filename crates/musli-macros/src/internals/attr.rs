@@ -13,6 +13,19 @@ use crate::expander::TagMethod;
 use crate::internals::symbol::*;
 use crate::internals::{Ctxt, Mode, ModePath};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum Only {
+    Encode,
+    Decode,
+}
+
+#[derive(Default)]
+struct OneOf<T> {
+    encode: T,
+    decode: T,
+    any: T,
+}
+
 /// The value and method to encode / decode a tag.
 #[derive(Clone, Copy)]
 pub(crate) struct EnumTag<'a> {
@@ -57,9 +70,15 @@ impl fmt::Display for Packing {
 }
 
 macro_rules! merge {
-    ($self:expr, $cx:expr, $new:expr, $field:ident) => {{
+    ($self:expr, $cx:expr, $new:expr, $field:ident, $only:expr) => {{
         for $field in $new.$field {
-            if $self.$field.is_some() {
+            let out = match $only {
+                None => &mut $self.$field.any,
+                Some(Only::Decode) => &mut $self.$field.decode,
+                Some(Only::Encode) => &mut $self.$field.encode,
+            };
+
+            if out.is_some() {
                 $cx.error_span(
                     $field.0,
                     format_args!(
@@ -69,7 +88,7 @@ macro_rules! merge {
                     ),
                 );
             } else {
-                $self.$field = Some($field);
+                *out = Some($field);
             }
         }
     }};
@@ -103,14 +122,27 @@ macro_rules! layer {
             $(
                 #[allow(unused)]
                 pub(crate) fn $single(&self, mode: Mode<'_>) -> Option<&(Span, $single_ty)> {
-                    self.by_mode(mode, |m| m.$single.as_ref())
+                    self.by_mode(mode, |m| {
+                        match mode.only {
+                            Only::Encode if m.$single.encode.is_some() => m.$single.encode.as_ref(),
+                            Only::Decode if m.$single.decode.is_some() => m.$single.decode.as_ref(),
+                            _ => m.$single.any.as_ref(),
+                        }
+                    })
                 }
             )*
 
             $(
                 #[allow(unused)]
                 pub(crate) fn $multiple(&self, mode: Mode<'_>) -> &[(Span, $multiple_ty)] {
-                    self.by_mode(mode, |m| (!m.$multiple.is_empty()).then_some(&m.$multiple[..])).unwrap_or_default()
+                    self.by_mode(mode, |m| {
+                        match mode.only {
+                            Only::Encode if !m.$multiple.encode.is_empty() => Some(&m.$multiple.encode[..]),
+                            Only::Decode if !m.$multiple.decode.is_empty() => Some(&m.$multiple.decode[..]),
+                            _ if !m.$multiple.any.is_empty() => Some(&m.$multiple.any[..]),
+                            _ => None,
+                        }
+                    }).unwrap_or_default()
                 }
             )*
         }
@@ -123,15 +155,32 @@ macro_rules! layer {
 
         #[derive(Default)]
         struct $layer {
-            $($(#[$($single_meta)*])* $single: Option<(Span, $single_ty)>,)*
-            $($(#[$($multiple_meta)*])* $multiple: Vec<(Span, $multiple_ty)>,)*
+            $($(#[$($single_meta)*])* $single: OneOf<Option<(Span, $single_ty)>>,)*
+            $($(#[$($multiple_meta)*])* $multiple: OneOf<Vec<(Span, $multiple_ty)>>,)*
         }
 
         impl $layer {
             /// Merge attributes.
-            fn merge_with(&mut self, cx: &Ctxt, new: $new) {
-                $(merge!(self, cx, new, $single);)*
-                $(self.$multiple.extend(new.$multiple);)*
+            fn merge_with(&mut self, cx: &Ctxt, new: $new, only: Option<Only>) {
+                $(
+                    merge!(self, cx, new, $single, only);
+                )*
+
+                $(
+                    let list = match only {
+                        None => {
+                            &mut self.$multiple.any
+                        }
+                        Some(Only::Encode) => {
+                            &mut self.$multiple.encode
+                        }
+                        Some(Only::Decode) => {
+                            &mut self.$multiple.decode
+                        }
+                    };
+
+                    list.extend(new.$multiple);
+                )*
             }
         }
     }
@@ -186,7 +235,7 @@ impl TypeAttr {
 
     /// Get the configured crate, or fallback to default.
     pub(crate) fn crate_or_default(&self) -> syn::Path {
-        if let Some((_, krate)) = &self.root.krate {
+        if let Some((_, krate)) = self.root.krate.any.as_ref() {
             krate.clone()
         } else {
             syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()))
@@ -204,12 +253,23 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
         let mut new = TypeLayerNew::default();
         let mut mode = None::<syn::Path>;
+        let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
             // parse #[musli(mode = <path>)]
             if meta.path == MODE {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
+                return Ok(());
+            }
+
+            if meta.path == ENCODE_ONLY {
+                only = Some(Only::Encode);
+                return Ok(());
+            }
+
+            if meta.path == DECODE_ONLY {
+                only = Some(Only::Decode);
                 return Ok(());
             }
 
@@ -324,7 +384,7 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
             None => &mut attr.root,
         };
 
-        attr.merge_with(cx, new);
+        attr.merge_with(cx, new, only);
     }
 
     attr
@@ -364,8 +424,7 @@ layer! {
 impl VariantAttr {
     /// Test if the `#[musli(default)]` tag is specified.
     pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
-        self.by_mode(mode, |m| m.default_field.as_ref())
-            .map(|&(s, ())| s)
+        self.default_field(mode).map(|&(s, ())| s)
     }
 }
 
@@ -380,12 +439,23 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
         let mut new = VariantLayerNew::default();
         let mut mode = None::<syn::Path>;
+        let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
             // parse #[musli(mode = <path>)]
             if meta.path == MODE {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
+                return Ok(());
+            }
+
+            if meta.path == ENCODE_ONLY {
+                only = Some(Only::Encode);
+                return Ok(());
+            }
+
+            if meta.path == DECODE_ONLY {
+                only = Some(Only::Decode);
                 return Ok(());
             }
 
@@ -458,7 +528,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             None => &mut attr.root,
         };
 
-        attr.merge_with(cx, new);
+        attr.merge_with(cx, new, only);
     }
 
     attr
@@ -483,7 +553,7 @@ layer! {
 impl Field {
     /// Expand encode of the given field.
     pub(crate) fn encode_path_expanded(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
-        let encode_path = self.by_mode(mode, |l| l.encode_path.as_ref());
+        let encode_path = self.encode_path(mode);
 
         if let Some((span, encode_path)) = encode_path {
             let mut encode_path = encode_path.clone();
@@ -502,7 +572,7 @@ impl Field {
 
     /// Expand decode of the given field.
     pub(crate) fn decode_path_expanded(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
-        let decode_path = self.by_mode(mode, |l| l.decode_path.as_ref());
+        let decode_path = self.decode_path(mode);
 
         if let Some((span, decode_path)) = decode_path {
             let mut decode_path = decode_path.clone();
@@ -531,12 +601,23 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 
         let mut new = FieldNew::default();
         let mut mode = None::<syn::Path>;
+        let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
             // parse #[musli(mode = <path>)]
             if meta.path == MODE {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
+                return Ok(());
+            }
+
+            if meta.path == ENCODE_ONLY {
+                only = Some(Only::Encode);
+                return Ok(());
+            }
+
+            if meta.path == DECODE_ONLY {
+                only = Some(Only::Decode);
                 return Ok(());
             }
 
@@ -613,7 +694,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
             None => &mut attr.root,
         };
 
-        attr.merge_with(cx, new);
+        attr.merge_with(cx, new, only);
     }
 
     attr

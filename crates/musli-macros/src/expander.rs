@@ -5,8 +5,7 @@ use crate::internals::attr::{self, DefaultTag, TypeAttr};
 use crate::internals::build::Build;
 use crate::internals::symbol::*;
 use crate::internals::tokens::Tokens;
-use crate::internals::Expansion;
-use crate::internals::{Ctxt, Mode};
+use crate::internals::{Ctxt, Expansion, Mode, Only};
 
 pub(crate) type Result<T, E = ()> = std::result::Result<T, E>;
 
@@ -137,6 +136,7 @@ impl<'a> Expander<'a> {
         &'b self,
         modes: &'b [syn::Path],
         mode_ident: &'b syn::Ident,
+        only: Only,
     ) -> Result<Vec<Build<'b>>> {
         let mut builds = Vec::new();
 
@@ -144,16 +144,22 @@ impl<'a> Expander<'a> {
             builds.push(crate::internals::build::setup(
                 self,
                 Expansion::Generic { mode_ident },
+                only,
             )?);
         } else {
             for mode_ident in modes {
                 builds.push(crate::internals::build::setup(
                     self,
                     Expansion::Moded { mode_ident },
+                    only,
                 )?);
             }
 
-            builds.push(crate::internals::build::setup(self, Expansion::Default)?);
+            builds.push(crate::internals::build::setup(
+                self,
+                Expansion::Default,
+                only,
+            )?);
         }
 
         Ok(builds)
@@ -164,7 +170,7 @@ impl<'a> Expander<'a> {
         let modes = self.cx.modes();
         let mode_ident = syn::Ident::new("M", self.type_name.span());
 
-        let builds = self.setup_builds(&modes, &mode_ident)?;
+        let builds = self.setup_builds(&modes, &mode_ident, Only::Encode)?;
 
         let mut out = TokenStream::new();
 
@@ -180,7 +186,7 @@ impl<'a> Expander<'a> {
         let modes = self.cx.modes();
         let mode_ident = syn::Ident::new("M", self.type_name.span());
 
-        let builds = self.setup_builds(&modes, &mode_ident)?;
+        let builds = self.setup_builds(&modes, &mode_ident, Only::Decode)?;
 
         let mut out = TokenStream::new();
 

@@ -1,9 +1,11 @@
 //! Helper for determining the mode we're currently in.
 
-use crate::internals::tokens::Tokens;
 use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::Token;
+
+use crate::internals::tokens::Tokens;
+use crate::internals::Only;
 
 #[derive(Clone, Copy)]
 pub(crate) enum ModePath<'a> {
@@ -25,6 +27,7 @@ pub(crate) struct Mode<'a> {
     pub(crate) ident: Option<&'a syn::Path>,
     pub(crate) mode_path: ModePath<'a>,
     pub(crate) tokens: &'a Tokens,
+    pub(crate) only: Only,
 }
 
 impl<'a> Mode<'a> {

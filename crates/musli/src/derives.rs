@@ -6,10 +6,31 @@
 //! They come with a number of options for customizing their implementation,
 //! detailed below. But first we need to talk about *modes*.
 //!
+//! <br>
+//!
+//! #### Attributes
+//!
+//! * [*Meta attributes*](#meta-attributes) which apply to the attribute itself.
+//!   It is used to filter what scope the current attribute applies to, such as
+//!   only applying to an `Encode` derive using `#[musli(encode_only, ..)]` or a
+//!   specific mode such as `#[musli(mode = Json, ..)]`.
+//!
+//! * [*Container attributes*](#container-attributes) are attributes which apply
+//!   to the `struct` or `enum`.
+//!
+//! * [*Variant attributes*](#variant-attributes) are attributes which apply to
+//!   each individual variant in an `enum`.
+//!
+//! * [*Field attributes*](#field-attributes) are attributes which apply to each
+//!   individual field either in a `struct` or an `enum` variant.
+//!
+//! <br>
+//!
 //! #### Modes
 //!
 //! If you've paid close attention to the [`Encode`] and [`Decode`] traits you
-//! might've noticed that they have an extra parameter called `M` for "mode".
+//! might've noticed that they have an extra parameter called `M` which stands
+//! for "mode".
 //!
 //! This allows a single type to have *more than one* implementation of encoding
 //! traits, allowing for a high level of flexibility in how a type should be
@@ -17,7 +38,7 @@
 //!
 //! When it comes to deriving these traits you can scope attributes to apply to
 //! either any mode, the [default mode], or a completely custom mode. This is
-//! done using the `#[musli(mode = ..)]` attribute like this:
+//! done using the `#[musli(mode = ..)]` meta attribute like this:
 //!
 //! ```
 //! use musli::{Encode, Decode, Mode};
@@ -64,11 +85,90 @@
 //! its sibling attributes will be added to the given *alternative* mode, rather
 //! the [default mode].
 //!
-//! #### Attributes
+//! <br>
 //!
-//! * *Container attributes* are attributes which apply to the `struct` or
-//!   `enum`. Like the uses of `#[musli(packed)]` and
-//!   `#[musli(default_variant_name = "name")]` here:
+//! ## Meta attributes
+//!
+//! Certain attributes affect which other attributes apply to a given context.
+//! These are called *meta* attributes.
+//!
+//! Meta attributes are applicable to any context, and can be used on
+//! containers, variants, and fields.
+//!
+//! <br>
+//!
+//! #### `#[musli(mode = <path>)]`
+//!
+//! The attributes only apply to the given `mode`.
+//!
+//! The `Person` struct below uses string field names when the `Json` mode is
+//! enabled, otherwise it uses default numerical field names.
+//!
+//! ```
+//! use musli::{Encode, Decode, Mode};
+//!
+//! enum Json {}
+//! impl Mode for Json {}
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(default_field_name = "index")]
+//! #[musli(mode = Json, default_field_name = "name")]
+//! struct Person<'a> {
+//!     name: &'a str,
+//!     age: u32,
+//! }
+//! ```
+//!
+//! <br>
+//!
+//! #### `#[musli(encode_only)]`
+//!
+//! The attributes only apply when implementing the `Encode` trait.
+//!
+//! An example where this is useful is if you want to apply `#[musli(packed)]`
+//! in a different mode, but only for encoding, since decoding packed types is
+//! not supported for enums.
+//!
+//! ```
+//! use musli::mode::DefaultMode;
+//! use musli::{Decode, Encode, Mode};
+//!
+//! enum Packed {}
+//! impl Mode for Packed {}
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(mode = Packed, encode_only, packed)]
+//! enum Name<'a> {
+//!     Full(&'a str),
+//!     Given(&'a str),
+//! }
+//! ```
+//!
+//! <br>
+//!
+//! #### `#[musli(decode_only)]`
+//!
+//! The attributes only apply when implementing the `Decode` trait.
+//!
+//! ```
+//! use musli::{Decode, Encode};
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(default_field_name = "name")]
+//! struct Name<'a> {
+//!     sur_name: &'a str,
+//!     #[musli(decode_only, rename = "last")]
+//!     last_name: &'a str,
+//! }
+//! ```
+//!
+//! <br>
+//!
+//! ## Container attributes
+//!
+//! Container attributes apply to the container, such as directly on the
+//! `struct` or `enum`. Like the uses of `#[musli(packed)]` and
+//! `#[musli(default_variant_name = "name")]` here:
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -86,47 +186,7 @@
 //! }
 //! ```
 //!
-//! * *Variant attributes* are attributes which apply to each individual variant
-//!   in an `enum`. Like the use of `#[musli(name)]` here:
-//!
-//! ```
-//! use musli::{Encode, Decode};
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(default_variant_name = "name")]
-//! enum Enum {
-//!     #[musli(rename = "Other")]
-//!     Something {
-//!         /* variant body */
-//!     }
-//! }
-//! ```
-//!
-//! * *Field attributes* are attributes which apply to each individual field
-//!   either in a `struct` or an `enum` variant. Like the uses of
-//!   `#[musli(rename)]` here:
-//!
-//! ```
-//! use musli::{Encode, Decode};
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "name")]
-//! struct Struct {
-//!     #[musli(rename = "other")]
-//!     something: String,
-//! }
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "name")]
-//! enum Enum {
-//!     Variant {
-//!         #[musli(rename = "other")]
-//!         something: String,
-//!     }
-//! }
-//! ```
-//!
-//! ## Container attributes
+//! <br>
 //!
 //! #### `#[musli(default_field_name = "..")]`
 //!
@@ -159,6 +219,8 @@
 //! }
 //! ```
 //!
+//! <br>
+//!
 //! #### `#[musli(default_variant_name = "..")]`
 //!
 //! This determines how the default tag for a variant is determined. It can take
@@ -184,6 +246,8 @@
 //! }
 //! ```
 //!
+//! <br>
+//!
 //! #### `#[musli(transparent)]`
 //!
 //! This can only be used on types which have a single field. It will cause that
@@ -203,6 +267,8 @@
 //! assert_eq!(data.as_slice(), vec![Tag::new(Kind::Continuation, 42).byte()]);
 //! # Ok(()) }
 //! ```
+//!
+//! <br>
 //!
 //! #### `#[musli(packed)]`
 //!
@@ -239,6 +305,8 @@
 //! # Ok(()) }
 //! ```
 //!
+//! <br>
+//!
 //! #### `#[musli(name_type = ..)]`
 //!
 //! This indicates which type any contained `#[musli(tag = ..)]` attributes
@@ -269,6 +337,8 @@
 //! }
 //! ```
 //!
+//! <br>
+//!
 //! #### `#[musli(bound = {..})]` and `#[musli(decode_bound = {..})]`
 //!
 //! These attributes can be used to apply bounds to an [`Encode`] or [`Decode`]
@@ -292,7 +362,11 @@
 //! }
 //! ```
 //!
+//! <br>
+//!
 //! ## Enum attributes
+//!
+//! <br>
 //!
 //! #### `#[musli(tag = ..)]`
 //!
@@ -300,7 +374,27 @@
 //! See [enum representations](#enum-representations) for details on this
 //! representation.
 //!
+//! <br>
+//!
 //! ## Variant attributes
+//!
+//! *Variant attributes* are attributes which apply to each individual variant
+//! in an `enum`. Like the use of `#[musli(name)]` here:
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(default_variant_name = "name")]
+//! enum Enum {
+//!     #[musli(rename = "Other")]
+//!     Something {
+//!         /* variant body */
+//!     }
+//! }
+//! ```
+//!
+//! <br>
 //!
 //! #### `#[musli(rename = ..)]`
 //!
@@ -316,6 +410,8 @@
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through
 //! the `#[musli(name_type)]` container attribute (see above).
+//!
+//! <br>
 //!
 //! #### `#[musli(default_field_name = "..")]`
 //!
@@ -343,11 +439,15 @@
 //! }
 //! ```
 //!
+//! <br>
+//!
 //! #### `#[musli(transparent)]`
 //!
 //! This can only be used on variants which have a single field. It will cause
 //! that field to define how that variant is encoded or decoded transparently
 //! without being treated as a field.
+//!
+//! <br>
 //!
 //! #### `#[musli(name_type = ..)]`
 //!
@@ -376,6 +476,8 @@
 //! }
 //! ```
 //!
+//! <br>
+//!
 //! #### `#[musli(default)]`
 //!
 //! This defines the variant that will be used in case no other variant matches.
@@ -395,7 +497,35 @@
 //! }
 //! ```
 //!
+//! <br>
+//!
 //! ## Field attributes
+//!
+//! *Field attributes* are attributes which apply to each individual field
+//! either in a `struct` or an `enum` variant. Like the uses of
+//! `#[musli(rename)]` here:
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(default_field_name = "name")]
+//! struct Struct {
+//!     #[musli(rename = "other")]
+//!     something: String,
+//! }
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(default_field_name = "name")]
+//! enum Enum {
+//!     Variant {
+//!         #[musli(rename = "other")]
+//!         something: String,
+//!     }
+//! }
+//! ```
+//!
+//! <br>
 //!
 //! #### `#[musli(rename = ..)]`
 //!
@@ -411,6 +541,8 @@
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through
 //! the `#[musli(name_type)]` variant or container attributes (see above).
+//!
+//! <br>
 //!
 //! #### `#[musli(with = <path>)]`
 //!
@@ -520,6 +652,8 @@
 //! # }
 //! ```
 //!
+//! <br>
+//!
 //! #### `#[musli(default)]`
 //!
 //! This constructs the field using [Default::default] in case it's not
@@ -535,6 +669,8 @@
 //!     age: Option<u32>,
 //! }
 //! ```
+//!
+//! <br>
 //!
 //! #### `#[musli(skip_encoding_if = <path>)]`
 //!
@@ -573,6 +709,8 @@
 //! }
 //! ```
 //!
+//! <br>
+//!
 //! ## Externally tagged
 //!
 //! When an enum is externally tagged it is represented by a single field
@@ -588,6 +726,8 @@
 //!
 //! Conceptually this can be considered as a "pair", where the variant tag can
 //! be extracted from the format before the variant is decoded.
+//!
+//! <br>
 //!
 //! ## Internally tagged
 //!

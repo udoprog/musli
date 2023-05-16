@@ -8,6 +8,8 @@ pub struct Symbol(&'static str);
 pub const ATTR: Symbol = Symbol("musli");
 pub const BOUND: Symbol = Symbol("bound");
 pub const DECODE_BOUND: Symbol = Symbol("decode_bound");
+pub const DECODE_ONLY: Symbol = Symbol("decode_only");
+pub const ENCODE_ONLY: Symbol = Symbol("encode_only");
 pub const CONTENT: Symbol = Symbol("content");
 pub const CRATE: Symbol = Symbol("crate");
 pub const DEFAULT_FIELD_NAME: Symbol = Symbol("default_field_name");

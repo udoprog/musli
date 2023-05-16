@@ -4,17 +4,14 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
 use syn::Token;
 
+use crate::expander::Taggable;
 use crate::expander::{
     Data, EnumData, Expander, FieldData, Result, StructData, TagMethod, VariantData,
 };
 use crate::internals::attr::{DefaultTag, EnumTagging, Packing};
+use crate::internals::symbol::*;
 use crate::internals::tokens::Tokens;
-use crate::internals::Expansion;
-use crate::internals::{symbol::*, ModePath};
-use crate::{
-    expander::Taggable,
-    internals::{Ctxt, Mode},
-};
+use crate::internals::{Ctxt, Expansion, Mode, ModePath, Only};
 
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
@@ -173,8 +170,12 @@ pub(crate) struct FieldBuild<'a> {
 /// Setup a build.
 ///
 /// Handles mode decoding, and construction of parameters which might give rise to errors.
-pub(crate) fn setup<'a>(e: &'a Expander, expansion: Expansion<'a>) -> Result<Build<'a>> {
-    let mode = expansion.as_mode(&e.tokens);
+pub(crate) fn setup<'a>(
+    e: &'a Expander,
+    expansion: Expansion<'a>,
+    only: Only,
+) -> Result<Build<'a>> {
+    let mode = expansion.as_mode(&e.tokens, only);
 
     let data = match &e.data {
         Data::Struct(data) => BuildData::Struct(setup_struct(e, mode, data)?),
