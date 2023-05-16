@@ -69,6 +69,7 @@ fn generate_large_struct() -> BigStruct {
     }
 }
 
+#[cfg(feature = "bincode")]
 #[inline(never)]
 fn encode_bincode<T>(expected: &T) -> Vec<u8>
 where
@@ -77,6 +78,7 @@ where
     bincode::serialize(expected).unwrap()
 }
 
+#[cfg(feature = "bincode")]
 #[inline(never)]
 fn decode_bincode<'de, T>(data: &'de [u8]) -> T
 where
@@ -127,6 +129,7 @@ fn main() {
     let large_struct = generate_large_struct();
 
     match it.next().as_deref() {
+        #[cfg(feature = "bincode")]
         Some("bincode") => {
             println!("bincode");
             test!(large_struct, encode_bincode, decode_bincode, 1_000_000);

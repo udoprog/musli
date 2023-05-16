@@ -15,10 +15,12 @@ use serde::{Deserialize, Serialize};
 use crate::mode::Packed;
 
 macro_rules! ranges {
-    ($(const $ident:ident: Range<usize> = $range:expr, $miri:expr;)*) => {
+    ($($(#[$($meta:meta)*])* const $ident:ident: Range<usize> = $range:expr, $miri:expr;)*) => {
         $(
+            $(#[$($meta)*])*
             #[cfg(miri)]
             const $ident: Range<usize> = $miri;
+            $(#[$($meta)*])*
             #[cfg(not(miri))]
             const $ident: Range<usize> = $range;
         )*

@@ -26,17 +26,51 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     macro_rules! it {
         ($b:expr, $base:ident) => {
+            $b.iter(|| utils::$base::encode(&primitives_struct))
+        };
+    }
+
+    group!("enc-prim", it);
+
+    macro_rules! it {
+        ($b:expr, $base:ident) => {{
+            let data = utils::$base::encode(&primitives_struct);
+            $b.iter(|| utils::$base::decode::<Primitives>(&data))
+        }};
+    }
+
+    group!("dec-prim", it);
+
+    macro_rules! it {
+        ($b:expr, $base:ident) => {
             $b.iter(|| {
                 let out = utils::$base::encode(&primitives_struct);
                 let actual = utils::$base::decode::<Primitives>(&out);
-                debug_assert_ne!(actual, primitives_struct);
+                debug_assert_eq!(actual, primitives_struct);
                 criterion::black_box(actual);
                 out
             })
         };
     }
 
-    group!("roundtrip-primitives", it);
+    group!("rt-prim", it);
+
+    macro_rules! it {
+        ($b:expr, $base:ident) => {
+            $b.iter(|| utils::$base::encode(&large_struct))
+        };
+    }
+
+    group!("enc-lg", it);
+
+    macro_rules! it {
+        ($b:expr, $base:ident) => {{
+            let data = utils::$base::encode(&large_struct);
+            $b.iter(|| utils::$base::decode::<LargeStruct>(&data))
+        }};
+    }
+
+    group!("dec-lg", it);
 
     macro_rules! it {
         ($b:expr, $base:ident) => {
@@ -50,49 +84,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         };
     }
 
-    group!("roundtrip-large", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {
-            $b.iter(|| utils::$base::encode(&primitives_struct))
-        };
-    }
-
-    group!("encode-primitives", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {
-            $b.iter(|| utils::$base::encode(&primitives_struct))
-        };
-    }
-
-    group!("encode-primitives", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {
-            $b.iter(|| utils::$base::encode(&large_struct))
-        };
-    }
-
-    group!("encode-large", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {{
-            let data = utils::$base::encode(&primitives_struct);
-            $b.iter(|| utils::$base::decode::<Primitives>(&data))
-        }};
-    }
-
-    group!("decode-primitives", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {{
-            let data = utils::$base::encode(&large_struct);
-            $b.iter(|| utils::$base::decode::<LargeStruct>(&data))
-        }};
-    }
-
-    group!("decode-large", it);
+    group!("rt-lg", it);
 }
 
 criterion_group!(benches, criterion_benchmark);
