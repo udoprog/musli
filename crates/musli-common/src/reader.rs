@@ -189,6 +189,18 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        if self.len() < buf.len() {
+            return Err(BufferError::custom("buffer underflow"));
+        }
+
+        let (head, tail) = self.split_at(buf.len());
+        buf.copy_from_slice(head);
+        *self = tail;
+        Ok(())
+    }
+
+    #[inline]
     fn read_bytes<V>(&mut self, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
@@ -203,20 +215,32 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
-        Ok(self.first().copied())
+    fn read_byte(&mut self) -> Result<u8, Self::Error> {
+        let &[first, ref tail @ ..] = *self else {
+            return Err(BufferError::custom("buffer underflow"));
+        };
+
+        *self = tail;
+        Ok(first)
     }
 
     #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        if self.len() < buf.len() {
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
+        if self.len() < N {
             return Err(BufferError::custom("buffer underflow"));
         }
 
-        let (head, tail) = self.split_at(buf.len());
-        buf.copy_from_slice(head);
+        let (head, tail) = self.split_at(N);
         *self = tail;
-        Ok(())
+
+        Ok(std::array::from_fn(|n| {
+            head[n]
+        }))
+    }
+
+    #[inline]
+    fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
+        Ok(self.first().copied())
     }
 }
 

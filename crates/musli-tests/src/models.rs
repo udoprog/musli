@@ -2,7 +2,7 @@
 
 use core::ops::Range;
 
-#[cfg(all(feature = "std", not(any(feature = "rkyv", feature = "dlhn"))))]
+#[cfg(feature = "std")]
 use std::collections::HashMap;
 
 use alloc::string::String;

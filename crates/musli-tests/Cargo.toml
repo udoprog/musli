@@ -5,10 +5,12 @@ edition = "2021"
 publish = false
 
 [features]
-default = ["std", "musli-wire", "musli-descriptive", "musli-storage", "musli-json", "musli-value"]
+default = ["std", "simdutf8", "musli"]
 extra = ["rmp-serde", "bincode", "serde_json", "serde_cbor", "bitcode"]
+musli = ["musli-wire", "musli-descriptive", "musli-storage", "musli-json", "musli-value"]
 std = ["musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std", "rkyv?/std"]
 test = ["musli-wire", "musli-storage", "musli-descriptive"]
+simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptive?/simdutf8"]
 
 [dependencies]
 musli = { path = "../musli", default-features = false, features = ["alloc"] }
