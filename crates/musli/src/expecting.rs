@@ -73,7 +73,7 @@ pub(crate) fn bad_visitor_type<'a>(
     format_fn(move |f| {
         write! {
             f,
-            "bad reference type: got: {actual}, expected: {expected}",
+            "bad reference type {actual}, expected {expected}",
         }
     })
 }

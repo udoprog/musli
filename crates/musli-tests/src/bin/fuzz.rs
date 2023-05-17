@@ -76,7 +76,7 @@ fn main() -> Result<()> {
                     let step = iter / 10;
 
                     for n in 0..iter {
-                        if n % step == 0 {
+                        if step == 0 || n % step == 0 {
                             write!(o, ".")?;
                             o.flush()?;
                         }

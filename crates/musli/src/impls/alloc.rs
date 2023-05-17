@@ -42,8 +42,6 @@ where
     where
         D: Decoder<'de>,
     {
-        return decoder.decode_string(Visitor(marker::PhantomData));
-
         struct Visitor<E>(marker::PhantomData<E>);
 
         impl<'de, E> ValueVisitor<'de> for Visitor<E>
@@ -74,6 +72,8 @@ where
                 Ok(string.to_owned())
             }
         }
+
+        decoder.decode_string(Visitor(marker::PhantomData))
     }
 }
 
@@ -103,61 +103,85 @@ where
     }
 }
 
-impl<M> Encode<M> for Cow<'_, str>
-where
-    M: Mode,
-{
-    #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-    where
-        E: Encoder,
-    {
-        Encode::<M>::encode(self.as_ref(), encoder)
-    }
-}
-
-impl<'de, M> Decode<'de, M> for Cow<'de, str>
-where
-    M: Mode,
-{
-    #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    where
-        D: Decoder<'de>,
-    {
-        return decoder.decode_string(Visitor(marker::PhantomData));
-
-        struct Visitor<E>(marker::PhantomData<E>);
-
-        impl<'de, E> ValueVisitor<'de> for Visitor<E>
+macro_rules! cow {
+    ($ty:ty, $source:ty, $decode:ident, |$owned:ident| $owned_expr:expr, |$borrowed:ident| $borrowed_expr:expr, |$reference:ident| $reference_expr:expr) => {
+        impl<M> Encode<M> for Cow<'_, $ty>
         where
-            E: Error,
+            M: Mode,
         {
-            type Target = str;
-            type Ok = Cow<'de, str>;
-            type Error = E;
-
             #[inline]
-            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "string")
-            }
-
-            #[inline]
-            fn visit_owned(self, string: String) -> Result<Self::Ok, Self::Error> {
-                Ok(Cow::Owned(string))
-            }
-
-            #[inline]
-            fn visit_borrowed(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
-                Ok(Cow::Borrowed(string))
-            }
-
-            #[inline]
-            fn visit_ref(self, string: &str) -> Result<Self::Ok, Self::Error> {
-                Ok(Cow::Owned(string.to_owned()))
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            where
+                E: Encoder,
+            {
+                Encode::<M>::encode(self.as_ref(), encoder)
             }
         }
-    }
+
+        impl<'de, M> Decode<'de, M> for Cow<'de, $ty>
+        where
+            M: Mode,
+        {
+            #[inline]
+            fn decode<D>(decoder: D) -> Result<Self, D::Error>
+            where
+                D: Decoder<'de>,
+            {
+                struct Visitor<E>(marker::PhantomData<E>);
+
+                impl<'de, E> ValueVisitor<'de> for Visitor<E>
+                where
+                    E: Error,
+                {
+                    type Target = $source;
+                    type Ok = Cow<'de, $ty>;
+                    type Error = E;
+
+                    #[inline]
+                    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                        write!(f, "string")
+                    }
+
+                    #[inline]
+                    fn visit_owned(
+                        self,
+                        $owned: <$source as ToOwned>::Owned,
+                    ) -> Result<Self::Ok, Self::Error> {
+                        Ok($owned_expr)
+                    }
+
+                    #[inline]
+                    fn visit_borrowed(
+                        self,
+                        $borrowed: &'de $source,
+                    ) -> Result<Self::Ok, Self::Error> {
+                        Ok($borrowed_expr)
+                    }
+
+                    #[inline]
+                    fn visit_ref(self, $reference: &$source) -> Result<Self::Ok, Self::Error> {
+                        Ok($reference_expr)
+                    }
+                }
+
+                decoder.$decode(Visitor(marker::PhantomData))
+            }
+        }
+    };
+}
+
+cow! {
+    str, str, decode_string,
+    |owned| Cow::Owned(owned),
+    |borrowed| Cow::Borrowed(borrowed),
+    |reference| Cow::Owned(reference.to_owned())
+}
+
+cow! {
+    CStr, [u8], decode_bytes,
+    |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(E::custom)?),
+    |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(E::custom)?),
+    |reference| Cow::Owned(CStr::from_bytes_with_nul(reference).map_err(E::custom)?.to_owned())
 }
 
 macro_rules! sequence {
@@ -329,6 +353,39 @@ where
     where
         D: Decoder<'de>,
     {
-        Ok(<&CStr as Decode<M>>::decode(decoder)?.to_owned())
+        struct Visitor<E>(marker::PhantomData<E>);
+
+        impl<'de, E> ValueVisitor<'de> for Visitor<E>
+        where
+            E: Error,
+        {
+            type Target = [u8];
+            type Ok = CString;
+            type Error = E;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "a cstring")
+            }
+
+            #[inline]
+            fn visit_owned(self, value: Vec<u8>) -> Result<Self::Ok, Self::Error> {
+                CString::from_vec_with_nul(value).map_err(E::custom)
+            }
+
+            #[inline]
+            fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+                self.visit_ref(bytes)
+            }
+
+            #[inline]
+            fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+                Ok(CStr::from_bytes_with_nul(bytes)
+                    .map_err(E::custom)?
+                    .to_owned())
+            }
+        }
+
+        decoder.decode_bytes(Visitor(marker::PhantomData))
     }
 }
