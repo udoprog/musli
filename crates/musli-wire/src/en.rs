@@ -10,23 +10,25 @@ use musli_storage::en::StorageEncoder;
 use musli_storage::int::Variable;
 
 /// A very simple encoder.
-pub struct WireEncoder<W, I, L, const P: usize>
+pub struct WireEncoder<'a, W, I, L, const P: usize>
 where
+    W: ?Sized,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    writer: W,
+    writer: &'a mut W,
     _marker: marker::PhantomData<(I, L)>,
 }
 
-impl<W, I, L, const P: usize> WireEncoder<W, I, L, P>
+impl<'a, W, I, L, const P: usize> WireEncoder<'a, W, I, L, P>
 where
+    W: ?Sized,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(writer: W) -> Self {
+    pub(crate) fn new(writer: &'a mut W) -> Self {
         Self {
             writer,
             _marker: marker::PhantomData,
@@ -34,26 +36,26 @@ where
     }
 }
 
-pub struct WirePackEncoder<W, I, L, const P: usize>
+pub struct WirePackEncoder<'a, W, I, L, const P: usize>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    writer: W,
+    writer: &'a mut W,
     pack_buf: FixedBytes<P, W::Error>,
     _marker: marker::PhantomData<(I, L)>,
 }
 
-impl<W, I, L, const P: usize> WirePackEncoder<W, I, L, P>
+impl<'a, W, I, L, const P: usize> WirePackEncoder<'a, W, I, L, P>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(writer: W, pack_buf: FixedBytes<P, W::Error>) -> Self {
+    pub(crate) fn new(writer: &'a mut W, pack_buf: FixedBytes<P, W::Error>) -> Self {
         Self {
             writer,
             pack_buf,
@@ -63,16 +65,16 @@ where
 }
 
 #[musli::encoder]
-impl<W, I, L, const P: usize> Encoder for WireEncoder<W, I, L, P>
+impl<'a, W, I, L, const P: usize> Encoder for WireEncoder<'a, W, I, L, P>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
 
-    type Pack = WirePackEncoder<W, I, L, P>;
+    type Pack = WirePackEncoder<'a, W, I, L, P>;
     type Some = Self;
     type Sequence = Self;
     type Tuple = Self;
@@ -86,7 +88,7 @@ where
     }
 
     #[inline]
-    fn encode_unit(mut self) -> Result<Self::Ok, Self::Error> {
+    fn encode_unit(self) -> Result<Self::Ok, Self::Error> {
         self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
@@ -102,16 +104,16 @@ where
     }
 
     #[inline]
-    fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
-        encode_prefix::<W, L>(&mut self.writer, bytes.len())?;
+    fn encode_bytes(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+        encode_prefix::<W, L>(self.writer, bytes.len())?;
         self.writer.write_bytes(bytes)?;
         Ok(())
     }
 
     #[inline]
-    fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
+    fn encode_bytes_vectored(self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
         let len = vectors.iter().map(|v| v.len()).sum();
-        encode_prefix::<W, L>(&mut self.writer, len)?;
+        encode_prefix::<W, L>(self.writer, len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(bytes)?;
@@ -136,7 +138,7 @@ where
     }
 
     #[inline]
-    fn encode_bool(mut self, value: bool) -> Result<Self::Ok, Self::Error> {
+    fn encode_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
         self.writer
             .write_byte(Tag::new(Kind::Byte, if value { 1 } else { 0 }).byte())
     }
@@ -147,7 +149,7 @@ where
     }
 
     #[inline]
-    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, Self::Error> {
+    fn encode_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
         let (tag, embedded) = Tag::with_byte(Kind::Byte, value);
         self.writer.write_byte(tag.byte())?;
 
@@ -214,13 +216,13 @@ where
     }
 
     #[inline]
-    fn encode_some(mut self) -> Result<Self::Some, Self::Error> {
+    fn encode_some(self) -> Result<Self::Some, Self::Error> {
         self.writer.write_byte(Tag::new(Kind::Sequence, 1).byte())?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_none(mut self) -> Result<Self::Ok, Self::Error> {
+    fn encode_none(self) -> Result<Self::Ok, Self::Error> {
         self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
@@ -280,21 +282,21 @@ where
     }
 
     #[inline]
-    fn encode_variant(mut self) -> Result<Self::Variant, Self::Error> {
+    fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
         self.writer.write_byte(Tag::new(Kind::Sequence, 2).byte())?;
         Ok(self)
     }
 }
 
-impl<W, I, L, const P: usize> SequenceEncoder for WirePackEncoder<W, I, L, P>
+impl<'a, W, I, L, const P: usize> SequenceEncoder for WirePackEncoder<'a, W, I, L, P>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<'this, FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
@@ -302,26 +304,26 @@ where
     }
 
     #[inline]
-    fn end(mut self) -> Result<Self::Ok, Self::Error> {
-        encode_prefix::<W, L>(&mut self.writer, self.pack_buf.len())?;
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        encode_prefix::<W, L>(self.writer, self.pack_buf.len())?;
         self.writer.write_bytes(self.pack_buf.as_slice())?;
         Ok(())
     }
 }
 
-impl<W, I, L, const P: usize> SequenceEncoder for WireEncoder<W, I, L, P>
+impl<'a, W, I, L, const P: usize> SequenceEncoder for WireEncoder<'a, W, I, L, P>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
+    type Encoder<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer.borrow_mut()))
+        Ok(WireEncoder::new(self.writer))
     }
 
     #[inline]
@@ -330,19 +332,19 @@ where
     }
 }
 
-impl<W, I, L, const P: usize> PairsEncoder for WireEncoder<W, I, L, P>
+impl<'a, W, I, L, const P: usize> PairsEncoder for WireEncoder<'a, W, I, L, P>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
+    type Encoder<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer.borrow_mut()))
+        Ok(WireEncoder::new(self.writer))
     }
 
     #[inline]
@@ -351,25 +353,25 @@ where
     }
 }
 
-impl<W, I, L, const P: usize> PairEncoder for WireEncoder<W, I, L, P>
+impl<'a, W, I, L, const P: usize> PairEncoder for WireEncoder<'a, W, I, L, P>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type First<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
-    type Second<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
+    type First<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
+    type Second<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer.borrow_mut()))
+        Ok(WireEncoder::new(self.writer))
     }
 
     #[inline]
     fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer.borrow_mut()))
+        Ok(WireEncoder::new(self.writer))
     }
 
     #[inline]
@@ -378,25 +380,25 @@ where
     }
 }
 
-impl<W, I, L, const P: usize> VariantEncoder for WireEncoder<W, I, L, P>
+impl<'a, W, I, L, const P: usize> VariantEncoder for WireEncoder<'a, W, I, L, P>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type Tag<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
-    type Variant<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
+    type Tag<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
+    type Variant<'this> = WireEncoder<'this, W, I, L, P> where Self: 'this;
 
     #[inline]
     fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer.borrow_mut()))
+        Ok(WireEncoder::new(self.writer))
     }
 
     #[inline]
     fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
-        Ok(WireEncoder::new(self.writer.borrow_mut()))
+        Ok(WireEncoder::new(self.writer))
     }
 
     #[inline]
@@ -417,7 +419,7 @@ impl fmt::Display for Overflow {
 #[inline]
 fn encode_prefix<W, L>(writer: &mut W, len: usize) -> Result<(), W::Error>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     L: WireUsizeEncoding,
 {
     let (tag, embedded) = Tag::with_len(Kind::Prefix, len);

@@ -22,6 +22,7 @@ pub struct FixedBytes<const N: usize, E = BufferError> {
 
 impl<const N: usize, E> FixedBytes<N, E> {
     /// Construct a new fixed bytes array storage.
+    #[inline]
     pub const fn new() -> Self {
         Self {
             // SAFETY: MaybeUnint::uninit_array is not stable.
@@ -32,26 +33,31 @@ impl<const N: usize, E> FixedBytes<N, E> {
     }
 
     /// Get the length of the collection.
+    #[inline]
     pub const fn len(&self) -> usize {
         self.init
     }
 
     /// Test if the current container is empty.
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.init == 0
     }
 
     /// Clear the [FixedBytes] container.
+    #[inline]
     pub fn clear(&mut self) {
         self.init = 0;
     }
 
     /// Get the remaining capacity of the [FixedBytes].
+    #[inline]
     pub const fn remaining(&self) -> usize {
         N.saturating_sub(self.init)
     }
 
     /// Coerce into the underlying bytes if all of them have been initialized.
+    #[inline]
     pub fn into_bytes(self) -> Option<[u8; N]> {
         if self.init == N {
             // SAFETY: All of the bytes in the sequence have been initialized
@@ -66,6 +72,7 @@ impl<const N: usize, E> FixedBytes<N, E> {
     }
 
     /// Coerce into the slice of initialized memory which is present.
+    #[inline]
     pub fn as_slice(&self) -> &[u8] {
         if self.init == 0 {
             return &[];
@@ -77,6 +84,7 @@ impl<const N: usize, E> FixedBytes<N, E> {
     }
 
     /// Coerce into the mutable slice of initialized memory which is present.
+    #[inline]
     pub fn as_mut_slice(&mut self) -> &[u8] {
         if self.init == 0 {
             return &[];
@@ -88,6 +96,7 @@ impl<const N: usize, E> FixedBytes<N, E> {
     }
 
     /// Try and push a single byte.
+    #[inline]
     pub fn push(&mut self, value: u8) -> bool {
         if N.saturating_sub(self.init) == 0 {
             return false;
@@ -106,6 +115,7 @@ impl<const N: usize, E> FixedBytes<N, E> {
     }
 
     /// Try and extend from the given slice.
+    #[inline]
     pub fn extend_from_slice(&mut self, source: &[u8]) -> bool {
         if source.len() > N.saturating_sub(self.init) {
             return false;
@@ -122,6 +132,7 @@ impl<const N: usize, E> FixedBytes<N, E> {
 }
 
 impl<const N: usize, E> Default for FixedBytes<N, E> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -150,6 +161,26 @@ where
             }));
         }
 
+        Ok(())
+    }
+
+    #[inline]
+    fn write_array<const U: usize>(&mut self, array: [u8; U]) -> Result<(), Self::Error> {
+        if U > N.saturating_sub(self.init) {
+            return Err(E::message(format_args! {
+                "Overflow when writing {additional} bytes at {at} with capacity {capacity}",
+                at = self.init,
+                additional = U,
+                capacity = N,
+            }));
+        }
+
+        unsafe {
+            let dst = (self.data.as_mut_ptr() as *mut u8).add(self.init);
+            ptr::copy_nonoverlapping(array.as_ptr(), dst, U);
+        }
+
+        self.init = self.init.wrapping_add(U);
         Ok(())
     }
 }

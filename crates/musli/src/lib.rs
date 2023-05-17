@@ -22,6 +22,35 @@
 //! serialization formats provided aim to efficiently and natively support and
 //! accurately encode every type and data structure available in Rust.
 //!
+//! As an example of this, these two functions both produce the same assembly on
+//! my machine (built with `--release`):
+//!
+//! ```
+//! const ENCODING: Encoding<DefaultMode, Fixed<NativeEndian>, Variable> =
+//!     Encoding::new().with_fixed_integers_endian();
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(packed)]
+//! pub struct Storage {
+//!     value: u32,
+//!     value2: u32,
+//! }
+//!
+//! #[inline(never)]
+//! #[no_mangle]
+//! pub fn with_musli(storage: &Storage) -> Result<[u8; 8]> {
+//!     Ok(ENCODING.to_fixed_bytes::<8, _>(storage)?.into_bytes().context("buffer not filled")?)
+//! }
+//!
+//! #[inline(never)]
+//! #[no_mangle]
+//! pub fn without_musli(storage: &Storage) -> Result<[u8; 8]> {
+//!     let [a, b, c, d] = storage.value.to_ne_bytes();
+//!     let [e, f, g, h] = storage.value2.to_ne_bytes();
+//!     Ok([a, b, c, d, e, f, g, h])
+//! }
+//! ```
+//!
 //! The heavy lifting in user code is done through the [Encode] and [Decode]
 //! derives. They are both documented in the [derives] module. Müsli operates
 //! solely based on the schema derived from the types it uses.

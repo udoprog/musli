@@ -58,11 +58,11 @@ where
     W: ?Sized + Writer,
 {
     type Error = W::Error;
-    type Mut<'this> = W::Mut<'this> where Self: 'this;
+    type Mut<'this> = &'this mut W where Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
-        (**self).borrow_mut()
+        self
     }
 
     #[inline]

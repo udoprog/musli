@@ -510,11 +510,11 @@ impl<'de, R> PosReader<'de> for &mut R
 where
     R: ?Sized + PosReader<'de>,
 {
-    type PosMut<'this> = R::PosMut<'this> where Self: 'this;
+    type PosMut<'this> = &'this mut R where Self: 'this;
 
     #[inline]
     fn pos_borrow_mut(&mut self) -> Self::PosMut<'_> {
-        (**self).pos_borrow_mut()
+        self
     }
 
     #[inline]

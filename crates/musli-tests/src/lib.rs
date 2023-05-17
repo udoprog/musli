@@ -5,6 +5,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+const RNG_SEED: u64 = 2718281828459045235;
+
 #[macro_export]
 macro_rules! miri {
     ($($(#[$($meta:meta)*])* const $ident:ident: $value_ty:ty = $range:expr, $miri:expr;)*) => {
@@ -121,9 +123,8 @@ macro_rules! types {
     }
 }
 
-const SEED: u64 = 2718281828459045235;
-
+/// Build common RNG.
 pub fn rng() -> rand::prelude::StdRng {
     use rand::prelude::*;
-    rand::prelude::StdRng::seed_from_u64(SEED)
+    rand::prelude::StdRng::seed_from_u64(RNG_SEED)
 }

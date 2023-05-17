@@ -78,7 +78,7 @@ where
         write!(f, "type supported by the storage decoder")
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_unit(mut self) -> Result<(), Self::Error> {
         let pos = self.reader.pos();
         let count = L::decode_usize(self.reader.pos_borrow_mut())?;
@@ -93,17 +93,17 @@ where
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
         Ok(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_array<const N: usize>(mut self) -> Result<[u8; N], Self::Error> {
         self.reader.read_array()
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
@@ -112,13 +112,11 @@ where
         self.reader.read_bytes(len, visitor)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
         V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
-        return self.decode_bytes(Visitor(visitor));
-
         struct Visitor<V>(V);
 
         impl<'de, V> ValueVisitor<'de> for Visitor<V>
@@ -129,13 +127,13 @@ where
             type Ok = V::Ok;
             type Error = V::Error;
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 self.0.expecting(f)
             }
 
             #[cfg(feature = "alloc")]
-            #[inline]
+            #[inline(always)]
             fn visit_owned(self, bytes: Vec<u8>) -> Result<Self::Ok, Self::Error> {
                 if let Err(error) = from_utf8(&bytes) {
                     return Err(Self::Error::custom(error));
@@ -146,21 +144,23 @@ where
                 self.0.visit_owned(string)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
                 let string = from_utf8(bytes).map_err(Self::Error::custom)?;
                 self.0.visit_borrowed(string)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 let string = from_utf8(bytes).map_err(Self::Error::custom)?;
                 self.0.visit_ref(string)
             }
         }
+
+        self.decode_bytes(Visitor(visitor))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_bool(mut self) -> Result<bool, Self::Error> {
         let pos = self.reader.pos();
         let byte = self.reader.read_byte()?;
@@ -172,7 +172,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_char(self) -> Result<char, Self::Error> {
         let pos = self.reader.pos();
         let num = self.decode_u32()?;
@@ -183,69 +183,69 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u8(mut self) -> Result<u8, Self::Error> {
         self.reader.read_byte()
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u16(self) -> Result<u16, Self::Error> {
         I::decode_unsigned(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u32(self) -> Result<u32, Self::Error> {
         I::decode_unsigned(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u64(self) -> Result<u64, Self::Error> {
         I::decode_unsigned(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u128(self) -> Result<u128, Self::Error> {
         I::decode_unsigned(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i8(self) -> Result<i8, Self::Error> {
         Ok(self.decode_u8()? as i8)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i16(self) -> Result<i16, Self::Error> {
         I::decode_signed(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i32(self) -> Result<i32, Self::Error> {
         I::decode_signed(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i64(self) -> Result<i64, Self::Error> {
         I::decode_signed(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i128(self) -> Result<i128, Self::Error> {
         I::decode_signed(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_usize(self) -> Result<usize, Self::Error> {
         L::decode_usize(self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_isize(self) -> Result<isize, Self::Error> {
         Ok(self.decode_usize()? as isize)
     }
 
     /// Decode a 32-bit floating point value by reading the 32-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
-    #[inline]
+    #[inline(always)]
     fn decode_f32(self) -> Result<f32, Self::Error> {
         let bits = self.decode_u32()?;
         Ok(f32::from_bits(bits))
@@ -253,7 +253,7 @@ where
 
     /// Decode a 64-bit floating point value by reading the 64-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
-    #[inline]
+    #[inline(always)]
     fn decode_f64(self) -> Result<f64, Self::Error> {
         let bits = self.decode_u64()?;
         Ok(f64::from_bits(bits))

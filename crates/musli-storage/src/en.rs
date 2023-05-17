@@ -6,26 +6,28 @@ use musli_common::int::{IntegerEncoding, UsizeEncoding, Variable};
 use musli_common::writer::Writer;
 
 /// The alias for a [StorageEncoder] that is used for packs.
-pub type PackEncoder<W> = StorageEncoder<W, Variable, Variable>;
+pub type PackEncoder<'a, W> = StorageEncoder<'a, W, Variable, Variable>;
 
 /// A vaery simple encoder suitable for storage encoding.
-pub struct StorageEncoder<W, I, L>
+pub struct StorageEncoder<'a, W, I, L>
 where
+    W: ?Sized,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
-    writer: W,
+    writer: &'a mut W,
     _marker: marker::PhantomData<(I, L)>,
 }
 
-impl<W, I, L> StorageEncoder<W, I, L>
+impl<'a, W, I, L> StorageEncoder<'a, W, I, L>
 where
+    W: ?Sized,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub fn new(writer: W) -> Self {
+    pub fn new(writer: &'a mut W) -> Self {
         Self {
             writer,
             _marker: marker::PhantomData,
@@ -34,9 +36,9 @@ where
 }
 
 #[musli::encoder]
-impl<W, I, L> Encoder for StorageEncoder<W, I, L>
+impl<'a, W, I, L> Encoder for StorageEncoder<'a, W, I, L>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
@@ -66,22 +68,22 @@ where
         Ok(self)
     }
 
-    #[inline]
-    fn encode_array<const N: usize>(mut self, array: [u8; N]) -> Result<Self::Ok, Self::Error> {
+    #[inline(always)]
+    fn encode_array<const N: usize>(self, array: [u8; N]) -> Result<Self::Ok, Self::Error> {
         self.writer.write_array(array)
     }
 
-    #[inline]
-    fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
-        L::encode_usize(self.writer.borrow_mut(), bytes.len())?;
+    #[inline(always)]
+    fn encode_bytes(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+        L::encode_usize(&mut *self.writer, bytes.len())?;
         self.writer.write_bytes(bytes)?;
         Ok(())
     }
 
     #[inline]
-    fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
+    fn encode_bytes_vectored(self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
         let len = vectors.iter().map(|v| v.len()).sum();
-        L::encode_usize(self.writer.borrow_mut(), len)?;
+        L::encode_usize(&mut *self.writer, len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(bytes)?;
@@ -90,108 +92,108 @@ where
         Ok(())
     }
 
-    #[inline]
-    fn encode_string(mut self, string: &str) -> Result<Self::Ok, Self::Error> {
-        L::encode_usize(self.writer.borrow_mut(), string.len())?;
+    #[inline(always)]
+    fn encode_string(self, string: &str) -> Result<Self::Ok, Self::Error> {
+        L::encode_usize(&mut *self.writer, string.len())?;
         self.writer.write_bytes(string.as_bytes())?;
         Ok(())
     }
 
-    #[inline]
-    fn encode_usize(mut self, value: usize) -> Result<Self::Ok, Self::Error> {
-        L::encode_usize(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_usize(self, value: usize) -> Result<Self::Ok, Self::Error> {
+        L::encode_usize(self.writer, value)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_isize(self, value: isize) -> Result<Self::Ok, Self::Error> {
         self.encode_usize(value as usize)
     }
 
-    #[inline]
-    fn encode_bool(mut self, value: bool) -> Result<Self::Ok, Self::Error> {
+    #[inline(always)]
+    fn encode_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
         self.writer.write_byte(if value { 1 } else { 0 })
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_char(self, value: char) -> Result<Self::Ok, Self::Error> {
         self.encode_u32(value as u32)
     }
 
-    #[inline]
-    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, Self::Error> {
+    #[inline(always)]
+    fn encode_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
         self.writer.write_byte(value)
     }
 
-    #[inline]
-    fn encode_u16(mut self, value: u16) -> Result<Self::Ok, Self::Error> {
-        I::encode_unsigned(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
+        I::encode_unsigned(self.writer, value)
     }
 
-    #[inline]
-    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, Self::Error> {
-        I::encode_unsigned(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
+        I::encode_unsigned(self.writer, value)
     }
 
-    #[inline]
-    fn encode_u64(mut self, value: u64) -> Result<Self::Ok, Self::Error> {
-        I::encode_unsigned(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+        I::encode_unsigned(self.writer, value)
     }
 
-    #[inline]
-    fn encode_u128(mut self, value: u128) -> Result<Self::Ok, Self::Error> {
-        I::encode_unsigned(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+        I::encode_unsigned(self.writer, value)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
         self.encode_u8(value as u8)
     }
 
-    #[inline]
-    fn encode_i16(mut self, value: i16) -> Result<Self::Ok, Self::Error> {
-        I::encode_signed(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
+        I::encode_signed(self.writer, value)
     }
 
-    #[inline]
-    fn encode_i32(mut self, value: i32) -> Result<Self::Ok, Self::Error> {
-        I::encode_signed(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
+        I::encode_signed(self.writer, value)
     }
 
-    #[inline]
-    fn encode_i64(mut self, value: i64) -> Result<Self::Ok, Self::Error> {
-        I::encode_signed(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+        I::encode_signed(self.writer, value)
     }
 
-    #[inline]
-    fn encode_i128(mut self, value: i128) -> Result<Self::Ok, Self::Error> {
-        I::encode_signed(self.writer.borrow_mut(), value)
+    #[inline(always)]
+    fn encode_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+        I::encode_signed(self.writer, value)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
         self.encode_u32(value.to_bits())
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
         self.encode_u64(value.to_bits())
     }
 
     #[inline]
-    fn encode_some(mut self) -> Result<Self::Some, Self::Error> {
+    fn encode_some(self) -> Result<Self::Some, Self::Error> {
         self.writer.write_byte(1)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_none(mut self) -> Result<Self::Ok, Self::Error> {
+    fn encode_none(self) -> Result<Self::Ok, Self::Error> {
         self.writer.write_byte(0)?;
         Ok(())
     }
 
     #[inline]
-    fn encode_sequence(mut self, len: usize) -> Result<Self::Sequence, Self::Error> {
-        L::encode_usize(self.writer.borrow_mut(), len)?;
+    fn encode_sequence(self, len: usize) -> Result<Self::Sequence, Self::Error> {
+        L::encode_usize(&mut *self.writer, len)?;
         Ok(self)
     }
 
@@ -202,14 +204,14 @@ where
     }
 
     #[inline]
-    fn encode_map(mut self, len: usize) -> Result<Self::Map, Self::Error> {
-        L::encode_usize(self.writer.borrow_mut(), len)?;
+    fn encode_map(self, len: usize) -> Result<Self::Map, Self::Error> {
+        L::encode_usize(&mut *self.writer, len)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_struct(mut self, len: usize) -> Result<Self::Struct, Self::Error> {
-        L::encode_usize(self.writer.borrow_mut(), len)?;
+    fn encode_struct(self, len: usize) -> Result<Self::Struct, Self::Error> {
+        L::encode_usize(&mut *self.writer, len)?;
         Ok(self)
     }
 
@@ -219,19 +221,19 @@ where
     }
 }
 
-impl<W, I, L> SequenceEncoder for StorageEncoder<W, I, L>
+impl<'a, W, I, L> SequenceEncoder for StorageEncoder<'a, W, I, L>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<'this, W, I, L> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+        Ok(StorageEncoder::new(self.writer))
     }
 
     #[inline]
@@ -240,19 +242,19 @@ where
     }
 }
 
-impl<W, I, L> PairsEncoder for StorageEncoder<W, I, L>
+impl<'a, W, I, L> PairsEncoder for StorageEncoder<'a, W, I, L>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<'this, W, I, L> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
-        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+        Ok(StorageEncoder::new(self.writer))
     }
 
     #[inline]
@@ -261,25 +263,25 @@ where
     }
 }
 
-impl<W, I, L> PairEncoder for StorageEncoder<W, I, L>
+impl<'a, W, I, L> PairEncoder for StorageEncoder<'a, W, I, L>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type First<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
-    type Second<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
+    type First<'this> = StorageEncoder<'this, W, I, L> where Self: 'this;
+    type Second<'this> = StorageEncoder<'this, W, I, L> where Self: 'this;
 
     #[inline]
     fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
-        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+        Ok(StorageEncoder::new(self.writer))
     }
 
     #[inline]
     fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
-        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+        Ok(StorageEncoder::new(self.writer))
     }
 
     #[inline]
@@ -288,25 +290,25 @@ where
     }
 }
 
-impl<W, I, L> VariantEncoder for StorageEncoder<W, I, L>
+impl<'a, W, I, L> VariantEncoder for StorageEncoder<'a, W, I, L>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Ok = ();
     type Error = W::Error;
-    type Tag<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
-    type Variant<'this> = StorageEncoder<W::Mut<'this>, I, L> where Self: 'this;
+    type Tag<'this> = StorageEncoder<'this, W, I, L> where Self: 'this;
+    type Variant<'this> = StorageEncoder<'this, W, I, L> where Self: 'this;
 
     #[inline]
     fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
-        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+        Ok(StorageEncoder::new(self.writer))
     }
 
     #[inline]
     fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
-        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+        Ok(StorageEncoder::new(self.writer))
     }
 
     #[inline]

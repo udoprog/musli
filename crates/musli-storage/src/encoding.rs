@@ -16,8 +16,8 @@ use crate::en::StorageEncoder;
 use crate::error::BufferError;
 use crate::fixed_bytes::FixedBytes;
 use crate::int::{
-    BigEndian, Fixed, FixedUsize, IntegerEncoding, LittleEndian, NetworkEndian, UsizeEncoding,
-    Variable,
+    BigEndian, ByteOrder, Fixed, FixedUsize, IntegerEncoding, LittleEndian, NetworkEndian,
+    UsizeEncoding, Variable,
 };
 use crate::reader::{Reader, SliceReader};
 use crate::writer::{Buffer, Writer};
@@ -36,9 +36,9 @@ pub const DEFAULT: Encoding<DefaultMode, Variable, Variable> = Encoding::new();
 /// Encode the given value to the given [`Writer`] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
+pub fn encode<W, T>(writer: &mut W, value: &T) -> Result<(), W::Error>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -188,6 +188,14 @@ where
         }
     }
 
+    /// Configure the encoding to use fixed integer network-endian encoding
+    /// (Default).
+    pub const fn with_fixed_integers_ne(self) -> Encoding<M, Fixed<NetworkEndian>, L> {
+        Encoding {
+            _marker: marker::PhantomData,
+        }
+    }
+
     /// Configure the encoding to use fixed integer little-endian encoding.
     pub const fn with_fixed_integers_le(self) -> Encoding<M, Fixed<LittleEndian>, L> {
         Encoding {
@@ -202,9 +210,11 @@ where
         }
     }
 
-    /// Configure the encoding to use fixed integer network-endian encoding
-    /// (Default).
-    pub const fn with_fixed_integers_ne(self) -> Encoding<M, Fixed<NetworkEndian>, L> {
+    /// Configure the encoding to use fixed integer custom endian encoding.
+    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, Fixed<E>, L>
+    where
+        E: ByteOrder,
+    {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -236,9 +246,9 @@ where
     /// Encode the given value to the given [`Writer`] using the current
     /// configuration.
     #[inline]
-    pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), W::Error>
+    pub fn encode<W, T>(self, writer: &mut W, value: &T) -> Result<(), W::Error>
     where
-        W: Writer,
+        W: ?Sized + Writer,
         T: ?Sized + Encode<M>,
     {
         T::encode(value, StorageEncoder::<_, I, L>::new(writer))
@@ -248,13 +258,13 @@ where
     /// configuration.
     #[cfg(feature = "std")]
     #[inline]
-    pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
+    pub fn to_writer<W, T>(self, writer: W, value: &T) -> Result<(), io::Error>
     where
         W: io::Write,
         T: ?Sized + Encode<M>,
     {
-        let writer = crate::wrap::wrap(write);
-        T::encode(value, StorageEncoder::<_, I, L>::new(writer))
+        let mut writer = crate::wrap::wrap(writer);
+        T::encode(value, StorageEncoder::<_, I, L>::new(&mut writer))
     }
 
     /// Encode the given value to a [Buffer] using the current configuration.

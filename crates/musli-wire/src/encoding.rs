@@ -16,7 +16,7 @@ use crate::de::WireDecoder;
 use crate::en::WireEncoder;
 use crate::error::BufferError;
 use crate::fixed_bytes::FixedBytes;
-use crate::int::{BigEndian, Fixed, FixedUsize, LittleEndian, NetworkEndian, Variable};
+use crate::int::{BigEndian, ByteOrder, Fixed, FixedUsize, LittleEndian, NetworkEndian, Variable};
 use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
 use crate::reader::{Reader, SliceReader};
 use crate::tag::MAX_INLINE_LEN;
@@ -40,9 +40,9 @@ pub const DEFAULT: Encoding = Encoding::new();
 /// Encode the given value to the given [Writer] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
+pub fn encode<W, T>(writer: &mut W, value: &T) -> Result<(), W::Error>
 where
-    W: Writer,
+    W: ?Sized + Writer,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -213,6 +213,16 @@ where
         }
     }
 
+    /// Configure the encoding to use fixed integer custom endian encoding.
+    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, Fixed<E>, L, P>
+    where
+        E: ByteOrder,
+    {
+        Encoding {
+            _marker: marker::PhantomData,
+        }
+    }
+
     /// Configure the encoding to use variable length encoding.
     pub const fn with_variable_lengths(self) -> Encoding<M, I, Variable, P> {
         Encoding {
@@ -248,12 +258,12 @@ where
     /// Encode the given value to the given [Writer] using the current
     /// configuration.
     #[inline]
-    pub fn encode<W, T>(self, mut writer: W, value: &T) -> Result<(), W::Error>
+    pub fn encode<W, T>(self, writer: &mut W, value: &T) -> Result<(), W::Error>
     where
-        W: Writer,
+        W: ?Sized + Writer,
         T: ?Sized + Encode<M>,
     {
-        T::encode(value, WireEncoder::<_, I, L, P>::new(&mut writer))
+        T::encode(value, WireEncoder::<_, I, L, P>::new(writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
