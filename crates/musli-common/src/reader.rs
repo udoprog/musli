@@ -4,6 +4,7 @@
 //! it which allows it to make the assumption the bytes are always returned with
 //! the `'de` lifetime.
 
+use core::array;
 use core::fmt;
 use core::marker;
 use core::ops::Range;
@@ -233,7 +234,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         let (head, tail) = self.split_at(N);
         *self = tail;
 
-        Ok(std::array::from_fn(|n| head[n]))
+        Ok(array::from_fn(|n| head[n]))
     }
 
     #[inline]
