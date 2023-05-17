@@ -45,12 +45,13 @@ where
 
     while b & CONT_BYTE == CONT_BYTE {
         shift += 7;
-        b = r.read_byte()?;
 
-        value = T::from_byte(b & MASK_BYTE)
-            .checked_shl(shift)
-            .and_then(|add| value.checked_add(add))
-            .ok_or_else(|| R::Error::custom("length overflow"))?;
+        if shift >= T::BITS {
+            return Err(R::Error::custom("bits overflow"));
+        }
+
+        b = r.read_byte()?;
+        value = value.wrapping_add(T::from_byte(b & MASK_BYTE).wrapping_shl(shift));
     }
 
     Ok(value)

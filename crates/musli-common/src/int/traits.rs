@@ -21,6 +21,9 @@ pub trait Unsigned:
     /// Number of bytes.
     const BYTES: u8;
 
+    /// Number of bits.
+    const BITS: u32;
+
     /// The signed representation of this unsigned number.
     type Signed: Signed;
 
@@ -45,8 +48,14 @@ pub trait Unsigned:
     /// Perform a shift-left operation.
     fn checked_shl(self, value: u32) -> Option<Self>;
 
+    /// Perform a wrapping shift-left operation.
+    fn wrapping_shl(self, value: u32) -> Self;
+
     /// Perform a checked addition.
     fn checked_add(self, value: Self) -> Option<Self>;
+
+    /// Perform a wrapping addition.
+    fn wrapping_add(self, value: Self) -> Self;
 }
 
 /// Helper trait for performing I/O over [Unsigned] types.
@@ -99,6 +108,7 @@ macro_rules! implement {
         impl Unsigned for $unsigned {
             const ONE: Self = 1;
             const BYTES: u8 = (<$unsigned>::BITS / 8) as u8;
+            const BITS: u32 = <$signed>::BITS;
 
             type Signed = $signed;
 
@@ -138,8 +148,18 @@ macro_rules! implement {
             }
 
             #[inline]
+            fn wrapping_shl(self, value: u32) -> Self {
+                self.wrapping_shl(value)
+            }
+
+            #[inline]
             fn checked_add(self, value: Self) -> Option<Self> {
                 self.checked_add(value)
+            }
+
+            #[inline]
+            fn wrapping_add(self, value: Self) -> Self {
+                self.wrapping_add(value)
             }
         }
     };
