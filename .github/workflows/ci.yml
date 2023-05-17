@@ -23,7 +23,7 @@ jobs:
       if: matrix.rust != 'stable'
     - run: cargo test --workspace --all-targets
       if: matrix.rust == 'stable'
-    - run: cargo test --workspace --all-features --doc
+    - run: cargo test --workspace --doc
       if: matrix.rust == 'stable'
 
   fuzz:
@@ -32,7 +32,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo run --release --bin fuzz_test --all-features
+    - run: cargo run --release --bin fuzz
 
   miri:
     needs: each_package
@@ -42,8 +42,8 @@ jobs:
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: miri
-    - run: cargo miri test --workspace --exclude musli-common --all-features
-    - run: cargo miri run --bin fuzz_test
+    - run: cargo miri test --workspace --exclude musli-common
+    - run: cargo miri run --bin fuzz
 
   each_package:
     needs: [rustfmt, clippy]
