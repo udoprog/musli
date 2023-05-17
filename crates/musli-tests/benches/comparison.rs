@@ -1,14 +1,14 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::prelude::*;
 
-use musli_tests::models::{LargeStruct, Primitives};
+use musli_tests::models::{Generate, LargeStruct, Primitives};
 use musli_tests::utils;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rng = StdRng::seed_from_u64(123412327832);
 
-    let primitives_struct = musli_tests::models::generate_primitives(&mut rng);
-    let large_struct = musli_tests::models::generate_large_struct(&mut rng);
+    let primitives_struct: Primitives = rng.generate();
+    let large_struct: LargeStruct = rng.generate();
 
     macro_rules! group {
         ($name:literal, $it:ident) => {{

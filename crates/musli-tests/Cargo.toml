@@ -5,12 +5,31 @@ edition = "2021"
 publish = false
 
 [features]
-default = ["std", "simdutf8", "musli"]
-extra = ["rmp-serde", "bincode", "serde_json", "serde_cbor", "bitcode"]
+default = ["std", "simdutf8", "musli", "model_full"]
+extra = ["rmp-serde", "bincode", "serde_json", "serde_cbor"]
+full = ["musli", "extra", "rkyv", "dlhn", "bitcode"]
 musli = ["musli-wire", "musli-descriptive", "musli-storage", "musli-json", "musli-value"]
 std = ["musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std", "rkyv?/std"]
 test = ["musli-wire", "musli-storage", "musli-descriptive"]
 simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptive?/simdutf8"]
+
+model_full = ["model_vec", "model_128", "model_usize", "model_tuple", "model_float", "model_map", "model_map_string_key"]
+model_minimal = ["model_vec", "model_tuple", "model_float"]
+model_map = ["std"]
+model_vec = []
+model_128 = []
+model_usize = []
+model_tuple = []
+model_float = []
+model_map_string_key = ["std"]
+
+rkyv = ["dep:rkyv", "model_vec", "model_128", "model_map", "model_float"]
+dlhn = ["dep:dlhn", "model_vec", "model_usize", "model_tuple", "model_float", "model_map_string_key"]
+bitcode = ["dep:bitcode", "model_full"]
+serde_json = ["dep:serde_json", "model_full"]
+serde_cbor = ["dep:serde_cbor", "model_full"]
+bincode = ["dep:bincode", "model_full"]
+rmp-serde = ["dep:rmp-serde", "model_full"]
 
 [dependencies]
 musli = { path = "../musli", default-features = false, features = ["alloc"] }
@@ -21,9 +40,9 @@ musli-json = { path = "../musli-json", default-features = false, features = ["al
 musli-value = { path = "../musli-value", default-features = false, features = ["alloc", "test"], optional = true }
 
 anyhow = "1.0.71"
+serde = { version = "1.0.163", default-features = false, features = ["derive"] }
 rand = { version = "0.8.5", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.1", optional = true }
-serde = { version = "1.0.163", default-features = false, features = ["derive"] }
 bincode = { version = "1.3.3", default-features = false, optional = true }
 serde_json = { version = "1.0.96", default-features = false, features = ["alloc"], optional = true }
 serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc", "std"], optional = true }

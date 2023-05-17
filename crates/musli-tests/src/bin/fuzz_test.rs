@@ -2,29 +2,16 @@ use std::io;
 use std::io::Write;
 use std::time::Instant;
 
-use musli_tests::models;
+use musli_tests::models::{self, Generate};
 use musli_tests::utils;
 use rand::prelude::*;
 
-#[cfg(miri)]
-const PRIMITIVE_STRUCTS: usize = 2;
-#[cfg(not(miri))]
-const PRIMITIVE_STRUCTS: usize = 100;
-
-#[cfg(miri)]
-const LARGE_STRUCTS: usize = 2;
-#[cfg(not(miri))]
-const LARGE_STRUCTS: usize = 100;
-
-#[cfg(miri)]
-const PRIMITIVE_ITERATIONS: usize = 2;
-#[cfg(not(miri))]
-const PRIMITIVE_ITERATIONS: usize = 10_000;
-
-#[cfg(miri)]
-const LARGE_ITERATIONS: usize = 2;
-#[cfg(not(miri))]
-const LARGE_ITERATIONS: usize = 30;
+musli_tests::miri! {
+    const PRIMITIVE_STRUCTS: usize = 100, 2;
+    const LARGE_STRUCTS: usize = 100, 2;
+    const PRIMITIVE_ITERATIONS: usize = 10_000, 2;
+    const LARGE_ITERATIONS: usize = 30, 2;
+}
 
 fn main() -> io::Result<()> {
     let filter = std::env::args().skip(1).collect::<Vec<_>>();
@@ -42,15 +29,15 @@ fn main() -> io::Result<()> {
 
     let mut rng = StdRng::seed_from_u64(123412327832);
 
-    let mut primitives = Vec::new();
-    let mut large = Vec::new();
+    let mut primitives: Vec<(usize, models::Primitives)> = Vec::new();
+    let mut large: Vec<(usize, models::LargeStruct)> = Vec::new();
 
     for index in 0..PRIMITIVE_STRUCTS {
-        primitives.push((index, models::generate_primitives(&mut rng)));
+        primitives.push((index, rng.generate()));
     }
 
     for index in 0..LARGE_STRUCTS {
-        large.push((index, models::generate_large_struct(&mut rng)));
+        large.push((index, rng.generate()));
     }
 
     #[allow(unused)]

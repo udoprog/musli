@@ -5,6 +5,42 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[macro_export]
+macro_rules! miri {
+    ($($(#[$($meta:meta)*])* const $ident:ident: $value_ty:ty = $range:expr, $miri:expr;)*) => {
+        $(
+            $(#[$($meta)*])*
+            #[cfg(miri)]
+            const $ident: $value_ty = $miri;
+            $(#[$($meta)*])*
+            #[cfg(not(miri))]
+            const $ident: $value_ty = $range;
+        )*
+    }
+}
+
+// Defines denies feature combinations.
+//
+// * Negative features are not supported in cargo, and feature blocking
+//   everything is too complex. model_map for example also depends on std.
+// * Benchmarks for these must be explicitly run, because they only include a
+//   subset of available data, we wouldn't be doing an apples-to-apples
+//   comparison if we allowed only a model subset to be compared against a
+//   serialization which supports a superset. If you do want to make this
+//   comparison, you can enable `model_minimal`.
+macro_rules! deny {
+    ($base:literal $(, $feature:literal)*) => {
+        $(
+            #[cfg(all(feature = $base, feature = $feature))]
+            compile_error!(concat!($base, ": does not support feature: ", $feature));
+        )*
+    }
+}
+
+deny!("rkyv", "model_tuple", "model_map_string_key", "model_usize");
+deny!("dlhn", "model_map", "model_128");
+deny!("bitcode", "model_128");
+
 mod mode;
 pub mod models;
 pub mod utils;

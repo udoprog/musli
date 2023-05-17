@@ -2,7 +2,7 @@ use std::io::Write;
 use std::time::Instant;
 
 use criterion::black_box;
-use musli_tests::models::{generate_large_struct, LargeStruct};
+use musli_tests::models::{Generate, LargeStruct};
 use rand::prelude::*;
 
 fn main() -> anyhow::Result<()> {
@@ -35,7 +35,7 @@ fn main() -> anyhow::Result<()> {
     let mut it = std::env::args().skip(1);
 
     let mut rng = StdRng::seed_from_u64(123412327832);
-    let large_struct = generate_large_struct(&mut rng);
+    let large_struct = rng.generate();
 
     let value = it.next();
 
