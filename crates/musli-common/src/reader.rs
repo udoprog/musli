@@ -233,9 +233,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         let (head, tail) = self.split_at(N);
         *self = tail;
 
-        Ok(std::array::from_fn(|n| {
-            head[n]
-        }))
+        Ok(std::array::from_fn(|n| head[n]))
     }
 
     #[inline]

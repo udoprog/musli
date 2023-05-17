@@ -250,9 +250,7 @@ where
                 }
 
                 // SAFETY: String was checked above.
-                let string = unsafe {
-                    String::from_utf8_unchecked(bytes)
-                };
+                let string = unsafe { String::from_utf8_unchecked(bytes) };
 
                 self.0.visit_owned(string)
             }

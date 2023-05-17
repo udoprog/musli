@@ -21,18 +21,70 @@ using both libraries side by side if desired.
 
 Müsli is designed with similar principles as [serde]. Relying on Rust's
 powerful trait system to generate code which can largely be optimized away.
-The end result should be very similar to a handwritten encoding.
+The end result should be very similar to a handwritten encoding. The binary
+serialization formats provided aim to efficiently and natively support and
+accurately encode every type and data structure available in Rust.
 
 The heavy lifting in user code is done through the [Encode] and [Decode]
-derives. They are both documented in the [derives] module.
+derives. They are both documented in the [derives] module. Müsli operates
+solely based on the schema derived from the types it uses.
 
-Where Müsli differs in approach is that we don't make as heavy use of the
-visitor pattern. Instead the encoding interacts with the framework through
-encoding interfaces that describe "what it wants" and leverages GATs to make
-the API efficient and ergonomic.
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct Person {
+    /* .. fields .. */
+}
+```
+
+> **Note** by default a field is identified by its *numerical index* which
+> would change if they are re-ordered. Renaming fields and setting a default
+> naming policy can be done by configuring the [derives].
+
+Where Müsli differs in design is that we make sparser use of the visitor
+pattern. Instead the encoding interacts with the framework through encoding
+interfaces that describe "what it wants" and leverages GATs to make the API
+ergonomic and efficient.
+
+Note how decoding a sequence [does not require the use of a visitor]:
+
+```rust
+use musli::de::{Decode, Decoder, SequenceDecoder};
+use musli::mode::Mode;
+
+struct MyType {
+    data: Vec<String>,
+}
+
+impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        let mut seq = decoder.decode_sequence()?;
+        let mut data = Vec::with_capacity(seq.size_hint().or_default());
+
+        while let Some(decoder) = seq.next()? {
+            data.push(Decode::<M>::decode(decoder)?);
+        }
+
+        seq.end()?;
+
+        Ok(Self {
+            data
+        })
+    }
+}
+```
 
 Another major aspect where Müsli differs is in the concept of
-[modes](#modes). This is a larger topic and is covered further down.
+[modes](#modes) (note the `M` parameter above). Since this parameterises the
+`Encode` and `Decode` traits it allows for the same data model to be
+serialized in many different ways. This is a larger topic and is covered
+further down.
+
+[does not require the use of a visitor]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
 
 <br>
 
@@ -62,36 +114,37 @@ fields.
 
 The available formats and their capabilities are:
 
-| | reorder? | missing? | unknown? | self? |
+| | `reorder` | `missing` | `unknown` | `self` |
 |-|-|-|-|-|
 | [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
 | [musli-storage]                    | ✔ | ✔ | ✗ | ✗ |
 | [musli-wire]                       | ✔ | ✔ | ✔ | ✗ |
 | [musli-descriptive]                | ✔ | ✔ | ✔ | ✔ |
 
-`reorder?` determines whether fields must occur in exactly the order in
-which they are specified. So reordering fields in such a struct would cause
-either an error or some kind of undefined behavior. This is only suitable
-for byte-oriented IPC where data models are strictly synchronized.
+`reorder` determines whether fields must occur in exactly the order in which
+they are specified in their type. Reordering fields in such a type would
+cause unknown but safe behavior of some kind. This is only suitable for
+byte-oriented IPC where the data models of each client are are strictly
+synchronized.
 
-`missing?` determines if reading can handle missing fields, as exemplified
-above. This is suitable for on-disk storage.
+`missing` determines if reading can handle missing fields through something
+like `Option<T>`. This is suitable for on-disk storage, because it means
+that new optional fields can be added as the schema evolves.
 
-`unknown?` determines if the format can skip over unknown fields. This is
+`unknown` determines if the format can skip over unknown fields. This is
 suitable for network communication. At this point you've reached *upgrade
-stability*. Some level of introspection is possible on this level, because
-it must contain enough information about fields to know what to skip which
-usually allows for reasoning about basic types.
+stability*. Some level of introspection is possible here, because the
+serialized format must contain enough information about fields to know what
+to skip which usually allows for reasoning about basic types.
 
-`self?` determines if the format is self-descriptive. Allowing field names
-and variants to be fully reconstructed from the serialized data. These
-formats do not require models to decode, and can make use of generic
-containers such as [musli-value].
+`self` determines if the format is self-descriptive. Allowing the structure
+of the data to be fully reconstructed from its serialized state. These
+formats do not require models to decode, and can be converted to and from
+dynamic containers such as [musli-value] for introspection.
 
 For every feature you drop, the format becomes more compact and efficient.
-`musli-storage` `#[musli(packed)]` for example is roughly as compact and
-efficient as [bincode] while [musli-wire] is comparable to something like
-[protobuf]*.
+`musli-storage` `#[musli(packed)]` for example is roughly as compact as
+[bincode] while [musli-wire] is comparable to something like [protobuf].
 
 <br>
 
@@ -226,41 +279,15 @@ This library currently has two instances of unsafe:
 > The following are the results of preliminary benchmarking and should be
 > taken with a big grain of 🧂.
 
-Preliminary benchmarking indicates that Müsli roundtrip encodings for large
-objects are about 10x faster than using JSON through serde, 5x faster than
-`serde_cbor`, and 12% faster than bincode. Note that the JSON comparison
-obviously isn't apples-to-apples since the Müsli encoding isn't
-self-descriptive, but it's included here to give a general idea of how it
-compares. CBOR and bincode on the other hand have *comparable*
-configurations.
+The two benchmark suites portrayed are:
+* `rt-prim` - which is a small object containing one of each primitive type
+  and a string and a byte array.
+* `rt-lg` - which is roundtrip encoding of a large object, containing
+  vectors and maps of other objects.
 
-For small objects the difference in encoding performance is even more
-significant. Müsli producing code that's 100x faster than JSON **and** CBOR,
-20x faster than bincode (despite doing similarly oversized pre-allocation).
-This holds for both the wire and storage format.
+<img src="https://raw.githubusercontent.com/udoprog/musli/main/images/rt-lg.png" alt="Roundtrip of a large object">
 
-```text
-json/roundtrip-large    time:   [91.263 us 91.756 us 92.239 us]
-cbor/roundtrip-large    time:   [51.289 us 51.696 us 52.215 us]
-bincode/roundtrip-large time:   [10.225 us 10.328 us 10.431 us]
-musli-storage/roundtrip-large
-                        time:   [9.0467 us 9.0881 us 9.1329 us]
-musli-wire/roundtrip-large
-                        time:   [11.906 us 11.933 us 11.964 us]
-
-cbor/roundtrip-small    time:   [138.40 ns 147.94 ns 158.60 ns]
-json/roundtrip-small    time:   [137.06 ns 137.93 ns 139.16 ns]
-bincode/roundtrip-small time:   [16.978 ns 17.425 ns 18.057 ns]
-musli-wire/roundtrip-small
-                        time:   [1.0177 ns 1.0227 ns 1.0277 ns]
-musli-storage/roundtrip-small
-                        time:   [802.38 ps 803.95 ps 805.65 ps]
-```
-
-Note that these benchmarks include no "waste", like extra unrecognized
-fields. This is an area where Müsli's current encoding indeed is expected to
-lag behind since it needs to perform a fair bit of work to walk over
-unrecognized data.
+<img src="https://raw.githubusercontent.com/udoprog/musli/main/images/rt-prim.png" alt="Roundtrip of a small object">
 
 [`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
 [bincode]: https://docs.rs/bincode
