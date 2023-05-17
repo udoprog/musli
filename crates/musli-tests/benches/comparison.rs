@@ -1,17 +1,18 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::prelude::*;
 
-use musli_tests::models::{Generate, LargeStruct, Primitives};
+use musli_tests::models::{Allocated, Generate, LargeStruct, Primitives};
 use musli_tests::utils;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rng = StdRng::seed_from_u64(123412327832);
 
-    let primitives_struct: Primitives = rng.generate();
-    let large_struct: LargeStruct = rng.generate();
+    let prim: Primitives = rng.generate();
+    let alloc: Allocated = rng.generate();
+    let lg: LargeStruct = rng.generate();
 
     macro_rules! group {
-        ($name:literal, $it:ident) => {{
+        ($name:expr, $it:ident) => {{
             let mut g = c.benchmark_group($name);
 
             macro_rules! bench {
@@ -24,67 +25,44 @@ fn criterion_benchmark(c: &mut Criterion) {
         }};
     }
 
-    macro_rules! it {
-        ($b:expr, $base:ident) => {
-            $b.iter(|| utils::$base::encode(&primitives_struct))
-        };
-    }
+    macro_rules! setup {
+        ($var:ident, $ty:ty) => {{
+            macro_rules! it {
+                ($b:expr, $base:ident) => {
+                    $b.iter(|| utils::$base::encode(&$var))
+                };
+            }
 
-    group!("enc-prim", it);
+            group!(concat!("enc-", stringify!($var)), it);
 
-    macro_rules! it {
-        ($b:expr, $base:ident) => {{
-            let data = utils::$base::encode(&primitives_struct);
-            $b.iter(|| utils::$base::decode::<Primitives>(&data))
+            macro_rules! it {
+                ($b:expr, $base:ident) => {{
+                    let data = utils::$base::encode(&$var);
+                    $b.iter(|| utils::$base::decode::<$ty>(&data))
+                }};
+            }
+
+            group!(concat!("dec-", stringify!($var)), it);
+
+            macro_rules! it {
+                ($b:expr, $base:ident) => {
+                    $b.iter(|| {
+                        let out = utils::$base::encode(&$var);
+                        let actual = utils::$base::decode::<$ty>(&out);
+                        debug_assert_eq!(actual, $var);
+                        criterion::black_box(actual);
+                        out
+                    })
+                };
+            }
+
+            group!(concat!("rt-", stringify!($var)), it);
         }};
     }
 
-    group!("dec-prim", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {
-            $b.iter(|| {
-                let out = utils::$base::encode(&primitives_struct);
-                let actual = utils::$base::decode::<Primitives>(&out);
-                debug_assert_eq!(actual, primitives_struct);
-                criterion::black_box(actual);
-                out
-            })
-        };
-    }
-
-    group!("rt-prim", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {
-            $b.iter(|| utils::$base::encode(&large_struct))
-        };
-    }
-
-    group!("enc-lg", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {{
-            let data = utils::$base::encode(&large_struct);
-            $b.iter(|| utils::$base::decode::<LargeStruct>(&data))
-        }};
-    }
-
-    group!("dec-lg", it);
-
-    macro_rules! it {
-        ($b:expr, $base:ident) => {
-            $b.iter(|| {
-                let out = utils::$base::encode(&large_struct);
-                let actual = utils::$base::decode::<LargeStruct>(&out);
-                debug_assert_eq!(actual, large_struct);
-                criterion::black_box(actual);
-                out
-            })
-        };
-    }
-
-    group!("rt-lg", it);
+    setup!(prim, Primitives);
+    setup!(alloc, Allocated);
+    setup!(lg, LargeStruct);
 }
 
 criterion_group!(benches, criterion_benchmark);

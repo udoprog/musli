@@ -25,7 +25,7 @@ model_map_string_key = ["std"]
 
 rkyv = ["dep:rkyv", "model_vec", "model_128", "model_map", "model_float"]
 dlhn = ["dep:dlhn", "model_vec", "model_usize", "model_tuple", "model_float", "model_map_string_key"]
-bitcode = ["dep:bitcode", "model_full"]
+bitcode = ["dep:bitcode", "model_vec", "model_usize", "model_tuple", "model_float", "model_map", "model_map_string_key"]
 serde_json = ["dep:serde_json", "model_full"]
 serde_cbor = ["dep:serde_cbor", "model_full"]
 bincode = ["dep:bincode", "model_full"]

@@ -55,8 +55,6 @@ pub struct Primitives {
     float32: f32,
     #[cfg(feature = "model_float")]
     float64: f64,
-    string: String,
-    bytes: Vec<u8>,
 }
 
 #[cfg(feature = "rkyv")]
@@ -92,6 +90,35 @@ impl Generate<Primitives> for StdRng {
             float32: self.generate(),
             #[cfg(feature = "model_float")]
             float64: self.generate(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
+#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(
+    feature = "rkyv",
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
+    archive(compare(PartialEq), check_bytes),
+    archive_attr(derive(Debug))
+)]
+#[musli(mode = Packed, packed)]
+pub struct Allocated {
+    string: String,
+    bytes: Vec<u8>,
+}
+
+#[cfg(feature = "rkyv")]
+impl PartialEq<Allocated> for &ArchivedAllocated {
+    #[inline]
+    fn eq(&self, other: &Allocated) -> bool {
+        *other == **self
+    }
+}
+
+impl Generate<Allocated> for StdRng {
+    fn generate(&mut self) -> Allocated {
+        Allocated {
             string: self.generate(),
             bytes: self.generate(),
         }
@@ -175,6 +202,7 @@ pub enum MediumEnum {
     StringVariant(String),
     #[musli(transparent)]
     NumbereVariant(u64),
+    EmptyTupleVariant(),
     NamedEmptyVariant {},
     NamedVariant {
         a: u32,
@@ -197,8 +225,9 @@ impl Generate<MediumEnum> for StdRng {
         match self.gen_range(0..=5) {
             0 => MediumEnum::StringVariant(self.generate()),
             1 => MediumEnum::NumbereVariant(self.generate()),
-            2 => MediumEnum::NamedEmptyVariant {},
-            3 => MediumEnum::NamedVariant {
+            2 => MediumEnum::EmptyTupleVariant(),
+            3 => MediumEnum::NamedEmptyVariant {},
+            4 => MediumEnum::NamedVariant {
                 a: self.generate(),
                 primitives: self.generate(),
                 b: self.generate(),
