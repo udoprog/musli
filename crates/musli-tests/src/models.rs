@@ -7,23 +7,29 @@ use std::collections::HashMap;
 
 use core::ops::Range;
 
+use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+#[cfg(feature = "musli")]
 use musli::{Decode, Encode};
-use rand::prelude::*;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "musli")]
 use crate::mode::Packed;
 
 pub use self::generate::Generate;
+pub use rand::prelude::*;
 
 miri! {
-    const LARGE_MEMBER_RANGE: Range<usize> = 100..500, 1..3;
-    const MEDIUM_RANGE: Range<usize> = 200..500, 1..3;
+    const PRIMITIVES_RANGE: Range<usize> = 10..100, 1..3;
+    const MEDIUM_RANGE: Range<usize> = 10..100, 1..3;
 }
 
-#[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "musli", derive(Encode, Decode))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -31,7 +37,7 @@ miri! {
     archive(compare(PartialEq), check_bytes),
     archive_attr(derive(Debug))
 )]
-#[musli(mode = Packed, packed)]
+#[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct Primitives {
     boolean: bool,
     character: char,
@@ -94,7 +100,9 @@ impl Generate<Primitives> for StdRng {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "musli", derive(Encode, Decode))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -102,10 +110,11 @@ impl Generate<Primitives> for StdRng {
     archive(compare(PartialEq), check_bytes),
     archive_attr(derive(Debug))
 )]
-#[musli(mode = Packed, packed)]
+#[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct Allocated {
     string: String,
     bytes: Vec<u8>,
+    c_string: CString,
 }
 
 #[cfg(feature = "rkyv")]
@@ -121,11 +130,14 @@ impl Generate<Allocated> for StdRng {
         Allocated {
             string: self.generate(),
             bytes: self.generate(),
+            c_string: self.generate(),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "musli", derive(Encode, Decode))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -133,7 +145,7 @@ impl Generate<Allocated> for StdRng {
     archive(compare(PartialEq), check_bytes),
     archive_attr(derive(Debug))
 )]
-#[musli(mode = Packed, packed)]
+#[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct Tuples {
     u0: (),
     u1: (bool,),
@@ -188,7 +200,9 @@ impl Generate<Tuples> for StdRng {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "musli", derive(Encode, Decode))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -196,11 +210,11 @@ impl Generate<Tuples> for StdRng {
     archive(compare(PartialEq), check_bytes),
     archive_attr(derive(Debug))
 )]
-#[musli(mode = Packed)]
+#[cfg_attr(feature = "musli", musli(mode = Packed))]
 pub enum MediumEnum {
-    #[musli(transparent)]
+    #[cfg_attr(feature = "musli", musli(transparent))]
     StringVariant(String),
-    #[musli(transparent)]
+    #[cfg_attr(feature = "musli", musli(transparent))]
     NumbereVariant(u64),
     EmptyTupleVariant(),
     NamedEmptyVariant {},
@@ -237,7 +251,9 @@ impl Generate<MediumEnum> for StdRng {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Encode, Decode, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "musli", derive(Encode, Decode))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -245,7 +261,7 @@ impl Generate<MediumEnum> for StdRng {
     archive(compare(PartialEq), check_bytes),
     archive_attr(derive(Debug))
 )]
-#[musli(mode = Packed, packed)]
+#[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct LargeStruct {
     primitives: Vec<Primitives>,
     #[cfg(all(feature = "model_vec", feature = "model_tuple"))]
@@ -271,9 +287,9 @@ impl PartialEq<LargeStruct> for &ArchivedLargeStruct {
 impl Generate<LargeStruct> for StdRng {
     fn generate(&mut self) -> LargeStruct {
         LargeStruct {
-            primitives: self.generate_range(LARGE_MEMBER_RANGE),
+            primitives: self.generate_range(PRIMITIVES_RANGE),
             #[cfg(all(feature = "model_vec", feature = "model_tuple"))]
-            tuples: self.generate_range(LARGE_MEMBER_RANGE),
+            tuples: self.generate_range(PRIMITIVES_RANGE),
             medium_vec: self.generate_range(MEDIUM_RANGE),
             #[cfg(feature = "model_map_string_key")]
             medium_map: self.generate_range(MEDIUM_RANGE),

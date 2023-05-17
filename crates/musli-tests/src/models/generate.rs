@@ -1,6 +1,8 @@
+#[cfg(feature = "std")]
 use core::hash::Hash;
 use core::ops::Range;
 
+use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -13,8 +15,9 @@ use std::collections::HashMap;
 
 miri! {
     const STRING_RANGE: Range<usize> = 0..256, 0..16;
-    const MAP_RANGE: Range<usize> = 100..500, 1..3;
-    const VEC_RANGE: Range<usize> = 100..500, 1..3;
+    #[cfg(feature = "std")]
+    const MAP_RANGE: Range<usize> = 10..100, 1..3;
+    const VEC_RANGE: Range<usize> = 10..100, 1..3;
 }
 
 pub trait Generate<T>: Sized {
@@ -81,6 +84,19 @@ impl Generate<String> for StdRng {
         }
 
         string
+    }
+}
+
+impl Generate<CString> for StdRng {
+    fn generate(&mut self) -> CString {
+        let mut string = Vec::new();
+
+        for _ in 0..self.gen_range(STRING_RANGE) {
+            string.push(self.gen_range(1..=u8::MAX));
+        }
+
+        string.push(0);
+        CString::from_vec_with_nul(string).unwrap()
     }
 }
 

@@ -41,6 +41,7 @@ deny!("rkyv", "model_tuple", "model_map_string_key", "model_usize");
 deny!("dlhn", "model_map", "model_128");
 deny!("bitcode", "model_128");
 
+#[cfg(feature = "musli")]
 mod mode;
 pub mod models;
 pub mod utils;
@@ -81,34 +82,48 @@ macro_rules! rt {
 /// Call the given macro with the existing feature matrix.
 #[macro_export]
 macro_rules! feature_matrix {
-    ($call:path) => {
+    ($call:path $(, $($tt:tt)*)?) => {
         #[cfg(feature = "serde_json")]
-        $call!(serde_json);
+        $call!(serde_json $(, $($tt)*)*);
         #[cfg(feature = "bincode")]
-        $call!(serde_bincode);
+        $call!(serde_bincode $(, $($tt)*)*);
         #[cfg(feature = "rmp-serde")]
-        $call!(serde_rmp);
+        $call!(serde_rmp $(, $($tt)*)*);
         #[cfg(feature = "musli-json")]
-        $call!(musli_json);
+        $call!(musli_json $(, $($tt)*)*);
         #[cfg(feature = "musli-wire")]
-        $call!(musli_wire);
+        $call!(musli_wire $(, $($tt)*)*);
         #[cfg(feature = "musli-descriptive")]
-        $call!(musli_descriptive);
+        $call!(musli_descriptive $(, $($tt)*)*);
         #[cfg(feature = "musli-storage")]
-        $call!(musli_storage);
+        $call!(musli_storage $(, $($tt)*)*);
         #[cfg(feature = "musli-storage")]
-        $call!(musli_storage_packed);
+        $call!(musli_storage_packed $(, $($tt)*)*);
         #[cfg(feature = "musli-value")]
-        $call!(musli_value);
+        $call!(musli_value $(, $($tt)*)*);
         #[cfg(all(feature = "dlhn", not(any(model_128, model_all))))]
-        $call!(serde_dlhn);
+        $call!(serde_dlhn $(, $($tt)*)*);
         #[cfg(feature = "serde_cbor")]
-        $call!(serde_cbor);
+        $call!(serde_cbor $(, $($tt)*)*);
         #[cfg(feature = "bitcode")]
-        $call!(serde_bitcode);
+        $call!(serde_bitcode $(, $($tt)*)*);
         #[cfg(feature = "bitcode")]
-        $call!(derive_bitcode);
+        $call!(derive_bitcode $(, $($tt)*)*);
         #[cfg(feature = "rkyv")]
-        $call!(rkyv);
+        $call!(rkyv $(, $($tt)*)*);
     };
+}
+
+#[macro_export]
+macro_rules! types {
+    ($call:path $(, $($tt:tt)*)?) => {
+        $call!($($($tt)*,)? prim, Primitives, PRIMITIVES, lg, LargeStruct, LARGE_STRUCTS, allocated, Allocated, ALLOCATED, medium_enum, MediumEnum, MEDIUM_ENUMS);
+    }
+}
+
+const SEED: u64 = 2718281828459045235;
+
+pub fn rng() -> rand::prelude::StdRng {
+    use rand::prelude::*;
+    rand::prelude::StdRng::seed_from_u64(SEED)
 }
