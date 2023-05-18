@@ -190,7 +190,6 @@ impl Writer for Vec<u8> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Writer for &mut [u8] {
     type Error = BufferError;
     type Mut<'this> = &'this mut Self where Self: 'this;
