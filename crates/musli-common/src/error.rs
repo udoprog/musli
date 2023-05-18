@@ -1,8 +1,8 @@
-//! Generic error types that can be used for most [Reader] / [Writer]
+//! Generic error types that can be used for most [`Reader`] / [`Writer`]
 //! implementations.
 //!
-//! [Reader]: crate::reader::Reader
-//! [Writer]: crate::reader::Writer
+//! [`Reader`]: crate::reader::Reader
+//! [`Writer`]: crate::writer::Writer
 
 use core::fmt;
 

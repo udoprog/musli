@@ -55,3 +55,10 @@ cargo +nightly miri run --bin fuzz -- --random
 
 > **Note** you can add the running of optional crates by enabling its
 > corresponding feature, such as `--features bincode`.
+
+<br>
+
+## Potential security issues discovered by this crate
+
+* `dlhn`: Allocating and initializing large arrays based on untrusted input
+  (DoS): [dlhn#11](https://github.com/otake84/dlhn/issues/11).

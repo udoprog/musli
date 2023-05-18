@@ -43,7 +43,7 @@ imply, but self-descriptive formats are also possible (see
 ```rust
 use musli::{Encode, Decode};
 
-#[derive(Debug, PartialEq, Encode, Decode)]
+#[derive(Encode, Decode)]
 struct Person {
     /* .. fields .. */
 }
@@ -192,22 +192,28 @@ perform [bit packing] if the benefits are obvious.
 
 <br>
 
-## Examples
+## Upgrade stability
 
-The following is an example of *full upgrade stability* using [`musli-wire`]:
+The following is an example of *full upgrade stability* using
+[`musli-wire`]. Note how `Version1` can be decoded from an instance of
+`Version2` because it understands how to skip fields which are part of
+`Version2`. We're also explicitly `#[musli(rename = ..)]` the fields to
+ensure that they don't change in case they are re-ordered.
 
 ```rust
 use musli::{Encode, Decode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Version1 {
+    #[musli(rename = 0)]
     name: String,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Version2 {
+    #[musli(rename = 0)]
     name: String,
-    #[musli(default)]
+    #[musli(default, rename = 1)]
     age: Option<u32>,
 }
 
@@ -217,14 +223,13 @@ let version2 = musli_wire::to_buffer(&Version2 {
 })?;
 
 let version1: Version1 = musli_wire::decode(version2.as_slice())?;
-
-assert_eq!(version1, Version1 {
-    name: String::from("Aristotle"),
-});
 ```
 
 The following is an example of *partial upgrade stability* using
-[`musli-storage`]:
+[`musli-storage`] on the same data models. Note how `Version2` can be
+decoded from `Version1` but *not* the other way around. That's why it's
+suitable for on-disk storage the schema can evolve from older to newer
+versions.
 
 ```rust
 use musli::{Encode, Decode};
@@ -241,11 +246,6 @@ let version1 = musli_storage::to_buffer(&Version1 {
 })?;
 
 let version2: Version2 = musli_storage::decode(version1.as_slice())?;
-
-assert_eq!(version2, Version2 {
-    name: String::from("Aristotle"),
-    age: None,
-});
 ```
 
 <br>
@@ -266,6 +266,10 @@ modes which are present in a model and [`DefaultMode`]. This way, an
 encoding which uses `DefaultMode` (which it does by default) should always
 work.
 
+For more information on how to configure modes, see the [`derives`] module.
+Below is a simple example of how we can use two modes to provide two
+different kinds of serialization to a single struct.
+
 ```rust
 use musli::mode::{DefaultMode, Mode};
 use musli::{Decode, Encode};
@@ -274,7 +278,7 @@ use musli_json::Encoding;
 enum Alt {}
 impl Mode for Alt {}
 
-#[derive(Debug, PartialEq, Decode, Encode)]
+#[derive(Decode, Encode)]
 #[musli(mode = Alt, packed)]
 #[musli(default_field_name = "name")]
 struct Word<'a> {
@@ -292,29 +296,40 @@ let word = Word {
 
 let out = CONFIG.to_string(&word)?;
 assert_eq!(out, r#"{"text":"あります","teineigo":true}"#);
-let word2 = CONFIG.from_str(&out[..])?;
-assert_eq!(word, word2);
 
 let out = ALT_CONFIG.to_string(&word)?;
 assert_eq!(out, r#"["あります",true]"#);
-let word2 = ALT_CONFIG.from_str(&out[..])?;
-assert_eq!(word, word2);
-
 ```
 
 <br>
 
 ## Unsafety
 
-This library currently has two instances of unsafe:
+This is a non-exhaustive list of unsafe use in this crate, and why they are
+used:
 
 * A `mem::transcode` in `Tag::kind`. Which guarantees that converting into
-  the `Kind` enum which is `#[repr(u8)]` is as efficient as possible. (Soon
-  to be replaced with an equivalent safe variant).
+  the `Kind` enum which is `#[repr(u8)]` is as efficient as possible.
 
 * A largely unsafe `SliceReader` which provides more efficient reading than
-  the default `Reader` impl for `&[u8]` does (which uses split_at). Since it
-  can perform most of the necessary comparisons directly on the pointers.
+  the default `Reader` impl for `&[u8]` does. Since it can perform most of
+  the necessary comparisons directly on the pointers.
+
+* Some unsafety related to UTF-8 handling in `musli_json`, because we check
+  UTF-8 validity internally ourselves (like `serde_json`).
+
+* `FixedBytes<N>` is a stack-based container that can operate over
+  uninitialized data. Its implementation is largely unsafe. With it
+  stack-based serialization can be performed which is useful in no-std
+  environments.
+
+* Some unsafe is used for owned `String` decoding in all binary formats to
+  support faster string processing using [`simdutf8`]. Disabling the
+  `simdutf8` feature (enabled by default) removes the use of this unsafe.
+
+To ensure this library is correctly implemented with regards to memory
+safety, extensive testing is performed using `miri`. For more information on
+this, see [`musli-tests`] for more information on this.
 
 <br>
 
@@ -347,3 +362,4 @@ The two benchmark suites portrayed are:
 [`serde`]: https://serde.rs
 [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
 [when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
+[`simdutf8`]: https://docs.rs/simdutf8

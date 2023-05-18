@@ -30,8 +30,10 @@ impl fmt::Display for Utf8Error {
     }
 }
 
-/// The same as [`String::from_utf`], but the implementation can different
+/// The same as [`String::from_utf8`], but the implementation can different
 /// depending on if the `simdutf8` feature is enabled.
+/// 
+/// [`String::from_utf8`]: alloc::string::String::from_utf8
 #[inline(always)]
 #[cfg(all(feature = "alloc", not(feature = "simdutf8")))]
 pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
@@ -41,8 +43,10 @@ pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
     }
 }
 
-/// The same as [`String::from_utf`], but the implementation can different
+/// The same as [`String::from_utf8`], but the implementation can different
 /// depending on if the `simdutf8` feature is enabled.
+/// 
+/// [`String::from_utf8`]: alloc::string::String::from_utf8
 #[inline(always)]
 #[cfg(all(feature = "alloc", feature = "simdutf8"))]
 pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {

@@ -337,6 +337,10 @@
 //!   support faster string processing using [`simdutf8`]. Disabling the
 //!   `simdutf8` feature (enabled by default) removes the use of this unsafe.
 //!
+//! To ensure this library is correctly implemented with regards to memory
+//! safety, extensive testing is performed using `miri`. For more information on
+//! this, see [`musli-tests`] for more information on this.
+//!
 //! <br>
 //!
 //! ## Performance
