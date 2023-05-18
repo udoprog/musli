@@ -109,8 +109,8 @@
 //! ```
 //!
 //! Another major aspect where Müsli differs is in the concept of
-//! [modes](#modes) (note the `M` parameter above). Since this parameterises the
-//! `Encode` and `Decode` traits it allows for the same data model to be
+//! [modes](#modes) (note the `M` parameter above). Since this is a parameter of
+//! the `Encode` and `Decode` traits it allows for the same data model to be
 //! serialized in many different ways. This is a larger topic and is covered
 //! further down.
 //!
@@ -123,8 +123,8 @@
 //! Add the following to your `Cargo.toml`:
 //!
 //! ```toml
-//! musli = "0.0.45"
-//! musli-wire = "0.0.45"
+//! musli = "0.0.46"
+//! musli-wire = "0.0.46"
 //! ```
 //!
 //! <br>
