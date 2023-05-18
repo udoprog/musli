@@ -16,6 +16,8 @@ mod de;
 mod en;
 mod expander;
 mod internals;
+#[cfg(feature = "test")]
+mod test;
 mod types;
 
 /// Please refer to the main [musli documentation](https://docs.rs/musli).
@@ -139,4 +141,24 @@ fn to_compile_errors(errors: Vec<syn::Error>) -> proc_macro2::TokenStream {
     }
 
     output
+}
+
+#[cfg(feature = "test")]
+#[proc_macro_derive(Generate, attributes(generate))]
+pub fn derive_generate(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    let mut cx = test::Ctxt::default();
+
+    if let Ok(stream) = test::expand(&mut cx, &input) {
+        return stream.into();
+    }
+
+    let mut stream = proc_macro2::TokenStream::default();
+
+    for error in cx.errors {
+        stream.extend(error.to_compile_error());
+    }
+
+    stream.into()
 }

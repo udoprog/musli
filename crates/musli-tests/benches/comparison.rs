@@ -26,7 +26,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     macro_rules! setup {
         ($($var:ident, $ty:ty, $num:expr),*) => {
             $({
-                let $var: $ty = rng.generate();
+                let $var: $ty = Generate::generate(&mut rng);
 
                 macro_rules! it {
                     ($b:expr, $base:ident, $buf:ident) => {{

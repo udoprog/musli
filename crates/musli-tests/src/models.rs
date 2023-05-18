@@ -14,6 +14,7 @@ use alloc::vec::Vec;
 
 #[cfg(feature = "musli")]
 use musli::{Decode, Encode};
+use musli_macros::Generate;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +29,7 @@ miri! {
     const MEDIUM_RANGE: Range<usize> = 10..100, 1..3;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
@@ -72,36 +73,7 @@ impl PartialEq<Primitives> for &ArchivedPrimitives {
     }
 }
 
-impl Generate<Primitives> for StdRng {
-    fn generate(&mut self) -> Primitives {
-        Primitives {
-            boolean: self.generate(),
-            character: self.generate(),
-            unsigned8: self.generate(),
-            unsigned16: self.generate(),
-            unsigned32: self.generate(),
-            unsigned64: self.generate(),
-            #[cfg(feature = "model_128")]
-            unsigned128: self.generate(),
-            signed8: self.generate(),
-            signed16: self.generate(),
-            signed32: self.generate(),
-            signed64: self.generate(),
-            #[cfg(feature = "model_128")]
-            signed128: self.generate(),
-            #[cfg(feature = "model_usize")]
-            unsignedsize: self.generate(),
-            #[cfg(feature = "model_usize")]
-            signedsize: self.generate(),
-            #[cfg(feature = "model_float")]
-            float32: self.generate(),
-            #[cfg(feature = "model_float")]
-            float64: self.generate(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
@@ -127,18 +99,7 @@ impl PartialEq<Allocated> for &ArchivedAllocated {
     }
 }
 
-impl Generate<Allocated> for StdRng {
-    fn generate(&mut self) -> Allocated {
-        Allocated {
-            string: self.generate(),
-            bytes: self.generate(),
-            #[cfg(feature = "model_cstring")]
-            c_string: self.generate(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
@@ -178,32 +139,7 @@ impl PartialEq<Tuples> for &ArchivedTuples {
     }
 }
 
-impl Generate<Tuples> for StdRng {
-    fn generate(&mut self) -> Tuples {
-        Tuples {
-            u0: self.generate(),
-            u1: self.generate(),
-            u2: self.generate(),
-            u3: self.generate(),
-            u4: self.generate(),
-            #[cfg(feature = "model_float")]
-            u5: self.generate(),
-            #[cfg(feature = "model_float")]
-            u6: self.generate(),
-            i0: self.generate(),
-            i1: self.generate(),
-            i2: self.generate(),
-            i3: self.generate(),
-            i4: self.generate(),
-            #[cfg(feature = "model_float")]
-            i5: self.generate(),
-            #[cfg(feature = "model_float")]
-            i6: self.generate(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
@@ -218,7 +154,7 @@ pub enum MediumEnum {
     #[cfg_attr(feature = "musli", musli(transparent))]
     StringVariant(String),
     #[cfg_attr(feature = "musli", musli(transparent))]
-    NumbereVariant(u64),
+    NumberedVariant(u64),
     EmptyTupleVariant(),
     NamedEmptyVariant {},
     NamedVariant {
@@ -237,24 +173,7 @@ impl PartialEq<MediumEnum> for &ArchivedMediumEnum {
     }
 }
 
-impl Generate<MediumEnum> for StdRng {
-    fn generate(&mut self) -> MediumEnum {
-        match self.gen_range(0..=5) {
-            0 => MediumEnum::StringVariant(self.generate()),
-            1 => MediumEnum::NumbereVariant(self.generate()),
-            2 => MediumEnum::EmptyTupleVariant(),
-            3 => MediumEnum::NamedEmptyVariant {},
-            4 => MediumEnum::NamedVariant {
-                a: self.generate(),
-                primitives: self.generate(),
-                b: self.generate(),
-            },
-            _ => MediumEnum::UnnamedVariant,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
@@ -266,11 +185,15 @@ impl Generate<MediumEnum> for StdRng {
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct LargeStruct {
+    #[generate(range = PRIMITIVES_RANGE)]
     primitives: Vec<Primitives>,
     #[cfg(all(feature = "model_vec", feature = "model_tuple"))]
+    #[generate(range = PRIMITIVES_RANGE)]
     tuples: Vec<(Tuples, Tuples)>,
+    #[generate(range = MEDIUM_RANGE)]
     medium_vec: Vec<MediumEnum>,
     #[cfg(feature = "model_map_string_key")]
+    #[generate(range = MEDIUM_RANGE)]
     medium_map: HashMap<String, MediumEnum>,
     #[cfg(feature = "model_map_string_key")]
     string_keys: HashMap<String, u64>,
@@ -284,23 +207,5 @@ impl PartialEq<LargeStruct> for &ArchivedLargeStruct {
     #[inline]
     fn eq(&self, other: &LargeStruct) -> bool {
         *other == **self
-    }
-}
-
-impl Generate<LargeStruct> for StdRng {
-    fn generate(&mut self) -> LargeStruct {
-        LargeStruct {
-            primitives: self.generate_range(PRIMITIVES_RANGE),
-            #[cfg(all(feature = "model_vec", feature = "model_tuple"))]
-            tuples: self.generate_range(PRIMITIVES_RANGE),
-            medium_vec: self.generate_range(MEDIUM_RANGE),
-            #[cfg(feature = "model_map_string_key")]
-            medium_map: self.generate_range(MEDIUM_RANGE),
-            #[cfg(feature = "model_map_string_key")]
-            string_keys: self.generate(),
-            #[cfg(feature = "model_map")]
-            number_keys: self.generate(),
-            number_vec: self.generate(),
-        }
     }
 }
