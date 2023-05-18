@@ -165,7 +165,7 @@ fn main() -> Result<()> {
                                 write!(o, "C")?;
                                 writeln!(o)?;
                                 writeln!(o, "{name}: model mismatch: {} struct {index}", stringify!($name))?;
-                                writeln!(o, "actual: {actual:?}")?;
+                                writeln!(o, "  actual: {actual:?}")?;
                                 writeln!(o, "expected: {var:?}")?;
                                 break 'outer;
                             }
