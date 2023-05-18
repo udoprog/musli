@@ -309,9 +309,9 @@
 //!
 //! #### `#[musli(name_type = ..)]`
 //!
-//! This indicates which type any contained `#[musli(tag = ..)]` attributes
+//! This indicates which type any contained `#[musli(rename = ..)]` attributes
 //! should have. Tags can usually be inferred, but specifying this field ensures
-//! that all tags have a well-defined type.
+//! that all tags have a single well-defined type.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -374,12 +374,24 @@
 //! See [enum representations](#enum-representations) for details on this
 //! representation.
 //!
+//! ```rust
+//! # use musli::{Encode, Decode};
+//! # #[derive(Encode, Decode)] struct Params;
+//! # #[derive(Encode, Decode)] struct Value;
+//! #[derive(Encode, Decode)]
+//! #[musli(tag = "type")]
+//! enum Message {
+//!     Request { id: String, method: String, params: Params },
+//!     Response { id: String, result: Value },
+//! }
+//! ```
+//!
 //! <br>
 //!
 //! ## Variant attributes
 //!
 //! *Variant attributes* are attributes which apply to each individual variant
-//! in an `enum`. Like the use of `#[musli(name)]` here:
+//! in an `enum`. Like the use of `#[musli(rename = ..)]` here:
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -398,9 +410,9 @@
 //!
 //! #### `#[musli(rename = ..)]`
 //!
-//! This allows for renaming a variant from its default value.
-//! It can take any value (including complex ones) that can be serialized with
-//! the current encoding, such as:
+//! This allows for renaming a variant from its default value. It can take any
+//! value (including complex ones) that can be serialized with the current
+//! encoding, such as:
 //!
 //! * `#[musli(rename = 1)]`
 //! * `#[musli(rename = "Hello World")]`
@@ -409,7 +421,36 @@
 //!   [`Encode`] and [`Decode`] as appropriate).
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through
-//! the `#[musli(name_type)]` container attribute (see above).
+//! the `#[musli(name_type)]` attribute.
+//!
+//! <br>
+//!
+//! #### `#[musli(name_type = ..)]`
+//!
+//! This indicates which type any contained `#[musli(tag = ..)]` attributes
+//! should have. Tags can usually be inferred, but specifying this field ensures
+//! that all tags have a well-defined type.
+//!
+//! This attribute takes priority over the one with the same name on the
+//! container.
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
+//! #[musli(transparent)]
+//! struct CustomTag<'a>(&'a [u8]);
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(name_type = usize)]
+//! enum Enum {
+//!     #[musli(name_type = CustomTag)]
+//!     Variant {
+//!         #[musli(rename = CustomTag(b"name in bytes"))]
+//!         name: String,
+//!     }
+//! }
+//! ```
 //!
 //! <br>
 //!
@@ -446,35 +487,6 @@
 //! This can only be used on variants which have a single field. It will cause
 //! that field to define how that variant is encoded or decoded transparently
 //! without being treated as a field.
-//!
-//! <br>
-//!
-//! #### `#[musli(name_type = ..)]`
-//!
-//! This indicates which type any contained `#[musli(tag = ..)]` attributes
-//! should have. Tags can usually be inferred, but specifying this field ensures
-//! that all tags have a well-defined type.
-//!
-//! This attribute takes priority over the one with the same name on the
-//! container.
-//!
-//! ```
-//! use musli::{Encode, Decode};
-//!
-//! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-//! #[musli(transparent)]
-//! struct CustomTag<'a>(&'a [u8]);
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(name_type = usize)]
-//! enum Enum {
-//!     #[musli(name_type = CustomTag)]
-//!     Variant {
-//!         #[musli(rename = CustomTag(b"name in bytes"))]
-//!         name: String,
-//!     }
-//! }
-//! ```
 //!
 //! <br>
 //!
@@ -694,9 +706,13 @@
 //! supported by *serde*:
 //!
 //! * Externally tagged (*default*).
-//! * Internally tagged when `#[musli(tag)]` is specified on the enum.
-//! * Adjacently tagged when both `#[musli(tag)]` and `#[musli(content)]` are
-//!   specified.
+//! * Internally tagged when `#[musli(tag = ..)]` is specified on the enum.
+//! * Adjacently tagged when both `#[musli(tag = ..)]` and `#[musli(content)]`
+//!   are specified.
+//!
+//! <br>
+//!
+//! ## Externally tagged
 //!
 //! ```rust
 //! # use musli::{Encode, Decode};
@@ -708,10 +724,6 @@
 //!     Response { id: String, result: Value },
 //! }
 //! ```
-//!
-//! <br>
-//!
-//! ## Externally tagged
 //!
 //! When an enum is externally tagged it is represented by a single field
 //! indicating the variant of the enum.

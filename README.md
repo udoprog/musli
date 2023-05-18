@@ -264,12 +264,12 @@ let version2: Version2 = musli_storage::decode(version1.as_slice())?;
 ## Modes
 
 In Müsli the same model can be serialized in different ways. Instead of
-requiring the use of multiple models, we instead support each model
-implementing different *modes*.
+requiring the use of distinct models we support implementing different
+*modes* for a single model.
 
 A mode allows for different encoding attributes to apply depending on which
-mode something is performed in. A mode can apply to *any* musli parameter
-giving you a lot of flexibility.
+mode an encoder is configured to use. A mode can apply to *any* musli
+parameter giving you a lot of flexibility.
 
 If a mode is not specified, an implementation will apply to all modes (`M:
 Mode`), if at least one mode is specified it will be implemented for all
