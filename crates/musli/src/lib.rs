@@ -235,8 +235,7 @@
 //! versions.
 //!
 //! ```rust
-//! use musli::{Encode, Decode};
-//!
+//! # use musli::{Encode, Decode};
 //! # #[derive(Debug, PartialEq, Encode, Decode)]
 //! # struct Version1 { name: String }
 //! # #[derive(Debug, PartialEq, Encode, Decode)]
