@@ -16,10 +16,11 @@ keywords = ["no_std", "serialization"]
 categories = ["encoding"]
 
 [features]
-default = ["std", "musli", "model_full"]
+default = ["std", "musli", "model_full", "musli-json", "musli-value"]
 extra = ["rkyv", "dlhn", "bitcode", "serde_cbor"]
-full = ["rmp-serde", "bincode", "serde_json"]
-musli = ["musli-wire", "musli-descriptive", "musli-storage", "musli-json", "musli-value"]
+full = ["rmp-serde", "bincode", "postcard", "musli-json", "serde_json"]
+musli = ["musli-wire", "musli-descriptive", "musli-storage"]
+text = ["musli-json", "serde_json"]
 std = ["musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std", "rkyv?/std"]
 test = ["musli-wire", "musli-storage", "musli-descriptive"]
 simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptive?/simdutf8"]
@@ -51,6 +52,7 @@ bincode = ["dep:bincode", "serde"]
 rmp-serde = ["dep:rmp-serde", "serde"]
 serde = ["dep:serde", "bitcode?/serde"]
 rkyv = ["dep:rkyv", "std"]
+postcard = ["dep:postcard", "serde"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.49", default-features = false, optional = true, features = ["alloc"] }
@@ -71,6 +73,7 @@ serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc"
 dlhn = { version = "0.1.5", default-features = false, optional = true }
 bitcode = { version = "0.4.0", default-features = false, optional = true, features = ["derive"] }
 rkyv = { version = "0.7.42", default-features = false, optional = true, features = ["alloc", "size_32", "validation"] }
+postcard = { version = "1.0.4",  default-features = false, optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports"] }

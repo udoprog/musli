@@ -24,13 +24,13 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     macro_rules! setup {
-        ($($var:ident, $ty:ty, $num:expr),*) => {
+        ($($var:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
             $({
                 let $var: $ty = Generate::generate(&mut rng);
 
                 macro_rules! it {
                     ($b:expr, $base:ident, $buf:ident) => {{
-                        utils::$base::reset(&mut $buf);
+                        utils::$base::reset(&mut $buf, $size_hint, &$var);
                         $b.iter(|| {
                             black_box(utils::$base::encode(&mut $buf, &$var).unwrap());
                         })
@@ -41,7 +41,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
                 macro_rules! it {
                     ($b:expr, $base:ident, $buf:ident) => {{
-                        utils::$base::reset(&mut $buf);
+                        utils::$base::reset(&mut $buf, $size_hint, &$var);
                         let data = utils::$base::encode(&mut $buf, &$var).unwrap();
                         $b.iter(|| utils::$base::decode::<$ty>(&data).unwrap())
                     }};
@@ -51,7 +51,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
                 macro_rules! it {
                     ($b:expr, $base:ident, $buf:ident) => {{
-                        utils::$base::reset(&mut $buf);
+                        utils::$base::reset(&mut $buf, $size_hint, &$var);
 
                         $b.iter(|| {
                             let out = utils::$base::encode(&mut $buf, &$var).unwrap();
