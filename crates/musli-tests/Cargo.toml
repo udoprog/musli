@@ -16,16 +16,18 @@ keywords = ["no_std", "serialization"]
 categories = ["encoding"]
 
 [features]
-default = ["std", "core", "model_full"]
+default = ["std", "musli", "model_full"]
 extra = ["rkyv", "dlhn", "bitcode"]
-full = ["musli", "rmp-serde", "bincode", "serde_json", "serde_cbor"]
-core = ["musli", "musli-wire", "musli-descriptive", "musli-storage", "musli-json", "musli-value"]
+full = ["rmp-serde", "bincode", "serde_json", "serde_cbor"]
+musli = ["musli-wire", "musli-descriptive", "musli-storage", "musli-json", "musli-value"]
 std = ["musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std", "rkyv?/std"]
 test = ["musli-wire", "musli-storage", "musli-descriptive"]
 simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptive?/simdutf8"]
-musli-wire = ["dep:musli-wire", "musli"]
-musli-descriptive = ["dep:musli-descriptive", "musli"]
-musli-storage = ["dep:musli-storage", "musli"]
+musli-wire = ["dep:musli", "dep:musli-wire"]
+musli-descriptive = ["dep:musli", "dep:musli-descriptive"]
+musli-storage = ["dep:musli", "dep:musli-storage"]
+musli-json = ["dep:musli", "dep:musli-json"]
+musli-value = ["dep:musli", "dep:musli-value"]
 
 model_full = ["model_vec", "model_128", "model_usize", "model_tuple", "model_float", "model_map", "model_map_string_key", "model_cstring"]
 model_minimal = ["model_vec", "model_float"]
@@ -54,7 +56,7 @@ musli = { path = "../musli", default-features = false, optional = true, features
 musli-wire = { path = "../musli-wire", default-features = false, features = ["alloc", "test"], optional = true }
 musli-descriptive = { path = "../musli-descriptive", default-features = false, features = ["alloc", "test"], optional = true }
 musli-storage = { path = "../musli-storage", default-features = false, features = ["alloc", "test"], optional = true }
-musli-json = { path = "../musli-json", default-features = false, features = ["alloc", "test"], optional = true }
+musli-json = { path = "../musli-json", default-features = false, features = ["alloc", "test",], optional = true }
 musli-value = { path = "../musli-value", default-features = false, features = ["alloc", "test"], optional = true }
 
 anyhow = "1.0.71"
@@ -62,7 +64,7 @@ serde = { version = "1.0.163", default-features = false, optional = true, featur
 rand = { version = "0.8.5", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.1", optional = true }
 bincode = { version = "1.3.3", default-features = false, optional = true }
-serde_json = { version = "1.0.96", default-features = false, features = ["alloc", "arbitrary_precision"], optional = true }
+serde_json = { version = "1.0.96", default-features = false, features = ["alloc", "float_roundtrip"], optional = true }
 serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc", "std"], optional = true }
 dlhn = { version = "0.1.5", default-features = false, optional = true }
 bitcode = { version = "0.4.0", default-features = false, optional = true, features = ["derive"] }

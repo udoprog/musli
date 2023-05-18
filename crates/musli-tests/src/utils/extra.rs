@@ -161,7 +161,7 @@ pub mod serde_bitcode {
     use serde::{Deserialize, Serialize};
 
     pub fn buffer() -> Buffer {
-        Buffer::with_capacity(10000000)
+        Buffer::with_capacity(4096)
     }
 
     pub fn reset(_: &mut Buffer) {}
@@ -193,7 +193,7 @@ pub mod derive_bitcode {
     use bitcode::{Decode, Encode};
 
     pub fn buffer() -> Buffer {
-        Buffer::with_capacity(10000000)
+        Buffer::with_capacity(4096)
     }
 
     pub fn reset(_: &mut Buffer) {}

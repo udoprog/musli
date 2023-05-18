@@ -18,7 +18,7 @@
 //! `model_minimal`.
 //!
 //! ```
-//! cargo bench --no-default-features --features full,core,extra,model_minimal,simdutf8
+//! cargo bench --no-default-features --features musli,full,extra,model_minimal,simdutf8
 //! ```
 //!
 //! To run benchmarks for serialization suites which *do* support all features, do:
@@ -98,7 +98,6 @@ deny!("rkyv", "model_tuple", "model_map_string_key", "model_usize");
 deny!("dlhn", "model_map", "model_128");
 deny!("bitcode", "model_128");
 
-#[cfg(feature = "musli")]
 mod mode;
 pub mod models;
 pub mod utils;

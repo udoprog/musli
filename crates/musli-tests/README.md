@@ -21,7 +21,7 @@ The exact tradeoff can be seen by comparing the feature `model_full` with
 `model_minimal`.
 
 ```rust
-cargo bench --no-default-features --features full,core,extra,model_minimal,simdutf8
+cargo bench --no-default-features --features musli,full,extra,model_minimal,simdutf8
 ```
 
 To run benchmarks for serialization suites which *do* support all features, do:
