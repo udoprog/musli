@@ -24,6 +24,9 @@ mod value;
 pub use self::value::{AsValueDecoder, Value};
 pub use error::ValueError;
 
+/// Convenience type alias for error raised by `musli-value`.
+pub type Result<T, E = ValueError> = core::result::Result<T, E>;
+
 use en::ValueEncoder;
 use musli::{Decode, Encode};
 

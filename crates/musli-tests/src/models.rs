@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use core::ops::Range;
 
+#[cfg(feature = "model_cstring")]
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -114,6 +115,7 @@ impl Generate<Primitives> for StdRng {
 pub struct Allocated {
     string: String,
     bytes: Vec<u8>,
+    #[cfg(feature = "model_cstring")]
     c_string: CString,
 }
 
@@ -130,6 +132,7 @@ impl Generate<Allocated> for StdRng {
         Allocated {
             string: self.generate(),
             bytes: self.generate(),
+            #[cfg(feature = "model_cstring")]
             c_string: self.generate(),
         }
     }

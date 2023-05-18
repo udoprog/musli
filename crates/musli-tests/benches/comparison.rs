@@ -27,7 +27,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
                 macro_rules! it {
                     ($b:expr, $base:ident) => {
-                        $b.iter(|| utils::$base::encode(&$var))
+                        $b.iter(|| utils::$base::encode(&$var).unwrap())
                     };
                 }
 
@@ -35,8 +35,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
                 macro_rules! it {
                     ($b:expr, $base:ident) => {{
-                        let data = utils::$base::encode(&$var);
-                        $b.iter(|| utils::$base::decode::<$ty>(&data))
+                        let data = utils::$base::encode(&$var).unwrap();
+                        $b.iter(|| utils::$base::decode::<$ty>(&data).unwrap())
                     }};
                 }
 
@@ -45,8 +45,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                 macro_rules! it {
                     ($b:expr, $base:ident) => {
                         $b.iter(|| {
-                            let out = utils::$base::encode(&$var);
-                            let actual = utils::$base::decode::<$ty>(&out);
+                            let out = utils::$base::encode(&$var).unwrap();
+                            let actual = utils::$base::decode::<$ty>(&out).unwrap();
                             debug_assert_eq!(actual, $var);
                             criterion::black_box(actual);
                             out

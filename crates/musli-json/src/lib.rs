@@ -27,6 +27,7 @@ mod de;
 mod en;
 pub mod encoding;
 pub mod reader;
+pub use self::reader::ParseError;
 
 #[cfg(feature = "alloc")]
 pub use self::encoding::to_string;

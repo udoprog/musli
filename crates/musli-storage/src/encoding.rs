@@ -56,7 +56,7 @@ where
     DEFAULT.to_writer(writer, value)
 }
 
-/// Encode the given value to a [Buffer] using the [DEFAULT] configuration.
+/// Encode the given value to a [`Buffer`] using the [DEFAULT] configuration.
 #[inline]
 pub fn to_buffer<T>(value: &T) -> Result<Buffer, BufferError>
 where
@@ -65,7 +65,7 @@ where
     DEFAULT.to_buffer(value)
 }
 
-/// Encode the given value to a [Vec] using the [DEFAULT] configuration.
+/// Encode the given value to a [`Vec`] using the [DEFAULT] configuration.
 #[cfg(feature = "alloc")]
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, BufferError>
@@ -267,7 +267,7 @@ where
         T::encode(value, StorageEncoder::<_, I, L>::new(&mut writer))
     }
 
-    /// Encode the given value to a [Buffer] using the current configuration.
+    /// Encode the given value to a [`Buffer`] using the current configuration.
     #[inline]
     pub fn to_buffer<T>(self, value: &T) -> Result<Buffer, BufferError>
     where
@@ -278,7 +278,7 @@ where
         Ok(data)
     }
 
-    /// Encode the given value to a [Vec] using the current configuration.
+    /// Encode the given value to a [`Vec`] using the current configuration.
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, BufferError>

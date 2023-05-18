@@ -44,6 +44,7 @@ jobs:
         components: miri
     - run: cargo miri test --workspace --exclude musli-common
     - run: cargo miri run --bin fuzz
+    - run: cargo miri run --bin fuzz --random
 
   each_package:
     needs: [rustfmt, clippy]
