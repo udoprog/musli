@@ -9,7 +9,7 @@ pub mod serde_dlhn {
     use serde::{Deserialize, Serialize};
 
     pub fn buffer() -> Vec<u8> {
-        alloc::vec![0; 4096]
+        Vec::with_capacity(4096)
     }
 
     pub fn reset(buf: &mut Vec<u8>) {
@@ -123,7 +123,7 @@ pub mod serde_rmp {
     use serde::{Deserialize, Serialize};
 
     pub fn buffer() -> Vec<u8> {
-        alloc::vec![0; 4096]
+        Vec::with_capacity(4096)
     }
 
     pub fn reset(buf: &mut Vec<u8>) {

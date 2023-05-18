@@ -2,10 +2,15 @@
 //! [<img alt="crates.io" src="https://img.shields.io/crates/v/musli.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/musli)
 //! [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-musli-66c2a5?style=for-the-badge&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/musli)
 //!
-//! Excellent performance, no compromises!
+//! Excellent performance, no compromises[^1]!
 //!
 //! Müsli is a flexible, fast, and generic binary serialization framework for
-//! Rust.
+//! Rust, in the same vein as [`serde`].
+//!
+//! It provides a set of [formats](#formats), each with its own well-documented
+//! set of features and tradeoffs.
+//!
+//! [^1]: As in Müsli should be able to do everything you need and more.
 //!
 //! <br>
 //!
@@ -14,6 +19,7 @@
 //! * For information on how to implement [`Encode`] and [`Decode`], see
 //!   [`derives`].
 //! * For information on how this library is tested, see [`musli-tests`].
+//! * For [performance](#performance) and [size comparisons](#size-comparisons).
 //!
 //! <br>
 //!
@@ -356,6 +362,49 @@
 //! <img src="https://raw.githubusercontent.com/udoprog/musli/main/images/rt-lg.png" alt="Roundtrip of a large object">
 //!
 //! <img src="https://raw.githubusercontent.com/udoprog/musli/main/images/rt-prim.png" alt="Roundtrip of a small object">
+//!
+//! <br>
+//!
+//! ## Size comparisons
+//!
+//! This is not yet an area which has received much focus, but because people
+//! are bound to ask the following section performs a *raw* size comparison
+//! between different formats.
+//!
+//! Each test suite serializes a collection of values, which have all been
+//! randomly populated.
+//!
+//! * A struct containing one of every primitive value (`prim`).
+//! * A really big struct (`lg`).
+//! * A structure containing fairly sizable, allocated fields (`allocated`).
+//! * A moderately sized enum with many field variations (`medium_enum`).
+//!
+//! > **Note** so far these are all synthetic examples. Real world data is
+//! > rarely *this* random. But hopefully it should give an idea of the extreme
+//! > ranges.
+//!
+//! | **framework** | **prim** | **lg** | **allocated** | **medium_enum** |
+//! | - | - | - | - | - |
+//! | derive_bitcode[^i128] | <a title="samples: 500, min: 53, max: 55, stddev: 0.24931105069771997">54.94 ± 0.25</a> | <a title="samples: 10, min: 5821, max: 15067, stddev: 2786.3727675958935">9442.00 ± 2786.37</a> | <a title="samples: 100, min: 51, max: 1102, stddev: 312.9389237535018">552.50 ± 312.94</a> | <a title="samples: 500, min: 9, max: 1011, stddev: 223.4092284217462">104.28 ± 223.41</a> |
+//! | musli_descriptive | <a title="samples: 500, min: 91, max: 98, stddev: 1.3101144988129874">95.06 ± 1.31</a> | <a title="samples: 10, min: 7434, max: 19833, stddev: 3802.4608400350426">12995.40 ± 3802.46</a> | <a title="samples: 100, min: 90, max: 1239, stddev: 317.05311794713515">636.98 ± 317.05</a> | <a title="samples: 500, min: 7, max: 1010, stddev: 222.81380212186133">111.17 ± 222.81</a> |
+//! | musli_json[^incomplete] | <a title="samples: 500, min: 173, max: 186, stddev: 2.293136716377804">180.78 ± 2.29</a> | <a title="samples: 10, min: 10712, max: 28988, stddev: 6081.874011355381">19913.10 ± 6081.87</a> | <a title="samples: 100, min: 125, max: 1341, stddev: 322.0241661739069">703.58 ± 322.02</a> | <a title="samples: 500, min: 12, max: 1014, stddev: 225.22871845304292">133.13 ± 225.23</a> |
+//! | musli_storage | <a title="samples: 500, min: 61, max: 62, stddev: 0.4364218143035427">61.74 ± 0.44</a> | <a title="samples: 10, min: 6212, max: 16436, stddev: 3070.8698914151346">10433.10 ± 3070.87</a> | <a title="samples: 100, min: 46, max: 1097, stddev: 312.9784171472531">547.48 ± 312.98</a> | <a title="samples: 500, min: 3, max: 1005, stddev: 222.8345511450142">101.10 ± 222.83</a> |
+//! | musli_storage_packed | <a title="samples: 500, min: 48, max: 49, stddev: 0.4364218143035427">48.74 ± 0.44</a> | <a title="samples: 10, min: 5935, max: 15301, stddev: 2811.1667844508975">9604.90 ± 2811.17</a> | <a title="samples: 100, min: 43, max: 1094, stddev: 312.9784171472531">544.48 ± 312.98</a> | <a title="samples: 500, min: 3, max: 1005, stddev: 223.06596207400182">99.26 ± 223.07</a> |
+//! | musli_wire | <a title="samples: 500, min: 77, max: 84, stddev: 1.4007083922073085">81.50 ± 1.40</a> | <a title="samples: 10, min: 7062, max: 18513, stddev: 3470.110287872707">12041.30 ± 3470.11</a> | <a title="samples: 100, min: 68, max: 1169, stddev: 314.6552607219527">592.87 ± 314.66</a> | <a title="samples: 500, min: 5, max: 1009, stddev: 222.79926477437036">107.70 ± 222.80</a> |
+//! | rkyv[^incomplete] | <a title="samples: 500, min: 56, max: 56, stddev: 0">56.00 ± 0.00</a> | <a title="samples: 10, min: 9348, max: 20780, stddev: 3425.1459764512224">13239.20 ± 3425.15</a> | <a title="samples: 100, min: 60, max: 1112, stddev: 312.8191784401973">562.04 ± 312.82</a> | <a title="samples: 500, min: 72, max: 1072, stddev: 226.7913908771672">158.03 ± 226.79</a> |
+//! | serde_bincode | <a title="samples: 500, min: 53, max: 55, stddev: 0.24931105069771997">54.94 ± 0.25</a> | <a title="samples: 10, min: 6112, max: 15645, stddev: 2853.7147737641894">9821.70 ± 2853.71</a> | <a title="samples: 100, min: 64, max: 1114, stddev: 312.73420727512365">564.66 ± 312.73</a> | <a title="samples: 500, min: 12, max: 1020, stddev: 225.23564016380698">108.52 ± 225.24</a> |
+//! | serde_bitcode[^i128] | <a title="samples: 500, min: 53, max: 55, stddev: 0.24931105069771997">54.94 ± 0.25</a> | <a title="samples: 10, min: 5830, max: 15078, stddev: 2786.196233218328">9449.50 ± 2786.20</a> | <a title="samples: 100, min: 51, max: 1102, stddev: 312.9389237535018">552.50 ± 312.94</a> | <a title="samples: 500, min: 9, max: 1011, stddev: 223.40126061416933">104.27 ± 223.40</a> |
+//! | serde_cbor[^i128] | <a title="samples: 500, min: 171, max: 175, stddev: 0.7945287911712187">174.08 ± 0.79</a> | <a title="samples: 10, min: 9794, max: 27970, stddev: 5987.688673436521">18810.50 ± 5987.69</a> | <a title="samples: 100, min: 84, max: 1192, stddev: 315.1654486138987">612.80 ± 315.17</a> | <a title="samples: 500, min: 17, max: 1022, stddev: 224.73637586292085">136.06 ± 224.74</a> |
+//! | serde_dlhn[^i128] | <a title="samples: 500, min: 51, max: 56, stddev: 0.9239567089425708">55.05 ± 0.92</a> | <a title="samples: 10, min: 6154, max: 15892, stddev: 2926.4894481272268">10078.10 ± 2926.49</a> | <a title="samples: 100, min: 43, max: 1094, stddev: 312.9784171472531">544.48 ± 312.98</a> | <a title="samples: 500, min: 2, max: 1005, stddev: 223.13293195761125">99.53 ± 223.13</a> |
+//! | serde_json[^incomplete] | <a title="samples: 500, min: 259, max: 272, stddev: 2.2931367163778087">266.78 ± 2.29</a> | <a title="samples: 10, min: 13375, max: 37849, stddev: 8600.791647284568">26306.80 ± 8600.79</a> | <a title="samples: 100, min: 134, max: 1350, stddev: 322.0241661739069">712.58 ± 322.02</a> | <a title="samples: 500, min: 21, max: 1026, stddev: 232.85885510325784">159.36 ± 232.86</a> |
+//! | serde_rmp | <a title="samples: 500, min: 58, max: 63, stddev: 1.0778107440548104">61.02 ± 1.08</a> | <a title="samples: 10, min: 7287, max: 17926, stddev: 3136.9678417223213">11477.60 ± 3136.97</a> | <a title="samples: 100, min: 63, max: 1145, stddev: 314.18724608105913">577.12 ± 314.19</a> | <a title="samples: 500, min: 17, max: 1022, stddev: 222.52838470631107">117.70 ± 222.53</a> |
+//!
+//! [^incomplete]: These formats do not support a wide range of Rust types.
+//! Exact level of support varies. But from a size perspective it makes size
+//! comparisons either unfair or simply an esoteric exercise since they can (or
+//! cannot) make stricter assumptions as a result.
+//!
+//! [^i128]: Lacks 128-bit support.
 //!
 //! [`bincode`]: https://docs.rs/bincode
 //! [`Decode`]: https://docs.rs/musli/latest/musli/trait.Decode.html

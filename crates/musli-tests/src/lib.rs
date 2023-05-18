@@ -59,6 +59,20 @@
 //!
 //! * `dlhn`: Allocating and initializing large arrays based on untrusted input
 //!   (DoS): [dlhn#11](https://github.com/otake84/dlhn/issues/11).
+//!
+//! <br>
+//!
+//! ## Size comparison
+//!
+//! To perform a one-off size comparison:
+//!
+//! ```sh
+//! cargo run --bin fuzz -- --size
+//! ```
+//!
+//! This will *for now* just take the first generated field of a given type,
+//! serialize it, and print out its size. In the future it will perform an
+//! average over the entire set with more statistics.
 
 #![no_std]
 

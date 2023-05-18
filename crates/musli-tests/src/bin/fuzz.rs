@@ -1,3 +1,4 @@
+use std::collections::{BTreeSet, HashMap};
 use std::hint::black_box;
 use std::io::Write;
 use std::time::Instant;
@@ -5,6 +6,12 @@ use std::time::Instant;
 use anyhow::{bail, Context, Result};
 use musli_tests::models::*;
 use musli_tests::utils;
+
+struct SizeSet {
+    framework: &'static str,
+    suite: &'static str,
+    samples: Vec<i64>,
+}
 
 musli_tests::miri! {
     const ITER: usize = 10000, 2;
@@ -34,6 +41,7 @@ fn main() -> Result<()> {
 
     let mut iter = ITER;
     let mut random = false;
+    let mut size = false;
     let mut filter = Vec::new();
 
     while let Some(arg) = it.next() {
@@ -47,6 +55,9 @@ fn main() -> Result<()> {
             }
             "--random" => {
                 random = true;
+            }
+            "--size" => {
+                size = true;
             }
             other if other.starts_with("--") => {
                 bail!("Bad argument: {other}");
@@ -118,12 +129,51 @@ fn main() -> Result<()> {
         };
     }
 
+    let mut size_sets = Vec::<SizeSet>::new();
+
+    macro_rules! size {
+        // musli value is not a bytes-oriented encoding.
+        (musli_value $($tt:tt)*) => {
+        };
+
+        ($base:ident $(, $name:ident, $ty:ty)*) => {
+            $({
+                let name = concat!(stringify!($base), "/", stringify!($name), "/size");
+
+                if size && condition(name) {
+                    let mut buf = utils::$base::buffer();
+
+                    let mut set = SizeSet {
+                        framework: stringify!($base),
+                        suite: stringify!($name),
+                        samples: Vec::new(),
+                    };
+
+                    for var in &$name {
+                        utils::$base::reset(&mut buf);
+
+                        match utils::$base::encode(&mut buf, var) {
+                            Ok(value) => {
+                                set.samples.push(value.len() as i64);
+                            }
+                            Err(error) => {
+                                writeln!(o, "{name}: error during encode: {error}")?;
+                            }
+                        }
+                    }
+
+                    size_sets.push(set);
+                }
+            })*
+        };
+    }
+
     macro_rules! run {
         ($base:ident $(, $name:ident, $ty:ty)*) => {
             $({
                 let name = concat!(stringify!($base), "/", stringify!($name));
 
-                if !random && condition(name) {
+                if (!random && !size) && condition(name) {
                     write!(o, "{name}: ")?;
                     o.flush()?;
                     let start = Instant::now();
@@ -182,6 +232,7 @@ fn main() -> Result<()> {
     macro_rules! test {
         ($base:ident, $buf:ident $(, $name:ident, $ty:ty)*) => {{
             fuzz!($base $(, $name, $ty)*);
+            size!($base $(, $name, $ty)*);
             run!($base $(, $name, $ty)*);
         }};
     }
@@ -197,5 +248,81 @@ fn main() -> Result<()> {
     }
 
     musli_tests::types!(build);
+
+    if !size_sets.is_empty() {
+        let mut footnotes = HashMap::new();
+
+        footnotes.insert("musli_json", "[^incomplete]");
+        footnotes.insert("rkyv", "[^incomplete]");
+        footnotes.insert("serde_bitcode", "[^i128]");
+        footnotes.insert("serde_cbor", "[^i128]");
+        footnotes.insert("serde_dlhn", "[^i128]");
+        footnotes.insert("serde_json", "[^incomplete]");
+        footnotes.insert("derive_bitcode", "[^i128]");
+
+        let mut columns = Vec::new();
+        let mut rows = BTreeSet::new();
+
+        macro_rules! build_column {
+            ($($name:ident, $ty:ty, $num:expr),*) => {
+                $(columns.push(stringify!($name));)*
+            };
+        }
+
+        musli_tests::types!(build_column);
+
+        let mut index = HashMap::<_, SizeSet>::new();
+
+        for set in size_sets {
+            rows.insert(set.framework);
+            let replaced = index.insert((set.suite, set.framework), set);
+            assert!(replaced.is_none());
+        }
+
+        write!(o, "| **framework** |")?;
+
+        for suite in &columns {
+            write!(o, " **{suite}** |")?;
+        }
+
+        writeln!(o)?;
+        write!(o, "| - |")?;
+
+        for _ in &columns {
+            write!(o, " - |")?;
+        }
+
+        writeln!(o)?;
+
+        for framework in rows {
+            let footnote = footnotes.get(framework).copied().unwrap_or_default();
+            write!(o, "| {framework}{footnote} |")?;
+
+            for suite in &columns {
+                let Some(mut set) = index.remove(&(suite, framework)).filter(|s| !s.samples.is_empty()) else {
+                    write!(o, " - |")?;
+                    continue;
+                };
+
+                let len = set.samples.len() as f64;
+
+                set.samples.sort();
+                let mean = set.samples.iter().sum::<i64>() as f64 / len;
+
+                let (Some(mn), Some(mx)) = (set.samples.first(), set.samples.last()) else {
+                    write!(o, " - |")?;
+                    continue;
+                };
+
+                let ss = set.samples.iter().map(|s| (*s as f64 - mean).powf(2.0));
+                let stddev = (ss.sum::<f64>() / len).sqrt();
+
+                write!(o, " <a title=\"samples: {len}, min: {mn}, max: {mx}, stddev: {stddev}\">{mean:.2} ± {stddev:.2}</a> |")?;
+            }
+
+            writeln!(o)?;
+        }
+    }
+
     Ok(())
 }

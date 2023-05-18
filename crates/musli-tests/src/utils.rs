@@ -15,7 +15,7 @@ pub mod musli_json {
     const ENCODING: Encoding = Encoding::new();
 
     pub fn buffer() -> Vec<u8> {
-        alloc::vec![0; 4096]
+        Vec::with_capacity(4096)
     }
 
     pub fn reset(buf: &mut Vec<u8>) {
@@ -45,19 +45,17 @@ pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
     use ::musli_storage::error::BufferError;
-    use ::musli_storage::int::{Fixed, FixedUsize};
+    use ::musli_storage::int::{Fixed, Variable};
     use ::musli_storage::Encoding;
     use musli::{Decode, Encode};
 
     use crate::mode::Packed;
 
-    const ENCODING: Encoding<Packed, Fixed, FixedUsize<u64>> = Encoding::new()
-        .with_fixed_integers()
-        .with_fixed_lengths64()
-        .with_mode::<Packed>();
+    const ENCODING: Encoding<Packed, Fixed, Variable> =
+        Encoding::new().with_fixed_integers().with_mode::<Packed>();
 
     pub fn buffer() -> Vec<u8> {
-        alloc::vec![0; 4096]
+        Vec::with_capacity(4096)
     }
 
     pub fn reset(buf: &mut Vec<u8>) {
@@ -87,16 +85,15 @@ pub mod musli_storage {
     use alloc::vec::Vec;
 
     use ::musli_storage::error::BufferError;
-    use ::musli_storage::int::{Fixed, FixedUsize};
+    use ::musli_storage::int::{Fixed, Variable};
     use ::musli_storage::Encoding;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
-    const ENCODING: Encoding<DefaultMode, Fixed, FixedUsize<u64>> =
-        Encoding::new().with_fixed_integers().with_fixed_lengths64();
+    const ENCODING: Encoding<DefaultMode, Fixed, Variable> = Encoding::new().with_fixed_integers();
 
     pub fn buffer() -> Vec<u8> {
-        alloc::vec![0; 4096]
+        Vec::with_capacity(4096)
     }
 
     pub fn reset(buf: &mut Vec<u8>) {
@@ -126,16 +123,15 @@ pub mod musli_wire {
     use alloc::vec::Vec;
 
     use ::musli_wire::error::BufferError;
-    use ::musli_wire::int::{Fixed, FixedUsize};
+    use ::musli_wire::int::Variable;
     use ::musli_wire::Encoding;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
-    const ENCODING: Encoding<DefaultMode, Fixed, FixedUsize<u64>> =
-        Encoding::new().with_fixed_integers().with_fixed_lengths64();
+    const ENCODING: Encoding<DefaultMode, Variable, Variable> = Encoding::new();
 
     pub fn buffer() -> Vec<u8> {
-        alloc::vec![0; 4096]
+        Vec::with_capacity(4096)
     }
 
     pub fn reset(buf: &mut Vec<u8>) {
@@ -172,7 +168,7 @@ pub mod musli_descriptive {
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
     pub fn buffer() -> Vec<u8> {
-        alloc::vec![0; 4096]
+        Vec::with_capacity(4096)
     }
 
     pub fn reset(buf: &mut Vec<u8>) {
