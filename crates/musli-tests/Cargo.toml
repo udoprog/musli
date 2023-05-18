@@ -52,12 +52,12 @@ serde = ["dep:serde", "bitcode?/serde"]
 rkyv = ["dep:rkyv", "std"]
 
 [dependencies]
-musli = { path = "../musli", default-features = false, optional = true, features = ["alloc"] }
-musli-wire = { path = "../musli-wire", default-features = false, features = ["alloc", "test"], optional = true }
-musli-descriptive = { path = "../musli-descriptive", default-features = false, features = ["alloc", "test"], optional = true }
-musli-storage = { path = "../musli-storage", default-features = false, features = ["alloc", "test"], optional = true }
-musli-json = { path = "../musli-json", default-features = false, features = ["alloc", "test",], optional = true }
-musli-value = { path = "../musli-value", default-features = false, features = ["alloc", "test"], optional = true }
+musli = { path = "../musli", version = "0.0.47", default-features = false, optional = true, features = ["alloc"] }
+musli-wire = { path = "../musli-wire", version = "0.0.47", default-features = false, features = ["alloc", "test"], optional = true }
+musli-descriptive = { path = "../musli-descriptive", version = "0.0.47", default-features = false, features = ["alloc", "test"], optional = true }
+musli-storage = { path = "../musli-storage", version = "0.0.47", default-features = false, features = ["alloc", "test"], optional = true }
+musli-json = { path = "../musli-json", version = "0.0.47", default-features = false, features = ["alloc", "test",], optional = true }
+musli-value = { path = "../musli-value", version = "0.0.47", default-features = false, features = ["alloc", "test"], optional = true }
 
 anyhow = "1.0.71"
 serde = { version = "1.0.163", default-features = false, optional = true, features = ["derive"] }
