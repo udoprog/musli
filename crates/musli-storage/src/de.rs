@@ -1,12 +1,6 @@
 use core::fmt;
 use core::marker;
-#[cfg(not(feature = "simdutf8"))]
-use core::str::from_utf8;
-#[cfg(feature = "simdutf8")]
-use simdutf8::basic::from_utf8;
 
-#[cfg(feature = "alloc")]
-use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
@@ -135,24 +129,20 @@ where
             #[cfg(feature = "alloc")]
             #[inline(always)]
             fn visit_owned(self, bytes: Vec<u8>) -> Result<Self::Ok, Self::Error> {
-                if let Err(error) = from_utf8(&bytes) {
-                    return Err(Self::Error::custom(error));
-                }
-
-                // SAFETY: String was checked above.
-                let string = unsafe { String::from_utf8_unchecked(bytes) };
+                let string =
+                    musli_common::str::from_utf8_owned(bytes).map_err(Self::Error::custom)?;
                 self.0.visit_owned(string)
             }
 
             #[inline(always)]
             fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
-                let string = from_utf8(bytes).map_err(Self::Error::custom)?;
+                let string = musli_common::str::from_utf8(bytes).map_err(Self::Error::custom)?;
                 self.0.visit_borrowed(string)
             }
 
             #[inline(always)]
             fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
-                let string = from_utf8(bytes).map_err(Self::Error::custom)?;
+                let string = musli_common::str::from_utf8(bytes).map_err(Self::Error::custom)?;
                 self.0.visit_ref(string)
             }
         }

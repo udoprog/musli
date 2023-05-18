@@ -17,11 +17,12 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["musli/std"]
+std = ["musli/std", "simdutf8?/std"]
 alloc = []
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.47", default-features = false }
+simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 
 [dev-dependencies]
 rand = "0.8.5"

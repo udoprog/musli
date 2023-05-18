@@ -59,6 +59,8 @@ jobs:
     - run: cargo build -p ${{matrix.package}} --no-default-features
     - run: cargo build -p ${{matrix.package}} --no-default-features --features alloc
     - run: cargo build -p ${{matrix.package}} --no-default-features --features std
+    - run: cargo build -p ${{matrix.package}} --no-default-features --features simdutf8
+      if: matrix.package == 'musli-storage' || matrix.package == 'musli-wire' || matrix.package == 'musli-descriptive'
 
   clippy:
     runs-on: ubuntu-latest

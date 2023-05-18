@@ -28,5 +28,6 @@ pub mod error;
 pub mod fixed_bytes;
 pub mod int;
 pub mod reader;
+pub mod str;
 pub mod wrap;
 pub mod writer;

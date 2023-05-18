@@ -5,15 +5,10 @@
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-musli-66c2a5?style=for-the-badge&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/musli)
 [<img alt="build status" src="https://img.shields.io/github/actions/workflow/status/udoprog/musli/ci.yml?branch=main&style=for-the-badge" height="20">](https://github.com/udoprog/musli/actions?query=branch%3Amain)
 
-Müsli is a flexible and generic binary serialization framework.
+Excellent performance, no compromises!
 
-The central components of the framework are the [`Encode`] and [`Decode`]
-derives. They are thoroughly documented in the [`derives`] module.
-
-I've chosen to internally use the term "encoding", "encode", and "decode"
-because it's common terminology when talking about binary formats. It's also
-distinct from [`serde`]'s use of "serialization" allowing for the ease of
-using both libraries side by side if desired.
+Müsli is a flexible, fast, and generic binary serialization framework for
+Rust.
 
 <br>
 
@@ -39,11 +34,38 @@ musli-wire = "0.0.47"
 
 ## Design
 
-Müsli is designed with similar principles as [`serde`]. Relying on Rust's
+The heavy lifting in user code is done through the [`Encode`] and [`Decode`]
+derives which are thoroughly documented in the [`derives`] module. Müsli
+primarily operates based on the schema types which implement these traits
+imply, but self-descriptive formats are also possible (see
+[`Formats`](#formats) below).
+
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct Person {
+    /* .. fields .. */
+}
+```
+
+> **Note** by default a field is identified by its *numerical index* which
+> would change if they are re-ordered. Renaming fields and setting a default
+> naming policy can be done by configuring the [`derives`].
+
+The binary serialization formats provided aim to efficiently and accurately
+encode every type and data structure available in Rust. Each format comes
+with [well-documented tradeoffs](#formats) and aim to be fully memory safe
+to use.
+
+Internally we use the terms "encoding", "encode", and "decode" because it's
+distinct from [`serde`]'s use of "serialization", "serialize", and
+"deserialize" allowing for the ease of using both libraries side by side if
+desired.
+
+Müsli is designed on similar principles as [`serde`]. Relying on Rust's
 powerful trait system to generate code which can largely be optimized away.
-The end result should be very similar to a handwritten encoding. The binary
-serialization formats provided aim to efficiently and natively support and
-accurately encode every type and data structure available in Rust.
+The end result should be very similar to handwritten highly optimized code.
 
 As an example of this, these two functions both produce the same assembly on
 my machine (built with `--release`):
@@ -73,29 +95,14 @@ fn without_musli(storage: &Storage) -> Result<[u8; 8]> {
 }
 ```
 
-The heavy lifting in user code is done through the [`Encode`] and [`Decode`]
-derives. They are both documented in the [`derives`] module. Müsli operates
-solely based on the schema derived from the types it uses.
+Where Müsli differs in design philosophy is twofold:
 
-```rust
-use musli::{Encode, Decode};
+We make use of GATs to provide tighter abstractions, which should be easier
+for Rust to optimize.
 
-#[derive(Debug, PartialEq, Encode, Decode)]
-struct Person {
-    /* .. fields .. */
-}
-```
-
-> **Note** by default a field is identified by its *numerical index* which
-> would change if they are re-ordered. Renaming fields and setting a default
-> naming policy can be done by configuring the [`derives`].
-
-Where Müsli differs in design is that we make sparser use of the visitor
-pattern. Instead the encoding interacts with the framework through encoding
-interfaces that describe "what it wants" and leverages GATs to make the API
-ergonomic and efficient.
-
-Note how decoding a sequence [does not require the use of a visitor]:
+We make less use of the Visitor pattern in certain instances where it's
+deemed unnecessary, such as [when decoding collections]. The result is
+usually cleaner decode implementations, as shown here:
 
 ```rust
 use musli::de::{Decode, Decoder, SequenceDecoder};
@@ -131,8 +138,6 @@ Another major aspect where Müsli differs is in the concept of
 the `Encode` and `Decode` traits it allows for the same data model to be
 serialized in many different ways. This is a larger topic and is covered
 further down.
-
-[does not require the use of a visitor]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
 
 <br>
 
@@ -180,9 +185,10 @@ formats do not require models to decode, and can be converted to and from
 dynamic containers such as [`musli-value`] for introspection.
 
 For every feature you drop, the format becomes more compact and efficient.
-`musli-storage` `#[musli(packed)]` for example is roughly as compact as
-[`bincode`] while [`musli-wire`] is comparable in size to something like
-[`protobuf`].
+[`musli-storage`] using `#[musli(packed)]` for example is roughly as compact
+as [`bincode`] while [`musli-wire`] is comparable in size to something like
+[`protobuf`]. All formats are primarily byte-oriented, but some might
+perform [bit packing] if the benefits are obvious.
 
 <br>
 
@@ -339,3 +345,5 @@ The two benchmark suites portrayed are:
 [`musli-wire`]: https://docs.rs/musli-wire
 [`protobuf`]: https://developers.google.com/protocol-buffers
 [`serde`]: https://serde.rs
+[bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
+[when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
