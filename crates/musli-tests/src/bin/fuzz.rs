@@ -23,12 +23,12 @@ musli_tests::miri! {
 
 fn generate<T>(rng: &mut StdRng, count: usize) -> Vec<(usize, T)>
 where
-    StdRng: Generate<T>,
+    T: Generate,
 {
     let mut out = Vec::with_capacity(count);
 
     for index in 0..count {
-        out.push((index, rng.generate()));
+        out.push((index, T::generate(rng)));
     }
 
     out
@@ -84,7 +84,7 @@ fn main() -> Result<()> {
 
     if random {
         for _ in 0..iter {
-            random_bytes.push(rng.generate_range(0..256));
+            random_bytes.push(Generate::generate_range(&mut rng, 0..256));
         }
     }
 

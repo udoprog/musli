@@ -19,6 +19,9 @@ categories = ["encoding"]
 proc-macro = true
 path = "src/lib.rs"
 
+[features]
+test = []
+
 [dependencies]
 proc-macro2 = "1.0.58"
 quote = "1.0.27"

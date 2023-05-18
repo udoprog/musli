@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 
 use rand::distributions::Distribution;
 use rand::distributions::Standard;
-use rand::{rngs::StdRng, Rng};
 
 #[cfg(feature = "std")]
 use std::collections::HashMap;
@@ -20,31 +19,42 @@ miri! {
     const VEC_RANGE: Range<usize> = 10..100, 1..3;
 }
 
-pub trait Generate<T>: Sized {
+pub trait Generate: Sized {
     /// Generate a value of the given type.
-    fn generate(&mut self) -> T;
+    fn generate<R>(rng: &mut R) -> Self
+    where
+        R: rand::Rng;
 
     /// Implement to receive a range parameters, by default it is simply ignored.
-    fn generate_range(&mut self, _: Range<usize>) -> T {
-        self.generate()
+    fn generate_range<R>(rng: &mut R, _: Range<usize>) -> Self
+    where
+        R: rand::Rng,
+    {
+        Self::generate(rng)
     }
 }
 
-impl<T> Generate<Vec<T>> for StdRng
+impl<T> Generate for Vec<T>
 where
-    Self: Generate<T>,
+    T: Generate,
 {
     #[inline]
-    fn generate(&mut self) -> Vec<T> {
-        Generate::<Vec<T>>::generate_range(self, VEC_RANGE)
+    fn generate<R>(rng: &mut R) -> Self
+    where
+        R: rand::Rng,
+    {
+        <Vec<T> as Generate>::generate_range(rng, VEC_RANGE)
     }
 
-    fn generate_range(&mut self, range: Range<usize>) -> Vec<T> {
-        let cap = self.gen_range(range);
+    fn generate_range<R>(rng: &mut R, range: Range<usize>) -> Self
+    where
+        R: rand::Rng,
+    {
+        let cap = rng.gen_range(range);
         let mut vec = Vec::with_capacity(cap);
 
         for _ in 0..cap {
-            vec.push(self.generate());
+            vec.push(T::generate(rng));
         }
 
         vec
@@ -52,47 +62,59 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<K, V> Generate<HashMap<K, V>> for StdRng
+impl<K, V> Generate for HashMap<K, V>
 where
     K: Eq + Hash,
-    Self: Generate<K>,
-    Self: Generate<V>,
+    K: Generate,
+    V: Generate,
 {
     #[inline]
-    fn generate(&mut self) -> HashMap<K, V> {
-        self.generate_range(MAP_RANGE)
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
+        Self::generate_range(rng, MAP_RANGE)
     }
 
-    fn generate_range(&mut self, range: Range<usize>) -> HashMap<K, V> {
-        let cap = self.gen_range(range);
+    fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
+    where
+        T: rand::Rng,
+    {
+        let cap = rng.gen_range(range);
         let mut map = HashMap::with_capacity(cap);
 
         for _ in 0..cap {
-            map.insert(self.generate(), self.generate());
+            map.insert(K::generate(rng), V::generate(rng));
         }
 
         map
     }
 }
 
-impl Generate<String> for StdRng {
-    fn generate(&mut self) -> String {
+impl Generate for String {
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
         let mut string = String::new();
 
-        for _ in 0..self.gen_range(STRING_RANGE) {
-            string.push(self.gen());
+        for _ in 0..rng.gen_range(STRING_RANGE) {
+            string.push(rng.gen());
         }
 
         string
     }
 }
 
-impl Generate<CString> for StdRng {
-    fn generate(&mut self) -> CString {
+impl Generate for CString {
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
         let mut string = Vec::new();
 
-        for _ in 0..self.gen_range(STRING_RANGE) {
-            string.push(self.gen_range(1..=u8::MAX));
+        for _ in 0..rng.gen_range(STRING_RANGE) {
+            string.push(rng.gen_range(1..=u8::MAX));
         }
 
         string.push(0);
@@ -100,23 +122,21 @@ impl Generate<CString> for StdRng {
     }
 }
 
-impl Generate<()> for StdRng {
+impl Generate for () {
     #[inline]
-    fn generate(&mut self) {}
+    fn generate<T>(_: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
+    }
 }
 
 macro_rules! tuple {
     ($($ty:ident),* $(,)?) => {
-        impl<$($ty,)*> Generate<($($ty,)*)> for StdRng where $(Self: Generate<$ty>,)* {
+        impl<$($ty,)*> Generate for ($($ty,)*) where $($ty: Generate,)* {
             #[inline]
-            fn generate(&mut self) -> ($($ty,)*) {
-                macro_rules! generate {
-                    ($_:ident) => {
-                        self.generate()
-                    }
-                }
-
-                ($(generate!($ty),)*)
+            fn generate<T>(rng: &mut T) -> Self where T: rand::Rng {
+                ($(<$ty>::generate(rng),)*)
             }
         }
     }
@@ -132,13 +152,16 @@ tuple!(A, B, C, D, E, F, G);
 
 macro_rules! primitive {
     ($ty:ty) => {
-        impl Generate<$ty> for StdRng
+        impl Generate for $ty
         where
             Standard: Distribution<$ty>,
         {
             #[inline]
-            fn generate(&mut self) -> $ty {
-                self.gen()
+            fn generate<T>(rng: &mut T) -> Self
+            where
+                T: rand::Rng,
+            {
+                rng.gen()
             }
         }
     };
