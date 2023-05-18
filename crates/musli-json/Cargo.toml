@@ -28,7 +28,7 @@ musli-value = { path = "../musli-value", version = "0.0.49", default-features = 
 
 itoa = "1.0.6"
 ryu = "1.0.13"
-lexical = { version = "6.1.1", default-features = false }
+lexical = { version = "6.1.1", default-features = false, features = ["parse-floats", "std"] }
 
 [dev-dependencies]
 rand = "0.8.5"
