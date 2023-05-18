@@ -1,8 +1,19 @@
 [package]
 name = "musli-tests"
 version = "0.0.0"
+authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-publish = false
+rust-version = "1.65"
+description = """
+Müsli is a flexible and generic binary serialization framework.
+"""
+documentation = "https://docs.rs/musli"
+readme = "README.md"
+homepage = "https://github.com/udoprog/musli"
+repository = "https://github.com/udoprog/musli"
+license = "MIT/Apache-2.0"
+keywords = ["no_std", "serialization"]
+categories = ["encoding"]
 
 [features]
 default = ["std", "core", "model_full"]
@@ -15,7 +26,6 @@ simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptiv
 musli-wire = ["dep:musli-wire", "musli"]
 musli-descriptive = ["dep:musli-descriptive", "musli"]
 musli-storage = ["dep:musli-storage", "musli"]
-rkyv = ["dep:rkyv", "std"]
 
 model_full = ["model_vec", "model_128", "model_usize", "model_tuple", "model_float", "model_map", "model_map_string_key", "model_cstring"]
 model_minimal = ["model_vec", "model_float"]
@@ -37,6 +47,7 @@ serde_cbor = ["dep:serde_cbor", "serde"]
 bincode = ["dep:bincode", "serde"]
 rmp-serde = ["dep:rmp-serde", "serde"]
 serde = ["dep:serde", "bitcode?/serde"]
+rkyv = ["dep:rkyv", "std"]
 
 [dependencies]
 musli = { path = "../musli", default-features = false, optional = true, features = ["alloc"] }
@@ -51,7 +62,7 @@ serde = { version = "1.0.163", default-features = false, optional = true, featur
 rand = { version = "0.8.5", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.1", optional = true }
 bincode = { version = "1.3.3", default-features = false, optional = true }
-serde_json = { version = "1.0.96", default-features = false, features = ["alloc"], optional = true }
+serde_json = { version = "1.0.96", default-features = false, features = ["alloc", "arbitrary_precision"], optional = true }
 serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc", "std"], optional = true }
 dlhn = { version = "0.1.5", default-features = false, optional = true }
 bitcode = { version = "0.4.0", default-features = false, optional = true, features = ["derive"] }

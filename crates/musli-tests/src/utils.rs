@@ -202,7 +202,7 @@ pub mod musli_value {
     use ::musli_value::Value;
     use musli::{Decode, Encode};
 
-    pub fn buffer() -> () {}
+    pub fn buffer() {}
     pub fn reset(_: &mut ()) {}
 
     #[inline(always)]

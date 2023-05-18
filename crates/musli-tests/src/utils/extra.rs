@@ -17,7 +17,10 @@ pub mod serde_dlhn {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &mut Vec<u8>, value: &T) -> Result<&'buf [u8], dlhn::ser::Error>
+    pub fn encode<'buf, T>(
+        buf: &'buf mut Vec<u8>,
+        value: &T,
+    ) -> Result<&'buf [u8], dlhn::ser::Error>
     where
         T: Serialize,
     {
@@ -161,9 +164,7 @@ pub mod serde_bitcode {
         Buffer::with_capacity(10000000)
     }
 
-    pub fn reset(buf: &mut Buffer) {
-        buf.clear();
-    }
+    pub fn reset(_: &mut Buffer) {}
 
     #[inline(always)]
     pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
@@ -195,9 +196,7 @@ pub mod derive_bitcode {
         Buffer::with_capacity(10000000)
     }
 
-    pub fn reset(buf: &mut Buffer) {
-        buf.clear();
-    }
+    pub fn reset(_: &mut Buffer) {}
 
     #[inline(always)]
     pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>

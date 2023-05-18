@@ -4,19 +4,39 @@
 //!
 //! Müsli is a flexible and generic binary serialization framework.
 //!
-//! The central components of the framework are the [Encode] and [Decode]
-//! derives. They are thoroughly documented in the [derives] module.
+//! The central components of the framework are the [`Encode`] and [`Decode`]
+//! derives. They are thoroughly documented in the [`derives`] module.
 //!
 //! I've chosen to internally use the term "encoding", "encode", and "decode"
 //! because it's common terminology when talking about binary formats. It's also
-//! distinct from [serde]'s use of "serialization" allowing for the ease of
+//! distinct from [`serde`]'s use of "serialization" allowing for the ease of
 //! using both libraries side by side if desired.
+//!
+//! <br>
+//!
+//! ## Quick guide
+//!
+//! * For information on how to implement [`Encode`] and [`Decode`], see
+//!   [`derives`].
+//! * For information on how this library is tested, see [`musli-tests`].
+//!
+//! <br>
+//!
+//! ## Usage
+//!
+//! Add the following to your `Cargo.toml` using the [format](#formats) you want
+//! to use:
+//!
+//! ```toml
+//! musli = "0.0.46"
+//! musli-wire = "0.0.46"
+//! ```
 //!
 //! <br>
 //!
 //! ## Design
 //!
-//! Müsli is designed with similar principles as [serde]. Relying on Rust's
+//! Müsli is designed with similar principles as [`serde`]. Relying on Rust's
 //! powerful trait system to generate code which can largely be optimized away.
 //! The end result should be very similar to a handwritten encoding. The binary
 //! serialization formats provided aim to efficiently and natively support and
@@ -55,8 +75,8 @@
 //! }
 //! ```
 //!
-//! The heavy lifting in user code is done through the [Encode] and [Decode]
-//! derives. They are both documented in the [derives] module. Müsli operates
+//! The heavy lifting in user code is done through the [`Encode`] and [`Decode`]
+//! derives. They are both documented in the [`derives`] module. Müsli operates
 //! solely based on the schema derived from the types it uses.
 //!
 //! ```
@@ -70,7 +90,7 @@
 //!
 //! > **Note** by default a field is identified by its *numerical index* which
 //! > would change if they are re-ordered. Renaming fields and setting a default
-//! > naming policy can be done by configuring the [derives].
+//! > naming policy can be done by configuring the [`derives`].
 //!
 //! Where Müsli differs in design is that we make sparser use of the visitor
 //! pattern. Instead the encoding interacts with the framework through encoding
@@ -118,17 +138,6 @@
 //!
 //! <br>
 //!
-//! ## Usage
-//!
-//! Add the following to your `Cargo.toml`:
-//!
-//! ```toml
-//! musli = "0.0.46"
-//! musli-wire = "0.0.46"
-//! ```
-//!
-//! <br>
-//!
 //! ## Formats
 //!
 //! Formats are currently distinguished by supporting various degrees of
@@ -146,10 +155,10 @@
 //!
 //! | | `reorder` | `missing` | `unknown` | `self` |
 //! |-|-|-|-|-|
-//! | [musli-storage] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
-//! | [musli-storage]                    | ✔ | ✔ | ✗ | ✗ |
-//! | [musli-wire]                       | ✔ | ✔ | ✔ | ✗ |
-//! | [musli-descriptive]                | ✔ | ✔ | ✔ | ✔ |
+//! | [`musli-storage`] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
+//! | [`musli-storage`]                    | ✔ | ✔ | ✗ | ✗ |
+//! | [`musli-wire`]                       | ✔ | ✔ | ✔ | ✗ |
+//! | [`musli-descriptive`]                | ✔ | ✔ | ✔ | ✔ |
 //!
 //! `reorder` determines whether fields must occur in exactly the order in which
 //! they are specified in their type. Reordering fields in such a type would
@@ -170,17 +179,18 @@
 //! `self` determines if the format is self-descriptive. Allowing the structure
 //! of the data to be fully reconstructed from its serialized state. These
 //! formats do not require models to decode, and can be converted to and from
-//! dynamic containers such as [musli-value] for introspection.
+//! dynamic containers such as [`musli-value`] for introspection.
 //!
 //! For every feature you drop, the format becomes more compact and efficient.
 //! `musli-storage` `#[musli(packed)]` for example is roughly as compact as
-//! [bincode] while [musli-wire] is comparable to something like [protobuf].
+//! [`bincode`] while [`musli-wire`] is comparable in size to something like
+//! [`protobuf`].
 //!
 //! <br>
 //!
 //! ## Examples
 //!
-//! The following is an example of *full upgrade stability* using [musli-wire]:
+//! The following is an example of *full upgrade stability* using [`musli-wire`]:
 //!
 //! ```rust
 //! use musli::{Encode, Decode};
@@ -211,7 +221,7 @@
 //! ```
 //!
 //! The following is an example of *partial upgrade stability* using
-//! [musli-storage]:
+//! [`musli-storage`]:
 //!
 //! ```rust
 //! use musli::{Encode, Decode};
@@ -327,19 +337,18 @@
 //!
 //! <img src="https://raw.githubusercontent.com/udoprog/musli/main/images/rt-prim.png" alt="Roundtrip of a small object">
 //!
+//! [`bincode`]: https://docs.rs/bincode
+//! [`Decode`]: https://docs.rs/musli/latest/musli/trait.Decode.html
 //! [`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
-//! [bincode]: https://docs.rs/bincode
-//! [Decode]: https://docs.rs/musli/latest/musli/trait.Decode.html
-//! [derives]: https://docs.rs/musli/latest/musli/derives/
-//! [Encode]: https://docs.rs/musli/latest/musli/trait.Encode.html
-//! [GATs]: https://github.com/rust-lang/rust/issues/44265
-//! [json-serde-value]: https://docs.rs/serde_json/latest/serde_json/enum.Value.html
-//! [musli-storage]: https://docs.rs/musli-storage
-//! [musli-wire]: https://docs.rs/musli-wire
-//! [musli-descriptive]: https://docs.rs/musli-descriptive
-//! [musli-value]: https://docs.rs/musli-value
-//! [protobuf]: https://developers.google.com/protocol-buffers
-//! [serde]: https://serde.rs
+//! [`derives`]: https://docs.rs/musli/latest/musli/derives/
+//! [`Encode`]: https://docs.rs/musli/latest/musli/trait.Encode.html
+//! [`musli-descriptive`]: https://docs.rs/musli-descriptive
+//! [`musli-storage`]: https://docs.rs/musli-storage
+//! [`musli-tests`]: https://github.com/udoprog/musli/tree/main/crates/musli-tests
+//! [`musli-value`]: https://docs.rs/musli-value
+//! [`musli-wire`]: https://docs.rs/musli-wire
+//! [`protobuf`]: https://developers.google.com/protocol-buffers
+//! [`serde`]: https://serde.rs
 
 #![deny(missing_docs)]
 #![no_std]
