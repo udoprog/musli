@@ -9,7 +9,8 @@
 //!
 //! It provides a set of [formats](#formats), each with its own well-documented
 //! set of features and tradeoffs. Every byte-oriented serialization method
-//! available has full `#[no_std]` support with or without `alloc`.
+//! (including [`musli-json`]) has full `#[no_std]` support with or without
+//! `alloc`.
 //!
 //! [^1]: As in Müsli should be able to do everything you need and more.
 //!
@@ -171,6 +172,7 @@
 //! | [`musli-storage`]                    | ✔ | ✔ | ✗ | ✗ |
 //! | [`musli-wire`]                       | ✔ | ✔ | ✔ | ✗ |
 //! | [`musli-descriptive`]                | ✔ | ✔ | ✔ | ✔ |
+//! | [`musli-json`][`musli-json`][^json]  | ✔ | ✔ | ✔ | ✔ |
 //!
 //! `reorder` determines whether fields must occur in exactly the order in which
 //! they are specified in their type. Reordering fields in such a type would
@@ -198,6 +200,10 @@
 //! as [`bincode`] while [`musli-wire`] is comparable in size to something like
 //! [`protobuf`]. All formats are primarily byte-oriented, but some might
 //! perform [bit packing] if the benefits are obvious.
+//!
+//! [^json]: This is strictly not a binary serialization, but it was implemented
+//! as a litmus test to ensure that Müsli has the necessary framework features
+//! to support it. Luckily, the implementation is also quite good!
 //!
 //! <br>
 //!
@@ -417,6 +423,7 @@
 //! [`musli-tests`]: https://github.com/udoprog/musli/tree/main/crates/musli-tests
 //! [`musli-value`]: https://docs.rs/musli-value
 //! [`musli-wire`]: https://docs.rs/musli-wire
+//! [`musli-json`]: https://docs.rs/musli-json
 //! [`protobuf`]: https://developers.google.com/protocol-buffers
 //! [`serde`]: https://serde.rs
 //! [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
