@@ -40,9 +40,9 @@ pub const DEFAULT: Encoding = Encoding::new();
 /// Encode the given value to the given [Writer] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn encode<W, T>(writer: &mut W, value: &T) -> Result<(), W::Error>
+pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
 where
-    W: ?Sized + Writer,
+    W: Writer,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -258,9 +258,9 @@ where
     /// Encode the given value to the given [Writer] using the current
     /// configuration.
     #[inline]
-    pub fn encode<W, T>(self, writer: &mut W, value: &T) -> Result<(), W::Error>
+    pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), W::Error>
     where
-        W: ?Sized + Writer,
+        W: Writer,
         T: ?Sized + Encode<M>,
     {
         T::encode(value, WireEncoder::<_, I, L, P>::new(writer))
@@ -275,8 +275,8 @@ where
         W: io::Write,
         T: ?Sized + Encode<M>,
     {
-        let mut writer = crate::wrap::wrap(write);
-        T::encode(value, WireEncoder::<_, I, L, P>::new(&mut writer))
+        let writer = crate::wrap::wrap(write);
+        T::encode(value, WireEncoder::<_, I, L, P>::new(writer))
     }
 
     /// Encode the given value to a [Vec] using the current configuration.

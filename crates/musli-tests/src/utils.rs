@@ -213,11 +213,11 @@ pub mod musli_wire {
         ENCODING.to_buffer(value).unwrap().into_vec()
     }
 
-    pub fn decode<'de, T>(data: &'de [u8]) -> T
+    pub fn decode<'de, T>(mut data: &'de [u8]) -> T
     where
         T: Decode<'de>,
     {
-        ENCODING.decode(data).unwrap()
+        ENCODING.decode(&mut data).unwrap()
     }
 }
 

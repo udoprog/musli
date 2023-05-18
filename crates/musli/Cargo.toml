@@ -24,6 +24,7 @@ alloc = []
 musli-macros = { version = "=0.0.45", path = "../musli-macros" }
 
 [dev-dependencies]
+anyhow = "1.0.71"
 musli-wire = { path = "../musli-wire", default-features = false }
 musli-storage = { path = "../musli-storage", default-features = false }
 musli-json = { path = "../musli-json", default-features = false, features = ["std"] }

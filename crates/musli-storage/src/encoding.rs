@@ -36,9 +36,9 @@ pub const DEFAULT: Encoding<DefaultMode, Variable, Variable> = Encoding::new();
 /// Encode the given value to the given [`Writer`] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn encode<W, T>(writer: &mut W, value: &T) -> Result<(), W::Error>
+pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
 where
-    W: ?Sized + Writer,
+    W: Writer,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -246,9 +246,9 @@ where
     /// Encode the given value to the given [`Writer`] using the current
     /// configuration.
     #[inline]
-    pub fn encode<W, T>(self, writer: &mut W, value: &T) -> Result<(), W::Error>
+    pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), W::Error>
     where
-        W: ?Sized + Writer,
+        W: Writer,
         T: ?Sized + Encode<M>,
     {
         T::encode(value, StorageEncoder::<_, I, L>::new(writer))

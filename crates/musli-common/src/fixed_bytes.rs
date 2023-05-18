@@ -126,7 +126,7 @@ impl<const N: usize, E> FixedBytes<N, E> {
             ptr::copy_nonoverlapping(source.as_ptr(), dst, source.len());
         }
 
-        self.init += source.len();
+        self.init = self.init.wrapping_add(source.len());
         true
     }
 }
@@ -164,7 +164,7 @@ where
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_array<const U: usize>(&mut self, array: [u8; U]) -> Result<(), Self::Error> {
         if U > N.saturating_sub(self.init) {
             return Err(E::message(format_args! {
@@ -176,7 +176,7 @@ where
         }
 
         unsafe {
-            let dst = (self.data.as_mut_ptr() as *mut u8).add(self.init);
+            let dst = self.data.as_mut_ptr().cast::<u8>().add(self.init);
             ptr::copy_nonoverlapping(array.as_ptr(), dst, U);
         }
 

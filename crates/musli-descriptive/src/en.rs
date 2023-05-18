@@ -249,7 +249,7 @@ where
 {
     type Ok = ();
     type Error = W::Error;
-    type Encoder<'this> = StorageEncoder<'this, FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
 
     #[inline]
     fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
@@ -258,7 +258,7 @@ where
             None => return Err(Self::Error::message("overflow")),
         };
 
-        Ok(StorageEncoder::new(&mut self.pack_buf))
+        Ok(StorageEncoder::new(self.pack_buf.borrow_mut()))
     }
 
     #[inline]

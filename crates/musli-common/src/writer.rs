@@ -2,6 +2,7 @@
 //!
 //! To adapt [std::io::Write] types, see the [wrap][crate::io::wrap] function.
 
+use core::mem::take;
 use core::ops::Deref;
 
 use musli::error::Error;
@@ -185,6 +186,65 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_array<const N: usize>(&mut self, array: [u8; N]) -> Result<(), Self::Error> {
         self.extend_from_slice(&array[..]);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Writer for &mut [u8] {
+    type Error = BufferError;
+    type Mut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
+
+    #[inline]
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+        if self.len() < bytes.len() {
+            return Err(Self::Error::message(format_args!(
+                "Buffer overflow, remaining is {} while tried to write {}",
+                self.len(),
+                bytes.len()
+            )));
+        }
+
+        let next = take(self);
+        let (this, next) = next.split_at_mut(bytes.len());
+        this.copy_from_slice(bytes);
+        *self = next;
+        Ok(())
+    }
+
+    #[inline]
+    fn write_byte(&mut self, b: u8) -> Result<(), Self::Error> {
+        if self.is_empty() {
+            return Err(Self::Error::message(format_args!(
+                "Buffer overflow, remaining is {} while tried to write 1",
+                self.len()
+            )));
+        }
+
+        self[0] = b;
+        *self = &mut take(self)[1..];
+        Ok(())
+    }
+
+    #[inline]
+    fn write_array<const N: usize>(&mut self, array: [u8; N]) -> Result<(), Self::Error> {
+        if self.len() < N {
+            return Err(Self::Error::message(format_args!(
+                "Buffer overflow, remaining is {} while tried to write {}",
+                self.len(),
+                N
+            )));
+        }
+
+        let next = take(self);
+        let (this, next) = next.split_at_mut(N);
+        this.copy_from_slice(&array[..]);
+        *self = next;
         Ok(())
     }
 }

@@ -25,6 +25,34 @@ The end result should be very similar to a handwritten encoding. The binary
 serialization formats provided aim to efficiently and natively support and
 accurately encode every type and data structure available in Rust.
 
+As an example of this, these two functions both produce the same assembly on
+my machine (built with `--release`):
+
+```rust
+const ENCODING: Encoding<DefaultMode, Fixed<NativeEndian>, Variable> =
+    Encoding::new().with_fixed_integers_endian();
+
+#[derive(Encode, Decode)]
+#[musli(packed)]
+pub struct Storage {
+    left: u32,
+    right: u32,
+}
+
+fn with_musli(storage: &Storage) -> Result<[u8; 8]> {
+    let mut array = [0; 8];
+    ENCODING.encode(&mut array[..], storage)?;
+    Ok(array)
+}
+
+fn without_musli(storage: &Storage) -> Result<[u8; 8]> {
+    let mut array = [0; 8];
+    array[..4].copy_from_slice(&storage.left.to_ne_bytes());
+    array[4..].copy_from_slice(&storage.right.to_ne_bytes());
+    Ok(array)
+}
+```
+
 The heavy lifting in user code is done through the [Encode] and [Decode]
 derives. They are both documented in the [derives] module. Müsli operates
 solely based on the schema derived from the types it uses.

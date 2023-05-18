@@ -26,28 +26,32 @@
 //! my machine (built with `--release`):
 //!
 //! ```
+//! # use anyhow::Result;
+//! # use musli::{Decode, Encode};
+//! # use musli::mode::DefaultMode;
+//! # use musli_storage::encoding::Encoding;
+//! # use musli_storage::int::{Fixed, NativeEndian, Variable};
 //! const ENCODING: Encoding<DefaultMode, Fixed<NativeEndian>, Variable> =
 //!     Encoding::new().with_fixed_integers_endian();
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(packed)]
 //! pub struct Storage {
-//!     value: u32,
-//!     value2: u32,
+//!     left: u32,
+//!     right: u32,
 //! }
 //!
-//! #[inline(never)]
-//! #[no_mangle]
-//! pub fn with_musli(storage: &Storage) -> Result<[u8; 8]> {
-//!     Ok(ENCODING.to_fixed_bytes::<8, _>(storage)?.into_bytes().context("buffer not filled")?)
+//! fn with_musli(storage: &Storage) -> Result<[u8; 8]> {
+//!     let mut array = [0; 8];
+//!     ENCODING.encode(&mut array[..], storage)?;
+//!     Ok(array)
 //! }
 //!
-//! #[inline(never)]
-//! #[no_mangle]
-//! pub fn without_musli(storage: &Storage) -> Result<[u8; 8]> {
-//!     let [a, b, c, d] = storage.value.to_ne_bytes();
-//!     let [e, f, g, h] = storage.value2.to_ne_bytes();
-//!     Ok([a, b, c, d, e, f, g, h])
+//! fn without_musli(storage: &Storage) -> Result<[u8; 8]> {
+//!     let mut array = [0; 8];
+//!     array[..4].copy_from_slice(&storage.left.to_ne_bytes());
+//!     array[4..].copy_from_slice(&storage.right.to_ne_bytes());
+//!     Ok(array)
 //! }
 //! ```
 //!

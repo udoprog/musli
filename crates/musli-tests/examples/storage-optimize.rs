@@ -9,7 +9,7 @@ use musli::{mode::DefaultMode, Decode, Encode};
 use musli_storage::encoding::Encoding;
 use musli_storage::int::{Fixed, NativeEndian, Variable};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 const ENCODING: Encoding<DefaultMode, Fixed<NativeEndian>, Variable> =
     Encoding::new().with_fixed_integers_endian();
@@ -24,18 +24,18 @@ pub struct Storage {
 #[inline(never)]
 #[no_mangle]
 pub fn with_musli(storage: &Storage) -> Result<[u8; 8]> {
-    Ok(ENCODING
-        .to_fixed_bytes::<8, _>(storage)?
-        .into_bytes()
-        .context("Buffer not filled")?)
+    let mut array = [0; 8];
+    ENCODING.encode(&mut array[..], storage)?;
+    Ok(array)
 }
 
 #[inline(never)]
 #[no_mangle]
 pub fn without_musli(storage: &Storage) -> Result<[u8; 8]> {
-    let [a, b, c, d] = storage.value.to_ne_bytes();
-    let [e, f, g, h] = storage.value2.to_ne_bytes();
-    Ok([a, b, c, d, e, f, g, h])
+    let mut array = [0; 8];
+    array[..4].copy_from_slice(&storage.value.to_ne_bytes());
+    array[4..].copy_from_slice(&storage.value2.to_ne_bytes());
+    Ok(array)
 }
 
 fn main() -> Result<()> {
