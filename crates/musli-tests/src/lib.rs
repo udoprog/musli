@@ -86,33 +86,33 @@ macro_rules! rt {
 macro_rules! feature_matrix {
     ($call:path $(, $($tt:tt)*)?) => {
         #[cfg(feature = "serde_json")]
-        $call!(serde_json $(, $($tt)*)*);
+        $call!(serde_json, serde_json_buf $(, $($tt)*)*);
         #[cfg(feature = "bincode")]
-        $call!(serde_bincode $(, $($tt)*)*);
+        $call!(serde_bincode, serde_bincode_buf $(, $($tt)*)*);
         #[cfg(feature = "rmp-serde")]
-        $call!(serde_rmp $(, $($tt)*)*);
+        $call!(serde_rmp, serde_rmp_buf $(, $($tt)*)*);
         #[cfg(feature = "musli-json")]
-        $call!(musli_json $(, $($tt)*)*);
+        $call!(musli_json, musli_json_buf $(, $($tt)*)*);
         #[cfg(feature = "musli-wire")]
-        $call!(musli_wire $(, $($tt)*)*);
+        $call!(musli_wire, musli_wire_buf $(, $($tt)*)*);
         #[cfg(feature = "musli-descriptive")]
-        $call!(musli_descriptive $(, $($tt)*)*);
+        $call!(musli_descriptive, musli_descriptive_buf $(, $($tt)*)*);
         #[cfg(feature = "musli-storage")]
-        $call!(musli_storage $(, $($tt)*)*);
+        $call!(musli_storage, musli_storage_buf $(, $($tt)*)*);
         #[cfg(feature = "musli-storage")]
-        $call!(musli_storage_packed $(, $($tt)*)*);
+        $call!(musli_storage_packed, musli_storage_packed_buf $(, $($tt)*)*);
         #[cfg(feature = "musli-value")]
-        $call!(musli_value $(, $($tt)*)*);
+        $call!(musli_value, musli_value_buf $(, $($tt)*)*);
         #[cfg(all(feature = "dlhn", not(any(model_128, model_all))))]
-        $call!(serde_dlhn $(, $($tt)*)*);
+        $call!(serde_dlhn, serde_dlhn_buf $(, $($tt)*)*);
         #[cfg(feature = "serde_cbor")]
-        $call!(serde_cbor $(, $($tt)*)*);
+        $call!(serde_cbor, serde_cbor_buf $(, $($tt)*)*);
         #[cfg(feature = "bitcode")]
-        $call!(serde_bitcode $(, $($tt)*)*);
+        $call!(serde_bitcode, serde_bitcode_buf $(, $($tt)*)*);
         #[cfg(feature = "bitcode")]
-        $call!(derive_bitcode $(, $($tt)*)*);
+        $call!(derive_bitcode, derive_bitcode_buf $(, $($tt)*)*);
         #[cfg(feature = "rkyv")]
-        $call!(rkyv $(, $($tt)*)*);
+        $call!(rkyv, rkyv_buf $(, $($tt)*)*);
     };
 }
 

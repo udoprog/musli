@@ -13,6 +13,9 @@ std = ["musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", 
 test = ["musli-wire", "musli-storage", "musli-descriptive"]
 simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptive?/simdutf8"]
 musli-wire = ["dep:musli-wire", "musli"]
+musli-descriptive = ["dep:musli-descriptive", "musli"]
+musli-storage = ["dep:musli-storage", "musli"]
+rkyv = ["dep:rkyv", "std"]
 
 model_full = ["model_vec", "model_128", "model_usize", "model_tuple", "model_float", "model_map", "model_map_string_key", "model_cstring"]
 model_minimal = ["model_vec", "model_float"]

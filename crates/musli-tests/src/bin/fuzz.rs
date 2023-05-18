@@ -129,6 +129,8 @@ fn main() -> Result<()> {
                     let start = Instant::now();
                     let step = iter / 10;
 
+                    let mut buf = utils::$base::buffer();
+
                     'outer:
                     for n in 0..iter {
                         if step == 0 || n % step == 0 {
@@ -137,7 +139,9 @@ fn main() -> Result<()> {
                         }
 
                         for &(index, ref var) in &$name {
-                            let out = match utils::$base::encode(var) {
+                            utils::$base::reset(&mut buf);
+
+                            let out = match utils::$base::encode(&mut buf, var) {
                                 Ok(value) => value,
                                 Err(error) => {
                                     write!(o, "E")?;
@@ -176,7 +180,7 @@ fn main() -> Result<()> {
     }
 
     macro_rules! test {
-        ($base:ident $(, $name:ident, $ty:ty)*) => {{
+        ($base:ident, $buf:ident $(, $name:ident, $ty:ty)*) => {{
             fuzz!($base $(, $name, $ty)*);
             run!($base $(, $name, $ty)*);
         }};

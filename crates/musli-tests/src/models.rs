@@ -2,7 +2,7 @@
 
 mod generate;
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "model_map", feature = "model_map_string_key"))]
 use std::collections::HashMap;
 
 use core::ops::Range;

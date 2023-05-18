@@ -4,12 +4,21 @@ pub mod serde_json {
 
     use serde::{Deserialize, Serialize};
 
+    pub fn buffer() -> Vec<u8> {
+        alloc::vec![0; 4096]
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> serde_json::Result<Vec<u8>>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> serde_json::Result<&'buf [u8]>
     where
         T: Serialize,
     {
-        serde_json::to_vec(value)
+        serde_json::to_writer(&mut *buf, value)?;
+        Ok(buf.as_slice())
     }
 
     #[inline(always)]
@@ -27,14 +36,21 @@ pub mod serde_bincode {
 
     use serde::{Deserialize, Serialize};
 
+    pub fn buffer() -> Vec<u8> {
+        alloc::vec![0; 4096]
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> bincode::Result<Vec<u8>>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> bincode::Result<&'buf [u8]>
     where
         T: Serialize,
     {
-        let mut data = Vec::new();
-        bincode::serialize_into(&mut data, value)?;
-        Ok(data)
+        bincode::serialize_into(&mut *buf, value)?;
+        Ok(buf.as_slice())
     }
 
     #[inline(always)]
@@ -52,12 +68,21 @@ pub mod serde_cbor {
 
     use serde::{Deserialize, Serialize};
 
+    pub fn buffer() -> Vec<u8> {
+        alloc::vec![0; 4096]
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> serde_cbor::Result<Vec<u8>>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> serde_cbor::Result<&'buf [u8]>
     where
         T: Serialize,
     {
-        serde_cbor::to_vec(value)
+        serde_cbor::to_writer(&mut *buf, value)?;
+        Ok(buf.as_slice())
     }
 
     #[inline(always)]

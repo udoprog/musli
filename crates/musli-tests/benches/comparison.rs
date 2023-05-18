@@ -1,3 +1,5 @@
+use std::hint::black_box;
+
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use musli_tests::models::*;
@@ -11,8 +13,9 @@ fn criterion_benchmark(c: &mut Criterion) {
             let mut g = c.benchmark_group($name);
 
             macro_rules! bench {
-                ($base:ident) => {{
-                    g.bench_function(stringify!($base), |b| $it!(b, $base));
+                ($base:ident, $buf:ident) => {{
+                    let mut $buf = utils::$base::buffer();
+                    g.bench_function(stringify!($base), |b| $it!(b, $base, $buf));
                 }};
             }
 
@@ -26,35 +29,41 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let $var: $ty = rng.generate();
 
                 macro_rules! it {
-                    ($b:expr, $base:ident) => {
-                        $b.iter(|| utils::$base::encode(&$var).unwrap())
-                    };
+                    ($b:expr, $base:ident, $buf:ident) => {{
+                        utils::$base::reset(&mut $buf);
+                        $b.iter(|| {
+                            black_box(utils::$base::encode(&mut $buf, &$var).unwrap());
+                        })
+                    }};
                 }
 
-                group!(concat!("enc-", stringify!($var)), it);
+                group!(concat!("enc/", stringify!($var)), it);
 
                 macro_rules! it {
-                    ($b:expr, $base:ident) => {{
-                        let data = utils::$base::encode(&$var).unwrap();
+                    ($b:expr, $base:ident, $buf:ident) => {{
+                        utils::$base::reset(&mut $buf);
+                        let data = utils::$base::encode(&mut $buf, &$var).unwrap();
                         $b.iter(|| utils::$base::decode::<$ty>(&data).unwrap())
                     }};
                 }
 
-                group!(concat!("dec-", stringify!($var)), it);
+                group!(concat!("dec/", stringify!($var)), it);
 
                 macro_rules! it {
-                    ($b:expr, $base:ident) => {
+                    ($b:expr, $base:ident, $buf:ident) => {{
+                        utils::$base::reset(&mut $buf);
+
                         $b.iter(|| {
-                            let out = utils::$base::encode(&$var).unwrap();
+                            let out = utils::$base::encode(&mut $buf, &$var).unwrap();
                             let actual = utils::$base::decode::<$ty>(&out).unwrap();
                             debug_assert_eq!(actual, $var);
-                            criterion::black_box(actual);
-                            out
+                            black_box(actual);
+                            black_box(out);
                         })
-                    };
+                    }};
                 }
 
-                group!(concat!("rt-", stringify!($var)), it);
+                group!(concat!("rt/", stringify!($var)), it);
             })*
         };
     }

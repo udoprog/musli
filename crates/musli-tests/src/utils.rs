@@ -14,12 +14,21 @@ pub mod musli_json {
 
     const ENCODING: Encoding = Encoding::new();
 
+    pub fn buffer() -> Vec<u8> {
+        alloc::vec![0; 4096]
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> Result<Vec<u8>, BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
     where
         T: Encode,
     {
-        Ok(ENCODING.to_buffer(value)?.into_vec())
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf.as_slice())
     }
 
     #[inline(always)]
@@ -47,12 +56,21 @@ pub mod musli_storage_packed {
         .with_fixed_lengths64()
         .with_mode::<Packed>();
 
+    pub fn buffer() -> Vec<u8> {
+        alloc::vec![0; 4096]
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> Result<Vec<u8>, BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
     where
         T: Encode<Packed>,
     {
-        Ok(ENCODING.to_buffer(value)?.into_vec())
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf.as_slice())
     }
 
     #[inline(always)]
@@ -77,12 +95,21 @@ pub mod musli_storage {
     const ENCODING: Encoding<DefaultMode, Fixed, FixedUsize<u64>> =
         Encoding::new().with_fixed_integers().with_fixed_lengths64();
 
+    pub fn buffer() -> Vec<u8> {
+        alloc::vec![0; 4096]
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> Result<Vec<u8>, BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
     where
         T: Encode,
     {
-        Ok(ENCODING.to_buffer(value)?.into_vec())
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf.as_slice())
     }
 
     #[inline(always)]
@@ -107,12 +134,21 @@ pub mod musli_wire {
     const ENCODING: Encoding<DefaultMode, Fixed, FixedUsize<u64>> =
         Encoding::new().with_fixed_integers().with_fixed_lengths64();
 
+    pub fn buffer() -> Vec<u8> {
+        alloc::vec![0; 4096]
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> Result<Vec<u8>, BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
     where
         T: Encode,
     {
-        Ok(ENCODING.to_buffer(value)?.into_vec())
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf.as_slice())
     }
 
     #[inline(always)]
@@ -135,12 +171,21 @@ pub mod musli_descriptive {
 
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
+    pub fn buffer() -> Vec<u8> {
+        alloc::vec![0; 4096]
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> Result<Vec<u8>, BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
     where
         T: Encode,
     {
-        Ok(ENCODING.to_buffer(value)?.into_vec())
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf.as_slice())
     }
 
     #[inline(always)]
@@ -157,8 +202,11 @@ pub mod musli_value {
     use ::musli_value::Value;
     use musli::{Decode, Encode};
 
+    pub fn buffer() -> () {}
+    pub fn reset(_: &mut ()) {}
+
     #[inline(always)]
-    pub fn encode<T>(value: &T) -> musli_value::Result<Value>
+    pub fn encode<T>(_: &mut (), value: &T) -> musli_value::Result<Value>
     where
         T: Encode,
     {
