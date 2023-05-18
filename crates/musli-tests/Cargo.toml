@@ -1,6 +1,6 @@
 [package]
 name = "musli-tests"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.66"

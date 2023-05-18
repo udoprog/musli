@@ -1,6 +1,6 @@
 [package]
 name = "musli-macros"
-version = "0.0.46"
+version = "0.0.47"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.66"
