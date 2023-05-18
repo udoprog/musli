@@ -188,13 +188,21 @@ macro_rules! feature_matrix {
         $call!(derive_bitcode, derive_bitcode_buf $(, $($tt)*)*);
         #[cfg(feature = "rkyv")]
         $call!(rkyv, rkyv_buf $(, $($tt)*)*);
+        #[cfg(feature = "postcard")]
+        $call!(postcard, postcard_buf $(, $($tt)*)*);
     };
 }
 
 #[macro_export]
 macro_rules! types {
     ($call:path $(, $($tt:tt)*)?) => {
-        $call!($($($tt)*,)? prim, Primitives, PRIMITIVES, lg, LargeStruct, LARGE_STRUCTS, allocated, Allocated, ALLOCATED, medium_enum, MediumEnum, MEDIUM_ENUMS);
+        $call! {
+            $($($tt)*,)?
+            prim, Primitives, PRIMITIVES, 1000,
+            lg, LargeStruct, LARGE_STRUCTS, 10000,
+            allocated, Allocated, ALLOCATED, 5000,
+            medium_enum, MediumEnum, MEDIUM_ENUMS, 1000
+        };
     }
 }
 

@@ -93,7 +93,7 @@ fn main() -> Result<()> {
         (musli_value $($tt:tt)*) => {
         };
 
-        ($base:ident $(, $name:ident, $ty:ty)*) => {
+        ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
             $({
                 let name = concat!(stringify!($base), "/", stringify!($name), "/random");
 
@@ -136,7 +136,7 @@ fn main() -> Result<()> {
         (musli_value $($tt:tt)*) => {
         };
 
-        ($base:ident $(, $name:ident, $ty:ty)*) => {
+        ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
             $({
                 let name = concat!(stringify!($base), "/", stringify!($name), "/size");
 
@@ -150,7 +150,7 @@ fn main() -> Result<()> {
                     };
 
                     for var in &$name {
-                        utils::$base::reset(&mut buf);
+                        utils::$base::reset(&mut buf, $size_hint, var);
 
                         match utils::$base::encode(&mut buf, var) {
                             Ok(value) => {
@@ -169,7 +169,7 @@ fn main() -> Result<()> {
     }
 
     macro_rules! run {
-        ($base:ident $(, $name:ident, $ty:ty)*) => {
+        ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
             $({
                 let name = concat!(stringify!($base), "/", stringify!($name));
 
@@ -189,7 +189,7 @@ fn main() -> Result<()> {
                         }
 
                         for &(index, ref var) in &$name {
-                            utils::$base::reset(&mut buf);
+                            utils::$base::reset(&mut buf, $size_hint, var);
 
                             let out = match utils::$base::encode(&mut buf, var) {
                                 Ok(value) => value,
@@ -230,20 +230,20 @@ fn main() -> Result<()> {
     }
 
     macro_rules! test {
-        ($base:ident, $buf:ident $(, $name:ident, $ty:ty)*) => {{
-            fuzz!($base $(, $name, $ty)*);
-            size!($base $(, $name, $ty)*);
-            run!($base $(, $name, $ty)*);
+        ($base:ident, $buf:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {{
+            fuzz!($base $(, $name, $ty, $size_hint)*);
+            size!($base $(, $name, $ty, $size_hint)*);
+            run!($base $(, $name, $ty, $size_hint)*);
         }};
     }
 
     macro_rules! build {
-        ($($name:ident, $ty:ty, $num:expr),*) => {
+        ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),* $(,)?) => {
             $(
                 let $name = generate::<$ty>(&mut rng, $num);
             )*
 
-            musli_tests::feature_matrix!(test $(, $name, $ty)*);
+            musli_tests::feature_matrix!(test $(, $name, $ty, $size_hint)*);
         }
     }
 
@@ -264,7 +264,7 @@ fn main() -> Result<()> {
         let mut rows = BTreeSet::new();
 
         macro_rules! build_column {
-            ($($name:ident, $ty:ty, $num:expr),*) => {
+            ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
                 $(columns.push(stringify!($name));)*
             };
         }

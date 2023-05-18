@@ -18,7 +18,7 @@ pub mod musli_json {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -58,7 +58,7 @@ pub mod musli_storage_packed {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -96,7 +96,7 @@ pub mod musli_storage {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -134,7 +134,7 @@ pub mod musli_wire {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -171,7 +171,7 @@ pub mod musli_descriptive {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -199,7 +199,7 @@ pub mod musli_value {
     use musli::{Decode, Encode};
 
     pub fn buffer() {}
-    pub fn reset(_: &mut ()) {}
+    pub fn reset<T>(_: &mut (), _: usize, _: &T) {}
 
     #[inline(always)]
     pub fn encode<T>(_: &mut (), value: &T) -> musli_value::Result<Value>

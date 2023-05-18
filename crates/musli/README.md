@@ -11,7 +11,8 @@ Müsli is a flexible, fast, and generic binary serialization framework for
 Rust, in the same vein as [`serde`].
 
 It provides a set of [formats](#formats), each with its own well-documented
-set of features and tradeoffs.
+set of features and tradeoffs. Every byte-oriented serialization method
+available has full `#[no_std]` support with or without `alloc`.
 
 [^1]: As in Müsli should be able to do everything you need and more.
 

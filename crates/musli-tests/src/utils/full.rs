@@ -8,7 +8,7 @@ pub mod serde_json {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -40,7 +40,7 @@ pub mod serde_bincode {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -72,7 +72,7 @@ pub mod serde_cbor {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -91,5 +91,56 @@ pub mod serde_cbor {
         T: Deserialize<'de>,
     {
         serde_cbor::from_slice(data)
+    }
+}
+
+#[cfg(feature = "postcard")]
+pub mod postcard {
+    use alloc::vec::Vec;
+
+    use serde::{Deserialize, Serialize};
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::new()
+    }
+
+    pub fn reset<T>(buf: &mut Vec<u8>, size_hint: usize, value: &T)
+    where
+        T: Serialize,
+    {
+        if buf.len() < size_hint {
+            buf.resize(size_hint, 0);
+        }
+
+        // Figure out the size of the buffer to use. Don't worry, anything we do
+        // in `reset` doesn't count towards benchmarking.
+        while let Err(error) = postcard::to_slice(value, buf) {
+            match error {
+                postcard::Error::SerializeBufferFull => {
+                    let new_size = (buf.len() as f32 * 1.5f32) as usize;
+                    buf.resize(new_size, 0);
+                }
+                error => {
+                    panic!("{}", error)
+                }
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> postcard::Result<&'buf [u8]>
+    where
+        T: Serialize,
+    {
+        let buf = postcard::to_slice(value, buf)?;
+        Ok(buf)
+    }
+
+    #[inline(always)]
+    pub fn decode<'de, T>(data: &'de [u8]) -> postcard::Result<T>
+    where
+        T: Deserialize<'de>,
+    {
+        postcard::from_bytes(data)
     }
 }

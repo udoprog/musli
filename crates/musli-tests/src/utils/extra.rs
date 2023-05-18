@@ -12,7 +12,7 @@ pub mod serde_dlhn {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -74,7 +74,7 @@ pub mod rkyv {
         }
     }
 
-    pub fn reset(buf: &mut Buffers) {
+    pub fn reset<T>(buf: &mut Buffers, _: usize, _: &T) {
         buf.serialize_buffer.clear();
     }
 
@@ -126,7 +126,7 @@ pub mod serde_rmp {
         Vec::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
         buf.clear();
     }
 
@@ -164,7 +164,7 @@ pub mod serde_bitcode {
         Buffer::with_capacity(4096)
     }
 
-    pub fn reset(_: &mut Buffer) {}
+    pub fn reset<T>(_: &mut Buffer, _: usize, _: &T) {}
 
     #[inline(always)]
     pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
@@ -196,7 +196,7 @@ pub mod derive_bitcode {
         Buffer::with_capacity(4096)
     }
 
-    pub fn reset(_: &mut Buffer) {}
+    pub fn reset<T>(_: &mut Buffer, _: usize, _: &T) {}
 
     #[inline(always)]
     pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
