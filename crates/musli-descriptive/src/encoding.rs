@@ -4,7 +4,6 @@
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use core::marker;
-use musli_common::context::Capture;
 #[cfg(feature = "std")]
 use std::io;
 
@@ -181,7 +180,8 @@ where
         W: Writer,
         T: ?Sized + Encode<M>,
     {
-        T::encode(value, SelfEncoder::<_, P>::new(&mut writer))
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, SelfEncoder::<_, P>::new(&mut writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
@@ -194,7 +194,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut writer = musli_common::wrap::wrap(write);
-        T::encode(value, SelfEncoder::<_, P>::new(&mut writer))
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, SelfEncoder::<_, P>::new(&mut writer))
     }
 
     /// Encode the given value to a [Buffer] using the current configuration.
@@ -204,7 +205,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut data = Buffer::new();
-        T::encode(value, SelfEncoder::<_, P>::new(&mut data))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, SelfEncoder::<_, P>::new(&mut data))?;
         Ok(data)
     }
 
@@ -226,7 +228,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut bytes = FixedBytes::new();
-        T::encode(value, SelfEncoder::<_, P>::new(&mut bytes))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, SelfEncoder::<_, P>::new(&mut bytes))?;
         Ok(bytes)
     }
 
@@ -238,13 +241,8 @@ where
         R: Reader<'de>,
         T: Decode<'de, M>,
     {
-        let mut cx = Capture::default();
-
-        let Ok(value) = T::decode(&mut cx, SelfDecoder::<_>::new(reader.with_position())) else {
-            return Err(cx.unwrap());
-        };
-
-        Ok(value)
+        let mut cx = musli_common::context::Same::default();
+        T::decode(&mut cx, SelfDecoder::<_>::new(reader.with_position()))
     }
 
     /// Decode the given type `T` from the given slice using the current
@@ -254,13 +252,11 @@ where
     where
         T: Decode<'de, M>,
     {
-        let mut cx = Capture::default();
-
-        let Ok(value) = T::decode(&mut cx, SelfDecoder::<_>::new(SliceReader::new(bytes).with_position())) else {
-            return Err(cx.unwrap());
-        };
-
-        Ok(value)
+        let mut cx = musli_common::context::Same::default();
+        T::decode(
+            &mut cx,
+            SelfDecoder::<_>::new(SliceReader::new(bytes).with_position()),
+        )
     }
 }
 

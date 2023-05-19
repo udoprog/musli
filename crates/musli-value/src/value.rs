@@ -140,25 +140,26 @@ impl<M> Encode<M> for Number
 where
     M: Mode,
 {
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
         match self {
-            Number::U8(n) => encoder.encode_u8(*n),
-            Number::U16(n) => encoder.encode_u16(*n),
-            Number::U32(n) => encoder.encode_u32(*n),
-            Number::U64(n) => encoder.encode_u64(*n),
-            Number::U128(n) => encoder.encode_u128(*n),
-            Number::I8(n) => encoder.encode_i8(*n),
-            Number::I16(n) => encoder.encode_i16(*n),
-            Number::I32(n) => encoder.encode_i32(*n),
-            Number::I64(n) => encoder.encode_i64(*n),
-            Number::I128(n) => encoder.encode_i128(*n),
-            Number::Usize(n) => encoder.encode_usize(*n),
-            Number::Isize(n) => encoder.encode_isize(*n),
-            Number::F32(n) => encoder.encode_f32(*n),
-            Number::F64(n) => encoder.encode_f64(*n),
+            Number::U8(n) => encoder.encode_u8(cx, *n),
+            Number::U16(n) => encoder.encode_u16(cx, *n),
+            Number::U32(n) => encoder.encode_u32(cx, *n),
+            Number::U64(n) => encoder.encode_u64(cx, *n),
+            Number::U128(n) => encoder.encode_u128(cx, *n),
+            Number::I8(n) => encoder.encode_i8(cx, *n),
+            Number::I16(n) => encoder.encode_i16(cx, *n),
+            Number::I32(n) => encoder.encode_i32(cx, *n),
+            Number::I64(n) => encoder.encode_i64(cx, *n),
+            Number::I128(n) => encoder.encode_i128(cx, *n),
+            Number::Usize(n) => encoder.encode_usize(cx, *n),
+            Number::Isize(n) => encoder.encode_isize(cx, *n),
+            Number::F32(n) => encoder.encode_f32(cx, *n),
+            Number::F64(n) => encoder.encode_f64(cx, *n),
         }
     }
 }
@@ -605,52 +606,54 @@ impl<M> Encode<M> for Value
 where
     M: Mode,
 {
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
         match self {
-            Value::Unit => encoder.encode_unit(),
-            Value::Bool(b) => encoder.encode_bool(*b),
-            Value::Char(c) => encoder.encode_char(*c),
-            Value::Number(n) => Encode::<M>::encode(n, encoder),
+            Value::Unit => encoder.encode_unit(cx),
+            Value::Bool(b) => encoder.encode_bool(cx, *b),
+            Value::Char(c) => encoder.encode_char(cx, *c),
+            Value::Number(n) => Encode::<M>::encode(n, cx, encoder),
             #[cfg(feature = "alloc")]
-            Value::Bytes(bytes) => encoder.encode_bytes(bytes),
+            Value::Bytes(bytes) => encoder.encode_bytes(cx, bytes),
             #[cfg(feature = "alloc")]
-            Value::String(string) => encoder.encode_string(string),
+            Value::String(string) => encoder.encode_string(cx, string),
             #[cfg(feature = "alloc")]
             Value::Sequence(values) => {
-                let mut sequence = encoder.encode_sequence(values.len())?;
+                let mut sequence = encoder.encode_sequence(cx, values.len())?;
 
                 for value in values {
-                    Encode::<M>::encode(value, sequence.next()?)?;
+                    let next = sequence.next(cx)?;
+                    Encode::<M>::encode(value, cx, next)?;
                 }
 
-                sequence.end()
+                sequence.end(cx)
             }
             #[cfg(feature = "alloc")]
             Value::Map(values) => {
-                let mut map = encoder.encode_map(values.len())?;
+                let mut map = encoder.encode_map(cx, values.len())?;
 
                 for (first, second) in values {
-                    map.insert::<M, _, _>(first, second)?;
+                    map.insert::<M, _, _, _>(cx, first, second)?;
                 }
 
-                map.end()
+                map.end(cx)
             }
             #[cfg(feature = "alloc")]
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;
-                let encoder = encoder.encode_variant()?;
-                encoder.insert::<M, _, _>(tag, variant)
+                let encoder = encoder.encode_variant(cx)?;
+                encoder.insert::<M, _, _, _>(cx, tag, variant)
             }
             #[cfg(feature = "alloc")]
             Value::Option(option) => match option {
                 Some(value) => {
-                    let encoder = encoder.encode_some()?;
-                    Encode::<M>::encode(&**value, encoder)
+                    let encoder = encoder.encode_some(cx)?;
+                    Encode::<M>::encode(&**value, cx, encoder)
                 }
-                None => encoder.encode_none(),
+                None => encoder.encode_none(cx),
             },
         }
     }

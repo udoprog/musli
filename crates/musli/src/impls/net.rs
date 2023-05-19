@@ -10,11 +10,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_array(self.octets())
+        encoder.encode_array(cx, self.octets())
     }
 }
 
@@ -37,11 +38,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_array(self.octets())
+        encoder.encode_array(cx, self.octets())
     }
 }
 
@@ -64,15 +66,16 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        let variant = encoder.encode_variant()?;
+        let variant = encoder.encode_variant(cx)?;
 
         match self {
-            IpAddr::V4(v4) => variant.insert::<M, _, _>(0usize, v4),
-            IpAddr::V6(v6) => variant.insert::<M, _, _>(1usize, v6),
+            IpAddr::V4(v4) => variant.insert::<M, _, _, _>(cx, 0usize, v4),
+            IpAddr::V6(v6) => variant.insert::<M, _, _, _>(cx, 1usize, v6),
         }
     }
 }
@@ -118,14 +121,15 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        let mut pack = encoder.encode_pack()?;
-        pack.push::<M, _>(self.ip())?;
-        pack.push::<M, _>(self.port())?;
-        pack.end()
+        let mut pack = encoder.encode_pack(cx)?;
+        pack.push::<M, _, _>(cx, self.ip())?;
+        pack.push::<M, _, _>(cx, self.port())?;
+        pack.end(cx)
     }
 }
 
@@ -156,16 +160,17 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        let mut pack = encoder.encode_pack()?;
-        pack.push::<M, _>(self.ip())?;
-        pack.push::<M, _>(self.port())?;
-        pack.push::<M, _>(self.flowinfo())?;
-        pack.push::<M, _>(self.scope_id())?;
-        pack.end()
+        let mut pack = encoder.encode_pack(cx)?;
+        pack.push::<M, _, _>(cx, self.ip())?;
+        pack.push::<M, _, _>(cx, self.port())?;
+        pack.push::<M, _, _>(cx, self.flowinfo())?;
+        pack.push::<M, _, _>(cx, self.scope_id())?;
+        pack.end(cx)
     }
 }
 
@@ -202,15 +207,16 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        let variant = encoder.encode_variant()?;
+        let variant = encoder.encode_variant(cx)?;
 
         match self {
-            SocketAddr::V4(v4) => variant.insert::<M, _, _>(0usize, v4),
-            SocketAddr::V6(v6) => variant.insert::<M, _, _>(1usize, v6),
+            SocketAddr::V4(v4) => variant.insert::<M, _, _, _>(cx, 0usize, v4),
+            SocketAddr::V6(v6) => variant.insert::<M, _, _, _>(cx, 1usize, v6),
         }
     }
 }

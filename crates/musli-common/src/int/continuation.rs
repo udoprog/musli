@@ -63,29 +63,30 @@ where
 
 /// Encode the given length using variable length encoding.
 #[inline(never)]
-pub fn encode<W, T>(mut w: W, mut value: T) -> Result<(), W::Error>
+pub fn encode<C, W, T>(cx: &mut C, mut w: W, mut value: T) -> Result<(), C::Error>
 where
+    C: Context<W::Error>,
     W: Writer,
     T: int::Unsigned,
 {
     let mut b = value.as_byte();
 
     if value < T::from_byte(0b1000_0000) {
-        w.write_byte(b)?;
+        w.write_byte(cx, b)?;
         return Ok(());
     }
 
     loop {
         value = value
             .checked_shr(7)
-            .ok_or_else(|| <W::Error as Error>::custom("length underflow"))?;
+            .ok_or_else(|| cx.custom("length underflow"))?;
 
         if value.is_zero() {
-            w.write_byte(b & MASK_BYTE)?;
+            w.write_byte(cx, b & MASK_BYTE)?;
             break;
         }
 
-        w.write_byte(b | CONT_BYTE)?;
+        w.write_byte(cx, b | CONT_BYTE)?;
         b = value.as_byte();
     }
 

@@ -19,8 +19,9 @@ fn test_continuation_encoding() -> Result<()> {
         T: PartialEq<T> + fmt::Debug + Unsigned,
     {
         let mut out = Buffer::new();
-        c::encode(&mut out, expected)?;
-        c::encode(&mut out, expected)?;
+        let mut cx = crate::context::Same::default();
+        c::encode(&mut cx, &mut out, expected)?;
+        c::encode(&mut cx, &mut out, expected)?;
         let mut data = out.as_slice();
         let mut cx = context::Capture::default();
         let a: T = c::decode(&mut cx, &mut data)?;
@@ -36,7 +37,8 @@ fn test_continuation_encoding() -> Result<()> {
         T: Unsigned,
     {
         let mut out = Vec::new();
-        c::encode(crate::wrap::wrap(&mut out), value)?;
+        let mut cx = crate::context::Same::default();
+        c::encode(&mut cx, crate::wrap::wrap(&mut out), value)?;
         Ok(out)
     }
 

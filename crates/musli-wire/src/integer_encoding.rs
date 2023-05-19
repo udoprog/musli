@@ -1,6 +1,5 @@
 use core::fmt::{Debug, Display};
 
-use musli::error::Error;
 use musli::Context;
 use musli_common::int::continuation as c;
 use musli_common::int::zigzag as zig;
@@ -22,8 +21,9 @@ mod private {
 /// The two common implementations of this is [Variable] and [Fixed].
 pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sealed {
     /// Governs how unsigned integers are encoded into a [Writer].
-    fn encode_typed_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_typed_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: ByteOrderIo;
 
@@ -35,8 +35,9 @@ pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sea
         T: ByteOrderIo;
 
     /// Governs how signed integers are encoded into a [Writer].
-    fn encode_typed_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_typed_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo;
@@ -54,8 +55,9 @@ pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sea
 /// `isize`) are encoded in a format which is platform-neutral.
 pub trait WireUsizeEncoding: musli_common::int::UsizeEncoding + private::Sealed {
     /// Governs how usize lengths are encoded into a [Writer].
-    fn encode_typed_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_typed_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer;
 
     /// Governs how usize lengths are decoded from a [Reader].
@@ -67,16 +69,17 @@ pub trait WireUsizeEncoding: musli_common::int::UsizeEncoding + private::Sealed 
 
 impl WireIntegerEncoding for Variable {
     #[inline]
-    fn encode_typed_unsigned<W, T>(mut writer: W, value: T) -> Result<(), W::Error>
+    fn encode_typed_unsigned<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: Unsigned,
     {
         if value.is_smaller_than(DATA_MASK) {
-            writer.write_byte(Tag::new(Kind::Continuation, value.as_byte()).byte())
+            writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
         } else {
-            writer.write_byte(Tag::empty(Kind::Continuation).byte())?;
-            c::encode(writer, value)
+            writer.write_byte(cx, Tag::empty(Kind::Continuation).byte())?;
+            c::encode(cx, writer, value)
         }
     }
 
@@ -101,13 +104,14 @@ impl WireIntegerEncoding for Variable {
     }
 
     #[inline]
-    fn encode_typed_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_typed_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo,
     {
-        Self::encode_typed_unsigned(writer, zig::encode(value))
+        Self::encode_typed_unsigned(cx, writer, zig::encode(value))
     }
 
     #[inline]
@@ -125,15 +129,16 @@ impl WireIntegerEncoding for Variable {
 
 impl WireUsizeEncoding for Variable {
     #[inline]
-    fn encode_typed_usize<W>(mut writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_typed_usize<C, W>(cx: &mut C, mut writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
     {
         if value.is_smaller_than(DATA_MASK) {
-            writer.write_byte(Tag::new(Kind::Continuation, value.as_byte()).byte())
+            writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
         } else {
-            writer.write_byte(Tag::empty(Kind::Continuation).byte())?;
-            c::encode(writer, value)
+            writer.write_byte(cx, Tag::empty(Kind::Continuation).byte())?;
+            c::encode(cx, writer, value)
         }
     }
 
@@ -162,13 +167,14 @@ where
     B: ByteOrder,
 {
     #[inline]
-    fn encode_typed_unsigned<W, T>(mut writer: W, value: T) -> Result<(), W::Error>
+    fn encode_typed_unsigned<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: ByteOrderIo,
     {
-        writer.write_byte(Tag::new(Kind::Prefix, T::BYTES).byte())?;
-        value.write_bytes_unsigned::<_, B>(writer)
+        writer.write_byte(cx, Tag::new(Kind::Prefix, T::BYTES).byte())?;
+        value.write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]
@@ -186,14 +192,15 @@ where
     }
 
     #[inline]
-    fn encode_typed_signed<W, T>(mut writer: W, value: T) -> Result<(), W::Error>
+    fn encode_typed_signed<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo,
     {
-        writer.write_byte(Tag::new(Kind::Prefix, T::Unsigned::BYTES).byte())?;
-        value.unsigned().write_bytes_unsigned::<_, B>(writer)
+        writer.write_byte(cx, Tag::new(Kind::Prefix, T::Unsigned::BYTES).byte())?;
+        value.unsigned().write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]
@@ -221,13 +228,14 @@ where
     <usize as TryFrom<L>>::Error: 'static + Debug + Display + Send + Sync,
 {
     #[inline]
-    fn encode_typed_usize<W>(mut writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_typed_usize<C, W>(cx: &mut C, mut writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
     {
-        writer.write_byte(Tag::new(Kind::Prefix, L::BYTES).byte())?;
-        let value: L = value.try_into().map_err(W::Error::custom)?;
-        value.write_bytes_unsigned::<_, B>(writer)
+        writer.write_byte(cx, Tag::new(Kind::Prefix, L::BYTES).byte())?;
+        let value: L = value.try_into().map_err(|err| cx.custom(err))?;
+        value.write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]

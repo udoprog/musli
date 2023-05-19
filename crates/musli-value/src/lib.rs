@@ -36,7 +36,8 @@ where
     T: Encode,
 {
     let mut output = Value::Unit;
-    value.encode(ValueEncoder::new(&mut output))?;
+    let mut cx = musli_common::context::Same::default();
+    value.encode(&mut cx, ValueEncoder::new(&mut output))?;
     Ok(output)
 }
 

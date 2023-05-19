@@ -26,11 +26,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_unit()
+        encoder.encode_unit(cx)
     }
 }
 
@@ -53,11 +54,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_unit()
+        encoder.encode_unit(cx)
     }
 }
 
@@ -111,11 +113,12 @@ macro_rules! non_zero {
             M: Mode,
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<E::Error>,
                 E: Encoder,
             {
-                Encode::<M>::encode(&self.get(), encoder)
+                Encode::<M>::encode(&self.get(), cx, encoder)
             }
         }
 
@@ -178,11 +181,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_array(*self)
+        encoder.encode_array(cx, *self)
     }
 }
 
@@ -207,11 +211,12 @@ macro_rules! impl_number {
             M: Mode,
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<E::Error>,
                 E: Encoder,
             {
-                encoder.$write(*self)
+                encoder.$write(cx, *self)
             }
         }
 
@@ -236,11 +241,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_bool(*self)
+        encoder.encode_bool(cx, *self)
     }
 }
 
@@ -263,11 +269,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_char(*self)
+        encoder.encode_char(cx, *self)
     }
 }
 
@@ -305,11 +312,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_string(self)
+        encoder.encode_string(cx, self)
     }
 }
 
@@ -354,11 +362,12 @@ impl<M> Encode<M> for [u8]
 where
     M: Mode,
 {
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_bytes(self)
+        encoder.encode_bytes(cx, self)
     }
 }
 
@@ -405,15 +414,16 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
         match self {
             Some(value) => encoder
-                .encode_some()
-                .and_then(|encoder| value.encode(encoder)),
-            None => encoder.encode_none(),
+                .encode_some(cx)
+                .and_then(|encoder| value.encode(cx, encoder)),
+            None => encoder.encode_none(cx),
         }
     }
 }
@@ -444,15 +454,16 @@ where
     U: Encode<M>,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        let variant = encoder.encode_variant()?;
+        let variant = encoder.encode_variant(cx)?;
 
         match self {
-            Ok(ok) => variant.insert::<M, _, _>(0usize, ok),
-            Err(err) => variant.insert::<M, _, _>(1usize, err),
+            Ok(ok) => variant.insert::<M, _, _, _>(cx, 0usize, ok),
+            Err(err) => variant.insert::<M, _, _, _>(cx, 1usize, err),
         }
     }
 }
@@ -491,11 +502,12 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        Encode::encode(&self.0, encoder)
+        Encode::encode(&self.0, cx, encoder)
     }
 }
 
@@ -519,11 +531,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_bytes(self.to_bytes_with_nul())
+        encoder.encode_bytes(cx, self.to_bytes_with_nul())
     }
 }
 

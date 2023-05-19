@@ -560,7 +560,7 @@ impl Field {
             let mode_ident = mode.mode_ident();
 
             if let Some(last) = encode_path.segments.last_mut() {
-                adjust_mode_path(last, mode_ident, false);
+                adjust_mode_path(last, mode_ident);
             }
 
             (*span, encode_path)
@@ -579,7 +579,7 @@ impl Field {
             let mode_ident = mode.mode_ident();
 
             if let Some(last) = decode_path.segments.last_mut() {
-                adjust_mode_path(last, mode_ident, true);
+                adjust_mode_path(last, mode_ident);
             }
 
             (*span, decode_path)
@@ -701,7 +701,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 }
 
 /// Adjust a mode path.
-fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath, decode: bool) {
+fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath) {
     let insert_args = |args: &mut Punctuated<_, _>| {
         args.insert(
             0,
@@ -718,14 +718,12 @@ fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath, decode: b
             })),
         );
 
-        if decode {
-            args.insert(
-                2,
-                syn::GenericArgument::Type(syn::Type::Infer(syn::TypeInfer {
-                    underscore_token: <Token![_]>::default(),
-                })),
-            );
-        }
+        args.insert(
+            2,
+            syn::GenericArgument::Type(syn::Type::Infer(syn::TypeInfer {
+                underscore_token: <Token![_]>::default(),
+            })),
+        );
     };
 
     match &mut last.arguments {

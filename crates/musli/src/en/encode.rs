@@ -1,5 +1,7 @@
 use crate::en::Encoder;
 use crate::mode::{DefaultMode, Mode};
+use crate::Context;
+
 pub use musli_macros::Encode;
 
 /// Trait governing how types are encoded.
@@ -8,8 +10,9 @@ where
     M: Mode,
 {
     /// Encode the given output.
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder;
 }
 
@@ -19,11 +22,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        T::encode(*self, encoder)
+        T::encode(*self, cx, encoder)
     }
 }
 
@@ -33,10 +37,11 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        T::encode(*self, encoder)
+        T::encode(*self, cx, encoder)
     }
 }

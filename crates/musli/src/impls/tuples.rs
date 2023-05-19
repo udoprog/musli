@@ -44,15 +44,20 @@ macro_rules! declare {
     (($ty0:ident, $ident0:ident) $(, ($ty:ident, $ident:ident))* $(,)?) => {
         impl<M, $ty0 $(, $ty)*> Encode<M> for ($ty0, $($ty),*) where M: Mode, $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<E::Error>,
                 E: Encoder,
             {
-                let mut pack = encoder.encode_tuple(count!($ident0 $($ident)*))?;
+                let mut pack = encoder.encode_tuple(cx, count!($ident0 $($ident)*))?;
                 let ($ident0, $($ident),*) = self;
-                <$ty0>::encode($ident0, pack.next()?)?;
-                $(<$ty>::encode($ident, pack.next()?)?;)*
-                pack.end()
+                let value = pack.next(cx)?;
+                <$ty0>::encode($ident0, cx, value)?;
+                $(
+                    let value = pack.next(cx)?;
+                    <$ty>::encode($ident, cx, value)?;
+                )*
+                pack.end(cx)
             }
         }
 
@@ -73,15 +78,20 @@ macro_rules! declare {
 
         impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)> where M: Mode, $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<E::Error>,
                 E: Encoder,
             {
                 let Packed(($ident0, $($ident),*)) = self;
-                let mut pack = encoder.encode_pack()?;
-                <$ty0>::encode($ident0, pack.next()?)?;
-                $(<$ty>::encode($ident, pack.next()?)?;)*
-                pack.end()
+                let mut pack = encoder.encode_pack(cx)?;
+                let value = pack.next(cx)?;
+                <$ty0>::encode($ident0, cx, value)?;
+                $(
+                    let value = pack.next(cx)?;
+                    <$ty>::encode($ident, cx, value)?;
+                )*
+                pack.end(cx)
             }
         }
 

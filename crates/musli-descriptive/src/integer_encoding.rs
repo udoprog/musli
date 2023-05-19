@@ -9,12 +9,18 @@ use musli_common::writer::Writer;
 use crate::tag::{Kind, Tag};
 
 #[inline]
-pub(crate) fn encode_typed_unsigned<W, T>(writer: W, bits: u8, value: T) -> Result<(), W::Error>
+pub(crate) fn encode_typed_unsigned<C, W, T>(
+    cx: &mut C,
+    writer: W,
+    bits: u8,
+    value: T,
+) -> Result<(), C::Error>
 where
+    C: Context<W::Error>,
     W: Writer,
     T: Unsigned,
 {
-    encode_typed(writer, Kind::Number, bits, value)
+    encode_typed(cx, writer, Kind::Number, bits, value)
 }
 
 #[inline]
@@ -28,13 +34,20 @@ where
 }
 
 #[inline]
-fn encode_typed<W, T>(mut writer: W, kind: Kind, bits: u8, value: T) -> Result<(), W::Error>
+fn encode_typed<C, W, T>(
+    cx: &mut C,
+    mut writer: W,
+    kind: Kind,
+    bits: u8,
+    value: T,
+) -> Result<(), C::Error>
 where
+    C: Context<W::Error>,
     W: Writer,
     T: Unsigned,
 {
-    writer.write_byte(Tag::new(kind, bits).byte())?;
-    c::encode(writer, value)
+    writer.write_byte(cx, Tag::new(kind, bits).byte())?;
+    c::encode(cx, writer, value)
 }
 
 #[inline]
@@ -54,12 +67,18 @@ where
 }
 
 #[inline]
-pub(crate) fn encode_typed_signed<W, T>(writer: W, bits: u8, value: T) -> Result<(), W::Error>
+pub(crate) fn encode_typed_signed<C, W, T>(
+    cx: &mut C,
+    writer: W,
+    bits: u8,
+    value: T,
+) -> Result<(), C::Error>
 where
+    C: Context<W::Error>,
     W: Writer,
     T: Signed,
 {
-    encode_typed(writer, Kind::Number, bits, zig::encode(value))
+    encode_typed(cx, writer, Kind::Number, bits, zig::encode(value))
 }
 
 #[inline]

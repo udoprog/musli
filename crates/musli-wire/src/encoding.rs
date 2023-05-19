@@ -263,7 +263,8 @@ where
         W: Writer,
         T: ?Sized + Encode<M>,
     {
-        T::encode(value, WireEncoder::<_, I, L, P>::new(writer))
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, WireEncoder::<_, I, L, P>::new(writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
@@ -276,7 +277,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let writer = crate::wrap::wrap(write);
-        T::encode(value, WireEncoder::<_, I, L, P>::new(writer))
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, WireEncoder::<_, I, L, P>::new(writer))
     }
 
     /// Encode the given value to a [Vec] using the current configuration.
@@ -286,7 +288,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut data = Buffer::new();
-        T::encode(value, WireEncoder::<_, I, L, P>::new(&mut data))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, WireEncoder::<_, I, L, P>::new(&mut data))?;
         Ok(data)
     }
 
@@ -308,7 +311,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut bytes = FixedBytes::new();
-        T::encode(value, WireEncoder::<_, I, L, P>::new(&mut bytes))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, WireEncoder::<_, I, L, P>::new(&mut bytes))?;
         Ok(bytes)
     }
 

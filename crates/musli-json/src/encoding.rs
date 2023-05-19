@@ -190,7 +190,8 @@ where
         W: Writer,
         T: ?Sized + Encode<M>,
     {
-        T::encode(value, JsonEncoder::<M, _>::new(&mut writer))
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
@@ -203,7 +204,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut writer = crate::wrap::wrap(write);
-        T::encode(value, JsonEncoder::<M, _>::new(&mut writer))
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut writer))
     }
 
     /// Encode the given value to a [`Buffer`] using the current configuration.
@@ -213,7 +215,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut data = Buffer::new();
-        T::encode(value, JsonEncoder::<M, _>::new(&mut data))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut data))?;
         Ok(data)
     }
 
@@ -235,7 +238,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut data = Buffer::with_capacity(128);
-        T::encode(value, JsonEncoder::<M, _>::new(&mut data))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data.into_vec()) })
     }
@@ -248,7 +252,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut bytes = FixedBytes::new();
-        T::encode(value, JsonEncoder::<M, _>::new(&mut bytes))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut bytes))?;
         Ok(bytes)
     }
 

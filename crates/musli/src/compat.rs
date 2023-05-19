@@ -39,18 +39,19 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        let mut seq = encoder.encode_sequence(self.0.len())?;
+        let mut seq = encoder.encode_sequence(cx, self.0.len())?;
 
         for value in self.0 {
-            let encoder = seq.next()?;
-            T::encode(value, encoder)?;
+            let encoder = seq.next(cx)?;
+            T::encode(value, cx, encoder)?;
         }
 
-        seq.end()
+        seq.end(cx)
     }
 }
 
@@ -59,11 +60,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_sequence(0)?.end()
+        encoder.encode_sequence(cx, 0)?.end(cx)
     }
 }
 
@@ -102,11 +104,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_array(self.0)
+        encoder.encode_array(cx, self.0)
     }
 }
 

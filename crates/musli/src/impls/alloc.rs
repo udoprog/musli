@@ -26,11 +26,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_str(), encoder)
+        Encode::<M>::encode(self.as_str(), cx, encoder)
     }
 }
 
@@ -86,11 +87,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_ref(), encoder)
+        Encode::<M>::encode(self.as_ref(), cx, encoder)
     }
 }
 
@@ -115,11 +117,12 @@ macro_rules! cow {
             M: Mode,
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<E::Error>,
                 E: Encoder,
             {
-                Encode::<M>::encode(self.as_ref(), encoder)
+                Encode::<M>::encode(self.as_ref(), cx, encoder)
             }
         }
 
@@ -212,17 +215,19 @@ macro_rules! sequence {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<E::Error>,
                 E: Encoder,
             {
-                let mut seq = encoder.encode_sequence(self.len())?;
+                let mut seq = encoder.encode_sequence(cx, self.len())?;
 
                 for value in self {
-                    value.encode(seq.next()?)?;
+                    let encoder = seq.next(cx)?;
+                    value.encode(cx, encoder)?;
                 }
 
-                seq.end()
+                seq.end(cx)
             }
         }
 
@@ -292,20 +297,23 @@ macro_rules! map {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<E::Error>,
                 E: Encoder,
             {
-                let mut map = encoder.encode_map(self.len())?;
+                let mut map = encoder.encode_map(cx, self.len())?;
 
                 for (k, v) in self {
-                    let mut entry = map.next()?;
-                    k.encode(entry.first()?)?;
-                    v.encode(entry.second()?)?;
-                    entry.end()?;
+                    let mut entry = map.next(cx)?;
+                    let first = entry.first(cx)?;
+                    k.encode(cx, first)?;
+                    let second = entry.second(cx)?;
+                    v.encode(cx, second)?;
+                    entry.end(cx)?;
                 }
 
-                map.end()
+                map.end(cx)
             }
         }
 
@@ -352,11 +360,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_bytes(self.to_bytes_with_nul())
+        encoder.encode_bytes(cx, self.to_bytes_with_nul())
     }
 }
 

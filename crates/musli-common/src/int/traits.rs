@@ -64,8 +64,9 @@ pub trait Unsigned:
 pub trait ByteOrderIo: Unsigned {
     /// Write the current byte array to the given writer in little-endian
     /// encoding.
-    fn write_bytes_unsigned<W, B>(self, writer: W) -> Result<(), W::Error>
+    fn write_bytes_unsigned<C, W, B>(self, cx: &mut C, writer: W) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         B: ByteOrder;
 
@@ -174,12 +175,17 @@ macro_rules! implement_io {
 
         impl ByteOrderIo for $unsigned {
             #[inline]
-            fn write_bytes_unsigned<W, B>(self, mut writer: W) -> Result<(), W::Error>
+            fn write_bytes_unsigned<C, W, B>(
+                self,
+                cx: &mut C,
+                mut writer: W,
+            ) -> Result<(), C::Error>
             where
+                C: Context<W::Error>,
                 W: Writer,
                 B: ByteOrder,
             {
-                writer.write_array(B::$write(self))
+                writer.write_array(cx, B::$write(self))
             }
 
             #[inline]

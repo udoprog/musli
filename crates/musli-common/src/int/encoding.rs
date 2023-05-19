@@ -1,7 +1,6 @@
 use core::fmt::{Debug, Display};
 use core::hash::Hash;
 
-use musli::error::Error;
 use musli::Context;
 
 use crate::int::continuation as c;
@@ -31,8 +30,9 @@ pub trait IntegerEncoding:
     Clone + Copy + Debug + Eq + Hash + Ord + PartialEq + PartialOrd + private::Sealed
 {
     /// Governs how unsigned integers are encoded into a [Writer].
-    fn encode_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: ByteOrderIo;
 
@@ -44,8 +44,9 @@ pub trait IntegerEncoding:
         T: ByteOrderIo;
 
     /// Governs how signed integers are encoded into a [Writer].
-    fn encode_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo;
@@ -63,8 +64,9 @@ pub trait IntegerEncoding:
 /// `isize`) are encoded in a format which is platform-neutral.
 pub trait UsizeEncoding: private::Sealed {
     /// Governs how usize lengths are encoded into a [Writer].
-    fn encode_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer;
 
     /// Governs how usize lengths are decoded from a [Reader].
@@ -78,12 +80,13 @@ pub trait UsizeEncoding: private::Sealed {
 /// using zigzag variable length encoding.
 impl IntegerEncoding for Variable {
     #[inline]
-    fn encode_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: Unsigned,
     {
-        c::encode(writer, value)
+        c::encode(cx, writer, value)
     }
 
     #[inline]
@@ -97,12 +100,13 @@ impl IntegerEncoding for Variable {
     }
 
     #[inline]
-    fn encode_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: Signed,
     {
-        c::encode(writer, zig::encode(value))
+        c::encode(cx, writer, zig::encode(value))
     }
 
     #[inline]
@@ -120,11 +124,12 @@ impl IntegerEncoding for Variable {
 
 impl UsizeEncoding for Variable {
     #[inline]
-    fn encode_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
     {
-        c::encode(writer, value)
+        c::encode(cx, writer, value)
     }
 
     #[inline]
@@ -142,12 +147,13 @@ where
     B: ByteOrder,
 {
     #[inline]
-    fn encode_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: ByteOrderIo,
     {
-        value.write_bytes_unsigned::<_, B>(writer)
+        value.write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]
@@ -161,13 +167,14 @@ where
     }
 
     #[inline]
-    fn encode_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo,
     {
-        value.unsigned().write_bytes_unsigned::<_, B>(writer)
+        value.unsigned().write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]
@@ -192,12 +199,13 @@ where
     <usize as TryFrom<L>>::Error: 'static + Debug + Display + Send + Sync,
 {
     #[inline]
-    fn encode_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<W::Error>,
         W: Writer,
     {
-        let value: L = value.try_into().map_err(W::Error::custom)?;
-        value.write_bytes_unsigned::<_, B>(writer)
+        let value: L = value.try_into().map_err(|err| cx.custom(err))?;
+        value.write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]

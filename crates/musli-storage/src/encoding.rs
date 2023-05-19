@@ -251,7 +251,8 @@ where
         W: Writer,
         T: ?Sized + Encode<M>,
     {
-        T::encode(value, StorageEncoder::<_, I, L>::new(writer))
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, StorageEncoder::<_, I, L>::new(writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
@@ -264,7 +265,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut writer = crate::wrap::wrap(writer);
-        T::encode(value, StorageEncoder::<_, I, L>::new(&mut writer))
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, StorageEncoder::<_, I, L>::new(&mut writer))
     }
 
     /// Encode the given value to a [`Buffer`] using the current configuration.
@@ -274,7 +276,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut data = Buffer::new();
-        T::encode(value, StorageEncoder::<_, I, L>::new(&mut data))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, StorageEncoder::<_, I, L>::new(&mut data))?;
         Ok(data)
     }
 
@@ -296,7 +299,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut bytes = FixedBytes::new();
-        T::encode(value, StorageEncoder::<_, I, L>::new(&mut bytes))?;
+        let mut cx = musli_common::context::Same::default();
+        T::encode(value, &mut cx, StorageEncoder::<_, I, L>::new(&mut bytes))?;
         Ok(bytes)
     }
 

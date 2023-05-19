@@ -6,6 +6,7 @@ use core::mem::MaybeUninit;
 use core::ptr;
 
 use musli::error::Error;
+use musli::Context;
 
 use crate::error::BufferError;
 use crate::writer::Writer;
@@ -151,9 +152,12 @@ where
     }
 
     #[inline]
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         if !self.extend_from_slice(bytes) {
-            return Err(E::message(format_args! {
+            return Err(cx.message(format_args! {
                 "Overflow when writing {additional} bytes at {at} with capacity {capacity}",
                 at = self.init,
                 additional = bytes.len(),
@@ -165,9 +169,12 @@ where
     }
 
     #[inline(always)]
-    fn write_array<const U: usize>(&mut self, array: [u8; U]) -> Result<(), Self::Error> {
+    fn write_array<C, const U: usize>(&mut self, cx: &mut C, array: [u8; U]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         if U > N.saturating_sub(self.init) {
-            return Err(E::message(format_args! {
+            return Err(cx.message(format_args! {
                 "Overflow when writing {additional} bytes at {at} with capacity {capacity}",
                 at = self.init,
                 additional = U,

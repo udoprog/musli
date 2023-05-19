@@ -1,13 +1,14 @@
 use core::{fmt, marker};
 
-use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
-use crate::tag::{Kind, Tag};
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
-use musli::error::Error;
+use musli::Context;
 use musli_common::fixed_bytes::FixedBytes;
 use musli_common::writer::Writer;
 use musli_storage::en::StorageEncoder;
 use musli_storage::int::Variable;
+
+use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
+use crate::tag::{Kind, Tag};
 
 /// A very simple encoder.
 pub struct WireEncoder<W, I, L, const P: usize>
@@ -86,202 +87,297 @@ where
     }
 
     #[inline(always)]
-    fn encode_unit(mut self) -> Result<Self::Ok, Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
+    fn encode_unit<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.writer
+            .write_byte(cx, Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
 
     #[inline(always)]
-    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
+    fn encode_pack<C>(self, _: &mut C) -> Result<Self::Pack, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(WirePackEncoder::new(self.writer, FixedBytes::new()))
     }
 
     #[inline(always)]
-    fn encode_array<const N: usize>(self, array: [u8; N]) -> Result<Self::Ok, Self::Error> {
-        self.encode_bytes(array.as_slice())
+    fn encode_array<C, const N: usize>(
+        self,
+        cx: &mut C,
+        array: [u8; N],
+    ) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.encode_bytes(cx, array.as_slice())
     }
 
     #[inline(always)]
-    fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
-        encode_prefix::<W, L>(&mut self.writer, bytes.len())?;
-        self.writer.write_bytes(bytes)?;
+    fn encode_bytes<C>(mut self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        encode_prefix::<_, _, L>(cx, &mut self.writer, bytes.len())?;
+        self.writer.write_bytes(cx, bytes)?;
         Ok(())
     }
 
     #[inline(always)]
-    fn encode_bytes_vectored(mut self, vectors: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
+    fn encode_bytes_vectored<C>(
+        mut self,
+        cx: &mut C,
+        vectors: &[&[u8]],
+    ) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         let len = vectors.iter().map(|v| v.len()).sum();
-        encode_prefix::<W, L>(&mut self.writer, len)?;
+        encode_prefix::<_, _, L>(cx, &mut self.writer, len)?;
 
         for bytes in vectors {
-            self.writer.write_bytes(bytes)?;
+            self.writer.write_bytes(cx, bytes)?;
         }
 
         Ok(())
     }
 
     #[inline(always)]
-    fn encode_string(self, string: &str) -> Result<Self::Ok, Self::Error> {
-        self.encode_bytes(string.as_bytes())
+    fn encode_string<C>(self, cx: &mut C, string: &str) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.encode_bytes(cx, string.as_bytes())
     }
 
     #[inline(always)]
-    fn encode_usize(mut self, value: usize) -> Result<Self::Ok, Self::Error> {
-        L::encode_typed_usize(&mut self.writer, value)
+    fn encode_usize<C>(mut self, cx: &mut C, value: usize) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        L::encode_typed_usize(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_isize(mut self, value: isize) -> Result<Self::Ok, Self::Error> {
-        L::encode_typed_usize(&mut self.writer, value as usize)
+    fn encode_isize<C>(mut self, cx: &mut C, value: isize) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        L::encode_typed_usize(cx, &mut self.writer, value as usize)
     }
 
     #[inline(always)]
-    fn encode_bool(mut self, value: bool) -> Result<Self::Ok, Self::Error> {
+    fn encode_bool<C>(mut self, cx: &mut C, value: bool) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         self.writer
-            .write_byte(Tag::new(Kind::Byte, if value { 1 } else { 0 }).byte())
+            .write_byte(cx, Tag::new(Kind::Byte, if value { 1 } else { 0 }).byte())
     }
 
     #[inline(always)]
-    fn encode_char(self, value: char) -> Result<Self::Ok, Self::Error> {
-        self.encode_u32(value as u32)
+    fn encode_char<C>(self, cx: &mut C, value: char) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.encode_u32(cx, value as u32)
     }
 
     #[inline(always)]
-    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, Self::Error> {
+    fn encode_u8<C>(mut self, cx: &mut C, value: u8) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         let (tag, embedded) = Tag::with_byte(Kind::Byte, value);
-        self.writer.write_byte(tag.byte())?;
+        self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            self.writer.write_byte(value)?;
+            self.writer.write_byte(cx, value)?;
         }
 
         Ok(())
     }
 
     #[inline(always)]
-    fn encode_u16(mut self, value: u16) -> Result<Self::Ok, Self::Error> {
-        I::encode_typed_unsigned(&mut self.writer, value)
+    fn encode_u16<C>(mut self, cx: &mut C, value: u16) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        I::encode_typed_unsigned(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, Self::Error> {
-        I::encode_typed_unsigned(&mut self.writer, value)
+    fn encode_u32<C>(mut self, cx: &mut C, value: u32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        I::encode_typed_unsigned(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_u64(mut self, value: u64) -> Result<Self::Ok, Self::Error> {
-        I::encode_typed_unsigned(&mut self.writer, value)
+    fn encode_u64<C>(mut self, cx: &mut C, value: u64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        I::encode_typed_unsigned(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_u128(mut self, value: u128) -> Result<Self::Ok, Self::Error> {
-        I::encode_typed_unsigned(&mut self.writer, value)
+    fn encode_u128<C>(mut self, cx: &mut C, value: u128) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        I::encode_typed_unsigned(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
-        self.encode_u8(value as u8)
+    fn encode_i8<C>(self, cx: &mut C, value: i8) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.encode_u8(cx, value as u8)
     }
 
     #[inline(always)]
-    fn encode_i16(mut self, value: i16) -> Result<Self::Ok, Self::Error> {
-        I::encode_typed_signed(&mut self.writer, value)
+    fn encode_i16<C>(mut self, cx: &mut C, value: i16) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        I::encode_typed_signed(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_i32(mut self, value: i32) -> Result<Self::Ok, Self::Error> {
-        I::encode_typed_signed(&mut self.writer, value)
+    fn encode_i32<C>(mut self, cx: &mut C, value: i32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        I::encode_typed_signed(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_i64(mut self, value: i64) -> Result<Self::Ok, Self::Error> {
-        I::encode_typed_signed(&mut self.writer, value)
+    fn encode_i64<C>(mut self, cx: &mut C, value: i64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        I::encode_typed_signed(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_i128(mut self, value: i128) -> Result<Self::Ok, Self::Error> {
-        I::encode_typed_signed(&mut self.writer, value)
+    fn encode_i128<C>(mut self, cx: &mut C, value: i128) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        I::encode_typed_signed(cx, &mut self.writer, value)
     }
 
     #[inline(always)]
-    fn encode_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
-        self.encode_u32(value.to_bits())
+    fn encode_f32<C>(self, cx: &mut C, value: f32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.encode_u32(cx, value.to_bits())
     }
 
     #[inline(always)]
-    fn encode_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
-        self.encode_u64(value.to_bits())
+    fn encode_f64<C>(self, cx: &mut C, value: f64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.encode_u64(cx, value.to_bits())
     }
 
     #[inline(always)]
-    fn encode_some(mut self) -> Result<Self::Some, Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Sequence, 1).byte())?;
+    fn encode_some<C>(mut self, cx: &mut C) -> Result<Self::Some, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.writer
+            .write_byte(cx, Tag::new(Kind::Sequence, 1).byte())?;
         Ok(self)
     }
 
     #[inline(always)]
-    fn encode_none(mut self) -> Result<Self::Ok, Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Sequence, 0).byte())?;
+    fn encode_none<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.writer
+            .write_byte(cx, Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
 
     #[inline]
-    fn encode_sequence(mut self, len: usize) -> Result<Self::Sequence, Self::Error> {
+    fn encode_sequence<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Sequence, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(tag.byte())?;
+        self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            L::encode_usize(&mut self.writer, len)?;
+            L::encode_usize(cx, &mut self.writer, len)?;
         }
 
         Ok(self)
     }
 
     #[inline]
-    fn encode_tuple(mut self, len: usize) -> Result<Self::Tuple, Self::Error> {
+    fn encode_tuple<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Tuple, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(tag.byte())?;
+        self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            L::encode_usize(&mut self.writer, len)?;
+            L::encode_usize(cx, &mut self.writer, len)?;
         }
 
         Ok(self)
     }
 
     #[inline]
-    fn encode_map(mut self, len: usize) -> Result<Self::Map, Self::Error> {
-        let len = len
-            .checked_mul(2)
-            .ok_or_else(|| Self::Error::message(Overflow))?;
+    fn encode_map<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Map, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        let len = len.checked_mul(2).ok_or_else(|| cx.message(Overflow))?;
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(tag.byte())?;
+        self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            L::encode_usize(&mut self.writer, len)?;
+            L::encode_usize(cx, &mut self.writer, len)?;
         }
 
         Ok(self)
     }
 
     #[inline]
-    fn encode_struct(mut self, len: usize) -> Result<Self::Struct, Self::Error> {
-        let len = len
-            .checked_mul(2)
-            .ok_or_else(|| Self::Error::message(Overflow))?;
+    fn encode_struct<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Struct, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        let len = len.checked_mul(2).ok_or_else(|| cx.message(Overflow))?;
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(tag.byte())?;
+        self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            L::encode_usize(&mut self.writer, len)?;
+            L::encode_usize(cx, &mut self.writer, len)?;
         }
 
         Ok(self)
     }
 
     #[inline]
-    fn encode_variant(mut self) -> Result<Self::Variant, Self::Error> {
-        self.writer.write_byte(Tag::new(Kind::Sequence, 2).byte())?;
+    fn encode_variant<C>(mut self, cx: &mut C) -> Result<Self::Variant, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.writer
+            .write_byte(cx, Tag::new(Kind::Sequence, 2).byte())?;
         Ok(self)
     }
 }
@@ -297,14 +393,20 @@ where
     type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
 
     #[inline]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(StorageEncoder::new(&mut self.pack_buf))
     }
 
     #[inline]
-    fn end(mut self) -> Result<Self::Ok, Self::Error> {
-        encode_prefix::<W, L>(&mut self.writer, self.pack_buf.len())?;
-        self.writer.write_bytes(self.pack_buf.as_slice())?;
+    fn end<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        encode_prefix::<_, _, L>(cx, &mut self.writer, self.pack_buf.len())?;
+        self.writer.write_bytes(cx, self.pack_buf.as_slice())?;
         Ok(())
     }
 }
@@ -320,12 +422,18 @@ where
     type Encoder<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
 
     #[inline]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(())
     }
 }
@@ -341,12 +449,18 @@ where
     type Encoder<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
 
     #[inline]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(())
     }
 }
@@ -363,17 +477,26 @@ where
     type Second<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
 
     #[inline]
-    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second<C>(&mut self, _: &mut C) -> Result<Self::Second<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(())
     }
 }
@@ -390,17 +513,26 @@ where
     type Variant<'this> = WireEncoder<W::Mut<'this>, I, L, P> where Self: 'this;
 
     #[inline]
-    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
+    fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(())
     }
 }
@@ -415,16 +547,17 @@ impl fmt::Display for Overflow {
 
 /// Encode a length prefix.
 #[inline]
-fn encode_prefix<W, L>(writer: &mut W, len: usize) -> Result<(), W::Error>
+fn encode_prefix<C, W, L>(cx: &mut C, writer: &mut W, len: usize) -> Result<(), C::Error>
 where
+    C: Context<W::Error>,
     W: Writer,
     L: WireUsizeEncoding,
 {
     let (tag, embedded) = Tag::with_len(Kind::Prefix, len);
-    writer.write_byte(tag.byte())?;
+    writer.write_byte(cx, tag.byte())?;
 
     if !embedded {
-        L::encode_usize(writer, len)?;
+        L::encode_usize(cx, writer, len)?;
     }
 
     Ok(())

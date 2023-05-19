@@ -34,7 +34,7 @@ pub enum NeverMarker {}
 /// use musli::Context;
 /// use musli::de::Decoder;
 ///
-/// struct MyDecoder;
+/// struct MyDecoder(u32);
 ///
 /// #[musli::decoder]
 /// impl Decoder<'_> for MyDecoder {
@@ -48,7 +48,11 @@ pub enum NeverMarker {}
 ///     where
 ///         C: Context<Self::Error>
 ///     {
-///         Ok(42)
+///         if self.0 == 42 {
+///             return Ok(self.0);
+///         }
+///
+///         Err(cx.custom("I do not have the answer..."))
 ///     }
 /// }
 /// ```
@@ -334,12 +338,18 @@ where
         Self: 'this;
 
     #[inline]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    where
+        C: Context<E>,
+    {
         match self._never {}
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<E>,
+    {
         match self._never {}
     }
 }
@@ -353,11 +363,17 @@ where
     type Encoder<'this> = Self where Self: 'this;
 
     #[inline]
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         match self._never {}
     }
 
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         match self._never {}
     }
 }
@@ -374,17 +390,26 @@ where
     type Second<'this> = Self where Self: 'this;
 
     #[inline]
-    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         match self._never {}
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second<C>(&mut self, _: &mut C) -> Result<Self::Second<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         match self._never {}
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         match self._never {}
     }
 }
@@ -401,17 +426,26 @@ where
     type Variant<'this> = Self where Self: 'this;
 
     #[inline]
-    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         match self._never {}
     }
 
     #[inline]
-    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
+    fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         match self._never {}
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         match self._never {}
     }
 }

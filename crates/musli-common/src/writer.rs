@@ -6,6 +6,7 @@ use core::mem::take;
 use core::ops::Deref;
 
 use musli::error::Error;
+use musli::Context;
 
 use crate::error::BufferError;
 #[cfg(not(feature = "alloc"))]
@@ -39,18 +40,26 @@ pub trait Writer {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write bytes to the current writer.
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error>;
+    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>;
 
     /// Write a single byte.
     #[inline]
-    fn write_byte(&mut self, b: u8) -> Result<(), Self::Error> {
-        self.write_bytes(&[b])
+    fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.write_bytes(cx, &[b])
     }
 
     /// Write an array to the current writer.
     #[inline]
-    fn write_array<const N: usize>(&mut self, array: [u8; N]) -> Result<(), Self::Error> {
-        self.write_bytes(&array)
+    fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.write_bytes(cx, &array)
     }
 }
 
@@ -67,18 +76,27 @@ where
     }
 
     #[inline]
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
-        (*self).write_bytes(bytes)
+    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        (*self).write_bytes(cx, bytes)
     }
 
     #[inline]
-    fn write_byte(&mut self, b: u8) -> Result<(), Self::Error> {
-        (*self).write_byte(b)
+    fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        (*self).write_byte(cx, b)
     }
 
     #[inline]
-    fn write_array<const N: usize>(&mut self, array: [u8; N]) -> Result<(), Self::Error> {
-        (*self).write_array(array)
+    fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        (*self).write_array(cx, array)
     }
 }
 
@@ -143,19 +161,28 @@ impl Writer for Buffer {
     }
 
     #[inline]
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+    fn write_bytes<C>(&mut self, _: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         self.buf.extend_from_slice(bytes);
         Ok(())
     }
 
     #[inline]
-    fn write_byte(&mut self, b: u8) -> Result<(), Self::Error> {
+    fn write_byte<C>(&mut self, _: &mut C, b: u8) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         self.buf.push(b);
         Ok(())
     }
 
     #[inline]
-    fn write_array<const N: usize>(&mut self, array: [u8; N]) -> Result<(), Self::Error> {
+    fn write_array<C, const N: usize>(&mut self, _: &mut C, array: [u8; N]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         self.buf.extend_from_slice(&array[..]);
         Ok(())
     }
@@ -172,19 +199,28 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+    fn write_bytes<C>(&mut self, _: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         self.extend_from_slice(bytes);
         Ok(())
     }
 
     #[inline]
-    fn write_byte(&mut self, b: u8) -> Result<(), Self::Error> {
+    fn write_byte<C>(&mut self, _: &mut C, b: u8) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         self.push(b);
         Ok(())
     }
 
     #[inline]
-    fn write_array<const N: usize>(&mut self, array: [u8; N]) -> Result<(), Self::Error> {
+    fn write_array<C, const N: usize>(&mut self, _: &mut C, array: [u8; N]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         self.extend_from_slice(&array[..]);
         Ok(())
     }
@@ -200,9 +236,12 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         if self.len() < bytes.len() {
-            return Err(Self::Error::message(format_args!(
+            return Err(cx.message(format_args!(
                 "Buffer overflow, remaining is {} while tried to write {}",
                 self.len(),
                 bytes.len()
@@ -217,9 +256,12 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn write_byte(&mut self, b: u8) -> Result<(), Self::Error> {
+    fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         if self.is_empty() {
-            return Err(Self::Error::message(format_args!(
+            return Err(cx.message(format_args!(
                 "Buffer overflow, remaining is {} while tried to write 1",
                 self.len()
             )));
@@ -231,9 +273,12 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn write_array<const N: usize>(&mut self, array: [u8; N]) -> Result<(), Self::Error> {
+    fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         if self.len() < N {
-            return Err(Self::Error::message(format_args!(
+            return Err(cx.message(format_args!(
                 "Buffer overflow, remaining is {} while tried to write {}",
                 self.len(),
                 N

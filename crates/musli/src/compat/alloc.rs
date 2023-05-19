@@ -19,11 +19,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
-        encoder.encode_bytes(self.0.as_slice())
+        encoder.encode_bytes(cx, self.0.as_slice())
     }
 }
 
@@ -76,12 +77,13 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<E::Error>,
         E: Encoder,
     {
         let (first, second) = self.0.as_slices();
-        encoder.encode_bytes_vectored(&[first, second])
+        encoder.encode_bytes_vectored(cx, &[first, second])
     }
 }
 
