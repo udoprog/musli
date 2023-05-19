@@ -439,6 +439,9 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod context;
+pub use self::context::Context;
+
 pub mod compat;
 pub mod de;
 pub mod derives;

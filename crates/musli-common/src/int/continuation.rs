@@ -17,10 +17,13 @@
 
 #![allow(unused)]
 
+use musli::de;
+use musli::error::Error;
+use musli::Context;
+
 use crate::int;
 use crate::reader::Reader;
 use crate::writer::Writer;
-use musli::error::Error;
 
 use super::Unsigned;
 
@@ -29,12 +32,13 @@ const CONT_BYTE: u8 = 0b1000_0000;
 
 /// Decode the given length using variable int encoding.
 #[inline(never)]
-pub fn decode<'de, R, T>(mut r: R) -> Result<T, R::Error>
+pub fn decode<'de, C, R, T>(cx: &mut C, mut r: R) -> Result<T, C::Error>
 where
+    C: Context<R::Error>,
     R: Reader<'de>,
     T: int::Unsigned,
 {
-    let mut b = r.read_byte()?;
+    let mut b = r.read_byte(cx)?;
 
     if b & 0b1000_0000 == 0 {
         return Ok(T::from_byte(b));
@@ -47,10 +51,10 @@ where
         shift += 7;
 
         if shift >= T::BITS {
-            return Err(R::Error::custom("bits overflow"));
+            return Err(cx.custom("bits overflow"));
         }
 
-        b = r.read_byte()?;
+        b = r.read_byte(cx)?;
         value = value.wrapping_add(T::from_byte(b & MASK_BYTE).wrapping_shl(shift));
     }
 
@@ -74,7 +78,7 @@ where
     loop {
         value = value
             .checked_shr(7)
-            .ok_or_else(|| W::Error::custom("length underflow"))?;
+            .ok_or_else(|| <W::Error as Error>::custom("length underflow"))?;
 
         if value.is_zero() {
             w.write_byte(b & MASK_BYTE)?;

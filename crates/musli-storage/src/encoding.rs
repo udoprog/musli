@@ -309,7 +309,8 @@ where
         T: Decode<'de, M>,
     {
         let reader = reader.with_position();
-        T::decode(StorageDecoder::<_, I, L>::new(reader))
+        let mut cx = musli_common::context::Same::default();
+        T::decode(&mut cx, StorageDecoder::<_, I, L>::new(reader))
     }
 
     /// Decode the given type `T` from the given slice using the current
@@ -320,7 +321,8 @@ where
         T: Decode<'de, M>,
     {
         let reader = SliceReader::new(bytes).with_position();
-        T::decode(StorageDecoder::<_, I, L>::new(reader))
+        let mut cx = musli_common::context::Same::default();
+        T::decode(&mut cx, StorageDecoder::<_, I, L>::new(reader))
     }
 }
 

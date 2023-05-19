@@ -10,9 +10,9 @@ use musli::de::{
     Decoder, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
     SizeHint, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
-use musli::error::Error;
 #[cfg(feature = "musli-value")]
 use musli::mode::Mode;
+use musli::Context;
 
 use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
@@ -37,47 +37,50 @@ where
     }
 
     /// Skip over any values.
-    pub(crate) fn skip_any(mut self) -> Result<(), ParseError> {
+    pub(crate) fn skip_any<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<ParseError>,
+    {
         let start = self.parser.pos();
-        let actual = self.parser.peek()?;
+        let actual = self.parser.peek(cx)?;
 
         match actual {
             Token::OpenBrace => {
-                let mut object = JsonObjectDecoder::new(self.scratch, None, self.parser)?;
+                let mut object = JsonObjectDecoder::new(cx, self.scratch, None, self.parser)?;
 
-                while let Some(mut pair) = object.next()? {
-                    pair.first()?.skip_any()?;
-                    pair.skip_second()?;
+                while let Some(mut pair) = object.next(cx)? {
+                    pair.first(cx)?.skip_any(cx)?;
+                    pair.skip_second(cx)?;
                 }
             }
             Token::OpenBracket => {
-                let mut seq = JsonSequenceDecoder::new(self.scratch, None, self.parser)?;
+                let mut seq = JsonSequenceDecoder::new(cx, self.scratch, None, self.parser)?;
 
-                while let Some(item) = SequenceDecoder::next(&mut seq)? {
-                    item.skip_any()?;
+                while let Some(item) = SequenceDecoder::next(&mut seq, cx)? {
+                    item.skip_any(cx)?;
                 }
             }
             Token::Null => {
-                return self.parse_null();
+                return self.parse_null(cx);
             }
             Token::True => {
-                return self.parse_true();
+                return self.parse_true(cx);
             }
             Token::False => {
-                return self.parse_false();
+                return self.parse_false(cx);
             }
             Token::Number => {
-                return integer::skip_number(&mut self.parser);
+                return integer::skip_number(cx, &mut self.parser);
             }
             Token::String => {
-                return string::skip_string(&mut self.parser, true);
+                return string::skip_string(cx, &mut self.parser, true);
             }
             actual => {
-                return Err(ParseError::spanned(
+                return Err(cx.report(ParseError::spanned(
                     start,
                     self.parser.pos(),
                     ParseErrorKind::ExpectedValue(actual),
-                ))
+                )));
             }
         }
 
@@ -85,22 +88,31 @@ where
     }
 
     #[inline]
-    fn parse_true(mut self) -> Result<(), ParseError> {
-        self.parser.parse_exact(*b"true", |pos| {
+    fn parse_true<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<ParseError>,
+    {
+        self.parser.parse_exact(cx, *b"true", |pos| {
             ParseError::at(pos, ParseErrorKind::ExpectedTrue)
         })
     }
 
     #[inline]
-    fn parse_false(mut self) -> Result<(), ParseError> {
-        self.parser.parse_exact(*b"false", |pos| {
+    fn parse_false<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<ParseError>,
+    {
+        self.parser.parse_exact(cx, *b"false", |pos| {
             ParseError::at(pos, ParseErrorKind::ExpectedFalse)
         })
     }
 
     #[inline]
-    fn parse_null(mut self) -> Result<(), ParseError> {
-        self.parser.parse_exact(*b"null", |pos| {
+    fn parse_null<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<ParseError>,
+    {
+        self.parser.parse_exact(cx, *b"null", |pos| {
             ParseError::at(pos, ParseErrorKind::ExpectedNull)
         })
     }
@@ -128,8 +140,11 @@ where
     }
 
     #[inline]
-    fn type_hint(&mut self) -> Result<TypeHint, Self::Error> {
-        Ok(match self.parser.peek()? {
+    fn type_hint<C>(&mut self, cx: &mut C) -> Result<TypeHint, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        Ok(match self.parser.peek(cx)? {
             Token::OpenBrace => TypeHint::Map(SizeHint::Any),
             Token::OpenBracket => TypeHint::Sequence(SizeHint::Any),
             Token::String => TypeHint::String(SizeHint::Any),
@@ -143,43 +158,53 @@ where
 
     #[cfg(feature = "musli-value")]
     #[inline]
-    fn decode_buffer<M>(self) -> Result<Self::Buffer, Self::Error>
+    fn decode_buffer<M, C>(self, cx: &mut C) -> Result<Self::Buffer, C::Error>
     where
         M: Mode,
+        C: Context<Self::Error>,
     {
         use musli::de::Decode;
-        let value: musli_value::Value = Decode::<M>::decode(self)?;
+        let value: musli_value::Value = Decode::<M>::decode(cx, self)?;
         Ok(value.into_value_decoder())
     }
 
     #[inline]
-    fn decode_unit(self) -> Result<(), Self::Error> {
-        self.skip_any()
+    fn decode_unit<C>(self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.skip_any(cx)
     }
 
     #[inline]
-    fn decode_bool(mut self) -> Result<bool, Self::Error> {
-        match self.parser.peek()? {
+    fn decode_bool<C>(mut self, cx: &mut C) -> Result<bool, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        match self.parser.peek(cx)? {
             Token::True => {
-                self.parse_true()?;
+                self.parse_true(cx)?;
                 Ok(true)
             }
             Token::False => {
-                self.parse_false()?;
+                self.parse_false(cx)?;
                 Ok(false)
             }
-            actual => Err(ParseError::at(
+            actual => Err(cx.report(ParseError::at(
                 self.parser.pos(),
                 ParseErrorKind::ExpectedBool(actual),
-            )),
+            ))),
         }
     }
 
     #[inline]
-    fn decode_char(mut self) -> Result<char, Self::Error> {
+    fn decode_char<C>(mut self, cx: &mut C) -> Result<char, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         let start = self.parser.pos();
 
-        let string = match self.parser.parse_string(self.scratch, true)? {
+        let string = match self.parser.parse_string(cx, self.scratch, true)? {
             StringReference::Borrowed(string) => string,
             StringReference::Scratch(string) => string,
         };
@@ -189,123 +214,180 @@ where
 
         match (first, it.next()) {
             (Some(c), None) => Ok(c),
-            _ => Err(ParseError::spanned(
+            _ => Err(cx.report(ParseError::spanned(
                 start,
                 self.parser.pos(),
                 ParseErrorKind::CharEmptyString,
-            )),
+            ))),
         }
     }
 
     #[inline]
-    fn decode_u8(mut self) -> Result<u8, Self::Error> {
-        integer::parse_unsigned(&mut self.parser)
+    fn decode_u8<C>(mut self, cx: &mut C) -> Result<u8, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_u16(mut self) -> Result<u16, Self::Error> {
-        integer::parse_unsigned(&mut self.parser)
+    fn decode_u16<C>(mut self, cx: &mut C) -> Result<u16, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_u32(mut self) -> Result<u32, Self::Error> {
-        integer::parse_unsigned(&mut self.parser)
+    fn decode_u32<C>(mut self, cx: &mut C) -> Result<u32, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_u64(mut self) -> Result<u64, Self::Error> {
-        integer::parse_unsigned(&mut self.parser)
+    fn decode_u64<C>(mut self, cx: &mut C) -> Result<u64, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_u128(mut self) -> Result<u128, Self::Error> {
-        integer::parse_unsigned(&mut self.parser)
+    fn decode_u128<C>(mut self, cx: &mut C) -> Result<u128, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_i8(mut self) -> Result<i8, Self::Error> {
-        integer::parse_signed(&mut self.parser)
+    fn decode_i8<C>(mut self, cx: &mut C) -> Result<i8, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_i16(mut self) -> Result<i16, Self::Error> {
-        integer::parse_signed(&mut self.parser)
+    fn decode_i16<C>(mut self, cx: &mut C) -> Result<i16, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_i32(mut self) -> Result<i32, Self::Error> {
-        integer::parse_signed(&mut self.parser)
+    fn decode_i32<C>(mut self, cx: &mut C) -> Result<i32, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_i64(mut self) -> Result<i64, Self::Error> {
-        integer::parse_signed(&mut self.parser)
+    fn decode_i64<C>(mut self, cx: &mut C) -> Result<i64, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_i128(mut self) -> Result<i128, Self::Error> {
-        integer::parse_signed(&mut self.parser)
+    fn decode_i128<C>(mut self, cx: &mut C) -> Result<i128, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_usize(mut self) -> Result<usize, Self::Error> {
-        integer::parse_unsigned(&mut self.parser)
+    fn decode_usize<C>(mut self, cx: &mut C) -> Result<usize, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_isize(mut self) -> Result<isize, Self::Error> {
-        integer::parse_signed(&mut self.parser)
+    fn decode_isize<C>(mut self, cx: &mut C) -> Result<isize, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        integer::parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
-    fn decode_f32(mut self) -> Result<f32, Self::Error> {
-        self.parser.parse_f32()
+    fn decode_f32<C>(mut self, cx: &mut C) -> Result<f32, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.parser.parse_f32(cx)
     }
 
     #[inline]
-    fn decode_f64(mut self) -> Result<f64, Self::Error> {
-        self.parser.parse_f64()
+    fn decode_f64<C>(mut self, cx: &mut C) -> Result<f64, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.parser.parse_f64(cx)
     }
 
     #[inline]
-    fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
+    fn decode_number<V>(
+        mut self,
+        cx: &mut V::Context,
+        visitor: V,
+    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
     where
         V: NumberVisitor<'de, Error = Self::Error>,
     {
-        self.parser.parse_number(visitor)
+        self.parser.parse_number(cx, visitor)
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    fn decode_bytes<V>(
+        self,
+        cx: &mut V::Context,
+        visitor: V,
+    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
-        let mut seq = self.decode_sequence()?;
+        let mut seq = self.decode_sequence(cx)?;
         let mut bytes = Vec::with_capacity(seq.size_hint().or_default());
 
-        while let Some(item) = SequenceDecoder::next(&mut seq)? {
-            bytes.push(item.decode_u8()?);
+        while let Some(item) = SequenceDecoder::next(&mut seq, cx)? {
+            bytes.push(item.decode_u8(cx)?);
         }
 
-        visitor.visit_owned(bytes)
+        visitor.visit_owned(cx, bytes)
     }
 
     #[inline]
-    fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
+    fn decode_string<V>(
+        mut self,
+        cx: &mut V::Context,
+        visitor: V,
+    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
     where
         V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
-        match self.parser.parse_string(self.scratch, true)? {
-            StringReference::Borrowed(borrowed) => visitor.visit_borrowed(borrowed),
-            StringReference::Scratch(string) => visitor.visit_ref(string),
+        match self.parser.parse_string(cx, self.scratch, true)? {
+            StringReference::Borrowed(borrowed) => visitor.visit_borrowed(cx, borrowed),
+            StringReference::Scratch(string) => visitor.visit_ref(cx, string),
         }
     }
 
     #[inline]
-    fn decode_option(mut self) -> Result<Option<Self::Some>, Self::Error> {
-        if self.parser.peek()?.is_null() {
-            self.parse_null()?;
+    fn decode_option<C>(mut self, cx: &mut C) -> Result<Option<Self::Some>, C::Error>
+    where
+        C: Context<ParseError>,
+    {
+        if self.parser.peek(cx)?.is_null() {
+            self.parse_null(cx)?;
             Ok(None)
         } else {
             Ok(Some(self))
@@ -313,64 +395,91 @@ where
     }
 
     #[inline]
-    fn decode_pack(self) -> Result<Self::Pack, Self::Error> {
-        JsonSequenceDecoder::new(self.scratch, None, self.parser)
-    }
-
-    #[inline]
-    fn decode_sequence(self) -> Result<Self::Sequence, Self::Error> {
-        JsonSequenceDecoder::new(self.scratch, None, self.parser)
-    }
-
-    #[inline]
-    fn decode_tuple(self, len: usize) -> Result<Self::Tuple, Self::Error> {
-        JsonSequenceDecoder::new(self.scratch, Some(len), self.parser)
-    }
-
-    #[inline]
-    fn decode_map(self) -> Result<Self::Map, Self::Error> {
-        JsonObjectDecoder::new(self.scratch, None, self.parser)
-    }
-
-    #[inline]
-    fn decode_struct(self, len: usize) -> Result<Self::Struct, Self::Error> {
-        JsonObjectDecoder::new(self.scratch, Some(len), self.parser)
-    }
-
-    #[inline]
-    fn decode_variant(self) -> Result<Self::Variant, Self::Error> {
-        JsonVariantDecoder::new(self.scratch, self.parser)
-    }
-
-    #[inline]
-    fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
+    fn decode_pack<C>(self, cx: &mut C) -> Result<Self::Pack, C::Error>
     where
+        C: Context<Self::Error>,
+    {
+        JsonSequenceDecoder::new(cx, self.scratch, None, self.parser)
+    }
+
+    #[inline]
+    fn decode_sequence<C>(self, cx: &mut C) -> Result<Self::Sequence, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        JsonSequenceDecoder::new(cx, self.scratch, None, self.parser)
+    }
+
+    #[inline]
+    fn decode_tuple<C>(self, cx: &mut C, len: usize) -> Result<Self::Tuple, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        JsonSequenceDecoder::new(cx, self.scratch, Some(len), self.parser)
+    }
+
+    #[inline]
+    fn decode_map<C>(self, cx: &mut C) -> Result<Self::Map, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        JsonObjectDecoder::new(cx, self.scratch, None, self.parser)
+    }
+
+    #[inline]
+    fn decode_struct<C>(self, cx: &mut C, len: usize) -> Result<Self::Struct, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        JsonObjectDecoder::new(cx, self.scratch, Some(len), self.parser)
+    }
+
+    #[inline]
+    fn decode_variant<C>(self, cx: &mut C) -> Result<Self::Variant, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        JsonVariantDecoder::new(cx, self.scratch, self.parser)
+    }
+
+    #[inline]
+    fn decode_any<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    where
+        C: Context<ParseError>,
         V: Visitor<'de, Error = Self::Error>,
     {
-        self.parser.skip_whitespace()?;
+        self.parser.skip_whitespace(cx)?;
 
-        match self.parser.peek()? {
+        match self.parser.peek(cx)? {
             Token::OpenBrace => {
-                visitor.visit_map(JsonObjectDecoder::new(self.scratch, None, self.parser)?)
+                let decoder = JsonObjectDecoder::new(cx, self.scratch, None, self.parser)?;
+                visitor.visit_map(cx, decoder)
             }
             Token::OpenBracket => {
-                visitor.visit_sequence(JsonSequenceDecoder::new(self.scratch, None, self.parser)?)
+                let decoder = JsonSequenceDecoder::new(cx, self.scratch, None, self.parser)?;
+                visitor.visit_sequence(cx, decoder)
             }
-            Token::String => self.decode_string(visitor.visit_string(SizeHint::Any)?),
-            Token::Number => self.decode_number(visitor.visit_number(NumberHint::Any)?),
+            Token::String => {
+                let visitor = visitor.visit_string(cx, SizeHint::Any)?;
+                self.decode_string(cx, visitor)
+            }
+            Token::Number => {
+                let visitor = visitor.visit_number(cx, NumberHint::Any)?;
+                self.decode_number(cx, visitor)
+            }
             Token::Null => {
-                self.parse_null()?;
-                visitor.visit_unit()
+                self.parse_null(cx)?;
+                visitor.visit_unit(cx)
             }
             Token::True => {
-                self.parse_true()?;
-                visitor.visit_bool(true)
+                self.parse_true(cx)?;
+                visitor.visit_bool(cx, true)
             }
             Token::False => {
-                self.parse_false()?;
-                visitor.visit_bool(false)
+                self.parse_false(cx)?;
+                visitor.visit_bool(cx, false)
             }
-            _ => visitor.visit_any(self, TypeHint::Any),
+            _ => visitor.visit_any(cx, self, TypeHint::Any),
         }
     }
 }
@@ -386,8 +495,11 @@ where
     P: Parser<'de>,
 {
     #[inline]
-    fn skip_any(self) -> Result<(), ParseError> {
-        JsonDecoder::new(self.scratch, self.parser).skip_any()
+    fn skip_any<C>(self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<ParseError>,
+    {
+        JsonDecoder::new(self.scratch, self.parser).skip_any(cx)
     }
 }
 
@@ -402,22 +514,26 @@ where
     }
 
     #[inline]
-    fn decode_escaped_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
+    fn decode_escaped_bytes<V>(
+        mut self,
+        cx: &mut V::Context,
+        visitor: V,
+    ) -> Result<V::Ok, <V::Context as Context<V::Error>>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = ParseError>,
     {
-        match self.parser.parse_string(self.scratch, true)? {
-            StringReference::Borrowed(string) => visitor.visit_borrowed(string.as_bytes()),
-            StringReference::Scratch(string) => visitor.visit_ref(string.as_bytes()),
+        match self.parser.parse_string(cx, self.scratch, true)? {
+            StringReference::Borrowed(string) => visitor.visit_borrowed(cx, string.as_bytes()),
+            StringReference::Scratch(string) => visitor.visit_ref(cx, string.as_bytes()),
         }
     }
 }
 
-struct KeyUnsignedVisitor<T> {
-    _marker: marker::PhantomData<T>,
+struct KeyUnsignedVisitor<C, T> {
+    _marker: marker::PhantomData<(C, T)>,
 }
 
-impl<T> KeyUnsignedVisitor<T> {
+impl<C, T> KeyUnsignedVisitor<C, T> {
     const fn new() -> Self {
         Self {
             _marker: marker::PhantomData,
@@ -425,13 +541,15 @@ impl<T> KeyUnsignedVisitor<T> {
     }
 }
 
-impl<'de, T> ValueVisitor<'de> for KeyUnsignedVisitor<T>
+impl<'de, C, T> ValueVisitor<'de> for KeyUnsignedVisitor<C, T>
 where
+    C: Context<ParseError>,
     T: Unsigned,
 {
     type Target = [u8];
     type Ok = T;
     type Error = ParseError;
+    type Context = C;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -439,16 +557,16 @@ where
     }
 
     #[inline]
-    fn visit_ref(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        integer::parse_unsigned(&mut SliceParser::new(bytes))
+    fn visit_ref(self, cx: &mut C, bytes: &Self::Target) -> Result<Self::Ok, C::Error> {
+        integer::parse_unsigned(cx, &mut SliceParser::new(bytes))
     }
 }
 
-struct KeySignedVisitor<T> {
-    _marker: marker::PhantomData<T>,
+struct KeySignedVisitor<C, T> {
+    _marker: marker::PhantomData<(C, T)>,
 }
 
-impl<T> KeySignedVisitor<T> {
+impl<C, T> KeySignedVisitor<C, T> {
     const fn new() -> Self {
         Self {
             _marker: marker::PhantomData,
@@ -456,13 +574,15 @@ impl<T> KeySignedVisitor<T> {
     }
 }
 
-impl<'de, T> ValueVisitor<'de> for KeySignedVisitor<T>
+impl<'de, C, T> ValueVisitor<'de> for KeySignedVisitor<C, T>
 where
+    C: Context<ParseError>,
     T: Signed,
 {
     type Target = [u8];
     type Ok = T;
     type Error = ParseError;
+    type Context = C;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -470,8 +590,8 @@ where
     }
 
     #[inline]
-    fn visit_ref(self, bytes: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        integer::parse_signed(&mut SliceParser::new(bytes))
+    fn visit_ref(self, cx: &mut C, bytes: &Self::Target) -> Result<Self::Ok, C::Error> {
+        integer::parse_signed(cx, &mut SliceParser::new(bytes))
     }
 }
 
@@ -489,87 +609,137 @@ where
     }
 
     #[inline]
-    fn type_hint(&mut self) -> Result<TypeHint, Self::Error> {
-        JsonDecoder::new(self.scratch, &mut self.parser).type_hint()
+    fn type_hint<C>(&mut self, cx: &mut C) -> Result<TypeHint, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        JsonDecoder::new(self.scratch, &mut self.parser).type_hint(cx)
     }
 
     #[inline]
-    fn decode_u8(self) -> Result<u8, Self::Error> {
-        self.decode_escaped_bytes(KeyUnsignedVisitor::new())
+    fn decode_u8<C>(self, cx: &mut C) -> Result<u8, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_u16(self) -> Result<u16, Self::Error> {
-        self.decode_escaped_bytes(KeyUnsignedVisitor::new())
+    fn decode_u16<C>(self, cx: &mut C) -> Result<u16, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_u32(self) -> Result<u32, Self::Error> {
-        self.decode_escaped_bytes(KeyUnsignedVisitor::new())
+    fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_u64(self) -> Result<u64, Self::Error> {
-        self.decode_escaped_bytes(KeyUnsignedVisitor::new())
+    fn decode_u64<C>(self, cx: &mut C) -> Result<u64, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_u128(self) -> Result<u128, Self::Error> {
-        self.decode_escaped_bytes(KeyUnsignedVisitor::new())
+    fn decode_u128<C>(self, cx: &mut C) -> Result<u128, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i8(self) -> Result<i8, Self::Error> {
-        self.decode_escaped_bytes(KeySignedVisitor::new())
+    fn decode_i8<C>(self, cx: &mut C) -> Result<i8, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i16(self) -> Result<i16, Self::Error> {
-        self.decode_escaped_bytes(KeySignedVisitor::new())
+    fn decode_i16<C>(self, cx: &mut C) -> Result<i16, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i32(self) -> Result<i32, Self::Error> {
-        self.decode_escaped_bytes(KeySignedVisitor::new())
+    fn decode_i32<C>(self, cx: &mut C) -> Result<i32, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i64(self) -> Result<i64, Self::Error> {
-        self.decode_escaped_bytes(KeySignedVisitor::new())
+    fn decode_i64<C>(self, cx: &mut C) -> Result<i64, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i128(self) -> Result<i128, Self::Error> {
-        self.decode_escaped_bytes(KeySignedVisitor::new())
+    fn decode_i128<C>(self, cx: &mut C) -> Result<i128, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_usize(self) -> Result<usize, Self::Error> {
-        self.decode_escaped_bytes(KeyUnsignedVisitor::new())
+    fn decode_usize<C>(self, cx: &mut C) -> Result<usize, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_isize(self) -> Result<isize, Self::Error> {
-        self.decode_escaped_bytes(KeySignedVisitor::new())
+    fn decode_isize<C>(self, cx: &mut C) -> Result<isize, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
+    fn decode_string<V>(
+        self,
+        cx: &mut V::Context,
+        visitor: V,
+    ) -> Result<V::Ok, <V::Context as Context<V::Error>>::Error>
     where
         V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
-        JsonDecoder::new(self.scratch, self.parser).decode_string(visitor)
+        JsonDecoder::new(self.scratch, self.parser).decode_string(cx, visitor)
     }
 
     #[inline]
-    fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, Self::Error>
+    fn decode_any<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
+        C: Context<V::Error>,
         V: Visitor<'de, Error = Self::Error>,
     {
-        match self.parser.peek()? {
-            Token::String => self.decode_string(visitor.visit_string(SizeHint::Any)?),
-            Token::Number => self.decode_number(visitor.visit_number(NumberHint::Any)?),
-            _ => visitor.visit_any(self, TypeHint::Any),
+        match self.parser.peek(cx)? {
+            Token::String => {
+                let visitor = visitor.visit_string(cx, SizeHint::Any)?;
+                self.decode_string(cx, visitor)
+            }
+            Token::Number => {
+                let visitor = visitor.visit_number(cx, NumberHint::Any)?;
+                self.decode_number(cx, visitor)
+            }
+            _ => visitor.visit_any(cx, self, TypeHint::Any),
         }
     }
 }
@@ -586,23 +756,27 @@ where
     P: Parser<'de>,
 {
     #[inline]
-    pub fn new(
+    pub fn new<C>(
+        cx: &mut C,
         scratch: &'a mut Scratch,
         len: Option<usize>,
         mut parser: P,
-    ) -> Result<Self, ParseError> {
-        parser.skip_whitespace()?;
+    ) -> Result<Self, C::Error>
+    where
+        C: Context<ParseError>,
+    {
+        parser.skip_whitespace(cx)?;
 
-        let actual = parser.peek()?;
+        let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(ParseError::at(
+            return Err(cx.report(ParseError::at(
                 parser.pos(),
                 ParseErrorKind::ExpectedOpenBrace(actual),
-            ));
+            )));
         }
 
-        parser.skip(1)?;
+        parser.skip(cx, 1)?;
 
         Ok(Self {
             scratch,
@@ -629,11 +803,14 @@ where
     }
 
     #[inline]
-    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
+    fn next<C>(&mut self, cx: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         let first = mem::take(&mut self.first);
 
         loop {
-            let token = self.parser.peek()?;
+            let token = self.parser.peek(cx)?;
 
             if token.is_string() {
                 return Ok(Some(JsonObjectPairDecoder::new(
@@ -644,14 +821,14 @@ where
 
             match token {
                 Token::Comma if !first => {
-                    self.parser.skip(1)?;
+                    self.parser.skip(cx, 1)?;
                 }
                 Token::CloseBrace => {
-                    self.parser.skip(1)?;
+                    self.parser.skip(cx, 1)?;
                     return Ok(None);
                 }
                 token => {
-                    return Err(Self::Error::message(format_args!(
+                    return Err(cx.message(format_args!(
                         "expected value, or closing brace `}}` {token:?}"
                     )));
                 }
@@ -660,7 +837,10 @@ where
     }
 
     #[inline]
-    fn end(self) -> Result<(), Self::Error> {
+    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(())
     }
 }
@@ -690,7 +870,10 @@ where
     type Second = JsonDecoder<'a, P>;
 
     #[inline]
-    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(JsonKeyDecoder::new(
             &mut *self.scratch,
             self.parser.borrow_mut(),
@@ -698,31 +881,33 @@ where
     }
 
     #[inline]
-    fn second(mut self) -> Result<Self::Second, Self::Error> {
-        let actual = self.parser.peek()?;
+    fn second<C>(mut self, cx: &mut C) -> Result<Self::Second, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(Self::Error::message(format_args!(
-                "expected colon `:`, was {actual}"
-            )));
+            return Err(cx.message(format_args!("expected colon `:`, was {actual}")));
         }
 
-        self.parser.skip(1)?;
+        self.parser.skip(cx, 1)?;
         Ok(JsonDecoder::new(self.scratch, self.parser))
     }
 
     #[inline]
-    fn skip_second(mut self) -> Result<bool, Self::Error> {
-        let actual = self.parser.peek()?;
+    fn skip_second<C>(mut self, cx: &mut C) -> Result<bool, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(Self::Error::message(format_args!(
-                "expected colon `:`, was {actual}"
-            )));
+            return Err(cx.message(format_args!("expected colon `:`, was {actual}")));
         }
 
-        self.parser.skip(1)?;
-        JsonDecoder::new(self.scratch, self.parser.borrow_mut()).skip_any()?;
+        self.parser.skip(cx, 1)?;
+        JsonDecoder::new(self.scratch, self.parser.borrow_mut()).skip_any(cx)?;
         Ok(true)
     }
 }
@@ -740,21 +925,25 @@ where
     P: Parser<'de>,
 {
     #[inline]
-    pub fn new(
+    pub fn new<C>(
+        cx: &mut C,
         scratch: &'a mut Scratch,
         len: Option<usize>,
         mut parser: P,
-    ) -> Result<Self, ParseError> {
-        let actual = parser.peek()?;
+    ) -> Result<Self, C::Error>
+    where
+        C: Context<ParseError>,
+    {
+        let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBracket) {
-            return Err(ParseError::at(
+            return Err(cx.report(ParseError::at(
                 parser.pos(),
                 ParseErrorKind::ExpectedOpenBracket(actual),
-            ));
+            )));
         }
 
-        parser.skip(1)?;
+        parser.skip(cx, 1)?;
 
         Ok(Self {
             scratch,
@@ -782,11 +971,14 @@ where
     }
 
     #[inline]
-    fn next(&mut self) -> Result<Option<Self::Decoder<'_>>, Self::Error> {
+    fn next<C>(&mut self, cx: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         let first = mem::take(&mut self.first);
 
         loop {
-            let token = self.parser.peek()?;
+            let token = self.parser.peek(cx)?;
 
             if token.is_value() {
                 return Ok(Some(JsonDecoder::new(
@@ -797,15 +989,15 @@ where
 
             match token {
                 Token::Comma if !first => {
-                    self.parser.skip(1)?;
+                    self.parser.skip(cx, 1)?;
                 }
                 Token::CloseBracket => {
-                    self.parser.skip(1)?;
+                    self.parser.skip(cx, 1)?;
                     self.terminated = true;
                     return Ok(None);
                 }
                 _ => {
-                    return Err(Self::Error::message(format_args!(
+                    return Err(cx.message(format_args!(
                         "expected value or closing bracket `]`, but found {token}"
                     )));
                 }
@@ -814,18 +1006,21 @@ where
     }
 
     #[inline]
-    fn end(mut self) -> Result<(), Self::Error> {
+    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         if !self.terminated {
-            let actual = self.parser.peek()?;
+            let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(ParseError::at(
+                return Err(cx.report(ParseError::at(
                     self.parser.pos(),
                     ParseErrorKind::ExpectedCloseBracket(actual),
-                ));
+                )));
             }
 
-            self.parser.skip(1)?;
+            self.parser.skip(cx, 1)?;
             self.terminated = true;
         }
 
@@ -844,11 +1039,14 @@ where
         Self: 'this;
 
     #[inline]
-    fn next(&mut self) -> Result<Self::Decoder<'_>, Self::Error> {
+    fn next<C>(&mut self, cx: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         let first = mem::take(&mut self.first);
 
         loop {
-            let token = self.parser.peek()?;
+            let token = self.parser.peek(cx)?;
 
             if token.is_value() {
                 return Ok(JsonDecoder::new(self.scratch, self.parser.borrow_mut()));
@@ -856,18 +1054,18 @@ where
 
             match token {
                 Token::Comma if !first => {
-                    self.parser.skip(1)?;
+                    self.parser.skip(cx, 1)?;
                 }
                 Token::CloseBracket => {
-                    self.parser.skip(1)?;
+                    self.parser.skip(cx, 1)?;
                     self.terminated = true;
 
-                    return Err(Self::Error::message(format_args!(
-                        "encountered short array, but found {token}"
-                    )));
+                    return Err(
+                        cx.message(format_args!("encountered short array, but found {token}"))
+                    );
                 }
                 _ => {
-                    return Err(Self::Error::message(format_args!(
+                    return Err(cx.message(format_args!(
                         "expected value or closing bracket `]`, but found {token}"
                     )));
                 }
@@ -876,18 +1074,21 @@ where
     }
 
     #[inline]
-    fn end(mut self) -> Result<(), Self::Error> {
+    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         if !self.terminated {
-            let actual = self.parser.peek()?;
+            let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(ParseError::at(
+                return Err(cx.report(ParseError::at(
                     self.parser.pos(),
                     ParseErrorKind::ExpectedCloseBracket(actual),
-                ));
+                )));
             }
 
-            self.parser.skip(1)?;
+            self.parser.skip(cx, 1)?;
             self.terminated = true;
         }
 
@@ -905,20 +1106,22 @@ where
     P: Parser<'de>,
 {
     #[inline]
-    pub fn new(scratch: &'a mut Scratch, mut parser: P) -> Result<Self, ParseError> {
-        parser.skip_whitespace()?;
+    pub fn new<C>(cx: &mut C, scratch: &'a mut Scratch, mut parser: P) -> Result<Self, C::Error>
+    where
+        C: Context<ParseError>,
+    {
+        parser.skip_whitespace(cx)?;
 
-        let actual = parser.peek()?;
+        let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(ParseError::at(
+            return Err(cx.report(ParseError::at(
                 parser.pos(),
                 ParseErrorKind::ExpectedOpenBrace(actual),
-            ));
+            )));
         }
 
-        parser.skip(1)?;
-
+        parser.skip(cx, 1)?;
         Ok(Self { scratch, parser })
     }
 }
@@ -936,44 +1139,56 @@ where
     type Variant<'this> = JsonDecoder<'this, P::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
         Ok(JsonKeyDecoder::new(self.scratch, self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
-        let actual = self.parser.peek()?;
+    fn variant<C>(&mut self, cx: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(ParseError::at(
+            return Err(cx.report(ParseError::at(
                 self.parser.pos(),
                 ParseErrorKind::ExpectedColon(actual),
-            ));
+            )));
         }
 
-        self.parser.skip(1)?;
+        self.parser.skip(cx, 1)?;
         Ok(JsonDecoder::new(self.scratch, self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn skip_variant(&mut self) -> Result<bool, Self::Error> {
-        let this = self.variant()?;
-        JsonDecoder::new(this.scratch, this.parser).skip_any()?;
+    fn skip_variant<C>(&mut self, cx: &mut C) -> Result<bool, C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        let this = self.variant(cx)?;
+        JsonDecoder::new(this.scratch, this.parser).skip_any(cx)?;
         Ok(true)
     }
 
     #[inline]
-    fn end(mut self) -> Result<(), Self::Error> {
-        let actual = self.parser.peek()?;
+    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<Self::Error>,
+    {
+        let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::CloseBrace) {
-            return Err(ParseError::at(
+            return Err(cx.report(ParseError::at(
                 self.parser.pos(),
                 ParseErrorKind::ExpectedCloseBrace(actual),
-            ));
+            )));
         }
 
-        self.parser.skip(1)?;
+        self.parser.skip(cx, 1)?;
         Ok(())
     }
 }

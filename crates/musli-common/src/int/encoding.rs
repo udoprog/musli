@@ -1,12 +1,14 @@
 use core::fmt::{Debug, Display};
 use core::hash::Hash;
 
+use musli::error::Error;
+use musli::Context;
+
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
 use crate::int::{ByteOrder, ByteOrderIo, Fixed, FixedUsize, Signed, Unsigned, Variable};
 use crate::reader::Reader;
 use crate::writer::Writer;
-use musli::error::Error;
 
 mod private {
     use crate::int::{ByteOrder, Unsigned};
@@ -35,8 +37,9 @@ pub trait IntegerEncoding:
         T: ByteOrderIo;
 
     /// Governs how unsigned integers are decoded from a [Reader].
-    fn decode_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo;
 
@@ -48,8 +51,9 @@ pub trait IntegerEncoding:
         T::Unsigned: ByteOrderIo;
 
     /// Governs how signed integers are decoded from a [Reader].
-    fn decode_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>;
@@ -64,8 +68,9 @@ pub trait UsizeEncoding: private::Sealed {
         W: Writer;
 
     /// Governs how usize lengths are decoded from a [Reader].
-    fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
+    fn decode_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>;
 }
 
@@ -82,12 +87,13 @@ impl IntegerEncoding for Variable {
     }
 
     #[inline]
-    fn decode_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: Unsigned,
     {
-        c::decode(reader)
+        c::decode(cx, reader)
     }
 
     #[inline]
@@ -100,13 +106,14 @@ impl IntegerEncoding for Variable {
     }
 
     #[inline]
-    fn decode_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: Unsigned<Signed = T>,
     {
-        let value: T::Unsigned = c::decode(reader)?;
+        let value: T::Unsigned = c::decode(cx, reader)?;
         Ok(zig::decode(value))
     }
 }
@@ -121,11 +128,12 @@ impl UsizeEncoding for Variable {
     }
 
     #[inline]
-    fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
+    fn decode_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
     {
-        c::decode(reader)
+        c::decode(cx, reader)
     }
 }
 
@@ -143,12 +151,13 @@ where
     }
 
     #[inline]
-    fn decode_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo,
     {
-        T::read_bytes_unsigned::<_, B>(reader)
+        T::read_bytes_unsigned::<_, _, B>(cx, reader)
     }
 
     #[inline]
@@ -162,13 +171,14 @@ where
     }
 
     #[inline]
-    fn decode_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>,
     {
-        Ok(T::Unsigned::read_bytes_unsigned::<_, B>(reader)?.signed())
+        Ok(T::Unsigned::read_bytes_unsigned::<_, _, B>(cx, reader)?.signed())
     }
 }
 
@@ -191,10 +201,12 @@ where
     }
 
     #[inline]
-    fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
+    fn decode_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
     {
-        usize::try_from(L::read_bytes_unsigned::<_, B>(reader)?).map_err(R::Error::custom)
+        usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?)
+            .map_err(|error| cx.custom(error))
     }
 }

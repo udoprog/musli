@@ -4,6 +4,7 @@ use crate::compat::Packed;
 use crate::de::{Decode, Decoder, PackDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder};
 use crate::mode::Mode;
+use crate::Context;
 
 macro_rules! count {
     (_) => { 1 };
@@ -57,14 +58,15 @@ macro_rules! declare {
 
         impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*) where M: Mode, $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
-            fn decode<D>(decoder: D) -> Result<Self, D::Error>
+            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
+                C: Context<D::Error>,
                 D: Decoder<'de>
             {
-                let mut unpack = decoder.decode_tuple(count!($ident0 $($ident)*))?;
-                let $ident0 = unpack.next().and_then(<$ty0>::decode)?;
-                $(let $ident = unpack.next().and_then(<$ty>::decode)?;)*
-                unpack.end()?;
+                let mut unpack = decoder.decode_tuple(cx, count!($ident0 $($ident)*))?;
+                let $ident0 = unpack.next(cx).and_then(|v| <$ty0>::decode(cx, v))?;
+                $(let $ident = unpack.next(cx).and_then(|v| <$ty>::decode(cx, v))?;)*
+                unpack.end(cx)?;
                 Ok(($ident0, $($ident),*))
             }
         }
@@ -85,14 +87,15 @@ macro_rules! declare {
 
         impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)> where M: Mode, $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
-            fn decode<D>(decoder: D) -> Result<Self, D::Error>
+            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
+                C: Context<D::Error>,
                 D: Decoder<'de>
             {
-                let mut unpack = decoder.decode_pack()?;
-                let $ident0 = unpack.next().and_then(<$ty0>::decode)?;
-                $(let $ident = unpack.next().and_then(<$ty>::decode)?;)*
-                unpack.end()?;
+                let mut unpack = decoder.decode_pack(cx)?;
+                let $ident0 = unpack.next(cx).and_then(|v| <$ty0>::decode(cx, v))?;
+                $(let $ident = unpack.next(cx).and_then(|v| <$ty>::decode(cx, v))?;)*
+                unpack.end(cx)?;
                 Ok(Packed(($ident0, $($ident),*)))
             }
         }

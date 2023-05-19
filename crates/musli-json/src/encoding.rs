@@ -261,7 +261,8 @@ where
         T: Decode<'de, M>,
     {
         let mut scratch = Scratch::new();
-        T::decode(JsonDecoder::new(&mut scratch, &mut reader))
+        let mut cx = musli_common::context::Same::default();
+        T::decode(&mut cx, JsonDecoder::new(&mut scratch, &mut reader))
     }
 
     /// Decode the given type `T` from the given string using the current
@@ -283,7 +284,8 @@ where
     {
         let mut scratch = Scratch::new();
         let mut reader = SliceParser::new(bytes);
-        T::decode(JsonDecoder::new(&mut scratch, &mut reader))
+        let mut cx = musli_common::context::Same::default();
+        T::decode(&mut cx, JsonDecoder::new(&mut scratch, &mut reader))
     }
 }
 

@@ -42,7 +42,6 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Please refer to the main [musli documentation](https://docs.rs/musli).
 #[proc_macro_derive(Decode, attributes(musli))]
 pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);

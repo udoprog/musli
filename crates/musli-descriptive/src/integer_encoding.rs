@@ -1,4 +1,5 @@
-use musli::error::Error;
+use musli::Context;
+
 use musli_common::int::continuation as c;
 use musli_common::int::zigzag as zig;
 use musli_common::int::{Signed, Unsigned};
@@ -17,12 +18,13 @@ where
 }
 
 #[inline]
-pub(crate) fn decode_typed_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
+pub(crate) fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
 where
+    C: Context<R::Error>,
     R: Reader<'de>,
     T: Unsigned,
 {
-    decode_typed(reader, Kind::Number)
+    decode_typed(cx, reader, Kind::Number)
 }
 
 #[inline]
@@ -36,20 +38,19 @@ where
 }
 
 #[inline]
-fn decode_typed<'de, R, T>(mut reader: R, kind: Kind) -> Result<T, R::Error>
+fn decode_typed<'de, C, R, T>(cx: &mut C, mut reader: R, kind: Kind) -> Result<T, C::Error>
 where
+    C: Context<R::Error>,
     R: Reader<'de>,
     T: Unsigned,
 {
-    let tag = Tag::from_byte(reader.read_byte()?);
+    let tag = Tag::from_byte(reader.read_byte(cx)?);
 
     if tag.kind() != kind {
-        return Err(R::Error::message(format_args!(
-            "expected {kind:?}, got {tag:?}"
-        )));
+        return Err(cx.message(format_args!("expected {kind:?}, got {tag:?}")));
     }
 
-    c::decode(reader)
+    c::decode(cx, reader)
 }
 
 #[inline]
@@ -62,12 +63,13 @@ where
 }
 
 #[inline]
-pub(crate) fn decode_typed_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+pub(crate) fn decode_typed_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
 where
+    C: Context<R::Error>,
     R: Reader<'de>,
     T: Signed,
     T::Unsigned: Unsigned<Signed = T>,
 {
-    let value: T::Unsigned = decode_typed(reader, Kind::Number)?;
+    let value: T::Unsigned = decode_typed(cx, reader, Kind::Number)?;
     Ok(zig::decode(value))
 }

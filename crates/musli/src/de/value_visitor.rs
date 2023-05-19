@@ -5,6 +5,7 @@ use crate::de::{Decoder, TypeHint};
 use crate::error::Error;
 use crate::expecting::{self, Expecting};
 use crate::no_std::ToOwned;
+use crate::Context;
 
 /// A visitor for data where it might be possible to borrow it without copying
 /// from the underlying [Decoder].
@@ -29,6 +30,8 @@ pub trait ValueVisitor<'de>: Sized {
     type Ok;
     /// The error produced.
     type Error: Error;
+    /// The context associated with the value visitor.
+    type Context: Context<Self::Error>;
 
     /// Format an error indicating what was expected by this visitor.
     ///
@@ -37,21 +40,33 @@ pub trait ValueVisitor<'de>: Sized {
 
     /// Visit an owned value.
     #[inline]
-    fn visit_owned(self, value: <Self::Target as ToOwned>::Owned) -> Result<Self::Ok, Self::Error> {
-        self.visit_ref(value.borrow())
+    fn visit_owned(
+        self,
+        cx: &mut Self::Context,
+        value: <Self::Target as ToOwned>::Owned,
+    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+        self.visit_ref(cx, value.borrow())
     }
 
     /// Visit a string that is borrowed directly from the source data.
     #[inline]
-    fn visit_borrowed(self, value: &'de Self::Target) -> Result<Self::Ok, Self::Error> {
-        self.visit_ref(value)
+    fn visit_borrowed(
+        self,
+        cx: &mut Self::Context,
+        value: &'de Self::Target,
+    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+        self.visit_ref(cx, value)
     }
 
     /// Visit a value reference that is provided from the decoder in any manner
     /// possible. Which might require additional decoding work.
     #[inline]
-    fn visit_ref(self, _: &Self::Target) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::message(expecting::bad_visitor_type(
+    fn visit_ref(
+        self,
+        cx: &mut Self::Context,
+        _: &Self::Target,
+    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+        Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
             &ExpectingWrapper(self),
         )))
@@ -60,14 +75,16 @@ pub trait ValueVisitor<'de>: Sized {
     /// Fallback used when the type is either not implemented for this visitor
     /// or the underlying format doesn't know which type to decode.
     #[inline]
-    fn visit_any<D>(self, _: D, hint: TypeHint) -> Result<Self::Ok, Self::Error>
+    fn visit_any<D>(
+        self,
+        cx: &mut Self::Context,
+        _: D,
+        hint: TypeHint,
+    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error>
     where
         D: Decoder<'de, Error = Self::Error>,
     {
-        Err(Self::Error::message(expecting::invalid_type(
-            &hint,
-            &ExpectingWrapper(self),
-        )))
+        Err(cx.message(expecting::invalid_type(&hint, &ExpectingWrapper(self))))
     }
 }
 

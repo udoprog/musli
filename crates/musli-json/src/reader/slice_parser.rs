@@ -1,3 +1,5 @@
+use musli::Context;
+
 use crate::reader::{ParseError, ParseErrorKind, Parser, Scratch, StringReference, Token};
 
 /// An efficient [Reader] wrapper around a slice.
@@ -23,39 +25,49 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn parse_string<'scratch>(
+    fn parse_string<'scratch, C>(
         &mut self,
+        cx: &mut C,
         scratch: &'scratch mut Scratch,
         validate: bool,
-    ) -> Result<StringReference<'de, 'scratch>, ParseError> {
+    ) -> Result<StringReference<'de, 'scratch>, C::Error>
+    where
+        C: Context<ParseError>,
+    {
         let start = self.pos();
-        let actual = self.peek()?;
+        let actual = self.peek(cx)?;
 
         if !matches!(actual, Token::String) {
-            return Err(ParseError::at(
+            return Err(cx.report(ParseError::at(
                 start,
                 ParseErrorKind::ExpectedString(actual),
-            ));
+            )));
         }
 
-        self.skip(1)?;
+        self.skip(cx, 1)?;
         scratch.bytes.clear();
-        crate::reader::string::parse_string_slice_reader(self, scratch, validate, start)
+        crate::reader::string::parse_string_slice_reader(cx, self, scratch, validate, start)
     }
 
     #[inline]
-    fn read_byte(&mut self) -> Result<u8, ParseError> {
+    fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
+    where
+        C: Context<ParseError>,
+    {
         let mut byte = [0];
-        self.read(&mut byte[..])?;
+        self.read(cx, &mut byte[..])?;
         Ok(byte[0])
     }
 
     #[inline]
-    fn skip(&mut self, n: usize) -> Result<(), ParseError> {
+    fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
+    where
+        C: Context<ParseError>,
+    {
         let outcome = self.index.wrapping_add(n);
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(ParseError::at(self.pos(), ParseErrorKind::BufferUnderflow));
+            return Err(cx.report(ParseError::at(self.pos(), ParseErrorKind::BufferUnderflow)));
         }
 
         self.index = outcome;
@@ -63,11 +75,14 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> Result<(), ParseError> {
+    fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
+    where
+        C: Context<ParseError>,
+    {
         let outcome = self.index.wrapping_add(buf.len());
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(ParseError::at(self.pos(), ParseErrorKind::BufferUnderflow));
+            return Err(cx.report(ParseError::at(self.pos(), ParseErrorKind::BufferUnderflow)));
         }
 
         buf.copy_from_slice(&self.slice[self.index..outcome]);
@@ -76,7 +91,10 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn skip_whitespace(&mut self) -> Result<(), ParseError> {
+    fn skip_whitespace<C>(&mut self, _: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<ParseError>,
+    {
         while matches!(
             self.slice.get(self.index),
             Some(b' ' | b'\n' | b'\t' | b'\r')
@@ -93,12 +111,18 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn peek_byte(&mut self) -> Result<Option<u8>, ParseError> {
+    fn peek_byte<C>(&mut self, _: &mut C) -> Result<Option<u8>, C::Error>
+    where
+        C: Context<ParseError>,
+    {
         Ok(self.slice.get(self.index).copied())
     }
 
     #[inline]
-    fn parse_f32(&mut self) -> Result<f32, ParseError> {
+    fn parse_f32<C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
+    where
+        C: Context<ParseError>,
+    {
         use lexical::parse_float_options::JSON;
         const FORMAT: u128 = lexical::format::STANDARD;
 
@@ -108,10 +132,10 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         ) {
             Ok(out) => out,
             Err(error) => {
-                return Err(ParseError::at(
+                return Err(cx.report(ParseError::at(
                     self.pos(),
                     ParseErrorKind::ParseFloat(error),
-                ))
+                )));
             }
         };
 
@@ -120,7 +144,10 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn parse_f64(&mut self) -> Result<f64, ParseError> {
+    fn parse_f64<C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
+    where
+        C: Context<ParseError>,
+    {
         use lexical::parse_float_options::JSON;
         const FORMAT: u128 = lexical::format::STANDARD;
 
@@ -130,10 +157,10 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         ) {
             Ok(out) => out,
             Err(error) => {
-                return Err(ParseError::at(
+                return Err(cx.report(ParseError::at(
                     self.pos(),
                     ParseErrorKind::ParseFloat(error),
-                ))
+                )));
             }
         };
 

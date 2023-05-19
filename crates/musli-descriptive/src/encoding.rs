@@ -1,9 +1,10 @@
-//! Module that defines [Encoding] whith allows for customization of the
+//! Module that defines [`Encoding`] whith allows for customization of the
 //! encoding format, and the [DEFAULT] encoding configuration.
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use core::marker;
+use musli_common::context::Capture;
 #[cfg(feature = "std")]
 use std::io;
 
@@ -113,7 +114,7 @@ pub struct Encoding<M = DefaultMode, const P: usize = MAX_INLINE_LEN> {
 }
 
 impl Encoding<DefaultMode, MAX_INLINE_LEN> {
-    /// Construct a new [Encoding] instance.
+    /// Construct a new [`Encoding`] instance.
     ///
     /// ```rust
     /// use musli_descriptive::{Encoding};
@@ -237,7 +238,13 @@ where
         R: Reader<'de>,
         T: Decode<'de, M>,
     {
-        T::decode(SelfDecoder::<_>::new(reader.with_position()))
+        let mut cx = Capture::default();
+
+        let Ok(value) = T::decode(&mut cx, SelfDecoder::<_>::new(reader.with_position())) else {
+            return Err(cx.unwrap());
+        };
+
+        Ok(value)
     }
 
     /// Decode the given type `T` from the given slice using the current
@@ -247,9 +254,13 @@ where
     where
         T: Decode<'de, M>,
     {
-        T::decode(SelfDecoder::<_>::new(
-            SliceReader::new(bytes).with_position(),
-        ))
+        let mut cx = Capture::default();
+
+        let Ok(value) = T::decode(&mut cx, SelfDecoder::<_>::new(SliceReader::new(bytes).with_position())) else {
+            return Err(cx.unwrap());
+        };
+
+        Ok(value)
     }
 }
 

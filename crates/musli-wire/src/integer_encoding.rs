@@ -1,12 +1,14 @@
 use core::fmt::{Debug, Display};
 
-use crate::tag::{Kind, Tag, DATA_MASK};
 use musli::error::Error;
+use musli::Context;
 use musli_common::int::continuation as c;
 use musli_common::int::zigzag as zig;
 use musli_common::int::{ByteOrder, ByteOrderIo, Fixed, FixedUsize, Signed, Unsigned, Variable};
 use musli_common::reader::Reader;
 use musli_common::writer::Writer;
+
+use crate::tag::{Kind, Tag, DATA_MASK};
 
 mod private {
     pub trait Sealed {}
@@ -26,8 +28,9 @@ pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sea
         T: ByteOrderIo;
 
     /// Governs how unsigned integers are decoded from a [Reader].
-    fn decode_typed_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo;
 
@@ -39,8 +42,9 @@ pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sea
         T::Unsigned: ByteOrderIo;
 
     /// Governs how signed integers are decoded from a [Reader].
-    fn decode_typed_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>;
@@ -55,8 +59,9 @@ pub trait WireUsizeEncoding: musli_common::int::UsizeEncoding + private::Sealed 
         W: Writer;
 
     /// Governs how usize lengths are decoded from a [Reader].
-    fn decode_typed_usize<'de, R>(reader: R) -> Result<usize, R::Error>
+    fn decode_typed_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>;
 }
 
@@ -76,21 +81,22 @@ impl WireIntegerEncoding for Variable {
     }
 
     #[inline]
-    fn decode_typed_unsigned<'de, R, T>(mut reader: R) -> Result<T, R::Error>
+    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: Unsigned,
     {
-        let tag = Tag::from_byte(reader.read_byte()?);
+        let tag = Tag::from_byte(reader.read_byte(cx)?);
 
         if tag.kind() != Kind::Continuation {
-            return Err(R::Error::custom("Expected Continuation"));
+            return Err(cx.custom("Expected Continuation"));
         }
 
         if let Some(data) = tag.data() {
             Ok(T::from_byte(data))
         } else {
-            c::decode(reader)
+            c::decode(cx, reader)
         }
     }
 
@@ -105,13 +111,14 @@ impl WireIntegerEncoding for Variable {
     }
 
     #[inline]
-    fn decode_typed_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: Unsigned<Signed = T> + ByteOrderIo,
     {
-        let value: T::Unsigned = Self::decode_typed_unsigned(reader)?;
+        let value: T::Unsigned = Self::decode_typed_unsigned(cx, reader)?;
         Ok(zig::decode(value))
     }
 }
@@ -131,20 +138,21 @@ impl WireUsizeEncoding for Variable {
     }
 
     #[inline]
-    fn decode_typed_usize<'de, R>(mut reader: R) -> Result<usize, R::Error>
+    fn decode_typed_usize<'de, C, R>(cx: &mut C, mut reader: R) -> Result<usize, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
     {
-        let tag = Tag::from_byte(reader.read_byte()?);
+        let tag = Tag::from_byte(reader.read_byte(cx)?);
 
         if tag.kind() != Kind::Continuation {
-            return Err(R::Error::custom("Expected Continuation"));
+            return Err(cx.custom("Expected Continuation"));
         }
 
         if let Some(data) = tag.data() {
             Ok(usize::from_byte(data))
         } else {
-            c::decode(reader)
+            c::decode(cx, reader)
         }
     }
 }
@@ -164,16 +172,17 @@ where
     }
 
     #[inline]
-    fn decode_typed_unsigned<'de, R, T>(mut reader: R) -> Result<T, R::Error>
+    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo,
     {
-        if Tag::from_byte(reader.read_byte()?) != Tag::new(Kind::Prefix, T::BYTES) {
-            return Err(R::Error::custom("expected fixed integer"));
+        if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::BYTES) {
+            return Err(cx.custom("expected fixed integer"));
         }
 
-        T::read_bytes_unsigned::<_, B>(reader)
+        T::read_bytes_unsigned::<_, _, B>(cx, reader)
     }
 
     #[inline]
@@ -188,17 +197,18 @@ where
     }
 
     #[inline]
-    fn decode_typed_signed<'de, R, T>(mut reader: R) -> Result<T, R::Error>
+    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>,
     {
-        if Tag::from_byte(reader.read_byte()?) != Tag::new(Kind::Prefix, T::Unsigned::BYTES) {
-            return Err(R::Error::custom("expected fixed integer"));
+        if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::Unsigned::BYTES) {
+            return Err(cx.custom("expected fixed integer"));
         }
 
-        Ok(T::Unsigned::read_bytes_unsigned::<_, B>(reader)?.signed())
+        Ok(T::Unsigned::read_bytes_unsigned::<_, _, B>(cx, reader)?.signed())
     }
 }
 
@@ -221,14 +231,16 @@ where
     }
 
     #[inline]
-    fn decode_typed_usize<'de, R>(mut reader: R) -> Result<usize, R::Error>
+    fn decode_typed_usize<'de, C, R>(cx: &mut C, mut reader: R) -> Result<usize, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
     {
-        if Tag::from_byte(reader.read_byte()?) != Tag::new(Kind::Prefix, L::BYTES) {
-            return Err(R::Error::custom("expected fixed integer"));
+        if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, L::BYTES) {
+            return Err(cx.custom("expected fixed integer"));
         }
 
-        usize::try_from(L::read_bytes_unsigned::<_, B>(reader)?).map_err(R::Error::custom)
+        usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?)
+            .map_err(|err| cx.custom(err))
     }
 }

@@ -63,6 +63,7 @@ impl<'a> Mode<'a> {
         decode_t
             .segments
             .push(syn::PathSegment::from(syn::Ident::new("decode", span)));
+
         decode_t
     }
 }

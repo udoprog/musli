@@ -10,6 +10,7 @@ pub use self::packed::Packed;
 use crate::de::{Decode, Decoder, SequenceDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder};
 use crate::mode::Mode;
+use crate::Context;
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
@@ -70,12 +71,13 @@ impl<'de, M> Decode<'de, M> for Sequence<()>
 where
     M: Mode,
 {
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<D::Error>,
         D: Decoder<'de>,
     {
-        let seq = decoder.decode_sequence()?;
-        seq.end()?;
+        let seq = decoder.decode_sequence(cx)?;
+        seq.end(cx)?;
         Ok(Self(()))
     }
 }
@@ -113,10 +115,11 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<D::Error>,
         D: Decoder<'de>,
     {
-        decoder.decode_array().map(Self)
+        decoder.decode_array(cx).map(Self)
     }
 }

@@ -1,5 +1,7 @@
 use core::ops::{BitAnd, BitXor, Neg, Shl, Shr};
 
+use musli::Context;
+
 use crate::int::ByteOrder;
 use crate::reader::Reader;
 use crate::writer::Writer;
@@ -68,8 +70,9 @@ pub trait ByteOrderIo: Unsigned {
         B: ByteOrder;
 
     /// Read the current value from the reader in little-endian encoding.
-    fn read_bytes_unsigned<'de, R, B>(reader: R) -> Result<Self, R::Error>
+    fn read_bytes_unsigned<'de, C, R, B>(cx: &mut C, reader: R) -> Result<Self, C::Error>
     where
+        C: Context<R::Error>,
         R: Reader<'de>,
         B: ByteOrder;
 }
@@ -180,12 +183,16 @@ macro_rules! implement_io {
             }
 
             #[inline]
-            fn read_bytes_unsigned<'de, R, B>(mut reader: R) -> Result<Self, R::Error>
+            fn read_bytes_unsigned<'de, C, R, B>(
+                cx: &mut C,
+                mut reader: R,
+            ) -> Result<Self, C::Error>
             where
+                C: Context<R::Error>,
                 R: Reader<'de>,
                 B: ByteOrder,
             {
-                Ok(B::$read(reader.read_array()?))
+                Ok(B::$read(reader.read_array(cx)?))
             }
         }
     };

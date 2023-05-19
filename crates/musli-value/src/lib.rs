@@ -45,5 +45,6 @@ pub fn decode<'de, T>(value: &'de Value) -> Result<T, ValueError>
 where
     T: Decode<'de>,
 {
-    T::decode(value.decoder())
+    let mut cx = musli_common::context::Same::default();
+    T::decode(&mut cx, value.decoder())
 }
