@@ -115,6 +115,7 @@
 //! usually cleaner decode implementations, as shown here:
 //!
 //! ```
+//! use musli::Context;
 //! use musli::de::{Decode, Decoder, SequenceDecoder};
 //! use musli::mode::Mode;
 //!
@@ -123,15 +124,16 @@
 //! }
 //!
 //! impl<'de, M> Decode<'de, M> for MyType where M: Mode {
-//!     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+//!     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
 //!     where
+//!         C: Context<D::Error>,
 //!         D: Decoder<'de>,
 //!     {
-//!         let mut seq = decoder.decode_sequence()?;
+//!         let mut seq = decoder.decode_sequence(cx)?;
 //!         let mut data = Vec::with_capacity(seq.size_hint().or_default());
 //!
-//!         while let Some(decoder) = seq.next()? {
-//!             data.push(Decode::<M>::decode(decoder)?);
+//!         while let Some(decoder) = seq.next(cx)? {
+//!             data.push(Decode::<M>::decode(cx, decoder)?);
 //!         }
 //!
 //!         seq.end()?;
@@ -518,6 +520,7 @@ pub use musli_macros::encoder;
 /// ```
 /// use std::fmt;
 ///
+/// use musli::Context;
 /// use musli::de::Decoder;
 ///
 /// struct MyDecoder;
@@ -530,7 +533,10 @@ pub use musli_macros::encoder;
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32(self) -> Result<u32, Self::Error> {
+///     fn decode_u32<C>(self, _: &mut C) -> Result<u32, C::Error>
+///     where
+///         C: Context<Self::Error>
+///     {
 ///         Ok(42)
 ///     }
 /// }

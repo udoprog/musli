@@ -639,6 +639,7 @@
 //!     use std::collections::HashSet;
 //!     use std::hash::Hash;
 //!
+//!     use musli::Context;
 //!     use musli::en::{Encode, Encoder};
 //!     use musli::de::{Decode, Decoder};
 //!     use musli::mode::Mode;
@@ -652,13 +653,14 @@
 //!         HashSet::<T>::encode(set, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, M, D, T>(decoder: D) -> Result<HashSet<T>, D::Error>
+//!     pub fn decode<'de, M, C, D, T>(cx: &mut C, decoder: D) -> Result<HashSet<T>, C::Error>
 //!     where
 //!         M: Mode,
+//!         C: Context<D::Error>,
 //!         D: Decoder<'de>,
 //!         T: Decode<'de> + Eq + Hash,
 //!     {
-//!         HashSet::<T>::decode(decoder)
+//!         HashSet::<T>::decode(cx, decoder)
 //!     }
 //! }
 //! # }

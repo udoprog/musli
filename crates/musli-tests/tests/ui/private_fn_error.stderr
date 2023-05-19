@@ -7,11 +7,11 @@ error[E0603]: function `decode` is private
 note: the function `decode` is defined here
   --> tests/ui/private_fn_error.rs:22:5
    |
-22 | /     fn decode<'de, M, D, T, const N: usize>(decoder: D) -> Result<[T; N], D::Error>
+22 | /     fn decode<'de, M, C, D, T, const N: usize>(cx: &mut C, decoder: D) -> Result<[T; N], C::Error>
 23 | |     where
 24 | |         M: Mode,
-25 | |         D: Decoder<'de>,
-26 | |     {
-27 | |         todo!()
-28 | |     }
+25 | |         C: Context<D::Error>,
+...  |
+28 | |         todo!()
+29 | |     }
    | |_____^

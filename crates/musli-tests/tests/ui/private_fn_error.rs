@@ -7,7 +7,7 @@ struct Struct {
 }
 
 mod array {
-    use musli::{Mode, Encoder, Decoder};
+    use musli::{Context, Mode, Encoder, Decoder};
 
     #[inline]
     fn encode<M, E, T, const N: usize>(this: &[T; N], encoder: E) -> Result<E::Ok, E::Error>
@@ -19,9 +19,10 @@ mod array {
     }
 
     #[inline]
-    fn decode<'de, M, D, T, const N: usize>(decoder: D) -> Result<[T; N], D::Error>
+    fn decode<'de, M, C, D, T, const N: usize>(cx: &mut C, decoder: D) -> Result<[T; N], C::Error>
     where
         M: Mode,
+        C: Context<D::Error>,
         D: Decoder<'de>,
     {
         todo!()

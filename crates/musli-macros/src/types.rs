@@ -145,27 +145,39 @@ impl Types {
                         predicates: Punctuated::default(),
                     };
 
+                    let c_param: proc_macro2::Ident = syn::Ident::new("C", Span::call_site());
+
                     let mut predicate = syn::PredicateType {
                         lifetimes: None,
                         bounded_ty: syn::Type::Path(syn::TypePath {
                             qself: None,
-                            path: ident_path(syn::Ident::new("C", Span::call_site())),
+                            path: ident_path(c_param.clone()),
                         }),
                         colon_token: <Token![:]>::default(),
                         bounds: Punctuated::default(),
                     };
 
                     predicate.bounds.push(syn::TypeParamBound::Verbatim(quote!(
-                        "Context<Self::Error>"
+                        musli::Context<Self::Error>
                     )));
 
                     where_clause
                         .predicates
                         .push(syn::WherePredicate::Type(predicate));
 
+                    let mut params = Punctuated::default();
+                    params.push(syn::GenericParam::Type(syn::TypeParam {
+                        attrs: Vec::new(),
+                        ident: c_param,
+                        colon_token: None,
+                        bounds: Punctuated::default(),
+                        eq_token: None,
+                        default: None,
+                    }));
+
                     syn::Generics {
                         lt_token: Some(<Token![<]>::default()),
-                        params: Punctuated::default(),
+                        params,
                         gt_token: Some(<Token![>]>::default()),
                         where_clause: Some(where_clause),
                     }

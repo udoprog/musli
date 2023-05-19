@@ -31,6 +31,7 @@ pub enum NeverMarker {}
 /// ```
 /// use std::fmt;
 ///
+/// use musli::Context;
 /// use musli::de::Decoder;
 ///
 /// struct MyDecoder;
@@ -43,7 +44,10 @@ pub enum NeverMarker {}
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32(self) -> Result<u32, Self::Error> {
+///     fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
+///     where
+///         C: Context<Self::Error>
+///     {
 ///         Ok(42)
 ///     }
 /// }
