@@ -1,5 +1,6 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote_spanned, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
 
@@ -10,10 +11,8 @@ use crate::internals::build::{Build, BuildData, EnumBuild, FieldBuild, StructBui
 pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     e.validate_decode()?;
 
-    let span = e.input.ident.span();
-
     let ctx_var = syn::Ident::new("__ctx", Span::call_site());
-    let root_decoder_var = syn::Ident::new("root_decoder", Span::call_site());
+    let root_decoder_var = syn::Ident::new("__decoder", Span::call_site());
 
     let body = match &e.data {
         BuildData::Struct(data) => decode_struct(&e, &ctx_var, &root_decoder_var, data)?,
@@ -64,8 +63,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         );
     }
 
-    Ok(quote_spanned! {
-        span =>
+    Ok(quote! {
         #[automatically_derived]
         #[allow(clippy::init_numbered_fields)]
         #[allow(clippy::let_unit_value)]
@@ -513,14 +511,13 @@ fn decode_tagged(
     let fields_len = fields.len();
     let mut decls = Vec::with_capacity(fields_len);
     let mut patterns = Vec::with_capacity(fields_len);
-    let mut assigns = Vec::with_capacity(fields_len);
+    let mut assigns = Punctuated::<_, Token![,]>::new();
 
     let tag_visitor_output = syn::Ident::new("TagVisitorOutput", e.input.ident.span());
     let mut outputs = Vec::with_capacity(fields_len);
 
     for f in fields {
         let tag = &f.tag;
-        let access = &f.field_access;
         let (span, decode_path) = &f.decode_path;
         let var = syn::Ident::new(&format!("v{}", f.index), *span);
 
@@ -537,18 +534,21 @@ fn decode_tagged(
         let fallback = if let Some(span) = f.default_attr {
             quote_spanned!(span => #default_function())
         } else {
-            quote_spanned! {
-                f.span =>
+            quote! {
                 return Err(#context_t::expected_tag(#ctx_var, #type_name, #tag))
             }
         };
 
-        assigns.push(quote_spanned! {
-            f.span =>
-            #access: match #var {
-                Some(#var) => #var,
-                None => #fallback,
-            }
+        assigns.push(syn::FieldValue {
+            attrs: Vec::new(),
+            member: f.field_access.clone(),
+            colon_token: Some(<Token![:]>::default()),
+            expr: syn::Expr::Verbatim(quote! {
+                match #var {
+                    Some(#var) => #var,
+                    None => #fallback,
+                }
+            }),
         });
     }
 
@@ -593,20 +593,39 @@ fn decode_tagged(
         },
     };
 
-    let tag_type = tag_type
-        .as_ref()
-        .map(|(_, ty)| quote_spanned!(span => : #ty));
+    let tag = syn::Ident::new("tag", Span::call_site());
+
+    let mut tag_stmt = syn::Local {
+        attrs: Vec::new(),
+        let_token: <Token![let]>::default(),
+        pat: syn::Pat::Ident(syn::PatIdent {
+            attrs: Vec::new(),
+            by_ref: None,
+            mutability: None,
+            ident: tag.clone(),
+            subpat: None,
+        }),
+        init: None,
+        semi_token: <Token![;]>::default(),
+    };
+
+    if let Some((_, tag_type)) = tag_type {
+        tag_stmt.pat = syn::Pat::Type(syn::PatType {
+            attrs: Vec::new(),
+            pat: Box::new(tag_stmt.pat),
+            colon_token: <Token![:]>::default(),
+            ty: Box::new(tag_type.clone()),
+        });
+    }
 
     let body = if patterns.is_empty() {
-        quote_spanned! {
-            span =>
+        quote! {
             if !#skip_field {
                 return Err(#unsupported);
             }
         }
     } else {
-        quote_spanned! {
-            span =>
+        quote! {
             match tag {
                 #(#patterns,)*
                 #unsupported_pattern => {
@@ -618,25 +637,27 @@ fn decode_tagged(
         }
     };
 
-    let pair_decoder_t_first = &e.tokens.pair_decoder_t_first;
+    tag_stmt.init = Some(syn::LocalInit {
+        eq_token: <Token![=]>::default(),
+        expr: Box::new(syn::Expr::Verbatim(quote! {{
+            let #struct_decoder_var = #pair_decoder_t::first(&mut #struct_decoder_var, #ctx_var)?;
+            #decode_tag
+        }})),
+        diverge: None,
+    });
 
-    Ok(quote_spanned! {
-        span =>
+    Ok(quote! {
         #(#decls)*
         #output_enum
         let mut type_decoder = #decoder_t::decode_struct(#parent_decoder_var, #ctx_var, #fields_len)?;
 
         while let Some(mut #struct_decoder_var) = #pairs_decoder_t::next(&mut type_decoder, #ctx_var)? {
-            let tag #tag_type = {
-                let #struct_decoder_var = #pair_decoder_t_first(&mut #struct_decoder_var, #ctx_var)?;
-                #decode_tag
-            };
-
+            #tag_stmt
             #body
         }
 
         #pairs_decoder_t::end(type_decoder, #ctx_var)?;
-        #path { #(#assigns),* }
+        #path { #assigns }
     })
 }
 
@@ -735,9 +756,10 @@ fn handle_tag_decode(
         TagMethod::Index => {
             let decode_t_decode = &e.decode_t_decode;
 
-            let decode_tag = quote_spanned! {
-                span => #decode_t_decode(#ctx_var, #thing_decoder_var)?
-            };
+            let decode_tag = quote! {{
+                let tag = #decode_t_decode(#ctx_var, #thing_decoder_var)?;
+                tag
+            }};
 
             Ok((decode_tag, quote_spanned!(span => tag), None))
         }

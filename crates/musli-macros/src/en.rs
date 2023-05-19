@@ -1,5 +1,7 @@
-use proc_macro2::{Span, TokenStream};
-use quote::quote_spanned;
+use proc_macro2::TokenStream;
+use quote::{quote, quote_spanned};
+use syn::punctuated::Punctuated;
+use syn::Token;
 
 use crate::expander::Result;
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
@@ -12,7 +14,7 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let type_ident = &e.input.ident;
 
-    let var = syn::Ident::new("encoder", span);
+    let var = syn::Ident::new("__encoder", span);
     let ctx_var = syn::Ident::new("__ctx", span);
 
     let body = match &e.data {
@@ -34,7 +36,7 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     if !e.bounds.is_empty() {
         let where_clause = where_clause.get_or_insert_with(|| syn::WhereClause {
-            where_token: <syn::Token![where]>::default(),
+            where_token: <Token![where]>::default(),
             predicates: Default::default(),
         });
 
@@ -88,7 +90,7 @@ fn encode_struct(
         Packing::Tagged => {
             let fields = encode_fields(e, ctx_var, var, &st.fields)?;
 
-            let len = length_test(st.span, st.fields.len(), &fields.tests);
+            let len = length_test(st.fields.len(), &fields.tests);
             let decls = fields.test_decls();
             let encoders = &fields.encoders;
 
@@ -125,7 +127,6 @@ fn encode_struct(
 }
 
 struct FieldTest {
-    span: Span,
     decl: TokenStream,
     var: syn::Ident,
 }
@@ -154,18 +155,13 @@ fn encode_fields(
         let mut encode = encode_field(e, ctx_var, var, f)?;
 
         if let Some((decl, var)) = do_field_test(f) {
-            encode = quote_spanned! {
-                f.span =>
+            encode = quote! {
                 if #var {
                     #encode
                 }
             };
 
-            tests.push(FieldTest {
-                span: f.span,
-                decl,
-                var,
-            })
+            tests.push(FieldTest { decl, var })
         }
 
         encoders.push(encode);
@@ -227,16 +223,12 @@ fn encode_variant(
             }
         };
 
-        let (span, encode_path) = &f.encode_path;
-        let access = &f.field_access;
-
-        let encode = quote_spanned! {
-            *span => #encode_path(this, #ctx_var, #var)
-        };
-
+        let encode_path = &f.encode_path.1;
+        let encode = quote!(#encode_path(this, #ctx_var, #var));
         let encode = encode_variant_container(e, ctx_var, var, v, encode)?;
+        let access = &f.field_access;
         let path = &v.path;
-        return Ok((quote_spanned!(v.span => #path { #access: this }), encode));
+        return Ok((quote!(#path { #access: this }), encode));
     }
 
     let fields = encode_fields(e, ctx_var, var, &v.fields)?;
@@ -246,8 +238,7 @@ fn encode_variant(
         let sequence_encoder_t = &e.tokens.sequence_encoder_t;
 
         let encode = if fields.encoders.is_empty() {
-            quote_spanned! {
-                v.span =>
+            quote! {
                 let pack = #encoder_t::encode_pack(#var, #ctx_var)?;
                 #sequence_encoder_t::end(pack, #ctx_var)
             }
@@ -255,8 +246,7 @@ fn encode_variant(
             let decls = fields.test_decls();
             let encoders = &fields.encoders;
 
-            quote_spanned! {
-                v.span =>
+            quote! {
                 let mut pack = #encoder_t::encode_pack(#var, #ctx_var)?;
                 #(#decls)*
                 #(#encoders)*
@@ -313,7 +303,7 @@ fn encode_variant(
 
                 let encode_t_encode = &e.encode_t_encode;
 
-                let len = length_test(v.span, v.fields.len(), &fields.tests);
+                let len = length_test(v.fields.len(), &fields.tests);
 
                 let encode = quote_spanned! {
                     v.span =>
@@ -343,7 +333,7 @@ fn encode_variant(
     let encoder_t = &e.tokens.encoder_t;
     let pairs_encoder_t = &e.tokens.pairs_encoder_t;
 
-    let len = length_test(v.span, v.fields.len(), &fields.tests);
+    let len = length_test(v.fields.len(), &fields.tests);
 
     let encode = if fields.encoders.is_empty() {
         quote_spanned! {
@@ -378,7 +368,6 @@ fn encode_variant_container(
     if let Packing::Tagged = v.enum_packing {
         let encoder_t = &e.tokens.encoder_t;
         let variant_encoder_t = &e.tokens.variant_encoder_t;
-
         let encode_t_encode = &e.encode_t_encode;
         let tag = &v.tag;
 
@@ -418,7 +407,7 @@ fn encode_field(
     var: &syn::Ident,
     f: &FieldBuild,
 ) -> Result<TokenStream> {
-    let (span, encode_path) = &f.encode_path;
+    let encode_path = &f.encode_path.1;
     let access = &f.self_access;
 
     match f.packing {
@@ -428,22 +417,19 @@ fn encode_field(
             let encode_t_encode = &e.encode_t_encode;
             let tag = &f.tag;
 
-            Ok(quote_spanned! {
-                *span => {
-                    let mut pair_encoder = #pairs_encoder_t::next(&mut #var, #ctx_var)?;
-                    let field_encoder = #pair_encoder_t::first(&mut pair_encoder, #ctx_var)?;
-                    #encode_t_encode(&#tag, #ctx_var, field_encoder)?;
-                    let value_encoder = #pair_encoder_t::second(&mut pair_encoder, #ctx_var)?;
-                    #encode_path(#access, #ctx_var, value_encoder)?;
-                    #pair_encoder_t::end(pair_encoder, #ctx_var)?;
-                }
+            Ok(quote! {
+                let mut pair_encoder = #pairs_encoder_t::next(&mut #var, #ctx_var)?;
+                let field_encoder = #pair_encoder_t::first(&mut pair_encoder, #ctx_var)?;
+                #encode_t_encode(&#tag, #ctx_var, field_encoder)?;
+                let value_encoder = #pair_encoder_t::second(&mut pair_encoder, #ctx_var)?;
+                #encode_path(#access, #ctx_var, value_encoder)?;
+                #pair_encoder_t::end(pair_encoder, #ctx_var)?;
             })
         }
         Packing::Packed => {
             let sequence_encoder_t = &e.tokens.sequence_encoder_t;
 
-            Ok(quote_spanned! {
-                *span =>
+            Ok(quote! {
                 let __seq_next_decoder = #sequence_encoder_t::next(&mut pack, #ctx_var)?;
                 #encode_path(#access, #ctx_var, __seq_next_decoder)?;
             })
@@ -451,14 +437,14 @@ fn encode_field(
     }
 }
 
-fn length_test(span: Span, count: usize, tests: &[FieldTest]) -> TokenStream {
-    if tests.is_empty() {
-        quote_spanned!(span => #count)
-    } else {
-        let count = count.saturating_sub(tests.len());
-        let tests = tests
-            .iter()
-            .map(|FieldTest { span, var, .. }| quote_spanned!(*span => if #var { 1 } else { 0 }));
-        quote_spanned!(span => #count + #(#tests)+*)
+fn length_test(count: usize, tests: &[FieldTest]) -> Punctuated<TokenStream, Token![+]> {
+    let mut punctuated = Punctuated::<_, Token![+]>::new();
+    let count = count.saturating_sub(tests.len());
+    punctuated.push(quote!(#count));
+
+    for FieldTest { var, .. } in tests {
+        punctuated.push(quote!(if #var { 1 } else { 0 }))
     }
+
+    punctuated
 }
