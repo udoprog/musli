@@ -36,7 +36,7 @@ jobs:
     - run: cargo run --release --bin fuzz -- --random --iter 10000
 
   miri:
-    needs: each_package
+    needs: test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
