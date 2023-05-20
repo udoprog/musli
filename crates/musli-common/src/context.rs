@@ -27,6 +27,8 @@ where
 {
     type Input = E;
     type Error = E;
+    type FieldMarker = ();
+    type VariantMarker = ();
 
     #[inline(always)]
     fn report<T>(&mut self, error: T) -> Self::Error
@@ -87,6 +89,8 @@ where
 impl<E> Context for Ignore<E> {
     type Input = E;
     type Error = de::Error;
+    type FieldMarker = ();
+    type VariantMarker = ();
 
     #[inline(always)]
     fn report<T>(&mut self, _: T) -> de::Error
@@ -141,6 +145,8 @@ where
 {
     type Input = E;
     type Error = de::Error;
+    type FieldMarker = ();
+    type VariantMarker = ();
 
     #[inline(always)]
     fn report<T>(&mut self, error: T) -> de::Error

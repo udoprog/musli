@@ -192,6 +192,8 @@ layer! {
         krate: syn::Path,
         /// `#[musli(name_type)]`.
         name_type: syn::Type,
+        /// `#[musli(name_format_with)]`.
+        name_format_with: syn::Path,
         /// `#[musli(default_variant_name = "..")]`.
         default_variant_name: DefaultTag,
         /// `#[musli(default_field_name = "..")]`.
@@ -295,9 +297,16 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
             }
 
             // parse #[musli(name_type = <type>)]
-            if meta.path == NAME_TYPE {
+            if meta.path.is_ident("name_type") {
                 meta.input.parse::<Token![=]>()?;
                 new.name_type.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(name_format_with = <path>)]
+            if meta.path.is_ident("name_format_with") {
+                meta.input.parse::<Token![=]>()?;
+                new.name_format_with.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
@@ -409,6 +418,8 @@ layer! {
     VariantAttr, VariantLayerNew, VariantLayer {
         /// `#[musli(name_type)]`.
         name_type: syn::Type,
+        /// `#[musli(name_format_with)]`.
+        name_format_with: syn::Path,
         /// Rename a field to the given expression.
         rename: syn::Expr,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
@@ -460,9 +471,16 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             }
 
             // parse #[musli(name_type = <type>)]
-            if meta.path == NAME_TYPE {
+            if meta.path.is_ident("name_type") {
                 meta.input.parse::<Token![=]>()?;
                 new.name_type.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(name_format_with = <path>)]
+            if meta.path.is_ident("name_format_with") {
+                meta.input.parse::<Token![=]>()?;
+                new.name_format_with.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 

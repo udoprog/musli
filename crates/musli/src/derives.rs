@@ -314,11 +314,19 @@
 //! that all tags have a single well-defined type.
 //!
 //! ```
+//! use core::fmt;
+//!
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 //! #[musli(transparent)]
 //! struct CustomTag<'a>(&'a [u8]);
+//!
+//! impl fmt::Display for CustomTag<'_> {
+//!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//!         fmt::Debug::fmt(self.0, f)
+//!     }
+//! }
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(name_type = CustomTag)]
@@ -435,11 +443,19 @@
 //! container.
 //!
 //! ```
+//! use core::fmt;
+//!
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 //! #[musli(transparent)]
 //! struct CustomTag<'a>(&'a [u8]);
+//!
+//! impl fmt::Display for CustomTag<'_> {
+//!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//!         fmt::Debug::fmt(self.0, f)
+//!     }
+//! }
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(name_type = usize)]

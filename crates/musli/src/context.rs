@@ -8,6 +8,10 @@ pub trait Context {
     type Input;
     /// Error produced by context.
     type Error;
+    /// Returned marker for matching field traces.
+    type FieldMarker: Default;
+    /// Returned marker for matching variant traces.
+    type VariantMarker: Default;
 
     /// Report the given encoding error.
     fn report<T>(&mut self, error: T) -> Self::Error
@@ -98,23 +102,125 @@ pub trait Context {
     #[inline(always)]
     fn trace_array(&mut self, _: usize) {}
 
-    /// Trace that we've entered the given field.
+    /// Indicate that we've entered a struct with the given `name`.
+    ///
+    /// The `name` variable corresponds to the identifiers of the struct.
+    ///
+    /// This will be matched with a corresponding call to
+    /// [`trace_leave_struct`][Context::trace_leave_struct].
+    ///
+    /// [`trace_leave_struct`]: Context::trace_leave_struct
+    #[allow(unused_variables)]
+    fn trace_enter_struct(&mut self, name: &'static str) {}
+
+    /// Trace that we've left the last struct that was entered.
     #[inline(always)]
-    fn trace_field<T>(&mut self, _: &T)
+    fn trace_leave_struct(&mut self) {}
+
+    /// Trace that we've entered the given named field.
+    ///
+    /// A named field is part of a regular struct, where the literal field name
+    /// is the `name` argument below, and the musli tag being used for the field
+    /// is the second argument.
+    ///
+    /// This will be matched with a corresponding call to [`trace_leave_field`].
+    ///
+    /// Here `name` is `"field"` and `tag` is `"string"`.
+    ///
+    /// ```rust
+    /// use musli::{Decode, Encode};
+    ///
+    /// #[derive(Decode, Encode)]
+    /// struct Struct {
+    ///     #[musli(rename = "string")]
+    ///     field: String,
+    /// }
+    /// ```
+    ///
+    /// [`trace_leave_field`]: Context::trace_leave_field
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn trace_enter_named_field<T>(&mut self, name: &'static str, tag: T) -> Self::FieldMarker
     where
-        T: ?Sized + fmt::Display,
+        T: fmt::Display,
     {
+        Self::FieldMarker::default()
     }
 
-    /// Trace that we've entered the given variant.
+    /// Trace that we've entered the given unnamed field.
+    ///
+    /// An unnamed field is part of a tuple struct, where the field index is the
+    /// `index` argument below, and the musli tag being used for the field is
+    /// the second argument.
+    ///
+    /// This will be matched with a corresponding call to [`trace_leave_field`].
+    ///
+    /// Here `index` is `0` and `tag` is `"string"`.
+    ///
+    /// ```rust
+    /// use musli::{Decode, Encode};
+    ///
+    /// #[derive(Decode, Encode)]
+    /// struct Struct(#[musli(rename = "string")] String);
+    /// ```
+    ///
+    /// [`trace_leave_field`]: Context::trace_leave_field
     #[inline(always)]
-    fn trace_variant<T>(&mut self, _: &T)
+    #[allow(unused_variables)]
+    fn trace_enter_unnamed_field<T>(&mut self, index: u32, _: T) -> Self::FieldMarker
     where
-        T: ?Sized + fmt::Display,
+        T: fmt::Display,
     {
+        Self::FieldMarker::default()
     }
 
-    /// Trace that we've left the current context.
+    /// Trace that we've left the last field that was entered.
+    ///
+    /// The `marker` argument will be the same as the one returned from
+    /// [`trace_enter_named_field`] or [`trace_enter_unnamed_field`].
+    ///
+    /// [`trace_enter_named_field`]: Context::trace_enter_named_field
+    /// [`trace_enter_unnamed_field`]: Context::trace_enter_unnamed_field
     #[inline(always)]
-    fn trace_leave(&mut self) {}
+    #[allow(unused_variables)]
+    fn trace_leave_field(&mut self, marker: Self::FieldMarker) {}
+
+    /// Trace that we've entered the given variant in an enum.
+    ///
+    /// A named variant is part of an enum, where the literal variant name is
+    /// the `name` argument below, and the musli tag being used to decode the
+    /// variant is the second argument.
+    ///
+    /// This will be matched with a corresponding call to
+    /// [`trace_leave_variant`] with the same marker provided as an argument as
+    /// the one returned here.
+    ///
+    /// Here `name` is `"field"` and `tag` is `"string"`.
+    ///
+    /// ```rust
+    /// use musli::{Decode, Encode};
+    ///
+    /// #[derive(Decode, Encode)]
+    /// struct Struct {
+    ///     #[musli(rename = "string")]
+    ///     field: String,
+    /// }
+    /// ```
+    ///
+    /// [`trace_leave_variant`]: Context::trace_leave_variant
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn trace_enter_variant<T>(&mut self, name: &'static str, tag: T) -> Self::VariantMarker {
+        Self::VariantMarker::default()
+    }
+
+    /// Trace that we've left the last variant that was entered.
+    ///
+    /// The `marker` argument will be the same as the one returned from
+    /// [`trace_enter_variant`].
+    ///
+    /// [`trace_enter_variant`]: Context::trace_enter_variant
+    #[inline(always)]
+    #[allow(unused_variables)]
+    fn trace_leave_variant(&mut self, marker: Self::VariantMarker) {}
 }

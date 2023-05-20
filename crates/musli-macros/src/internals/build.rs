@@ -114,7 +114,8 @@ pub(crate) enum BuildData<'a> {
 pub(crate) struct StructBuild<'a> {
     pub(crate) span: Span,
     pub(crate) fields: Vec<FieldBuild<'a>>,
-    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing: Packing,
     pub(crate) path: syn::Path,
     pub(crate) field_tag_method: TagMethod,
@@ -126,7 +127,8 @@ pub(crate) struct EnumBuild<'a> {
     pub(crate) variants: Vec<VariantBuild<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
     pub(crate) variant_tag_method: TagMethod,
-    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
 
@@ -138,7 +140,8 @@ pub(crate) struct VariantBuild<'a> {
     pub(crate) packing: Packing,
     pub(crate) enum_packing: Packing,
     pub(crate) tag: syn::Expr,
-    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) field_tag_method: TagMethod,
     pub(crate) is_default: bool,
     pub(crate) path: syn::Path,
@@ -210,7 +213,6 @@ fn setup_struct<'a>(
     let mut fields = Vec::with_capacity(data.fields.len());
 
     let default_field_name = e.type_attr.default_field_name(mode).map(|&(_, v)| v);
-    let tag_type = e.type_attr.name_type(mode);
     let packing = e
         .type_attr
         .packing(mode)
@@ -234,7 +236,8 @@ fn setup_struct<'a>(
     Ok(StructBuild {
         span: data.span,
         fields,
-        tag_type,
+        name_type: e.type_attr.name_type(mode),
+        name_format_with: e.type_attr.name_format_with(mode),
         packing,
         path,
         field_tag_method: tag_methods.pick(),
@@ -248,7 +251,6 @@ fn setup_enum<'a>(
 ) -> Result<EnumBuild<'a>> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
-    let tag_type = e.type_attr.name_type(mode);
     // Keep track of variant index manually since fallback variants do not
     // count.
     let mut tag_methods = TagMethods::new(&e.cx);
@@ -277,7 +279,8 @@ fn setup_enum<'a>(
         variants,
         fallback,
         variant_tag_method: tag_methods.pick(),
-        tag_type,
+        name_type: e.type_attr.name_type(mode),
+        name_format_with: e.type_attr.name_format_with(mode),
         packing_span,
     })
 }
@@ -319,8 +322,6 @@ fn setup_variant<'a>(
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
-
-    let tag_type = data.attr.name_type(mode);
 
     let is_default = if data.attr.default_attr(mode).is_some() {
         if !data.fields.is_empty() {
@@ -368,7 +369,8 @@ fn setup_variant<'a>(
         packing: variant_packing,
         enum_packing,
         tag,
-        tag_type,
+        name_type: data.attr.name_type(mode),
+        name_format_with: data.attr.name_format_with(mode),
         field_tag_method: field_tag_methods.pick(),
         is_default,
         path,

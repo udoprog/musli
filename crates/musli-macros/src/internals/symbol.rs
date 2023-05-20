@@ -16,7 +16,6 @@ pub const DEFAULT_FIELD_NAME: Symbol = Symbol("default_field_name");
 pub const DEFAULT_VARIANT_NAME: Symbol = Symbol("default_variant_name");
 pub const DEFAULT: Symbol = Symbol("default");
 pub const MODE: Symbol = Symbol("mode");
-pub const NAME_TYPE: Symbol = Symbol("name_type");
 pub const PACKED: Symbol = Symbol("packed");
 pub const RENAME: Symbol = Symbol("rename");
 pub const SKIP_ENCODING_IF: Symbol = Symbol("skip_encoding_if");

@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Span, TokenStream, Literal};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -93,13 +93,14 @@ fn decode_struct(
             ctx_var,
             decoder_var,
             e.type_name,
-            st.tag_type,
+            st.name_type,
+            st.name_format_with,
             &st.path,
             &st.fields,
             None,
             st.field_tag_method,
         )?,
-        Packing::Packed => decode_packed(e, st.span, ctx_var, decoder_var, &st.path, &st.fields)?,
+        Packing::Packed => decode_packed(e, ctx_var, decoder_var, &st.path, &st.fields)?,
         Packing::Transparent => {
             decode_transparent(e, st.span, ctx_var, decoder_var, &st.path, &st.fields)?
         }
@@ -157,14 +158,15 @@ fn decode_enum(
                 ctx_var,
                 &body_decoder_var,
                 v.name,
-                v.tag_type,
+                v.name_type,
+                v.name_format_with,
                 &v.path,
                 &v.fields,
                 Some(&variant_tag),
                 v.field_tag_method,
             )?,
             Packing::Packed => {
-                decode_packed(e, v.span, ctx_var, &body_decoder_var, &v.path, &v.fields)?
+                decode_packed(e, ctx_var, &body_decoder_var, &v.path, &v.fields)?
             }
             Packing::Transparent => {
                 decode_transparent(e, v.span, ctx_var, &body_decoder_var, &v.path, &v.fields)?
@@ -180,7 +182,7 @@ fn decode_enum(
         );
 
         outputs.extend(output);
-        patterns.push((v.span, output_tag, decode));
+        patterns.push((v, output_tag, decode));
     }
 
     let fallback = match en.fallback {
@@ -217,8 +219,8 @@ fn decode_enum(
         en.span => #unsupported_pattern => { #fallback }
     };
 
-    let tag_type = en
-        .tag_type
+    let name_type = en
+        .name_type
         .as_ref()
         .map(|(_, ty)| quote_spanned!(ty.span() => : #ty));
 
@@ -236,12 +238,21 @@ fn decode_enum(
                         method: field_tag_method,
                     },
             } => {
-                let patterns = patterns.into_iter().map(|(span, tag, output)| {
-                    quote_spanned! {
-                        span =>
+                let patterns = patterns.into_iter().map(|(v, tag, output)| {
+                    let name = &v.name;
+
+                    let formatted_tag = match en.name_format_with {
+                        Some((_, path)) => quote!(&#path(&#tag)),
+                        None => quote!(&#tag),
+                    };
+
+                    quote! {
                         #tag => {
+                            let variant_marker = #context_t::trace_enter_variant(#ctx_var, #name, #formatted_tag);
                             let #body_decoder_var = #as_decoder_t::as_decoder(&content, #ctx_var)?;
-                            #output
+                            let variant_output = #output;
+                            #context_t::trace_leave_variant(#ctx_var, variant_marker);
+                            variant_output
                         }
                     }
                 });
@@ -268,7 +279,7 @@ fn decode_enum(
                         let st = #as_decoder_t::as_decoder(&content, #ctx_var)?;
                         let mut st = #decoder_t::decode_map(st, #ctx_var)?;
 
-                        let #variant_tag #tag_type = {
+                        let #variant_tag #name_type = {
                             let field = loop {
                                 let mut entry = match #pairs_decoder_t::next(&mut st, #ctx_var)? {
                                     Some(entry) => entry,
@@ -312,11 +323,20 @@ fn decode_enum(
                     },
                 content,
             } => {
-                let patterns = patterns.into_iter().map(|(span, tag, output)| {
-                    quote_spanned! {
-                        span =>
+                let patterns = patterns.into_iter().map(|(v, tag, output)| {
+                    let name = &v.name;
+
+                    let formatted_tag = match en.name_format_with {
+                        Some((_, path)) => quote!(&#path(&#tag)),
+                        None => quote!(&#tag),
+                    };
+
+                    quote! {
                         #tag => {
-                            #output
+                            let variant_marker = #context_t::trace_enter_variant(#ctx_var, #name, #formatted_tag);
+                            let variant_output = #output;
+                            #context_t::trace_leave_variant(#ctx_var, variant_marker);
+                            variant_output
                         }
                     }
                 });
@@ -364,7 +384,7 @@ fn decode_enum(
                                     tag = Some(#decode_tag);
                                 }
                                 Outcome::Content => {
-                                    let #variant_tag #tag_type = match tag {
+                                    let #variant_tag #name_type = match tag {
                                         Some(tag) => tag,
                                         None => {
                                             return Err(#context_t::invalid_field_tag(#ctx_var, #type_name, #tag));
@@ -390,18 +410,26 @@ fn decode_enum(
         }
     }
 
-    let patterns = patterns.into_iter().map(|(span, tag, output)| {
+    let patterns = patterns.into_iter().map(|(v, tag, output)| {
         let variant_decoder_t = &e.tokens.variant_decoder_t;
+        let name = &v.name;
 
-        quote_spanned! {
-            span =>
+        let formatted_tag = match en.name_format_with {
+            Some((_, path)) => quote!(&#path(&#tag)),
+            None => quote!(&#tag),
+        };
+
+        quote! {
             #tag => {
+                let variant_marker = #context_t::trace_enter_variant(#ctx_var, #name, #formatted_tag);
+
                 let output = {
                     let #body_decoder_var = #variant_decoder_t::variant(&mut #variant_decoder_var, #ctx_var)?;
                     #output
                 };
 
                 #variant_decoder_t::end(#variant_decoder_var, #ctx_var)?;
+                #context_t::trace_leave_variant(#ctx_var, variant_marker);
                 output
             }
         }
@@ -417,7 +445,7 @@ fn decode_enum(
 
         let mut #variant_decoder_var = #decoder_t::decode_variant(#root_decoder_var, #ctx_var)?;
 
-        let #variant_tag #tag_type = {
+        let #variant_tag #name_type = {
             let mut #variant_decoder_var = #variant_decoder_t_tag(&mut #variant_decoder_var, #ctx_var)?;
             #decode_tag
         };
@@ -495,7 +523,8 @@ fn decode_tagged(
     ctx_var: &syn::Ident,
     parent_decoder_var: &syn::Ident,
     type_name: &syn::LitStr,
-    tag_type: Option<&(Span, syn::Type)>,
+    name_type: Option<&(Span, syn::Type)>,
+    name_format_with: Option<&(Span, syn::Path)>,
     path: &syn::Path,
     fields: &[FieldBuild],
     variant_tag: Option<&syn::Ident>,
@@ -521,9 +550,32 @@ fn decode_tagged(
         let (span, decode_path) = &f.decode_path;
         let var = syn::Ident::new(&format!("v{}", f.index), *span);
 
-        decls.push(quote_spanned!(*span => let mut #var = None;));
-        let decode =
-            quote_spanned!(*span => #var = Some(#decode_path(#ctx_var, #struct_decoder_var)?));
+        decls.push(quote!(let mut #var = None;));
+
+        let (name, enter) = match &f.field_access {
+            syn::Member::Named(name) => (
+                syn::Lit::Str(syn::LitStr::new(&name.to_string(), name.span())),
+                syn::Ident::new("trace_enter_named_field", Span::call_site()),
+            ),
+            syn::Member::Unnamed(index) => (
+                syn::Lit::Int(syn::LitInt::from(Literal::u32_suffixed(index.index))),
+                syn::Ident::new("trace_enter_unnamed_field", Span::call_site()),
+            ),
+        };
+
+        let formatted_tag = match name_format_with {
+            Some((_, path)) => quote!(&#path(&#tag)),
+            None => quote!(&#tag),
+        };
+
+        let decode = quote! {
+            #var = {
+                let trace_marker = #context_t::#enter(#ctx_var, #name, #formatted_tag);
+                let field_value = #decode_path(#ctx_var, #struct_decoder_var)?;
+                #context_t::trace_leave_field(#ctx_var, trace_marker);
+                Some(field_value)
+            }
+        };
 
         let (output_tag, output) =
             handle_indirect_output_tag(*span, f.index, field_tag_method, tag, &tag_visitor_output);
@@ -531,8 +583,8 @@ fn decode_tagged(
         outputs.extend(output);
         patterns.push((f.span, output_tag, decode));
 
-        let fallback = if let Some(span) = f.default_attr {
-            quote_spanned!(span => #default_function())
+        let fallback = if f.default_attr.is_some() {
+            quote!(#default_function())
         } else {
             quote! {
                 return Err(#context_t::expected_tag(#ctx_var, #type_name, #tag))
@@ -609,12 +661,12 @@ fn decode_tagged(
         semi_token: <Token![;]>::default(),
     };
 
-    if let Some((_, tag_type)) = tag_type {
+    if let Some((_, name_type)) = name_type {
         tag_stmt.pat = syn::Pat::Type(syn::PatType {
             attrs: Vec::new(),
             pat: Box::new(tag_stmt.pat),
             colon_token: <Token![:]>::default(),
-            ty: Box::new(tag_type.clone()),
+            ty: Box::new(name_type.clone()),
         });
     }
 
@@ -647,17 +699,19 @@ fn decode_tagged(
     });
 
     Ok(quote! {
-        #(#decls)*
-        #output_enum
-        let mut type_decoder = #decoder_t::decode_struct(#parent_decoder_var, #ctx_var, #fields_len)?;
+        {
+            #(#decls)*
+            #output_enum
+            let mut type_decoder = #decoder_t::decode_struct(#parent_decoder_var, #ctx_var, #fields_len)?;
 
-        while let Some(mut #struct_decoder_var) = #pairs_decoder_t::next(&mut type_decoder, #ctx_var)? {
-            #tag_stmt
-            #body
+            while let Some(mut #struct_decoder_var) = #pairs_decoder_t::next(&mut type_decoder, #ctx_var)? {
+                #tag_stmt
+                #body
+            }
+
+            #pairs_decoder_t::end(type_decoder, #ctx_var)?;
+            #path { #assigns }
         }
-
-        #pairs_decoder_t::end(type_decoder, #ctx_var)?;
-        #path { #assigns }
     })
 }
 
@@ -692,7 +746,6 @@ fn decode_transparent(
 /// Decode something packed.
 fn decode_packed(
     e: &Build<'_>,
-    span: Span,
     ctx_var: &syn::Ident,
     decoder_var: &syn::Ident,
     path: &syn::Path,
@@ -720,14 +773,15 @@ fn decode_packed(
     }
 
     if assign.is_empty() {
-        Ok(quote_spanned!(span => #path {}))
+        Ok(quote!(#path {}))
     } else {
-        Ok(quote_spanned! {
-            span =>
-            let mut unpack = #decoder_t::decode_pack(#decoder_var, #ctx_var)?;
-            let output = #path { #(#assign),* };
-            #pack_decoder_t::end(unpack, #ctx_var)?;
-            output
+        Ok(quote! {
+            {
+                let mut unpack = #decoder_t::decode_pack(#decoder_var, #ctx_var)?;
+                let output = #path { #(#assign),* };
+                #pack_decoder_t::end(unpack, #ctx_var)?;
+                output
+            }
         })
     }
 }
