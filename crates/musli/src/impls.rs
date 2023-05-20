@@ -17,7 +17,6 @@ use core::{fmt, marker};
 
 use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
 use crate::en::{Encode, Encoder, VariantEncoder};
-use crate::error::Error;
 use crate::mode::Mode;
 use crate::Context;
 
@@ -331,17 +330,13 @@ where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
-        struct Visitor<C, E>(marker::PhantomData<(C, E)>);
+        struct Visitor;
 
-        impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
+        impl<'de, C> ValueVisitor<'de, C, str> for Visitor
         where
-            C: Context<Input = E>,
-            E: Error,
+            C: Context,
         {
-            type Target = str;
             type Ok = &'de str;
-            type Error = E;
-            type Context = C;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -354,7 +349,7 @@ where
             }
         }
 
-        decoder.decode_string(cx, Visitor(marker::PhantomData))
+        decoder.decode_string(cx, Visitor)
     }
 }
 
@@ -381,17 +376,13 @@ where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
-        struct Visitor<C, E>(marker::PhantomData<(C, E)>);
+        struct Visitor;
 
-        impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
+        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
         where
-            C: Context<Input = E>,
-            E: Error,
+            C: Context,
         {
-            type Target = [u8];
             type Ok = &'de [u8];
-            type Error = E;
-            type Context = C;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -404,7 +395,7 @@ where
             }
         }
 
-        decoder.decode_bytes(cx, Visitor(marker::PhantomData))
+        decoder.decode_bytes(cx, Visitor)
     }
 }
 

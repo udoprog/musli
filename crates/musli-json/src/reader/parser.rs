@@ -164,13 +164,10 @@ pub trait Parser<'de>: private::Sealed {
     /// Parse an unknown number and try to coerce it into the best fit type
     /// through [NumberVisitor].
     #[doc(hidden)]
-    fn parse_number<V>(
-        &mut self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn parse_number<C, V>(&mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: NumberVisitor<'de, Error = ParseError>,
+        C: Context<Input = ParseError>,
+        V: NumberVisitor<'de, C>,
     {
         let signed = integer::decode_signed::<i128, _, _>(cx, self)?;
 

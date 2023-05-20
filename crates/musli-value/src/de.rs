@@ -258,13 +258,10 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_bytes<V>(
-        self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_bytes<C, V>(self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         ensure!(self, cx, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
             visitor.visit_borrowed(cx, bytes)
@@ -273,13 +270,10 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_string<V>(
-        self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_string<C, V>(self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, str>,
     {
         ensure!(self, cx, hint, ExpectedString(hint), Value::String(string) => {
             visitor.visit_borrowed(cx, string)

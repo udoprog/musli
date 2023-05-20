@@ -124,7 +124,7 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "visitor",
         &types::VISITOR_TYPES,
-        ["Ok", "Error"],
+        ["Ok"],
         "__UseMusliVisitorAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),

@@ -136,6 +136,31 @@ pub enum Number {
     F64(f64),
 }
 
+macro_rules! from {
+    ($ty:ty, $variant:ident) => {
+        impl From<$ty> for Number {
+            fn from(value: $ty) -> Self {
+                Self::$variant(value)
+            }
+        }
+    };
+}
+
+from!(u8, U8);
+from!(u16, U16);
+from!(u32, U32);
+from!(u64, U64);
+from!(u128, U128);
+from!(i8, I8);
+from!(i16, I16);
+from!(i32, I32);
+from!(i64, I64);
+from!(i128, I128);
+from!(usize, Usize);
+from!(isize, Isize);
+from!(f32, F32);
+from!(f64, F64);
+
 impl<M> Encode<M> for Number
 where
     M: Mode,
@@ -198,11 +223,11 @@ where
     type Error = E;
 
     #[cfg(feature = "alloc")]
-    type String<C> = StringVisitor<C, E> where C: Context<Input = Self::Error>;
+    type String<C> = StringVisitor where C: Context<Input = E>;
     #[cfg(feature = "alloc")]
-    type Bytes<C> = BytesVisitor<C, E> where C: Context<Input = Self::Error>;
+    type Bytes<C> = BytesVisitor where C: Context<Input = E>;
     #[cfg(feature = "alloc")]
-    type Number<C> = ValueNumberVisitor<C, E> where C: Context<Input = Self::Error>;
+    type Number<C> = ValueNumberVisitor where C: Context<Input = E>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -404,7 +429,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        Ok(BytesVisitor(marker::PhantomData))
+        Ok(BytesVisitor)
     }
 
     #[cfg(feature = "alloc")]
@@ -413,7 +438,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        Ok(StringVisitor(marker::PhantomData))
+        Ok(StringVisitor)
     }
 
     #[cfg(feature = "alloc")]
@@ -422,7 +447,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        Ok(ValueNumberVisitor(marker::PhantomData))
+        Ok(ValueNumberVisitor)
     }
 
     #[cfg(feature = "alloc")]
@@ -455,18 +480,14 @@ where
 }
 
 #[cfg(feature = "alloc")]
-struct BytesVisitor<C, E>(marker::PhantomData<(C, E)>);
+struct BytesVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C, E> ValueVisitor<'de> for BytesVisitor<C, E>
+impl<'de, C> ValueVisitor<'de, C, [u8]> for BytesVisitor
 where
-    C: Context<Input = E>,
-    E: Error,
+    C: Context,
 {
-    type Target = [u8];
     type Ok = Value;
-    type Error = E;
-    type Context = C;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -486,18 +507,14 @@ where
 }
 
 #[cfg(feature = "alloc")]
-struct StringVisitor<C, E>(marker::PhantomData<(C, E)>);
+struct StringVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C, E> ValueVisitor<'de> for StringVisitor<C, E>
+impl<'de, C> ValueVisitor<'de, C, str> for StringVisitor
 where
-    C: Context<Input = E>,
-    E: Error,
+    C: Context,
 {
-    type Target = str;
     type Ok = Value;
-    type Error = E;
-    type Context = C;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -515,16 +532,13 @@ where
     }
 }
 
-struct ValueNumberVisitor<C, E>(marker::PhantomData<(C, E)>);
+struct ValueNumberVisitor;
 
-impl<'de, C, E> NumberVisitor<'de> for ValueNumberVisitor<C, E>
+impl<'de, C> NumberVisitor<'de, C> for ValueNumberVisitor
 where
-    C: Context<Input = E>,
-    E: Error,
+    C: Context,
 {
     type Ok = Value;
-    type Error = E;
-    type Context = C;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

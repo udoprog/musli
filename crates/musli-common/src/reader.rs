@@ -79,17 +79,13 @@ pub trait Reader<'de> {
     where
         C: Context<Input = Self::Error>,
     {
-        struct Visitor<'a, E, C>(&'a mut [u8], marker::PhantomData<(E, C)>);
+        struct Visitor<'a>(&'a mut [u8]);
 
-        impl<'a, 'de, E, C> ValueVisitor<'de> for Visitor<'a, E, C>
+        impl<'a, 'de, C> ValueVisitor<'de, C, [u8]> for Visitor<'a>
         where
-            E: Error,
-            C: Context<Input = E>,
+            C: Context,
         {
-            type Target = [u8];
             type Ok = ();
-            type Error = E;
-            type Context = C;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -97,41 +93,25 @@ pub trait Reader<'de> {
             }
 
             #[inline]
-            fn visit_borrowed(
-                self,
-                cx: &mut Self::Context,
-                bytes: &'de Self::Target,
-            ) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
             #[inline]
-            fn visit_ref(
-                self,
-                _: &mut Self::Context,
-                bytes: &Self::Target,
-            ) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 self.0.copy_from_slice(bytes);
                 Ok(())
             }
         }
 
-        self.read_bytes(
-            cx,
-            buf.len(),
-            Visitor::<Self::Error, C>(buf, marker::PhantomData),
-        )
+        self.read_bytes(cx, buf.len(), Visitor(buf))
     }
 
     /// Read a slice out of the current reader.
-    fn read_bytes<V>(
-        &mut self,
-        cx: &mut V::Context,
-        n: usize,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn read_bytes<C, V>(&mut self, cx: &mut C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>;
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>;
 
     /// Read a single byte.
     #[inline]
@@ -149,17 +129,13 @@ pub trait Reader<'de> {
     where
         C: Context<Input = Self::Error>,
     {
-        struct Visitor<const N: usize, E, C>([u8; N], marker::PhantomData<(E, C)>);
+        struct Visitor<const N: usize>([u8; N]);
 
-        impl<'de, const N: usize, E, C> ValueVisitor<'de> for Visitor<N, E, C>
+        impl<'de, const N: usize, C> ValueVisitor<'de, C, [u8]> for Visitor<N>
         where
-            E: Error,
-            C: Context<Input = E>,
+            C: Context,
         {
-            type Target = [u8];
             type Ok = [u8; N];
-            type Error = E;
-            type Context = C;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -167,26 +143,18 @@ pub trait Reader<'de> {
             }
 
             #[inline]
-            fn visit_borrowed(
-                self,
-                cx: &mut C,
-                bytes: &'de Self::Target,
-            ) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
             #[inline]
-            fn visit_ref(mut self, _: &mut C, bytes: &Self::Target) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(mut self, _: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 self.0.copy_from_slice(bytes);
                 Ok(self.0)
             }
         }
 
-        self.read_bytes(
-            cx,
-            N,
-            Visitor::<N, Self::Error, C>([0u8; N], marker::PhantomData),
-        )
+        self.read_bytes(cx, N, Visitor([0u8; N]))
     }
 
     /// Keep an accurate record of the position within the reader.
@@ -252,14 +220,10 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn read_bytes<V>(
-        &mut self,
-        cx: &mut V::Context,
-        n: usize,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn read_bytes<C, V>(&mut self, cx: &mut C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         if self.len() < n {
             return Err(cx.custom("buffer underflow"));
@@ -347,14 +311,10 @@ where
     }
 
     #[inline]
-    fn read_bytes<V>(
-        &mut self,
-        cx: &mut V::Context,
-        n: usize,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn read_bytes<C, V>(&mut self, cx: &mut C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
 
@@ -462,14 +422,10 @@ where
     }
 
     #[inline]
-    fn read_bytes<V>(
-        &mut self,
-        cx: &mut V::Context,
-        n: usize,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn read_bytes<C, V>(&mut self, cx: &mut C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         let ok = self.reader.read_bytes(cx, n, visitor)?;
         self.pos += n;
@@ -581,14 +537,10 @@ where
     }
 
     #[inline]
-    fn read_bytes<V>(
-        &mut self,
-        cx: &mut V::Context,
-        n: usize,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn read_bytes<C, V>(&mut self, cx: &mut C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         self.bounds_check(cx, n)?;
         self.reader.read_bytes(cx, n, visitor)
@@ -671,14 +623,10 @@ where
     }
 
     #[inline]
-    fn read_bytes<V>(
-        &mut self,
-        cx: &mut V::Context,
-        n: usize,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn read_bytes<C, V>(&mut self, cx: &mut C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         (**self).read_bytes(cx, n, visitor)
     }

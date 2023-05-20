@@ -2,7 +2,6 @@ use core::ffi::CStr;
 use core::fmt;
 #[cfg(feature = "std")]
 use core::hash::{BuildHasher, Hash};
-use core::marker;
 
 use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
@@ -16,7 +15,6 @@ use std::collections::{HashMap, HashSet};
 
 use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
 use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
-use crate::error::Error;
 use crate::internal::size_hint;
 use crate::mode::Mode;
 use crate::Context;
@@ -45,17 +43,13 @@ where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
-        struct Visitor<C, E>(marker::PhantomData<(C, E)>);
+        struct Visitor;
 
-        impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
+        impl<'de, C> ValueVisitor<'de, C, str> for Visitor
         where
-            C: Context<Input = E>,
-            E: Error,
+            C: Context,
         {
-            type Target = str;
             type Ok = String;
-            type Error = E;
-            type Context = C;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -78,7 +72,7 @@ where
             }
         }
 
-        decoder.decode_string(cx, Visitor(marker::PhantomData))
+        decoder.decode_string(cx, Visitor)
     }
 }
 
@@ -136,17 +130,13 @@ macro_rules! cow {
                 C: Context<Input = D::Error>,
                 D: Decoder<'de>,
             {
-                struct Visitor<C, E>(marker::PhantomData<(C, E)>);
+                struct Visitor;
 
-                impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
+                impl<'de, C> ValueVisitor<'de, C, $source> for Visitor
                 where
-                    C: Context<Input = E>,
-                    E: Error,
+                    C: Context,
                 {
-                    type Target = $source;
                     type Ok = Cow<'de, $ty>;
-                    type Error = E;
-                    type Context = C;
 
                     #[inline]
                     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -181,7 +171,7 @@ macro_rules! cow {
                     }
                 }
 
-                decoder.$decode(cx, Visitor(marker::PhantomData))
+                decoder.$decode(cx, Visitor)
             }
         }
     };
@@ -379,17 +369,13 @@ where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
-        struct Visitor<C, E>(marker::PhantomData<(C, E)>);
+        struct Visitor;
 
-        impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
+        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
         where
-            C: Context<Input = E>,
-            E: Error,
+            C: Context,
         {
-            type Target = [u8];
             type Ok = CString;
-            type Error = E;
-            type Context = C;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -414,6 +400,6 @@ where
             }
         }
 
-        decoder.decode_bytes(cx, Visitor(marker::PhantomData))
+        decoder.decode_bytes(cx, Visitor)
     }
 }

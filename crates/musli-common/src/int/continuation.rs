@@ -6,11 +6,13 @@
 //! use musli_common::fixed_bytes::FixedBytes;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut cx = musli_common::context::Same::default();
+//!
 //! let mut bytes = FixedBytes::<8>::new();
-//! c::encode(&mut bytes, 5000u32)?;
+//! c::encode(&mut cx, &mut bytes, 5000u32)?;
 //! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let number: u32 = c::decode(bytes.as_slice())?;
+//! let number: u32 = c::decode(&mut cx, bytes.as_slice())?;
 //! assert_eq!(number, 5000u32);
 //! # Ok(()) }
 //! ```

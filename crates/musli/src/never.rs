@@ -56,10 +56,10 @@ pub enum NeverMarker {}
 ///     }
 /// }
 /// ```
-pub struct Never<A, B = NeverMarker, C: ?Sized = NeverMarker, D = NeverMarker> {
+pub struct Never<A, B: ?Sized = NeverMarker, C = NeverMarker> {
     // Field makes type uninhabitable.
     _never: NeverMarker,
-    _marker: marker::PhantomData<(A, B, D, C)>,
+    _marker: marker::PhantomData<(A, C, B)>,
 }
 
 impl<'de, E> Decoder<'de> for Never<E>
@@ -296,30 +296,23 @@ where
     }
 }
 
-impl<'de, O, E, C> NumberVisitor<'de> for Never<O, E, C>
+impl<'de, O, C> NumberVisitor<'de, C> for Never<O, C>
 where
-    C: Context<Input = E>,
-    E: Error,
+    C: Context,
 {
     type Ok = O;
-    type Error = E;
-    type Context = C;
 
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}
     }
 }
 
-impl<'de, O, E, T, C> ValueVisitor<'de> for Never<O, E, T, C>
+impl<'de, O, T, C> ValueVisitor<'de, C, T> for Never<O, T, C>
 where
     T: ?Sized + ToOwned,
-    C: Context<Input = E>,
-    E: Error,
+    C: Context,
 {
-    type Target = T;
     type Ok = O;
-    type Error = E;
-    type Context = C;
 
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}

@@ -302,8 +302,8 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         let mut discriminant = None::<u32>;
     ///
-    ///         while let Some(mut e) = st.next()? {
-    ///             let found = e.first()?.decode_string(cx, musli::utils::visit_string_fn(|cx, string| {
+    ///         while let Some(mut e) = st.next(cx)? {
+    ///             let found = e.first(cx)?.decode_string(cx, musli::utils::visit_owned_fn("a string that is 'type'", |cx: &mut C, string: &str| {
     ///                 Ok(string == "type")
     ///             }))?;
     ///
@@ -385,7 +385,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_bool()?,
+    ///             data: decoder.decode_bool(cx)?,
     ///         })
     ///     }
     /// }
@@ -419,7 +419,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_char()?,
+    ///             data: decoder.decode_char(cx)?,
     ///         })
     ///     }
     /// }
@@ -453,7 +453,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_u8()?,
+    ///             data: decoder.decode_u8(cx)?,
     ///         })
     ///     }
     /// }
@@ -487,7 +487,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_u16()?,
+    ///             data: decoder.decode_u16(cx)?,
     ///         })
     ///     }
     /// }
@@ -516,8 +516,9 @@ pub trait Decoder<'de>: Sized {
     /// }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
-    ///     fn decode<C, D>(cx: &mut Context<Input = D::Error>, decoder: D) -> Result<Self, C::Error>
+    ///     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     ///     where
+    ///         C: Context<Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
@@ -555,7 +556,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_u64()?,
+    ///             data: decoder.decode_u64(cx)?,
     ///         })
     ///     }
     /// }
@@ -589,7 +590,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_u128()?,
+    ///             data: decoder.decode_u128(cx)?,
     ///         })
     ///     }
     /// }
@@ -623,7 +624,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_i8()?,
+    ///             data: decoder.decode_i8(cx)?,
     ///         })
     ///     }
     /// }
@@ -657,7 +658,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_i16()?,
+    ///             data: decoder.decode_i16(cx)?,
     ///         })
     ///     }
     /// }
@@ -691,7 +692,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_i32()?,
+    ///             data: decoder.decode_i32(cx)?,
     ///         })
     ///     }
     /// }
@@ -725,7 +726,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_i64()?,
+    ///             data: decoder.decode_i64(cx)?,
     ///         })
     ///     }
     /// }
@@ -759,7 +760,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_i128()?,
+    ///             data: decoder.decode_i128(cx)?,
     ///         })
     ///     }
     /// }
@@ -793,7 +794,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_usize()?,
+    ///             data: decoder.decode_usize(cx)?,
     ///         })
     ///     }
     /// }
@@ -827,7 +828,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_isize()?,
+    ///             data: decoder.decode_isize(cx)?,
     ///         })
     ///     }
     /// }
@@ -861,7 +862,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_f32()?,
+    ///             data: decoder.decode_f32(cx)?,
     ///         })
     ///     }
     /// }
@@ -895,7 +896,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_f64()?,
+    ///             data: decoder.decode_f64(cx)?,
     ///         })
     ///     }
     /// }
@@ -914,13 +915,10 @@ pub trait Decoder<'de>: Sized {
     /// Decode an unknown number using a visitor that can handle arbitrary
     /// precision numbers.
     #[inline]
-    fn decode_number<V>(
-        self,
-        cx: &mut V::Context,
-        _: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_number<C, V>(self, cx: &mut C, _: V) -> Result<V::Ok, C::Error>
     where
-        V: NumberVisitor<'de, Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: NumberVisitor<'de, C>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Number,
@@ -946,7 +944,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_array()?,
+    ///             data: decoder.decode_array(cx)?,
     ///         })
     ///     }
     /// }
@@ -968,11 +966,11 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use std::fmt;
-    /// use std::marker;
     ///
     /// use musli::{Context, Decode, Decoder, Mode};
-    /// use musli::de::{ValueVisitor};
+    /// use musli::de::ValueVisitor;
     ///
+    /// #[derive(Debug, PartialEq)]
     /// struct BytesReference<'de> {
     ///     data: &'de [u8],
     /// }
@@ -984,43 +982,43 @@ pub trait Decoder<'de>: Sized {
     ///         C: Context<Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
-    ///         struct Visitor<C, E>(marker::PhantomData<(C, E)>);
+    ///         struct Visitor;
     ///
-    ///         impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
+    ///         impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
     ///         where
-    ///             C: Context<Input = E>,
-    ///             E: Error,
+    ///             C: Context,
     ///         {
-    ///             type Target = [u8];
     ///             type Ok = &'de [u8];
-    ///             type Error = E;
-    ///             type Context = C;
     ///
     ///             #[inline]
     ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    ///                 write!(f, "exact bytes reference")
+    ///                 write!(f, "a literal byte reference")
     ///             }
     ///
     ///             #[inline]
-    ///             fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+    ///             fn visit_borrowed(self, _: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
     ///                 Ok(bytes)
     ///             }
     ///         }
     ///
     ///         Ok(Self {
-    ///             data: decoder.decode_bytes(Visitor(marker::PhantomData))?,
+    ///             data: decoder.decode_bytes(cx, Visitor)?,
     ///         })
     ///     }
     /// }
+    ///
+    /// let value = musli_value::Value::Bytes(vec![0, 1, 2, 3]);
+    /// assert_eq!(musli_value::decode::<BytesReference>(&value)?, BytesReference { data: &[0, 1, 2, 3] });
+    ///
+    /// let value = musli_value::Value::Number(42u32.into());
+    /// assert_eq!(musli_value::decode::<BytesReference>(&value).unwrap_err().to_string(), "expected bytes, but found number");
+    /// Ok::<_, musli_value::ValueError>(())
     /// ```
     #[inline]
-    fn decode_bytes<V>(
-        self,
-        cx: &mut V::Context,
-        _: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_bytes<C, V>(self, cx: &mut C, _: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Bytes,
@@ -1034,13 +1032,12 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use std::fmt;
-    /// use std::marker;
     ///
     /// use musli::Context;
     /// use musli::de::{Decode, Decoder, ValueVisitor};
     /// use musli::mode::Mode;
-    /// use musli::error::Error;
     ///
+    /// #[derive(Debug, PartialEq)]
     /// struct StringReference<'de> {
     ///     data: &'de str,
     /// }
@@ -1052,17 +1049,13 @@ pub trait Decoder<'de>: Sized {
     ///         C: Context<Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
-    ///         struct Visitor<C, E>(marker::PhantomData<(C, E)>);
+    ///         struct Visitor;
     ///
-    ///         impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
+    ///         impl<'de, C> ValueVisitor<'de, C, str> for Visitor
     ///         where
-    ///             C: Context<Input = E>,
-    ///             E: Error,
+    ///             C: Context,
     ///         {
-    ///             type Target = str;
     ///             type Ok = &'de str;
-    ///             type Error = E;
-    ///             type Context = C;
     ///
     ///             #[inline]
     ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1070,25 +1063,29 @@ pub trait Decoder<'de>: Sized {
     ///             }
     ///
     ///             #[inline]
-    ///             fn visit_borrowed(self, cx: &mut Self::Context, bytes: &'de str) -> Result<Self::Ok, Self::Context::Error> {
+    ///             fn visit_borrowed(self, cx: &mut C, bytes: &'de str) -> Result<Self::Ok, C::Error> {
     ///                 Ok(bytes)
     ///             }
     ///         }
     ///
     ///         Ok(Self {
-    ///             data: decoder.decode_string(cx, Visitor(marker::PhantomData))?,
+    ///             data: decoder.decode_string(cx, Visitor)?,
     ///         })
     ///     }
     /// }
+    ///
+    /// let value = musli_value::Value::String(String::from("Hello!"));
+    /// assert_eq!(musli_value::decode::<StringReference>(&value)?, StringReference { data: "Hello!" });
+    ///
+    /// let value = musli_value::Value::Number(42u32.into());
+    /// assert_eq!(musli_value::decode::<StringReference>(&value).unwrap_err().to_string(), "expected string, but found number");
+    /// Ok::<_, musli_value::ValueError>(())
     /// ```
     #[inline]
-    fn decode_string<V>(
-        self,
-        cx: &mut V::Context,
-        _: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_string<C, V>(self, cx: &mut C, _: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, str>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::String,
@@ -1113,8 +1110,8 @@ pub trait Decoder<'de>: Sized {
     ///         C: Context<Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
-    ///         let data = if let Some(decoder) = decoder.decode_option()? {
-    ///             Some(<String as Decode<M>>::decode(decoder)?)
+    ///         let data = if let Some(decoder) = decoder.decode_option(cx)? {
+    ///             Some(<String as Decode<M>>::decode(cx, decoder)?)
     ///         } else {
     ///             None
     ///         };
@@ -1279,8 +1276,8 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use std::collections::HashMap;
     ///
-    /// use musli::de::{Decode, Decoder, PairsDecoder, PairDecoder};
-    /// use musli::mode::Mode;
+    /// use musli::{Context, Mode, Decode, Decoder};
+    /// use musli::de::{PairsDecoder, PairDecoder};
     ///
     /// struct MapStruct {
     ///     data: HashMap<String, u32>,
@@ -1292,16 +1289,16 @@ pub trait Decoder<'de>: Sized {
     ///         C: Context<Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut map = decoder.decode_map()?;
+    ///         let mut map = decoder.decode_map(cx)?;
     ///         let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
-    ///         while let Some(mut entry) = map.next()? {
-    ///             let key = entry.first().and_then(<String as Decode<M>>::decode)?;
-    ///             let value = entry.second().and_then(<u32 as Decode<M>>::decode)?;
+    ///         while let Some(mut entry) = map.next(cx)? {
+    ///             let key = entry.first(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
+    ///             let value = entry.second(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?;
     ///             data.insert(key, value);
     ///         }
     ///
-    ///         map.end()?;
+    ///         map.end(cx)?;
     ///
     ///         Ok(Self {
     ///             data

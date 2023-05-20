@@ -439,7 +439,7 @@ where
 {
     let decode_t_decode = &e.decode_t_decode;
     let decoder_t = &e.tokens.decoder_t;
-    let visit_string_fn = &e.tokens.visit_string_fn;
+    let visit_owned_fn = &e.tokens.visit_owned_fn;
 
     let patterns = patterns
         .into_iter()
@@ -448,7 +448,7 @@ where
     match tag_method {
         Some(TagMethod::String) => quote_spanned! {
             span =>
-            #decoder_t::decode_string(decoder, #ctx_var, #visit_string_fn(|#ctx_var, string| {
+            #decoder_t::decode_string(decoder, #ctx_var, #visit_owned_fn("a string field tag", |#ctx_var, string: &str| {
                 Ok(match string {
                     #(#patterns,)*
                     other => Outcome::Other(string.to_owned()),
@@ -837,7 +837,7 @@ fn string_variant_tag_decode(
     outputs: &[IndirectOutput],
 ) -> Result<(TokenStream, TokenStream)> {
     let decoder_t = &e.tokens.decoder_t;
-    let visit_string_fn = &e.tokens.visit_string_fn;
+    let visit_owned_fn = &e.tokens.visit_owned_fn;
     let fmt = &e.tokens.fmt;
     let patterns = outputs.iter().map(|o| o.as_arm());
 
@@ -845,7 +845,7 @@ fn string_variant_tag_decode(
     // decoders that owns the string.
     let decode_tag = quote_spanned! {
         span =>
-        #decoder_t::decode_string(#var, #ctx_var, #visit_string_fn(|#ctx_var, string| {
+        #decoder_t::decode_string(#var, #ctx_var, #visit_owned_fn("a string variant tag", |#ctx_var, string: &str| {
             Ok::<#output, _>(match string { #(#patterns,)* _ => #output::Err(string.into())})
         }))?
     };

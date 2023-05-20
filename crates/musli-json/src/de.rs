@@ -335,26 +335,20 @@ where
     }
 
     #[inline]
-    fn decode_number<V>(
-        mut self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_number<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: NumberVisitor<'de, Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: NumberVisitor<'de, C>,
     {
         self.parser.parse_number(cx, visitor)
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_bytes<V>(
-        self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_bytes<C, V>(self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         let mut seq = self.decode_sequence(cx)?;
         let mut bytes = Vec::with_capacity(seq.size_hint().or_default());
@@ -367,13 +361,10 @@ where
     }
 
     #[inline]
-    fn decode_string<V>(
-        mut self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_string<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, str>,
     {
         match self.parser.parse_string(cx, self.scratch, true)? {
             StringReference::Borrowed(borrowed) => visitor.visit_borrowed(cx, borrowed),
@@ -514,13 +505,10 @@ where
     }
 
     #[inline]
-    fn decode_escaped_bytes<V>(
-        mut self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_escaped_bytes<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = ParseError>,
+        C: Context<Input = ParseError>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         match self.parser.parse_string(cx, self.scratch, true)? {
             StringReference::Borrowed(string) => visitor.visit_borrowed(cx, string.as_bytes()),
@@ -541,15 +529,12 @@ impl<C, T> KeyUnsignedVisitor<C, T> {
     }
 }
 
-impl<'de, C, T> ValueVisitor<'de> for KeyUnsignedVisitor<C, T>
+impl<'de, C, T> ValueVisitor<'de, C, [u8]> for KeyUnsignedVisitor<C, T>
 where
     C: Context<Input = ParseError>,
     T: Unsigned,
 {
-    type Target = [u8];
     type Ok = T;
-    type Error = ParseError;
-    type Context = C;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -557,7 +542,7 @@ where
     }
 
     #[inline]
-    fn visit_ref(self, cx: &mut C, bytes: &Self::Target) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         integer::parse_unsigned(cx, &mut SliceParser::new(bytes))
     }
 }
@@ -574,15 +559,12 @@ impl<C, T> KeySignedVisitor<C, T> {
     }
 }
 
-impl<'de, C, T> ValueVisitor<'de> for KeySignedVisitor<C, T>
+impl<'de, C, T> ValueVisitor<'de, C, [u8]> for KeySignedVisitor<C, T>
 where
     C: Context<Input = ParseError>,
     T: Signed,
 {
-    type Target = [u8];
     type Ok = T;
-    type Error = ParseError;
-    type Context = C;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -590,7 +572,7 @@ where
     }
 
     #[inline]
-    fn visit_ref(self, cx: &mut C, bytes: &Self::Target) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         integer::parse_signed(cx, &mut SliceParser::new(bytes))
     }
 }
@@ -713,13 +695,10 @@ where
     }
 
     #[inline]
-    fn decode_string<V>(
-        self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_string<C, V>(self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
+        V: ValueVisitor<'de, C, str>,
+        C: Context<Input = Self::Error>,
     {
         JsonDecoder::new(self.scratch, self.parser).decode_string(cx, visitor)
     }

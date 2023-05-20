@@ -295,13 +295,10 @@ where
     }
 
     #[inline]
-    fn decode_bytes<V>(
-        mut self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_bytes<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, [u8]>,
     {
         let pos = self.reader.pos();
         let len = self.decode_prefix(cx, Kind::Bytes, pos)?;
@@ -309,24 +306,19 @@ where
     }
 
     #[inline]
-    fn decode_string<V>(
-        mut self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_string<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, Target = str, Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, str>,
     {
         struct Visitor<V>(V);
 
-        impl<'de, V> ValueVisitor<'de> for Visitor<V>
+        impl<'de, C, V> ValueVisitor<'de, C, [u8]> for Visitor<V>
         where
-            V: ValueVisitor<'de, Target = str>,
+            C: Context,
+            V: ValueVisitor<'de, C, str>,
         {
-            type Target = [u8];
             type Ok = V::Ok;
-            type Error = V::Error;
-            type Context = V::Context;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -335,32 +327,20 @@ where
 
             #[cfg(feature = "alloc")]
             #[inline]
-            fn visit_owned(
-                self,
-                cx: &mut Self::Context,
-                bytes: Vec<u8>,
-            ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
+            fn visit_owned(self, cx: &mut C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 let string =
                     musli_common::str::from_utf8_owned(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
-            fn visit_borrowed(
-                self,
-                cx: &mut Self::Context,
-                bytes: &'de [u8],
-            ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
+            fn visit_borrowed(self, cx: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 let string = musli_common::str::from_utf8(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
-            fn visit_ref(
-                self,
-                cx: &mut Self::Context,
-                bytes: &[u8],
-            ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
+            fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 let string = musli_common::str::from_utf8(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_ref(cx, string)
             }
@@ -414,13 +394,10 @@ where
     }
 
     #[inline]
-    fn decode_number<V>(
-        mut self,
-        cx: &mut V::Context,
-        visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context>::Error>
+    fn decode_number<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: NumberVisitor<'de, Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: NumberVisitor<'de, C>,
     {
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 

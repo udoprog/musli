@@ -2,7 +2,6 @@
 //! certain kind of value.
 
 use core::fmt;
-use core::marker;
 
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
@@ -10,7 +9,6 @@ use alloc::vec::Vec;
 use crate::compat::Bytes;
 use crate::de::{Decode, Decoder, ValueVisitor};
 use crate::en::{Encode, Encoder};
-use crate::error::Error;
 use crate::mode::Mode;
 use crate::Context;
 
@@ -38,17 +36,13 @@ where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
-        struct Visitor<C, E>(marker::PhantomData<(C, E)>);
+        struct Visitor;
 
-        impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
+        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
         where
-            C: Context<Input = E>,
-            E: Error,
+            C: Context,
         {
-            type Target = [u8];
             type Ok = Vec<u8>;
-            type Error = E;
-            type Context = C;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -66,9 +60,7 @@ where
             }
         }
 
-        decoder
-            .decode_bytes(cx, Visitor(marker::PhantomData))
-            .map(Bytes)
+        decoder.decode_bytes(cx, Visitor).map(Bytes)
     }
 }
 
