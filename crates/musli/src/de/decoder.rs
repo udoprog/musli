@@ -300,32 +300,26 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         let mut st = buffer.as_decoder(cx)?.decode_map(cx)?;
     ///
-    ///         let mut discriminant = None::<u32>;
+    ///         let discriminant = loop {
+    ///             let Some(mut e) = st.next(cx)? else {
+    ///                 return Err(cx.missing_variant_tag("MyVariantType"));
+    ///             };
     ///
-    ///         while let Some(mut e) = st.next(cx)? {
     ///             let found = e.first(cx)?.decode_string(cx, musli::utils::visit_owned_fn("a string that is 'type'", |cx: &mut C, string: &str| {
-    ///                 if (string == "type") {
-    ///                     Ok(true)
-    ///                 } else {
-    ///                     // store string for diagnostics later, in case you want to report an error related to it.
-    ///                     cx.store_string(string)
-    ///                     Ok(false)
-    ///                 }
+    ///                 Ok(string == "type")
     ///             }))?;
     ///
     ///             if found {
-    ///                 discriminant = Some(e.second(cx).and_then(|v| Decode::<M>::decode(cx, v))?);
-    ///                 break;
+    ///                 break e.second(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
     ///             }
-    ///         }
+    ///         };
     ///
     ///         st.end(cx)?;
     ///
     ///         match discriminant {
-    ///             Some(0) => Ok(MyVariantType::Variant1),
-    ///             Some(1) => Ok(MyVariantType::Variant2(buffer.as_decoder(cx).and_then(|v| Decode::<M>::decode(cx, v))?)),
-    ///             Some(other) => Err(cx.invalid_variant_tag("MyVariantType", other)),
-    ///             None => Err(cx.missing_variant_tag("MyVariantType")),
+    ///             0 => Ok(MyVariantType::Variant1),
+    ///             1 => Ok(MyVariantType::Variant2(buffer.as_decoder(cx).and_then(|v| Decode::<M>::decode(cx, v))?)),
+    ///             other => Err(cx.invalid_variant_tag("MyVariantType", other)),
     ///         }
     ///     }
     /// }
