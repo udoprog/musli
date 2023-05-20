@@ -75,7 +75,7 @@ where
     #[inline(always)]
     fn decode_unit<C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let pos = self.reader.pos();
         let count = L::decode_usize(cx, self.reader.pos_borrow_mut())?;
@@ -90,7 +90,7 @@ where
     #[inline(always)]
     fn decode_pack<C>(self, _: &mut C) -> Result<Self::Pack, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self)
     }
@@ -98,7 +98,7 @@ where
     #[inline(always)]
     fn decode_array<C, const N: usize>(mut self, cx: &mut C) -> Result<[u8; N], C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.reader.read_array(cx)
     }
@@ -108,7 +108,7 @@ where
         mut self,
         cx: &mut V::Context,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
@@ -121,7 +121,7 @@ where
         self,
         cx: &mut V::Context,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
@@ -147,7 +147,7 @@ where
                 self,
                 cx: &mut Self::Context,
                 bytes: Vec<u8>,
-            ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+            ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
                 let string =
                     musli_common::str::from_utf8_owned(bytes).map_err(|error| cx.custom(error))?;
                 self.0.visit_owned(cx, string)
@@ -158,7 +158,7 @@ where
                 self,
                 cx: &mut Self::Context,
                 bytes: &'de [u8],
-            ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+            ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
                 let string =
                     musli_common::str::from_utf8(bytes).map_err(|error| cx.custom(error))?;
                 self.0.visit_borrowed(cx, string)
@@ -169,7 +169,7 @@ where
                 self,
                 cx: &mut Self::Context,
                 bytes: &[u8],
-            ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+            ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
                 let string =
                     musli_common::str::from_utf8(bytes).map_err(|error| cx.custom(error))?;
                 self.0.visit_ref(cx, string)
@@ -182,7 +182,7 @@ where
     #[inline(always)]
     fn decode_bool<C>(mut self, cx: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let pos = self.reader.pos();
         let byte = self.reader.read_byte(cx)?;
@@ -197,7 +197,7 @@ where
     #[inline(always)]
     fn decode_char<C>(self, cx: &mut C) -> Result<char, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let pos = self.reader.pos();
         let num = self.decode_u32(cx)?;
@@ -211,7 +211,7 @@ where
     #[inline(always)]
     fn decode_u8<C>(mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.reader.read_byte(cx)
     }
@@ -219,7 +219,7 @@ where
     #[inline(always)]
     fn decode_u16<C>(self, cx: &mut C) -> Result<u16, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         I::decode_unsigned(cx, self.reader)
     }
@@ -227,7 +227,7 @@ where
     #[inline(always)]
     fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         I::decode_unsigned(cx, self.reader)
     }
@@ -235,7 +235,7 @@ where
     #[inline(always)]
     fn decode_u64<C>(self, cx: &mut C) -> Result<u64, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         I::decode_unsigned(cx, self.reader)
     }
@@ -243,7 +243,7 @@ where
     #[inline(always)]
     fn decode_u128<C>(self, cx: &mut C) -> Result<u128, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         I::decode_unsigned(cx, self.reader)
     }
@@ -251,7 +251,7 @@ where
     #[inline(always)]
     fn decode_i8<C>(self, cx: &mut C) -> Result<i8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self.decode_u8(cx)? as i8)
     }
@@ -259,7 +259,7 @@ where
     #[inline(always)]
     fn decode_i16<C>(self, cx: &mut C) -> Result<i16, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         I::decode_signed(cx, self.reader)
     }
@@ -267,7 +267,7 @@ where
     #[inline(always)]
     fn decode_i32<C>(self, cx: &mut C) -> Result<i32, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         I::decode_signed(cx, self.reader)
     }
@@ -275,7 +275,7 @@ where
     #[inline(always)]
     fn decode_i64<C>(self, cx: &mut C) -> Result<i64, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         I::decode_signed(cx, self.reader)
     }
@@ -283,7 +283,7 @@ where
     #[inline(always)]
     fn decode_i128<C>(self, cx: &mut C) -> Result<i128, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         I::decode_signed(cx, self.reader)
     }
@@ -291,7 +291,7 @@ where
     #[inline(always)]
     fn decode_usize<C>(self, cx: &mut C) -> Result<usize, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         L::decode_usize(cx, self.reader)
     }
@@ -299,7 +299,7 @@ where
     #[inline(always)]
     fn decode_isize<C>(self, cx: &mut C) -> Result<isize, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self.decode_usize(cx)? as isize)
     }
@@ -309,7 +309,7 @@ where
     #[inline(always)]
     fn decode_f32<C>(self, cx: &mut C) -> Result<f32, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let bits = self.decode_u32(cx)?;
         Ok(f32::from_bits(bits))
@@ -320,7 +320,7 @@ where
     #[inline(always)]
     fn decode_f64<C>(self, cx: &mut C) -> Result<f64, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let bits = self.decode_u64(cx)?;
         Ok(f64::from_bits(bits))
@@ -329,7 +329,7 @@ where
     #[inline]
     fn decode_option<C>(mut self, cx: &mut C) -> Result<Option<Self::Some>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let b = self.reader.read_byte(cx)?;
         Ok(if b == 1 { Some(self) } else { None })
@@ -338,7 +338,7 @@ where
     #[inline]
     fn decode_sequence<C>(self, cx: &mut C) -> Result<Self::Sequence, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         LimitedStorageDecoder::new(cx, self)
     }
@@ -346,7 +346,7 @@ where
     #[inline]
     fn decode_tuple<C>(self, _: &mut C, _: usize) -> Result<Self::Tuple, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self)
     }
@@ -354,7 +354,7 @@ where
     #[inline]
     fn decode_map<C>(self, cx: &mut C) -> Result<Self::Map, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         LimitedStorageDecoder::new(cx, self)
     }
@@ -362,7 +362,7 @@ where
     #[inline]
     fn decode_struct<C>(self, cx: &mut C, _: usize) -> Result<Self::Struct, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         LimitedStorageDecoder::new(cx, self)
     }
@@ -370,7 +370,7 @@ where
     #[inline]
     fn decode_variant<C>(self, _: &mut C) -> Result<Self::Variant, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self)
     }
@@ -388,7 +388,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
     }
@@ -396,7 +396,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(())
     }
@@ -411,7 +411,7 @@ where
     #[inline]
     fn new<C>(cx: &mut C, mut decoder: StorageDecoder<R, I, L>) -> Result<Self, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
     {
         let remaining = L::decode_usize(cx, &mut decoder.reader)?;
         Ok(Self { remaining, decoder })
@@ -435,7 +435,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.remaining == 0 {
             return Ok(None);
@@ -450,7 +450,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(())
     }
@@ -476,7 +476,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.remaining == 0 {
             return Ok(None);
@@ -491,7 +491,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(())
     }
@@ -510,7 +510,7 @@ where
     #[inline]
     fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
     }
@@ -518,7 +518,7 @@ where
     #[inline]
     fn second<C>(self, _: &mut C) -> Result<Self::Second, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self)
     }
@@ -526,7 +526,7 @@ where
     #[inline]
     fn skip_second<C>(self, _: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(false)
     }
@@ -545,7 +545,7 @@ where
     #[inline]
     fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
     }
@@ -553,7 +553,7 @@ where
     #[inline]
     fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
     }
@@ -561,7 +561,7 @@ where
     #[inline]
     fn skip_variant<C>(&mut self, _: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(false)
     }
@@ -569,7 +569,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(())
     }

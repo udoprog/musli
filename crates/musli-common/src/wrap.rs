@@ -37,7 +37,7 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.inner.write_all(bytes).map_err(|err| cx.custom(err))
     }

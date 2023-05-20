@@ -33,7 +33,7 @@ where
     /// Finish writing.
     pub fn finish<C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
     {
         if !self.buf.is_empty() {
             self.writer.write_bytes(cx, self.buf.as_slice())?;
@@ -58,7 +58,7 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.buf.remaining() < bytes.len() {
             self.writer.write_bytes(cx, self.buf.as_slice())?;

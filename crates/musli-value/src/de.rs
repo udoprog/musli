@@ -71,7 +71,7 @@ where
     #[inline]
     fn type_hint<C>(&mut self, _: &mut C) -> Result<TypeHint, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self.value.type_hint())
     }
@@ -79,7 +79,7 @@ where
     #[inline]
     fn decode_buffer<M, C>(self, _: &mut C) -> Result<Self::Buffer, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
         M: Mode,
     {
         Ok(AsValueDecoder::new(self.value.clone()))
@@ -88,7 +88,7 @@ where
     #[inline]
     fn decode_unit<C>(self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedUnit(hint), Value::Unit => Ok(()))
     }
@@ -96,7 +96,7 @@ where
     #[inline]
     fn decode_bool<C>(self, cx: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedBool(hint), Value::Bool(b) => Ok(*b))
     }
@@ -104,7 +104,7 @@ where
     #[inline]
     fn decode_char<C>(self, cx: &mut C) -> Result<char, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedChar(hint), Value::Char(c) => Ok(*c))
     }
@@ -112,7 +112,7 @@ where
     #[inline]
     fn decode_u8<C>(self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => {
             u8::from_number(n).map_err(|err| cx.report(err))
@@ -122,7 +122,7 @@ where
     #[inline]
     fn decode_u16<C>(self, cx: &mut C) -> Result<u16, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => {
             u16::from_number(n).map_err(|err| cx.report(err))
@@ -132,7 +132,7 @@ where
     #[inline]
     fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => {
             u32::from_number(n).map_err(|err| cx.report(err))
@@ -142,7 +142,7 @@ where
     #[inline]
     fn decode_u64<C>(self, cx: &mut C) -> Result<u64, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => {
             u64::from_number(n).map_err(|err| cx.report(err))
@@ -152,7 +152,7 @@ where
     #[inline]
     fn decode_u128<C>(self, cx: &mut C) -> Result<u128, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => {
             u128::from_number(n).map_err(|err| cx.report(err))
@@ -162,7 +162,7 @@ where
     #[inline]
     fn decode_i8<C>(self, cx: &mut C) -> Result<i8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => {
             i8::from_number(n).map_err(|err| cx.report(err))
@@ -172,7 +172,7 @@ where
     #[inline]
     fn decode_i16<C>(self, cx: &mut C) -> Result<i16, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => {
             i16::from_number(n).map_err(|err| cx.report(err))
@@ -182,7 +182,7 @@ where
     #[inline]
     fn decode_i32<C>(self, cx: &mut C) -> Result<i32, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => {
             i32::from_number(n).map_err(|err| cx.report(err))
@@ -192,7 +192,7 @@ where
     #[inline]
     fn decode_i64<C>(self, cx: &mut C) -> Result<i64, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => {
             i64::from_number(n).map_err(|err| cx.report(err))
@@ -202,7 +202,7 @@ where
     #[inline]
     fn decode_i128<C>(self, cx: &mut C) -> Result<i128, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => {
             i128::from_number(n).map_err(|err| cx.report(err))
@@ -212,7 +212,7 @@ where
     #[inline]
     fn decode_usize<C>(self, cx: &mut C) -> Result<usize, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => {
             usize::from_number(n).map_err(|err| cx.report(err))
@@ -222,7 +222,7 @@ where
     #[inline]
     fn decode_isize<C>(self, cx: &mut C) -> Result<isize, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => {
             isize::from_number(n).map_err(|error| cx.report(error))
@@ -232,7 +232,7 @@ where
     #[inline]
     fn decode_f32<C>(self, cx: &mut C) -> Result<f32, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::F32, hint), Value::Number(Number::F32(n)) => Ok(*n))
     }
@@ -240,7 +240,7 @@ where
     #[inline]
     fn decode_f64<C>(self, cx: &mut C) -> Result<f64, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::F64, hint), Value::Number(Number::F64(n)) => Ok(*n))
     }
@@ -249,7 +249,7 @@ where
     #[inline]
     fn decode_array<C, const N: usize>(self, cx: &mut C) -> Result<[u8; N], C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
             <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| cx.report(ValueError::ArrayOutOfBounds))
@@ -262,7 +262,7 @@ where
         self,
         cx: &mut V::Context,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<V::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
@@ -277,7 +277,7 @@ where
         self,
         cx: &mut V::Context,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<V::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = str, Error = Self::Error>,
     {
@@ -290,7 +290,7 @@ where
     #[inline]
     fn decode_option<C>(self, cx: &mut C) -> Result<Option<Self::Some>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedOption(hint), Value::Option(option) => {
             Ok(option.as_ref().map(|some| ValueDecoder::new(some)))
@@ -301,7 +301,7 @@ where
     #[inline]
     fn decode_pack<C>(self, cx: &mut C) -> Result<Self::Pack, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedPack(hint), Value::Bytes(pack) => {
             Ok(StorageDecoder::new(SliceReader::new(pack).with_position()))
@@ -312,7 +312,7 @@ where
     #[inline]
     fn decode_sequence<C>(self, cx: &mut C) -> Result<Self::Sequence, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
             Ok(IterValueDecoder::new(sequence))
@@ -323,7 +323,7 @@ where
     #[inline]
     fn decode_tuple<C>(self, cx: &mut C, _: usize) -> Result<Self::Tuple, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
             Ok(IterValueDecoder::new(sequence))
@@ -334,7 +334,7 @@ where
     #[inline]
     fn decode_map<C>(self, cx: &mut C) -> Result<Self::Map, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedMap(hint), Value::Map(map) => {
             Ok(IterValuePairsDecoder::new(map))
@@ -345,7 +345,7 @@ where
     #[inline]
     fn decode_struct<C>(self, cx: &mut C, _: usize) -> Result<Self::Struct, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedMap(hint), Value::Map(st) => {
             Ok(IterValuePairsDecoder::new(st))
@@ -356,7 +356,7 @@ where
     #[inline]
     fn decode_variant<C>(self, cx: &mut C) -> Result<Self::Variant, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedVariant(hint), Value::Variant(st) => {
             Ok(IterValueVariantDecoder::new(st))
@@ -366,7 +366,7 @@ where
     #[inline]
     fn decode_any<C, V>(self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
         V: Visitor<'de, Error = Self::Error>,
     {
         match self.value {
@@ -425,7 +425,7 @@ where
     #[inline]
     fn as_decoder<C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(ValueDecoder::new(self.value))
     }
@@ -462,7 +462,7 @@ where
     #[inline]
     fn next<C>(&mut self, cx: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self.iter.next() {
             Some(value) => Ok(ValueDecoder::new(value)),
@@ -473,7 +473,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(())
     }
@@ -497,7 +497,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self.iter.next() {
             Some(value) => Ok(Some(ValueDecoder::new(value))),
@@ -508,7 +508,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(())
     }
@@ -549,7 +549,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self.iter.next().map(IterValuePairDecoder::new))
     }
@@ -557,7 +557,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(())
     }
@@ -594,7 +594,7 @@ where
     #[inline]
     fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(ValueDecoder::new(&self.pair.0))
     }
@@ -602,7 +602,7 @@ where
     #[inline]
     fn second<C>(self, _: &mut C) -> Result<Self::Second, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(ValueDecoder::new(&self.pair.1))
     }
@@ -610,7 +610,7 @@ where
     #[inline]
     fn skip_second<C>(self, _: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(true)
     }
@@ -650,7 +650,7 @@ where
     #[inline]
     fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(ValueDecoder::new(&self.pair.0))
     }
@@ -658,7 +658,7 @@ where
     #[inline]
     fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(ValueDecoder::new(&self.pair.1))
     }
@@ -666,7 +666,7 @@ where
     #[inline]
     fn skip_variant<C>(&mut self, _: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(true)
     }
@@ -674,7 +674,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(())
     }

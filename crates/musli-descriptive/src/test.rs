@@ -33,7 +33,7 @@ where
 {
     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         let mut unpack = decoder.decode_pack(cx)?;

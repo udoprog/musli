@@ -31,7 +31,7 @@ pub trait ValueVisitor<'de>: Sized {
     /// The error produced.
     type Error: Error;
     /// The context associated with the value visitor.
-    type Context: Context<Self::Error>;
+    type Context: Context<Input = Self::Error>;
 
     /// Format an error indicating what was expected by this visitor.
     ///
@@ -44,7 +44,7 @@ pub trait ValueVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         value: <Self::Target as ToOwned>::Owned,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         self.visit_ref(cx, value.borrow())
     }
 
@@ -54,7 +54,7 @@ pub trait ValueVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         value: &'de Self::Target,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         self.visit_ref(cx, value)
     }
 
@@ -65,7 +65,7 @@ pub trait ValueVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: &Self::Target,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
             &ExpectingWrapper(self),
@@ -80,7 +80,7 @@ pub trait ValueVisitor<'de>: Sized {
         cx: &mut Self::Context,
         _: D,
         hint: TypeHint,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error>
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error>
     where
         D: Decoder<'de, Error = Self::Error>,
     {

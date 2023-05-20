@@ -11,7 +11,7 @@ pub fn visit_bytes_fn<'de, T, C, O, E>(
 ) -> impl ValueVisitor<'de, Context = C, Target = [u8], Ok = O, Error = E>
 where
     T: FnOnce(&mut C, &[u8]) -> Result<O, C::Error>,
-    C: Context<E>,
+    C: Context<Input = E>,
     E: Error,
 {
     FromFn {
@@ -28,7 +28,7 @@ struct FromFn<T, C, O, E> {
 impl<'de, T, C, O, E> ValueVisitor<'de> for FromFn<T, C, O, E>
 where
     T: FnOnce(&mut C, &[u8]) -> Result<O, C::Error>,
-    C: Context<E>,
+    C: Context<Input = E>,
     E: Error,
 {
     type Target = [u8];

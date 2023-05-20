@@ -12,7 +12,7 @@ pub trait NumberVisitor<'de>: Sized {
     /// An error type.
     type Error: Error;
     /// The context associated with the value visitor.
-    type Context: Context<Self::Error>;
+    type Context: Context<Input = Self::Error>;
 
     /// Format an error indicating what was expected by this visitor.
     ///
@@ -25,7 +25,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: u8,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned8,
             &ExpectingWrapper(self),
@@ -38,7 +38,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: u16,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned16,
             &ExpectingWrapper(self),
@@ -51,7 +51,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: u32,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned32,
             &ExpectingWrapper(self),
@@ -64,7 +64,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: u64,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned64,
             &ExpectingWrapper(self),
@@ -77,7 +77,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: u128,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned128,
             &ExpectingWrapper(self),
@@ -90,7 +90,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: i8,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed8,
             &ExpectingWrapper(self),
@@ -103,7 +103,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: i16,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed16,
             &ExpectingWrapper(self),
@@ -116,7 +116,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: i32,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed32,
             &ExpectingWrapper(self),
@@ -129,7 +129,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: i64,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed64,
             &ExpectingWrapper(self),
@@ -142,7 +142,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: i128,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed128,
             &ExpectingWrapper(self),
@@ -155,7 +155,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: f32,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Float32,
             &ExpectingWrapper(self),
@@ -168,7 +168,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: f64,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Float64,
             &ExpectingWrapper(self),
@@ -181,7 +181,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: usize,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Usize,
             &ExpectingWrapper(self),
@@ -194,7 +194,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: isize,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Isize,
             &ExpectingWrapper(self),
@@ -207,7 +207,7 @@ pub trait NumberVisitor<'de>: Sized {
         self,
         cx: &mut Self::Context,
         _: &'de [u8],
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error> {
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Number,
             &ExpectingWrapper(self),
@@ -222,7 +222,7 @@ pub trait NumberVisitor<'de>: Sized {
         cx: &mut Self::Context,
         _: D,
         hint: TypeHint,
-    ) -> Result<Self::Ok, <Self::Context as Context<Self::Error>>::Error>
+    ) -> Result<Self::Ok, <Self::Context as Context>::Error>
     where
         D: Decoder<'de, Error = Self::Error>,
     {

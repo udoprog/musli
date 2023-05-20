@@ -622,7 +622,7 @@
 //!     pub fn encode<M, C, E>(uuid: &CustomUuid, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
-//!         C: Context<E::Error>,
+//!         C: Context<Input = E::Error>,
 //!         E: Encoder,
 //!     {
 //!         Encode::<M>::encode(&uuid.0, cx, encoder)
@@ -631,7 +631,7 @@
 //!     pub fn decode<'de, M, C, D>(cx: &mut C, decoder: D) -> Result<CustomUuid, C::Error>
 //!     where
 //!         M: Mode,
-//!         C: Context<D::Error>,
+//!         C: Context<Input = D::Error>,
 //!         D: Decoder<'de>
 //!     {
 //!         Ok(CustomUuid(<u128 as Decode<M>>::decode(cx, decoder)?))
@@ -650,7 +650,7 @@
 //!     pub fn encode<M, C, E, T>(set: &HashSet<T>, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
-//!         C: Context<E::Error>,
+//!         C: Context<Input = E::Error>,
 //!         E: Encoder,
 //!         T: Encode<M> + Eq + Hash,
 //!     {
@@ -660,7 +660,7 @@
 //!     pub fn decode<'de, M, C, D, T>(cx: &mut C, decoder: D) -> Result<HashSet<T>, C::Error>
 //!     where
 //!         M: Mode,
-//!         C: Context<D::Error>,
+//!         C: Context<Input = D::Error>,
 //!         D: Decoder<'de>,
 //!         T: Decode<'de> + Eq + Hash,
 //!     {

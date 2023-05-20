@@ -55,7 +55,7 @@ pub(crate) fn parse_string_slice_reader<'de, 'sratch, C>(
     start: u32,
 ) -> Result<StringReference<'de, 'sratch>, C::Error>
 where
-    C: Context<ParseError>,
+    C: Context<Input = ParseError>,
 {
     // Index of the first byte not yet copied into the scratch space.
     let mut open = reader.index;
@@ -125,7 +125,7 @@ where
 #[inline]
 fn check_utf8<C>(cx: &mut C, bytes: &[u8], start: u32, pos: u32) -> Result<(), C::Error>
 where
-    C: Context<ParseError>,
+    C: Context<Input = ParseError>,
 {
     if musli_common::str::from_utf8(bytes).is_err() {
         Err(cx.report(ParseError::spanned(
@@ -147,7 +147,7 @@ fn parse_escape<C>(
     scratch: &mut Scratch,
 ) -> Result<bool, C::Error>
 where
-    C: Context<ParseError>,
+    C: Context<Input = ParseError>,
 {
     let start = parser.pos();
     let b = parser.read_byte(cx)?;
@@ -300,7 +300,7 @@ pub(crate) fn decode_hex_val(val: u8) -> Option<u16> {
 /// Specialized reader implementation from a slice.
 pub(crate) fn skip_string<'de, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
 where
-    C: Context<ParseError>,
+    C: Context<Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     loop {
@@ -337,7 +337,7 @@ where
 /// the previous byte read was a backslash.
 fn skip_escape<'de, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
 where
-    C: Context<ParseError>,
+    C: Context<Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let start = p.pos();

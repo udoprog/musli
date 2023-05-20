@@ -158,7 +158,7 @@ impl Types {
                     };
 
                     predicate.bounds.push(syn::TypeParamBound::Verbatim(quote!(
-                        musli::Context<Self::Error>
+                        musli::Context<Input = Self::Error>
                     )));
 
                     where_clause

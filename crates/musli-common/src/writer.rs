@@ -42,13 +42,13 @@ pub trait Writer {
     /// Write bytes to the current writer.
     fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>;
+        C: Context<Input = Self::Error>;
 
     /// Write a single byte.
     #[inline]
     fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.write_bytes(cx, &[b])
     }
@@ -57,7 +57,7 @@ pub trait Writer {
     #[inline]
     fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.write_bytes(cx, &array)
     }
@@ -78,7 +78,7 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         (*self).write_bytes(cx, bytes)
     }
@@ -86,7 +86,7 @@ where
     #[inline]
     fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         (*self).write_byte(cx, b)
     }
@@ -94,7 +94,7 @@ where
     #[inline]
     fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         (*self).write_array(cx, array)
     }
@@ -163,7 +163,7 @@ impl Writer for Buffer {
     #[inline]
     fn write_bytes<C>(&mut self, _: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.buf.extend_from_slice(bytes);
         Ok(())
@@ -172,7 +172,7 @@ impl Writer for Buffer {
     #[inline]
     fn write_byte<C>(&mut self, _: &mut C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.buf.push(b);
         Ok(())
@@ -181,7 +181,7 @@ impl Writer for Buffer {
     #[inline]
     fn write_array<C, const N: usize>(&mut self, _: &mut C, array: [u8; N]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.buf.extend_from_slice(&array[..]);
         Ok(())
@@ -201,7 +201,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_bytes<C>(&mut self, _: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.extend_from_slice(bytes);
         Ok(())
@@ -210,7 +210,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_byte<C>(&mut self, _: &mut C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.push(b);
         Ok(())
@@ -219,7 +219,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_array<C, const N: usize>(&mut self, _: &mut C, array: [u8; N]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.extend_from_slice(&array[..]);
         Ok(())
@@ -238,7 +238,7 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.len() < bytes.len() {
             return Err(cx.message(format_args!(
@@ -258,7 +258,7 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.is_empty() {
             return Err(cx.message(format_args!(
@@ -275,7 +275,7 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.len() < N {
             return Err(cx.message(format_args!(

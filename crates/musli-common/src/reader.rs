@@ -66,25 +66,25 @@ pub trait Reader<'de> {
     /// Skip over the given number of bytes.
     fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>;
+        C: Context<Input = Self::Error>;
 
     /// Peek the next value.
     fn peek<C>(&mut self, cx: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<Self::Error>;
+        C: Context<Input = Self::Error>;
 
     /// Read a slice into the given buffer.
     #[inline]
     fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         struct Visitor<'a, E, C>(&'a mut [u8], marker::PhantomData<(E, C)>);
 
         impl<'a, 'de, E, C> ValueVisitor<'de> for Visitor<'a, E, C>
         where
             E: Error,
-            C: Context<E>,
+            C: Context<Input = E>,
         {
             type Target = [u8];
             type Ok = ();
@@ -129,7 +129,7 @@ pub trait Reader<'de> {
         cx: &mut V::Context,
         n: usize,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>;
 
@@ -137,7 +137,7 @@ pub trait Reader<'de> {
     #[inline]
     fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let [byte] = self.read_array::<C, 1>(cx)?;
         Ok(byte)
@@ -147,14 +147,14 @@ pub trait Reader<'de> {
     #[inline]
     fn read_array<C, const N: usize>(&mut self, cx: &mut C) -> Result<[u8; N], C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         struct Visitor<const N: usize, E, C>([u8; N], marker::PhantomData<(E, C)>);
 
         impl<'de, const N: usize, E, C> ValueVisitor<'de> for Visitor<N, E, C>
         where
             E: Error,
-            C: Context<E>,
+            C: Context<Input = E>,
         {
             type Target = [u8];
             type Ok = [u8; N];
@@ -225,7 +225,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.len() < n {
             return Err(cx.custom("buffer underflow"));
@@ -239,7 +239,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.len() < buf.len() {
             return Err(cx.custom("buffer underflow"));
@@ -257,7 +257,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         cx: &mut V::Context,
         n: usize,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
@@ -273,7 +273,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let &[first, ref tail @ ..] = *self else {
             return Err(cx.custom("buffer underflow"));
@@ -286,7 +286,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn read_array<C, const N: usize>(&mut self, cx: &mut C) -> Result<[u8; N], C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.len() < N {
             return Err(cx.custom("buffer underflow"));
@@ -301,7 +301,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn peek<C>(&mut self, _: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Ok(self.first().copied())
     }
@@ -340,7 +340,7 @@ where
     #[inline]
     fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.range.start = bounds_check_add(cx, &self.range, n)?;
         Ok(())
@@ -352,7 +352,7 @@ where
         cx: &mut V::Context,
         n: usize,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
@@ -368,7 +368,7 @@ where
     #[inline]
     fn peek<C>(&mut self, _: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if self.range.start == self.range.end {
             return Ok(None);
@@ -381,7 +381,7 @@ where
     #[inline]
     fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let outcome = bounds_check_add(cx, &self.range, buf.len())?;
 
@@ -401,7 +401,7 @@ fn bounds_check_add<C, E>(
     len: usize,
 ) -> Result<*const u8, C::Error>
 where
-    C: Context<E>,
+    C: Context<Input = E>,
     E: Error,
 {
     let outcome = range.start.wrapping_add(len);
@@ -454,7 +454,7 @@ where
     #[inline]
     fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.reader.skip(cx, n)?;
         self.pos += n;
@@ -467,7 +467,7 @@ where
         cx: &mut V::Context,
         n: usize,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
@@ -479,7 +479,7 @@ where
     #[inline]
     fn peek<C>(&mut self, cx: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.reader.peek(cx)
     }
@@ -487,7 +487,7 @@ where
     #[inline]
     fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.reader.read(cx, buf)?;
         self.pos += buf.len();
@@ -497,7 +497,7 @@ where
     #[inline]
     fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let b = self.reader.read_byte(cx)?;
         self.pos += 1;
@@ -507,7 +507,7 @@ where
     #[inline]
     fn read_array<C, const N: usize>(&mut self, cx: &mut C) -> Result<[u8; N], C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         let array = self.reader.read_array(cx)?;
         self.pos += N;
@@ -529,7 +529,7 @@ where
 {
     fn bounds_check<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
     {
         match self.remaining.checked_sub(n) {
             Some(remaining) => {
@@ -574,7 +574,7 @@ where
     #[inline]
     fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.bounds_check(cx, n)?;
         self.reader.skip(cx, n)
@@ -586,7 +586,7 @@ where
         cx: &mut V::Context,
         n: usize,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
@@ -597,7 +597,7 @@ where
     #[inline]
     fn peek<C>(&mut self, cx: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.reader.peek(cx)
     }
@@ -605,7 +605,7 @@ where
     #[inline]
     fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.bounds_check(cx, buf.len())?;
         self.reader.read(cx, buf)
@@ -614,7 +614,7 @@ where
     #[inline]
     fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.bounds_check(cx, 1)?;
         self.reader.read_byte(cx)
@@ -623,7 +623,7 @@ where
     #[inline]
     fn read_array<C, const N: usize>(&mut self, cx: &mut C) -> Result<[u8; N], C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         self.bounds_check(cx, N)?;
         self.reader.read_array(cx)
@@ -665,7 +665,7 @@ where
     #[inline]
     fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         (**self).skip(cx, n)
     }
@@ -676,7 +676,7 @@ where
         cx: &mut V::Context,
         n: usize,
         visitor: V,
-    ) -> Result<V::Ok, <V::Context as Context<Self::Error>>::Error>
+    ) -> Result<V::Ok, <V::Context as Context>::Error>
     where
         V: ValueVisitor<'de, Target = [u8], Error = Self::Error>,
     {
@@ -686,7 +686,7 @@ where
     #[inline]
     fn peek<C>(&mut self, cx: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         (**self).peek(cx)
     }
@@ -694,7 +694,7 @@ where
     #[inline]
     fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         (**self).read(cx, buf)
     }
@@ -702,7 +702,7 @@ where
     #[inline]
     fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         (**self).read_byte(cx)
     }
@@ -710,7 +710,7 @@ where
     #[inline]
     fn read_array<C, const N: usize>(&mut self, cx: &mut C) -> Result<[u8; N], C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         (**self).read_array(cx)
     }

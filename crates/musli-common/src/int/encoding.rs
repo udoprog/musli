@@ -32,21 +32,21 @@ pub trait IntegerEncoding:
     /// Governs how unsigned integers are encoded into a [Writer].
     fn encode_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
         T: ByteOrderIo;
 
     /// Governs how unsigned integers are decoded from a [Reader].
     fn decode_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo;
 
     /// Governs how signed integers are encoded into a [Writer].
     fn encode_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo;
@@ -54,7 +54,7 @@ pub trait IntegerEncoding:
     /// Governs how signed integers are decoded from a [Reader].
     fn decode_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>;
@@ -66,13 +66,13 @@ pub trait UsizeEncoding: private::Sealed {
     /// Governs how usize lengths are encoded into a [Writer].
     fn encode_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer;
 
     /// Governs how usize lengths are decoded from a [Reader].
     fn decode_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>;
 }
 
@@ -82,7 +82,7 @@ impl IntegerEncoding for Variable {
     #[inline]
     fn encode_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
         T: Unsigned,
     {
@@ -92,7 +92,7 @@ impl IntegerEncoding for Variable {
     #[inline]
     fn decode_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
         T: Unsigned,
     {
@@ -102,7 +102,7 @@ impl IntegerEncoding for Variable {
     #[inline]
     fn encode_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
         T: Signed,
     {
@@ -112,7 +112,7 @@ impl IntegerEncoding for Variable {
     #[inline]
     fn decode_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: Unsigned<Signed = T>,
@@ -126,7 +126,7 @@ impl UsizeEncoding for Variable {
     #[inline]
     fn encode_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
     {
         c::encode(cx, writer, value)
@@ -135,7 +135,7 @@ impl UsizeEncoding for Variable {
     #[inline]
     fn decode_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
     {
         c::decode(cx, reader)
@@ -149,7 +149,7 @@ where
     #[inline]
     fn encode_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
         T: ByteOrderIo,
     {
@@ -159,7 +159,7 @@ where
     #[inline]
     fn decode_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo,
     {
@@ -169,7 +169,7 @@ where
     #[inline]
     fn encode_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo,
@@ -180,7 +180,7 @@ where
     #[inline]
     fn decode_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>,
@@ -201,7 +201,7 @@ where
     #[inline]
     fn encode_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
     {
         let value: L = value.try_into().map_err(|err| cx.custom(err))?;
@@ -211,7 +211,7 @@ where
     #[inline]
     fn decode_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
     {
         usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?)

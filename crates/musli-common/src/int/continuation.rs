@@ -34,7 +34,7 @@ const CONT_BYTE: u8 = 0b1000_0000;
 #[inline(never)]
 pub fn decode<'de, C, R, T>(cx: &mut C, mut r: R) -> Result<T, C::Error>
 where
-    C: Context<R::Error>,
+    C: Context<Input = R::Error>,
     R: Reader<'de>,
     T: int::Unsigned,
 {
@@ -65,7 +65,7 @@ where
 #[inline(never)]
 pub fn encode<C, W, T>(cx: &mut C, mut w: W, mut value: T) -> Result<(), C::Error>
 where
-    C: Context<W::Error>,
+    C: Context<Input = W::Error>,
     W: Writer,
     T: int::Unsigned,
 {

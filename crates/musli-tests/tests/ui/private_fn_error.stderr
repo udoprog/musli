@@ -10,7 +10,7 @@ note: the function `decode` is defined here
 22 | /     fn decode<'de, M, C, D, T, const N: usize>(cx: &mut C, decoder: D) -> Result<[T; N], C::Error>
 23 | |     where
 24 | |         M: Mode,
-25 | |         C: Context<D::Error>,
+25 | |         C: Context<Input = D::Error>,
 ...  |
 28 | |         todo!()
 29 | |     }

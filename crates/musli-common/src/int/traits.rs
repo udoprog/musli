@@ -66,14 +66,14 @@ pub trait ByteOrderIo: Unsigned {
     /// encoding.
     fn write_bytes_unsigned<C, W, B>(self, cx: &mut C, writer: W) -> Result<(), C::Error>
     where
-        C: Context<W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
         B: ByteOrder;
 
     /// Read the current value from the reader in little-endian encoding.
     fn read_bytes_unsigned<'de, C, R, B>(cx: &mut C, reader: R) -> Result<Self, C::Error>
     where
-        C: Context<R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
         B: ByteOrder;
 }
@@ -181,7 +181,7 @@ macro_rules! implement_io {
                 mut writer: W,
             ) -> Result<(), C::Error>
             where
-                C: Context<W::Error>,
+                C: Context<Input = W::Error>,
                 W: Writer,
                 B: ByteOrder,
             {
@@ -194,7 +194,7 @@ macro_rules! implement_io {
                 mut reader: R,
             ) -> Result<Self, C::Error>
             where
-                C: Context<R::Error>,
+                C: Context<Input = R::Error>,
                 R: Reader<'de>,
                 B: ByteOrder,
             {

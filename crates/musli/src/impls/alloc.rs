@@ -28,7 +28,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         Encode::<M>::encode(self.as_str(), cx, encoder)
@@ -42,14 +42,14 @@ where
     #[inline]
     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         struct Visitor<C, E>(marker::PhantomData<(C, E)>);
 
         impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
         where
-            C: Context<E>,
+            C: Context<Input = E>,
             E: Error,
         {
             type Target = str;
@@ -89,7 +89,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         Encode::<M>::encode(self.as_ref(), cx, encoder)
@@ -103,7 +103,7 @@ where
     #[inline]
     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         Ok(<String as Decode<M>>::decode(cx, decoder)?.into())
@@ -119,7 +119,7 @@ macro_rules! cow {
             #[inline]
             fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<E::Error>,
+                C: Context<Input = E::Error>,
                 E: Encoder,
             {
                 Encode::<M>::encode(self.as_ref(), cx, encoder)
@@ -133,14 +133,14 @@ macro_rules! cow {
             #[inline]
             fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<D::Error>,
+                C: Context<Input = D::Error>,
                 D: Decoder<'de>,
             {
                 struct Visitor<C, E>(marker::PhantomData<(C, E)>);
 
                 impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
                 where
-                    C: Context<E>,
+                    C: Context<Input = E>,
                     E: Error,
                 {
                     type Target = $source;
@@ -217,7 +217,7 @@ macro_rules! sequence {
             #[inline]
             fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<E::Error>,
+                C: Context<Input = E::Error>,
                 E: Encoder,
             {
                 let mut seq = encoder.encode_sequence(cx, self.len())?;
@@ -240,7 +240,7 @@ macro_rules! sequence {
             #[inline]
             fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<D::Error>,
+                C: Context<Input = D::Error>,
                 D: Decoder<'de>,
             {
                 let mut $access = decoder.decode_sequence(cx)?;
@@ -299,7 +299,7 @@ macro_rules! map {
             #[inline]
             fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<E::Error>,
+                C: Context<Input = E::Error>,
                 E: Encoder,
             {
                 let mut map = encoder.encode_map(cx, self.len())?;
@@ -327,7 +327,7 @@ macro_rules! map {
             #[inline]
             fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<D::Error>,
+                C: Context<Input = D::Error>,
                 D: Decoder<'de>,
             {
                 let mut $access = decoder.decode_map(cx)?;
@@ -362,7 +362,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         encoder.encode_bytes(cx, self.to_bytes_with_nul())
@@ -376,14 +376,14 @@ where
     #[inline]
     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         struct Visitor<C, E>(marker::PhantomData<(C, E)>);
 
         impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
         where
-            C: Context<E>,
+            C: Context<Input = E>,
             E: Error,
         {
             type Target = [u8];

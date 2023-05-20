@@ -52,9 +52,9 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
         #[automatically_derived]
         impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
-            fn encode<C, E>(&self, #ctx_var: &mut C, #var: E) -> Result<<E as #encoder_t>::Ok, <C as #context_t<<E as #encoder_t>::Error>>::Error>
+            fn encode<C, E>(&self, #ctx_var: &mut C, #var: E) -> Result<<E as #encoder_t>::Ok, <C as #context_t>::Error>
             where
-                C: #context_t<<E as #encoder_t>::Error>,
+                C: #context_t<Input = <E as #encoder_t>::Error>,
                 E: #encoder_t
             {
                 #body

@@ -22,7 +22,7 @@ mod array {
     fn decode<'de, M, C, D, T, const N: usize>(cx: &mut C, decoder: D) -> Result<[T; N], C::Error>
     where
         M: Mode,
-        C: Context<D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         todo!()

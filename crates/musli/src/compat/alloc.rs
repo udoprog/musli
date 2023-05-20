@@ -21,7 +21,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         encoder.encode_bytes(cx, self.0.as_slice())
@@ -35,14 +35,14 @@ where
     #[inline]
     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         struct Visitor<C, E>(marker::PhantomData<(C, E)>);
 
         impl<'de, C, E> ValueVisitor<'de> for Visitor<C, E>
         where
-            C: Context<E>,
+            C: Context<Input = E>,
             E: Error,
         {
             type Target = [u8];
@@ -79,7 +79,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         let (first, second) = self.0.as_slices();
@@ -94,7 +94,7 @@ where
     #[inline]
     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         <Bytes<Vec<u8>> as Decode<M>>::decode(cx, decoder)

@@ -69,9 +69,9 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         #[allow(clippy::let_unit_value)]
         impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #original_generics #where_clause {
             #[inline]
-            fn decode<C, D>(#ctx_var: &mut C, #root_decoder_var: D) -> #core_result<Self, <C as #context_t<<D as #decoder_t<#lt>>::Error>>::Error>
+            fn decode<C, D>(#ctx_var: &mut C, #root_decoder_var: D) -> #core_result<Self, <C as #context_t>::Error>
             where
-                C: #context_t<<D as #decoder_t<#lt>>::Error>,
+                C: #context_t<Input = <D as #decoder_t<#lt>>::Error>,
                 D: #decoder_t<#lt>
             {
                 #body

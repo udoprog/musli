@@ -12,7 +12,7 @@ where
     /// Encode the given output.
     fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder;
 }
 
@@ -24,7 +24,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         T::encode(*self, cx, encoder)
@@ -39,7 +39,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         T::encode(*self, cx, encoder)

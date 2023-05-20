@@ -154,7 +154,7 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if !self.extend_from_slice(bytes) {
             return Err(cx.message(format_args! {
@@ -171,7 +171,7 @@ where
     #[inline(always)]
     fn write_array<C, const U: usize>(&mut self, cx: &mut C, array: [u8; U]) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if U > N.saturating_sub(self.init) {
             return Err(cx.message(format_args! {

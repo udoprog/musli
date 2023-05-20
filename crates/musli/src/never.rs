@@ -46,7 +46,7 @@ pub enum NeverMarker {}
 ///
 ///     fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
 ///     where
-///         C: Context<Self::Error>
+///         C: Context<Input = Self::Error>
 ///     {
 ///         if self.0 == 42 {
 ///             return Ok(self.0);
@@ -96,7 +96,7 @@ where
     #[inline]
     fn as_decoder<C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -117,7 +117,7 @@ where
     #[inline]
     fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -125,7 +125,7 @@ where
     #[inline]
     fn second<C>(self, _: &mut C) -> Result<Self::Second, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -133,7 +133,7 @@ where
     #[inline]
     fn skip_second<C>(self, _: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -154,7 +154,7 @@ where
     #[inline]
     fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -162,7 +162,7 @@ where
     #[inline]
     fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -170,7 +170,7 @@ where
     #[inline]
     fn skip_variant<C>(&mut self, _: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -178,7 +178,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -202,7 +202,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -210,7 +210,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -234,7 +234,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -242,7 +242,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -261,7 +261,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -269,7 +269,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -298,7 +298,7 @@ where
 
 impl<'de, O, E, C> NumberVisitor<'de> for Never<O, E, C>
 where
-    C: Context<E>,
+    C: Context<Input = E>,
     E: Error,
 {
     type Ok = O;
@@ -313,7 +313,7 @@ where
 impl<'de, O, E, T, C> ValueVisitor<'de> for Never<O, E, T, C>
 where
     T: ?Sized + ToOwned,
-    C: Context<E>,
+    C: Context<Input = E>,
     E: Error,
 {
     type Target = T;
@@ -340,7 +340,7 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
     where
-        C: Context<E>,
+        C: Context<Input = E>,
     {
         match self._never {}
     }
@@ -348,7 +348,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<E>,
+        C: Context<Input = E>,
     {
         match self._never {}
     }
@@ -365,14 +365,14 @@ where
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -392,7 +392,7 @@ where
     #[inline]
     fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -400,7 +400,7 @@ where
     #[inline]
     fn second<C>(&mut self, _: &mut C) -> Result<Self::Second<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -408,7 +408,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -428,7 +428,7 @@ where
     #[inline]
     fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -436,7 +436,7 @@ where
     #[inline]
     fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -444,7 +444,7 @@ where
     #[inline]
     fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }

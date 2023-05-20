@@ -6,13 +6,13 @@ use crate::error::Error;
 use crate::Context;
 
 /// Construct an anonymous string visitor from a function.
-pub fn visit_string_fn<'de, T, C, O, E>(
+pub fn visit_string_fn<'de, T, C, O>(
     function: T,
-) -> impl ValueVisitor<'de, Context = C, Target = str, Ok = O, Error = E>
+) -> impl ValueVisitor<'de, Context = C, Target = str, Ok = O, Error = C::Input>
 where
     T: FnOnce(&mut C, &str) -> Result<O, C::Error>,
-    C: Context<E>,
-    E: Error,
+    C: Context,
+    C::Input: Error,
 {
     FromFn {
         function,
@@ -20,20 +20,20 @@ where
     }
 }
 
-struct FromFn<T, C, O, E> {
+struct FromFn<T, C, O> {
     function: T,
-    _marker: marker::PhantomData<(C, O, E)>,
+    _marker: marker::PhantomData<(C, O)>,
 }
 
-impl<'de, T, C, O, E> ValueVisitor<'de> for FromFn<T, C, O, E>
+impl<'de, T, C, O> ValueVisitor<'de> for FromFn<T, C, O>
 where
     T: FnOnce(&mut C, &str) -> Result<O, C::Error>,
-    C: Context<E>,
-    E: Error,
+    C: Context,
+    C::Input: Error,
 {
     type Target = str;
     type Ok = O;
-    type Error = E;
+    type Error = C::Input;
     type Context = C;
 
     #[inline]
@@ -42,14 +42,7 @@ where
     }
 
     #[inline]
-    fn visit_ref(
-        self,
-        cx: &mut C,
-        string: &Self::Target,
-    ) -> Result<Self::Ok, <C as Context<Self::Error>>::Error>
-    where
-        C: Context<Self::Error>,
-    {
+    fn visit_ref(self, cx: &mut C, string: &Self::Target) -> Result<Self::Ok, C::Error> {
         (self.function)(cx, string)
     }
 }

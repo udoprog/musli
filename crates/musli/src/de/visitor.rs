@@ -23,15 +23,15 @@ pub trait Visitor<'de>: Sized {
     /// String decoder to use.
     type String<C>: ValueVisitor<'de, Target = str, Ok = Self::Ok, Error = Self::Error, Context = C>
     where
-        C: Context<Self::Error>;
+        C: Context<Input = Self::Error>;
     /// Bytes decoder to use.
     type Bytes<C>: ValueVisitor<'de, Target = [u8], Ok = Self::Ok, Error = Self::Error, Context = C>
     where
-        C: Context<Self::Error>;
+        C: Context<Input = Self::Error>;
     /// Number decoder to use.
     type Number<C>: NumberVisitor<'de, Ok = Self::Ok, Error = Self::Error, Context = C>
     where
-        C: Context<Self::Error>;
+        C: Context<Input = Self::Error>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::visitor]`][crate::visitor] attribute
@@ -47,7 +47,7 @@ pub trait Visitor<'de>: Sized {
     /// or the underlying format doesn't know which type to decode.
     fn visit_any<C, D>(self, cx: &mut C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
         D: Decoder<'de, Error = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(&hint, &ExpectingWrapper(self))))
@@ -57,7 +57,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_unit<C>(self, cx: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Unit,
@@ -69,7 +69,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_bool<C>(self, cx: &mut C, _: bool) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Bool,
@@ -81,7 +81,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_char<C>(self, cx: &mut C, _: char) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Char,
@@ -93,7 +93,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_u8<C>(self, cx: &mut C, _: u8) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Unsigned8,
@@ -105,7 +105,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_u16<C>(self, cx: &mut C, _: u16) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Unsigned16,
@@ -117,7 +117,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_u32<C>(self, cx: &mut C, _: u32) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Unsigned32,
@@ -129,7 +129,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_u64<C>(self, cx: &mut C, _: u64) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Unsigned64,
@@ -141,7 +141,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_u128<C>(self, cx: &mut C, _: u128) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Unsigned128,
@@ -153,7 +153,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_i8<C>(self, cx: &mut C, _: i8) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Signed8,
@@ -165,7 +165,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_i16<C>(self, cx: &mut C, _: i16) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Signed16,
@@ -177,7 +177,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_i32<C>(self, cx: &mut C, _: i32) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Signed32,
@@ -189,7 +189,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_i64<C>(self, cx: &mut C, _: i64) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Signed64,
@@ -201,7 +201,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_i128<C>(self, cx: &mut C, _: i128) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Signed128,
@@ -213,7 +213,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_usize<C>(self, cx: &mut C, _: usize) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Usize,
@@ -225,7 +225,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_isize<C>(self, cx: &mut C, _: isize) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Isize,
@@ -237,7 +237,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_f32<C>(self, cx: &mut C, _: f32) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Float32,
@@ -249,7 +249,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_f64<C>(self, cx: &mut C, _: f64) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Float64,
@@ -261,7 +261,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_option<C, D>(self, cx: &mut C, _: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
         D: Decoder<'de, Error = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
@@ -274,7 +274,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_sequence<C, D>(self, cx: &mut C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
         D: SequenceDecoder<'de, Error = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
@@ -287,7 +287,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_map<C, D>(self, cx: &mut C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
         D: PairsDecoder<'de, Error = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
@@ -300,7 +300,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_string<C>(self, cx: &mut C, hint: SizeHint) -> Result<Self::String<C>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::StringWith(hint),
@@ -312,7 +312,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_bytes<C>(self, cx: &mut C, hint: SizeHint) -> Result<Self::Bytes<C>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::BytesWith(hint),
@@ -324,7 +324,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_number<C>(self, cx: &mut C, hint: NumberHint) -> Result<Self::Number<C>, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::NumberWith(hint),
@@ -336,7 +336,7 @@ pub trait Visitor<'de>: Sized {
     #[inline]
     fn visit_variant<C, D>(self, cx: &mut C, _: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Self::Error>,
+        C: Context<Input = Self::Error>,
         D: VariantDecoder<'de, Error = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(

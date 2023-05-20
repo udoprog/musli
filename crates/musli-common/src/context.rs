@@ -21,10 +21,11 @@ impl<E> Default for Same<E> {
     }
 }
 
-impl<E> Context<E> for Same<E>
+impl<E> Context for Same<E>
 where
     E: Error,
 {
+    type Input = E;
     type Error = E;
 
     #[inline(always)]
@@ -83,7 +84,8 @@ where
     }
 }
 
-impl<E> Context<E> for Ignore<E> {
+impl<E> Context for Ignore<E> {
+    type Input = E;
     type Error = de::Error;
 
     #[inline(always)]
@@ -133,10 +135,11 @@ where
     }
 }
 
-impl<E> Context<E> for Capture<E>
+impl<E> Context for Capture<E>
 where
     E: Error,
 {
+    type Input = E;
     type Error = de::Error;
 
     #[inline(always)]

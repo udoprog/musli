@@ -3,14 +3,16 @@ use core::fmt;
 /// Provides ergonomic access to the serialization context.
 ///
 /// This is used to among other things report diagnostics.
-pub trait Context<E> {
+pub trait Context {
+    /// The error type which is collected by the context.
+    type Input;
     /// Error produced by context.
     type Error;
 
     /// Report the given encoding error.
     fn report<T>(&mut self, error: T) -> Self::Error
     where
-        E: From<T>;
+        Self::Input: From<T>;
 
     /// Report a custom error.
     fn custom<T>(&mut self, error: T) -> Self::Error
