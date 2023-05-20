@@ -229,7 +229,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_unit()
+    ///         encoder.encode_unit(cx)
     ///     }
     /// }
     /// ```
@@ -261,7 +261,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_bool(self.data)
+    ///         encoder.encode_bool(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -293,7 +293,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_char(self.data)
+    ///         encoder.encode_char(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -325,7 +325,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_u8(self.data)
+    ///         encoder.encode_u8(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -357,7 +357,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_u16(self.data)
+    ///         encoder.encode_u16(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -389,7 +389,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_u32(self.data)
+    ///         encoder.encode_u32(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -421,7 +421,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_u64(self.data)
+    ///         encoder.encode_u64(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -453,7 +453,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_u128(self.data)
+    ///         encoder.encode_u128(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -485,7 +485,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_i8(self.data)
+    ///         encoder.encode_i8(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -517,7 +517,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_i16(self.data)
+    ///         encoder.encode_i16(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -549,7 +549,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_i32(self.data)
+    ///         encoder.encode_i32(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -581,7 +581,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_i64(self.data)
+    ///         encoder.encode_i64(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -613,7 +613,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_i128(self.data)
+    ///         encoder.encode_i128(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -645,7 +645,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_usize(self.data)
+    ///         encoder.encode_usize(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -677,7 +677,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_isize(self.data)
+    ///         encoder.encode_isize(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -709,7 +709,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_f32(self.data)
+    ///         encoder.encode_f32(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -741,7 +741,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_f64(self.data)
+    ///         encoder.encode_f64(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -773,7 +773,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_array(self.data)
+    ///         encoder.encode_array(cx, self.data)
     ///     }
     /// }
     /// ```
@@ -805,7 +805,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_bytes(self.data.as_slice())
+    ///         encoder.encode_bytes(cx, self.data.as_slice())
     ///     }
     /// }
     /// ```
@@ -845,7 +845,7 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         let (first, second) = self.data.as_slices();
-    ///         encoder.encode_bytes_vectored(&[first, second])
+    ///         encoder.encode_bytes_vectored(cx, &[first, second])
     ///     }
     /// }
     /// ```
@@ -877,7 +877,7 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         encoder.encode_string(self.data.as_str())
+    ///         encoder.encode_string(cx, self.data.as_str())
     ///     }
     /// }
     /// ```
@@ -911,10 +911,10 @@ pub trait Encoder: Sized {
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some().and_then(|e| Encode::<M>::encode(data, e))
+    ///                 encoder.encode_some(cx).and_then(|e| Encode::<M>::encode(data, cx, e))
     ///             }
     ///             None => {
-    ///                 encoder.encode_none()
+    ///                 encoder.encode_none(cx)
     ///             }
     ///         }
     ///     }
@@ -950,10 +950,10 @@ pub trait Encoder: Sized {
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some().and_then(|e| Encode::<M>::encode(data, e))
+    ///                 encoder.encode_some(cx).and_then(|e| Encode::<M>::encode(data, cx, e))
     ///             }
     ///             None => {
-    ///                 encoder.encode_none()
+    ///                 encoder.encode_none(cx)
     ///             }
     ///         }
     ///     }
@@ -980,6 +980,7 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
+    /// use musli::Context;
     /// use musli::en::{Encode, Encoder, SequenceEncoder};
     /// use musli::mode::Mode;
     ///
@@ -994,10 +995,10 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         let mut pack = encoder.encode_pack()?;
-    ///         pack.next()?.encode_u32(self.field)?;
-    ///         pack.next()?.encode_array(self.data)?;
-    ///         pack.end()
+    ///         let mut pack = encoder.encode_pack(cx)?;
+    ///         pack.next(cx)?.encode_u32(cx, self.field)?;
+    ///         pack.next(cx)?.encode_array(cx, self.data)?;
+    ///         pack.end(cx)
     ///     }
     /// }
     /// ```
@@ -1023,6 +1024,7 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
+    /// use musli::Context;
     /// use musli::en::{Encode, Encoder, SequenceEncoder};
     /// use musli::mode::Mode;
     ///
@@ -1036,13 +1038,13 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         let mut seq = encoder.encode_sequence(self.data.len())?;
+    ///         let mut seq = encoder.encode_sequence(cx, self.data.len())?;
     ///
     ///         for element in &self.data {
-    ///             seq.push::<M, _>(element)?;
+    ///             seq.push::<M, _, _>(cx, element)?;
     ///         }
     ///
-    ///         seq.end()
+    ///         seq.end(cx)
     ///     }
     /// }
     /// ```
@@ -1074,6 +1076,7 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
+    /// use musli::Context;
     /// use musli::en::{Encode, Encoder, SequenceEncoder};
     /// use musli::mode::Mode;
     ///
@@ -1085,10 +1088,10 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         let mut tuple = encoder.encode_tuple(2)?;
-    ///         tuple.next()?.encode_u32(self.0)?;
-    ///         tuple.next()?.encode_array(self.1)?;
-    ///         tuple.end()
+    ///         let mut tuple = encoder.encode_tuple(cx, 2)?;
+    ///         tuple.next(cx)?.encode_u32(cx, self.0)?;
+    ///         tuple.next(cx)?.encode_array(cx, self.1)?;
+    ///         tuple.end(cx)
     ///     }
     /// }
     /// ```
@@ -1126,6 +1129,7 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
+    /// use musli::Context;
     /// use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder};
     /// use musli::mode::Mode;
     ///
@@ -1141,8 +1145,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         let mut st = encoder.encode_struct(cx, 2)?;
-    ///         st.insert::<M, _, _>(cx, "name", &self.name)?;
-    ///         st.insert::<M, _, _>(cx, "age", self.age)?;
+    ///         st.insert::<M, _, _, _>(cx, "name", &self.name)?;
+    ///         st.insert::<M, _, _, _>(cx, "age", self.age)?;
     ///         st.end(cx)
     ///     }
     /// }
@@ -1163,6 +1167,7 @@ pub trait Encoder: Sized {
     /// # Examples
     ///
     /// ```
+    /// use musli::Context;
     /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder};
     /// use musli::mode::Mode;
     ///
@@ -1181,24 +1186,24 @@ pub trait Encoder: Sized {
     ///         C: Context<E::Error>,
     ///         E: Encoder
     ///     {
-    ///         let mut variant = encoder.encode_variant()?;
+    ///         let mut variant = encoder.encode_variant(cx)?;
     ///
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 variant.insert::<M, _, _>("variant1", ())
+    ///                 variant.insert::<M, _, _, _>(cx, "variant1", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 variant.insert::<M, _, _>("variant2", data)
+    ///                 variant.insert::<M, _, _, _>(cx, "variant2", data)
     ///             }
     ///             Enum::Variant { data, age } => {
-    ///                 variant.tag()?.encode_string("variant3")?;
+    ///                 variant.tag(cx)?.encode_string(cx, "variant3")?;
     ///
-    ///                 let mut st = variant.variant()?.encode_struct(2)?;
-    ///                 st.insert::<M, _, _>("data", data)?;
-    ///                 st.insert::<M, _, _>("age", age)?;
-    ///                 st.end()?;
+    ///                 let mut st = variant.variant(cx)?.encode_struct(cx, 2)?;
+    ///                 st.insert::<M, _, _, _>(cx, "data", data)?;
+    ///                 st.insert::<M, _, _, _>(cx, "age", age)?;
+    ///                 st.end(cx)?;
     ///
-    ///                 variant.end()
+    ///                 variant.end(cx)
     ///             }
     ///         }
     ///     }

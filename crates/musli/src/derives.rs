@@ -612,26 +612,29 @@
 //! }
 //!
 //! mod custom_uuid {
+//!     use musli::Context;
 //!     use musli::en::{Encode, Encoder};
 //!     use musli::de::{Decode, Decoder};
 //!     use musli::mode::Mode;
 //!
 //!     use super::CustomUuid;
 //!
-//!     pub fn encode<M, E>(uuid: &CustomUuid, encoder: E) -> Result<E::Ok, E::Error>
+//!     pub fn encode<M, C, E>(uuid: &CustomUuid, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
+//!         C: Context<E::Error>,
 //!         E: Encoder,
 //!     {
-//!         Encode::<M>::encode(&uuid.0, encoder)
+//!         Encode::<M>::encode(&uuid.0, cx, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, M, D>(decoder: D) -> Result<CustomUuid, D::Error>
+//!     pub fn decode<'de, M, C, D>(cx: &mut C, decoder: D) -> Result<CustomUuid, C::Error>
 //!     where
 //!         M: Mode,
+//!         C: Context<D::Error>,
 //!         D: Decoder<'de>
 //!     {
-//!         Ok(CustomUuid(<u128 as Decode<M>>::decode(decoder)?))
+//!         Ok(CustomUuid(<u128 as Decode<M>>::decode(cx, decoder)?))
 //!     }
 //! }
 //!
@@ -644,13 +647,14 @@
 //!     use musli::de::{Decode, Decoder};
 //!     use musli::mode::Mode;
 //!
-//!     pub fn encode<M, E, T>(set: &HashSet<T>, encoder: E) -> Result<E::Ok, E::Error>
+//!     pub fn encode<M, C, E, T>(set: &HashSet<T>, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
+//!         C: Context<E::Error>,
 //!         E: Encoder,
 //!         T: Encode<M> + Eq + Hash,
 //!     {
-//!         HashSet::<T>::encode(set, encoder)
+//!         HashSet::<T>::encode(set, cx, encoder)
 //!     }
 //!
 //!     pub fn decode<'de, M, C, D, T>(cx: &mut C, decoder: D) -> Result<HashSet<T>, C::Error>

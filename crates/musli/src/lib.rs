@@ -136,7 +136,7 @@
 //!             data.push(Decode::<M>::decode(cx, decoder)?);
 //!         }
 //!
-//!         seq.end()?;
+//!         seq.end(cx)?;
 //!
 //!         Ok(Self {
 //!             data
@@ -481,6 +481,7 @@ pub use self::mode::Mode;
 /// ```
 /// use std::fmt;
 ///
+/// use musli::Context;
 /// use musli::en::Encoder;
 ///
 /// struct MyEncoder<'a> {
@@ -496,7 +497,10 @@ pub use self::mode::Mode;
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
+///     fn encode_u32<C>(self, cx: &mut C, value: u32) -> Result<(), C::Error>
+///     where
+///         C: Context<Self::Error>
+///     {
 ///         *self.value = Some(value);
 ///         Ok(())
 ///     }
