@@ -10,9 +10,10 @@ mod array {
     use musli::{Context, Mode, Encoder, Decoder};
 
     #[inline]
-    fn encode<M, E, T, const N: usize>(this: &[T; N], encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<M, E, C, T, const N: usize>(this: &[T; N], cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
         M: Mode,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         todo!()

@@ -29,6 +29,7 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
     let encode_t = &e.tokens.encode_t;
     let context_t = &e.tokens.context_t;
     let encoder_t = &e.tokens.encoder_t;
+    let core_result = &e.tokens.core_result;
 
     let (impl_generics, mode_ident, mut where_clause) = e
         .expansion
@@ -52,7 +53,7 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
         #[automatically_derived]
         impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
-            fn encode<C, E>(&self, #ctx_var: &mut C, #var: E) -> Result<<E as #encoder_t>::Ok, <C as #context_t>::Error>
+            fn encode<C, E>(&self, #ctx_var: &mut C, #var: E) -> #core_result<<E as #encoder_t>::Ok, <C as #context_t>::Error>
             where
                 C: #context_t<Input = <E as #encoder_t>::Error>,
                 E: #encoder_t
@@ -214,26 +215,23 @@ fn encode_variant(
     en: &EnumBuild,
     v: &VariantBuild,
 ) -> Result<(TokenStream, TokenStream)> {
-    if let Packing::Transparent = v.packing {
-        let f = match &v.fields[..] {
-            [f] => f,
-            _ => {
-                e.transparent_diagnostics(v.span, &v.fields);
-                return Err(());
-            }
+    if let Packing::Transparent = v.st_.packing {
+        let [f] = &v.st_.fields[..] else {
+            e.transparent_diagnostics(v.span, &v.st_.fields);
+            return Err(());
         };
 
         let encode_path = &f.encode_path.1;
         let encode = quote!(#encode_path(this, #ctx_var, #var));
         let encode = encode_variant_container(e, ctx_var, var, v, encode)?;
-        let access = &f.field_access;
-        let path = &v.path;
+        let access = &f.member;
+        let path = &v.st_.path;
         return Ok((quote!(#path { #access: this }), encode));
     }
 
-    let fields = encode_fields(e, ctx_var, var, &v.fields)?;
+    let fields = encode_fields(e, ctx_var, var, &v.st_.fields)?;
 
-    if let Packing::Packed = v.packing {
+    if let Packing::Packed = v.st_.packing {
         let encoder_t = &e.tokens.encoder_t;
         let sequence_encoder_t = &e.tokens.sequence_encoder_t;
 
@@ -303,7 +301,7 @@ fn encode_variant(
 
                 let encode_t_encode = &e.encode_t_encode;
 
-                let len = length_test(v.fields.len(), &fields.tests);
+                let len = length_test(v.st_.fields.len(), &fields.tests);
 
                 let encode = quote_spanned! {
                     v.span =>
@@ -333,7 +331,7 @@ fn encode_variant(
     let encoder_t = &e.tokens.encoder_t;
     let pairs_encoder_t = &e.tokens.pairs_encoder_t;
 
-    let len = length_test(v.fields.len(), &fields.tests);
+    let len = length_test(v.st_.fields.len(), &fields.tests);
 
     let encode = if fields.encoders.is_empty() {
         quote_spanned! {

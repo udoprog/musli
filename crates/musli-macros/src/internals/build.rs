@@ -136,15 +136,10 @@ pub(crate) struct VariantBuild<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) name: &'a syn::LitStr,
-    pub(crate) fields: Vec<FieldBuild<'a>>,
-    pub(crate) packing: Packing,
     pub(crate) enum_packing: Packing,
     pub(crate) tag: syn::Expr,
-    pub(crate) name_type: Option<&'a (Span, syn::Type)>,
-    pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
-    pub(crate) field_tag_method: TagMethod,
     pub(crate) is_default: bool,
-    pub(crate) path: syn::Path,
+    pub(crate) st_: StructBuild<'a>,
     patterns: Vec<syn::FieldValue>,
 }
 
@@ -152,7 +147,7 @@ impl VariantBuild<'_> {
     /// Generate constructor for this variant.
     pub(crate) fn constructor(&self) -> TokenStream {
         let patterns = &self.patterns;
-        let path = &self.path;
+        let path = &self.st_.path;
         quote_spanned!(self.span => #path { #(#patterns),* })
     }
 }
@@ -166,7 +161,7 @@ pub(crate) struct FieldBuild<'a> {
     pub(crate) skip_encoding_if: Option<&'a (Span, syn::Path)>,
     pub(crate) default_attr: Option<Span>,
     pub(crate) self_access: syn::Expr,
-    pub(crate) field_access: syn::Member,
+    pub(crate) member: syn::Member,
     pub(crate) packing: Packing,
 }
 
@@ -365,16 +360,19 @@ fn setup_variant<'a>(
         span: data.span,
         index: data.index,
         name: &data.name,
-        fields,
-        packing: variant_packing,
         enum_packing,
         tag,
-        name_type: data.attr.name_type(mode),
-        name_format_with: data.attr.name_format_with(mode),
-        field_tag_method: field_tag_methods.pick(),
         is_default,
-        path,
         patterns,
+        st_: StructBuild {
+            span: data.span,
+            fields,
+            packing: variant_packing,
+            name_type: data.attr.name_type(mode),
+            name_format_with: data.attr.name_format_with(mode),
+            field_tag_method: field_tag_methods.pick(),
+            path,
+        },
     })
 }
 
@@ -472,7 +470,7 @@ fn setup_field<'a>(
         skip_encoding_if,
         default_attr,
         self_access,
-        field_access: member,
+        member,
         packing,
     })
 }

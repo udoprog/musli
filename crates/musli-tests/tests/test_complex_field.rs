@@ -1,7 +1,7 @@
 use core::fmt;
 
-use musli::{Decode, Encode};
 use bstr::BStr;
+use musli::{Decode, Encode};
 
 #[derive(Debug, Encode, Decode, PartialEq, Eq)]
 struct FieldVariantTag<'a> {

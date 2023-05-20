@@ -5,13 +5,13 @@ error[E0603]: function `decode` is private
    |                          ^^^^^ private function
    |
 note: the function `decode` is defined here
-  --> tests/ui/private_fn_error.rs:22:5
+  --> tests/ui/private_fn_error.rs:23:5
    |
-22 | /     fn decode<'de, M, C, D, T, const N: usize>(cx: &mut C, decoder: D) -> Result<[T; N], C::Error>
-23 | |     where
-24 | |         M: Mode,
-25 | |         C: Context<Input = D::Error>,
+23 | /     fn decode<'de, M, C, D, T, const N: usize>(cx: &mut C, decoder: D) -> Result<[T; N], C::Error>
+24 | |     where
+25 | |         M: Mode,
+26 | |         C: Context<Input = D::Error>,
 ...  |
-28 | |         todo!()
-29 | |     }
+29 | |         todo!()
+30 | |     }
    | |_____^

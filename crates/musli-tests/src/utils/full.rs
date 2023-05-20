@@ -45,7 +45,7 @@ pub mod serde_bincode {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> bincoResult<&'buf [u8]>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> bincode::Result<&'buf [u8]>
     where
         T: Serialize,
     {
@@ -54,7 +54,7 @@ pub mod serde_bincode {
     }
 
     #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> bincoResult<T>
+    pub fn decode<'de, T>(data: &'de [u8]) -> bincode::Result<T>
     where
         T: Deserialize<'de>,
     {

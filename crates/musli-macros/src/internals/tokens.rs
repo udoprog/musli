@@ -23,6 +23,10 @@ pub(crate) struct Tokens {
     pub(crate) variant_decoder_t: syn::Path,
     pub(crate) variant_encoder_t: syn::Path,
     pub(crate) visit_owned_fn: syn::Path,
+    pub(crate) option_some: syn::Path,
+    pub(crate) option_none: syn::Path,
+    pub(crate) result_ok: syn::Path,
+    pub(crate) result_err: syn::Path,
 }
 
 impl Tokens {
@@ -38,6 +42,10 @@ impl Tokens {
             encode_t: path(span, prefix, ["en", "Encode"]),
             encoder_t: path(span, prefix, ["en", "Encoder"]),
             fmt: core(span, ["fmt"]),
+            option_some: core(span, ["option", "Option", "Some"]),
+            option_none: core(span, ["option", "Option", "None"]),
+            result_ok: core(span, ["result", "Result", "Ok"]),
+            result_err: core(span, ["result", "Result", "Err"]),
             mode_t: path(span, prefix, ["mode", "Mode"]),
             pack_decoder_t: path(span, prefix, ["de", "PackDecoder"]),
             pair_decoder_t: path(span, prefix, ["de", "PairDecoder"]),

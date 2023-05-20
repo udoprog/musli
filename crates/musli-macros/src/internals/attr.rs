@@ -240,7 +240,9 @@ impl TypeAttr {
         if let Some((_, krate)) = self.root.krate.any.as_ref() {
             krate.clone()
         } else {
-            syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()))
+            let mut path = syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()));
+            path.leading_colon = Some(<Token![::]>::default());
+            path
         }
     }
 }
@@ -306,7 +308,8 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
             // parse #[musli(name_format_with = <path>)]
             if meta.path.is_ident("name_format_with") {
                 meta.input.parse::<Token![=]>()?;
-                new.name_format_with.push((meta.path.span(), meta.input.parse()?));
+                new.name_format_with
+                    .push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
@@ -480,7 +483,8 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             // parse #[musli(name_format_with = <path>)]
             if meta.path.is_ident("name_format_with") {
                 meta.input.parse::<Token![=]>()?;
-                new.name_format_with.push((meta.path.span(), meta.input.parse()?));
+                new.name_format_with
+                    .push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 

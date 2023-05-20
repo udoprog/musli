@@ -57,13 +57,26 @@ pub trait Context {
         ))
     }
 
-    /// Encountered an unsupported number tag.
+    /// Encountered an unsupported field tag.
     #[inline]
     fn invalid_field_tag<T>(&mut self, type_name: &'static str, tag: T) -> Self::Error
     where
         T: fmt::Debug,
     {
         self.message(format_args!("{type_name}: invalid field tag: {tag:?}"))
+    }
+
+    /// Encountered an unsupported field tag, where the tag has been stored
+    /// using [`store_string`].
+    ///
+    /// [`store_string`]: Context::store_string
+    #[inline]
+    fn invalid_field_string_tag(&mut self, type_name: &'static str) -> Self::Error {
+        if let Some(..) = self.get_string() {
+            // self.message(format_args!("{type_name}: invalid field tag: {string}"))
+        }
+
+        self.message(format_args!("{type_name}: invalid field tag"))
     }
 
     /// Missing variant field required to decode.
@@ -96,6 +109,21 @@ pub trait Context {
         self.message(format_args!(
             "{type_name}: invalid variant field tag: variant: {variant:?}, tag: {tag:?}",
         ))
+    }
+
+    /// For named (string) variants, stores the tag string in the context.
+    ///
+    /// It should be possible to recall the string later using [`take_string`].
+    ///
+    /// [`take_string`]: Context::take_string
+    #[allow(unused_variables)]
+    fn store_string(&mut self, string: &str) {}
+
+    /// Access the last string stored with [`store_string`].
+    ///
+    /// [`store_string`]: Context::store_string
+    fn get_string(&self) -> Option<&str> {
+        None
     }
 
     /// Trace that we've entered the given index of an array.

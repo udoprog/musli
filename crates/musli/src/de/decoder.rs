@@ -304,7 +304,13 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         while let Some(mut e) = st.next(cx)? {
     ///             let found = e.first(cx)?.decode_string(cx, musli::utils::visit_owned_fn("a string that is 'type'", |cx: &mut C, string: &str| {
-    ///                 Ok(string == "type")
+    ///                 if (string == "type") {
+    ///                     Ok(true)
+    ///                 } else {
+    ///                     // store string for diagnostics later, in case you want to report an error related to it.
+    ///                     cx.store_string(string)
+    ///                     Ok(false)
+    ///                 }
     ///             }))?;
     ///
     ///             if found {
