@@ -246,14 +246,10 @@ fn decode_enum(
 
     let Some(enum_tagging) = en.enum_tagging else {
         let patterns = variant_output_tags.iter().flat_map(|(v, tag_pattern, tag_value)| {
-            let name = &v.st_.name;
+            let name = &v.st.name;
 
+            let formatted_tag = en.name_format(tag_value);
             let decode = decode_variant(e, v, ctx_var, &body_decoder_var, &variant_tag_var).ok()?;
-
-            let formatted_tag = match en.name_format_with {
-                Some((_, path)) => quote!(&#path(&#tag_value)),
-                None => quote!(&#tag_value),
-            };
 
             Some(quote! {
                 #tag_pattern => {
@@ -304,13 +300,9 @@ fn decode_enum(
                 },
         } => {
             let patterns = variant_output_tags.iter().flat_map(|(v, tag_pattern, tag_value)| {
-                let name = &v.st_.name;
+                let name = &v.st.name;
 
-                let formatted_tag = match en.name_format_with {
-                    Some((_, path)) => quote!(&#path(&#tag_value)),
-                    None => quote!(&#tag_value),
-                };
-
+                let formatted_tag = en.name_format(tag_value);
                 let decode = decode_variant(e, v, ctx_var, &buffer_decoder_var, &variant_tag_var).ok()?;
 
                 Some(quote! {
@@ -422,13 +414,9 @@ fn decode_enum(
             content,
         } => {
             let patterns = variant_output_tags.iter().flat_map(|(v, tag_pattern, tag_value)| {
-                let name = &v.st_.name;
+                let name = &v.st.name;
 
-                let formatted_tag = match en.name_format_with {
-                    Some((_, path)) => quote!(&#path(&#tag_value)),
-                    None => quote!(&#tag_value),
-                };
-
+                let formatted_tag = en.name_format(tag_value);
                 let decode = decode_variant(e, v, ctx_var, &body_decoder_var, &variant_tag_var).ok()?;
 
                 Some(quote! {
@@ -550,17 +538,17 @@ fn decode_variant(
     body_decoder_var: &Ident,
     variant_tag: &Ident,
 ) -> Result<TokenStream, ()> {
-    Ok(match v.st_.packing {
+    Ok(match v.st.packing {
         Packing::Tagged => decode_tagged(
             e,
-            &v.st_,
+            &v.st,
             ctx_var,
             body_decoder_var,
             Some(variant_tag),
             false,
         )?,
-        Packing::Packed => decode_packed(e, &v.st_, ctx_var, body_decoder_var, false)?,
-        Packing::Transparent => decode_transparent(e, &v.st_, ctx_var, body_decoder_var, false)?,
+        Packing::Packed => decode_packed(e, &v.st, ctx_var, body_decoder_var, false)?,
+        Packing::Transparent => decode_transparent(e, &v.st, ctx_var, body_decoder_var, false)?,
     })
 }
 
@@ -917,21 +905,27 @@ impl TagVariant<'_> {
             path: self.path.clone(),
         });
 
-        let mut args = Punctuated::default();
-        args.push(body);
-
         syn::Arm {
             attrs: Vec::new(),
             pat: syn::Pat::Verbatim(self.tag.to_token_stream()),
             guard: None,
             fat_arrow_token: <Token![=>]>::default(),
-            body: Box::new(build_call(option_some, args)),
+            body: Box::new(build_call(option_some, [body])),
             comma: None,
         }
     }
 }
 
-fn build_call(path: &syn::Path, args: Punctuated<syn::Expr, Token![,]>) -> syn::Expr {
+pub(crate) fn build_call<A>(path: &syn::Path, it: A) -> syn::Expr
+where
+    A: IntoIterator<Item = syn::Expr>,
+{
+    let mut args = Punctuated::default();
+
+    for arg in it {
+        args.push(arg);
+    }
+
     syn::Expr::Call(syn::ExprCall {
         attrs: Vec::new(),
         func: Box::new(syn::Expr::Path(syn::ExprPath {
@@ -941,6 +935,15 @@ fn build_call(path: &syn::Path, args: Punctuated<syn::Expr, Token![,]>) -> syn::
         })),
         paren_token: syn::token::Paren::default(),
         args,
+    })
+}
+
+pub(crate) fn build_reference(expr: syn::Expr) -> syn::Expr {
+    syn::Expr::Reference(syn::ExprReference {
+        attrs: Vec::new(),
+        and_token: <Token![&]>::default(),
+        mutability: None,
+        expr: Box::new(expr),
     })
 }
 
@@ -967,8 +970,9 @@ fn build_tag_variant<'a>(
         path,
     });
 
-    let mut args = Punctuated::new();
-    args.push(expr.clone());
-
-    (build_call(&e.tokens.option_some, args), expr, output)
+    (
+        build_call(&e.tokens.option_some, [expr.clone()]),
+        expr,
+        output,
+    )
 }

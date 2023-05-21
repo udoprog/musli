@@ -11,16 +11,25 @@ use musli::de;
 use musli::error::Error;
 use musli::Context;
 
-/// A rich context which uses allocations.
-pub struct AllocContext<'buf, E> {
+/// A collected error which has been context decorated.
+pub struct RichError<'a, E> {
+    path: &'a [Step],
+    range: Range<usize>,
+    error: &'a E,
+}
+
+/// A rich context which uses allocations and tracks the exact location of every
+/// error.
+pub struct RichContext<'buf, E> {
     mark: usize,
     string: ptr::NonNull<String>,
-    errors: Vec<(Range<usize>, E)>,
+    errors: Vec<(Vec<Step>, Range<usize>, E)>,
     path: Vec<Step>,
+    include_type: bool,
     _marker: PhantomData<(&'buf mut String, E)>,
 }
 
-impl<'buf, E> AllocContext<'buf, E> {
+impl<'buf, E> RichContext<'buf, E> {
     /// Construct a new context which uses allocations to store arbitrary
     /// amounts of diagnostics about decoding.
     ///
@@ -31,12 +40,29 @@ impl<'buf, E> AllocContext<'buf, E> {
             string: string.into(),
             errors: Vec::new(),
             path: Vec::new(),
+            include_type: false,
             _marker: PhantomData,
         }
     }
+
+    /// Configure the context to visualize type information, and not just
+    /// variant and fields.
+    pub fn include_type(&mut self) -> &mut Self {
+        self.include_type = true;
+        self
+    }
+
+    /// Iterate over all collected errors.
+    pub fn iter(&self) -> impl Iterator<Item = RichError<'_, E>> {
+        self.errors.iter().map(|(path, range, error)| RichError {
+            path,
+            range: range.clone(),
+            error,
+        })
+    }
 }
 
-impl<'buf, E> Context<'buf> for AllocContext<'buf, E>
+impl<'buf, E> Context<'buf> for RichContext<'buf, E>
 where
     E: Error,
 {
@@ -51,7 +77,8 @@ where
     where
         E: From<T>,
     {
-        self.errors.push((self.mark..self.mark, E::from(error)));
+        self.errors
+            .push((self.path.clone(), self.mark..self.mark, E::from(error)));
         de::Error
     }
 
@@ -60,7 +87,8 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.errors.push((self.mark..self.mark, E::custom(message)));
+        self.errors
+            .push((self.path.clone(), self.mark..self.mark, E::custom(message)));
         de::Error
     }
 
@@ -69,11 +97,8 @@ where
     where
         T: fmt::Display,
     {
-        let path = format_path(&self.path);
-        self.errors.push((
-            self.mark..self.mark,
-            E::message(format_args!("{path}: {message}")),
-        ));
+        self.errors
+            .push((self.path.clone(), self.mark..self.mark, E::message(message)));
         de::Error
     }
 
@@ -82,12 +107,8 @@ where
     where
         T: fmt::Display,
     {
-        let now = self.mark;
-        let path = format_path(&self.path);
-        self.errors.push((
-            mark..self.mark,
-            E::message(format_args!("{path}: {message} (at {mark}..{now})")),
-        ));
+        self.errors
+            .push((self.path.clone(), mark..self.mark, E::message(message)));
         de::Error
     }
 
@@ -140,22 +161,30 @@ where
 
     #[inline]
     fn trace_enter_struct(&mut self, name: &'static str) {
-        self.path.push(Step::Struct(name));
+        if self.include_type {
+            self.path.push(Step::Struct(name));
+        }
     }
 
     #[inline]
     fn trace_leave_struct(&mut self) {
-        self.path.pop();
+        if self.include_type {
+            self.path.pop();
+        }
     }
 
     #[inline]
     fn trace_enter_enum(&mut self, name: &'static str) {
-        self.path.push(Step::Enum(name));
+        if self.include_type {
+            self.path.push(Step::Enum(name));
+        }
     }
 
     #[inline]
     fn trace_leave_enum(&mut self) {
-        self.path.pop();
+        if self.include_type {
+            self.path.pop();
+        }
     }
 
     #[inline]
@@ -163,44 +192,55 @@ where
         self.path.push(Step::Variant(name));
     }
 
+    #[inline]
     fn trace_leave_variant(&mut self, _: Self::TraceVariant) {
+        self.path.pop();
+    }
+
+    #[inline]
+    fn trace_enter_sequence_index(&mut self, index: usize) {
+        self.path.push(Step::Index(index));
+    }
+
+    #[inline]
+    fn trace_leave_sequence_index(&mut self) {
         self.path.pop();
     }
 }
 
-impl<'buf, E> fmt::Display for AllocContext<'buf, E>
+impl<'buf, E> fmt::Display for RichError<'buf, E>
 where
     E: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.errors.is_empty() {
-            write!(f, "no errors")?;
-            return Ok(());
-        }
+        let path = format_path(self.path);
 
-        for (range, error) in &self.errors {
-            if range.start != 0 || range.end != 0 {
-                if range.start == range.end {
-                    writeln!(f, "{error} (at byte {})", range.start)?;
-                } else {
-                    writeln!(f, "{error} (at bytes {}-{})", range.start, range.end)?;
-                }
+        if self.range.start != 0 || self.range.end != 0 {
+            if self.range.start == self.range.end {
+                write!(f, "{path}: {} (at byte {})", self.error, self.range.start)?;
             } else {
-                writeln!(f, "{error}")?;
+                write!(
+                    f,
+                    "{path}: {} (at bytes {}-{})",
+                    self.error, self.range.start, self.range.end
+                )?;
             }
+        } else {
+            write!(f, "{path}: {}", self.error)?;
         }
 
         Ok(())
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Step {
     Struct(&'static str),
     Enum(&'static str),
     Variant(&'static str),
     NamedField(&'static str),
     UnnamedField(u32),
+    Index(usize),
 }
 
 fn format_path(path: &[Step]) -> impl fmt::Display + '_ {
@@ -215,50 +255,64 @@ impl<'a> fmt::Display for FormatPath<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut has_type = false;
         let mut has_prior = false;
+        let mut level = 0;
 
         for step in self.path {
             match *step {
                 Step::Struct(name) => {
                     if take(&mut has_prior) {
-                        write!(f, " / ")?;
+                        write!(f, " = ")?;
                     }
 
-                    write!(f, "{name} {{ ")?;
+                    write!(f, "{name}")?;
                     has_type = true;
                 }
                 Step::Enum(name) => {
                     if take(&mut has_prior) {
-                        write!(f, " / ")?;
+                        write!(f, " = ")?;
                     }
 
                     write!(f, "{name}::")?;
                 }
                 Step::Variant(name) => {
-                    write!(f, "{name} {{ ")?;
+                    if take(&mut has_prior) {
+                        write!(f, " = ")?;
+                    }
+
+                    write!(f, "{name}")?;
                     has_type = true;
                 }
                 Step::NamedField(name) => {
-                    write!(f, ".{name}")?;
-
                     if take(&mut has_type) {
-                        write!(f, " }}")?;
+                        write!(f, " {{ ")?;
+                        level += 1;
                     }
 
+                    write!(f, ".{name}")?;
                     has_prior = true;
                 }
                 Step::UnnamedField(index) => {
-                    write!(f, ".{index}")?;
-
                     if take(&mut has_type) {
-                        write!(f, " }}")?;
+                        write!(f, " {{ ")?;
+                        level += 1;
                     }
 
+                    write!(f, ".{index}")?;
+                    has_prior = true;
+                }
+                Step::Index(index) => {
+                    if take(&mut has_type) {
+                        write!(f, " {{ ")?;
+                        level += 1;
+                    }
+
+                    write!(f, "[{index}]")?;
                     has_prior = true;
                 }
             }
         }
 
-        if has_type {
+        for _ in 0..level {
             write!(f, " }}")?;
         }
 

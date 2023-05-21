@@ -212,9 +212,14 @@ macro_rules! sequence {
             {
                 let mut seq = encoder.encode_sequence(cx, self.len())?;
 
+                let mut index = 0;
+
                 for value in self {
+                    cx.trace_enter_sequence_index(index);
                     let encoder = seq.next(cx)?;
                     value.encode(cx, encoder)?;
+                    cx.trace_leave_sequence_index();
+                    index = index.wrapping_add(1);
                 }
 
                 seq.end(cx)
@@ -236,8 +241,13 @@ macro_rules! sequence {
                 let mut $access = decoder.decode_sequence(cx)?;
                 let mut out = $factory;
 
+                let mut index = 0;
+
                 while let Some(value) = $access.next(cx)? {
+                    cx.trace_enter_sequence_index(index);
                     out.$insert(T::decode(cx, value)?);
+                    cx.trace_leave_sequence_index();
+                    index = index.wrapping_add(1);
                 }
 
                 $access.end(cx)?;
@@ -310,7 +320,7 @@ macro_rules! map {
         impl<'de, K, V, M $(, $extra)*> Decode<'de, M> for $ty<K, V $(, $extra)*>
         where
             M: Mode,
-            K: Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
+            K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
@@ -325,8 +335,10 @@ macro_rules! map {
 
                 while let Some(mut entry) = $access.next(cx)? {
                     let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
+                    cx.trace_enter_map_field(&key);
                     let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
                     out.insert(key, value);
+                    cx.trace_leave_map_field();
                 }
 
                 $access.end(cx)?;

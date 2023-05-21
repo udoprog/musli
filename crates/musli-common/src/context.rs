@@ -1,7 +1,7 @@
 //! Helper types to set up a basic Müsli [`Context`].
 
 #[cfg(feature = "alloc")]
-mod alloc_context;
+mod rich_context;
 
 use core::fmt;
 use core::marker::PhantomData;
@@ -11,7 +11,7 @@ use musli::error::Error;
 use musli::Context;
 
 #[cfg(feature = "alloc")]
-pub use self::alloc_context::AllocContext;
+pub use self::rich_context::RichContext;
 
 /// A simple non-diagnostical capturing context which simply emits the original
 /// error.

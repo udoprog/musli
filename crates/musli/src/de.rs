@@ -36,7 +36,9 @@ pub use self::visitor::Visitor;
 
 use crate::mode::Mode;
 
-/// Decode to a `'static` value.
+/// Decode to an owned value.
+///
+/// This is a simpler bound to use than `for<'de> Decode<'de, M>`.
 pub trait DecodeOwned<M>: for<'de> Decode<'de, M>
 where
     M: Mode,

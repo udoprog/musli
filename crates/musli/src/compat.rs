@@ -46,9 +46,11 @@ where
     {
         let mut seq = encoder.encode_sequence(cx, self.0.len())?;
 
-        for value in self.0 {
+        for (index, value) in self.0.iter().enumerate() {
+            cx.trace_enter_sequence_index(index);
             let encoder = seq.next(cx)?;
             T::encode(value, cx, encoder)?;
+            cx.trace_leave_sequence_index();
         }
 
         seq.end(cx)

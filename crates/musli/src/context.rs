@@ -305,4 +305,38 @@ pub trait Context<'buf> {
     #[allow(unused_variables)]
     #[inline(always)]
     fn trace_leave_variant(&mut self, marker: Self::TraceVariant) {}
+
+    /// Trace a map field.
+    #[allow(unused_variables)]
+    #[inline(always)]
+    fn trace_enter_map_field<T>(&mut self, field: T)
+    where
+        T: fmt::Display,
+    {
+    }
+
+    /// Trace that we've left the last map field that was entered.
+    ///
+    /// The `marker` argument will be the same as the one returned from
+    /// [`trace_enter_map_field`].
+    ///
+    /// [`trace_enter_map_field`]: Context::trace_enter_map_field
+    #[allow(unused_variables)]
+    #[inline(always)]
+    fn trace_leave_map_field(&mut self) {}
+
+    /// Trace a sequence field.
+    #[allow(unused_variables)]
+    #[inline(always)]
+    fn trace_enter_sequence_index(&mut self, index: usize) {}
+
+    /// Trace that we've left the last sequence index that was entered.
+    ///
+    /// The `marker` argument will be the same as the one returned from
+    /// [`trace_enter_sequence_index`].
+    ///
+    /// [`trace_enter_sequence_index`]: Context::trace_enter_sequence_index
+    #[allow(unused_variables)]
+    #[inline(always)]
+    fn trace_leave_sequence_index(&mut self) {}
 }

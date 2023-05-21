@@ -4,6 +4,7 @@ use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::Token;
 
+use crate::de::{build_call, build_reference};
 use crate::expander::Taggable;
 use crate::expander::{
     Data, EnumData, Expander, FieldData, Result, StructData, TagMethod, VariantData,
@@ -121,6 +122,15 @@ pub(crate) struct StructBuild<'a> {
     pub(crate) field_tag_method: TagMethod,
 }
 
+impl StructBuild<'_> {
+    pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
+        match self.name_format_with {
+            Some((_, path)) => build_call(path, [build_reference(value.clone())]),
+            None => build_reference(value.clone()),
+        }
+    }
+}
+
 pub(crate) struct EnumBuild<'a> {
     pub(crate) span: Span,
     pub(crate) name: &'a syn::LitStr,
@@ -134,12 +144,21 @@ pub(crate) struct EnumBuild<'a> {
     pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
 
+impl EnumBuild<'_> {
+    pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
+        match self.name_format_with {
+            Some((_, path)) => build_call(path, [build_reference(value.clone())]),
+            None => build_reference(value.clone()),
+        }
+    }
+}
+
 pub(crate) struct VariantBuild<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) tag: syn::Expr,
     pub(crate) is_default: bool,
-    pub(crate) st_: StructBuild<'a>,
+    pub(crate) st: StructBuild<'a>,
     pub(crate) patterns: Punctuated<syn::FieldPat, Token![,]>,
 }
 
@@ -355,7 +374,7 @@ fn setup_variant<'a>(
         tag,
         is_default,
         patterns,
-        st_: StructBuild {
+        st: StructBuild {
             span: data.span,
             name: &data.name,
             fields,
