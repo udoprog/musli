@@ -24,7 +24,7 @@ mod type_hint;
 mod value_visitor;
 mod visitor;
 
-pub use self::decode::Decode;
+pub use self::decode::{Decode, TraceDecode};
 pub use self::decoder::{
     AsDecoder, Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder,
 };

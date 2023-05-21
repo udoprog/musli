@@ -13,8 +13,10 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
 
-use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
-use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
+use crate::de::{
+    Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, TraceDecode, ValueVisitor,
+};
+use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder, TraceEncode};
 use crate::internal::size_hint;
 use crate::mode::Mode;
 use crate::Context;
@@ -215,10 +217,10 @@ macro_rules! sequence {
                 let mut index = 0;
 
                 for value in self {
-                    cx.trace_enter_sequence_index(index);
+                    cx.enter_sequence_index(index);
                     let encoder = seq.next(cx)?;
                     value.encode(cx, encoder)?;
-                    cx.trace_leave_sequence_index();
+                    cx.leave_sequence_index();
                     index = index.wrapping_add(1);
                 }
 
@@ -244,9 +246,9 @@ macro_rules! sequence {
                 let mut index = 0;
 
                 while let Some(value) = $access.next(cx)? {
-                    cx.trace_enter_sequence_index(index);
+                    cx.enter_sequence_index(index);
                     out.$insert(T::decode(cx, value)?);
-                    cx.trace_leave_sequence_index();
+                    cx.leave_sequence_index();
                     index = index.wrapping_add(1);
                 }
 
@@ -317,10 +319,40 @@ macro_rules! map {
             }
         }
 
+        impl<'de, M, K, V $(, $extra)*> TraceEncode<M> for $ty<K, V $(, $extra)*>
+        where
+            M: Mode,
+            K: fmt::Display + Encode<M>,
+            V: Encode<M>,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            #[inline]
+            fn trace_encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            where
+                C: Context<'buf, Input = E::Error>,
+                E: Encoder,
+            {
+                let mut map = encoder.encode_map(cx, self.len())?;
+
+                for (k, v) in self {
+                    cx.enter_map_key(k);
+                    let mut entry = map.next(cx)?;
+                    let first = entry.first(cx)?;
+                    k.encode(cx, first)?;
+                    let second = entry.second(cx)?;
+                    v.encode(cx, second)?;
+                    entry.end(cx)?;
+                    cx.leave_map_key();
+                }
+
+                map.end(cx)
+            }
+        }
+
         impl<'de, K, V, M $(, $extra)*> Decode<'de, M> for $ty<K, V $(, $extra)*>
         where
             M: Mode,
-            K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
+            K: Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
@@ -335,10 +367,37 @@ macro_rules! map {
 
                 while let Some(mut entry) = $access.next(cx)? {
                     let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
-                    cx.trace_enter_map_field(&key);
                     let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
                     out.insert(key, value);
-                    cx.trace_leave_map_field();
+                }
+
+                $access.end(cx)?;
+                Ok(out)
+            }
+        }
+
+        impl<'de, K, V, M $(, $extra)*> TraceDecode<'de, M> for $ty<K, V $(, $extra)*>
+        where
+            M: Mode,
+            K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
+            V: Decode<'de, M>,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            #[inline]
+            fn trace_decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            where
+                C: Context<'buf, Input = D::Error>,
+                D: Decoder<'de>,
+            {
+                let mut $access = decoder.decode_map(cx)?;
+                let mut out = $with_capacity;
+
+                while let Some(mut entry) = $access.next(cx)? {
+                    let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
+                    cx.enter_map_key(&key);
+                    let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
+                    out.insert(key, value);
+                    cx.leave_map_key();
                 }
 
                 $access.end(cx)?;

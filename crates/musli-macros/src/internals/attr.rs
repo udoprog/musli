@@ -568,6 +568,8 @@ layer! {
         rename: syn::Expr,
         /// Use a default value for the field if it's not available.
         default_field: (),
+        /// Use the alternate TraceDecode for the field.
+        trace: (),
         @multiple
     }
 }
@@ -587,7 +589,8 @@ impl Field {
 
             (*span, encode_path)
         } else {
-            let encode_path = mode.encode_t_encode(span);
+            let trace = self.trace(mode).is_some();
+            let encode_path = mode.encode_t_encode(trace);
             (span, encode_path)
         }
     }
@@ -606,7 +609,8 @@ impl Field {
 
             (*span, decode_path)
         } else {
-            let decode_path = mode.decode_t_decode(span);
+            let trace = self.trace(mode).is_some();
+            let decode_path = mode.decode_t_decode(trace);
             (span, decode_path)
         }
     }
@@ -695,6 +699,12 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
             // parse #[musli(default)]
             if meta.path == DEFAULT {
                 new.default_field.push((meta.path.span(), ()));
+                return Ok(());
+            }
+
+            // parse #[musli(default)]
+            if meta.path.is_ident("trace") {
+                new.trace.push((meta.path.span(), ()));
                 return Ok(());
             }
 

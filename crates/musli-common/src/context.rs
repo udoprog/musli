@@ -33,8 +33,6 @@ where
 {
     type Input = E;
     type Error = E;
-    type TraceField = ();
-    type TraceVariant = ();
     type Mark = ();
 
     #[inline(always)]
@@ -96,8 +94,6 @@ where
 impl<'buf, E> Context<'buf> for Ignore<E> {
     type Input = E;
     type Error = de::Error;
-    type TraceField = ();
-    type TraceVariant = ();
     type Mark = ();
 
     #[inline(always)]
@@ -153,8 +149,6 @@ where
 {
     type Input = E;
     type Error = de::Error;
-    type TraceField = ();
-    type TraceVariant = ();
     type Mark = ();
 
     #[inline(always)]

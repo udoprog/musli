@@ -81,8 +81,8 @@ fn encode_struct(
     let result_ok = &e.tokens.result_ok;
     let type_name = &st.name;
 
-    let enter = trace.then(|| quote!(#context_t::trace_enter_struct(#ctx_var, #type_name);));
-    let leave = trace.then(|| quote!(#context_t::trace_leave_struct(#ctx_var);));
+    let enter = trace.then(|| quote!(#context_t::enter_struct(#ctx_var, #type_name);));
+    let leave = trace.then(|| quote!(#context_t::leave_struct(#ctx_var);));
 
     let encode;
 
@@ -167,7 +167,6 @@ fn encode_fields(
     let pair_encoder_var = e.cx.ident("pair_encoder");
     let field_encoder_var = e.cx.ident("field_encoder");
     let value_encoder_var = e.cx.ident("value_encoder");
-    let field_marker = e.cx.ident("field_marker");
 
     let mut encoders = Vec::with_capacity(st.fields.len());
     let mut tests = Vec::with_capacity(st.fields.len());
@@ -187,20 +186,22 @@ fn encode_fields(
                     let tag = st.name_format(tag);
 
                     quote! {
-                        let #field_marker = #context_t::trace_enter_named_field(#ctx_var, #field_name, #tag);
+                        #context_t::enter_named_field(#ctx_var, #field_name, #tag);
                     }
                 })
             }
             syn::Member::Unnamed(index) => {
                 let index = index.index;
                 trace.then(|| {
-                    let tag = st.name_format(tag); quote! {
-                    let #field_marker = #context_t::trace_enter_unnamed_field(#ctx_var, #index, #tag);
-                }})
+                    let tag = st.name_format(tag);
+                    quote! {
+                        #context_t::enter_unnamed_field(#ctx_var, #index, #tag);
+                    }
+                })
             }
         };
 
-        let leave = trace.then(|| quote!(#context_t::trace_leave_field(#ctx_var, #field_marker);));
+        let leave = trace.then(|| quote!(#context_t::leave_field(#ctx_var);));
 
         match f.packing {
             Packing::Tagged | Packing::Transparent => {
@@ -432,14 +433,13 @@ fn encode_variant(
 
     if trace {
         let output_var = b.cx.ident("output");
-        let trace_variant_var = b.cx.ident("trace_variant");
 
         let tag = en.name_format(&v.tag);
-        let enter = quote!(#context_t::trace_enter_variant(#ctx_var, #type_name, #tag));
-        let leave = quote!(#context_t::trace_leave_variant(#ctx_var, #trace_variant_var));
+        let enter = quote!(#context_t::enter_variant(#ctx_var, #type_name, #tag));
+        let leave = quote!(#context_t::leave_variant(#ctx_var));
 
         encode = quote! {{
-            let #trace_variant_var = #enter;
+            #enter;
             let #output_var = #encode;
             #leave;
             #output_var

@@ -10,10 +10,6 @@ pub trait Context<'buf> {
     type Error;
     /// A mark during processing.
     type Mark: Copy + Default;
-    /// Returned marker for matching field traces.
-    type TraceField: Default;
-    /// Returned marker for matching variant traces.
-    type TraceVariant: Default;
 
     /// Report the given encoding error.
     fn report<T>(&mut self, error: T) -> Self::Error
@@ -171,40 +167,35 @@ pub trait Context<'buf> {
         None
     }
 
-    /// Trace that we've entered the given index of an array.
-    #[inline(always)]
-    fn trace_array(&mut self, _: usize) {}
-
     /// Indicate that we've entered a struct with the given `name`.
     ///
     /// The `name` variable corresponds to the identifiers of the struct.
     ///
-    /// This will be matched with a corresponding call to
-    /// [`trace_leave_struct`].
+    /// This will be matched with a corresponding call to [`leave_struct`].
     ///
-    /// [`trace_leave_struct`]: Context::trace_leave_struct
+    /// [`leave_struct`]: Context::leave_struct
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_enter_struct(&mut self, name: &'static str) {}
+    fn enter_struct(&mut self, name: &'static str) {}
 
     /// Trace that we've left the last struct that was entered.
     #[inline(always)]
-    fn trace_leave_struct(&mut self) {}
+    fn leave_struct(&mut self) {}
 
     /// Indicate that we've entered an enum with the given `name`.
     ///
     /// The `name` variable corresponds to the identifiers of the enum.
     ///
-    /// This will be matched with a corresponding call to [`trace_leave_enum`].
+    /// This will be matched with a corresponding call to [`leave_enum`].
     ///
-    /// [`trace_leave_enum`]: Context::trace_leave_enum
+    /// [`leave_enum`]: Context::leave_enum
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_enter_enum(&mut self, name: &'static str) {}
+    fn enter_enum(&mut self, name: &'static str) {}
 
     /// Trace that we've left the last enum that was entered.
     #[inline(always)]
-    fn trace_leave_enum(&mut self) {}
+    fn leave_enum(&mut self) {}
 
     /// Trace that we've entered the given named field.
     ///
@@ -212,7 +203,7 @@ pub trait Context<'buf> {
     /// is the `name` argument below, and the musli tag being used for the field
     /// is the second argument.
     ///
-    /// This will be matched with a corresponding call to [`trace_leave_field`].
+    /// This will be matched with a corresponding call to [`leave_field`].
     ///
     /// Here `name` is `"field"` and `tag` is `"string"`.
     ///
@@ -226,14 +217,13 @@ pub trait Context<'buf> {
     /// }
     /// ```
     ///
-    /// [`trace_leave_field`]: Context::trace_leave_field
+    /// [`leave_field`]: Context::leave_field
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_enter_named_field<T>(&mut self, name: &'static str, tag: T) -> Self::TraceField
+    fn enter_named_field<T>(&mut self, name: &'static str, tag: T)
     where
         T: fmt::Display,
     {
-        Self::TraceField::default()
     }
 
     /// Trace that we've entered the given unnamed field.
@@ -242,7 +232,7 @@ pub trait Context<'buf> {
     /// `index` argument below, and the musli tag being used for the field is
     /// the second argument.
     ///
-    /// This will be matched with a corresponding call to [`trace_leave_field`].
+    /// This will be matched with a corresponding call to [`leave_field`].
     ///
     /// Here `index` is `0` and `tag` is `"string"`.
     ///
@@ -253,26 +243,25 @@ pub trait Context<'buf> {
     /// struct Struct(#[musli(rename = "string")] String);
     /// ```
     ///
-    /// [`trace_leave_field`]: Context::trace_leave_field
+    /// [`leave_field`]: Context::leave_field
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_enter_unnamed_field<T>(&mut self, index: u32, _: T) -> Self::TraceField
+    fn enter_unnamed_field<T>(&mut self, index: u32, _: T)
     where
         T: fmt::Display,
     {
-        Self::TraceField::default()
     }
 
     /// Trace that we've left the last field that was entered.
     ///
     /// The `marker` argument will be the same as the one returned from
-    /// [`trace_enter_named_field`] or [`trace_enter_unnamed_field`].
+    /// [`enter_named_field`] or [`enter_unnamed_field`].
     ///
-    /// [`trace_enter_named_field`]: Context::trace_enter_named_field
-    /// [`trace_enter_unnamed_field`]: Context::trace_enter_unnamed_field
+    /// [`enter_named_field`]: Context::enter_named_field
+    /// [`enter_unnamed_field`]: Context::enter_unnamed_field
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_leave_field(&mut self, marker: Self::TraceField) {}
+    fn leave_field(&mut self) {}
 
     /// Trace that we've entered the given variant in an enum.
     ///
@@ -281,7 +270,7 @@ pub trait Context<'buf> {
     /// variant is the second argument.
     ///
     /// This will be matched with a corresponding call to
-    /// [`trace_leave_variant`] with the same marker provided as an argument as
+    /// [`leave_variant`] with the same marker provided as an argument as
     /// the one returned here.
     ///
     /// Here `name` is `"field"` and `tag` is `"string"`.
@@ -296,30 +285,29 @@ pub trait Context<'buf> {
     /// }
     /// ```
     ///
-    /// [`trace_leave_variant`]: Context::trace_leave_variant
+    /// [`leave_variant`]: Context::leave_variant
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_enter_variant<T>(&mut self, name: &'static str, tag: T) -> Self::TraceVariant
+    fn enter_variant<T>(&mut self, name: &'static str, tag: T)
     where
         T: fmt::Display,
     {
-        Self::TraceVariant::default()
     }
 
     /// Trace that we've left the last variant that was entered.
     ///
     /// The `marker` argument will be the same as the one returned from
-    /// [`trace_enter_variant`].
+    /// [`enter_variant`].
     ///
-    /// [`trace_enter_variant`]: Context::trace_enter_variant
+    /// [`enter_variant`]: Context::enter_variant
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_leave_variant(&mut self, marker: Self::TraceVariant) {}
+    fn leave_variant(&mut self) {}
 
-    /// Trace a map field.
+    /// Trace a that a map key has been entered.
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_enter_map_field<T>(&mut self, field: T)
+    fn enter_map_key<T>(&mut self, field: T)
     where
         T: fmt::Display,
     {
@@ -328,25 +316,25 @@ pub trait Context<'buf> {
     /// Trace that we've left the last map field that was entered.
     ///
     /// The `marker` argument will be the same as the one returned from
-    /// [`trace_enter_map_field`].
+    /// [`enter_map_key`].
     ///
-    /// [`trace_enter_map_field`]: Context::trace_enter_map_field
+    /// [`enter_map_key`]: Context::enter_map_key
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_leave_map_field(&mut self) {}
+    fn leave_map_key(&mut self) {}
 
     /// Trace a sequence field.
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_enter_sequence_index(&mut self, index: usize) {}
+    fn enter_sequence_index(&mut self, index: usize) {}
 
     /// Trace that we've left the last sequence index that was entered.
     ///
     /// The `marker` argument will be the same as the one returned from
-    /// [`trace_enter_sequence_index`].
+    /// [`enter_sequence_index`].
     ///
-    /// [`trace_enter_sequence_index`]: Context::trace_enter_sequence_index
+    /// [`enter_sequence_index`]: Context::enter_sequence_index
     #[allow(unused_variables)]
     #[inline(always)]
-    fn trace_leave_sequence_index(&mut self) {}
+    fn leave_sequence_index(&mut self) {}
 }

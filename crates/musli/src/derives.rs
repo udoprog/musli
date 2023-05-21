@@ -722,6 +722,40 @@
 //! }
 //! ```
 //!
+//! #### `#[musli(trace)]`
+//!
+//! This causes the field to use the [`DecodeTrace`] / [`EncodeTrace`] when
+//! encoding the field. This is left optional for types where enabling tracing
+//! for the field requires extra traits to be implemented, such as `HashMap<K,
+//! V>` where we'd need `K` to implement `fmt::Display`.
+//!
+//! Without using the `trace` attribute below, the keys in the `values` field
+//! would not be instrumented, so with a decoding error you'd see this:
+//!
+//! ```text
+//! .values: not numeric (at bytes 15-16)
+//! ```
+//!
+//! Instead of this (where `#[musli(trace)]` is enabled):
+//!
+//! ```text
+//! .values[Hello]: not numeric (at bytes 15-16)
+//! ```
+//!
+//! ```
+//! use std::collections::HashMap;
+//!
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! struct Collection {
+//!     #[musli(trace)]
+//!     values: HashMap<String, u32>,
+//! }
+//! ```
+//!
+//! <br>
+//!
 //! # Enum representations
 //!
 //! Müsli supports the following enum representations, which mimics the ones

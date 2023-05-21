@@ -203,8 +203,8 @@ pub(crate) fn setup<'a>(
         decode_bounds: e.type_attr.decode_bounds(mode),
         expansion,
         data,
-        decode_t_decode: mode.decode_t_decode(Span::call_site()),
-        encode_t_encode: mode.encode_t_encode(Span::call_site()),
+        decode_t_decode: mode.decode_t_decode(false),
+        encode_t_encode: mode.encode_t_encode(false),
         mode_ident: mode.mode_ident(),
         enum_tagging_span: e.type_attr.enum_tagging_span(mode),
     })

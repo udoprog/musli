@@ -1,44 +1,31 @@
 #![allow(unused)]
 
+use std::collections::HashMap;
+
 use musli::{Decode, Encode};
 use musli_common::context::RichContext;
 
 #[derive(Encode)]
-enum InnerFrom {
-    Variant1,
-    Variant2 { vector: Vec<u32>, ok: u32 },
-}
-
-#[derive(Encode)]
 struct From {
-    ok: u32,
-    field: InnerFrom,
+    values: HashMap<String, String>,
 }
 
 #[derive(Decode)]
-enum InnerTo {
-    Variant1,
-    Variant2 { vector: Vec<String>, ok: u32 },
-}
-
-#[derive(Decode)]
-struct To {
-    ok: u32,
-    field: InnerTo,
+struct Collection {
+    #[musli(trace)]
+    values: HashMap<String, u32>,
 }
 
 #[test]
-fn json_trace() {
+fn trace_collection() {
     let mut string = String::new();
     let mut cx = RichContext::new(&mut string);
 
-    let from = From {
-        ok: 10,
-        field: InnerFrom::Variant2 {
-            vector: vec![42],
-            ok: 10004000,
-        },
-    };
+    let mut values = HashMap::new();
+
+    values.insert("Hello".to_string(), "World".to_string());
+
+    let from = From { values };
 
     let encoding = musli_json::Encoding::new();
 
@@ -52,9 +39,9 @@ fn json_trace() {
 
     let mut cx = RichContext::new(&mut string);
 
-    let Ok(..) = encoding.from_slice_with::<_, To>(&mut cx, &bytes) else {
+    let Ok(..) = encoding.from_slice_with::<_, Collection>(&mut cx, &bytes) else {
         if let Some(error) = cx.iter().next() {
-            assert_eq!(error.to_string(), ".field = Variant2 { .vector[0] }: expected string, found <number> (at byte 27)");
+            assert_eq!(error.to_string(), ".values[Hello]: not numeric (at bytes 15-16)");
             return;
         }
 

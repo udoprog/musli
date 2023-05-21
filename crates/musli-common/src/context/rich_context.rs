@@ -4,7 +4,7 @@ use core::mem::take;
 use core::ops::Range;
 use core::ptr;
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use musli::de;
@@ -22,7 +22,7 @@ pub struct RichError<'a, E> {
 /// error.
 pub struct RichContext<'buf, E> {
     mark: usize,
-    string: Option<ptr::NonNull<String>>,
+    string: ptr::NonNull<String>,
     errors: Vec<(Vec<Step>, Range<usize>, E)>,
     path: Vec<Step>,
     include_type: bool,
@@ -37,7 +37,7 @@ impl<'buf, E> RichContext<'buf, E> {
     pub fn new(string: &'buf mut String) -> Self {
         Self {
             mark: 0,
-            string: Some(string.into()),
+            string: string.into(),
             errors: Vec::new(),
             path: Vec::new(),
             include_type: false,
@@ -68,8 +68,6 @@ where
 {
     type Input = E;
     type Error = de::Error;
-    type TraceField = ();
-    type TraceVariant = ();
     type Mark = usize;
 
     #[inline(always)]
@@ -134,90 +132,100 @@ where
 
     #[inline(always)]
     fn store_string(&mut self, s: &str) {
-        if let Some(mut string) = self.string {
-            // SAFETY: we're holding onto a mutable reference to the string so it
-            // must be live for the duration of the context.
-            let string = unsafe { string.as_mut() };
-            string.clear();
-            string.push_str(s);
-        }
+        // SAFETY: we're holding onto a mutable reference to the string so it
+        // must be live for the duration of the context.
+        let string = unsafe { self.string.as_mut() };
+        string.clear();
+        string.push_str(s);
     }
 
     #[inline(always)]
     fn get_string<'a>(&self) -> Option<&'buf str> {
-        let string = self.string?;
         // SAFETY: we're holding onto a mutable reference to the string so it
         // must be live for the duration of the context.
-        let string = unsafe { string.as_ref() };
+        let string = unsafe { self.string.as_ref() };
         Some(string)
     }
 
     #[inline]
-    fn trace_enter_named_field<T>(&mut self, name: &'static str, _: T) -> Self::TraceField
+    fn enter_named_field<T>(&mut self, name: &'static str, _: T)
     where
         T: fmt::Display,
     {
-        self.path.push(Step::NamedField(name));
+        self.path.push(Step::Named(name));
     }
 
     #[inline]
-    fn trace_enter_unnamed_field<T>(&mut self, index: u32, _: T) -> Self::TraceField
+    fn enter_unnamed_field<T>(&mut self, index: u32, _: T)
     where
         T: fmt::Display,
     {
-        self.path.push(Step::UnnamedField(index));
+        self.path.push(Step::Unnamed(index));
     }
 
     #[inline]
-    fn trace_leave_field(&mut self, _: Self::TraceField) {
+    fn leave_field(&mut self) {
         self.path.pop();
     }
 
     #[inline]
-    fn trace_enter_struct(&mut self, name: &'static str) {
+    fn enter_struct(&mut self, name: &'static str) {
         if self.include_type {
             self.path.push(Step::Struct(name));
         }
     }
 
     #[inline]
-    fn trace_leave_struct(&mut self) {
+    fn leave_struct(&mut self) {
         if self.include_type {
             self.path.pop();
         }
     }
 
     #[inline]
-    fn trace_enter_enum(&mut self, name: &'static str) {
+    fn enter_enum(&mut self, name: &'static str) {
         if self.include_type {
             self.path.push(Step::Enum(name));
         }
     }
 
     #[inline]
-    fn trace_leave_enum(&mut self) {
+    fn leave_enum(&mut self) {
         if self.include_type {
             self.path.pop();
         }
     }
 
     #[inline]
-    fn trace_enter_variant<T>(&mut self, name: &'static str, _: T) -> Self::TraceVariant {
+    fn enter_variant<T>(&mut self, name: &'static str, _: T) {
         self.path.push(Step::Variant(name));
     }
 
     #[inline]
-    fn trace_leave_variant(&mut self, _: Self::TraceVariant) {
+    fn leave_variant(&mut self) {
         self.path.pop();
     }
 
     #[inline]
-    fn trace_enter_sequence_index(&mut self, index: usize) {
+    fn enter_sequence_index(&mut self, index: usize) {
         self.path.push(Step::Index(index));
     }
 
     #[inline]
-    fn trace_leave_sequence_index(&mut self) {
+    fn leave_sequence_index(&mut self) {
+        self.path.pop();
+    }
+
+    #[inline]
+    fn enter_map_key<T>(&mut self, field: T)
+    where
+        T: fmt::Display,
+    {
+        self.path.push(Step::Key(field.to_string()));
+    }
+
+    #[inline]
+    fn leave_map_key(&mut self) {
         self.path.pop();
     }
 }
@@ -252,9 +260,10 @@ enum Step {
     Struct(&'static str),
     Enum(&'static str),
     Variant(&'static str),
-    NamedField(&'static str),
-    UnnamedField(u32),
+    Named(&'static str),
+    Unnamed(u32),
     Index(usize),
+    Key(String),
 }
 
 fn format_path(path: &[Step]) -> impl fmt::Display + '_ {
@@ -268,13 +277,13 @@ struct FormatPath<'a> {
 impl<'a> fmt::Display for FormatPath<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut has_type = false;
-        let mut has_prior = false;
+        let mut has_field = false;
         let mut level = 0;
 
         for step in self.path {
-            match *step {
+            match step {
                 Step::Struct(name) => {
-                    if take(&mut has_prior) {
+                    if take(&mut has_field) {
                         write!(f, " = ")?;
                     }
 
@@ -282,37 +291,37 @@ impl<'a> fmt::Display for FormatPath<'a> {
                     has_type = true;
                 }
                 Step::Enum(name) => {
-                    if take(&mut has_prior) {
+                    if take(&mut has_field) {
                         write!(f, " = ")?;
                     }
 
                     write!(f, "{name}::")?;
                 }
                 Step::Variant(name) => {
-                    if take(&mut has_prior) {
+                    if take(&mut has_field) {
                         write!(f, " = ")?;
                     }
 
                     write!(f, "{name}")?;
                     has_type = true;
                 }
-                Step::NamedField(name) => {
+                Step::Named(name) => {
                     if take(&mut has_type) {
                         write!(f, " {{ ")?;
                         level += 1;
                     }
 
                     write!(f, ".{name}")?;
-                    has_prior = true;
+                    has_field = true;
                 }
-                Step::UnnamedField(index) => {
+                Step::Unnamed(index) => {
                     if take(&mut has_type) {
                         write!(f, " {{ ")?;
                         level += 1;
                     }
 
                     write!(f, ".{index}")?;
-                    has_prior = true;
+                    has_field = true;
                 }
                 Step::Index(index) => {
                     if take(&mut has_type) {
@@ -321,7 +330,16 @@ impl<'a> fmt::Display for FormatPath<'a> {
                     }
 
                     write!(f, "[{index}]")?;
-                    has_prior = true;
+                    has_field = true;
+                }
+                Step::Key(key) => {
+                    if take(&mut has_type) {
+                        write!(f, " {{ ")?;
+                        level += 1;
+                    }
+
+                    write!(f, "[{key}]")?;
+                    has_field = true;
                 }
             }
         }
