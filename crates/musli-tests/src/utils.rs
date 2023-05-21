@@ -52,7 +52,7 @@ pub mod musli_storage_packed {
     use crate::mode::Packed;
 
     const ENCODING: Encoding<Packed, Fixed, Variable> =
-        Encoding::new().with_fixed_integers().with_mode::<Packed>();
+        Encoding::new().with_fixed_integers().with_mode();
 
     pub fn buffer() -> Vec<u8> {
         Vec::with_capacity(4096)

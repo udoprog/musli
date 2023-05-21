@@ -2,12 +2,13 @@ use core::fmt;
 
 use self::traits::FromUnsigned;
 pub(crate) use self::traits::{Float, Signed, Unsigned};
-use crate::reader::{ParseError, ParseErrorKind, Parser};
+use crate::reader::{ParseError, Parser};
 use musli::Context;
 
 /// Error when computing integer.
 #[derive(Debug)]
-pub(crate) enum Error {
+#[non_exhaustive]
+pub enum Error {
     /// Arithmetic overflow.
     Overflow,
     /// Decimal number encountered.
@@ -202,7 +203,7 @@ where
     C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
 
     if p.peek_byte(cx)? == Some(b'-') {
         p.skip(cx, 1)?;
@@ -214,11 +215,7 @@ where
             p.consume_while(cx, is_digit_nonzero)?;
         }
         _ => {
-            return Err(cx.report(ParseError::spanned(
-                start,
-                p.pos(),
-                ParseErrorKind::InvalidNumeric,
-            )));
+            return Err(cx.marked_report(start, ParseError::InvalidNumeric));
         }
     }
 
@@ -253,15 +250,11 @@ where
     C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
 
     match decode_unsigned(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.report(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::IntegerError(error),
-        ))),
+        Err(error) => Err(cx.marked_report(start, ParseError::IntegerError(error))),
     }
 }
 
@@ -274,7 +267,7 @@ where
     C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
     decode_unsigned_inner(cx, p, start)
 }
 
@@ -288,7 +281,7 @@ where
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
 
     let is_negative = if p.peek_byte(cx)? == Some(b'-') {
         p.skip(cx, 1)?;
@@ -311,15 +304,11 @@ where
     C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
 
     match decode_signed(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.report(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::IntegerError(error),
-        ))),
+        Err(error) => Err(cx.marked_report(start, ParseError::IntegerError(error))),
     }
 }
 
@@ -328,7 +317,7 @@ where
 fn decode_unsigned_inner<'de, 'buf, T, C, P>(
     cx: &mut C,
     p: &mut P,
-    start: u32,
+    start: C::Mark,
 ) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
@@ -347,11 +336,7 @@ where
             base
         }
         _ => {
-            return Err(cx.report(ParseError::spanned(
-                start,
-                p.pos(),
-                ParseErrorKind::InvalidNumeric,
-            )));
+            return Err(cx.marked_report(start, ParseError::InvalidNumeric));
         }
     };
 
@@ -375,11 +360,9 @@ where
                 m.value = match m.value.checked_pow10(zeros as u32) {
                     Some(mantissa) => mantissa,
                     None => {
-                        return Err(cx.report(ParseError::spanned(
-                            start,
-                            p.pos(),
-                            ParseErrorKind::IntegerError(Error::Overflow),
-                        )));
+                        return Err(
+                            cx.marked_report(start, ParseError::IntegerError(Error::Overflow))
+                        );
                     }
                 };
             }
@@ -401,7 +384,7 @@ where
 }
 
 /// Decode an exponent.
-fn decode_exponent<'de, 'buf, C, P>(cx: &mut C, p: &mut P, start: u32) -> Result<i32, C::Error>
+fn decode_exponent<'de, 'buf, C, P>(cx: &mut C, p: &mut P, start: C::Mark) -> Result<i32, C::Error>
 where
     C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
@@ -426,17 +409,18 @@ where
 
     match if is_negative { e.negate() } else { e.signed() } {
         Some(value) => Ok(value),
-        None => Err(cx.report(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::IntegerError(Error::Overflow),
-        ))),
+        None => Err(cx.marked_report(start, ParseError::IntegerError(Error::Overflow))),
     }
 }
 
 /// Decode a single digit into `out`.
 #[inline]
-fn digit<'de, 'buf, T, C, P>(cx: &mut C, mut out: T, p: &mut P, start: u32) -> Result<T, C::Error>
+fn digit<'de, 'buf, T, C, P>(
+    cx: &mut C,
+    mut out: T,
+    p: &mut P,
+    start: C::Mark,
+) -> Result<T, C::Error>
 where
     T: Unsigned,
     C: Context<'buf, Input = ParseError>,
@@ -445,11 +429,7 @@ where
     out = match out.checked_mul10() {
         Some(value) => value,
         None => {
-            return Err(cx.report(ParseError::spanned(
-                start,
-                p.pos(),
-                ParseErrorKind::IntegerError(Error::Overflow),
-            )));
+            return Err(cx.marked_report(start, ParseError::IntegerError(Error::Overflow)));
         }
     };
 

@@ -9,7 +9,7 @@ pub trait Context<'buf> {
     /// Error produced by context.
     type Error;
     /// A mark during processing.
-    type Mark: Default;
+    type Mark: Copy + Default;
     /// Returned marker for matching field traces.
     type TraceField: Default;
     /// Returned marker for matching variant traces.
@@ -19,6 +19,16 @@ pub trait Context<'buf> {
     fn report<T>(&mut self, error: T) -> Self::Error
     where
         Self::Input: From<T>;
+
+    /// Report the given encoding error from the given mark.
+    #[allow(unused_variables)]
+    #[inline(always)]
+    fn marked_report<T>(&mut self, mark: Self::Mark, error: T) -> Self::Error
+    where
+        Self::Input: From<T>,
+    {
+        self.report(error)
+    }
 
     /// Report a custom error.
     fn custom<T>(&mut self, error: T) -> Self::Error

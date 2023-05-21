@@ -9,7 +9,7 @@ use musli::de::{
 };
 use musli::Context;
 use musli_common::int::{continuation as c, UsizeEncoding, Variable};
-use musli_common::reader::PosReader;
+use musli_common::reader::Reader;
 use musli_storage::de::StorageDecoder;
 
 use crate::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
@@ -56,7 +56,7 @@ impl<R> SelfTupleDecoder<R> {
 
 impl<'de, R> SelfDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any<'buf, C>(&mut self, cx: &mut C) -> Result<(), C::Error>
@@ -123,7 +123,7 @@ where
     where
         C: Context<'buf, Input = R::Error>,
     {
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let len = self.decode_prefix(cx, Kind::Map, pos)?;
         Ok(RemainingSelfDecoder::new(len, self))
     }
@@ -137,7 +137,7 @@ where
     where
         C: Context<'buf, Input = R::Error>,
     {
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let len = self.decode_prefix(cx, Kind::Sequence, pos)?;
         Ok(RemainingSelfDecoder::new(len, self))
     }
@@ -148,7 +148,7 @@ where
         &mut self,
         cx: &mut C,
         kind: Kind,
-        pos: usize,
+        mark: C::Mark,
     ) -> Result<usize, C::Error>
     where
         C: Context<'buf, Input = R::Error>,
@@ -156,11 +156,13 @@ where
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
         if tag.kind() != kind {
-            return Err(cx.message(Expected {
-                expected: kind,
-                actual: tag,
-                pos,
-            }));
+            return Err(cx.marked_message(
+                mark,
+                Expected {
+                    expected: kind,
+                    actual: tag,
+                },
+            ));
         }
 
         Ok(if let Some(len) = tag.data() {
@@ -184,7 +186,7 @@ pub struct RemainingSelfDecoder<R> {
 #[musli::decoder]
 impl<'de, R> Decoder<'de> for SelfDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     type Error = R::Error;
     type Pack = SelfPackDecoder<R>;
@@ -280,7 +282,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let len = self.decode_prefix(cx, Kind::Bytes, pos)?;
         Ok(SelfPackDecoder::new(self.reader, len))
     }
@@ -290,13 +292,16 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let len = self.decode_prefix(cx, Kind::Bytes, pos)?;
 
         if len != N {
-            return Err(cx.message(format_args! {
-                "bad length, got {len} but expect {N} (at {pos})"
-            }));
+            return Err(cx.marked_message(
+                pos,
+                format_args! {
+                    "bad length, got {len} but expect {N}"
+                },
+            ));
         }
 
         self.reader.read_array(cx)
@@ -308,7 +313,7 @@ where
         C: Context<'buf, Input = Self::Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>,
     {
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let len = self.decode_prefix(cx, Kind::Bytes, pos)?;
         self.reader.read_bytes(cx, len, visitor)
     }
@@ -354,7 +359,7 @@ where
             }
         }
 
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let len = self.decode_prefix(cx, Kind::String, pos)?;
         self.reader.read_bytes(cx, len, Visitor(visitor))
     }
@@ -367,15 +372,18 @@ where
         const FALSE: Tag = Tag::from_mark(Mark::False);
         const TRUE: Tag = Tag::from_mark(Mark::True);
 
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
         match tag {
             FALSE => Ok(false),
             TRUE => Ok(true),
-            tag => Err(cx.message(format_args! {
-                "bad boolean, got {tag:?} (at {pos})"
-            })),
+            tag => Err(cx.marked_message(
+                pos,
+                format_args! {
+                    "bad boolean, got {tag:?}"
+                },
+            )),
         }
     }
 
@@ -386,18 +394,18 @@ where
     {
         const CHAR: Tag = Tag::from_mark(Mark::Char);
 
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
         if tag != CHAR {
-            return Err(cx.message(format_args!("expected {CHAR:?}, got {tag:?} (at {pos})")));
+            return Err(cx.marked_message(pos, format_args!("expected {CHAR:?}, got {tag:?}")));
         }
 
         let num = c::decode(cx, self.reader.borrow_mut())?;
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(cx.message(format_args!("bad character (at {pos}"))),
+            None => Err(cx.marked_message(pos, format_args!("bad character"))),
         }
     }
 
@@ -592,15 +600,18 @@ where
         const NONE: Tag = Tag::from_mark(Mark::None);
         const SOME: Tag = Tag::from_mark(Mark::Some);
 
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
         match tag {
             NONE => Ok(None),
             SOME => Ok(Some(self)),
-            tag => Err(cx.message(format_args! {
-                "expected option, was {tag:?} (at {pos})"
-            })),
+            tag => Err(cx.marked_message(
+                pos,
+                format_args! {
+                    "expected option, was {tag:?}"
+                },
+            )),
         }
     }
 
@@ -617,7 +628,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let pos = self.reader.pos();
+        let pos = cx.mark();
         let actual = self.decode_prefix(cx, Kind::Sequence, pos)?;
 
         if len != actual {
@@ -658,7 +669,6 @@ where
             return Err(cx.message(Expected {
                 expected: Kind::Mark,
                 actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
             }));
         }
 
@@ -785,10 +795,10 @@ where
 
 impl<'de, R> PackDecoder<'de> for SelfPackDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, Variable, Variable> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<R::Mut<'this>, Variable, Variable> where Self: 'this;
 
     #[inline]
     fn next<'buf, C>(&mut self, cx: &mut C) -> Result<Self::Decoder<'_>, C::Error>
@@ -800,7 +810,7 @@ where
             None => return Err(cx.message("tried to decode past the pack")),
         };
 
-        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -814,17 +824,17 @@ where
 
 impl<'de, R> PackDecoder<'de> for SelfTupleDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     type Error = R::Error;
-    type Decoder<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
+    type Decoder<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
 
     #[inline]
     fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(SelfDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -838,7 +848,7 @@ where
 
 impl<'de, R> RemainingSelfDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     #[inline]
     fn new(remaining: usize, decoder: SelfDecoder<R>) -> Self {
@@ -848,10 +858,10 @@ where
 
 impl<'de, R> SequenceDecoder<'de> for RemainingSelfDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     type Error = R::Error;
-    type Decoder<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
+    type Decoder<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -868,7 +878,7 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(SelfDecoder::new(self.decoder.reader.pos_borrow_mut())))
+        Ok(Some(SelfDecoder::new(self.decoder.reader.borrow_mut())))
     }
 
     #[inline]
@@ -887,10 +897,10 @@ where
 
 impl<'de, R> PairDecoder<'de> for SelfDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     type Error = R::Error;
-    type First<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
+    type First<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
     type Second = Self;
 
     #[inline]
@@ -898,7 +908,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(SelfDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -921,18 +931,18 @@ where
 
 impl<'de, R> VariantDecoder<'de> for SelfDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     type Error = R::Error;
-    type Tag<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
-    type Variant<'this> = SelfDecoder<R::PosMut<'this>> where Self: 'this;
+    type Tag<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
+    type Variant<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
 
     #[inline]
     fn tag<'buf, C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(SelfDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -940,7 +950,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(SelfDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -963,11 +973,11 @@ where
 
 impl<'de, R> PairsDecoder<'de> for RemainingSelfDecoder<R>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
 {
     type Error = R::Error;
 
-    type Decoder<'this> = SelfDecoder<R::PosMut<'this>>
+    type Decoder<'this> = SelfDecoder<R::Mut<'this>>
     where
         Self: 'this;
 
@@ -986,7 +996,7 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(SelfDecoder::new(self.decoder.reader.pos_borrow_mut())))
+        Ok(Some(SelfDecoder::new(self.decoder.reader.borrow_mut())))
     }
 
     #[inline]
@@ -1006,17 +1016,12 @@ where
 struct Expected {
     expected: Kind,
     actual: Tag,
-    pos: usize,
 }
 
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            expected,
-            actual,
-            pos,
-        } = *self;
+        let Self { expected, actual } = *self;
 
-        write!(f, "Expected {expected:?} but was {actual:?} (at {pos})",)
+        write!(f, "Expected {expected:?} but was {actual:?}",)
     }
 }

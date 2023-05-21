@@ -32,3 +32,6 @@ pub mod reader;
 pub mod str;
 pub mod wrap;
 pub mod writer;
+
+#[macro_use]
+mod macros;

@@ -1,6 +1,6 @@
 use musli::Context;
 
-use crate::reader::{ParseError, ParseErrorKind, Parser, Scratch, StringReference, Token};
+use crate::reader::{ParseError, Parser, Scratch, StringReference, Token};
 
 /// An efficient [Reader] wrapper around a slice.
 pub struct SliceParser<'de> {
@@ -34,19 +34,18 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: Context<'buf, Input = ParseError>,
     {
-        let start = self.pos();
+        let start = cx.mark();
         let actual = self.peek(cx)?;
 
         if !matches!(actual, Token::String) {
-            return Err(cx.report(ParseError::at(
-                start,
-                ParseErrorKind::ExpectedString(actual),
-            )));
+            return Err(cx.marked_report(start, ParseError::ExpectedString(actual)));
         }
 
         self.skip(cx, 1)?;
         scratch.bytes.clear();
-        crate::reader::string::parse_string_slice_reader(cx, self, scratch, validate, start)
+        let out =
+            crate::reader::string::parse_string_slice_reader(cx, self, scratch, validate, start);
+        out
     }
 
     #[inline]
@@ -67,10 +66,11 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         let outcome = self.index.wrapping_add(n);
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.report(ParseError::at(self.pos(), ParseErrorKind::BufferUnderflow)));
+            return Err(cx.report(ParseError::BufferUnderflow));
         }
 
         self.index = outcome;
+        cx.advance(n);
         Ok(())
     }
 
@@ -82,16 +82,17 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         let outcome = self.index.wrapping_add(buf.len());
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.report(ParseError::at(self.pos(), ParseErrorKind::BufferUnderflow)));
+            return Err(cx.report(ParseError::BufferUnderflow));
         }
 
         buf.copy_from_slice(&self.slice[self.index..outcome]);
         self.index = outcome;
+        cx.advance(buf.len());
         Ok(())
     }
 
     #[inline]
-    fn skip_whitespace<'buf, C>(&mut self, _: &mut C) -> Result<(), C::Error>
+    fn skip_whitespace<'buf, C>(&mut self, cx: &mut C) -> Result<(), C::Error>
     where
         C: Context<'buf, Input = ParseError>,
     {
@@ -99,7 +100,8 @@ impl<'de> Parser<'de> for SliceParser<'de> {
             self.slice.get(self.index),
             Some(b' ' | b'\n' | b'\t' | b'\r')
         ) {
-            self.index += 1;
+            self.index = self.index.wrapping_add(1);
+            cx.advance(1);
         }
 
         Ok(())
@@ -132,14 +134,12 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         ) {
             Ok(out) => out,
             Err(error) => {
-                return Err(cx.report(ParseError::at(
-                    self.pos(),
-                    ParseErrorKind::ParseFloat(error),
-                )));
+                return Err(cx.report(ParseError::ParseFloat(error)));
             }
         };
 
         self.index += read;
+        cx.advance(read);
         Ok(value)
     }
 
@@ -157,14 +157,12 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         ) {
             Ok(out) => out,
             Err(error) => {
-                return Err(cx.report(ParseError::at(
-                    self.pos(),
-                    ParseErrorKind::ParseFloat(error),
-                )));
+                return Err(cx.report(ParseError::ParseFloat(error)));
             }
         };
 
         self.index += read;
+        cx.advance(read);
         Ok(value)
     }
 }

@@ -14,6 +14,7 @@ use std::io;
 use musli::de::Decode;
 use musli::en::Encode;
 use musli::mode::{DefaultMode, Mode};
+use musli::Context;
 
 use crate::de::JsonDecoder;
 use crate::en::JsonEncoder;
@@ -124,10 +125,7 @@ pub struct Encoding<M = DefaultMode> {
     _marker: marker::PhantomData<M>,
 }
 
-impl<M> Encoding<M>
-where
-    M: Mode,
-{
+impl Encoding<DefaultMode> {
     /// Construct a new [Encoding].
     ///
     /// You can modify this using the available factory methods:
@@ -136,7 +134,7 @@ where
     /// use musli_json::Encoding;
     /// use musli::{Encode, Decode, Mode};
     ///
-    /// const CONFIG: Encoding<Json> = Encoding::new();
+    /// const CONFIG: Encoding<Json> = Encoding::new().with_mode();
     ///
     /// // Mode marker indicating that some attributes should
     /// // only apply when we're decoding in a JSON mode.
@@ -171,7 +169,12 @@ where
             _marker: marker::PhantomData,
         }
     }
+}
 
+impl<M> Encoding<M>
+where
+    M: Mode,
+{
     /// Change the mode of the encoding.
     pub const fn with_mode<T>(self) -> Encoding<T>
     where
@@ -182,52 +185,24 @@ where
         }
     }
 
-    /// Encode the given value to the given [Writer] using the current
+    /// Encode the given value to the given [`Writer`] using the current
     /// configuration.
+    ///
+    /// This is the same as [`Encoding::encode`] but allows for using a
+    /// configurable [`Context`].
     #[inline]
-    pub fn encode<W, T>(self, mut writer: W, value: &T) -> Result<(), W::Error>
+    pub fn encode_with<'buf, C, W, T>(
+        self,
+        cx: &mut C,
+        writer: W,
+        value: &T,
+    ) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: ?Sized + Encode<M>,
     {
-        let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut writer))
-    }
-
-    /// Encode the given value to the given [Write][io::Write] using the current
-    /// configuration.
-    #[cfg(feature = "std")]
-    #[inline]
-    pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
-    where
-        W: io::Write,
-        T: ?Sized + Encode<M>,
-    {
-        let mut writer = crate::wrap::wrap(write);
-        let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut writer))
-    }
-
-    /// Encode the given value to a [`Buffer`] using the current configuration.
-    #[inline]
-    pub fn to_buffer<T>(self, value: &T) -> Result<Buffer, BufferError>
-    where
-        T: ?Sized + Encode<M>,
-    {
-        let mut data = Buffer::new();
-        let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut data))?;
-        Ok(data)
-    }
-
-    /// Encode the given value to a [`Vec`] using the current configuration.
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, BufferError>
-    where
-        T: ?Sized + Encode<M>,
-    {
-        Ok(self.to_buffer(value)?.into_vec())
+        T::encode(value, cx, JsonEncoder::<M, _>::new(writer))
     }
 
     /// Encode the given value to a [`String`] using the current configuration.
@@ -237,37 +212,53 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        let mut data = Buffer::with_capacity(128);
         let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut data))?;
-        // SAFETY: Encoder is guaranteed to produce valid UTF-8.
-        Ok(unsafe { String::from_utf8_unchecked(data.into_vec()) })
+        self.to_string_with(&mut cx, value)
     }
 
-    /// Encode the given value to a fixed-size bytes using the current
-    /// configuration.
+    /// Encode the given value to a [`String`] using the current configuration.
+    ///
+    /// This is the same as [`Encoding::to_string`] but allows for using a
+    /// configurable [`Context`].
+    #[cfg(feature = "alloc")]
     #[inline]
-    pub fn to_fixed_bytes<const N: usize, T>(self, value: &T) -> Result<FixedBytes<N>, BufferError>
+    pub fn to_string_with<'buf, T, C>(self, cx: &mut C, value: &T) -> Result<String, C::Error>
     where
+        C: Context<'buf, Input = BufferError>,
         T: ?Sized + Encode<M>,
     {
-        let mut bytes = FixedBytes::new();
-        let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, JsonEncoder::<M, _>::new(&mut bytes))?;
-        Ok(bytes)
+        let mut data = Buffer::with_capacity(128);
+        T::encode(value, cx, JsonEncoder::<M, _>::new(&mut data))?;
+        // SAFETY: Encoder is guaranteed to produce valid UTF-8.
+        Ok(unsafe { String::from_utf8_unchecked(data.into_vec()) })
     }
 
     /// Decode the given type `T` from the given [Parser] using the current
     /// configuration.
     #[inline]
-    pub fn decode<'de, R, T>(self, mut reader: R) -> Result<T, ParseError>
+    pub fn decode<'de, P, T>(self, parser: P) -> Result<T, ParseError>
     where
-        R: Parser<'de>,
+        P: Parser<'de>,
+        T: Decode<'de, M>,
+    {
+        let mut cx = musli_common::context::Same::default();
+        self.decode_with(&mut cx, parser)
+    }
+
+    /// Decode the given type `T` from the given [Parser] using the current
+    /// configuration.
+    ///
+    /// This is the same as [`Encoding::decode`] but allows for using a
+    /// configurable [`Context`].
+    #[inline]
+    pub fn decode_with<'de, 'buf, C, P, T>(self, cx: &mut C, parser: P) -> Result<T, C::Error>
+    where
+        C: Context<'buf, Input = ParseError>,
+        P: Parser<'de>,
         T: Decode<'de, M>,
     {
         let mut scratch = Scratch::new();
-        let mut cx = musli_common::context::Same::default();
-        T::decode(&mut cx, JsonDecoder::new(&mut scratch, &mut reader))
+        T::decode(cx, JsonDecoder::new(&mut scratch, parser))
     }
 
     /// Decode the given type `T` from the given string using the current
@@ -280,6 +271,20 @@ where
         self.from_slice(string.as_bytes())
     }
 
+    /// Decode the given type `T` from the given string using the current
+    /// configuration.
+    ///
+    /// This is the same as [`Encoding::from_str`] but allows for using a
+    /// configurable [`Context`].
+    #[inline]
+    pub fn from_str_with<'de, 'buf, C, T>(self, cx: &mut C, string: &'de str) -> Result<T, C::Error>
+    where
+        C: Context<'buf, Input = ParseError>,
+        T: Decode<'de, M>,
+    {
+        self.from_slice_with(cx, string.as_bytes())
+    }
+
     /// Decode the given type `T` from the given slice using the current
     /// configuration.
     #[inline]
@@ -287,11 +292,31 @@ where
     where
         T: Decode<'de, M>,
     {
+        let mut cx = musli_common::context::Same::default();
+        self.from_slice_with(&mut cx, bytes)
+    }
+
+    /// Decode the given type `T` from the given slice using the current
+    /// configuration.
+    ///
+    /// This is the same as [`Encoding::from_slice`] but allows for using a
+    /// configurable [`Context`].
+    #[inline]
+    pub fn from_slice_with<'de, 'buf, C, T>(
+        self,
+        cx: &mut C,
+        bytes: &'de [u8],
+    ) -> Result<T, C::Error>
+    where
+        C: Context<'buf, Input = ParseError>,
+        T: Decode<'de, M>,
+    {
         let mut scratch = Scratch::new();
         let mut reader = SliceParser::new(bytes);
-        let mut cx = musli_common::context::Same::default();
-        T::decode(&mut cx, JsonDecoder::new(&mut scratch, &mut reader))
+        T::decode(cx, JsonDecoder::new(&mut scratch, &mut reader))
     }
+
+    musli_common::encode_with_extensions!();
 }
 
 impl<M> Clone for Encoding<M> {

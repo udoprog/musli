@@ -82,6 +82,16 @@ where
         de::Error
     }
 
+    #[inline]
+    fn marked_report<T>(&mut self, mark: Self::Mark, message: T) -> Self::Error
+    where
+        E: From<T>,
+    {
+        self.errors
+            .push((self.path.clone(), mark..self.mark, E::from(message)));
+        de::Error
+    }
+
     #[inline(always)]
     fn custom<T>(&mut self, message: T) -> Self::Error
     where
@@ -110,6 +120,11 @@ where
         self.errors
             .push((self.path.clone(), mark..self.mark, E::message(message)));
         de::Error
+    }
+
+    #[inline]
+    fn mark(&mut self) -> Self::Mark {
+        self.mark
     }
 
     #[inline]

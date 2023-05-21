@@ -11,9 +11,7 @@ use musli::de::{
 use musli::error::Error;
 use musli::mode::Mode;
 use musli::Context;
-#[cfg(feature = "alloc")]
-use musli_common::reader::Reader;
-use musli_common::reader::{SliceReader, WithPosition};
+use musli_common::reader::SliceReader;
 use musli_storage::de::StorageDecoder;
 use musli_storage::int::Variable;
 
@@ -57,7 +55,7 @@ where
     type Error = E;
     type Buffer = AsValueDecoder<E>;
     type Some = Self;
-    type Pack = StorageDecoder<WithPosition<SliceReader<'de, Self::Error>>, Variable, Variable>;
+    type Pack = StorageDecoder<SliceReader<'de, Self::Error>, Variable, Variable>;
     type Sequence = IterValueDecoder<'de, E>;
     type Tuple = IterValueDecoder<'de, E>;
     type Map = IterValuePairsDecoder<'de, E>;
@@ -298,7 +296,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedPack(hint), Value::Bytes(pack) => {
-            Ok(StorageDecoder::new(SliceReader::new(pack).with_position()))
+            Ok(StorageDecoder::new(SliceReader::new(pack)))
         })
     }
 

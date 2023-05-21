@@ -17,28 +17,6 @@ use musli::Context;
 
 use crate::error::BufferError;
 
-/// A reader where the current position is exactly known.
-pub trait PosReader<'de>: Reader<'de> {
-    /// The exact position of a reader.
-    fn pos(&self) -> usize;
-
-    /// Type borrowed from self.
-    ///
-    /// Why oh why would we want to do this over having a simple `&'this mut T`?
-    ///
-    /// We want to avoid recursive types, which will blow up the compiler. And
-    /// the above is a typical example of when that can go wrong. This ensures
-    /// that each call to `borrow_mut` dereferences the [Reader] at each step to
-    /// avoid constructing a large muted type, like `&mut &mut &mut
-    /// SliceReader<'de>`.
-    type PosMut<'this>: PosReader<'de, Error = Self::Error>
-    where
-        Self: 'this;
-
-    /// Borrow the current reader.
-    fn pos_borrow_mut(&mut self) -> Self::PosMut<'_>;
-}
-
 /// Trait governing how a source of bytes is read.
 ///
 /// This requires the reader to be able to hand out contiguous references to the
@@ -153,24 +131,14 @@ pub trait Reader<'de> {
             }
 
             #[inline]
-            fn visit_ref(mut self, _: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(mut self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 self.0.copy_from_slice(bytes);
+                cx.advance(bytes.len());
                 Ok(self.0)
             }
         }
 
         self.read_bytes(cx, N, Visitor([0u8; N]))
-    }
-
-    /// Keep an accurate record of the position within the reader.
-    fn with_position(self) -> WithPosition<Self>
-    where
-        Self: Sized,
-    {
-        WithPosition {
-            pos: 0,
-            reader: self,
-        }
     }
 
     /// Keep an accurate record of the position within the reader.
@@ -387,7 +355,6 @@ fn bounds_check_add<'buf, C, E>(
 ) -> Result<*const u8, C::Error>
 where
     C: Context<'buf, Input = E>,
-    E: Error,
 {
     let outcome = range.start.wrapping_add(len);
 
@@ -395,109 +362,6 @@ where
         Err(cx.custom("buffer underflow"))
     } else {
         Ok(outcome)
-    }
-}
-
-/// Keep a record of the current position.
-///
-/// Constructed through [Reader::with_position].
-pub struct WithPosition<R> {
-    pos: usize,
-    reader: R,
-}
-
-impl<'de, R> PosReader<'de> for WithPosition<R>
-where
-    R: Reader<'de>,
-{
-    type PosMut<'this> = &'this mut Self where Self: 'this;
-
-    #[inline]
-    fn pos_borrow_mut(&mut self) -> Self::PosMut<'_> {
-        self
-    }
-
-    #[inline]
-    fn pos(&self) -> usize {
-        self.pos
-    }
-}
-
-impl<'de, R> Reader<'de> for WithPosition<R>
-where
-    R: Reader<'de>,
-{
-    type Error = R::Error;
-
-    type Mut<'this> = &'this mut Self where Self: 'this;
-
-    #[inline]
-    fn borrow_mut(&mut self) -> Self::Mut<'_> {
-        self
-    }
-
-    #[inline]
-    fn skip<'buf, C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-    {
-        self.reader.skip(cx, n)?;
-        self.pos += n;
-        Ok(())
-    }
-
-    #[inline]
-    fn read_bytes<'buf, C, V>(
-        &mut self,
-        cx: &mut C,
-        n: usize,
-        visitor: V,
-    ) -> Result<V::Ok, C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-        V: ValueVisitor<'de, 'buf, C, [u8]>,
-    {
-        let ok = self.reader.read_bytes(cx, n, visitor)?;
-        self.pos += n;
-        Ok(ok)
-    }
-
-    #[inline]
-    fn peek<'buf, C>(&mut self, cx: &mut C) -> Result<Option<u8>, C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-    {
-        self.reader.peek(cx)
-    }
-
-    #[inline]
-    fn read<'buf, C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-    {
-        self.reader.read(cx, buf)?;
-        self.pos += buf.len();
-        Ok(())
-    }
-
-    #[inline]
-    fn read_byte<'buf, C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-    {
-        let b = self.reader.read_byte(cx)?;
-        self.pos += 1;
-        Ok(b)
-    }
-
-    #[inline]
-    fn read_array<'buf, C, const N: usize>(&mut self, cx: &mut C) -> Result<[u8; N], C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-    {
-        let array = self.reader.read_array(cx)?;
-        self.pos += N;
-        Ok(array)
     }
 }
 
@@ -524,23 +388,6 @@ where
             }
             None => Err(cx.custom("out of bounds")),
         }
-    }
-}
-
-impl<'de, R> PosReader<'de> for Limit<R>
-where
-    R: PosReader<'de>,
-{
-    type PosMut<'this> = &'this mut Self where Self: 'this;
-
-    #[inline]
-    fn pos_borrow_mut(&mut self) -> Self::PosMut<'_> {
-        self
-    }
-
-    #[inline]
-    fn pos(&self) -> usize {
-        self.reader.pos()
     }
 }
 
@@ -619,30 +466,13 @@ where
 
 // Forward implementations.
 
-impl<'de, R> PosReader<'de> for &mut R
-where
-    R: ?Sized + PosReader<'de>,
-{
-    type PosMut<'this> = &'this mut R where Self: 'this;
-
-    #[inline]
-    fn pos_borrow_mut(&mut self) -> Self::PosMut<'_> {
-        self
-    }
-
-    #[inline]
-    fn pos(&self) -> usize {
-        (**self).pos()
-    }
-}
-
 impl<'de, R> Reader<'de> for &mut R
 where
     R: ?Sized + Reader<'de>,
 {
     type Error = R::Error;
 
-    type Mut<'this> = &'this mut Self where Self: 'this;
+    type Mut<'this> = &'this mut R where Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

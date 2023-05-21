@@ -69,7 +69,7 @@
 //! # struct Person<'a> { name: &'a str, age: u32 }
 //! use musli_json::Encoding;
 //!
-//! const JSON_ENCODING: Encoding<Json> = Encoding::new();
+//! const JSON_ENCODING: Encoding<Json> = Encoding::new().with_mode();
 //! const DEFAULT_ENCODING: Encoding = Encoding::new();
 //!
 //! let named = JSON_ENCODING.to_buffer(&Person { name: "Aristotle", age: 62 })?;

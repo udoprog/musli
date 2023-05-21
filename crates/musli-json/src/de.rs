@@ -16,9 +16,7 @@ use musli::Context;
 
 use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
-use crate::reader::{
-    integer, string, ParseError, ParseErrorKind, Parser, Scratch, StringReference, Token,
-};
+use crate::reader::{integer, string, ParseError, Parser, Scratch, StringReference, Token};
 
 /// A JSON decoder for Müsli.
 pub struct JsonDecoder<'a, P> {
@@ -41,7 +39,7 @@ where
     where
         C: Context<'buf, Input = ParseError>,
     {
-        let start = self.parser.pos();
+        let start = cx.mark();
         let actual = self.parser.peek(cx)?;
 
         match actual {
@@ -76,11 +74,7 @@ where
                 return string::skip_string(cx, &mut self.parser, true);
             }
             actual => {
-                return Err(cx.report(ParseError::spanned(
-                    start,
-                    self.parser.pos(),
-                    ParseErrorKind::ExpectedValue(actual),
-                )));
+                return Err(cx.marked_report(start, ParseError::ExpectedValue(actual)));
             }
         }
 
@@ -92,9 +86,8 @@ where
     where
         C: Context<'buf, Input = ParseError>,
     {
-        self.parser.parse_exact(cx, *b"true", |pos| {
-            ParseError::at(pos, ParseErrorKind::ExpectedTrue)
-        })
+        self.parser
+            .parse_exact(cx, *b"true", ParseError::ExpectedTrue)
     }
 
     #[inline]
@@ -102,9 +95,8 @@ where
     where
         C: Context<'buf, Input = ParseError>,
     {
-        self.parser.parse_exact(cx, *b"false", |pos| {
-            ParseError::at(pos, ParseErrorKind::ExpectedFalse)
-        })
+        self.parser
+            .parse_exact(cx, *b"false", ParseError::ExpectedFalse)
     }
 
     #[inline]
@@ -112,9 +104,8 @@ where
     where
         C: Context<'buf, Input = ParseError>,
     {
-        self.parser.parse_exact(cx, *b"null", |pos| {
-            ParseError::at(pos, ParseErrorKind::ExpectedNull)
-        })
+        self.parser
+            .parse_exact(cx, *b"null", ParseError::ExpectedNull)
     }
 }
 
@@ -190,10 +181,7 @@ where
                 self.parse_false(cx)?;
                 Ok(false)
             }
-            actual => Err(cx.report(ParseError::at(
-                self.parser.pos(),
-                ParseErrorKind::ExpectedBool(actual),
-            ))),
+            actual => Err(cx.report(ParseError::ExpectedBool(actual))),
         }
     }
 
@@ -202,7 +190,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let start = self.parser.pos();
+        let start = cx.mark();
 
         let string = match self.parser.parse_string(cx, self.scratch, true)? {
             StringReference::Borrowed(string) => string,
@@ -214,11 +202,7 @@ where
 
         match (first, it.next()) {
             (Some(c), None) => Ok(c),
-            _ => Err(cx.report(ParseError::spanned(
-                start,
-                self.parser.pos(),
-                ParseErrorKind::CharEmptyString,
-            ))),
+            _ => Err(cx.marked_report(start, ParseError::CharEmptyString)),
         }
     }
 
@@ -749,10 +733,7 @@ where
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(cx.report(ParseError::at(
-                parser.pos(),
-                ParseErrorKind::ExpectedOpenBrace(actual),
-            )));
+            return Err(cx.report(ParseError::ExpectedOpenBrace(actual)));
         }
 
         parser.skip(cx, 1)?;
@@ -916,10 +897,7 @@ where
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBracket) {
-            return Err(cx.report(ParseError::at(
-                parser.pos(),
-                ParseErrorKind::ExpectedOpenBracket(actual),
-            )));
+            return Err(cx.report(ParseError::ExpectedOpenBracket(actual)));
         }
 
         parser.skip(cx, 1)?;
@@ -993,10 +971,7 @@ where
             let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.report(ParseError::at(
-                    self.parser.pos(),
-                    ParseErrorKind::ExpectedCloseBracket(actual),
-                )));
+                return Err(cx.report(ParseError::ExpectedCloseBracket(actual)));
             }
 
             self.parser.skip(cx, 1)?;
@@ -1061,10 +1036,7 @@ where
             let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.report(ParseError::at(
-                    self.parser.pos(),
-                    ParseErrorKind::ExpectedCloseBracket(actual),
-                )));
+                return Err(cx.report(ParseError::ExpectedCloseBracket(actual)));
             }
 
             self.parser.skip(cx, 1)?;
@@ -1098,10 +1070,7 @@ where
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(cx.report(ParseError::at(
-                parser.pos(),
-                ParseErrorKind::ExpectedOpenBrace(actual),
-            )));
+            return Err(cx.report(ParseError::ExpectedOpenBrace(actual)));
         }
 
         parser.skip(cx, 1)?;
@@ -1137,10 +1106,7 @@ where
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(cx.report(ParseError::at(
-                self.parser.pos(),
-                ParseErrorKind::ExpectedColon(actual),
-            )));
+            return Err(cx.report(ParseError::ExpectedColon(actual)));
         }
 
         self.parser.skip(cx, 1)?;
@@ -1165,10 +1131,7 @@ where
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::CloseBrace) {
-            return Err(cx.report(ParseError::at(
-                self.parser.pos(),
-                ParseErrorKind::ExpectedCloseBrace(actual),
-            )));
+            return Err(cx.report(ParseError::ExpectedCloseBrace(actual)));
         }
 
         self.parser.skip(cx, 1)?;

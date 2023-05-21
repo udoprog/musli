@@ -9,7 +9,7 @@ use musli::de::{
     VariantDecoder,
 };
 use musli::Context;
-use musli_common::reader::{Limit, PosReader};
+use musli_common::reader::{Limit, Reader};
 use musli_storage::de::StorageDecoder;
 use musli_storage::int::{continuation as c, Variable};
 
@@ -44,7 +44,7 @@ where
 
 impl<'de, R, I, L> WireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
@@ -107,7 +107,6 @@ where
             _ => Err(cx.message(Expected {
                 expected: Kind::Sequence,
                 actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
             })),
         }
     }
@@ -140,18 +139,20 @@ where
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_prefix<'buf, C>(&mut self, cx: &mut C, pos: usize) -> Result<usize, C::Error>
+    fn decode_prefix<'buf, C>(&mut self, cx: &mut C, start: C::Mark) -> Result<usize, C::Error>
     where
         C: Context<'buf, Input = R::Error>,
     {
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
         if tag.kind() != Kind::Prefix {
-            return Err(cx.message(Expected {
-                expected: Kind::Prefix,
-                actual: tag,
-                pos,
-            }));
+            return Err(cx.marked_message(
+                start,
+                Expected {
+                    expected: Kind::Prefix,
+                    actual: tag,
+                },
+            ));
         }
 
         Ok(if let Some(len) = tag.data() {
@@ -179,7 +180,7 @@ where
 #[musli::decoder]
 impl<'de, R, I, L> Decoder<'de> for WireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
@@ -211,8 +212,8 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let pos = self.reader.pos();
-        let len = self.decode_prefix(cx, pos)?;
+        let mark = cx.mark();
+        let len = self.decode_prefix(cx, mark)?;
         Ok(WireDecoder::new(self.reader.limit(len)))
     }
 
@@ -221,15 +222,17 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let pos = self.reader.pos();
-        let len = self.decode_prefix(cx, pos)?;
+        let mark = cx.mark();
+        let len = self.decode_prefix(cx, mark)?;
 
         if len != N {
-            return Err(cx.message(BadLength {
-                actual: len,
-                expected: N,
-                pos,
-            }));
+            return Err(cx.marked_message(
+                mark,
+                BadLength {
+                    actual: len,
+                    expected: N,
+                },
+            ));
         }
 
         self.reader.read_array(cx)
@@ -241,8 +244,8 @@ where
         C: Context<'buf, Input = Self::Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>,
     {
-        let pos = self.reader.pos();
-        let len = self.decode_prefix(cx, pos)?;
+        let start = cx.mark();
+        let len = self.decode_prefix(cx, start)?;
         self.reader.read_bytes(cx, len, visitor)
     }
 
@@ -303,10 +306,7 @@ where
         match tag {
             FALSE => Ok(false),
             TRUE => Ok(true),
-            tag => Err(cx.message(BadBoolean {
-                actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
-            })),
+            tag => Err(cx.message(BadBoolean { actual: tag })),
         }
     }
 
@@ -334,7 +334,6 @@ where
             return Err(cx.message(Expected {
                 expected: Kind::Byte,
                 actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
             }));
         }
 
@@ -469,10 +468,7 @@ where
         match tag {
             NONE => Ok(None),
             SOME => Ok(Some(self)),
-            tag => Err(cx.message(ExpectedOption {
-                tag,
-                pos: self.reader.pos().saturating_sub(1),
-            })),
+            tag => Err(cx.message(ExpectedOption { tag })),
         }
     }
 
@@ -527,7 +523,6 @@ where
             return Err(cx.message(Expected {
                 expected: Kind::Sequence,
                 actual: tag,
-                pos: self.reader.pos().saturating_sub(1),
             }));
         }
 
@@ -537,19 +532,19 @@ where
 
 impl<'de, R, I, L> PackDecoder<'de> for WireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, Variable, Variable> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<R::Mut<'this>, Variable, Variable> where Self: 'this;
 
     #[inline]
     fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -563,7 +558,7 @@ where
 
 impl<'de, R, I, L> RemainingWireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
@@ -575,12 +570,12 @@ where
 
 impl<'de, R, I, L> SequenceDecoder<'de> for RemainingWireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Decoder<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -597,7 +592,7 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(WireDecoder::new(self.decoder.reader.pos_borrow_mut())))
+        Ok(Some(WireDecoder::new(self.decoder.reader.borrow_mut())))
     }
 
     #[inline]
@@ -616,12 +611,12 @@ where
 
 impl<'de, R, I, L> PairDecoder<'de> for WireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Error = R::Error;
-    type First<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type First<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
     type Second = Self;
 
     #[inline]
@@ -629,7 +624,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(WireDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(WireDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -652,20 +647,20 @@ where
 
 impl<'de, R, I, L> VariantDecoder<'de> for WireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Error = R::Error;
-    type Tag<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
-    type Variant<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Tag<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
+    type Variant<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn tag<'buf, C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(WireDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(WireDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -673,7 +668,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(WireDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(WireDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -696,13 +691,13 @@ where
 
 impl<'de, R, I, L> PairsDecoder<'de> for RemainingWireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Error = R::Error;
 
-    type Decoder<'this> = WireDecoder<R::PosMut<'this>, I, L>
+    type Decoder<'this> = WireDecoder<R::Mut<'this>, I, L>
     where
         Self: 'this;
 
@@ -721,7 +716,7 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(WireDecoder::new(self.decoder.reader.pos_borrow_mut())))
+        Ok(Some(WireDecoder::new(self.decoder.reader.borrow_mut())))
     }
 
     #[inline]
@@ -741,30 +736,24 @@ where
 struct Expected {
     expected: Kind,
     actual: Tag,
-    pos: usize,
 }
 
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            expected,
-            actual,
-            pos,
-        } = *self;
+        let Self { expected, actual } = *self;
 
-        write!(f, "Expected {expected:?} but was {actual:?} (at {pos})",)
+        write!(f, "Expected {expected:?} but was {actual:?}")
     }
 }
 
 struct BadBoolean {
     actual: Tag,
-    pos: usize,
 }
 
 impl fmt::Display for BadBoolean {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { actual, pos } = *self;
-        write!(f, "Bad boolean tag {actual:?} (at {pos})")
+        let Self { actual } = *self;
+        write!(f, "Bad boolean tag {actual:?}")
     }
 }
 
@@ -778,38 +767,26 @@ impl fmt::Display for BadCharacter {
 
 struct ExpectedOption {
     tag: Tag,
-    pos: usize,
 }
 
 impl fmt::Display for ExpectedOption {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { tag, pos } = *self;
+        let Self { tag } = *self;
 
-        write!(
-            f,
-            "Expected zero-to-single sequence, was {tag:?} (at {pos})",
-        )
+        write!(f, "Expected zero-to-single sequence, was {tag:?}",)
     }
 }
 
 struct BadLength {
     actual: usize,
     expected: usize,
-    pos: usize,
 }
 
 impl fmt::Display for BadLength {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            actual,
-            expected,
-            pos,
-        } = *self;
+        let Self { actual, expected } = *self;
 
-        write!(
-            f,
-            "Bad length, got {actual} but expect {expected} (at {pos})"
-        )
+        write!(f, "Bad length, got {actual} but expect {expected}")
     }
 }
 
@@ -842,12 +819,12 @@ where
 
 impl<'de, R, I, L> PackDecoder<'de> for TupleWireDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = WireDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Decoder<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn next<'buf, C>(&mut self, cx: &mut C) -> Result<Self::Decoder<'_>, C::Error>
@@ -859,7 +836,7 @@ where
         }
 
         self.remaining -= 1;
-        Ok(WireDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(WireDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -868,7 +845,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         while self.remaining > 0 {
-            WireDecoder::<_, I, L>::new(self.reader.pos_borrow_mut()).skip_any(cx)?;
+            WireDecoder::<_, I, L>::new(self.reader.borrow_mut()).skip_any(cx)?;
             self.remaining -= 1;
         }
 

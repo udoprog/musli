@@ -14,7 +14,7 @@ mod my_modes {
     impl Mode for Json {}
 }
 
-const CONFIG: Encoding<my_modes::Json> = Encoding::new();
+const CONFIG: Encoding<my_modes::Json> = Encoding::new().with_mode();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(mode = my_modes::Json, default_field_name = "name")]

@@ -28,7 +28,7 @@ struct To {
 }
 
 #[test]
-fn test_trace() {
+fn storage_trace() {
     let mut string = String::new();
     let mut cx = RichContext::new(&mut string);
 
@@ -51,8 +51,8 @@ fn test_trace() {
     };
 
     let Ok(..) = encoding.from_slice_with::<_, To>(&mut cx, &bytes) else {
-        for error in cx.iter() {
-            assert_eq!(error.to_string(), ".field = Variant2 { .vector[0] }: buffer underflow (at byte 22)");
+        if let Some(error) = cx.iter().next() {
+            assert_eq!(error.to_string(), ".field = Variant2 { .vector[0] }: buffer underflow (at byte 33)");
             return;
         }
 

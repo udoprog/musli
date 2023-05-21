@@ -1,7 +1,7 @@
 use musli::de::NumberVisitor;
 use musli::Context;
 
-use crate::reader::{integer, string, ParseError, ParseErrorKind, Scratch, StringReference, Token};
+use crate::reader::{integer, string, ParseError, Scratch, StringReference, Token};
 
 mod private {
     pub trait Sealed {}
@@ -119,16 +119,12 @@ pub trait Parser<'de>: private::Sealed {
         C: Context<'buf, Input = ParseError>,
     {
         let mut n = 0;
-        let start = self.pos();
+        let start = cx.mark();
 
         for _ in 0..4 {
             match string::decode_hex_val(self.read_byte(cx)?) {
                 None => {
-                    return Err(cx.report(ParseError::spanned(
-                        start,
-                        self.pos(),
-                        ParseErrorKind::InvalidEscape,
-                    )))
+                    return Err(cx.marked_report(start, ParseError::InvalidEscape));
                 }
                 Some(val) => {
                     n = (n << 4) + val;
@@ -144,18 +140,18 @@ pub trait Parser<'de>: private::Sealed {
         &mut self,
         cx: &mut C,
         exact: [u8; N],
-        err: impl FnOnce(u32) -> ParseError,
+        err: ParseError,
     ) -> Result<(), C::Error>
     where
         C: Context<'buf, Input = ParseError>,
     {
-        let pos = self.pos();
+        let mark = cx.mark();
 
         let mut bytes = [0u8; N];
         self.read(cx, &mut bytes)?;
 
         if bytes != exact {
-            return Err(cx.report(err(pos)));
+            return Err(cx.marked_report(mark, err));
         }
 
         Ok(())
