@@ -16,7 +16,7 @@ keywords = ["no_std", "serialization"]
 categories = ["encoding"]
 
 [features]
-default = []
+default = ["std"]
 test = []
 std = ["musli/std", "musli-storage/std", "musli-common/std", "alloc"]
 alloc = ["musli/alloc", "musli-storage/alloc", "musli-common/alloc"]
