@@ -58,7 +58,7 @@ impl Build<'_> {
 
     /// Emit diagnostics for a transparent encode / decode that failed because
     /// the wrong number of fields existed.
-    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[FieldBuild]) {
+    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[Field]) {
         if fields.is_empty() {
             self.cx.error_span(
                 span,
@@ -107,14 +107,14 @@ impl Build<'_> {
 
 /// Build model for enums and structs.
 pub(crate) enum BuildData<'a> {
-    Struct(StructBuild<'a>),
-    Enum(EnumBuild<'a>),
+    Struct(Body<'a>),
+    Enum(Enum<'a>),
 }
 
-pub(crate) struct StructBuild<'a> {
+pub(crate) struct Body<'a> {
     pub(crate) span: Span,
     pub(crate) name: &'a syn::LitStr,
-    pub(crate) fields: Vec<FieldBuild<'a>>,
+    pub(crate) fields: Vec<Field<'a>>,
     pub(crate) name_type: Option<&'a (Span, syn::Type)>,
     pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing: Packing,
@@ -122,7 +122,7 @@ pub(crate) struct StructBuild<'a> {
     pub(crate) field_tag_method: TagMethod,
 }
 
-impl StructBuild<'_> {
+impl Body<'_> {
     pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
         match self.name_format_with {
             Some((_, path)) => build_call(path, [build_reference(value.clone())]),
@@ -131,12 +131,12 @@ impl StructBuild<'_> {
     }
 }
 
-pub(crate) struct EnumBuild<'a> {
+pub(crate) struct Enum<'a> {
     pub(crate) span: Span,
     pub(crate) name: &'a syn::LitStr,
     pub(crate) enum_tagging: Option<EnumTagging<'a>>,
     pub(crate) enum_packing: Packing,
-    pub(crate) variants: Vec<VariantBuild<'a>>,
+    pub(crate) variants: Vec<Variant<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
     pub(crate) variant_tag_method: TagMethod,
     pub(crate) name_type: Option<&'a (Span, syn::Type)>,
@@ -144,7 +144,7 @@ pub(crate) struct EnumBuild<'a> {
     pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
 
-impl EnumBuild<'_> {
+impl Enum<'_> {
     pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
         match self.name_format_with {
             Some((_, path)) => build_call(path, [build_reference(value.clone())]),
@@ -153,16 +153,16 @@ impl EnumBuild<'_> {
     }
 }
 
-pub(crate) struct VariantBuild<'a> {
+pub(crate) struct Variant<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) tag: syn::Expr,
     pub(crate) is_default: bool,
-    pub(crate) st: StructBuild<'a>,
+    pub(crate) st: Body<'a>,
     pub(crate) patterns: Punctuated<syn::FieldPat, Token![,]>,
 }
 
-pub(crate) struct FieldBuild<'a> {
+pub(crate) struct Field<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) encode_path: (Span, syn::Path),
@@ -173,6 +173,7 @@ pub(crate) struct FieldBuild<'a> {
     pub(crate) self_access: syn::Expr,
     pub(crate) member: syn::Member,
     pub(crate) packing: Packing,
+    pub(crate) var: syn::Ident,
 }
 
 /// Setup a build.
@@ -209,11 +210,7 @@ pub(crate) fn setup<'a>(
     })
 }
 
-fn setup_struct<'a>(
-    e: &'a Expander,
-    mode: Mode<'_>,
-    data: &'a StructData<'a>,
-) -> Result<StructBuild<'a>> {
+fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -> Result<Body<'a>> {
     let mut fields = Vec::with_capacity(data.fields.len());
 
     let default_field_name = e.type_attr.default_field_name(mode).map(|&(_, v)| v);
@@ -237,7 +234,7 @@ fn setup_struct<'a>(
         )?);
     }
 
-    Ok(StructBuild {
+    Ok(Body {
         span: data.span,
         name: &data.name,
         fields,
@@ -249,11 +246,7 @@ fn setup_struct<'a>(
     })
 }
 
-fn setup_enum<'a>(
-    e: &'a Expander,
-    mode: Mode<'_>,
-    data: &'a EnumData<'a>,
-) -> Result<EnumBuild<'a>> {
+fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Result<Enum<'a>> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
     // Keep track of variant index manually since fallback variants do not
@@ -284,7 +277,7 @@ fn setup_enum<'a>(
         variants.push(setup_variant(e, mode, v, &mut fallback, &mut tag_methods)?);
     }
 
-    Ok(EnumBuild {
+    Ok(Enum {
         span: data.span,
         name: &data.name,
         enum_tagging,
@@ -304,7 +297,7 @@ fn setup_variant<'a>(
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
     tag_methods: &mut TagMethods,
-) -> Result<VariantBuild<'a>> {
+) -> Result<Variant<'a>> {
     let mut fields = Vec::with_capacity(data.fields.len());
 
     let variant_packing = data
@@ -368,13 +361,13 @@ fn setup_variant<'a>(
         )?);
     }
 
-    Ok(VariantBuild {
+    Ok(Variant {
         span: data.span,
         index: data.index,
         tag,
         is_default,
         patterns,
-        st: StructBuild {
+        st: Body {
             span: data.span,
             name: &data.name,
             fields,
@@ -395,7 +388,7 @@ fn setup_field<'a>(
     packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
     tag_methods: &mut TagMethods,
-) -> Result<FieldBuild<'a>> {
+) -> Result<Field<'a>> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
     let (tag, tag_method) = data.expand_tag(e, mode, default_field_name)?;
@@ -472,7 +465,12 @@ fn setup_field<'a>(
         })
     };
 
-    Ok(FieldBuild {
+    let var = match &member {
+        syn::Member::Named(ident) => ident.clone(),
+        syn::Member::Unnamed(index) => quote::format_ident!("_{}", index.index),
+    };
+
+    Ok(Field {
         span: data.span,
         index: data.index,
         encode_path,
@@ -483,6 +481,7 @@ fn setup_field<'a>(
         self_access,
         member,
         packing,
+        var,
     })
 }
 

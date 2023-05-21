@@ -5,7 +5,7 @@ use syn::Token;
 
 use crate::expander::Result;
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
-use crate::internals::build::{Build, BuildData, EnumBuild, StructBuild, VariantBuild};
+use crate::internals::build::{Body, Build, BuildData, Enum, Variant};
 
 pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
     e.validate_encode()?;
@@ -67,7 +67,7 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
 /// Encode a struct.
 fn encode_struct(
     e: &Build<'_>,
-    st: &StructBuild<'_>,
+    st: &Body<'_>,
     ctx_var: &syn::Ident,
     encoder_var: &syn::Ident,
     trace: bool,
@@ -151,7 +151,7 @@ struct FieldTest {
 
 fn encode_fields(
     e: &Build<'_>,
-    st: &StructBuild<'_>,
+    st: &Body<'_>,
     ctx_var: &syn::Ident,
     encoder_var: &syn::Ident,
     pack_var: &syn::Ident,
@@ -250,7 +250,7 @@ fn encode_fields(
 /// Encode an internally tagged enum.
 fn encode_enum(
     e: &Build<'_>,
-    en: &EnumBuild<'_>,
+    en: &Enum<'_>,
     ctx_var: &syn::Ident,
     encoder_var: &syn::Ident,
     trace: bool,
@@ -290,8 +290,8 @@ fn encode_enum(
 /// Setup encoding for a single variant. that is externally tagged.
 fn encode_variant(
     b: &Build<'_>,
-    en: &EnumBuild,
-    v: &VariantBuild,
+    en: &Enum,
+    v: &Variant,
     ctx_var: &syn::Ident,
     encoder_var: &syn::Ident,
     trace: bool,

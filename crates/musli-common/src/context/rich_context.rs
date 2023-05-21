@@ -22,7 +22,7 @@ pub struct RichError<'a, E> {
 /// error.
 pub struct RichContext<'buf, E> {
     mark: usize,
-    string: ptr::NonNull<String>,
+    string: Option<ptr::NonNull<String>>,
     errors: Vec<(Vec<Step>, Range<usize>, E)>,
     path: Vec<Step>,
     include_type: bool,
@@ -37,7 +37,7 @@ impl<'buf, E> RichContext<'buf, E> {
     pub fn new(string: &'buf mut String) -> Self {
         Self {
             mark: 0,
-            string: string.into(),
+            string: Some(string.into()),
             errors: Vec::new(),
             path: Vec::new(),
             include_type: false,
@@ -132,25 +132,24 @@ where
         self.mark = self.mark.wrapping_add(n);
     }
 
+    #[inline(always)]
     fn store_string(&mut self, s: &str) {
-        // SAFETY: we're holding onto a mutable reference to the string so it
-        // must be live for the duration of the context.
-        let string = unsafe { self.string.as_mut() };
-
-        string.clear();
-        string.push_str(s);
+        if let Some(mut string) = self.string {
+            // SAFETY: we're holding onto a mutable reference to the string so it
+            // must be live for the duration of the context.
+            let string = unsafe { string.as_mut() };
+            string.clear();
+            string.push_str(s);
+        }
     }
 
+    #[inline(always)]
     fn get_string<'a>(&self) -> Option<&'buf str> {
+        let string = self.string?;
         // SAFETY: we're holding onto a mutable reference to the string so it
         // must be live for the duration of the context.
-        let string = unsafe { self.string.as_ref() };
-
-        if string.is_empty() {
-            None
-        } else {
-            Some(string)
-        }
+        let string = unsafe { string.as_ref() };
+        Some(string)
     }
 
     #[inline]
