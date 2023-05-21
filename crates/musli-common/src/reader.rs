@@ -206,6 +206,7 @@ impl<'de> Reader<'de> for &'de [u8] {
 
         let (_, tail) = self.split_at(n);
         *self = tail;
+        cx.advance(n);
         Ok(())
     }
 
@@ -221,6 +222,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         let (head, tail) = self.split_at(buf.len());
         buf.copy_from_slice(head);
         *self = tail;
+        cx.advance(buf.len());
         Ok(())
     }
 
@@ -241,7 +243,9 @@ impl<'de> Reader<'de> for &'de [u8] {
 
         let (head, tail) = self.split_at(n);
         *self = tail;
-        visitor.visit_borrowed(cx, head)
+        let ok = visitor.visit_borrowed(cx, head)?;
+        cx.advance(n);
+        Ok(ok)
     }
 
     #[inline]
@@ -254,6 +258,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         };
 
         *self = tail;
+        cx.advance(1);
         Ok(first)
     }
 
@@ -268,7 +273,7 @@ impl<'de> Reader<'de> for &'de [u8] {
 
         let (head, tail) = self.split_at(N);
         *self = tail;
-
+        cx.advance(N);
         Ok(array::from_fn(|n| head[n]))
     }
 
@@ -317,6 +322,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         self.range.start = bounds_check_add(cx, &self.range, n)?;
+        cx.advance(n);
         Ok(())
     }
 
@@ -333,11 +339,14 @@ where
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
 
-        unsafe {
+        let ok = unsafe {
             let bytes = slice::from_raw_parts(self.range.start, n);
             self.range.start = outcome;
-            visitor.visit_borrowed(cx, bytes)
-        }
+            visitor.visit_borrowed(cx, bytes)?
+        };
+
+        cx.advance(n);
+        Ok(ok)
     }
 
     #[inline]
@@ -365,6 +374,7 @@ where
             self.range.start = outcome;
         }
 
+        cx.advance(buf.len());
         Ok(())
     }
 }

@@ -10,6 +10,7 @@ use std::io;
 use musli::de::Decode;
 use musli::en::Encode;
 use musli::mode::{DefaultMode, Mode};
+use musli::Context;
 
 use crate::de::StorageDecoder;
 use crate::en::StorageEncoder;
@@ -252,7 +253,27 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, StorageEncoder::<_, I, L>::new(writer))
+        self.encode_with(&mut cx, writer, value)
+    }
+
+    /// Encode the given value to the given [`Writer`] using the current
+    /// configuration.
+    ///
+    /// This is the same as [`Encoding::encode`] but allows for using a
+    /// configurable [`Context`].
+    #[inline]
+    pub fn encode_with<'buf, C, W, T>(
+        self,
+        cx: &mut C,
+        writer: W,
+        value: &T,
+    ) -> Result<(), C::Error>
+    where
+        C: Context<'buf, Input = W::Error>,
+        W: Writer,
+        T: ?Sized + Encode<M>,
+    {
+        T::encode(value, cx, StorageEncoder::<_, I, L>::new(writer))
     }
 
     /// Encode the given value to the given [Write][io::Write] using the current
@@ -264,9 +285,30 @@ where
         W: io::Write,
         T: ?Sized + Encode<M>,
     {
-        let mut writer = crate::wrap::wrap(writer);
         let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, StorageEncoder::<_, I, L>::new(&mut writer))
+        self.to_writer_with(&mut cx, writer, value)
+    }
+
+    /// Encode the given value to the given [Write][io::Write] using the current
+    /// configuration.
+    ///
+    /// This is the same as [`Encoding::to_writer`], but allows for using a
+    /// configurable [`Context`].
+    #[cfg(feature = "std")]
+    #[inline]
+    pub fn to_writer_with<'buf, C, W, T>(
+        self,
+        cx: &mut C,
+        writer: W,
+        value: &T,
+    ) -> Result<(), C::Error>
+    where
+        C: Context<'buf, Input = io::Error>,
+        W: io::Write,
+        T: ?Sized + Encode<M>,
+    {
+        let writer = crate::wrap::wrap(writer);
+        self.encode_with(cx, writer, value)
     }
 
     /// Encode the given value to a [`Buffer`] using the current configuration.
@@ -275,9 +317,22 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        let mut data = Buffer::new();
         let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, StorageEncoder::<_, I, L>::new(&mut data))?;
+        self.to_buffer_with(&mut cx, value)
+    }
+
+    /// Encode the given value to a [`Buffer`] using the current configuration.
+    ///
+    /// This is the same as [`Encoding::to_buffer`], but allows for using a
+    /// configurable [`Context`].
+    #[inline]
+    pub fn to_buffer_with<'buf, C, T>(self, cx: &mut C, value: &T) -> Result<Buffer, C::Error>
+    where
+        C: Context<'buf, Input = BufferError>,
+        T: ?Sized + Encode<M>,
+    {
+        let mut data = Buffer::new();
+        self.encode_with(cx, &mut data, value)?;
         Ok(data)
     }
 
@@ -291,6 +346,20 @@ where
         Ok(self.to_buffer(value)?.into_vec())
     }
 
+    /// Encode the given value to a [`Vec`] using the current configuration.
+    ///
+    /// This is the same as [`Encoding::to_vec`], but allows for using a
+    /// configurable [`Context`].
+    #[cfg(feature = "alloc")]
+    #[inline]
+    pub fn to_vec_with<'buf, C, T>(self, cx: &mut C, value: &T) -> Result<Vec<u8>, C::Error>
+    where
+        C: Context<'buf, Input = BufferError>,
+        T: ?Sized + Encode<M>,
+    {
+        Ok(self.to_buffer_with(cx, value)?.into_vec())
+    }
+
     /// Encode the given value to a fixed-size bytes using the current
     /// configuration.
     #[inline]
@@ -298,9 +367,24 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        let mut bytes = FixedBytes::new();
         let mut cx = musli_common::context::Same::default();
-        T::encode(value, &mut cx, StorageEncoder::<_, I, L>::new(&mut bytes))?;
+        self.to_fixed_bytes_with(&mut cx, value)
+    }
+
+    /// Encode the given value to a fixed-size bytes using the current
+    /// configuration.
+    #[inline]
+    pub fn to_fixed_bytes_with<'buf, C, const N: usize, T>(
+        self,
+        cx: &mut C,
+        value: &T,
+    ) -> Result<FixedBytes<N>, C::Error>
+    where
+        C: Context<'buf, Input = BufferError>,
+        T: ?Sized + Encode<M>,
+    {
+        let mut bytes = FixedBytes::new();
+        self.encode_with(cx, &mut bytes, value)?;
         Ok(bytes)
     }
 
@@ -312,9 +396,23 @@ where
         R: Reader<'de>,
         T: Decode<'de, M>,
     {
-        let reader = reader.with_position();
         let mut cx = musli_common::context::Same::default();
-        T::decode(&mut cx, StorageDecoder::<_, I, L>::new(reader))
+        self.decode_with(&mut cx, reader)
+    }
+
+    /// Decode the given type `T` from the given [Reader] using the current
+    /// configuration.
+    ///
+    /// This is the same as [`Encoding::decode`] but allows for using a
+    /// configurable [`Context`].
+    #[inline]
+    pub fn decode_with<'de, 'buf, C, R, T>(self, cx: &mut C, reader: R) -> Result<T, C::Error>
+    where
+        C: Context<'buf, Input = R::Error>,
+        R: Reader<'de>,
+        T: Decode<'de, M>,
+    {
+        T::decode(cx, StorageDecoder::<_, I, L>::new(reader))
     }
 
     /// Decode the given type `T` from the given slice using the current
@@ -324,9 +422,27 @@ where
     where
         T: Decode<'de, M>,
     {
-        let reader = SliceReader::new(bytes).with_position();
         let mut cx = musli_common::context::Same::default();
-        T::decode(&mut cx, StorageDecoder::<_, I, L>::new(reader))
+        self.from_slice_with(&mut cx, bytes)
+    }
+
+    /// Decode the given type `T` from the given slice using the current
+    /// configuration.
+    ///
+    /// This is the same as [`Encoding::from_slice`], but allows for using a
+    /// configurable [`Context`].
+    #[inline]
+    pub fn from_slice_with<'de, 'buf, C, T>(
+        self,
+        cx: &mut C,
+        bytes: &'de [u8],
+    ) -> Result<T, C::Error>
+    where
+        C: Context<'buf, Input = BufferError>,
+        T: Decode<'de, M>,
+    {
+        let reader = SliceReader::new(bytes).with_position();
+        self.decode_with(cx, reader)
     }
 }
 

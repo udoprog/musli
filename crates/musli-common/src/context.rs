@@ -1,11 +1,17 @@
 //! Helper types to set up a basic Müsli [`Context`].
 
+#[cfg(feature = "alloc")]
+mod alloc_context;
+
 use core::fmt;
 use core::marker::PhantomData;
 
 use musli::de;
 use musli::error::Error;
 use musli::Context;
+
+#[cfg(feature = "alloc")]
+pub use self::alloc_context::AllocContext;
 
 /// A simple non-diagnostical capturing context which simply emits the original
 /// error.
@@ -27,8 +33,9 @@ where
 {
     type Input = E;
     type Error = E;
-    type FieldMarker = ();
-    type VariantMarker = ();
+    type TraceField = ();
+    type TraceVariant = ();
+    type Mark = ();
 
     #[inline(always)]
     fn report<T>(&mut self, error: T) -> Self::Error
@@ -89,8 +96,9 @@ where
 impl<'buf, E> Context<'buf> for Ignore<E> {
     type Input = E;
     type Error = de::Error;
-    type FieldMarker = ();
-    type VariantMarker = ();
+    type TraceField = ();
+    type TraceVariant = ();
+    type Mark = ();
 
     #[inline(always)]
     fn report<T>(&mut self, _: T) -> de::Error
@@ -145,8 +153,9 @@ where
 {
     type Input = E;
     type Error = de::Error;
-    type FieldMarker = ();
-    type VariantMarker = ();
+    type TraceField = ();
+    type TraceVariant = ();
+    type Mark = ();
 
     #[inline(always)]
     fn report<T>(&mut self, error: T) -> de::Error

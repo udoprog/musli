@@ -16,7 +16,6 @@ use crate::internals::{Ctxt, Expansion, Mode, ModePath, Only};
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: &'a Ctxt,
-    pub(crate) type_name: &'a syn::LitStr,
     pub(crate) tokens: &'a Tokens,
     pub(crate) bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) decode_bounds: &'a [(Span, syn::WherePredicate)],
@@ -113,6 +112,7 @@ pub(crate) enum BuildData<'a> {
 
 pub(crate) struct StructBuild<'a> {
     pub(crate) span: Span,
+    pub(crate) name: &'a syn::LitStr,
     pub(crate) fields: Vec<FieldBuild<'a>>,
     pub(crate) name_type: Option<&'a (Span, syn::Type)>,
     pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
@@ -123,6 +123,7 @@ pub(crate) struct StructBuild<'a> {
 
 pub(crate) struct EnumBuild<'a> {
     pub(crate) span: Span,
+    pub(crate) name: &'a syn::LitStr,
     pub(crate) enum_tagging: Option<EnumTagging<'a>>,
     pub(crate) enum_packing: Packing,
     pub(crate) variants: Vec<VariantBuild<'a>>,
@@ -136,7 +137,6 @@ pub(crate) struct EnumBuild<'a> {
 pub(crate) struct VariantBuild<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
-    pub(crate) name: &'a syn::LitStr,
     pub(crate) tag: syn::Expr,
     pub(crate) is_default: bool,
     pub(crate) st_: StructBuild<'a>,
@@ -178,7 +178,6 @@ pub(crate) fn setup<'a>(
     Ok(Build {
         input: e.input,
         cx: &e.cx,
-        type_name: &e.type_name,
         tokens: &e.tokens,
         bounds: e.type_attr.bounds(mode),
         decode_bounds: e.type_attr.decode_bounds(mode),
@@ -221,6 +220,7 @@ fn setup_struct<'a>(
 
     Ok(StructBuild {
         span: data.span,
+        name: &data.name,
         fields,
         name_type: e.type_attr.name_type(mode),
         name_format_with: e.type_attr.name_format_with(mode),
@@ -267,6 +267,7 @@ fn setup_enum<'a>(
 
     Ok(EnumBuild {
         span: data.span,
+        name: &data.name,
         enum_tagging,
         enum_packing,
         variants,
@@ -351,12 +352,12 @@ fn setup_variant<'a>(
     Ok(VariantBuild {
         span: data.span,
         index: data.index,
-        name: &data.name,
         tag,
         is_default,
         patterns,
         st_: StructBuild {
             span: data.span,
+            name: &data.name,
             fields,
             packing: variant_packing,
             name_type: data.attr.name_type(mode),

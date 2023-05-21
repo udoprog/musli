@@ -10,7 +10,7 @@ use musli::de::{
 };
 use musli::Context;
 use musli_common::int::{IntegerEncoding, UsizeEncoding};
-use musli_common::reader::PosReader;
+use musli_common::reader::Reader;
 
 /// A very simple decoder suitable for storage decoding.
 pub struct StorageDecoder<R, I, L>
@@ -54,7 +54,7 @@ where
 #[musli::decoder]
 impl<'de, R, I, L> Decoder<'de> for StorageDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
@@ -77,11 +77,11 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let pos = self.reader.pos();
-        let count = L::decode_usize(cx, self.reader.pos_borrow_mut())?;
+        let mark = cx.mark();
+        let count = L::decode_usize(cx, self.reader.borrow_mut())?;
 
         if count != 0 {
-            return Err(cx.message(ExpectedEmptySequence { actual: count, pos }));
+            return Err(cx.marked_message(mark, ExpectedEmptySequence { actual: count }));
         }
 
         Ok(())
@@ -109,7 +109,7 @@ where
         C: Context<'buf, Input = Self::Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>,
     {
-        let len = L::decode_usize(cx, self.reader.pos_borrow_mut())?;
+        let len = L::decode_usize(cx, self.reader.borrow_mut())?;
         self.reader.read_bytes(cx, len, visitor)
     }
 
@@ -164,13 +164,13 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let pos = self.reader.pos();
+        let mark = cx.mark();
         let byte = self.reader.read_byte(cx)?;
 
         match byte {
             0 => Ok(false),
             1 => Ok(true),
-            b => Err(cx.message(BadBoolean { actual: b, pos })),
+            b => Err(cx.marked_message(mark, BadBoolean { actual: b })),
         }
     }
 
@@ -179,12 +179,12 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let pos = self.reader.pos();
+        let mark = cx.mark();
         let num = self.decode_u32(cx)?;
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(cx.message(BadCharacter { actual: num, pos })),
+            None => Err(cx.marked_message(mark, BadCharacter { actual: num })),
         }
     }
 
@@ -358,19 +358,19 @@ where
 
 impl<'de, R, I, L> PackDecoder<'de> for StorageDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -384,7 +384,7 @@ where
 
 impl<'de, R, I, L> LimitedStorageDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
@@ -400,12 +400,12 @@ where
 
 impl<'de, R, I, L> SequenceDecoder<'de> for LimitedStorageDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -422,9 +422,7 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(StorageDecoder::new(
-            self.decoder.reader.pos_borrow_mut(),
-        )))
+        Ok(Some(StorageDecoder::new(self.decoder.reader.borrow_mut())))
     }
 
     #[inline]
@@ -438,13 +436,13 @@ where
 
 impl<'de, R, I, L> PairsDecoder<'de> for LimitedStorageDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
 
-    type Decoder<'this> = StorageDecoder<R::PosMut<'this>, I, L>
+    type Decoder<'this> = StorageDecoder<R::Mut<'this>, I, L>
     where
         Self: 'this;
 
@@ -463,9 +461,7 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(StorageDecoder::new(
-            self.decoder.reader.pos_borrow_mut(),
-        )))
+        Ok(Some(StorageDecoder::new(self.decoder.reader.borrow_mut())))
     }
 
     #[inline]
@@ -479,12 +475,12 @@ where
 
 impl<'de, R, I, L> PairDecoder<'de> for StorageDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type First<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type First<'this> = StorageDecoder<R::Mut<'this>, I, L> where Self: 'this;
     type Second = Self;
 
     #[inline]
@@ -492,7 +488,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -514,20 +510,20 @@ where
 
 impl<'de, R, I, L> VariantDecoder<'de> for StorageDecoder<R, I, L>
 where
-    R: PosReader<'de>,
+    R: Reader<'de>,
     I: IntegerEncoding,
     L: UsizeEncoding,
 {
     type Error = R::Error;
-    type Tag<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
-    type Variant<'this> = StorageDecoder<R::PosMut<'this>, I, L> where Self: 'this;
+    type Tag<'this> = StorageDecoder<R::Mut<'this>, I, L> where Self: 'this;
+    type Variant<'this> = StorageDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]
     fn tag<'buf, C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -535,7 +531,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        Ok(StorageDecoder::new(self.reader.pos_borrow_mut()))
+        Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
@@ -557,36 +553,33 @@ where
 
 struct ExpectedEmptySequence {
     actual: usize,
-    pos: usize,
 }
 
 impl fmt::Display for ExpectedEmptySequence {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { actual, pos } = *self;
-        write!(f, "Expected empty sequence, but was {actual} (at {pos})",)
+        let Self { actual } = *self;
+        write!(f, "Expected empty sequence, but was {actual}",)
     }
 }
 
 struct BadBoolean {
     actual: u8,
-    pos: usize,
 }
 
 impl fmt::Display for BadBoolean {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { actual, pos } = *self;
-        write!(f, "Bad boolean byte 0x{actual:02x} (at {pos})")
+        let Self { actual } = *self;
+        write!(f, "Bad boolean byte 0x{actual:02x}")
     }
 }
 
 struct BadCharacter {
     actual: u32,
-    pos: usize,
 }
 
 impl fmt::Display for BadCharacter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { actual, pos } = *self;
-        write!(f, "Bad character number {actual} (at {pos})")
+        let Self { actual } = *self;
+        write!(f, "Bad character number {actual}")
     }
 }

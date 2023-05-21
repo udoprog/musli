@@ -165,6 +165,7 @@ where
             }));
         }
 
+        cx.advance(bytes.len());
         Ok(())
     }
 
@@ -192,6 +193,7 @@ where
         }
 
         self.init = self.init.wrapping_add(U);
+        cx.advance(U);
         Ok(())
     }
 }

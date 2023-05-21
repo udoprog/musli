@@ -33,6 +33,7 @@ pub(crate) struct FieldData<'a> {
 
 pub(crate) struct StructData<'a> {
     pub(crate) span: Span,
+    pub(crate) name: syn::LitStr,
     pub(crate) fields: Vec<FieldData<'a>>,
 }
 
@@ -47,6 +48,7 @@ pub(crate) struct VariantData<'a> {
 
 pub(crate) struct EnumData<'a> {
     pub(crate) span: Span,
+    pub(crate) name: syn::LitStr,
     pub(crate) variants: Vec<VariantData<'a>>,
 }
 
@@ -60,7 +62,6 @@ pub(crate) struct Expander<'a> {
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: Ctxt,
     pub(crate) type_attr: TypeAttr,
-    pub(crate) type_name: syn::LitStr,
     pub(crate) data: Data<'a>,
     pub(crate) tokens: Tokens,
 }
@@ -86,11 +87,11 @@ impl<'a> Expander<'a> {
 
         let cx = Ctxt::new();
         let type_attr = attr::type_attrs(&cx, &input.attrs);
-        let type_name = syn::LitStr::new(&input.ident.to_string(), input.ident.span());
 
         let data = match &input.data {
             syn::Data::Struct(st) => Data::Struct(StructData {
                 span: Span::call_site(),
+                name: syn::LitStr::new(&input.ident.to_string(), input.ident.span()),
                 fields: fields(&cx, &st.fields),
             }),
             syn::Data::Enum(en) => {
@@ -109,6 +110,7 @@ impl<'a> Expander<'a> {
 
                 Data::Enum(EnumData {
                     span: Span::call_site(),
+                    name: syn::LitStr::new(&input.ident.to_string(), input.ident.span()),
                     variants: variants.collect(),
                 })
             }
@@ -121,7 +123,6 @@ impl<'a> Expander<'a> {
             input,
             cx,
             type_attr,
-            type_name,
             data,
             tokens: Tokens::new(input.ident.span(), &prefix),
         }
@@ -168,7 +169,7 @@ impl<'a> Expander<'a> {
     /// Expand Encode implementation.
     pub(crate) fn expand_encode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
-        let mode_ident = syn::Ident::new("M", self.type_name.span());
+        let mode_ident = syn::Ident::new("M", Span::call_site());
 
         let builds = self.setup_builds(&modes, &mode_ident, Only::Encode)?;
 
@@ -184,7 +185,7 @@ impl<'a> Expander<'a> {
     /// Expand Decode implementation.
     pub(crate) fn expand_decode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
-        let mode_ident = syn::Ident::new("M", self.type_name.span());
+        let mode_ident = syn::Ident::new("M", Span::call_site());
 
         let builds = self.setup_builds(&modes, &mode_ident, Only::Decode)?;
 
