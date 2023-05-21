@@ -47,15 +47,15 @@ pub enum StringReference<'de, 'scratch> {
 }
 
 /// Specialized reader implementation from a slice.
-pub(crate) fn parse_string_slice_reader<'de, 'sratch, C>(
+pub(crate) fn parse_string_slice_reader<'de, 'buf, 'scratch, C>(
     cx: &mut C,
     reader: &mut SliceParser<'de>,
-    scratch: &'sratch mut Scratch,
+    scratch: &'scratch mut Scratch,
     validate: bool,
     start: u32,
-) -> Result<StringReference<'de, 'sratch>, C::Error>
+) -> Result<StringReference<'de, 'scratch>, C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
 {
     // Index of the first byte not yet copied into the scratch space.
     let mut open = reader.index;
@@ -123,9 +123,9 @@ where
 
 /// Check that the given slice is valid UTF-8.
 #[inline]
-fn check_utf8<C>(cx: &mut C, bytes: &[u8], start: u32, pos: u32) -> Result<(), C::Error>
+fn check_utf8<'buf, C>(cx: &mut C, bytes: &[u8], start: u32, pos: u32) -> Result<(), C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
 {
     if musli_common::str::from_utf8(bytes).is_err() {
         Err(cx.report(ParseError::spanned(
@@ -140,14 +140,14 @@ where
 
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
-fn parse_escape<C>(
+fn parse_escape<'buf, C>(
     cx: &mut C,
     parser: &mut SliceParser<'_>,
     validate: bool,
     scratch: &mut Scratch,
 ) -> Result<bool, C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
 {
     let start = parser.pos();
     let b = parser.read_byte(cx)?;
@@ -298,9 +298,13 @@ pub(crate) fn decode_hex_val(val: u8) -> Option<u16> {
 }
 
 /// Specialized reader implementation from a slice.
-pub(crate) fn skip_string<'de, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
+pub(crate) fn skip_string<'de, 'buf, C, P>(
+    cx: &mut C,
+    p: &mut P,
+    validate: bool,
+) -> Result<(), C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     loop {
@@ -335,9 +339,9 @@ where
 
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
-fn skip_escape<'de, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
+fn skip_escape<'de, 'buf, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let start = p.pos();

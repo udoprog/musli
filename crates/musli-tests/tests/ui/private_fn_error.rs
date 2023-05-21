@@ -13,7 +13,7 @@ mod array {
     fn encode<M, E, C, T, const N: usize>(this: &[T; N], cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
         M: Mode,
-        C: Context<Input = E::Error>,
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         todo!()
@@ -23,7 +23,7 @@ mod array {
     fn decode<'de, M, C, D, T, const N: usize>(cx: &mut C, decoder: D) -> Result<[T; N], C::Error>
     where
         M: Mode,
-        C: Context<Input = D::Error>,
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
         todo!()

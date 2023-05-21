@@ -44,26 +44,26 @@ where
     }
 
     #[inline]
-    fn encode_unit<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn encode_unit<'buf, C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.writer.write_bytes(cx, b"null")
     }
 
     #[inline]
-    fn encode_bool<C>(mut self, cx: &mut C, value: bool) -> Result<Self::Ok, C::Error>
+    fn encode_bool<'buf, C>(mut self, cx: &mut C, value: bool) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.writer
             .write_bytes(cx, if value { b"true" } else { b"false" })
     }
 
     #[inline]
-    fn encode_char<C>(mut self, cx: &mut C, value: char) -> Result<Self::Ok, C::Error>
+    fn encode_char<'buf, C>(mut self, cx: &mut C, value: char) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         encode_string(
             cx,
@@ -73,147 +73,147 @@ where
     }
 
     #[inline]
-    fn encode_u8<C>(mut self, cx: &mut C, value: u8) -> Result<Self::Ok, C::Error>
+    fn encode_u8<'buf, C>(mut self, cx: &mut C, value: u8) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u16<C>(mut self, cx: &mut C, value: u16) -> Result<Self::Ok, C::Error>
+    fn encode_u16<'buf, C>(mut self, cx: &mut C, value: u16) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u32<C>(mut self, cx: &mut C, value: u32) -> Result<Self::Ok, C::Error>
+    fn encode_u32<'buf, C>(mut self, cx: &mut C, value: u32) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u64<C>(mut self, cx: &mut C, value: u64) -> Result<Self::Ok, C::Error>
+    fn encode_u64<'buf, C>(mut self, cx: &mut C, value: u64) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u128<C>(mut self, cx: &mut C, value: u128) -> Result<Self::Ok, C::Error>
+    fn encode_u128<'buf, C>(mut self, cx: &mut C, value: u128) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i8<C>(mut self, cx: &mut C, value: i8) -> Result<Self::Ok, C::Error>
+    fn encode_i8<'buf, C>(mut self, cx: &mut C, value: i8) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i16<C>(mut self, cx: &mut C, value: i16) -> Result<Self::Ok, C::Error>
+    fn encode_i16<'buf, C>(mut self, cx: &mut C, value: i16) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i32<C>(mut self, cx: &mut C, value: i32) -> Result<Self::Ok, C::Error>
+    fn encode_i32<'buf, C>(mut self, cx: &mut C, value: i32) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i64<C>(mut self, cx: &mut C, value: i64) -> Result<Self::Ok, C::Error>
+    fn encode_i64<'buf, C>(mut self, cx: &mut C, value: i64) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i128<C>(mut self, cx: &mut C, value: i128) -> Result<Self::Ok, C::Error>
+    fn encode_i128<'buf, C>(mut self, cx: &mut C, value: i128) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_usize<C>(mut self, cx: &mut C, value: usize) -> Result<Self::Ok, C::Error>
+    fn encode_usize<'buf, C>(mut self, cx: &mut C, value: usize) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_isize<C>(mut self, cx: &mut C, value: isize) -> Result<Self::Ok, C::Error>
+    fn encode_isize<'buf, C>(mut self, cx: &mut C, value: isize) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_f32<C>(mut self, cx: &mut C, value: f32) -> Result<Self::Ok, C::Error>
+    fn encode_f32<'buf, C>(mut self, cx: &mut C, value: f32) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = ryu::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_f64<C>(mut self, cx: &mut C, value: f64) -> Result<Self::Ok, C::Error>
+    fn encode_f64<'buf, C>(mut self, cx: &mut C, value: f64) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buffer = ryu::Buffer::new();
         self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_array<C, const N: usize>(
+    fn encode_array<'buf, C, const N: usize>(
         self,
         cx: &mut C,
         bytes: [u8; N],
     ) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.encode_bytes(cx, bytes.as_slice())
     }
 
     #[inline]
-    fn encode_bytes<C>(mut self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error>
+    fn encode_bytes<'buf, C>(mut self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut buf = itoa::Buffer::new();
         let mut it = bytes.iter();
@@ -235,9 +235,13 @@ where
     }
 
     #[inline]
-    fn encode_bytes_vectored<C>(self, cx: &mut C, bytes: &[&[u8]]) -> Result<Self::Ok, C::Error>
+    fn encode_bytes_vectored<'buf, C>(
+        self,
+        cx: &mut C,
+        bytes: &[&[u8]],
+    ) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let mut seq = JsonArrayEncoder::<M, _>::new(cx, self.writer)?;
 
@@ -251,73 +255,73 @@ where
     }
 
     #[inline]
-    fn encode_string<C>(mut self, cx: &mut C, string: &str) -> Result<Self::Ok, C::Error>
+    fn encode_string<'buf, C>(mut self, cx: &mut C, string: &str) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         encode_string(cx, self.writer.borrow_mut(), string.as_bytes())
     }
 
     #[inline]
-    fn encode_some<C>(self, _: &mut C) -> Result<Self::Some, C::Error>
+    fn encode_some<'buf, C>(self, _: &mut C) -> Result<Self::Some, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         Ok(self)
     }
 
     #[inline]
-    fn encode_none<C>(self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn encode_none<'buf, C>(self, cx: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.encode_unit(cx)
     }
 
     #[inline]
-    fn encode_pack<C>(self, cx: &mut C) -> Result<Self::Pack, C::Error>
+    fn encode_pack<'buf, C>(self, cx: &mut C) -> Result<Self::Pack, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         JsonArrayEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_sequence<C>(self, cx: &mut C, _: usize) -> Result<Self::Sequence, C::Error>
+    fn encode_sequence<'buf, C>(self, cx: &mut C, _: usize) -> Result<Self::Sequence, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         JsonArrayEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_tuple<C>(self, cx: &mut C, _: usize) -> Result<Self::Tuple, C::Error>
+    fn encode_tuple<'buf, C>(self, cx: &mut C, _: usize) -> Result<Self::Tuple, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         JsonArrayEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_map<C>(self, cx: &mut C, _: usize) -> Result<Self::Map, C::Error>
+    fn encode_map<'buf, C>(self, cx: &mut C, _: usize) -> Result<Self::Map, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         JsonObjectEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_struct<C>(self, cx: &mut C, _: usize) -> Result<Self::Struct, C::Error>
+    fn encode_struct<'buf, C>(self, cx: &mut C, _: usize) -> Result<Self::Struct, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         JsonObjectEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_variant<C>(self, cx: &mut C) -> Result<Self::Variant, C::Error>
+    fn encode_variant<'buf, C>(self, cx: &mut C) -> Result<Self::Variant, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         JsonVariantEncoder::new(cx, self.writer)
     }
@@ -335,9 +339,9 @@ where
     W: Writer,
 {
     #[inline]
-    fn new<C>(cx: &mut C, mut writer: W) -> Result<Self, C::Error>
+    fn new<'buf, C>(cx: &mut C, mut writer: W) -> Result<Self, C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
     {
         writer.write_byte(cx, b'{')?;
 
@@ -362,9 +366,9 @@ where
         Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         let len = self.len;
         self.len += 1;
@@ -375,9 +379,9 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<'buf, C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.writer.write_byte(cx, b'}')?;
         Ok(())
@@ -417,9 +421,9 @@ where
     type Second<'this> = JsonEncoder<M, W::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, cx: &mut C) -> Result<Self::First<'_>, C::Error>
+    fn first<'buf, C>(&mut self, cx: &mut C) -> Result<Self::First<'_>, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         if !self.empty {
             self.writer.write_byte(cx, b',')?;
@@ -429,18 +433,18 @@ where
     }
 
     #[inline]
-    fn second<C>(&mut self, cx: &mut C) -> Result<Self::Second<'_>, C::Error>
+    fn second<'buf, C>(&mut self, cx: &mut C) -> Result<Self::Second<'_>, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         Ok(())
     }
@@ -457,9 +461,9 @@ where
     W: Writer,
 {
     #[inline]
-    fn new<C>(cx: &mut C, mut writer: W) -> Result<Self, C::Error>
+    fn new<'buf, C>(cx: &mut C, mut writer: W) -> Result<Self, C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
     {
         writer.write_byte(cx, b'{')?;
 
@@ -487,26 +491,26 @@ where
         Self: 'this;
 
     #[inline]
-    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    fn tag<'buf, C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn variant<C>(&mut self, cx: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    fn variant<'buf, C>(&mut self, cx: &mut C) -> Result<Self::Variant<'_>, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<'buf, C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.writer.write_byte(cx, b'}')
     }
@@ -548,105 +552,105 @@ where
     }
 
     #[inline]
-    fn encode_u8<C>(mut self, cx: &mut C, value: u8) -> Result<Self::Ok, C::Error>
+    fn encode_u8<'buf, C>(mut self, cx: &mut C, value: u8) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_u16<C>(mut self, cx: &mut C, value: u16) -> Result<Self::Ok, C::Error>
+    fn encode_u16<'buf, C>(mut self, cx: &mut C, value: u16) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_u32<C>(mut self, cx: &mut C, value: u32) -> Result<Self::Ok, C::Error>
+    fn encode_u32<'buf, C>(mut self, cx: &mut C, value: u32) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_u64<C>(mut self, cx: &mut C, value: u64) -> Result<Self::Ok, C::Error>
+    fn encode_u64<'buf, C>(mut self, cx: &mut C, value: u64) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_u128<C>(mut self, cx: &mut C, value: u128) -> Result<Self::Ok, C::Error>
+    fn encode_u128<'buf, C>(mut self, cx: &mut C, value: u128) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_i8<C>(mut self, cx: &mut C, value: i8) -> Result<Self::Ok, C::Error>
+    fn encode_i8<'buf, C>(mut self, cx: &mut C, value: i8) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_i16<C>(mut self, cx: &mut C, value: i16) -> Result<Self::Ok, C::Error>
+    fn encode_i16<'buf, C>(mut self, cx: &mut C, value: i16) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_i32<C>(mut self, cx: &mut C, value: i32) -> Result<Self::Ok, C::Error>
+    fn encode_i32<'buf, C>(mut self, cx: &mut C, value: i32) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_i64<C>(mut self, cx: &mut C, value: i64) -> Result<Self::Ok, C::Error>
+    fn encode_i64<'buf, C>(mut self, cx: &mut C, value: i64) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_i128<C>(mut self, cx: &mut C, value: i128) -> Result<Self::Ok, C::Error>
+    fn encode_i128<'buf, C>(mut self, cx: &mut C, value: i128) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_usize<C>(mut self, cx: &mut C, value: usize) -> Result<Self::Ok, C::Error>
+    fn encode_usize<'buf, C>(mut self, cx: &mut C, value: usize) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_isize<C>(mut self, cx: &mut C, value: isize) -> Result<Self::Ok, C::Error>
+    fn encode_isize<'buf, C>(mut self, cx: &mut C, value: isize) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         format_integer!(self, cx, value)
     }
 
     #[inline]
-    fn encode_string<C>(self, cx: &mut C, string: &str) -> Result<Self::Ok, C::Error>
+    fn encode_string<'buf, C>(self, cx: &mut C, string: &str) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         encode_string(cx, self.writer, string.as_bytes())
     }
@@ -664,9 +668,9 @@ where
     W: Writer,
 {
     #[inline]
-    fn new<C>(cx: &mut C, mut writer: W) -> Result<Self, C::Error>
+    fn new<'buf, C>(cx: &mut C, mut writer: W) -> Result<Self, C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
     {
         writer.write_byte(cx, b'[')?;
 
@@ -691,9 +695,9 @@ where
         Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, cx: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<'buf, C>(&mut self, cx: &mut C) -> Result<Self::Encoder<'_>, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         if !self.first {
             self.writer.write_byte(cx, b',')?;
@@ -704,9 +708,9 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<'buf, C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.writer.write_byte(cx, b']')?;
         Ok(())
@@ -715,9 +719,9 @@ where
 
 /// Encode a sequence of chars as a string.
 #[inline]
-fn encode_string<C, W>(cx: &mut C, mut writer: W, bytes: &[u8]) -> Result<(), C::Error>
+fn encode_string<'buf, C, W>(cx: &mut C, mut writer: W, bytes: &[u8]) -> Result<(), C::Error>
 where
-    C: Context<Input = W::Error>,
+    C: Context<'buf, Input = W::Error>,
     W: Writer,
 {
     writer.write_byte(cx, b'"')?;
@@ -786,9 +790,14 @@ static ESCAPE: [u8; 256] = [
 // Hex digits.
 static HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
 
-fn write_escape<C, W>(cx: &mut C, writer: &mut W, escape: u8, byte: u8) -> Result<(), C::Error>
+fn write_escape<'buf, C, W>(
+    cx: &mut C,
+    writer: &mut W,
+    escape: u8,
+    byte: u8,
+) -> Result<(), C::Error>
 where
-    C: Context<Input = W::Error>,
+    C: Context<'buf, Input = W::Error>,
     W: Writer,
 {
     let s = match escape {

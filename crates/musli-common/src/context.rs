@@ -21,7 +21,7 @@ impl<E> Default for Same<E> {
     }
 }
 
-impl<E> Context for Same<E>
+impl<'buf, E> Context<'buf> for Same<E>
 where
     E: Error,
 {
@@ -86,7 +86,7 @@ where
     }
 }
 
-impl<E> Context for Ignore<E> {
+impl<'buf, E> Context<'buf> for Ignore<E> {
     type Input = E;
     type Error = de::Error;
     type FieldMarker = ();
@@ -139,7 +139,7 @@ where
     }
 }
 
-impl<E> Context for Capture<E>
+impl<'buf, E> Context<'buf> for Capture<E>
 where
     E: Error,
 {

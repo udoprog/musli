@@ -10,9 +10,9 @@ where
     M: Mode,
 {
     /// Encode the given output.
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<'buf, Input = E::Error>,
         E: Encoder;
 }
 
@@ -22,9 +22,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         T::encode(*self, cx, encoder)
@@ -37,9 +37,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         T::encode(*self, cx, encoder)

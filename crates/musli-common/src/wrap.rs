@@ -35,9 +35,9 @@ where
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<'buf, C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context<'buf, Input = Self::Error>,
     {
         self.inner.write_all(bytes).map_err(|err| cx.custom(err))
     }

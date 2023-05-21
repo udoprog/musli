@@ -21,31 +21,35 @@ mod private {
 /// The two common implementations of this is [Variable] and [Fixed].
 pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sealed {
     /// Governs how unsigned integers are encoded into a [Writer].
-    fn encode_typed_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
+    fn encode_typed_unsigned<'buf, C, W, T>(
+        cx: &mut C,
+        writer: W,
+        value: T,
+    ) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: ByteOrderIo;
 
     /// Governs how unsigned integers are decoded from a [Reader].
-    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
+    fn decode_typed_unsigned<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo;
 
     /// Governs how signed integers are encoded into a [Writer].
-    fn encode_typed_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
+    fn encode_typed_signed<'buf, C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo;
 
     /// Governs how signed integers are decoded from a [Reader].
-    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
+    fn decode_typed_signed<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>;
@@ -55,23 +59,27 @@ pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sea
 /// `isize`) are encoded in a format which is platform-neutral.
 pub trait WireUsizeEncoding: musli_common::int::UsizeEncoding + private::Sealed {
     /// Governs how usize lengths are encoded into a [Writer].
-    fn encode_typed_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
+    fn encode_typed_usize<'buf, C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer;
 
     /// Governs how usize lengths are decoded from a [Reader].
-    fn decode_typed_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
+    fn decode_typed_usize<'de, 'buf, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>;
 }
 
 impl WireIntegerEncoding for Variable {
     #[inline]
-    fn encode_typed_unsigned<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
+    fn encode_typed_unsigned<'buf, C, W, T>(
+        cx: &mut C,
+        mut writer: W,
+        value: T,
+    ) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: Unsigned,
     {
@@ -84,9 +92,9 @@ impl WireIntegerEncoding for Variable {
     }
 
     #[inline]
-    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
+    fn decode_typed_unsigned<'de, 'buf, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: Unsigned,
     {
@@ -104,9 +112,9 @@ impl WireIntegerEncoding for Variable {
     }
 
     #[inline]
-    fn encode_typed_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
+    fn encode_typed_signed<'buf, C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo,
@@ -115,9 +123,9 @@ impl WireIntegerEncoding for Variable {
     }
 
     #[inline]
-    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
+    fn decode_typed_signed<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: Unsigned<Signed = T> + ByteOrderIo,
@@ -129,9 +137,13 @@ impl WireIntegerEncoding for Variable {
 
 impl WireUsizeEncoding for Variable {
     #[inline]
-    fn encode_typed_usize<C, W>(cx: &mut C, mut writer: W, value: usize) -> Result<(), C::Error>
+    fn encode_typed_usize<'buf, C, W>(
+        cx: &mut C,
+        mut writer: W,
+        value: usize,
+    ) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
     {
         if value.is_smaller_than(DATA_MASK) {
@@ -143,9 +155,9 @@ impl WireUsizeEncoding for Variable {
     }
 
     #[inline]
-    fn decode_typed_usize<'de, C, R>(cx: &mut C, mut reader: R) -> Result<usize, C::Error>
+    fn decode_typed_usize<'de, 'buf, C, R>(cx: &mut C, mut reader: R) -> Result<usize, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
     {
         let tag = Tag::from_byte(reader.read_byte(cx)?);
@@ -167,9 +179,13 @@ where
     B: ByteOrder,
 {
     #[inline]
-    fn encode_typed_unsigned<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
+    fn encode_typed_unsigned<'buf, C, W, T>(
+        cx: &mut C,
+        mut writer: W,
+        value: T,
+    ) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: ByteOrderIo,
     {
@@ -178,9 +194,9 @@ where
     }
 
     #[inline]
-    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
+    fn decode_typed_unsigned<'de, 'buf, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo,
     {
@@ -192,9 +208,13 @@ where
     }
 
     #[inline]
-    fn encode_typed_signed<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
+    fn encode_typed_signed<'buf, C, W, T>(
+        cx: &mut C,
+        mut writer: W,
+        value: T,
+    ) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo,
@@ -204,9 +224,9 @@ where
     }
 
     #[inline]
-    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
+    fn decode_typed_signed<'de, 'buf, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>,
@@ -228,9 +248,13 @@ where
     <usize as TryFrom<L>>::Error: 'static + Debug + Display + Send + Sync,
 {
     #[inline]
-    fn encode_typed_usize<C, W>(cx: &mut C, mut writer: W, value: usize) -> Result<(), C::Error>
+    fn encode_typed_usize<'buf, C, W>(
+        cx: &mut C,
+        mut writer: W,
+        value: usize,
+    ) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
     {
         writer.write_byte(cx, Tag::new(Kind::Prefix, L::BYTES).byte())?;
@@ -239,9 +263,9 @@ where
     }
 
     #[inline]
-    fn decode_typed_usize<'de, C, R>(cx: &mut C, mut reader: R) -> Result<usize, C::Error>
+    fn decode_typed_usize<'de, 'buf, C, R>(cx: &mut C, mut reader: R) -> Result<usize, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
     {
         if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, L::BYTES) {

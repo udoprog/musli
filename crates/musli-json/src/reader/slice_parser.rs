@@ -25,14 +25,14 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn parse_string<'scratch, C>(
+    fn parse_string<'scratch, 'buf, C>(
         &mut self,
         cx: &mut C,
         scratch: &'scratch mut Scratch,
         validate: bool,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: Context<Input = ParseError>,
+        C: Context<'buf, Input = ParseError>,
     {
         let start = self.pos();
         let actual = self.peek(cx)?;
@@ -50,9 +50,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
+    fn read_byte<'buf, C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<Input = ParseError>,
+        C: Context<'buf, Input = ParseError>,
     {
         let mut byte = [0];
         self.read(cx, &mut byte[..])?;
@@ -60,9 +60,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
+    fn skip<'buf, C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<Input = ParseError>,
+        C: Context<'buf, Input = ParseError>,
     {
         let outcome = self.index.wrapping_add(n);
 
@@ -75,9 +75,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<'buf, C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = ParseError>,
+        C: Context<'buf, Input = ParseError>,
     {
         let outcome = self.index.wrapping_add(buf.len());
 
@@ -91,9 +91,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn skip_whitespace<C>(&mut self, _: &mut C) -> Result<(), C::Error>
+    fn skip_whitespace<'buf, C>(&mut self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<Input = ParseError>,
+        C: Context<'buf, Input = ParseError>,
     {
         while matches!(
             self.slice.get(self.index),
@@ -111,17 +111,17 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn peek_byte<C>(&mut self, _: &mut C) -> Result<Option<u8>, C::Error>
+    fn peek_byte<'buf, C>(&mut self, _: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<Input = ParseError>,
+        C: Context<'buf, Input = ParseError>,
     {
         Ok(self.slice.get(self.index).copied())
     }
 
     #[inline]
-    fn parse_f32<C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
+    fn parse_f32<'buf, C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
     where
-        C: Context<Input = ParseError>,
+        C: Context<'buf, Input = ParseError>,
     {
         use lexical::parse_float_options::JSON;
         const FORMAT: u128 = lexical::format::STANDARD;
@@ -144,9 +144,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn parse_f64<C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
+    fn parse_f64<'buf, C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
     where
-        C: Context<Input = ParseError>,
+        C: Context<'buf, Input = ParseError>,
     {
         use lexical::parse_float_options::JSON;
         const FORMAT: u128 = lexical::format::STANDARD;

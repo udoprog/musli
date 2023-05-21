@@ -3,7 +3,7 @@ use core::fmt;
 /// Provides ergonomic access to the serialization context.
 ///
 /// This is used to among other things report diagnostics.
-pub trait Context {
+pub trait Context<'buf> {
     /// The error type which is collected by the context.
     type Input;
     /// Error produced by context.
@@ -72,11 +72,11 @@ pub trait Context {
     /// [`store_string`]: Context::store_string
     #[inline]
     fn invalid_field_string_tag(&mut self, type_name: &'static str) -> Self::Error {
-        if let Some(..) = self.get_string() {
-            // self.message(format_args!("{type_name}: invalid field tag: {string}"))
+        if let Some(string) = self.get_string() {
+            self.message(format_args!("{type_name}: invalid field tag: {string}"))
+        } else {
+            self.message(format_args!("{type_name}: invalid field tag"))
         }
-
-        self.message(format_args!("{type_name}: invalid field tag"))
     }
 
     /// Missing variant field required to decode.
@@ -119,10 +119,11 @@ pub trait Context {
     #[allow(unused_variables)]
     fn store_string(&mut self, string: &str) {}
 
-    /// Access the last string stored with [`store_string`].
+    /// Access the last string stored with [`store_string`], referenced from the
+    /// internal buffer.
     ///
     /// [`store_string`]: Context::store_string
-    fn get_string(&self) -> Option<&str> {
+    fn get_string(&self) -> Option<&'buf str> {
         None
     }
 

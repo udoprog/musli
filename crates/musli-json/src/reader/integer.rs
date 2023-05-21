@@ -197,9 +197,9 @@ where
 }
 
 /// Implementation to skip over a well-formed JSON number.
-pub(crate) fn skip_number<'de, C, P>(cx: &mut C, p: &mut P) -> Result<(), C::Error>
+pub(crate) fn skip_number<'de, 'buf, C, P>(cx: &mut C, p: &mut P) -> Result<(), C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let start = p.pos();
@@ -247,10 +247,10 @@ where
 }
 
 /// Fully parse an unsigned value.
-pub(crate) fn parse_unsigned<'de, T, C, P>(cx: &mut C, p: &mut P) -> Result<T, C::Error>
+pub(crate) fn parse_unsigned<'de, 'buf, T, C, P>(cx: &mut C, p: &mut P) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let start = p.pos();
@@ -265,10 +265,13 @@ where
     }
 }
 
-pub(crate) fn decode_unsigned<'de, T, C, P>(cx: &mut C, p: &mut P) -> Result<Parts<T>, C::Error>
+pub(crate) fn decode_unsigned<'de, 'buf, T, C, P>(
+    cx: &mut C,
+    p: &mut P,
+) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let start = p.pos();
@@ -276,9 +279,12 @@ where
 }
 
 /// Decode a signed integer.
-pub(crate) fn decode_signed<'de, T, C, P>(cx: &mut C, p: &mut P) -> Result<SignedParts<T>, C::Error>
+pub(crate) fn decode_signed<'de, 'buf, T, C, P>(
+    cx: &mut C,
+    p: &mut P,
+) -> Result<SignedParts<T>, C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
@@ -299,10 +305,10 @@ where
 }
 
 /// Fully parse a signed value.
-pub(crate) fn parse_signed<'de, T, C, P>(cx: &mut C, p: &mut P) -> Result<T, C::Error>
+pub(crate) fn parse_signed<'de, 'buf, T, C, P>(cx: &mut C, p: &mut P) -> Result<T, C::Error>
 where
     T: Signed,
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let start = p.pos();
@@ -319,14 +325,14 @@ where
 
 /// Generically decode a single (whole) integer from a stream of bytes abiding
 /// by JSON convention for format.
-fn decode_unsigned_inner<'de, T, C, P>(
+fn decode_unsigned_inner<'de, 'buf, T, C, P>(
     cx: &mut C,
     p: &mut P,
     start: u32,
 ) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let base = match p.read_byte(cx)? {
@@ -395,9 +401,9 @@ where
 }
 
 /// Decode an exponent.
-fn decode_exponent<'de, C, P>(cx: &mut C, p: &mut P, start: u32) -> Result<i32, C::Error>
+fn decode_exponent<'de, 'buf, C, P>(cx: &mut C, p: &mut P, start: u32) -> Result<i32, C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let mut is_negative = false;
@@ -430,10 +436,10 @@ where
 
 /// Decode a single digit into `out`.
 #[inline]
-fn digit<'de, T, C, P>(cx: &mut C, mut out: T, p: &mut P, start: u32) -> Result<T, C::Error>
+fn digit<'de, 'buf, T, C, P>(cx: &mut C, mut out: T, p: &mut P, start: u32) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     out = match out.checked_mul10() {
@@ -451,9 +457,9 @@ where
 }
 
 /// Decode sequence of zeros.
-fn decode_zeros<'de, C, P>(cx: &mut C, p: &mut P) -> Result<i32, C::Error>
+fn decode_zeros<'de, 'buf, C, P>(cx: &mut C, p: &mut P) -> Result<i32, C::Error>
 where
-    C: Context<Input = ParseError>,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let mut count = 0;

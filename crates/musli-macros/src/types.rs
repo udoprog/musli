@@ -145,7 +145,8 @@ impl Types {
                         predicates: Punctuated::default(),
                     };
 
-                    let c_param: proc_macro2::Ident = syn::Ident::new("C", Span::call_site());
+                    let c_param: syn::Ident = syn::Ident::new("C", Span::call_site());
+                    let buf_lt: syn::Lifetime = syn::Lifetime::new("'buf", Span::call_site());
 
                     let mut predicate = syn::PredicateType {
                         lifetimes: None,
@@ -158,7 +159,7 @@ impl Types {
                     };
 
                     predicate.bounds.push(syn::TypeParamBound::Verbatim(quote!(
-                        musli::Context<Input = Self::Error>
+                        musli::Context<#buf_lt, Input = Self::Error>
                     )));
 
                     where_clause
@@ -166,6 +167,14 @@ impl Types {
                         .push(syn::WherePredicate::Type(predicate));
 
                     let mut params = Punctuated::default();
+
+                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
+                        attrs: Vec::new(),
+                        lifetime: buf_lt,
+                        colon_token: None,
+                        bounds: Punctuated::default(),
+                    }));
+
                     params.push(syn::GenericParam::Type(syn::TypeParam {
                         attrs: Vec::new(),
                         ident: c_param,
@@ -269,7 +278,13 @@ fn never_type<const N: usize>(
         }
 
         if let Extra::Visitor(ty) = extra {
-            let Some(syn::GenericParam::Type(syn::TypeParam { ident: c_param, .. })) = generics.params.first() else {
+            let mut it = generics.params.iter();
+
+            let Some(syn::GenericParam::Lifetime(syn::LifetimeParam { lifetime: syn::Lifetime { .. }, .. })) = it.next() else {
+                return Err(syn::Error::new_spanned(generics, "Missing generic lifetime in associated type (usually `'buf`)"));
+            };
+
+            let Some(syn::GenericParam::Type(syn::TypeParam { ident: c_param, .. })) = it.next() else {
                 return Err(syn::Error::new_spanned(generics, "Missing generic parameter in associated type (usually `C`)"));
             };
 

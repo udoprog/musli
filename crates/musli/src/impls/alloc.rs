@@ -24,9 +24,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         Encode::<M>::encode(self.as_str(), cx, encoder)
@@ -38,16 +38,16 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, str> for Visitor
+        impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, str> for Visitor
         where
-            C: Context,
+            C: Context<'buf>,
         {
             type Ok = String;
 
@@ -81,9 +81,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         Encode::<M>::encode(self.as_ref(), cx, encoder)
@@ -95,9 +95,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
         Ok(<String as Decode<M>>::decode(cx, decoder)?.into())
@@ -111,9 +111,9 @@ macro_rules! cow {
             M: Mode,
         {
             #[inline]
-            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<'buf, Input = E::Error>,
                 E: Encoder,
             {
                 Encode::<M>::encode(self.as_ref(), cx, encoder)
@@ -125,16 +125,16 @@ macro_rules! cow {
             M: Mode,
         {
             #[inline]
-            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<'buf, Input = D::Error>,
                 D: Decoder<'de>,
             {
                 struct Visitor;
 
-                impl<'de, C> ValueVisitor<'de, C, $source> for Visitor
+                impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, $source> for Visitor
                 where
-                    C: Context,
+                    C: Context<'buf>,
                 {
                     type Ok = Cow<'de, $ty>;
 
@@ -205,9 +205,9 @@ macro_rules! sequence {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<'buf, Input = E::Error>,
                 E: Encoder,
             {
                 let mut seq = encoder.encode_sequence(cx, self.len())?;
@@ -228,9 +228,9 @@ macro_rules! sequence {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<'buf, Input = D::Error>,
                 D: Decoder<'de>,
             {
                 let mut $access = decoder.decode_sequence(cx)?;
@@ -287,9 +287,9 @@ macro_rules! map {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<'buf, Input = E::Error>,
                 E: Encoder,
             {
                 let mut map = encoder.encode_map(cx, self.len())?;
@@ -315,9 +315,9 @@ macro_rules! map {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<'buf, Input = D::Error>,
                 D: Decoder<'de>,
             {
                 let mut $access = decoder.decode_map(cx)?;
@@ -350,9 +350,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         encoder.encode_bytes(cx, self.to_bytes_with_nul())
@@ -364,16 +364,16 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+        impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, [u8]> for Visitor
         where
-            C: Context,
+            C: Context<'buf>,
         {
             type Ok = CString;
 

@@ -34,9 +34,9 @@ const CONT_BYTE: u8 = 0b1000_0000;
 
 /// Decode the given length using variable int encoding.
 #[inline(never)]
-pub fn decode<'de, C, R, T>(cx: &mut C, mut r: R) -> Result<T, C::Error>
+pub fn decode<'de, 'buf, C, R, T>(cx: &mut C, mut r: R) -> Result<T, C::Error>
 where
-    C: Context<Input = R::Error>,
+    C: Context<'buf, Input = R::Error>,
     R: Reader<'de>,
     T: int::Unsigned,
 {
@@ -65,9 +65,9 @@ where
 
 /// Encode the given length using variable length encoding.
 #[inline(never)]
-pub fn encode<C, W, T>(cx: &mut C, mut w: W, mut value: T) -> Result<(), C::Error>
+pub fn encode<'buf, C, W, T>(cx: &mut C, mut w: W, mut value: T) -> Result<(), C::Error>
 where
-    C: Context<Input = W::Error>,
+    C: Context<'buf, Input = W::Error>,
     W: Writer,
     T: int::Unsigned,
 {
