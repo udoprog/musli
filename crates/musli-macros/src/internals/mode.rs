@@ -40,10 +40,10 @@ impl<'a> Mode<'a> {
     pub(crate) fn encode_t_encode(&self, trace: bool) -> syn::Path {
         let moded_ident = &self.mode_path;
 
-        let mut encode_t = if trace {
-            self.tokens.trace_encode_t.clone()
+        let (mut encode_t, name) = if trace {
+            (self.tokens.trace_encode_t.clone(), "trace_encode")
         } else {
-            self.tokens.encode_t.clone()
+            (self.tokens.encode_t.clone(), "encode")
         };
 
         if let Some(segment) = encode_t.segments.last_mut() {
@@ -53,7 +53,7 @@ impl<'a> Mode<'a> {
         encode_t
             .segments
             .push(syn::PathSegment::from(syn::Ident::new(
-                "encode",
+                name,
                 encode_t.span(),
             )));
         encode_t

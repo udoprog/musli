@@ -1,7 +1,11 @@
 //! Helper types to set up a basic Müsli [`Context`].
 
 #[cfg(feature = "alloc")]
-mod rich_context;
+mod alloc_context;
+#[cfg(feature = "arrayvec")]
+mod no_std_context;
+#[cfg(any(feature = "alloc", feature = "arrayvec"))]
+mod rich_error;
 
 use core::fmt;
 use core::marker::PhantomData;
@@ -11,7 +15,13 @@ use musli::error::Error;
 use musli::Context;
 
 #[cfg(feature = "alloc")]
-pub use self::rich_context::RichContext;
+pub use self::alloc_context::{AllocBuf, AllocContext};
+
+#[cfg(feature = "arrayvec")]
+pub use self::no_std_context::{NoStdBuf, NoStdContext};
+
+#[cfg(any(feature = "alloc", feature = "arrayvec"))]
+pub use self::rich_error::RichError;
 
 /// A simple non-diagnostical capturing context which simply emits the original
 /// error.

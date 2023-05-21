@@ -1,6 +1,5 @@
 use core::fmt;
 use core::marker::PhantomData;
-use core::mem::take;
 use core::ops::Range;
 use core::ptr;
 
@@ -11,33 +10,45 @@ use musli::de;
 use musli::error::Error;
 use musli::Context;
 
-/// A collected error which has been context decorated.
-pub struct RichError<'a, E> {
-    path: &'a [Step],
-    range: Range<usize>,
-    error: &'a E,
+use crate::context::rich_error::{RichError, Step};
+
+/// Buffer used in combination with [`AllocContext`].
+///
+/// This can be safely re-used.
+#[derive(Default)]
+pub struct AllocBuf {
+    string: String,
+}
+
+impl AllocBuf {
+    /// De-allocate the underlying buffer, this can be useful if you're dealing
+    /// with infrequent decodings which uses large keys and you don't want the
+    /// memory to keep being reserved.
+    pub fn free(&mut self) {
+        self.string = String::new();
+    }
 }
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
-pub struct RichContext<'buf, E> {
+pub struct AllocContext<'buf, E> {
     mark: usize,
-    string: ptr::NonNull<String>,
-    errors: Vec<(Vec<Step>, Range<usize>, E)>,
-    path: Vec<Step>,
+    buf: ptr::NonNull<AllocBuf>,
+    errors: Vec<(Vec<Step<String>>, Range<usize>, E)>,
+    path: Vec<Step<String>>,
     include_type: bool,
-    _marker: PhantomData<(&'buf mut String, E)>,
+    _marker: PhantomData<(&'buf mut AllocBuf, E)>,
 }
 
-impl<'buf, E> RichContext<'buf, E> {
+impl<'buf, E> AllocContext<'buf, E> {
     /// Construct a new context which uses allocations to store arbitrary
     /// amounts of diagnostics about decoding.
     ///
     /// Or at least until we run out of memory.
-    pub fn new(string: &'buf mut String) -> Self {
+    pub fn new(buf: &'buf mut AllocBuf) -> Self {
         Self {
             mark: 0,
-            string: string.into(),
+            buf: buf.into(),
             errors: Vec::new(),
             path: Vec::new(),
             include_type: false,
@@ -53,16 +64,14 @@ impl<'buf, E> RichContext<'buf, E> {
     }
 
     /// Iterate over all collected errors.
-    pub fn iter(&self) -> impl Iterator<Item = RichError<'_, E>> {
-        self.errors.iter().map(|(path, range, error)| RichError {
-            path,
-            range: range.clone(),
-            error,
-        })
+    pub fn iter(&self) -> impl Iterator<Item = RichError<'_, String, E>> {
+        self.errors
+            .iter()
+            .map(|(path, range, error)| RichError::new(path, 0, range.clone(), error))
     }
 }
 
-impl<'buf, E> Context<'buf> for RichContext<'buf, E>
+impl<'buf, E> Context<'buf> for AllocContext<'buf, E>
 where
     E: Error,
 {
@@ -134,17 +143,17 @@ where
     fn store_string(&mut self, s: &str) {
         // SAFETY: we're holding onto a mutable reference to the string so it
         // must be live for the duration of the context.
-        let string = unsafe { self.string.as_mut() };
-        string.clear();
-        string.push_str(s);
+        let buf = unsafe { self.buf.as_mut() };
+        buf.string.clear();
+        buf.string.push_str(s);
     }
 
     #[inline(always)]
     fn get_string<'a>(&self) -> Option<&'buf str> {
         // SAFETY: we're holding onto a mutable reference to the string so it
         // must be live for the duration of the context.
-        let string = unsafe { self.string.as_ref() };
-        Some(string)
+        let buf = unsafe { self.buf.as_ref() };
+        Some(&buf.string)
     }
 
     #[inline]
@@ -227,127 +236,5 @@ where
     #[inline]
     fn leave_map_key(&mut self) {
         self.path.pop();
-    }
-}
-
-impl<'buf, E> fmt::Display for RichError<'buf, E>
-where
-    E: fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let path = format_path(self.path);
-
-        if self.range.start != 0 || self.range.end != 0 {
-            if self.range.start == self.range.end {
-                write!(f, "{path}: {} (at byte {})", self.error, self.range.start)?;
-            } else {
-                write!(
-                    f,
-                    "{path}: {} (at bytes {}-{})",
-                    self.error, self.range.start, self.range.end
-                )?;
-            }
-        } else {
-            write!(f, "{path}: {}", self.error)?;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-enum Step {
-    Struct(&'static str),
-    Enum(&'static str),
-    Variant(&'static str),
-    Named(&'static str),
-    Unnamed(u32),
-    Index(usize),
-    Key(String),
-}
-
-fn format_path(path: &[Step]) -> impl fmt::Display + '_ {
-    FormatPath { path }
-}
-
-struct FormatPath<'a> {
-    path: &'a [Step],
-}
-
-impl<'a> fmt::Display for FormatPath<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut has_type = false;
-        let mut has_field = false;
-        let mut level = 0;
-
-        for step in self.path {
-            match step {
-                Step::Struct(name) => {
-                    if take(&mut has_field) {
-                        write!(f, " = ")?;
-                    }
-
-                    write!(f, "{name}")?;
-                    has_type = true;
-                }
-                Step::Enum(name) => {
-                    if take(&mut has_field) {
-                        write!(f, " = ")?;
-                    }
-
-                    write!(f, "{name}::")?;
-                }
-                Step::Variant(name) => {
-                    if take(&mut has_field) {
-                        write!(f, " = ")?;
-                    }
-
-                    write!(f, "{name}")?;
-                    has_type = true;
-                }
-                Step::Named(name) => {
-                    if take(&mut has_type) {
-                        write!(f, " {{ ")?;
-                        level += 1;
-                    }
-
-                    write!(f, ".{name}")?;
-                    has_field = true;
-                }
-                Step::Unnamed(index) => {
-                    if take(&mut has_type) {
-                        write!(f, " {{ ")?;
-                        level += 1;
-                    }
-
-                    write!(f, ".{index}")?;
-                    has_field = true;
-                }
-                Step::Index(index) => {
-                    if take(&mut has_type) {
-                        write!(f, " {{ ")?;
-                        level += 1;
-                    }
-
-                    write!(f, "[{index}]")?;
-                    has_field = true;
-                }
-                Step::Key(key) => {
-                    if take(&mut has_type) {
-                        write!(f, " {{ ")?;
-                        level += 1;
-                    }
-
-                    write!(f, "[{key}]")?;
-                    has_field = true;
-                }
-            }
-        }
-
-        for _ in 0..level {
-            write!(f, " }}")?;
-        }
-
-        Ok(())
     }
 }
