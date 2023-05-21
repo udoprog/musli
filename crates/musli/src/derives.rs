@@ -724,7 +724,7 @@
 //!
 //! #### `#[musli(trace)]`
 //!
-//! This causes the field to use the [`DecodeTrace`] / [`EncodeTrace`] when
+//! This causes the field to use the [`TraceDecode`] / [`TraceEncode`] when
 //! encoding the field. This is left optional for types where enabling tracing
 //! for the field requires extra traits to be implemented, such as `HashMap<K,
 //! V>` where we'd need `K` to implement `fmt::Display`.
@@ -824,14 +824,16 @@
 //! a map for the field corresponding to the `tag`, and then use this to
 //! determine which decoder implementation to call.
 //!
-//! [default mode]: crate::mode::DefaultMode
+//! [`Decode`]: crate::Decode
+//! [`Decoder::decode_buffer`]: crate::Decoder::decode_buffer
+//! [`Decoder::decode_variant`]: crate::Decoder::decode_variant
+//! [`Decoder`]: crate::Decoder
 //! [`DefaultMode`]: crate::mode::DefaultMode
 //! [`Encode`]: crate::Encode
-//! [`Decode`]: crate::Decode
-//! [`Encoder`]: crate::Encoder
 //! [`Encoder::encode_variant`]: crate::Encoder::encode_variant
-//! [`Decoder`]: crate::Decoder
-//! [`Decoder::decode_variant`]: crate::Decoder::decode_variant
-//! [`Decoder::decode_buffer`]: crate::Decoder::decode_buffer
+//! [`Encoder`]: crate::Encoder
+//! [`TraceDecode`]: crate::de::TraceDecode
+//! [`TraceEncode`]: crate::en::TraceEncode
+//! [default mode]: crate::mode::DefaultMode
 
 // Parts of this documentation

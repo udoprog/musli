@@ -151,9 +151,9 @@ pub trait Context<'buf> {
 
     /// For named (string) variants, stores the tag string in the context.
     ///
-    /// It should be possible to recall the string later using [`take_string`].
+    /// It should be possible to recall the string later using [`get_string`].
     ///
-    /// [`take_string`]: Context::take_string
+    /// [`get_string`]: Context::get_string
     #[allow(unused_variables)]
     #[inline(always)]
     fn store_string(&mut self, string: &str) {}

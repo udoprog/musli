@@ -416,21 +416,21 @@
 //! [^i128]: Lacks 128-bit support.
 //!
 //! [`bincode`]: https://docs.rs/bincode
-//! [`Decode`]: https://docs.rs/musli/latest/musli/trait.Decode.html
+//! [`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
 //! [`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
 //! [`derives`]: https://docs.rs/musli/latest/musli/derives/
-//! [`Encode`]: https://docs.rs/musli/latest/musli/trait.Encode.html
+//! [`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
 //! [`musli-descriptive`]: https://docs.rs/musli-descriptive
+//! [`musli-json`]: https://docs.rs/musli-json
 //! [`musli-storage`]: https://docs.rs/musli-storage
 //! [`musli-tests`]: https://github.com/udoprog/musli/tree/main/crates/musli-tests
 //! [`musli-value`]: https://docs.rs/musli-value
 //! [`musli-wire`]: https://docs.rs/musli-wire
-//! [`musli-json`]: https://docs.rs/musli-json
 //! [`protobuf`]: https://developers.google.com/protocol-buffers
 //! [`serde`]: https://serde.rs
+//! [`simdutf8`]: https://docs.rs/simdutf8
 //! [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
 //! [when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
-//! [`simdutf8`]: https://docs.rs/simdutf8
 
 #![deny(missing_docs)]
 #![no_std]

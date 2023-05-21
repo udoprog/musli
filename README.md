@@ -113,6 +113,7 @@ deemed unnecessary, such as [when decoding collections]. The result is
 usually cleaner decode implementations, as shown here:
 
 ```rust
+use musli::Context;
 use musli::de::{Decode, Decoder, SequenceDecoder};
 use musli::mode::Mode;
 
@@ -121,18 +122,19 @@ struct MyType {
 }
 
 impl<'de, M> Decode<'de, M> for MyType where M: Mode {
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        let mut seq = decoder.decode_sequence()?;
+        let mut seq = decoder.decode_sequence(cx)?;
         let mut data = Vec::with_capacity(seq.size_hint().or_default());
 
-        while let Some(decoder) = seq.next()? {
-            data.push(Decode::<M>::decode(decoder)?);
+        while let Some(decoder) = seq.next(cx)? {
+            data.push(Decode::<M>::decode(cx, decoder)?);
         }
 
-        seq.end()?;
+        seq.end(cx)?;
 
         Ok(Self {
             data
@@ -403,18 +405,18 @@ cannot) make stricter assumptions as a result.
 [^i128]: Lacks 128-bit support.
 
 [`bincode`]: https://docs.rs/bincode
-[`Decode`]: https://docs.rs/musli/latest/musli/trait.Decode.html
+[`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
 [`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
 [`derives`]: https://docs.rs/musli/latest/musli/derives/
-[`Encode`]: https://docs.rs/musli/latest/musli/trait.Encode.html
+[`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
 [`musli-descriptive`]: https://docs.rs/musli-descriptive
+[`musli-json`]: https://docs.rs/musli-json
 [`musli-storage`]: https://docs.rs/musli-storage
 [`musli-tests`]: https://github.com/udoprog/musli/tree/main/crates/musli-tests
 [`musli-value`]: https://docs.rs/musli-value
 [`musli-wire`]: https://docs.rs/musli-wire
-[`musli-json`]: https://docs.rs/musli-json
 [`protobuf`]: https://developers.google.com/protocol-buffers
 [`serde`]: https://serde.rs
+[`simdutf8`]: https://docs.rs/simdutf8
 [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
 [when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
-[`simdutf8`]: https://docs.rs/simdutf8
