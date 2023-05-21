@@ -115,6 +115,7 @@
 //! usually cleaner decode implementations, as shown here:
 //!
 //! ```
+//! use musli::Context;
 //! use musli::de::{Decode, Decoder, SequenceDecoder};
 //! use musli::mode::Mode;
 //!
@@ -123,18 +124,19 @@
 //! }
 //!
 //! impl<'de, M> Decode<'de, M> for MyType where M: Mode {
-//!     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+//!     fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
 //!     where
+//!         C: Context<'buf, Input = D::Error>,
 //!         D: Decoder<'de>,
 //!     {
-//!         let mut seq = decoder.decode_sequence()?;
+//!         let mut seq = decoder.decode_sequence(cx)?;
 //!         let mut data = Vec::with_capacity(seq.size_hint().or_default());
 //!
-//!         while let Some(decoder) = seq.next()? {
-//!             data.push(Decode::<M>::decode(decoder)?);
+//!         while let Some(decoder) = seq.next(cx)? {
+//!             data.push(Decode::<M>::decode(cx, decoder)?);
 //!         }
 //!
-//!         seq.end()?;
+//!         seq.end(cx)?;
 //!
 //!         Ok(Self {
 //!             data
@@ -308,7 +310,7 @@
 //! }
 //!
 //! let CONFIG: Encoding<DefaultMode> = Encoding::new();
-//! let ALT_CONFIG: Encoding<Alt> = Encoding::new();
+//! let ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
 //!
 //! let word = Word {
 //!     text: "あります",
@@ -439,6 +441,9 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod context;
+pub use self::context::Context;
+
 pub mod compat;
 pub mod de;
 pub mod derives;
@@ -476,6 +481,7 @@ pub use self::mode::Mode;
 /// ```
 /// use std::fmt;
 ///
+/// use musli::Context;
 /// use musli::en::Encoder;
 ///
 /// struct MyEncoder<'a> {
@@ -491,7 +497,10 @@ pub use self::mode::Mode;
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
+///     fn encode_u32<'buf, C>(self, cx: &mut C, value: u32) -> Result<(), C::Error>
+///     where
+///         C: Context<'buf, Input = Self::Error>
+///     {
 ///         *self.value = Some(value);
 ///         Ok(())
 ///     }
@@ -515,6 +524,7 @@ pub use musli_macros::encoder;
 /// ```
 /// use std::fmt;
 ///
+/// use musli::Context;
 /// use musli::de::Decoder;
 ///
 /// struct MyDecoder;
@@ -527,7 +537,10 @@ pub use musli_macros::encoder;
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32(self) -> Result<u32, Self::Error> {
+///     fn decode_u32<'buf, C>(self, _: &mut C) -> Result<u32, C::Error>
+///     where
+///         C: Context<'buf, Input = Self::Error>
+///     {
 ///         Ok(42)
 ///     }
 /// }

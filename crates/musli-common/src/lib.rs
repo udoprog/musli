@@ -24,6 +24,7 @@ extern crate std;
 extern crate alloc;
 
 pub mod buffered_writer;
+pub mod context;
 pub mod error;
 pub mod fixed_bytes;
 pub mod int;
@@ -31,3 +32,6 @@ pub mod reader;
 pub mod str;
 pub mod wrap;
 pub mod writer;
+
+#[macro_use]
+mod macros;

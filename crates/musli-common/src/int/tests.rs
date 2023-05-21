@@ -4,6 +4,7 @@ use std::vec::Vec;
 
 type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
+use crate::context;
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
 use crate::int::{Signed, Unsigned};
@@ -18,11 +19,13 @@ fn test_continuation_encoding() -> Result<()> {
         T: PartialEq<T> + fmt::Debug + Unsigned,
     {
         let mut out = Buffer::new();
-        c::encode(&mut out, expected)?;
-        c::encode(&mut out, expected)?;
+        let mut cx = crate::context::Same::default();
+        c::encode(&mut cx, &mut out, expected)?;
+        c::encode(&mut cx, &mut out, expected)?;
         let mut data = out.as_slice();
-        let a: T = c::decode(&mut data)?;
-        let b: T = c::decode(&mut data)?;
+        let mut cx = context::Capture::default();
+        let a: T = c::decode(&mut cx, &mut data)?;
+        let b: T = c::decode(&mut cx, &mut data)?;
         assert!(data.is_empty());
         assert_eq!(a, expected);
         assert_eq!(b, expected);
@@ -34,7 +37,8 @@ fn test_continuation_encoding() -> Result<()> {
         T: Unsigned,
     {
         let mut out = Vec::new();
-        c::encode(crate::wrap::wrap(&mut out), value)?;
+        let mut cx = crate::context::Same::default();
+        c::encode(&mut cx, crate::wrap::wrap(&mut out), value)?;
         Ok(out)
     }
 

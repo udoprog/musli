@@ -19,6 +19,7 @@ use musli::en::{Encode, Encoder};
 use musli::en::{PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::error::Error;
 use musli::mode::Mode;
+use musli::Context;
 
 use crate::de::ValueDecoder;
 use crate::error::ValueError;
@@ -135,29 +136,55 @@ pub enum Number {
     F64(f64),
 }
 
+macro_rules! from {
+    ($ty:ty, $variant:ident) => {
+        impl From<$ty> for Number {
+            fn from(value: $ty) -> Self {
+                Self::$variant(value)
+            }
+        }
+    };
+}
+
+from!(u8, U8);
+from!(u16, U16);
+from!(u32, U32);
+from!(u64, U64);
+from!(u128, U128);
+from!(i8, I8);
+from!(i16, I16);
+from!(i32, I32);
+from!(i64, I64);
+from!(i128, I128);
+from!(usize, Usize);
+from!(isize, Isize);
+from!(f32, F32);
+from!(f64, F64);
+
 impl<M> Encode<M> for Number
 where
     M: Mode,
 {
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         match self {
-            Number::U8(n) => encoder.encode_u8(*n),
-            Number::U16(n) => encoder.encode_u16(*n),
-            Number::U32(n) => encoder.encode_u32(*n),
-            Number::U64(n) => encoder.encode_u64(*n),
-            Number::U128(n) => encoder.encode_u128(*n),
-            Number::I8(n) => encoder.encode_i8(*n),
-            Number::I16(n) => encoder.encode_i16(*n),
-            Number::I32(n) => encoder.encode_i32(*n),
-            Number::I64(n) => encoder.encode_i64(*n),
-            Number::I128(n) => encoder.encode_i128(*n),
-            Number::Usize(n) => encoder.encode_usize(*n),
-            Number::Isize(n) => encoder.encode_isize(*n),
-            Number::F32(n) => encoder.encode_f32(*n),
-            Number::F64(n) => encoder.encode_f64(*n),
+            Number::U8(n) => encoder.encode_u8(cx, *n),
+            Number::U16(n) => encoder.encode_u16(cx, *n),
+            Number::U32(n) => encoder.encode_u32(cx, *n),
+            Number::U64(n) => encoder.encode_u64(cx, *n),
+            Number::U128(n) => encoder.encode_u128(cx, *n),
+            Number::I8(n) => encoder.encode_i8(cx, *n),
+            Number::I16(n) => encoder.encode_i16(cx, *n),
+            Number::I32(n) => encoder.encode_i32(cx, *n),
+            Number::I64(n) => encoder.encode_i64(cx, *n),
+            Number::I128(n) => encoder.encode_i128(cx, *n),
+            Number::Usize(n) => encoder.encode_usize(cx, *n),
+            Number::Isize(n) => encoder.encode_isize(cx, *n),
+            Number::F32(n) => encoder.encode_f32(cx, *n),
+            Number::F64(n) => encoder.encode_f64(cx, *n),
         }
     }
 }
@@ -196,11 +223,11 @@ where
     type Error = E;
 
     #[cfg(feature = "alloc")]
-    type String = StringVisitor<E>;
+    type String<'buf, C> = StringVisitor where C: Context<'buf, Input = E>;
     #[cfg(feature = "alloc")]
-    type Bytes = BytesVisitor<E>;
+    type Bytes<'buf, C> = BytesVisitor where C: Context<'buf, Input = E>;
     #[cfg(feature = "alloc")]
-    type Number = ValueNumberVisitor<E>;
+    type Number<'buf, C> = ValueNumberVisitor where C: Context<'buf, Input = E>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -208,163 +235,241 @@ where
     }
 
     #[inline]
-    fn visit_unit(self) -> Result<Self::Ok, Self::Error> {
+    fn visit_unit<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Unit)
     }
 
     #[inline]
-    fn visit_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
+    fn visit_bool<'buf, C>(self, _: &mut C, value: bool) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Bool(value))
     }
 
     #[inline]
-    fn visit_char(self, value: char) -> Result<Self::Ok, Self::Error> {
+    fn visit_char<'buf, C>(self, _: &mut C, value: char) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Char(value))
     }
 
     #[inline]
-    fn visit_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
+    fn visit_u8<'buf, C>(self, _: &mut C, value: u8) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::U8(value)))
     }
 
     #[inline]
-    fn visit_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
+    fn visit_u16<'buf, C>(self, _: &mut C, value: u16) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::U16(value)))
     }
 
     #[inline]
-    fn visit_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
+    fn visit_u32<'buf, C>(self, _: &mut C, value: u32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::U32(value)))
     }
 
     #[inline]
-    fn visit_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+    fn visit_u64<'buf, C>(self, _: &mut C, value: u64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::U64(value)))
     }
 
     #[inline]
-    fn visit_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+    fn visit_u128<'buf, C>(self, _: &mut C, value: u128) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::U128(value)))
     }
 
     #[inline]
-    fn visit_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
+    fn visit_i8<'buf, C>(self, _: &mut C, value: i8) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::I8(value)))
     }
 
     #[inline]
-    fn visit_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
+    fn visit_i16<'buf, C>(self, _: &mut C, value: i16) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::I16(value)))
     }
 
     #[inline]
-    fn visit_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
+    fn visit_i32<'buf, C>(self, _: &mut C, value: i32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::I32(value)))
     }
 
     #[inline]
-    fn visit_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+    fn visit_i64<'buf, C>(self, _: &mut C, value: i64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::I64(value)))
     }
 
     #[inline]
-    fn visit_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+    fn visit_i128<'buf, C>(self, _: &mut C, value: i128) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::I128(value)))
     }
 
     #[inline]
-    fn visit_usize(self, value: usize) -> Result<Self::Ok, Self::Error> {
+    fn visit_usize<'buf, C>(self, _: &mut C, value: usize) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::Usize(value)))
     }
 
     #[inline]
-    fn visit_isize(self, value: isize) -> Result<Self::Ok, Self::Error> {
+    fn visit_isize<'buf, C>(self, _: &mut C, value: isize) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::Isize(value)))
     }
 
     #[inline]
-    fn visit_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
+    fn visit_f32<'buf, C>(self, _: &mut C, value: f32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::F32(value)))
     }
 
     #[inline]
-    fn visit_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
+    fn visit_f64<'buf, C>(self, _: &mut C, value: f64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(Value::Number(Number::F64(value)))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_option<D>(self, decoder: Option<D>) -> Result<Self::Ok, Self::Error>
+    fn visit_option<'buf, C, D>(self, cx: &mut C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
     where
+        C: Context<'buf, Input = Self::Error>,
         D: Decoder<'de, Error = Self::Error>,
     {
         match decoder {
-            Some(decoder) => Ok(Value::Option(Some(Box::new(Decode::<M>::decode(decoder)?)))),
+            Some(decoder) => Ok(Value::Option(Some(Box::new(Decode::<M>::decode(
+                cx, decoder,
+            )?)))),
             None => Ok(Value::Option(None)),
         }
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_sequence<D>(self, mut seq: D) -> Result<Self::Ok, Self::Error>
+    fn visit_sequence<'buf, C, D>(self, cx: &mut C, mut seq: D) -> Result<Self::Ok, C::Error>
     where
+        C: Context<'buf, Input = Self::Error>,
         D: SequenceDecoder<'de, Error = Self::Error>,
     {
         let mut out = Vec::with_capacity(seq.size_hint().or_default());
 
-        while let Some(item) = seq.next()? {
-            out.push(Decode::<M>::decode(item)?);
+        while let Some(item) = seq.next(cx)? {
+            out.push(Decode::<M>::decode(cx, item)?);
         }
 
-        seq.end()?;
+        seq.end(cx)?;
         Ok(Value::Sequence(out))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_map<D>(self, mut map: D) -> Result<Self::Ok, Self::Error>
+    fn visit_map<'buf, C, D>(self, cx: &mut C, mut map: D) -> Result<Self::Ok, C::Error>
     where
+        C: Context<'buf, Input = Self::Error>,
         D: PairsDecoder<'de, Error = Self::Error>,
     {
         let mut out = Vec::with_capacity(map.size_hint().or_default());
 
-        while let Some(mut item) = map.next()? {
-            let first = Decode::<M>::decode(item.first()?)?;
-            let second = Decode::<M>::decode(item.second()?)?;
+        while let Some(mut item) = map.next(cx)? {
+            let first = item.first(cx)?;
+            let first = Decode::<M>::decode(cx, first)?;
+            let second = item.second(cx)?;
+            let second = Decode::<M>::decode(cx, second)?;
             out.push((first, second));
         }
 
-        map.end()?;
+        map.end(cx)?;
         Ok(Value::Map(out))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_bytes(self, _: SizeHint) -> Result<Self::Bytes, Self::Error> {
-        Ok(BytesVisitor(marker::PhantomData))
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn visit_string(self, _: SizeHint) -> Result<Self::String, Self::Error> {
-        Ok(StringVisitor(marker::PhantomData))
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn visit_number(self, _: NumberHint) -> Result<Self::Number, Self::Error> {
-        Ok(ValueNumberVisitor(marker::PhantomData))
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn visit_variant<D>(self, mut variant: D) -> Result<Self::Ok, Self::Error>
+    fn visit_bytes<'buf, C>(self, _: &mut C, _: SizeHint) -> Result<Self::Bytes<'buf, C>, C::Error>
     where
+        C: Context<'buf, Input = Self::Error>,
+    {
+        Ok(BytesVisitor)
+    }
+
+    #[cfg(feature = "alloc")]
+    #[inline]
+    fn visit_string<'buf, C>(
+        self,
+        _: &mut C,
+        _: SizeHint,
+    ) -> Result<Self::String<'buf, C>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
+        Ok(StringVisitor)
+    }
+
+    #[cfg(feature = "alloc")]
+    #[inline]
+    fn visit_number<'buf, C>(
+        self,
+        _: &mut C,
+        _: NumberHint,
+    ) -> Result<Self::Number<'buf, C>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
+        Ok(ValueNumberVisitor)
+    }
+
+    #[cfg(feature = "alloc")]
+    #[inline]
+    fn visit_variant<'buf, C, D>(self, cx: &mut C, mut variant: D) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
         D: VariantDecoder<'de, Error = Self::Error>,
     {
-        let first = Decode::<M>::decode(variant.tag()?)?;
-        let second = Decode::<M>::decode(variant.variant()?)?;
-        variant.end()?;
+        let first = variant.tag(cx)?;
+        let first = Decode::<M>::decode(cx, first)?;
+        let second = variant.variant(cx)?;
+        let second = Decode::<M>::decode(cx, second)?;
+        variant.end(cx)?;
         Ok(Value::Variant(Box::new((first, second))))
     }
 }
@@ -373,25 +478,24 @@ impl<'de, M> Decode<'de, M> for Value
 where
     M: Mode,
 {
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        decoder.decode_any(AnyVisitor::<M, D::Error>(marker::PhantomData))
+        decoder.decode_any(cx, AnyVisitor::<M, D::Error>(marker::PhantomData))
     }
 }
 
 #[cfg(feature = "alloc")]
-struct BytesVisitor<E>(marker::PhantomData<E>);
+struct BytesVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, E> ValueVisitor<'de> for BytesVisitor<E>
+impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, [u8]> for BytesVisitor
 where
-    E: Error,
+    C: Context<'buf>,
 {
-    type Target = [u8];
     type Ok = Value;
-    type Error = E;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -400,27 +504,25 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_owned(self, bytes: Vec<u8>) -> Result<Self::Ok, Self::Error> {
+    fn visit_owned(self, _: &mut C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
         Ok(Value::Bytes(bytes))
     }
 
     #[inline]
-    fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, _: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         Ok(Value::Bytes(bytes.to_vec()))
     }
 }
 
 #[cfg(feature = "alloc")]
-struct StringVisitor<E>(marker::PhantomData<E>);
+struct StringVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, E> ValueVisitor<'de> for StringVisitor<E>
+impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, str> for StringVisitor
 where
-    E: Error,
+    C: Context<'buf>,
 {
-    type Target = str;
     type Ok = Value;
-    type Error = E;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -428,24 +530,23 @@ where
     }
 
     #[inline]
-    fn visit_owned(self, string: String) -> Result<Self::Ok, Self::Error> {
+    fn visit_owned(self, _: &mut C, string: String) -> Result<Self::Ok, C::Error> {
         Ok(Value::String(string))
     }
 
     #[inline]
-    fn visit_ref(self, string: &str) -> Result<Self::Ok, Self::Error> {
+    fn visit_ref(self, _: &mut C, string: &str) -> Result<Self::Ok, C::Error> {
         Ok(Value::String(string.to_owned()))
     }
 }
 
-struct ValueNumberVisitor<E>(marker::PhantomData<E>);
+struct ValueNumberVisitor;
 
-impl<'de, E> NumberVisitor<'de> for ValueNumberVisitor<E>
+impl<'de, 'buf, C> NumberVisitor<'de, 'buf, C> for ValueNumberVisitor
 where
-    E: Error,
+    C: Context<'buf>,
 {
     type Ok = Value;
-    type Error = E;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -453,72 +554,72 @@ where
     }
 
     #[inline]
-    fn visit_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
+    fn visit_u8(self, _: &mut C, value: u8) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U8(value)))
     }
 
     #[inline]
-    fn visit_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
+    fn visit_u16(self, _: &mut C, value: u16) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U16(value)))
     }
 
     #[inline]
-    fn visit_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
+    fn visit_u32(self, _: &mut C, value: u32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U32(value)))
     }
 
     #[inline]
-    fn visit_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+    fn visit_u64(self, _: &mut C, value: u64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U64(value)))
     }
 
     #[inline]
-    fn visit_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+    fn visit_u128(self, _: &mut C, value: u128) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U128(value)))
     }
 
     #[inline]
-    fn visit_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
+    fn visit_i8(self, _: &mut C, value: i8) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I8(value)))
     }
 
     #[inline]
-    fn visit_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
+    fn visit_i16(self, _: &mut C, value: i16) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I16(value)))
     }
 
     #[inline]
-    fn visit_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
+    fn visit_i32(self, _: &mut C, value: i32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I32(value)))
     }
 
     #[inline]
-    fn visit_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+    fn visit_i64(self, _: &mut C, value: i64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I64(value)))
     }
 
     #[inline]
-    fn visit_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+    fn visit_i128(self, _: &mut C, value: i128) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I128(value)))
     }
 
     #[inline]
-    fn visit_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
+    fn visit_f32(self, _: &mut C, value: f32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::F32(value)))
     }
 
     #[inline]
-    fn visit_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
+    fn visit_f64(self, _: &mut C, value: f64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::F64(value)))
     }
 
     #[inline]
-    fn visit_usize(self, value: usize) -> Result<Self::Ok, Self::Error> {
+    fn visit_usize(self, _: &mut C, value: usize) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::Usize(value)))
     }
 
     #[inline]
-    fn visit_isize(self, value: isize) -> Result<Self::Ok, Self::Error> {
+    fn visit_isize(self, _: &mut C, value: isize) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::Isize(value)))
     }
 }
@@ -527,52 +628,54 @@ impl<M> Encode<M> for Value
 where
     M: Mode,
 {
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         match self {
-            Value::Unit => encoder.encode_unit(),
-            Value::Bool(b) => encoder.encode_bool(*b),
-            Value::Char(c) => encoder.encode_char(*c),
-            Value::Number(n) => Encode::<M>::encode(n, encoder),
+            Value::Unit => encoder.encode_unit(cx),
+            Value::Bool(b) => encoder.encode_bool(cx, *b),
+            Value::Char(c) => encoder.encode_char(cx, *c),
+            Value::Number(n) => Encode::<M>::encode(n, cx, encoder),
             #[cfg(feature = "alloc")]
-            Value::Bytes(bytes) => encoder.encode_bytes(bytes),
+            Value::Bytes(bytes) => encoder.encode_bytes(cx, bytes),
             #[cfg(feature = "alloc")]
-            Value::String(string) => encoder.encode_string(string),
+            Value::String(string) => encoder.encode_string(cx, string),
             #[cfg(feature = "alloc")]
             Value::Sequence(values) => {
-                let mut sequence = encoder.encode_sequence(values.len())?;
+                let mut sequence = encoder.encode_sequence(cx, values.len())?;
 
                 for value in values {
-                    Encode::<M>::encode(value, sequence.next()?)?;
+                    let next = sequence.next(cx)?;
+                    Encode::<M>::encode(value, cx, next)?;
                 }
 
-                sequence.end()
+                sequence.end(cx)
             }
             #[cfg(feature = "alloc")]
             Value::Map(values) => {
-                let mut map = encoder.encode_map(values.len())?;
+                let mut map = encoder.encode_map(cx, values.len())?;
 
                 for (first, second) in values {
-                    map.insert::<M, _, _>(first, second)?;
+                    map.insert::<M, _, _, _>(cx, first, second)?;
                 }
 
-                map.end()
+                map.end(cx)
             }
             #[cfg(feature = "alloc")]
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;
-                let encoder = encoder.encode_variant()?;
-                encoder.insert::<M, _, _>(tag, variant)
+                let encoder = encoder.encode_variant(cx)?;
+                encoder.insert::<M, _, _, _>(cx, tag, variant)
             }
             #[cfg(feature = "alloc")]
             Value::Option(option) => match option {
                 Some(value) => {
-                    let encoder = encoder.encode_some()?;
-                    Encode::<M>::encode(&**value, encoder)
+                    let encoder = encoder.encode_some(cx)?;
+                    Encode::<M>::encode(&**value, cx, encoder)
                 }
-                None => encoder.encode_none(),
+                None => encoder.encode_none(cx),
             },
         }
     }
@@ -603,7 +706,10 @@ where
     type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;
 
     #[inline]
-    fn as_decoder(&self) -> Result<Self::Decoder<'_>, Self::Error> {
+    fn as_decoder<'buf, C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(self.value.decoder())
     }
 }

@@ -4,6 +4,9 @@
 //! The central function in this module is the [wrap] function which constructs
 //! an adapter around an I/O type to work with musli.
 
+#[cfg(feature = "std")]
+use musli::Context;
+
 /// Wrapper constructed with [wrap].
 pub struct Wrap<T> {
     #[cfg_attr(not(feature = "std"), allow(unused))]
@@ -32,7 +35,12 @@ where
     }
 
     #[inline]
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.inner.write_all(bytes)
+    fn write_bytes<'buf, C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
+        self.inner.write_all(bytes).map_err(|err| cx.custom(err))?;
+        cx.advance(bytes.len());
+        Ok(())
     }
 }

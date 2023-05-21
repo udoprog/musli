@@ -9,6 +9,7 @@
 //! [Müsli]: <https://docs.rs/musli>
 
 #![allow(clippy::too_many_arguments)]
+#![allow(clippy::needless_late_init)]
 
 use proc_macro::TokenStream;
 
@@ -42,7 +43,6 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Please refer to the main [musli documentation](https://docs.rs/musli).
 #[proc_macro_derive(Decode, attributes(musli))]
 pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
@@ -125,7 +125,7 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "visitor",
         &types::VISITOR_TYPES,
-        ["Ok", "Error"],
+        ["Ok"],
         "__UseMusliVisitorAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),

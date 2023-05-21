@@ -1,12 +1,13 @@
 use core::fmt::{Debug, Display};
 use core::hash::Hash;
 
+use musli::Context;
+
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
 use crate::int::{ByteOrder, ByteOrderIo, Fixed, FixedUsize, Signed, Unsigned, Variable};
 use crate::reader::Reader;
 use crate::writer::Writer;
-use musli::error::Error;
 
 mod private {
     use crate::int::{ByteOrder, Unsigned};
@@ -29,27 +30,31 @@ pub trait IntegerEncoding:
     Clone + Copy + Debug + Eq + Hash + Ord + PartialEq + PartialOrd + private::Sealed
 {
     /// Governs how unsigned integers are encoded into a [Writer].
-    fn encode_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_unsigned<'buf, C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: ByteOrderIo;
 
     /// Governs how unsigned integers are decoded from a [Reader].
-    fn decode_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_unsigned<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo;
 
     /// Governs how signed integers are encoded into a [Writer].
-    fn encode_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_signed<'buf, C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo;
 
     /// Governs how signed integers are decoded from a [Reader].
-    fn decode_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_signed<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>;
@@ -59,13 +64,15 @@ pub trait IntegerEncoding:
 /// `isize`) are encoded in a format which is platform-neutral.
 pub trait UsizeEncoding: private::Sealed {
     /// Governs how usize lengths are encoded into a [Writer].
-    fn encode_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_usize<'buf, C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer;
 
     /// Governs how usize lengths are decoded from a [Reader].
-    fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
+    fn decode_usize<'de, 'buf, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>;
 }
 
@@ -73,59 +80,65 @@ pub trait UsizeEncoding: private::Sealed {
 /// using zigzag variable length encoding.
 impl IntegerEncoding for Variable {
     #[inline]
-    fn encode_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_unsigned<'buf, C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: Unsigned,
     {
-        c::encode(writer, value)
+        c::encode(cx, writer, value)
     }
 
     #[inline]
-    fn decode_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_unsigned<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: Unsigned,
     {
-        c::decode(reader)
+        c::decode(cx, reader)
     }
 
     #[inline]
-    fn encode_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_signed<'buf, C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: Signed,
     {
-        c::encode(writer, zig::encode(value))
+        c::encode(cx, writer, zig::encode(value))
     }
 
     #[inline]
-    fn decode_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_signed<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: Unsigned<Signed = T>,
     {
-        let value: T::Unsigned = c::decode(reader)?;
+        let value: T::Unsigned = c::decode(cx, reader)?;
         Ok(zig::decode(value))
     }
 }
 
 impl UsizeEncoding for Variable {
     #[inline]
-    fn encode_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_usize<'buf, C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
     {
-        c::encode(writer, value)
+        c::encode(cx, writer, value)
     }
 
     #[inline]
-    fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
+    fn decode_usize<'de, 'buf, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
     {
-        c::decode(reader)
+        c::decode(cx, reader)
     }
 }
 
@@ -134,41 +147,45 @@ where
     B: ByteOrder,
 {
     #[inline]
-    fn encode_unsigned<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_unsigned<'buf, C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: ByteOrderIo,
     {
-        value.write_bytes_unsigned::<_, B>(writer)
+        value.write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]
-    fn decode_unsigned<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_unsigned<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: ByteOrderIo,
     {
-        T::read_bytes_unsigned::<_, B>(reader)
+        T::read_bytes_unsigned::<_, _, B>(cx, reader)
     }
 
     #[inline]
-    fn encode_signed<W, T>(writer: W, value: T) -> Result<(), W::Error>
+    fn encode_signed<'buf, C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
         T: Signed,
         T::Unsigned: ByteOrderIo,
     {
-        value.unsigned().write_bytes_unsigned::<_, B>(writer)
+        value.unsigned().write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]
-    fn decode_signed<'de, R, T>(reader: R) -> Result<T, R::Error>
+    fn decode_signed<'de, 'buf, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
         T: Signed,
         T::Unsigned: ByteOrderIo<Signed = T>,
     {
-        Ok(T::Unsigned::read_bytes_unsigned::<_, B>(reader)?.signed())
+        Ok(T::Unsigned::read_bytes_unsigned::<_, _, B>(cx, reader)?.signed())
     }
 }
 
@@ -182,19 +199,22 @@ where
     <usize as TryFrom<L>>::Error: 'static + Debug + Display + Send + Sync,
 {
     #[inline]
-    fn encode_usize<W>(writer: W, value: usize) -> Result<(), W::Error>
+    fn encode_usize<'buf, C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
     where
+        C: Context<'buf, Input = W::Error>,
         W: Writer,
     {
-        let value: L = value.try_into().map_err(W::Error::custom)?;
-        value.write_bytes_unsigned::<_, B>(writer)
+        let value: L = value.try_into().map_err(|err| cx.custom(err))?;
+        value.write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
     #[inline]
-    fn decode_usize<'de, R>(reader: R) -> Result<usize, R::Error>
+    fn decode_usize<'de, 'buf, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
     where
+        C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
     {
-        usize::try_from(L::read_bytes_unsigned::<_, B>(reader)?).map_err(R::Error::custom)
+        usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?)
+            .map_err(|error| cx.custom(error))
     }
 }

@@ -192,6 +192,8 @@ layer! {
         krate: syn::Path,
         /// `#[musli(name_type)]`.
         name_type: syn::Type,
+        /// `#[musli(name_format_with)]`.
+        name_format_with: syn::Path,
         /// `#[musli(default_variant_name = "..")]`.
         default_variant_name: DefaultTag,
         /// `#[musli(default_field_name = "..")]`.
@@ -238,7 +240,9 @@ impl TypeAttr {
         if let Some((_, krate)) = self.root.krate.any.as_ref() {
             krate.clone()
         } else {
-            syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()))
+            let mut path = syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()));
+            path.leading_colon = Some(<Token![::]>::default());
+            path
         }
     }
 }
@@ -295,9 +299,17 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
             }
 
             // parse #[musli(name_type = <type>)]
-            if meta.path == NAME_TYPE {
+            if meta.path.is_ident("name_type") {
                 meta.input.parse::<Token![=]>()?;
                 new.name_type.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(name_format_with = <path>)]
+            if meta.path.is_ident("name_format_with") {
+                meta.input.parse::<Token![=]>()?;
+                new.name_format_with
+                    .push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
@@ -409,6 +421,8 @@ layer! {
     VariantAttr, VariantLayerNew, VariantLayer {
         /// `#[musli(name_type)]`.
         name_type: syn::Type,
+        /// `#[musli(name_format_with)]`.
+        name_format_with: syn::Path,
         /// Rename a field to the given expression.
         rename: syn::Expr,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
@@ -460,9 +474,17 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             }
 
             // parse #[musli(name_type = <type>)]
-            if meta.path == NAME_TYPE {
+            if meta.path.is_ident("name_type") {
                 meta.input.parse::<Token![=]>()?;
                 new.name_type.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(name_format_with = <path>)]
+            if meta.path.is_ident("name_format_with") {
+                meta.input.parse::<Token![=]>()?;
+                new.name_format_with
+                    .push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
@@ -546,6 +568,8 @@ layer! {
         rename: syn::Expr,
         /// Use a default value for the field if it's not available.
         default_field: (),
+        /// Use the alternate TraceDecode for the field.
+        trace: (),
         @multiple
     }
 }
@@ -565,7 +589,8 @@ impl Field {
 
             (*span, encode_path)
         } else {
-            let encode_path = mode.encode_t_encode(span);
+            let trace = self.trace(mode).is_some();
+            let encode_path = mode.encode_t_encode(trace);
             (span, encode_path)
         }
     }
@@ -584,7 +609,8 @@ impl Field {
 
             (*span, decode_path)
         } else {
-            let decode_path = mode.decode_t_decode(span);
+            let trace = self.trace(mode).is_some();
+            let decode_path = mode.decode_t_decode(trace);
             (span, decode_path)
         }
     }
@@ -676,6 +702,12 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
+            // parse #[musli(default)]
+            if meta.path.is_ident("trace") {
+                new.trace.push((meta.path.span(), ()));
+                return Ok(());
+            }
+
             Err(syn::Error::new_spanned(
                 meta.path,
                 format_args!("#[{ATTR}] Unsupported field attribute"),
@@ -713,6 +745,13 @@ fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath) {
 
         args.insert(
             1,
+            syn::GenericArgument::Type(syn::Type::Infer(syn::TypeInfer {
+                underscore_token: <Token![_]>::default(),
+            })),
+        );
+
+        args.insert(
+            2,
             syn::GenericArgument::Type(syn::Type::Infer(syn::TypeInfer {
                 underscore_token: <Token![_]>::default(),
             })),

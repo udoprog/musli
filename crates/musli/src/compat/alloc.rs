@@ -2,7 +2,6 @@
 //! certain kind of value.
 
 use core::fmt;
-use core::marker;
 
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
@@ -10,19 +9,20 @@ use alloc::vec::Vec;
 use crate::compat::Bytes;
 use crate::de::{Decode, Decoder, ValueVisitor};
 use crate::en::{Encode, Encoder};
-use crate::error::Error;
 use crate::mode::Mode;
+use crate::Context;
 
 impl<M> Encode<M> for Bytes<Vec<u8>>
 where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
-        encoder.encode_bytes(self.0.as_slice())
+        encoder.encode_bytes(cx, self.0.as_slice())
     }
 }
 
@@ -31,23 +31,18 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        return decoder
-            .decode_bytes(Visitor(marker::PhantomData))
-            .map(Bytes);
+        struct Visitor;
 
-        struct Visitor<E>(marker::PhantomData<E>);
-
-        impl<'de, E> ValueVisitor<'de> for Visitor<E>
+        impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, [u8]> for Visitor
         where
-            E: Error,
+            C: Context<'buf>,
         {
-            type Target = [u8];
             type Ok = Vec<u8>;
-            type Error = E;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -55,15 +50,17 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+            fn visit_borrowed(self, _: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
 
             #[inline]
-            fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, _: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
         }
+
+        decoder.decode_bytes(cx, Visitor).map(Bytes)
     }
 }
 
@@ -72,12 +69,13 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
         let (first, second) = self.0.as_slices();
-        encoder.encode_bytes_vectored(&[first, second])
+        encoder.encode_bytes_vectored(cx, &[first, second])
     }
 }
 
@@ -86,11 +84,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        <Bytes<Vec<u8>> as Decode<M>>::decode(decoder)
+        <Bytes<Vec<u8>> as Decode<M>>::decode(cx, decoder)
             .map(|Bytes(bytes)| Bytes(VecDeque::from(bytes)))
     }
 }

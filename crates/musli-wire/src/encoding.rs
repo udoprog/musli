@@ -11,6 +11,7 @@ use std::io;
 use musli::de::Decode;
 use musli::en::Encode;
 use musli::mode::{DefaultMode, Mode};
+use musli::Context;
 
 use crate::de::WireDecoder;
 use crate::en::WireEncoder;
@@ -255,84 +256,14 @@ where
         }
     }
 
-    /// Encode the given value to the given [Writer] using the current
-    /// configuration.
-    #[inline]
-    pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), W::Error>
-    where
-        W: Writer,
-        T: ?Sized + Encode<M>,
-    {
-        T::encode(value, WireEncoder::<_, I, L, P>::new(writer))
+    musli_common::encoding_impls! {
+        WireEncoder::<_, I, L, P>::new,
+        WireDecoder::<_, I, L>::new
     }
 
-    /// Encode the given value to the given [Write][io::Write] using the current
-    /// configuration.
-    #[cfg(feature = "std")]
-    #[inline]
-    pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
-    where
-        W: io::Write,
-        T: ?Sized + Encode<M>,
-    {
-        let writer = crate::wrap::wrap(write);
-        T::encode(value, WireEncoder::<_, I, L, P>::new(writer))
-    }
-
-    /// Encode the given value to a [Vec] using the current configuration.
-    #[inline]
-    pub fn to_buffer<T>(self, value: &T) -> Result<Buffer, BufferError>
-    where
-        T: ?Sized + Encode<M>,
-    {
-        let mut data = Buffer::new();
-        T::encode(value, WireEncoder::<_, I, L, P>::new(&mut data))?;
-        Ok(data)
-    }
-
-    /// Encode the given value to a [Vec] using the current configuration.
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, BufferError>
-    where
-        T: ?Sized + Encode<M>,
-    {
-        Ok(self.to_buffer(value)?.into_vec())
-    }
-
-    /// Encode the given value to a fixed-size bytes using the current
-    /// configuration.
-    #[inline]
-    pub fn to_fixed_bytes<const N: usize, T>(self, value: &T) -> Result<FixedBytes<N>, BufferError>
-    where
-        T: ?Sized + Encode<M>,
-    {
-        let mut bytes = FixedBytes::new();
-        T::encode(value, WireEncoder::<_, I, L, P>::new(&mut bytes))?;
-        Ok(bytes)
-    }
-
-    /// Decode the given type `T` from the given [Reader] using the current
-    /// configuration.
-    #[inline]
-    pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
-    where
-        R: Reader<'de>,
-        T: Decode<'de, M>,
-    {
-        T::decode(WireDecoder::<_, I, L>::new(reader.with_position()))
-    }
-
-    /// Decode the given type `T` from the given slice using the current
-    /// configuration.
-    #[inline]
-    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, BufferError>
-    where
-        T: Decode<'de, M>,
-    {
-        T::decode(WireDecoder::<_, I, L>::new(
-            SliceReader::new(bytes).with_position(),
-        ))
+    musli_common::encoding_from_slice_impls! {
+        WireEncoder::<_, I, L, P>::new,
+        WireDecoder::<_, I, L>::new
     }
 }
 

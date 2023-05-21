@@ -6,6 +6,7 @@ use core::fmt;
 use core::mem;
 
 use musli::mode::Mode;
+use musli::Context;
 use musli::{Decode, Decoder};
 
 /// Variant corresponding to marks.
@@ -226,10 +227,11 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        Ok(Self::from_byte(decoder.decode_u8()?))
+        Ok(Self::from_byte(decoder.decode_u8(cx)?))
     }
 }

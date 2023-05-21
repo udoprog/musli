@@ -6,21 +6,26 @@
 //! use musli_common::fixed_bytes::FixedBytes;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut cx = musli_common::context::Same::default();
+//!
 //! let mut bytes = FixedBytes::<8>::new();
-//! c::encode(&mut bytes, 5000u32)?;
+//! c::encode(&mut cx, &mut bytes, 5000u32)?;
 //! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let number: u32 = c::decode(bytes.as_slice())?;
+//! let number: u32 = c::decode(&mut cx, bytes.as_slice())?;
 //! assert_eq!(number, 5000u32);
 //! # Ok(()) }
 //! ```
 
 #![allow(unused)]
 
+use musli::de;
+use musli::error::Error;
+use musli::Context;
+
 use crate::int;
 use crate::reader::Reader;
 use crate::writer::Writer;
-use musli::error::Error;
 
 use super::Unsigned;
 
@@ -29,12 +34,13 @@ const CONT_BYTE: u8 = 0b1000_0000;
 
 /// Decode the given length using variable int encoding.
 #[inline(never)]
-pub fn decode<'de, R, T>(mut r: R) -> Result<T, R::Error>
+pub fn decode<'de, 'buf, C, R, T>(cx: &mut C, mut r: R) -> Result<T, C::Error>
 where
+    C: Context<'buf, Input = R::Error>,
     R: Reader<'de>,
     T: int::Unsigned,
 {
-    let mut b = r.read_byte()?;
+    let mut b = r.read_byte(cx)?;
 
     if b & 0b1000_0000 == 0 {
         return Ok(T::from_byte(b));
@@ -47,10 +53,10 @@ where
         shift += 7;
 
         if shift >= T::BITS {
-            return Err(R::Error::custom("bits overflow"));
+            return Err(cx.custom("bits overflow"));
         }
 
-        b = r.read_byte()?;
+        b = r.read_byte(cx)?;
         value = value.wrapping_add(T::from_byte(b & MASK_BYTE).wrapping_shl(shift));
     }
 
@@ -59,29 +65,30 @@ where
 
 /// Encode the given length using variable length encoding.
 #[inline(never)]
-pub fn encode<W, T>(mut w: W, mut value: T) -> Result<(), W::Error>
+pub fn encode<'buf, C, W, T>(cx: &mut C, mut w: W, mut value: T) -> Result<(), C::Error>
 where
+    C: Context<'buf, Input = W::Error>,
     W: Writer,
     T: int::Unsigned,
 {
     let mut b = value.as_byte();
 
     if value < T::from_byte(0b1000_0000) {
-        w.write_byte(b)?;
+        w.write_byte(cx, b)?;
         return Ok(());
     }
 
     loop {
         value = value
             .checked_shr(7)
-            .ok_or_else(|| W::Error::custom("length underflow"))?;
+            .ok_or_else(|| cx.custom("length underflow"))?;
 
         if value.is_zero() {
-            w.write_byte(b & MASK_BYTE)?;
+            w.write_byte(cx, b & MASK_BYTE)?;
             break;
         }
 
-        w.write_byte(b | CONT_BYTE)?;
+        w.write_byte(cx, b | CONT_BYTE)?;
         b = value.as_byte();
     }
 

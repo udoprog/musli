@@ -10,6 +10,7 @@ use std::io;
 use musli::de::Decode;
 use musli::en::Encode;
 use musli::mode::{DefaultMode, Mode};
+use musli::Context;
 
 use crate::de::StorageDecoder;
 use crate::en::StorageEncoder;
@@ -243,84 +244,14 @@ where
         }
     }
 
-    /// Encode the given value to the given [`Writer`] using the current
-    /// configuration.
-    #[inline]
-    pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), W::Error>
-    where
-        W: Writer,
-        T: ?Sized + Encode<M>,
-    {
-        T::encode(value, StorageEncoder::<_, I, L>::new(writer))
+    musli_common::encoding_impls! {
+        StorageEncoder::<_, I, L>::new,
+        StorageDecoder::<_, I, L>::new
     }
 
-    /// Encode the given value to the given [Write][io::Write] using the current
-    /// configuration.
-    #[cfg(feature = "std")]
-    #[inline]
-    pub fn to_writer<W, T>(self, writer: W, value: &T) -> Result<(), io::Error>
-    where
-        W: io::Write,
-        T: ?Sized + Encode<M>,
-    {
-        let mut writer = crate::wrap::wrap(writer);
-        T::encode(value, StorageEncoder::<_, I, L>::new(&mut writer))
-    }
-
-    /// Encode the given value to a [`Buffer`] using the current configuration.
-    #[inline]
-    pub fn to_buffer<T>(self, value: &T) -> Result<Buffer, BufferError>
-    where
-        T: ?Sized + Encode<M>,
-    {
-        let mut data = Buffer::new();
-        T::encode(value, StorageEncoder::<_, I, L>::new(&mut data))?;
-        Ok(data)
-    }
-
-    /// Encode the given value to a [`Vec`] using the current configuration.
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, BufferError>
-    where
-        T: ?Sized + Encode<M>,
-    {
-        Ok(self.to_buffer(value)?.into_vec())
-    }
-
-    /// Encode the given value to a fixed-size bytes using the current
-    /// configuration.
-    #[inline]
-    pub fn to_fixed_bytes<const N: usize, T>(self, value: &T) -> Result<FixedBytes<N>, BufferError>
-    where
-        T: ?Sized + Encode<M>,
-    {
-        let mut bytes = FixedBytes::new();
-        T::encode(value, StorageEncoder::<_, I, L>::new(&mut bytes))?;
-        Ok(bytes)
-    }
-
-    /// Decode the given type `T` from the given [Reader] using the current
-    /// configuration.
-    #[inline]
-    pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
-    where
-        R: Reader<'de>,
-        T: Decode<'de, M>,
-    {
-        let reader = reader.with_position();
-        T::decode(StorageDecoder::<_, I, L>::new(reader))
-    }
-
-    /// Decode the given type `T` from the given slice using the current
-    /// configuration.
-    #[inline]
-    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, BufferError>
-    where
-        T: Decode<'de, M>,
-    {
-        let reader = SliceReader::new(bytes).with_position();
-        T::decode(StorageDecoder::<_, I, L>::new(reader))
+    musli_common::encoding_from_slice_impls! {
+        StorageEncoder::<_, I, L>::new,
+        StorageDecoder::<_, I, L>::new
     }
 }
 

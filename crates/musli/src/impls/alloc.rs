@@ -2,7 +2,6 @@ use core::ffi::CStr;
 use core::fmt;
 #[cfg(feature = "std")]
 use core::hash::{BuildHasher, Hash};
-use core::marker;
 
 use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
@@ -14,22 +13,25 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
 
-use crate::de::{Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, ValueVisitor};
-use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder};
-use crate::error::Error;
+use crate::de::{
+    Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, TraceDecode, ValueVisitor,
+};
+use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder, TraceEncode};
 use crate::internal::size_hint;
 use crate::mode::Mode;
+use crate::Context;
 
 impl<M> Encode<M> for String
 where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_str(), encoder)
+        Encode::<M>::encode(self.as_str(), cx, encoder)
     }
 }
 
@@ -38,19 +40,18 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        struct Visitor<E>(marker::PhantomData<E>);
+        struct Visitor;
 
-        impl<'de, E> ValueVisitor<'de> for Visitor<E>
+        impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, str> for Visitor
         where
-            E: Error,
+            C: Context<'buf>,
         {
-            type Target = str;
             type Ok = String;
-            type Error = E;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -58,22 +59,22 @@ where
             }
 
             #[inline]
-            fn visit_owned(self, value: String) -> Result<Self::Ok, Self::Error> {
+            fn visit_owned(self, _: &mut C, value: String) -> Result<Self::Ok, C::Error> {
                 Ok(value)
             }
 
             #[inline]
-            fn visit_borrowed(self, string: &'de str) -> Result<Self::Ok, Self::Error> {
-                self.visit_ref(string)
+            fn visit_borrowed(self, cx: &mut C, string: &'de str) -> Result<Self::Ok, C::Error> {
+                self.visit_ref(cx, string)
             }
 
             #[inline]
-            fn visit_ref(self, string: &str) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, _: &mut C, string: &str) -> Result<Self::Ok, C::Error> {
                 Ok(string.to_owned())
             }
         }
 
-        decoder.decode_string(Visitor(marker::PhantomData))
+        decoder.decode_string(cx, Visitor)
     }
 }
 
@@ -82,11 +83,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_ref(), encoder)
+        Encode::<M>::encode(self.as_ref(), cx, encoder)
     }
 }
 
@@ -95,26 +97,28 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        Ok(<String as Decode<M>>::decode(decoder)?.into())
+        Ok(<String as Decode<M>>::decode(cx, decoder)?.into())
     }
 }
 
 macro_rules! cow {
-    ($ty:ty, $source:ty, $decode:ident, |$owned:ident| $owned_expr:expr, |$borrowed:ident| $borrowed_expr:expr, |$reference:ident| $reference_expr:expr) => {
+    ($ty:ty, $source:ty, $decode:ident, $cx:pat, |$owned:ident| $owned_expr:expr, |$borrowed:ident| $borrowed_expr:expr, |$reference:ident| $reference_expr:expr) => {
         impl<M> Encode<M> for Cow<'_, $ty>
         where
             M: Mode,
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<'buf, Input = E::Error>,
                 E: Encoder,
             {
-                Encode::<M>::encode(self.as_ref(), encoder)
+                Encode::<M>::encode(self.as_ref(), cx, encoder)
             }
         }
 
@@ -123,19 +127,18 @@ macro_rules! cow {
             M: Mode,
         {
             #[inline]
-            fn decode<D>(decoder: D) -> Result<Self, D::Error>
+            fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
+                C: Context<'buf, Input = D::Error>,
                 D: Decoder<'de>,
             {
-                struct Visitor<E>(marker::PhantomData<E>);
+                struct Visitor;
 
-                impl<'de, E> ValueVisitor<'de> for Visitor<E>
+                impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, $source> for Visitor
                 where
-                    E: Error,
+                    C: Context<'buf>,
                 {
-                    type Target = $source;
                     type Ok = Cow<'de, $ty>;
-                    type Error = E;
 
                     #[inline]
                     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -145,43 +148,49 @@ macro_rules! cow {
                     #[inline]
                     fn visit_owned(
                         self,
+                        $cx: &mut C,
                         $owned: <$source as ToOwned>::Owned,
-                    ) -> Result<Self::Ok, Self::Error> {
+                    ) -> Result<Self::Ok, C::Error> {
                         Ok($owned_expr)
                     }
 
                     #[inline]
                     fn visit_borrowed(
                         self,
+                        $cx: &mut C,
                         $borrowed: &'de $source,
-                    ) -> Result<Self::Ok, Self::Error> {
+                    ) -> Result<Self::Ok, C::Error> {
                         Ok($borrowed_expr)
                     }
 
                     #[inline]
-                    fn visit_ref(self, $reference: &$source) -> Result<Self::Ok, Self::Error> {
+                    fn visit_ref(
+                        self,
+                        $cx: &mut C,
+                        $reference: &$source,
+                    ) -> Result<Self::Ok, C::Error> {
                         Ok($reference_expr)
                     }
                 }
 
-                decoder.$decode(Visitor(marker::PhantomData))
+                decoder.$decode(cx, Visitor)
             }
         }
     };
 }
 
 cow! {
-    str, str, decode_string,
+    str, str, decode_string, _,
     |owned| Cow::Owned(owned),
     |borrowed| Cow::Borrowed(borrowed),
     |reference| Cow::Owned(reference.to_owned())
 }
 
 cow! {
-    CStr, [u8], decode_bytes,
-    |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(E::custom)?),
-    |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(E::custom)?),
-    |reference| Cow::Owned(CStr::from_bytes_with_nul(reference).map_err(E::custom)?.to_owned())
+    CStr, [u8], decode_bytes, cx,
+    |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(|error| cx.custom(error))?),
+    |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(|error| cx.custom(error))?),
+    |reference| Cow::Owned(CStr::from_bytes_with_nul(reference).map_err(|error| cx.custom(error))?.to_owned())
 }
 
 macro_rules! sequence {
@@ -198,17 +207,24 @@ macro_rules! sequence {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<'buf, Input = E::Error>,
                 E: Encoder,
             {
-                let mut seq = encoder.encode_sequence(self.len())?;
+                let mut seq = encoder.encode_sequence(cx, self.len())?;
+
+                let mut index = 0;
 
                 for value in self {
-                    value.encode(seq.next()?)?;
+                    cx.enter_sequence_index(index);
+                    let encoder = seq.next(cx)?;
+                    value.encode(cx, encoder)?;
+                    cx.leave_sequence_index();
+                    index = index.wrapping_add(1);
                 }
 
-                seq.end()
+                seq.end(cx)
             }
         }
 
@@ -219,18 +235,24 @@ macro_rules! sequence {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn decode<D>(decoder: D) -> Result<Self, D::Error>
+            fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
+                C: Context<'buf, Input = D::Error>,
                 D: Decoder<'de>,
             {
-                let mut $access = decoder.decode_sequence()?;
+                let mut $access = decoder.decode_sequence(cx)?;
                 let mut out = $factory;
 
-                while let Some(value) = $access.next()? {
-                    out.$insert(T::decode(value)?);
+                let mut index = 0;
+
+                while let Some(value) = $access.next(cx)? {
+                    cx.enter_sequence_index(index);
+                    out.$insert(T::decode(cx, value)?);
+                    cx.leave_sequence_index();
+                    index = index.wrapping_add(1);
                 }
 
-                $access.end()?;
+                $access.end(cx)?;
                 Ok(out)
             }
         }
@@ -277,20 +299,53 @@ macro_rules! map {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
             where
+                C: Context<'buf, Input = E::Error>,
                 E: Encoder,
             {
-                let mut map = encoder.encode_map(self.len())?;
+                let mut map = encoder.encode_map(cx, self.len())?;
 
                 for (k, v) in self {
-                    let mut entry = map.next()?;
-                    k.encode(entry.first()?)?;
-                    v.encode(entry.second()?)?;
-                    entry.end()?;
+                    let mut entry = map.next(cx)?;
+                    let first = entry.first(cx)?;
+                    k.encode(cx, first)?;
+                    let second = entry.second(cx)?;
+                    v.encode(cx, second)?;
+                    entry.end(cx)?;
                 }
 
-                map.end()
+                map.end(cx)
+            }
+        }
+
+        impl<'de, M, K, V $(, $extra)*> TraceEncode<M> for $ty<K, V $(, $extra)*>
+        where
+            M: Mode,
+            K: fmt::Display + Encode<M>,
+            V: Encode<M>,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            #[inline]
+            fn trace_encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            where
+                C: Context<'buf, Input = E::Error>,
+                E: Encoder,
+            {
+                let mut map = encoder.encode_map(cx, self.len())?;
+
+                for (k, v) in self {
+                    cx.enter_map_key(k);
+                    let mut entry = map.next(cx)?;
+                    let first = entry.first(cx)?;
+                    k.encode(cx, first)?;
+                    let second = entry.second(cx)?;
+                    v.encode(cx, second)?;
+                    entry.end(cx)?;
+                    cx.leave_map_key();
+                }
+
+                map.end(cx)
             }
         }
 
@@ -302,20 +357,50 @@ macro_rules! map {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn decode<D>(decoder: D) -> Result<Self, D::Error>
+            fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
             where
+                C: Context<'buf, Input = D::Error>,
                 D: Decoder<'de>,
             {
-                let mut $access = decoder.decode_map()?;
+                let mut $access = decoder.decode_map(cx)?;
                 let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.next()? {
-                    let key = entry.first().and_then(K::decode)?;
-                    let value = entry.second().and_then(V::decode)?;
+                while let Some(mut entry) = $access.next(cx)? {
+                    let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
+                    let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
                     out.insert(key, value);
                 }
 
-                $access.end()?;
+                $access.end(cx)?;
+                Ok(out)
+            }
+        }
+
+        impl<'de, K, V, M $(, $extra)*> TraceDecode<'de, M> for $ty<K, V $(, $extra)*>
+        where
+            M: Mode,
+            K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
+            V: Decode<'de, M>,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            #[inline]
+            fn trace_decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            where
+                C: Context<'buf, Input = D::Error>,
+                D: Decoder<'de>,
+            {
+                let mut $access = decoder.decode_map(cx)?;
+                let mut out = $with_capacity;
+
+                while let Some(mut entry) = $access.next(cx)? {
+                    let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
+                    cx.enter_map_key(&key);
+                    let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
+                    out.insert(key, value);
+                    cx.leave_map_key();
+                }
+
+                $access.end(cx)?;
                 Ok(out)
             }
         }
@@ -336,11 +421,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
-        encoder.encode_bytes(self.to_bytes_with_nul())
+        encoder.encode_bytes(cx, self.to_bytes_with_nul())
     }
 }
 
@@ -349,19 +435,18 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        struct Visitor<E>(marker::PhantomData<E>);
+        struct Visitor;
 
-        impl<'de, E> ValueVisitor<'de> for Visitor<E>
+        impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, [u8]> for Visitor
         where
-            E: Error,
+            C: Context<'buf>,
         {
-            type Target = [u8];
             type Ok = CString;
-            type Error = E;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -369,23 +454,23 @@ where
             }
 
             #[inline]
-            fn visit_owned(self, value: Vec<u8>) -> Result<Self::Ok, Self::Error> {
-                CString::from_vec_with_nul(value).map_err(E::custom)
+            fn visit_owned(self, cx: &mut C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
+                CString::from_vec_with_nul(value).map_err(|error| cx.custom(error))
             }
 
             #[inline]
-            fn visit_borrowed(self, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
-                self.visit_ref(bytes)
+            fn visit_borrowed(self, cx: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+                self.visit_ref(cx, bytes)
             }
 
             #[inline]
-            fn visit_ref(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+            fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(CStr::from_bytes_with_nul(bytes)
-                    .map_err(E::custom)?
+                    .map_err(|error| cx.custom(error))?
                     .to_owned())
             }
         }
 
-        decoder.decode_bytes(Visitor(marker::PhantomData))
+        decoder.decode_bytes(cx, Visitor)
     }
 }

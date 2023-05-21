@@ -1,3 +1,6 @@
+use core::fmt;
+
+use bstr::BStr;
 use musli::{Decode, Encode};
 
 #[derive(Debug, Encode, Decode, PartialEq, Eq)]
@@ -5,13 +8,31 @@ struct FieldVariantTag<'a> {
     name: &'a str,
 }
 
+impl fmt::Display for FieldVariantTag<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.name.fmt(f)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[musli(transparent)]
 struct BytesTag<'a>(&'a [u8]);
 
+impl fmt::Display for BytesTag<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        BStr::new(self.0).fmt(f)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[musli(transparent)]
 struct BytesTagVec(Vec<u8>);
+
+impl fmt::Display for BytesTagVec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        BStr::new(&self.0).fmt(f)
+    }
+}
 
 /// A custom tag.
 const CUSTOM_TAG1: FieldVariantTag = FieldVariantTag { name: "field1" };
@@ -39,7 +60,7 @@ fn test_custom_struct_tag() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = [u8; 4])]
+#[musli(name_type = [u8; 4], name_format_with = BStr::new)]
 pub struct StructCustomTag {
     #[musli(rename = [1, 2, 3, 4])]
     field1: u32,

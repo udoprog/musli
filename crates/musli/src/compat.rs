@@ -10,6 +10,7 @@ pub use self::packed::Packed;
 use crate::de::{Decode, Decoder, SequenceDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder};
 use crate::mode::Mode;
+use crate::Context;
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
@@ -38,18 +39,21 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
-        let mut seq = encoder.encode_sequence(self.0.len())?;
+        let mut seq = encoder.encode_sequence(cx, self.0.len())?;
 
-        for value in self.0 {
-            let encoder = seq.next()?;
-            T::encode(value, encoder)?;
+        for (index, value) in self.0.iter().enumerate() {
+            cx.enter_sequence_index(index);
+            let encoder = seq.next(cx)?;
+            T::encode(value, cx, encoder)?;
+            cx.leave_sequence_index();
         }
 
-        seq.end()
+        seq.end(cx)
     }
 }
 
@@ -58,11 +62,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
-        encoder.encode_sequence(0)?.end()
+        encoder.encode_sequence(cx, 0)?.end(cx)
     }
 }
 
@@ -70,12 +75,13 @@ impl<'de, M> Decode<'de, M> for Sequence<()>
 where
     M: Mode,
 {
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        let seq = decoder.decode_sequence()?;
-        seq.end()?;
+        let seq = decoder.decode_sequence(cx)?;
+        seq.end(cx)?;
         Ok(Self(()))
     }
 }
@@ -100,11 +106,12 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
+        C: Context<'buf, Input = E::Error>,
         E: Encoder,
     {
-        encoder.encode_array(self.0)
+        encoder.encode_array(cx, self.0)
     }
 }
 
@@ -113,10 +120,11 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        decoder.decode_array().map(Self)
+        decoder.decode_array(cx).map(Self)
     }
 }

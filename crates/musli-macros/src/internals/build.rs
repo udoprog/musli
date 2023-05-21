@@ -1,9 +1,10 @@
 use std::collections::BTreeSet;
 
-use proc_macro2::{Span, TokenStream};
-use quote::quote_spanned;
+use proc_macro2::Span;
+use syn::punctuated::Punctuated;
 use syn::Token;
 
+use crate::de::{build_call, build_reference};
 use crate::expander::Taggable;
 use crate::expander::{
     Data, EnumData, Expander, FieldData, Result, StructData, TagMethod, VariantData,
@@ -16,7 +17,6 @@ use crate::internals::{Ctxt, Expansion, Mode, ModePath, Only};
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: &'a Ctxt,
-    pub(crate) type_name: &'a syn::LitStr,
     pub(crate) tokens: &'a Tokens,
     pub(crate) bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) decode_bounds: &'a [(Span, syn::WherePredicate)],
@@ -58,7 +58,7 @@ impl Build<'_> {
 
     /// Emit diagnostics for a transparent encode / decode that failed because
     /// the wrong number of fields existed.
-    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[FieldBuild]) {
+    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[Field]) {
         if fields.is_empty() {
             self.cx.error_span(
                 span,
@@ -107,54 +107,62 @@ impl Build<'_> {
 
 /// Build model for enums and structs.
 pub(crate) enum BuildData<'a> {
-    Struct(StructBuild<'a>),
-    Enum(EnumBuild<'a>),
+    Struct(Body<'a>),
+    Enum(Enum<'a>),
 }
 
-pub(crate) struct StructBuild<'a> {
+pub(crate) struct Body<'a> {
     pub(crate) span: Span,
-    pub(crate) fields: Vec<FieldBuild<'a>>,
-    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
-    pub(crate) packing: Packing,
-    pub(crate) path: syn::Path,
-    pub(crate) field_tag_method: TagMethod,
-}
-
-pub(crate) struct EnumBuild<'a> {
-    pub(crate) span: Span,
-    pub(crate) enum_tagging: Option<EnumTagging<'a>>,
-    pub(crate) variants: Vec<VariantBuild<'a>>,
-    pub(crate) fallback: Option<&'a syn::Ident>,
-    pub(crate) variant_tag_method: TagMethod,
-    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
-    pub(crate) packing_span: Option<&'a (Span, Packing)>,
-}
-
-pub(crate) struct VariantBuild<'a> {
-    pub(crate) span: Span,
-    pub(crate) index: usize,
     pub(crate) name: &'a syn::LitStr,
-    pub(crate) fields: Vec<FieldBuild<'a>>,
+    pub(crate) fields: Vec<Field<'a>>,
+    pub(crate) name_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing: Packing,
-    pub(crate) enum_packing: Packing,
-    pub(crate) tag: syn::Expr,
-    pub(crate) tag_type: Option<&'a (Span, syn::Type)>,
-    pub(crate) field_tag_method: TagMethod,
-    pub(crate) is_default: bool,
     pub(crate) path: syn::Path,
-    patterns: Vec<syn::FieldValue>,
+    pub(crate) field_tag_method: TagMethod,
 }
 
-impl VariantBuild<'_> {
-    /// Generate constructor for this variant.
-    pub(crate) fn constructor(&self) -> TokenStream {
-        let patterns = &self.patterns;
-        let path = &self.path;
-        quote_spanned!(self.span => #path { #(#patterns),* })
+impl Body<'_> {
+    pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
+        match self.name_format_with {
+            Some((_, path)) => build_call(path, [build_reference(value.clone())]),
+            None => build_reference(value.clone()),
+        }
     }
 }
 
-pub(crate) struct FieldBuild<'a> {
+pub(crate) struct Enum<'a> {
+    pub(crate) span: Span,
+    pub(crate) name: &'a syn::LitStr,
+    pub(crate) enum_tagging: Option<EnumTagging<'a>>,
+    pub(crate) enum_packing: Packing,
+    pub(crate) variants: Vec<Variant<'a>>,
+    pub(crate) fallback: Option<&'a syn::Ident>,
+    pub(crate) variant_tag_method: TagMethod,
+    pub(crate) name_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
+    pub(crate) packing_span: Option<&'a (Span, Packing)>,
+}
+
+impl Enum<'_> {
+    pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
+        match self.name_format_with {
+            Some((_, path)) => build_call(path, [build_reference(value.clone())]),
+            None => build_reference(value.clone()),
+        }
+    }
+}
+
+pub(crate) struct Variant<'a> {
+    pub(crate) span: Span,
+    pub(crate) index: usize,
+    pub(crate) tag: syn::Expr,
+    pub(crate) is_default: bool,
+    pub(crate) st: Body<'a>,
+    pub(crate) patterns: Punctuated<syn::FieldPat, Token![,]>,
+}
+
+pub(crate) struct Field<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) encode_path: (Span, syn::Path),
@@ -163,8 +171,9 @@ pub(crate) struct FieldBuild<'a> {
     pub(crate) skip_encoding_if: Option<&'a (Span, syn::Path)>,
     pub(crate) default_attr: Option<Span>,
     pub(crate) self_access: syn::Expr,
-    pub(crate) field_access: syn::Member,
+    pub(crate) member: syn::Member,
     pub(crate) packing: Packing,
+    pub(crate) var: syn::Ident,
 }
 
 /// Setup a build.
@@ -189,28 +198,22 @@ pub(crate) fn setup<'a>(
     Ok(Build {
         input: e.input,
         cx: &e.cx,
-        type_name: &e.type_name,
         tokens: &e.tokens,
         bounds: e.type_attr.bounds(mode),
         decode_bounds: e.type_attr.decode_bounds(mode),
         expansion,
         data,
-        decode_t_decode: mode.decode_t_decode(Span::call_site()),
-        encode_t_encode: mode.encode_t_encode(Span::call_site()),
+        decode_t_decode: mode.decode_t_decode(false),
+        encode_t_encode: mode.encode_t_encode(false),
         mode_ident: mode.mode_ident(),
         enum_tagging_span: e.type_attr.enum_tagging_span(mode),
     })
 }
 
-fn setup_struct<'a>(
-    e: &'a Expander,
-    mode: Mode<'_>,
-    data: &'a StructData<'a>,
-) -> Result<StructBuild<'a>> {
+fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -> Result<Body<'a>> {
     let mut fields = Vec::with_capacity(data.fields.len());
 
     let default_field_name = e.type_attr.default_field_name(mode).map(|&(_, v)| v);
-    let tag_type = e.type_attr.name_type(mode);
     let packing = e
         .type_attr
         .packing(mode)
@@ -231,30 +234,33 @@ fn setup_struct<'a>(
         )?);
     }
 
-    Ok(StructBuild {
+    Ok(Body {
         span: data.span,
+        name: &data.name,
         fields,
-        tag_type,
+        name_type: e.type_attr.name_type(mode),
+        name_format_with: e.type_attr.name_format_with(mode),
         packing,
         path,
         field_tag_method: tag_methods.pick(),
     })
 }
 
-fn setup_enum<'a>(
-    e: &'a Expander,
-    mode: Mode<'_>,
-    data: &'a EnumData<'a>,
-) -> Result<EnumBuild<'a>> {
+fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Result<Enum<'a>> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
-    let tag_type = e.type_attr.name_type(mode);
     // Keep track of variant index manually since fallback variants do not
     // count.
     let mut tag_methods = TagMethods::new(&e.cx);
     let enum_tagging = e.type_attr.enum_tagging(mode);
 
     let packing_span = e.type_attr.packing(mode);
+
+    let enum_packing = e
+        .type_attr
+        .packing(mode)
+        .map(|&(_, p)| p)
+        .unwrap_or_default();
 
     if enum_tagging.is_some() {
         match packing_span {
@@ -271,13 +277,16 @@ fn setup_enum<'a>(
         variants.push(setup_variant(e, mode, v, &mut fallback, &mut tag_methods)?);
     }
 
-    Ok(EnumBuild {
+    Ok(Enum {
         span: data.span,
+        name: &data.name,
         enum_tagging,
+        enum_packing,
         variants,
         fallback,
         variant_tag_method: tag_methods.pick(),
-        tag_type,
+        name_type: e.type_attr.name_type(mode),
+        name_format_with: e.type_attr.name_format_with(mode),
         packing_span,
     })
 }
@@ -288,7 +297,7 @@ fn setup_variant<'a>(
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
     tag_methods: &mut TagMethods,
-) -> Result<VariantBuild<'a>> {
+) -> Result<Variant<'a>> {
     let mut fields = Vec::with_capacity(data.fields.len());
 
     let variant_packing = data
@@ -304,12 +313,6 @@ fn setup_variant<'a>(
         .or_else(|| e.type_attr.default_field_name(mode))
         .map(|&(_, v)| v);
 
-    let enum_packing = e
-        .type_attr
-        .packing(mode)
-        .map(|&(_, p)| p)
-        .unwrap_or_default();
-
     let (tag, tag_method) = data.expand_tag(
         e,
         mode,
@@ -319,8 +322,6 @@ fn setup_variant<'a>(
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
-
-    let tag_type = data.attr.name_type(mode);
 
     let is_default = if data.attr.default_attr(mode).is_some() {
         if !data.fields.is_empty() {
@@ -345,7 +346,7 @@ fn setup_variant<'a>(
         false
     };
 
-    let mut patterns = Vec::new();
+    let mut patterns = Punctuated::default();
     let mut field_tag_methods = TagMethods::new(&e.cx);
 
     for f in &data.fields {
@@ -360,19 +361,22 @@ fn setup_variant<'a>(
         )?);
     }
 
-    Ok(VariantBuild {
+    Ok(Variant {
         span: data.span,
         index: data.index,
-        name: &data.name,
-        fields,
-        packing: variant_packing,
-        enum_packing,
         tag,
-        tag_type,
-        field_tag_method: field_tag_methods.pick(),
         is_default,
-        path,
         patterns,
+        st: Body {
+            span: data.span,
+            name: &data.name,
+            fields,
+            packing: variant_packing,
+            name_type: data.attr.name_type(mode),
+            name_format_with: data.attr.name_format_with(mode),
+            field_tag_method: field_tag_methods.pick(),
+            path,
+        },
     })
 }
 
@@ -382,9 +386,9 @@ fn setup_field<'a>(
     data: &'a FieldData<'a>,
     default_field_name: Option<DefaultTag>,
     packing: Packing,
-    patterns: Option<&mut Vec<syn::FieldValue>>,
+    patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
     tag_methods: &mut TagMethods,
-) -> Result<FieldBuild<'a>> {
+) -> Result<Field<'a>> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
     let (tag, tag_method) = data.expand_tag(e, mode, default_field_name)?;
@@ -403,15 +407,15 @@ fn setup_field<'a>(
     let self_access = if let Some(patterns) = patterns {
         match data.ident {
             Some(ident) => {
-                patterns.push(syn::FieldValue {
+                patterns.push(syn::FieldPat {
                     attrs: Vec::new(),
                     member: syn::Member::Named(ident.clone()),
                     colon_token: None,
-                    expr: syn::Expr::Path(syn::ExprPath {
+                    pat: Box::new(syn::Pat::Path(syn::PatPath {
                         attrs: Vec::new(),
                         qself: None,
                         path: syn::Path::from(ident.clone()),
-                    }),
+                    })),
                 });
 
                 syn::Expr::Path(syn::ExprPath {
@@ -423,15 +427,15 @@ fn setup_field<'a>(
             None => {
                 let var = quote::format_ident!("v{}", data.index);
 
-                patterns.push(syn::FieldValue {
+                patterns.push(syn::FieldPat {
                     attrs: Vec::new(),
                     member: syn::Member::Unnamed(syn::Index::from(data.index)),
                     colon_token: Some(<Token![:]>::default()),
-                    expr: syn::Expr::Path(syn::ExprPath {
+                    pat: Box::new(syn::Pat::Path(syn::PatPath {
                         attrs: Vec::new(),
                         qself: None,
                         path: syn::Path::from(var.clone()),
-                    }),
+                    })),
                 });
 
                 syn::Expr::Path(syn::ExprPath {
@@ -461,7 +465,12 @@ fn setup_field<'a>(
         })
     };
 
-    Ok(FieldBuild {
+    let var = match &member {
+        syn::Member::Named(ident) => ident.clone(),
+        syn::Member::Unnamed(index) => quote::format_ident!("_{}", index.index),
+    };
+
+    Ok(Field {
         span: data.span,
         index: data.index,
         encode_path,
@@ -470,8 +479,9 @@ fn setup_field<'a>(
         skip_encoding_if,
         default_attr,
         self_access,
-        field_access: member,
+        member,
         packing,
+        var,
     })
 }
 

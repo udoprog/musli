@@ -4,6 +4,7 @@ use core::fmt::Debug;
 
 use musli::de::PackDecoder;
 use musli::mode::{DefaultMode, Mode};
+use musli::Context;
 use musli::{Decode, Decoder, Encode};
 
 use crate::tag::Tag;
@@ -30,14 +31,19 @@ where
     M: Mode,
     T: Decode<'de, M>,
 {
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
+        C: Context<'buf, Input = D::Error>,
         D: Decoder<'de>,
     {
-        let mut unpack = decoder.decode_pack()?;
-        let tag = unpack.next().and_then(<Tag as Decode<M>>::decode)?;
-        let value = unpack.next().and_then(<T as Decode<M>>::decode)?;
-        unpack.end()?;
+        let mut unpack = decoder.decode_pack(cx)?;
+        let tag = unpack
+            .next(cx)
+            .and_then(|v| <Tag as Decode<M>>::decode(cx, v))?;
+        let value = unpack
+            .next(cx)
+            .and_then(|v| <T as Decode<M>>::decode(cx, v))?;
+        unpack.end(cx)?;
         Ok(Self { tag, value })
     }
 }

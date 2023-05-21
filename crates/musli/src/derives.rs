@@ -69,7 +69,7 @@
 //! # struct Person<'a> { name: &'a str, age: u32 }
 //! use musli_json::Encoding;
 //!
-//! const JSON_ENCODING: Encoding<Json> = Encoding::new();
+//! const JSON_ENCODING: Encoding<Json> = Encoding::new().with_mode();
 //! const DEFAULT_ENCODING: Encoding = Encoding::new();
 //!
 //! let named = JSON_ENCODING.to_buffer(&Person { name: "Aristotle", age: 62 })?;
@@ -314,11 +314,19 @@
 //! that all tags have a single well-defined type.
 //!
 //! ```
+//! use core::fmt;
+//!
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 //! #[musli(transparent)]
 //! struct CustomTag<'a>(&'a [u8]);
+//!
+//! impl fmt::Display for CustomTag<'_> {
+//!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//!         fmt::Debug::fmt(self.0, f)
+//!     }
+//! }
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(name_type = CustomTag)]
@@ -435,11 +443,19 @@
 //! container.
 //!
 //! ```
+//! use core::fmt;
+//!
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 //! #[musli(transparent)]
 //! struct CustomTag<'a>(&'a [u8]);
+//!
+//! impl fmt::Display for CustomTag<'_> {
+//!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//!         fmt::Debug::fmt(self.0, f)
+//!     }
+//! }
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(name_type = usize)]
@@ -612,26 +628,29 @@
 //! }
 //!
 //! mod custom_uuid {
+//!     use musli::Context;
 //!     use musli::en::{Encode, Encoder};
 //!     use musli::de::{Decode, Decoder};
 //!     use musli::mode::Mode;
 //!
 //!     use super::CustomUuid;
 //!
-//!     pub fn encode<M, E>(uuid: &CustomUuid, encoder: E) -> Result<E::Ok, E::Error>
+//!     pub fn encode<'buf, M, C, E>(uuid: &CustomUuid, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
+//!         C: Context<'buf, Input = E::Error>,
 //!         E: Encoder,
 //!     {
-//!         Encode::<M>::encode(&uuid.0, encoder)
+//!         Encode::<M>::encode(&uuid.0, cx, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, M, D>(decoder: D) -> Result<CustomUuid, D::Error>
+//!     pub fn decode<'de, 'buf, M, C, D>(cx: &mut C, decoder: D) -> Result<CustomUuid, C::Error>
 //!     where
 //!         M: Mode,
+//!         C: Context<'buf, Input = D::Error>,
 //!         D: Decoder<'de>
 //!     {
-//!         Ok(CustomUuid(<u128 as Decode<M>>::decode(decoder)?))
+//!         Ok(CustomUuid(<u128 as Decode<M>>::decode(cx, decoder)?))
 //!     }
 //! }
 //!
@@ -639,26 +658,29 @@
 //!     use std::collections::HashSet;
 //!     use std::hash::Hash;
 //!
+//!     use musli::Context;
 //!     use musli::en::{Encode, Encoder};
 //!     use musli::de::{Decode, Decoder};
 //!     use musli::mode::Mode;
 //!
-//!     pub fn encode<M, E, T>(set: &HashSet<T>, encoder: E) -> Result<E::Ok, E::Error>
+//!     pub fn encode<'buf, M, C, E, T>(set: &HashSet<T>, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
+//!         C: Context<'buf, Input = E::Error>,
 //!         E: Encoder,
 //!         T: Encode<M> + Eq + Hash,
 //!     {
-//!         HashSet::<T>::encode(set, encoder)
+//!         HashSet::<T>::encode(set, cx, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, M, D, T>(decoder: D) -> Result<HashSet<T>, D::Error>
+//!     pub fn decode<'de, 'buf, M, C, D, T>(cx: &mut C, decoder: D) -> Result<HashSet<T>, C::Error>
 //!     where
 //!         M: Mode,
+//!         C: Context<'buf, Input = D::Error>,
 //!         D: Decoder<'de>,
 //!         T: Decode<'de> + Eq + Hash,
 //!     {
-//!         HashSet::<T>::decode(decoder)
+//!         HashSet::<T>::decode(cx, decoder)
 //!     }
 //! }
 //! # }
@@ -699,6 +721,40 @@
 //!     age: Option<u32>,
 //! }
 //! ```
+//!
+//! #### `#[musli(trace)]`
+//!
+//! This causes the field to use the [`DecodeTrace`] / [`EncodeTrace`] when
+//! encoding the field. This is left optional for types where enabling tracing
+//! for the field requires extra traits to be implemented, such as `HashMap<K,
+//! V>` where we'd need `K` to implement `fmt::Display`.
+//!
+//! Without using the `trace` attribute below, the keys in the `values` field
+//! would not be instrumented, so with a decoding error you'd see this:
+//!
+//! ```text
+//! .values: not numeric (at bytes 15-16)
+//! ```
+//!
+//! Instead of this (where `#[musli(trace)]` is enabled):
+//!
+//! ```text
+//! .values[Hello]: not numeric (at bytes 15-16)
+//! ```
+//!
+//! ```
+//! use std::collections::HashMap;
+//!
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! struct Collection {
+//!     #[musli(trace)]
+//!     values: HashMap<String, u32>,
+//! }
+//! ```
+//!
+//! <br>
 //!
 //! # Enum representations
 //!

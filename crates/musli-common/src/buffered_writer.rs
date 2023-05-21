@@ -1,6 +1,8 @@
 //! A writer which buffers the writes before it outputs it into the backing
 //! storage.
 
+use musli::Context;
+
 use crate::fixed_bytes::FixedBytes;
 use crate::writer::Writer;
 
@@ -29,9 +31,12 @@ where
     }
 
     /// Finish writing.
-    pub fn finish(mut self) -> Result<(), W::Error> {
+    pub fn finish<'buf, C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    where
+        C: Context<'buf, Input = W::Error>,
+    {
         if !self.buf.is_empty() {
-            self.writer.write_bytes(self.buf.as_slice())?;
+            self.writer.write_bytes(cx, self.buf.as_slice())?;
         }
 
         Ok(())
@@ -51,12 +56,15 @@ where
     }
 
     #[inline]
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+    fn write_bytes<'buf, C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         if self.buf.remaining() < bytes.len() {
-            self.writer.write_bytes(self.buf.as_slice())?;
+            self.writer.write_bytes(cx, self.buf.as_slice())?;
             self.buf.clear();
         }
 
-        self.buf.write_bytes(bytes)
+        self.buf.write_bytes(cx, bytes)
     }
 }

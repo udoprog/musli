@@ -11,7 +11,6 @@ mod tests;
 mod token;
 
 pub use self::parse_error::ParseError;
-pub(crate) use self::parse_error::ParseErrorKind;
 pub use self::parser::Parser;
 pub use self::scratch::Scratch;
 pub(crate) use self::slice_parser::SliceParser;

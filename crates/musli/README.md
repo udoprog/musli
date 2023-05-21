@@ -298,7 +298,7 @@ struct Word<'a> {
 }
 
 let CONFIG: Encoding<DefaultMode> = Encoding::new();
-let ALT_CONFIG: Encoding<Alt> = Encoding::new();
+let ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
 
 let word = Word {
     text: "あります",

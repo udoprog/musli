@@ -2,11 +2,13 @@ use core::fmt;
 
 use self::traits::FromUnsigned;
 pub(crate) use self::traits::{Float, Signed, Unsigned};
-use crate::reader::{ParseError, ParseErrorKind, Parser};
+use crate::reader::{ParseError, Parser};
+use musli::Context;
 
 /// Error when computing integer.
 #[derive(Debug)]
-pub(crate) enum Error {
+#[non_exhaustive]
+pub enum Error {
     /// Arithmetic overflow.
     Overflow,
     /// Decimal number encountered.
@@ -196,97 +198,99 @@ where
 }
 
 /// Implementation to skip over a well-formed JSON number.
-pub(crate) fn skip_number<'de, P>(p: &mut P) -> Result<(), ParseError>
+pub(crate) fn skip_number<'de, 'buf, C, P>(cx: &mut C, p: &mut P) -> Result<(), C::Error>
 where
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
 
-    if p.peek_byte()? == Some(b'-') {
-        p.skip(1)?;
+    if p.peek_byte(cx)? == Some(b'-') {
+        p.skip(cx, 1)?;
     }
 
-    match p.read_byte()? {
+    match p.read_byte(cx)? {
         b'0' => (),
         b if is_digit_nonzero(b) => {
-            p.consume_while(is_digit_nonzero)?;
+            p.consume_while(cx, is_digit_nonzero)?;
         }
         _ => {
-            return Err(ParseError::spanned(
-                start,
-                p.pos(),
-                ParseErrorKind::InvalidNumeric,
-            ));
+            return Err(cx.marked_report(start, ParseError::InvalidNumeric));
         }
     }
 
-    if p.peek_byte()? == Some(b'.') {
-        p.skip(1)?;
-        p.consume_while(is_digit)?;
+    if p.peek_byte(cx)? == Some(b'.') {
+        p.skip(cx, 1)?;
+        p.consume_while(cx, is_digit)?;
     }
 
-    if matches!(p.peek_byte()?, Some(b'e') | Some(b'E')) {
-        p.skip(1)?;
+    if matches!(p.peek_byte(cx)?, Some(b'e') | Some(b'E')) {
+        p.skip(cx, 1)?;
 
-        match p.peek_byte()? {
+        match p.peek_byte(cx)? {
             Some(b'-') => {
-                p.skip(1)?;
+                p.skip(cx, 1)?;
             }
             Some(b'+') => {
-                p.skip(1)?;
+                p.skip(cx, 1)?;
             }
             _ => (),
         };
 
-        p.consume_while(is_digit)?;
+        p.consume_while(cx, is_digit)?;
     }
 
     Ok(())
 }
 
 /// Fully parse an unsigned value.
-pub(crate) fn parse_unsigned<'de, T, P>(p: &mut P) -> Result<T, ParseError>
+pub(crate) fn parse_unsigned<'de, 'buf, T, C, P>(cx: &mut C, p: &mut P) -> Result<T, C::Error>
 where
     T: Unsigned,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
 
-    match decode_unsigned(p)?.compute() {
+    match decode_unsigned(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::IntegerError(error),
-        )),
+        Err(error) => Err(cx.marked_report(start, ParseError::IntegerError(error))),
     }
 }
 
-pub(crate) fn decode_unsigned<'de, T, P>(p: &mut P) -> Result<Parts<T>, ParseError>
+pub(crate) fn decode_unsigned<'de, 'buf, T, C, P>(
+    cx: &mut C,
+    p: &mut P,
+) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
-    decode_unsigned_inner(p, start)
+    let start = cx.mark();
+    decode_unsigned_inner(cx, p, start)
 }
 
 /// Decode a signed integer.
-pub(crate) fn decode_signed<'de, T, P>(p: &mut P) -> Result<SignedParts<T>, ParseError>
+pub(crate) fn decode_signed<'de, 'buf, T, C, P>(
+    cx: &mut C,
+    p: &mut P,
+) -> Result<SignedParts<T>, C::Error>
 where
+    C: Context<'buf, Input = ParseError>,
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
 
-    let is_negative = if p.peek_byte()? == Some(b'-') {
-        p.skip(1)?;
+    let is_negative = if p.peek_byte(cx)? == Some(b'-') {
+        p.skip(cx, 1)?;
         true
     } else {
         false
     };
 
-    let parts = decode_unsigned_inner::<T::Unsigned, _>(p, start)?;
+    let parts = decode_unsigned_inner::<T::Unsigned, _, _>(cx, p, start)?;
     Ok(SignedParts {
         is_negative,
         unsigned: parts,
@@ -294,88 +298,84 @@ where
 }
 
 /// Fully parse a signed value.
-pub(crate) fn parse_signed<'de, T, P>(p: &mut P) -> Result<T, ParseError>
+pub(crate) fn parse_signed<'de, 'buf, T, C, P>(cx: &mut C, p: &mut P) -> Result<T, C::Error>
 where
     T: Signed,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let start = p.pos();
+    let start = cx.mark();
 
-    match decode_signed(p)?.compute() {
+    match decode_signed(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::IntegerError(error),
-        )),
+        Err(error) => Err(cx.marked_report(start, ParseError::IntegerError(error))),
     }
 }
 
 /// Generically decode a single (whole) integer from a stream of bytes abiding
 /// by JSON convention for format.
-fn decode_unsigned_inner<'de, T, P>(p: &mut P, start: u32) -> Result<Parts<T>, ParseError>
+fn decode_unsigned_inner<'de, 'buf, T, C, P>(
+    cx: &mut C,
+    p: &mut P,
+    start: C::Mark,
+) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
-    let base = match p.read_byte()? {
+    let base = match p.read_byte(cx)? {
         b'0' => T::ZERO,
         b if is_digit_nonzero(b) => {
             let mut base = T::from_byte(b - b'0');
 
-            while let Some(true) = p.peek_byte()?.map(is_digit) {
-                base = digit(base, p, start)?;
+            while let Some(true) = p.peek_byte(cx)?.map(is_digit) {
+                base = digit(cx, base, p, start)?;
             }
 
             base
         }
         _ => {
-            return Err(ParseError::spanned(
-                start,
-                p.pos(),
-                ParseErrorKind::InvalidNumeric,
-            ));
+            return Err(cx.marked_report(start, ParseError::InvalidNumeric));
         }
     };
 
     let mut m = Mantissa::<T>::default();
 
-    if let Some(b'.') = p.peek_byte()? {
-        p.skip(1)?;
+    if let Some(b'.') = p.peek_byte(cx)? {
+        p.skip(cx, 1)?;
 
         // NB: we use unchecked operations over mantissa_exp since the mantissa
         // for any supported type would overflow long before this.
-        m.exp += decode_zeros(p)?;
+        m.exp += decode_zeros(cx, p)?;
 
         // Stored zeros so that the last segment of zeros can be ignored since
         // they have no bearing on the value of the integer.
         let mut zeros = 0;
 
-        while let Some(true) = p.peek_byte()?.map(is_digit) {
+        while let Some(true) = p.peek_byte(cx)?.map(is_digit) {
             // Accrue accumulated zeros.
             if zeros > 0 {
                 m.exp += zeros;
                 m.value = match m.value.checked_pow10(zeros as u32) {
                     Some(mantissa) => mantissa,
                     None => {
-                        return Err(ParseError::spanned(
-                            start,
-                            p.pos(),
-                            ParseErrorKind::IntegerError(Error::Overflow),
-                        ))
+                        return Err(
+                            cx.marked_report(start, ParseError::IntegerError(Error::Overflow))
+                        );
                     }
                 };
             }
 
             m.exp += 1;
-            m.value = digit(m.value, p, start)?;
-            zeros = decode_zeros(p)?;
+            m.value = digit(cx, m.value, p, start)?;
+            zeros = decode_zeros(cx, p)?;
         }
     }
 
-    let e = if matches!(p.peek_byte()?, Some(b'e' | b'E')) {
-        p.skip(1)?;
-        decode_exponent(p, start)?
+    let e = if matches!(p.peek_byte(cx)?, Some(b'e' | b'E')) {
+        p.skip(cx, 1)?;
+        decode_exponent(cx, p, start)?
     } else {
         0
     };
@@ -384,69 +384,69 @@ where
 }
 
 /// Decode an exponent.
-fn decode_exponent<'de, P>(p: &mut P, start: u32) -> Result<i32, ParseError>
+fn decode_exponent<'de, 'buf, C, P>(cx: &mut C, p: &mut P, start: C::Mark) -> Result<i32, C::Error>
 where
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let mut is_negative = false;
     let mut e = 0u32;
 
-    match p.peek_byte()? {
+    match p.peek_byte(cx)? {
         Some(b'-') => {
-            p.skip(1)?;
+            p.skip(cx, 1)?;
             is_negative = true
         }
         Some(b'+') => {
-            p.skip(1)?;
+            p.skip(cx, 1)?;
         }
         _ => (),
     };
 
-    while let Some(true) = p.peek_byte()?.map(is_digit) {
-        e = digit(e, p, start)?;
+    while let Some(true) = p.peek_byte(cx)?.map(is_digit) {
+        e = digit(cx, e, p, start)?;
     }
 
     match if is_negative { e.negate() } else { e.signed() } {
         Some(value) => Ok(value),
-        None => Err(ParseError::spanned(
-            start,
-            p.pos(),
-            ParseErrorKind::IntegerError(Error::Overflow),
-        )),
+        None => Err(cx.marked_report(start, ParseError::IntegerError(Error::Overflow))),
     }
 }
 
 /// Decode a single digit into `out`.
 #[inline]
-fn digit<'de, T, P>(mut out: T, p: &mut P, start: u32) -> Result<T, ParseError>
+fn digit<'de, 'buf, T, C, P>(
+    cx: &mut C,
+    mut out: T,
+    p: &mut P,
+    start: C::Mark,
+) -> Result<T, C::Error>
 where
     T: Unsigned,
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     out = match out.checked_mul10() {
         Some(value) => value,
         None => {
-            return Err(ParseError::spanned(
-                start,
-                p.pos(),
-                ParseErrorKind::IntegerError(Error::Overflow),
-            ));
+            return Err(cx.marked_report(start, ParseError::IntegerError(Error::Overflow)));
         }
     };
 
-    Ok(out + T::from_byte(p.read_byte()? - b'0'))
+    Ok(out + T::from_byte(p.read_byte(cx)? - b'0'))
 }
 
 /// Decode sequence of zeros.
-fn decode_zeros<'de, P>(p: &mut P) -> Result<i32, ParseError>
+fn decode_zeros<'de, 'buf, C, P>(cx: &mut C, p: &mut P) -> Result<i32, C::Error>
 where
+    C: Context<'buf, Input = ParseError>,
     P: ?Sized + Parser<'de>,
 {
     let mut count = 0;
 
-    while let Some(b'0') = p.peek_byte()? {
+    while let Some(b'0') = p.peek_byte(cx)? {
         count += 1;
-        p.skip(1)?;
+        p.skip(cx, 1)?;
     }
 
     Ok(count)

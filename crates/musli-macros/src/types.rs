@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use proc_macro2::{Span, TokenStream};
+use quote::quote;
 use quote::ToTokens;
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
@@ -14,33 +15,39 @@ pub(super) enum Ty {
     Bytes,
 }
 
-pub(super) const ENCODER_TYPES: [(&str, Option<Ty>); 8] = [
-    ("Error", None),
-    ("Some", None),
-    ("Pack", None),
-    ("Sequence", None),
-    ("Tuple", None),
-    ("Map", None),
-    ("Struct", None),
-    ("Variant", None),
+#[derive(Debug, Clone, Copy)]
+pub(super) enum Extra {
+    None,
+    Visitor(Option<Ty>),
+}
+
+pub(super) const ENCODER_TYPES: [(&str, Extra); 8] = [
+    ("Error", Extra::None),
+    ("Some", Extra::None),
+    ("Pack", Extra::None),
+    ("Sequence", Extra::None),
+    ("Tuple", Extra::None),
+    ("Map", Extra::None),
+    ("Struct", Extra::None),
+    ("Variant", Extra::None),
 ];
 
-pub(super) const DECODER_TYPES: [(&str, Option<Ty>); 9] = [
-    ("Error", None),
-    ("Buffer", None),
-    ("Some", None),
-    ("Pack", None),
-    ("Sequence", None),
-    ("Tuple", None),
-    ("Map", None),
-    ("Struct", None),
-    ("Variant", None),
+pub(super) const DECODER_TYPES: [(&str, Extra); 9] = [
+    ("Error", Extra::None),
+    ("Buffer", Extra::None),
+    ("Some", Extra::None),
+    ("Pack", Extra::None),
+    ("Sequence", Extra::None),
+    ("Tuple", Extra::None),
+    ("Map", Extra::None),
+    ("Struct", Extra::None),
+    ("Variant", Extra::None),
 ];
 
-pub(super) const VISITOR_TYPES: [(&str, Option<Ty>); 3] = [
-    ("String", Some(Ty::Str)),
-    ("Bytes", Some(Ty::Bytes)),
-    ("Number", None),
+pub(super) const VISITOR_TYPES: [(&str, Extra); 3] = [
+    ("String", Extra::Visitor(Some(Ty::Str))),
+    ("Bytes", Extra::Visitor(Some(Ty::Bytes))),
+    ("Number", Extra::Visitor(None)),
 ];
 
 pub(super) struct Types {
@@ -60,13 +67,13 @@ impl Types {
     pub(crate) fn expand<const N: usize>(
         mut self,
         what: &str,
-        types: &[(&str, Option<Ty>)],
+        types: &[(&str, Extra)],
         arguments: [&str; N],
         hint: &str,
     ) -> syn::Result<TokenStream> {
         let mut missing = types
             .iter()
-            .map(|(ident, ty)| (syn::Ident::new(ident, Span::call_site()), *ty))
+            .map(|(ident, extra)| (syn::Ident::new(ident, Span::call_site()), *extra))
             .collect::<BTreeMap<_, _>>();
 
         // List of associated types which are specified, but under a `cfg`
@@ -76,7 +83,7 @@ impl Types {
         for item in &self.item_impl.items {
             match item {
                 syn::ImplItem::Type(impl_type) => {
-                    let Some(ty) = missing.remove(&impl_type.ident) else {
+                    let Some(extra) = missing.remove(&impl_type.ident) else {
                         continue;
                     };
 
@@ -96,7 +103,7 @@ impl Types {
                             ));
                         }
 
-                        not_attribute_ty.push((impl_type.clone(), ty));
+                        not_attribute_ty.push((impl_type.clone(), extra));
                         has_cfg = true;
                     }
                 }
@@ -104,7 +111,7 @@ impl Types {
             }
         }
 
-        for (mut impl_type, ty) in not_attribute_ty {
+        for (mut impl_type, extra) in not_attribute_ty {
             for attr in &mut impl_type.attrs {
                 if !attr.path().is_ident("cfg") {
                     continue;
@@ -112,7 +119,7 @@ impl Types {
 
                 if let syn::Meta::List(m) = &mut attr.meta {
                     let tokens = syn::Meta::List(syn::MetaList {
-                        path: not_path(),
+                        path: ident_path(syn::Ident::new("not", Span::call_site())),
                         delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
                         tokens: m.tokens.clone(),
                     })
@@ -124,14 +131,70 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: never_type(arguments, ty),
+                path: never_type(arguments, extra, &impl_type.generics)?,
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
         }
 
-        for (ident, ty) in missing {
-            let never = never_type(arguments, ty);
+        for (ident, extra) in missing {
+            let generics = match extra {
+                Extra::Visitor(..) => {
+                    let mut where_clause = syn::WhereClause {
+                        where_token: <Token![where]>::default(),
+                        predicates: Punctuated::default(),
+                    };
+
+                    let c_param: syn::Ident = syn::Ident::new("C", Span::call_site());
+                    let buf_lt: syn::Lifetime = syn::Lifetime::new("'buf", Span::call_site());
+
+                    let mut predicate = syn::PredicateType {
+                        lifetimes: None,
+                        bounded_ty: syn::Type::Path(syn::TypePath {
+                            qself: None,
+                            path: ident_path(c_param.clone()),
+                        }),
+                        colon_token: <Token![:]>::default(),
+                        bounds: Punctuated::default(),
+                    };
+
+                    predicate.bounds.push(syn::TypeParamBound::Verbatim(quote!(
+                        musli::Context<#buf_lt, Input = Self::Error>
+                    )));
+
+                    where_clause
+                        .predicates
+                        .push(syn::WherePredicate::Type(predicate));
+
+                    let mut params = Punctuated::default();
+
+                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
+                        attrs: Vec::new(),
+                        lifetime: buf_lt,
+                        colon_token: None,
+                        bounds: Punctuated::default(),
+                    }));
+
+                    params.push(syn::GenericParam::Type(syn::TypeParam {
+                        attrs: Vec::new(),
+                        ident: c_param,
+                        colon_token: None,
+                        bounds: Punctuated::default(),
+                        eq_token: None,
+                        default: None,
+                    }));
+
+                    syn::Generics {
+                        lt_token: Some(<Token![<]>::default()),
+                        params,
+                        gt_token: Some(<Token![>]>::default()),
+                        where_clause: Some(where_clause),
+                    }
+                }
+                Extra::None => syn::Generics::default(),
+            };
+
+            let never = never_type(arguments, extra, &generics)?;
 
             let ty = syn::ImplItemType {
                 attrs: Vec::new(),
@@ -139,7 +202,7 @@ impl Types {
                 defaultness: None,
                 type_token: <Token![type]>::default(),
                 ident,
-                generics: syn::Generics::default(),
+                generics,
                 eq_token: <Token![=]>::default(),
                 ty: syn::Type::Path(syn::TypePath {
                     qself: None,
@@ -172,23 +235,22 @@ impl Types {
     }
 }
 
-fn not_path() -> syn::Path {
+fn ident_path(ident: syn::Ident) -> syn::Path {
     let mut not_path = syn::Path {
         leading_colon: None,
         segments: Punctuated::default(),
     };
 
-    not_path
-        .segments
-        .push(syn::PathSegment::from(syn::Ident::new(
-            "not",
-            Span::call_site(),
-        )));
+    not_path.segments.push(syn::PathSegment::from(ident));
 
     not_path
 }
 
-fn never_type<const N: usize>(arguments: [&str; N], ty: Option<Ty>) -> syn::Path {
+fn never_type<const N: usize>(
+    arguments: [&str; N],
+    extra: Extra,
+    generics: &syn::Generics,
+) -> syn::Result<syn::Path> {
     let mut never = syn::Path {
         leading_colon: None,
         segments: Punctuated::default(),
@@ -215,43 +277,50 @@ fn never_type<const N: usize>(arguments: [&str; N], ty: Option<Ty>) -> syn::Path
             })));
         }
 
-        if let Some(ty) = ty {
-            match ty {
-                Ty::Str => {
-                    let mut path = syn::Path {
-                        leading_colon: None,
-                        segments: Punctuated::default(),
-                    };
+        if let Extra::Visitor(ty) = extra {
+            let mut it = generics.params.iter();
 
-                    path.segments.push(syn::PathSegment::from(syn::Ident::new(
-                        "str",
-                        Span::call_site(),
-                    )));
+            let Some(syn::GenericParam::Lifetime(syn::LifetimeParam { lifetime: syn::Lifetime { .. }, .. })) = it.next() else {
+                return Err(syn::Error::new_spanned(generics, "Missing generic lifetime in associated type (usually `'buf`)"));
+            };
 
-                    args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                        qself: None,
-                        path,
-                    })));
-                }
-                Ty::Bytes => {
-                    let mut path = syn::Path {
-                        leading_colon: None,
-                        segments: Punctuated::default(),
-                    };
+            let Some(syn::GenericParam::Type(syn::TypeParam { ident: c_param, .. })) = it.next() else {
+                return Err(syn::Error::new_spanned(generics, "Missing generic parameter in associated type (usually `C`)"));
+            };
 
-                    path.segments.push(syn::PathSegment::from(syn::Ident::new(
-                        "u8",
-                        Span::call_site(),
-                    )));
+            if let Some(ty) = ty {
+                match ty {
+                    Ty::Str => {
+                        args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                            qself: None,
+                            path: ident_path(syn::Ident::new("str", Span::call_site())),
+                        })));
+                    }
+                    Ty::Bytes => {
+                        let mut path = syn::Path {
+                            leading_colon: None,
+                            segments: Punctuated::default(),
+                        };
 
-                    args.push(syn::GenericArgument::Type(syn::Type::Slice(
-                        syn::TypeSlice {
-                            bracket_token: syn::token::Bracket::default(),
-                            elem: Box::new(syn::Type::Path(syn::TypePath { qself: None, path })),
-                        },
-                    )));
+                        path.segments.push(syn::PathSegment::from(syn::Ident::new(
+                            "u8",
+                            Span::call_site(),
+                        )));
+
+                        args.push(syn::GenericArgument::Type(syn::Type::Slice(
+                            syn::TypeSlice {
+                                bracket_token: syn::token::Bracket::default(),
+                                elem: Box::new(syn::Type::Path(syn::TypePath { qself: None, path })),
+                            },
+                        )));
+                    }
                 }
             }
+
+            args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                qself: None,
+                path: ident_path(c_param.clone()),
+            })));
         }
 
         s.arguments = syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
@@ -263,7 +332,8 @@ fn never_type<const N: usize>(arguments: [&str; N], ty: Option<Ty>) -> syn::Path
 
         s
     });
-    never
+
+    Ok(never)
 }
 
 fn self_type(what: &str) -> syn::Path {

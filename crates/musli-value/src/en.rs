@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use musli::en::Encoder;
 #[cfg(feature = "alloc")]
 use musli::en::{PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli::Context;
 
 use crate::error::ValueError;
 use crate::value::{Number, Value};
@@ -86,123 +87,191 @@ where
     }
 
     #[inline]
-    fn encode_unit(self) -> Result<Self::Ok, Self::Error> {
+    fn encode_unit<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(())
     }
 
     #[inline]
-    fn encode_bool(self, b: bool) -> Result<Self::Ok, Self::Error> {
+    fn encode_bool<'buf, C>(self, _: &mut C, b: bool) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Bool(b));
         Ok(())
     }
 
     #[inline]
-    fn encode_char(self, c: char) -> Result<Self::Ok, Self::Error> {
+    fn encode_char<'buf, C>(self, _: &mut C, c: char) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Char(c));
         Ok(())
     }
 
     #[inline]
-    fn encode_u8(self, n: u8) -> Result<Self::Ok, Self::Error> {
+    fn encode_u8<'buf, C>(self, _: &mut C, n: u8) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::U8(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_u16(self, n: u16) -> Result<Self::Ok, Self::Error> {
+    fn encode_u16<'buf, C>(self, _: &mut C, n: u16) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::U16(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_u32(self, n: u32) -> Result<Self::Ok, Self::Error> {
+    fn encode_u32<'buf, C>(self, _: &mut C, n: u32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::U32(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_u64(self, n: u64) -> Result<Self::Ok, Self::Error> {
+    fn encode_u64<'buf, C>(self, _: &mut C, n: u64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::U64(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_u128(self, n: u128) -> Result<Self::Ok, Self::Error> {
+    fn encode_u128<'buf, C>(self, _: &mut C, n: u128) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::U128(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_i8(self, n: i8) -> Result<Self::Ok, Self::Error> {
+    fn encode_i8<'buf, C>(self, _: &mut C, n: i8) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::I8(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_i16(self, n: i16) -> Result<Self::Ok, Self::Error> {
+    fn encode_i16<'buf, C>(self, _: &mut C, n: i16) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::I16(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_i32(self, n: i32) -> Result<Self::Ok, Self::Error> {
+    fn encode_i32<'buf, C>(self, _: &mut C, n: i32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::I32(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_i64(self, n: i64) -> Result<Self::Ok, Self::Error> {
+    fn encode_i64<'buf, C>(self, _: &mut C, n: i64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::I64(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_i128(self, n: i128) -> Result<Self::Ok, Self::Error> {
+    fn encode_i128<'buf, C>(self, _: &mut C, n: i128) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::I128(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_usize(self, n: usize) -> Result<Self::Ok, Self::Error> {
+    fn encode_usize<'buf, C>(self, _: &mut C, n: usize) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::Usize(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_isize(self, n: isize) -> Result<Self::Ok, Self::Error> {
+    fn encode_isize<'buf, C>(self, _: &mut C, n: isize) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::Isize(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_f32(self, n: f32) -> Result<Self::Ok, Self::Error> {
+    fn encode_f32<'buf, C>(self, _: &mut C, n: f32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::F32(n)));
         Ok(())
     }
 
     #[inline]
-    fn encode_f64(self, n: f64) -> Result<Self::Ok, Self::Error> {
+    fn encode_f64<'buf, C>(self, _: &mut C, n: f64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Number(Number::F64(n)));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_array<const N: usize>(self, array: [u8; N]) -> Result<Self::Ok, Self::Error> {
+    fn encode_array<'buf, C, const N: usize>(
+        self,
+        _: &mut C,
+        array: [u8; N],
+    ) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Bytes(array.into()));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_bytes(self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+    fn encode_bytes<'buf, C>(self, _: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Bytes(bytes.to_vec()));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_bytes_vectored(self, input: &[&[u8]]) -> Result<Self::Ok, Self::Error> {
+    fn encode_bytes_vectored<'buf, C>(
+        self,
+        _: &mut C,
+        input: &[&[u8]],
+    ) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         let mut bytes = Vec::new();
 
         for b in input {
@@ -215,14 +284,20 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_string(self, string: &str) -> Result<Self::Ok, Self::Error> {
+    fn encode_string<'buf, C>(self, _: &mut C, string: &str) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::String(string.into()));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_some(self) -> Result<Self::Some, Self::Error> {
+    fn encode_some<'buf, C>(self, _: &mut C) -> Result<Self::Some, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(ValueEncoder::new(SomeValueWriter {
             output: self.output,
         }))
@@ -230,44 +305,65 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_none(self) -> Result<Self::Ok, Self::Error> {
+    fn encode_none<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Option(None));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_pack(self) -> Result<Self::Pack, Self::Error> {
+    fn encode_pack<'buf, C>(self, _: &mut C) -> Result<Self::Pack, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_sequence(self, _: usize) -> Result<Self::Sequence, Self::Error> {
+    fn encode_sequence<'buf, C>(self, _: &mut C, _: usize) -> Result<Self::Sequence, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_tuple(self, _: usize) -> Result<Self::Tuple, Self::Error> {
+    fn encode_tuple<'buf, C>(self, _: &mut C, _: usize) -> Result<Self::Tuple, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_map(self, _: usize) -> Result<Self::Map, Self::Error> {
+    fn encode_map<'buf, C>(self, _: &mut C, _: usize) -> Result<Self::Map, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(MapValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_struct(self, _: usize) -> Result<Self::Struct, Self::Error> {
+    fn encode_struct<'buf, C>(self, _: &mut C, _: usize) -> Result<Self::Struct, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(MapValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_variant(self) -> Result<Self::Variant, Self::Error> {
+    fn encode_variant<'buf, C>(self, _: &mut C) -> Result<Self::Variant, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(VariantValueEncoder::new(self.output))
     }
 }
@@ -302,11 +398,17 @@ where
     where
         Self: 'this;
 
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+    fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(ValueEncoder::new(&mut self.values))
     }
 
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Sequence(self.values));
         Ok(())
     }
@@ -342,11 +444,17 @@ where
     where
         Self: 'this;
 
-    fn next(&mut self) -> Result<Self::Encoder<'_>, Self::Error> {
+    fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(PairValueEncoder::new(&mut self.values))
     }
 
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Map(self.values));
         Ok(())
     }
@@ -382,17 +490,26 @@ impl<'a> PairEncoder for PairValueEncoder<'a> {
     type Second<'this> = ValueEncoder<&'this mut Value> where Self: 'this;
 
     #[inline]
-    fn first(&mut self) -> Result<Self::First<'_>, Self::Error> {
+    fn first<'buf, C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(ValueEncoder::new(&mut self.pair.0))
     }
 
     #[inline]
-    fn second(&mut self) -> Result<Self::Second<'_>, Self::Error> {
+    fn second<'buf, C>(&mut self, _: &mut C) -> Result<Self::Second<'_>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(ValueEncoder::new(&mut self.pair.1))
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.push(self.pair);
         Ok(())
     }
@@ -432,15 +549,24 @@ where
     where
         Self: 'this;
 
-    fn tag(&mut self) -> Result<Self::Tag<'_>, Self::Error> {
+    fn tag<'buf, C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(ValueEncoder::new(&mut self.pair.0))
     }
 
-    fn variant(&mut self) -> Result<Self::Variant<'_>, Self::Error> {
+    fn variant<'buf, C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         Ok(ValueEncoder::new(&mut self.pair.1))
     }
 
-    fn end(self) -> Result<Self::Ok, Self::Error> {
+    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<'buf, Input = Self::Error>,
+    {
         self.output.write(Value::Variant(Box::new(self.pair)));
         Ok(())
     }
