@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
-use proc_macro2::{Span, TokenStream};
-use quote::quote_spanned;
+use proc_macro2::Span;
+use syn::punctuated::Punctuated;
 use syn::Token;
 
 use crate::expander::Taggable;
@@ -124,6 +124,7 @@ pub(crate) struct StructBuild<'a> {
 pub(crate) struct EnumBuild<'a> {
     pub(crate) span: Span,
     pub(crate) enum_tagging: Option<EnumTagging<'a>>,
+    pub(crate) enum_packing: Packing,
     pub(crate) variants: Vec<VariantBuild<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
     pub(crate) variant_tag_method: TagMethod,
@@ -136,20 +137,10 @@ pub(crate) struct VariantBuild<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) name: &'a syn::LitStr,
-    pub(crate) enum_packing: Packing,
     pub(crate) tag: syn::Expr,
     pub(crate) is_default: bool,
     pub(crate) st_: StructBuild<'a>,
-    patterns: Vec<syn::FieldValue>,
-}
-
-impl VariantBuild<'_> {
-    /// Generate constructor for this variant.
-    pub(crate) fn constructor(&self) -> TokenStream {
-        let patterns = &self.patterns;
-        let path = &self.st_.path;
-        quote_spanned!(self.span => #path { #(#patterns),* })
-    }
+    pub(crate) patterns: Punctuated<syn::FieldPat, Token![,]>,
 }
 
 pub(crate) struct FieldBuild<'a> {
@@ -253,6 +244,12 @@ fn setup_enum<'a>(
 
     let packing_span = e.type_attr.packing(mode);
 
+    let enum_packing = e
+        .type_attr
+        .packing(mode)
+        .map(|&(_, p)| p)
+        .unwrap_or_default();
+
     if enum_tagging.is_some() {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
@@ -271,6 +268,7 @@ fn setup_enum<'a>(
     Ok(EnumBuild {
         span: data.span,
         enum_tagging,
+        enum_packing,
         variants,
         fallback,
         variant_tag_method: tag_methods.pick(),
@@ -301,12 +299,6 @@ fn setup_variant<'a>(
         .default_field_name(mode)
         .or_else(|| e.type_attr.default_field_name(mode))
         .map(|&(_, v)| v);
-
-    let enum_packing = e
-        .type_attr
-        .packing(mode)
-        .map(|&(_, p)| p)
-        .unwrap_or_default();
 
     let (tag, tag_method) = data.expand_tag(
         e,
@@ -341,7 +333,7 @@ fn setup_variant<'a>(
         false
     };
 
-    let mut patterns = Vec::new();
+    let mut patterns = Punctuated::default();
     let mut field_tag_methods = TagMethods::new(&e.cx);
 
     for f in &data.fields {
@@ -360,7 +352,6 @@ fn setup_variant<'a>(
         span: data.span,
         index: data.index,
         name: &data.name,
-        enum_packing,
         tag,
         is_default,
         patterns,
@@ -382,7 +373,7 @@ fn setup_field<'a>(
     data: &'a FieldData<'a>,
     default_field_name: Option<DefaultTag>,
     packing: Packing,
-    patterns: Option<&mut Vec<syn::FieldValue>>,
+    patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
     tag_methods: &mut TagMethods,
 ) -> Result<FieldBuild<'a>> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
@@ -403,15 +394,15 @@ fn setup_field<'a>(
     let self_access = if let Some(patterns) = patterns {
         match data.ident {
             Some(ident) => {
-                patterns.push(syn::FieldValue {
+                patterns.push(syn::FieldPat {
                     attrs: Vec::new(),
                     member: syn::Member::Named(ident.clone()),
                     colon_token: None,
-                    expr: syn::Expr::Path(syn::ExprPath {
+                    pat: Box::new(syn::Pat::Path(syn::PatPath {
                         attrs: Vec::new(),
                         qself: None,
                         path: syn::Path::from(ident.clone()),
-                    }),
+                    })),
                 });
 
                 syn::Expr::Path(syn::ExprPath {
@@ -423,15 +414,15 @@ fn setup_field<'a>(
             None => {
                 let var = quote::format_ident!("v{}", data.index);
 
-                patterns.push(syn::FieldValue {
+                patterns.push(syn::FieldPat {
                     attrs: Vec::new(),
                     member: syn::Member::Unnamed(syn::Index::from(data.index)),
                     colon_token: Some(<Token![:]>::default()),
-                    expr: syn::Expr::Path(syn::ExprPath {
+                    pat: Box::new(syn::Pat::Path(syn::PatPath {
                         attrs: Vec::new(),
                         qself: None,
                         path: syn::Path::from(var.clone()),
-                    }),
+                    })),
                 });
 
                 syn::Expr::Path(syn::ExprPath {

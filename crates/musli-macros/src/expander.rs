@@ -14,12 +14,12 @@ pub(crate) enum TagMethod {
     /// Special method that requires generating a visitor.
     String,
     /// The default tag method.
-    Index,
+    Any,
 }
 
 impl Default for TagMethod {
     fn default() -> Self {
-        Self::Index
+        Self::Any
     }
 }
 
@@ -226,7 +226,7 @@ pub(crate) trait Taggable {
             }
             (None, Some(DefaultTag::Index), _) => (
                 usize_suffixed(self.index(), self.span()).into(),
-                Some(TagMethod::Index),
+                Some(TagMethod::Any),
             ),
             (None, Some(DefaultTag::Name), None) => {
                 e.cx.error_span(
@@ -323,7 +323,7 @@ pub(crate) fn determine_tag_method(expr: &syn::Expr) -> Option<TagMethod> {
         syn::ExprLit {
             lit: syn::Lit::Int(..),
             ..
-        } => Some(TagMethod::Index),
+        } => Some(TagMethod::Any),
         _ => None,
     }
 }
