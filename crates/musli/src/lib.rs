@@ -592,3 +592,28 @@ pub use musli_macros::decoder;
 /// ```
 #[doc(inline)]
 pub use musli_macros::visitor;
+
+/// Helper to maintain the bounds of the musli context.
+///
+/// This can automatically rewrite a function signature that looks like this:
+///
+/// ```rust,no_compile
+/// #[musli::context]
+/// fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, E::Error>
+/// where
+///     E: Encoder;
+/// ```
+///
+/// Into this:
+///
+/// ```rust,no_compile
+/// fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+/// where
+///     C: Context<'buf, Input = E::Error>,
+///     E: Encoder;
+/// ```
+///
+/// Essentially it automatically transports the `Result<_, E>` parameter into
+/// the `Context<Input = E>`, and introduces the `'buf` lifetime.
+#[cfg(musli_context_macro)]
+pub use musli_macros::context;

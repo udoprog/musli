@@ -13,6 +13,8 @@
 
 use proc_macro::TokenStream;
 
+#[cfg(musli_context_macro)]
+mod context;
 mod de;
 mod en;
 mod expander;
@@ -133,14 +135,23 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-fn to_compile_errors(errors: Vec<syn::Error>) -> proc_macro2::TokenStream {
-    let mut output = proc_macro2::TokenStream::new();
+#[cfg(musli_context_macro)]
+#[proc_macro_attribute]
+pub fn context(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attr = proc_macro2::TokenStream::from(attr);
 
-    for e in errors {
-        output.extend(e.to_compile_error());
+    if !attr.is_empty() {
+        return syn::Error::new_spanned(attr, "Arguments not supported")
+            .to_compile_error()
+            .into();
     }
 
-    output
+    let input = syn::parse_macro_input!(input as context::Context);
+
+    match input.expand() {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 #[cfg(feature = "test")]
@@ -161,4 +172,14 @@ pub fn derive_generate(input: TokenStream) -> TokenStream {
     }
 
     stream.into()
+}
+
+fn to_compile_errors(errors: Vec<syn::Error>) -> proc_macro2::TokenStream {
+    let mut output = proc_macro2::TokenStream::new();
+
+    for e in errors {
+        output.extend(e.to_compile_error());
+    }
+
+    output
 }
