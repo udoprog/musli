@@ -77,9 +77,7 @@ where
     }
 
     loop {
-        value = value
-            .checked_shr(7)
-            .ok_or_else(|| cx.custom("length underflow"))?;
+        value >>= 7;
 
         if value.is_zero() {
             w.write_byte(cx, b & MASK_BYTE)?;
