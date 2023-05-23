@@ -77,7 +77,7 @@ where
     }
 
     loop {
-        value >>= 7;
+        value = value >> 7;
 
         if value.is_zero() {
             w.write_byte(cx, b & MASK_BYTE)?;
