@@ -224,16 +224,17 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use std::fmt;
+    /// use core::fmt;
     ///
     /// use musli::Context;
+    /// use musli::context::Error;
     /// use musli::de::{self, Decoder};
     ///
     /// struct MyDecoder;
     ///
     /// #[musli::decoder]
     /// impl Decoder<'_> for MyDecoder {
-    ///     type Error = de::Error;
+    ///     type Error = Error;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")
@@ -1012,7 +1013,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// let value = musli_value::Value::Number(42u32.into());
     /// assert_eq!(musli_value::decode::<BytesReference>(&value).unwrap_err().to_string(), "expected bytes, but found number");
-    /// Ok::<_, musli_value::ValueError>(())
+    /// Ok::<_, musli_value::Error>(())
     /// ```
     #[inline]
     fn decode_bytes<'buf, C, V>(self, cx: &mut C, _: V) -> Result<V::Ok, C::Error>
@@ -1079,7 +1080,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// let value = musli_value::Value::Number(42u32.into());
     /// assert_eq!(musli_value::decode::<StringReference>(&value).unwrap_err().to_string(), "expected string, but found number");
-    /// Ok::<_, musli_value::ValueError>(())
+    /// Ok::<_, musli_value::Error>(())
     /// ```
     #[inline]
     fn decode_string<'buf, C, V>(self, cx: &mut C, _: V) -> Result<V::Ok, C::Error>

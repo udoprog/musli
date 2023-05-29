@@ -18,11 +18,11 @@ use musli::Context;
 
 use crate::de::JsonDecoder;
 use crate::en::JsonEncoder;
-use crate::error::BufferError;
+use crate::error::Error;
 use crate::fixed_bytes::FixedBytes;
-use crate::reader::{ParseError, Scratch};
+use crate::reader::Scratch;
 use crate::reader::{Parser, SliceParser};
-use crate::writer::{Buffer, Writer};
+use crate::writer::Writer;
 
 /// The default configuration.
 pub const DEFAULT: Encoding = Encoding::new();
@@ -30,9 +30,10 @@ pub const DEFAULT: Encoding = Encoding::new();
 /// Encode the given value to the given [Writer] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
+pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
+    Error: From<W::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -42,27 +43,19 @@ where
 /// configuration.
 #[cfg(feature = "std")]
 #[inline]
-pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), io::Error>
+pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: io::Write,
+    Error: From<io::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_writer(writer, value)
 }
 
-/// Encode the given value to a [`Buffer`] using the [DEFAULT] configuration.
-#[inline]
-pub fn to_buffer<T>(value: &T) -> Result<Buffer, BufferError>
-where
-    T: ?Sized + Encode<DefaultMode>,
-{
-    DEFAULT.to_buffer(value)
-}
-
 /// Encode the given value to a [`Vec`] using the [DEFAULT] configuration.
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, BufferError>
+pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
 where
     T: ?Sized + Encode<DefaultMode>,
 {
@@ -72,7 +65,7 @@ where
 /// Encode the given value to a [`String`] using the [DEFAULT] configuration.
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn to_string<T>(value: &T) -> Result<String, BufferError>
+pub fn to_string<T>(value: &T) -> Result<String, Error>
 where
     T: ?Sized + Encode<DefaultMode>,
 {
@@ -82,7 +75,7 @@ where
 /// Encode the given value to a fixed-size bytes using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, BufferError>
+pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, Error>
 where
     T: ?Sized + Encode<DefaultMode>,
 {
@@ -92,7 +85,7 @@ where
 /// Decode the given type `T` from the given [Parser] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn decode<'de, R, T>(reader: R) -> Result<T, ParseError>
+pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
 where
     R: Parser<'de>,
     T: Decode<'de, DefaultMode>,
@@ -103,7 +96,7 @@ where
 /// Decode the given type `T` from the given string using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn from_str<'de, T>(string: &'de str) -> Result<T, ParseError>
+pub fn from_str<'de, T>(string: &'de str) -> Result<T, Error>
 where
     T: Decode<'de, DefaultMode>,
 {
@@ -113,7 +106,7 @@ where
 /// Decode the given type `T` from the given slice using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, ParseError>
+pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
 where
     T: Decode<'de, DefaultMode>,
 {
@@ -155,10 +148,10 @@ impl Encoding<DefaultMode> {
     ///     age: 61,
     /// };
     ///
-    /// let out = CONFIG.to_buffer(&expected).unwrap();
+    /// let out = CONFIG.to_vec(&expected).unwrap();
     /// println!("{}", core::str::from_utf8(out.as_slice()).unwrap());
     ///
-    /// let out = musli_json::to_buffer(&expected).unwrap();
+    /// let out = musli_json::to_vec(&expected).unwrap();
     /// println!("{}", core::str::from_utf8(out.as_slice()).unwrap());
     /// let actual = musli_json::from_slice(out.as_slice()).unwrap();
     /// assert_eq!(expected, actual);
@@ -198,8 +191,9 @@ where
         value: &T,
     ) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = W::Error>,
+        C: Context<'buf, Input = Error>,
         W: Writer,
+        Error: From<W::Error>,
         T: ?Sized + Encode<M>,
     {
         T::encode(value, cx, JsonEncoder::<M, _>::new(writer))
@@ -208,7 +202,7 @@ where
     /// Encode the given value to a [`String`] using the current configuration.
     #[cfg(feature = "alloc")]
     #[inline]
-    pub fn to_string<T>(self, value: &T) -> Result<String, BufferError>
+    pub fn to_string<T>(self, value: &T) -> Result<String, Error>
     where
         T: ?Sized + Encode<M>,
     {
@@ -224,19 +218,19 @@ where
     #[inline]
     pub fn to_string_with<'buf, T, C>(self, cx: &mut C, value: &T) -> Result<String, C::Error>
     where
-        C: Context<'buf, Input = BufferError>,
+        C: Context<'buf, Input = Error>,
         T: ?Sized + Encode<M>,
     {
-        let mut data = Buffer::with_capacity(128);
+        let mut data = Vec::with_capacity(128);
         T::encode(value, cx, JsonEncoder::<M, _>::new(&mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
-        Ok(unsafe { String::from_utf8_unchecked(data.into_vec()) })
+        Ok(unsafe { String::from_utf8_unchecked(data) })
     }
 
     /// Decode the given type `T` from the given [Parser] using the current
     /// configuration.
     #[inline]
-    pub fn decode<'de, P, T>(self, parser: P) -> Result<T, ParseError>
+    pub fn decode<'de, P, T>(self, parser: P) -> Result<T, Error>
     where
         P: Parser<'de>,
         T: Decode<'de, M>,
@@ -253,7 +247,7 @@ where
     #[inline]
     pub fn decode_with<'de, 'buf, C, P, T>(self, cx: &mut C, parser: P) -> Result<T, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
@@ -264,7 +258,7 @@ where
     /// Decode the given type `T` from the given string using the current
     /// configuration.
     #[inline]
-    pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, ParseError>
+    pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, Error>
     where
         T: Decode<'de, M>,
     {
@@ -279,7 +273,7 @@ where
     #[inline]
     pub fn from_str_with<'de, 'buf, C, T>(self, cx: &mut C, string: &'de str) -> Result<T, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
         T: Decode<'de, M>,
     {
         self.from_slice_with(cx, string.as_bytes())
@@ -288,7 +282,7 @@ where
     /// Decode the given type `T` from the given slice using the current
     /// configuration.
     #[inline]
-    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, ParseError>
+    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
     where
         T: Decode<'de, M>,
     {
@@ -308,7 +302,7 @@ where
         bytes: &'de [u8],
     ) -> Result<T, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
         T: Decode<'de, M>,
     {
         let mut scratch = Scratch::new();

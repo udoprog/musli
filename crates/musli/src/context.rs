@@ -1,4 +1,12 @@
+//! Things related to working with contexts.
+
+mod error;
+
 use core::fmt;
+use core::marker;
+
+#[doc(inline)]
+pub use self::error::Error;
 
 /// Provides ergonomic access to the serialization context.
 ///
@@ -11,10 +19,74 @@ pub trait Context<'buf> {
     /// A mark during processing.
     type Mark: Copy + Default;
 
-    /// Report the given encoding error.
+    /// Adapt the current context so that it can convert an error from a
+    /// different type convertible to the current input
+    ///
+    /// This is necessary to support context error modules which consume an
+    /// error kind that is not identical to the current [`Context::Input`], but
+    /// can be converted to one.
+    ///
+    /// ```
+    /// use musli::Context;
+    ///
+    /// struct Function1Error {
+    ///     /* .. */
+    /// }
+    ///
+    /// impl From<Function2Error> for Function1Error {
+    ///     fn from(error: Function2Error) -> Self {
+    ///         /* .. */
+    ///         # Self {  }
+    ///     }
+    /// }
+    ///
+    /// fn function1<'buf, C>(cx: &mut C) -> Result<(), C::Error>
+    /// where
+    ///     C: Context<'buf, Input = Function1Error>
+    /// {
+    ///     function2(cx.adapt())
+    /// }
+    ///
+    /// struct Function2Error {
+    ///     /* .. */
+    /// }
+    ///
+    /// // This function uses a different error as input.
+    /// fn function2<'buf, C>(cx: &mut C) -> Result<(), C::Error>
+    /// where
+    ///     C: Context<'buf, Input = Function2Error>
+    /// {
+    ///     /* .. */
+    ///     Ok(())
+    /// }
+    /// ```
+    fn adapt<E>(&mut self) -> &mut Adapt<Self, E>
+    where
+        Self::Input: From<E>,
+    {
+        // SAFETY: adapter type is repr transparent.
+        unsafe { &mut *(self as *mut _ as *mut _) }
+    }
+
+    /// Report the given context error.
     fn report<T>(&mut self, error: T) -> Self::Error
     where
         Self::Input: From<T>;
+
+    /// Report a custom error, which is not encapsulated by the error type
+    /// expected by the context. This is essentially a type-erased way of
+    /// reporting error-like things out from the context.
+    fn custom<T>(&mut self, error: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + fmt::Display + fmt::Debug;
+
+    /// Report a message as an error.
+    ///
+    /// This is made available to format custom error messages in `no_std`
+    /// environments. The error message is to be collected by formatting `T`.
+    fn message<T>(&mut self, message: T) -> Self::Error
+    where
+        T: fmt::Display;
 
     /// Report the given encoding error from the given mark.
     #[allow(unused_variables)]
@@ -25,19 +97,6 @@ pub trait Context<'buf> {
     {
         self.report(error)
     }
-
-    /// Report a custom error.
-    fn custom<T>(&mut self, error: T) -> Self::Error
-    where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug;
-
-    /// Report an error as a message.
-    ///
-    /// This is made available to format custom error messages in `no_std`
-    /// environments. The error message is to be collected by formatting `T`.
-    fn message<T>(&mut self, message: T) -> Self::Error
-    where
-        T: fmt::Display;
 
     /// Report an error based on a mark.
     ///
@@ -118,8 +177,9 @@ pub trait Context<'buf> {
     }
 
     /// Missing variant field required to decode.
+    #[allow(unused_variables)]
     #[inline(always)]
-    fn missing_variant_field<T>(&mut self, _: &'static str, tag: T) -> Self::Error
+    fn missing_variant_field<T>(&mut self, name: &'static str, tag: T) -> Self::Error
     where
         T: fmt::Debug,
     {
@@ -127,16 +187,18 @@ pub trait Context<'buf> {
     }
 
     /// Indicate that a variant tag could not be determined.
+    #[allow(unused_variables)]
     #[inline(always)]
-    fn missing_variant_tag(&mut self, _: &'static str) -> Self::Error {
+    fn missing_variant_tag(&mut self, name: &'static str) -> Self::Error {
         self.message(format_args!("missing variant tag"))
     }
 
     /// Encountered an unsupported variant field.
+    #[allow(unused_variables)]
     #[inline(always)]
     fn invalid_variant_field_tag<V, T>(
         &mut self,
-        _: &'static str,
+        name: &'static str,
         variant: V,
         tag: T,
     ) -> Self::Error
@@ -246,7 +308,7 @@ pub trait Context<'buf> {
     /// [`leave_field`]: Context::leave_field
     #[allow(unused_variables)]
     #[inline(always)]
-    fn enter_unnamed_field<T>(&mut self, index: u32, _: T)
+    fn enter_unnamed_field<T>(&mut self, index: u32, tag: T)
     where
         T: fmt::Display,
     {
@@ -337,4 +399,222 @@ pub trait Context<'buf> {
     #[allow(unused_variables)]
     #[inline(always)]
     fn leave_sequence_index(&mut self) {}
+}
+
+/// Context adaptor returned by [`Context::adapt`].
+#[repr(transparent)]
+pub struct Adapt<C, E>
+where
+    C: ?Sized,
+{
+    error: marker::PhantomData<E>,
+    context: C,
+}
+
+impl<'buf, E, C> Context<'buf> for Adapt<C, E>
+where
+    C: Context<'buf>,
+    C::Input: From<E>,
+{
+    type Input = E;
+    type Error = C::Error;
+    type Mark = C::Mark;
+
+    #[inline(always)]
+    fn report<T>(&mut self, error: T) -> Self::Error
+    where
+        Self::Input: From<T>,
+    {
+        self.context.report(Self::Input::from(error))
+    }
+
+    #[inline(always)]
+    fn custom<T>(&mut self, error: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+    {
+        self.context.custom(error)
+    }
+
+    #[inline(always)]
+    fn message<T>(&mut self, message: T) -> Self::Error
+    where
+        T: fmt::Display,
+    {
+        self.context.message(message)
+    }
+
+    #[inline(always)]
+    fn marked_report<T>(&mut self, mark: Self::Mark, error: T) -> Self::Error
+    where
+        Self::Input: From<T>,
+    {
+        self.context.marked_report(mark, E::from(error))
+    }
+
+    #[inline(always)]
+    fn marked_message<T>(&mut self, mark: Self::Mark, message: T) -> Self::Error
+    where
+        T: fmt::Display,
+    {
+        self.context.marked_message(mark, message)
+    }
+
+    #[inline(always)]
+    fn advance(&mut self, n: usize) {
+        self.context.advance(n);
+    }
+
+    #[inline(always)]
+    fn mark(&mut self) -> Self::Mark {
+        self.context.mark()
+    }
+
+    #[inline(always)]
+    fn invalid_variant_tag<T>(&mut self, name: &'static str, tag: T) -> Self::Error
+    where
+        T: fmt::Debug,
+    {
+        self.context.invalid_variant_tag(name, tag)
+    }
+
+    #[inline(always)]
+    fn expected_tag<T>(&mut self, name: &'static str, tag: T) -> Self::Error
+    where
+        T: fmt::Debug,
+    {
+        self.context.expected_tag(name, tag)
+    }
+
+    #[inline(always)]
+    fn uninhabitable(&mut self, name: &'static str) -> Self::Error {
+        self.context.uninhabitable(name)
+    }
+
+    #[inline(always)]
+    fn invalid_field_tag<T>(&mut self, name: &'static str, tag: T) -> Self::Error
+    where
+        T: fmt::Debug,
+    {
+        self.context.invalid_field_tag(name, tag)
+    }
+
+    #[inline(always)]
+    fn invalid_field_string_tag(&mut self, name: &'static str) -> Self::Error {
+        self.context.invalid_field_string_tag(name)
+    }
+
+    #[inline(always)]
+    fn missing_variant_field<T>(&mut self, name: &'static str, tag: T) -> Self::Error
+    where
+        T: fmt::Debug,
+    {
+        self.context.missing_variant_field(name, tag)
+    }
+
+    #[inline(always)]
+    fn missing_variant_tag(&mut self, name: &'static str) -> Self::Error {
+        self.context.missing_variant_tag(name)
+    }
+
+    #[inline(always)]
+    fn invalid_variant_field_tag<V, T>(
+        &mut self,
+        name: &'static str,
+        variant: V,
+        tag: T,
+    ) -> Self::Error
+    where
+        V: fmt::Debug,
+        T: fmt::Debug,
+    {
+        self.context.invalid_variant_field_tag(name, variant, tag)
+    }
+
+    #[inline(always)]
+    fn store_string(&mut self, string: &str) {
+        self.context.store_string(string)
+    }
+
+    #[inline(always)]
+    fn get_string(&self) -> Option<&'buf str> {
+        self.context.get_string()
+    }
+
+    #[inline(always)]
+    fn enter_struct(&mut self, name: &'static str) {
+        self.context.enter_struct(name)
+    }
+
+    #[inline(always)]
+    fn leave_struct(&mut self) {
+        self.context.leave_struct()
+    }
+
+    #[inline(always)]
+    fn enter_enum(&mut self, name: &'static str) {
+        self.context.enter_enum(name)
+    }
+
+    #[inline(always)]
+    fn leave_enum(&mut self) {
+        self.context.leave_enum()
+    }
+
+    #[inline(always)]
+    fn enter_named_field<T>(&mut self, name: &'static str, tag: T)
+    where
+        T: fmt::Display,
+    {
+        self.context.enter_named_field(name, tag)
+    }
+
+    #[inline(always)]
+    fn enter_unnamed_field<T>(&mut self, index: u32, tag: T)
+    where
+        T: fmt::Display,
+    {
+        self.context.enter_unnamed_field(index, tag)
+    }
+
+    #[inline(always)]
+    fn leave_field(&mut self) {
+        self.context.leave_field()
+    }
+
+    #[inline(always)]
+    fn enter_variant<T>(&mut self, name: &'static str, tag: T)
+    where
+        T: fmt::Display,
+    {
+        self.context.enter_variant(name, tag)
+    }
+
+    #[inline(always)]
+    fn leave_variant(&mut self) {
+        self.context.leave_variant()
+    }
+
+    #[inline(always)]
+    fn enter_map_key<T>(&mut self, field: T)
+    where
+        T: fmt::Display,
+    {
+        self.context.enter_map_key(field)
+    }
+
+    #[inline(always)]
+    fn leave_map_key(&mut self) {
+        self.context.leave_map_key()
+    }
+
+    #[inline(always)]
+    fn enter_sequence_index(&mut self, index: usize) {
+        self.context.enter_sequence_index(index)
+    }
+
+    #[inline(always)]
+    fn leave_sequence_index(&mut self) {
+        self.context.leave_sequence_index()
+    }
 }

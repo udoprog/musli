@@ -8,7 +8,7 @@ use musli::en::Encoder;
 use musli::en::{PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::Context;
 
-use crate::error::ValueError;
+use crate::error::Error;
 use crate::value::{Number, Value};
 
 /// Insert a value into the given receiver.
@@ -65,7 +65,7 @@ where
     O: ValueOutput,
 {
     type Ok = ();
-    type Error = ValueError;
+    type Error = Error;
     #[cfg(feature = "alloc")]
     type Some = ValueEncoder<SomeValueWriter<O>>;
     #[cfg(feature = "alloc")]
@@ -392,7 +392,7 @@ where
     O: ValueOutput,
 {
     type Ok = ();
-    type Error = ValueError;
+    type Error = Error;
 
     type Encoder<'this> = ValueEncoder<&'this mut Vec<Value>>
     where
@@ -438,7 +438,7 @@ where
     O: ValueOutput,
 {
     type Ok = ();
-    type Error = ValueError;
+    type Error = Error;
 
     type Encoder<'this> = PairValueEncoder<'this>
     where
@@ -481,7 +481,7 @@ impl<'a> PairValueEncoder<'a> {
 #[cfg(feature = "alloc")]
 impl<'a> PairEncoder for PairValueEncoder<'a> {
     type Ok = ();
-    type Error = ValueError;
+    type Error = Error;
 
     type First<'this> = ValueEncoder<&'this mut Value>
     where
@@ -539,7 +539,7 @@ where
     O: ValueOutput,
 {
     type Ok = ();
-    type Error = ValueError;
+    type Error = Error;
 
     type Tag<'this> = ValueEncoder<&'this mut Value>
     where

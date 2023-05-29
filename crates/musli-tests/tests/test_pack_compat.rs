@@ -60,7 +60,7 @@ fn test_packed_compat() {
         Encoding::new().with_max_pack();
 
     let data = ENCODING
-        .to_buffer(&SmallPackCompat {
+        .to_vec(&SmallPackCompat {
             prefix: 42,
             small_pack: SmallPack {
                 small: [0; MAX_INLINE_LEN],

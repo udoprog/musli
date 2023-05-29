@@ -18,7 +18,6 @@
 
 mod decode;
 mod decoder;
-mod error;
 mod number_visitor;
 mod type_hint;
 mod value_visitor;
@@ -28,7 +27,6 @@ pub use self::decode::{Decode, TraceDecode};
 pub use self::decoder::{
     AsDecoder, Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, VariantDecoder,
 };
-pub use self::error::Error;
 pub use self::number_visitor::NumberVisitor;
 pub use self::type_hint::{NumberHint, SizeHint, TypeHint};
 pub use self::value_visitor::ValueVisitor;

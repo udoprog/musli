@@ -6,9 +6,10 @@ macro_rules! encode_with_extensions {
         /// Encode the given value to the given [Writer] using the current
         /// configuration.
         #[inline]
-        pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), W::Error>
+        pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), Error>
         where
             W: Writer,
+            Error: From<W::Error>,
             T: ?Sized + Encode<M>,
         {
             let mut cx = musli_common::context::Same::default();
@@ -19,49 +20,26 @@ macro_rules! encode_with_extensions {
         /// configuration.
         #[cfg(feature = "std")]
         #[inline]
-        pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), io::Error>
+        pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), Error>
         where
             W: io::Write,
+            Error: From<io::Error>,
             T: ?Sized + Encode<M>,
         {
             let mut writer = $crate::wrap::wrap(write);
             self.encode(&mut writer, value)
         }
 
-        /// Encode the given value to a [`Buffer`] using the current configuration.
-        #[inline]
-        pub fn to_buffer<T>(self, value: &T) -> Result<Buffer, BufferError>
-        where
-            T: ?Sized + Encode<M>,
-        {
-            let mut data = Buffer::new();
-            self.encode(&mut data, value)?;
-            Ok(data)
-        }
-
-        /// Encode the given value to a [`Buffer`] using the current configuration.
-        ///
-        /// This is the same as [`Encoding::to_buffer`], but allows for using a
-        /// configurable [`Context`].
-        #[inline]
-        pub fn to_buffer_with<'buf, C, T>(self, cx: &mut C, value: &T) -> Result<Buffer, C::Error>
-        where
-            C: Context<'buf, Input = BufferError>,
-            T: ?Sized + Encode<M>,
-        {
-            let mut data = Buffer::new();
-            self.encode_with(cx, &mut data, value)?;
-            Ok(data)
-        }
-
         /// Encode the given value to a [`Vec`] using the current configuration.
         #[cfg(feature = "alloc")]
         #[inline]
-        pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, BufferError>
+        pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, Error>
         where
             T: ?Sized + Encode<M>,
         {
-            Ok(self.to_buffer(value)?.into_vec())
+            let mut vec = Vec::new();
+            self.encode(&mut vec, value)?;
+            Ok(vec)
         }
 
         /// Encode the given value to a [`Vec`] using the current configuration.
@@ -72,19 +50,18 @@ macro_rules! encode_with_extensions {
         #[inline]
         pub fn to_vec_with<'buf, C, T>(self, cx: &mut C, value: &T) -> Result<Vec<u8>, C::Error>
         where
-            C: Context<'buf, Input = BufferError>,
+            C: Context<'buf, Input = Error>,
             T: ?Sized + Encode<M>,
         {
-            Ok(self.to_buffer_with(cx, value)?.into_vec())
+            let mut vec = Vec::new();
+            self.encode_with(cx, &mut vec, value)?;
+            Ok(vec)
         }
 
         /// Encode the given value to a fixed-size bytes using the current
         /// configuration.
         #[inline]
-        pub fn to_fixed_bytes<const N: usize, T>(
-            self,
-            value: &T,
-        ) -> Result<FixedBytes<N>, BufferError>
+        pub fn to_fixed_bytes<const N: usize, T>(self, value: &T) -> Result<FixedBytes<N>, Error>
         where
             T: ?Sized + Encode<M>,
         {
@@ -101,7 +78,7 @@ macro_rules! encode_with_extensions {
             value: &T,
         ) -> Result<FixedBytes<N>, C::Error>
         where
-            C: Context<'buf, Input = BufferError>,
+            C: Context<'buf, Input = Error>,
             T: ?Sized + Encode<M>,
         {
             let mut bytes = FixedBytes::new();
@@ -119,7 +96,7 @@ macro_rules! encoding_from_slice_impls {
         /// Decode the given type `T` from the given slice using the current
         /// configuration.
         #[inline]
-        pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, BufferError>
+        pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
         where
             T: Decode<'de, M>,
         {
@@ -140,7 +117,7 @@ macro_rules! encoding_from_slice_impls {
             bytes: &'de [u8],
         ) -> Result<T, C::Error>
         where
-            C: Context<'buf, Input = BufferError>,
+            C: Context<'buf, Input = Error>,
             T: Decode<'de, M>,
         {
             let reader = SliceReader::new(bytes);
@@ -167,8 +144,9 @@ macro_rules! encoding_impls {
             value: &T,
         ) -> Result<(), C::Error>
         where
-            C: Context<'buf, Input = W::Error>,
+            C: Context<'buf, Input = Error>,
             W: Writer,
+            Error: From<W::Error>,
             T: ?Sized + Encode<M>,
         {
             T::encode(value, cx, $encoder_new(writer))
@@ -182,8 +160,9 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn decode_with<'de, 'buf, C, R, T>(self, cx: &mut C, reader: R) -> Result<T, C::Error>
         where
-            C: Context<'buf, Input = R::Error>,
+            C: Context<'buf, Input = Error>,
             R: Reader<'de>,
+            Error: From<R::Error>,
             T: Decode<'de, M>,
         {
             T::decode(cx, $decoder_new(reader))
@@ -192,9 +171,10 @@ macro_rules! encoding_impls {
         /// Decode the given type `T` from the given [Reader] using the current
         /// configuration.
         #[inline]
-        pub fn decode<'de, R, T>(self, reader: R) -> Result<T, R::Error>
+        pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
             R: Reader<'de>,
+            Error: From<R::Error>,
             T: Decode<'de, M>,
         {
             let mut cx = musli_common::context::Same::default();

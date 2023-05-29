@@ -45,13 +45,15 @@ impl Error for std::io::Error {
 
 #[cfg(feature = "alloc")]
 impl Error for String {
+    #[inline]
     fn custom<T>(message: T) -> Self
     where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+        T: fmt::Display,
     {
         message.to_string()
     }
 
+    #[inline]
     fn message<T>(message: T) -> Self
     where
         T: fmt::Display,

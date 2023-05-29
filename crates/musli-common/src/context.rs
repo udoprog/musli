@@ -10,8 +10,7 @@ mod rich_error;
 use core::fmt;
 use core::marker::PhantomData;
 
-use musli::de;
-use musli::error::Error;
+use musli::context::Error;
 use musli::Context;
 
 #[cfg(feature = "alloc")]
@@ -39,7 +38,7 @@ impl<E> Default for Same<E> {
 
 impl<'buf, E> Context<'buf> for Same<E>
 where
-    E: Error,
+    E: musli::error::Error,
 {
     type Input = E;
     type Error = E;
@@ -89,7 +88,7 @@ impl<E> Default for Ignore<E> {
 
 impl<E> Ignore<E>
 where
-    E: Error,
+    E: musli::error::Error,
 {
     /// Construct an error or panic.
     pub fn unwrap(self) -> E {
@@ -103,34 +102,34 @@ where
 
 impl<'buf, E> Context<'buf> for Ignore<E> {
     type Input = E;
-    type Error = de::Error;
+    type Error = Error;
     type Mark = ();
 
     #[inline(always)]
-    fn report<T>(&mut self, _: T) -> de::Error
+    fn report<T>(&mut self, _: T) -> Error
     where
         E: From<T>,
     {
         self.error = true;
-        de::Error
+        Error
     }
 
     #[inline(always)]
-    fn custom<T>(&mut self, _: T) -> de::Error
+    fn custom<T>(&mut self, _: T) -> Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
         self.error = true;
-        de::Error
+        Error
     }
 
     #[inline(always)]
-    fn message<T>(&mut self, _: T) -> de::Error
+    fn message<T>(&mut self, _: T) -> Error
     where
         T: fmt::Display,
     {
         self.error = true;
-        de::Error
+        Error
     }
 }
 
@@ -141,7 +140,7 @@ pub struct Capture<E> {
 
 impl<E> Capture<E>
 where
-    E: Error,
+    E: musli::error::Error,
 {
     /// Construct an error or panic.
     pub fn unwrap(self) -> E {
@@ -155,37 +154,37 @@ where
 
 impl<'buf, E> Context<'buf> for Capture<E>
 where
-    E: Error,
+    E: musli::error::Error,
 {
     type Input = E;
-    type Error = de::Error;
+    type Error = Error;
     type Mark = ();
 
     #[inline(always)]
-    fn report<T>(&mut self, error: T) -> de::Error
+    fn report<T>(&mut self, error: T) -> Error
     where
         E: From<T>,
     {
         self.error = Some(E::from(error));
-        de::Error
+        Error
     }
 
     #[inline(always)]
-    fn custom<T>(&mut self, error: T) -> de::Error
+    fn custom<T>(&mut self, error: T) -> Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
         self.error = Some(E::custom(error));
-        de::Error
+        Error
     }
 
     #[inline(always)]
-    fn message<T>(&mut self, message: T) -> de::Error
+    fn message<T>(&mut self, message: T) -> Error
     where
         T: fmt::Display,
     {
         self.error = Some(E::message(message));
-        de::Error
+        Error
     }
 }
 

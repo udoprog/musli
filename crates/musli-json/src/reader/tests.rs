@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 
-use crate::reader::integer::{parse_signed, parse_unsigned};
+use crate::reader::integer::{parse_signed_full, parse_unsigned_full};
 use crate::reader::SliceParser;
 
 #[test]
@@ -10,7 +10,7 @@ fn test_decode_exponent() {
     macro_rules! test_number {
         ($ty:ty, $num:expr, $expected:expr) => {
             assert_eq!(
-                parse_unsigned::<$ty, _, _>(&mut cx, &mut SliceParser::new($num.as_bytes()))
+                parse_unsigned_full::<$ty, _, _>(&mut cx, &mut SliceParser::new($num.as_bytes()))
                     .unwrap(),
                 $expected
             );
@@ -45,7 +45,7 @@ fn test_decode_unsigned() {
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
             assert_eq!(
-                parse_unsigned::<$ty, _, _>(
+                parse_unsigned_full::<$ty, _, _>(
                     &mut cx,
                     &mut SliceParser::new(format!("{}", $num).as_bytes())
                 )
@@ -54,7 +54,7 @@ fn test_decode_unsigned() {
             );
 
             assert_eq!(
-                parse_unsigned::<$ty, _, _>(
+                parse_unsigned_full::<$ty, _, _>(
                     &mut cx,
                     &mut SliceParser::new(format!("{}.", $num).as_bytes())
                 )
@@ -63,7 +63,7 @@ fn test_decode_unsigned() {
             );
 
             assert_eq!(
-                parse_unsigned::<$ty, _, _>(
+                parse_unsigned_full::<$ty, _, _>(
                     &mut cx,
                     &mut SliceParser::new(format!("{}.0", $num).as_bytes())
                 )
@@ -72,7 +72,7 @@ fn test_decode_unsigned() {
             );
 
             assert_eq!(
-                parse_unsigned::<$ty, _, _>(
+                parse_unsigned_full::<$ty, _, _>(
                     &mut cx,
                     &mut SliceParser::new(format!("{}.00000", $num).as_bytes())
                 )
@@ -80,7 +80,7 @@ fn test_decode_unsigned() {
                 $num
             );
 
-            assert!(parse_unsigned::<$ty, _, _>(
+            assert!(parse_unsigned_full::<$ty, _, _>(
                 &mut cx,
                 &mut SliceParser::new(format!("{}.1", $num).as_bytes())
             )
@@ -111,7 +111,7 @@ fn test_decode_signed() {
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
             assert_eq!(
-                parse_signed::<$ty, _, _>(
+                parse_signed_full::<$ty, _, _>(
                     &mut cx,
                     &mut SliceParser::new(format!("{}", $num).as_bytes())
                 )
@@ -120,7 +120,7 @@ fn test_decode_signed() {
             );
 
             assert_eq!(
-                parse_signed::<$ty, _, _>(
+                parse_signed_full::<$ty, _, _>(
                     &mut cx,
                     &mut SliceParser::new(format!("{}.", $num).as_bytes())
                 )
@@ -129,7 +129,7 @@ fn test_decode_signed() {
             );
 
             assert_eq!(
-                parse_signed::<$ty, _, _>(
+                parse_signed_full::<$ty, _, _>(
                     &mut cx,
                     &mut SliceParser::new(format!("{}.0", $num).as_bytes())
                 )
@@ -138,7 +138,7 @@ fn test_decode_signed() {
             );
 
             assert_eq!(
-                parse_signed::<$ty, _, _>(
+                parse_signed_full::<$ty, _, _>(
                     &mut cx,
                     &mut SliceParser::new(format!("{}.00000", $num).as_bytes())
                 )
@@ -146,7 +146,7 @@ fn test_decode_signed() {
                 $num
             );
 
-            assert!(parse_signed::<$ty, _, _>(
+            assert!(parse_signed_full::<$ty, _, _>(
                 &mut cx,
                 &mut SliceParser::new(format!("{}.1", $num).as_bytes())
             )

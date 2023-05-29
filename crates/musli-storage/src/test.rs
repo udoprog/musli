@@ -18,7 +18,7 @@ macro_rules! rt {
 
     ($ty:ty, $expr:expr) => {{
         let value: $ty = $expr;
-        let out = $crate::to_buffer(&value).expect(concat!("storage: ", stringify!($ty), ": failed to encode"));
+        let out = $crate::to_vec(&value).expect(concat!("storage: ", stringify!($ty), ": failed to encode"));
         let decoded: $ty = $crate::from_slice(out.as_slice()).expect(concat!("storage: ", stringify!($ty), ": failed to decode"));
         assert_eq!(decoded, $expr, concat!("storage: ", stringify!($ty), ": roundtrip does not match"));
         decoded
@@ -32,7 +32,7 @@ where
     T: Debug + PartialEq + Encode<DefaultMode>,
     O: for<'de> Decode<'de, DefaultMode>,
 {
-    let out = crate::to_buffer(&value).expect("encode failed");
+    let out = crate::to_vec(&value).expect("encode failed");
     let mut buf = out.as_slice();
     let value: O = crate::decode(&mut buf).expect("decode failed");
     assert!(buf.is_empty());

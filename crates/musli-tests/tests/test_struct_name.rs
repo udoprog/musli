@@ -24,7 +24,7 @@ fn struct_named_fields() {
         number: 42,
     });
 
-    let out = musli_tests::wire::to_buffer(&Named {
+    let out = musli_tests::wire::to_vec(&Named {
         string: String::from("foo"),
         number: 42,
     })
@@ -68,7 +68,7 @@ fn struct_indexed_fields() {
         number: 42,
     });
 
-    let out = musli_tests::wire::to_buffer(&Indexed {
+    let out = musli_tests::wire::to_vec(&Indexed {
         string: String::from("foo"),
         number: 42,
     })

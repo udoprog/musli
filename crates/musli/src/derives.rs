@@ -72,10 +72,10 @@
 //! const JSON_ENCODING: Encoding<Json> = Encoding::new().with_mode();
 //! const DEFAULT_ENCODING: Encoding = Encoding::new();
 //!
-//! let named = JSON_ENCODING.to_buffer(&Person { name: "Aristotle", age: 62 })?;
+//! let named = JSON_ENCODING.to_vec(&Person { name: "Aristotle", age: 62 })?;
 //! assert_eq!(named.as_slice(), b"{\"name\":\"Aristotle\",\"age\":62}");
 //!
-//! let indexed = DEFAULT_ENCODING.to_buffer(&Person { name: "Plato", age: 84 })?;
+//! let indexed = DEFAULT_ENCODING.to_vec(&Person { name: "Plato", age: 84 })?;
 //! assert_eq!(indexed.as_slice(), b"{\"0\":\"Plato\",\"1\":84}");
 //!
 //! # Ok::<_, Box<dyn std::error::Error>>(())
@@ -263,7 +263,7 @@
 //! struct Struct(u32);
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let data = musli_wire::to_buffer(&Struct(42))?;
+//! let data = musli_wire::to_vec(&Struct(42))?;
 //! assert_eq!(data.as_slice(), vec![Tag::new(Kind::Continuation, 42).byte()]);
 //! # Ok(()) }
 //! ```
@@ -295,7 +295,7 @@
 //! }
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let data = musli_storage::to_buffer(&Struct {
+//! let data = musli_storage::to_vec(&Struct {
 //!     field1: 1,
 //!     field2: 2,
 //!     field3: 3,

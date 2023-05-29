@@ -1,27 +1,50 @@
 //! A container which can store up to a fixed number of uninitialized bytes on
 //! the stack and read into and from it.
 
-use core::marker;
+use core::fmt;
 use core::mem::MaybeUninit;
 use core::ptr;
 
-use musli::error::Error;
 use musli::Context;
 
-use crate::error::BufferError;
 use crate::writer::Writer;
 
+/// Capacity error raised by trying to write to a [FixedBytes] with no remaining
+/// capacity.
+#[derive(Debug)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+pub struct FixedBytesOverflow {
+    at: usize,
+    additional: usize,
+    capacity: usize,
+}
+
+impl fmt::Display for FixedBytesOverflow {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let FixedBytesOverflow {
+            at,
+            additional,
+            capacity,
+        } = self;
+
+        write!(
+            f,
+            "tried to write {additional} bytes at {at} with capacity {capacity}"
+        )
+    }
+}
+
 /// A fixed-size bytes storage which keeps track of how much has been initialized.
-pub struct FixedBytes<const N: usize, E = BufferError> {
+pub struct FixedBytes<const N: usize> {
     /// Data storage.
     data: [MaybeUninit<u8>; N],
     /// How many bytes have been initialized.
     init: usize,
-    /// Error type to raise when this is used as a `Writer` implementation.
-    _marker: marker::PhantomData<E>,
 }
 
-impl<const N: usize, E> FixedBytes<N, E> {
+impl<const N: usize> FixedBytes<N> {
     /// Construct a new fixed bytes array storage.
     #[inline]
     pub const fn new() -> Self {
@@ -29,7 +52,6 @@ impl<const N: usize, E> FixedBytes<N, E> {
             // SAFETY: MaybeUnint::uninit_array is not stable.
             data: unsafe { MaybeUninit::<[MaybeUninit<u8>; N]>::uninit().assume_init() },
             init: 0,
-            _marker: marker::PhantomData,
         }
     }
 
@@ -130,20 +152,34 @@ impl<const N: usize, E> FixedBytes<N, E> {
         self.init = self.init.wrapping_add(source.len());
         true
     }
+
+    /// Try and extend from the given slice.
+    #[inline]
+    pub fn write_bytes<'buf, C>(&mut self, cx: &mut C, source: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<'buf, Input = FixedBytesOverflow>,
+    {
+        if !self.extend_from_slice(source) {
+            return Err(cx.report(FixedBytesOverflow {
+                at: self.init,
+                additional: source.len(),
+                capacity: N,
+            }));
+        }
+
+        Ok(())
+    }
 }
 
-impl<const N: usize, E> Default for FixedBytes<N, E> {
+impl<const N: usize> Default for FixedBytes<N> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<const N: usize, E> Writer for FixedBytes<N, E>
-where
-    E: Error,
-{
-    type Error = E;
+impl<const N: usize> Writer for FixedBytes<N> {
+    type Error = FixedBytesOverflow;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -156,15 +192,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        if !self.extend_from_slice(bytes) {
-            return Err(cx.message(format_args! {
-                "Overflow when writing {additional} bytes at {at} with capacity {capacity}",
-                at = self.init,
-                additional = bytes.len(),
-                capacity = N,
-            }));
-        }
-
+        FixedBytes::write_bytes(self, cx, bytes)?;
         cx.advance(bytes.len());
         Ok(())
     }
@@ -179,11 +207,10 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         if U > N.saturating_sub(self.init) {
-            return Err(cx.message(format_args! {
-                "Overflow when writing {additional} bytes at {at} with capacity {capacity}",
-                at = self.init,
-                additional = U,
-                capacity = N,
+            return Err(cx.report(FixedBytesOverflow {
+                at: self.init,
+                additional: U,
+                capacity: N,
             }));
         }
 

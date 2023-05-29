@@ -21,17 +21,17 @@ mod en;
 mod error;
 mod value;
 
-pub use self::value::{AsValueDecoder, Value};
-pub use error::ValueError;
+/// Convenient result alias for use with `musli_value`.
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
-/// Convenience type alias for error raised by `musli-value`.
-pub type Result<T, E = ValueError> = core::result::Result<T, E>;
+pub use self::value::{AsValueDecoder, Value};
+pub use error::{Error, ErrorKind};
 
 use en::ValueEncoder;
 use musli::{Decode, Encode};
 
 /// Encode something that implements [Encode] into a [Value].
-pub fn encode<T>(value: T) -> Result<Value, ValueError>
+pub fn encode<T>(value: T) -> Result<Value, Error>
 where
     T: Encode,
 {
@@ -42,7 +42,7 @@ where
 }
 
 /// Decode a [Value] into a type which implements [Decode].
-pub fn decode<'de, T>(value: &'de Value) -> Result<T, ValueError>
+pub fn decode<'de, T>(value: &'de Value) -> Result<T, Error>
 where
     T: Decode<'de>,
 {

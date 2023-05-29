@@ -11,6 +11,34 @@
 //!   `#[musli(default)]`.
 //! * ✔ Can skip over unknown fields.
 //!
+//! ```rust
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Debug, PartialEq, Encode, Decode)]
+//! struct Version1 {
+//!     name: String,
+//! }
+//!
+//! #[derive(Debug, PartialEq, Encode, Decode)]
+//! struct Version2 {
+//!     name: String,
+//!     #[musli(default)]
+//!     age: Option<u32>,
+//! }
+//!
+//! let version2 = musli_json::to_vec(&Version2 {
+//!     name: String::from("Aristotle"),
+//!     age: Some(62),
+//! })?;
+//!
+//! let version1: Version1 = musli_json::from_slice(version2.as_slice())?;
+//!
+//! assert_eq!(version1, Version1 {
+//!     name: String::from("Aristotle"),
+//! });
+//! # Ok::<_, musli_json::Error>(())
+//! ```
+//!
 //! [Müsli]: https://github.com/udoprog/musli
 
 #![deny(missing_docs)]
@@ -26,13 +54,17 @@ extern crate std;
 mod de;
 mod en;
 pub mod encoding;
+mod error;
 pub mod reader;
-pub use self::reader::ParseError;
 
-#[cfg(feature = "alloc")]
-pub use self::encoding::to_string;
+/// Convenient result alias for use with `musli_json`.
+pub type Result<T, E = Error> = core::result::Result<T, E>;
+
 #[cfg(feature = "std")]
 pub use self::encoding::to_writer;
-pub use self::encoding::{decode, encode, from_slice, to_buffer, to_fixed_bytes, Encoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
+#[cfg(feature = "alloc")]
+pub use self::encoding::{to_string, to_vec};
+pub use self::error::Error;
 #[doc(inline)]
 pub use musli_common::*;

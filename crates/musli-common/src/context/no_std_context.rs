@@ -4,8 +4,7 @@ use core::ops::Range;
 use core::ptr;
 
 use arrayvec::{ArrayString, ArrayVec};
-use musli::de;
-use musli::error::Error;
+use musli::context::Error;
 use musli::Context;
 
 use crate::context::rich_error::{RichError, Step};
@@ -103,10 +102,10 @@ impl<'buf, const P: usize, const S: usize, E> NoStdContext<'buf, P, S, E> {
 
 impl<'buf, const V: usize, const S: usize, E> Context<'buf> for NoStdContext<'buf, V, S, E>
 where
-    E: Error,
+    E: musli::error::Error,
 {
     type Input = E;
-    type Error = de::Error;
+    type Error = Error;
     type Mark = usize;
 
     #[inline(always)]
@@ -115,7 +114,7 @@ where
         E: From<T>,
     {
         self.push_error(self.mark..self.mark, E::from(error));
-        de::Error
+        Error
     }
 
     #[inline]
@@ -124,7 +123,7 @@ where
         E: From<T>,
     {
         self.push_error(mark..self.mark, E::from(message));
-        de::Error
+        Error
     }
 
     #[inline(always)]
@@ -133,7 +132,7 @@ where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
         self.push_error(self.mark..self.mark, E::custom(message));
-        de::Error
+        Error
     }
 
     #[inline(always)]
@@ -142,7 +141,7 @@ where
         T: fmt::Display,
     {
         self.push_error(self.mark..self.mark, E::message(message));
-        de::Error
+        Error
     }
 
     #[inline]
@@ -151,7 +150,7 @@ where
         T: fmt::Display,
     {
         self.push_error(mark..self.mark, E::message(message));
-        de::Error
+        Error
     }
 
     #[inline]
