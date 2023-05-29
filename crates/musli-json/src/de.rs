@@ -15,6 +15,14 @@ use musli::mode::Mode;
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};
+#[cfg(not(feature = "parse-full"))]
+use crate::reader::integer::{
+    parse_signed_base as parse_signed, parse_unsigned_base as parse_unsigned,
+};
+#[cfg(feature = "parse-full")]
+use crate::reader::integer::{
+    parse_signed_full as parse_signed, parse_unsigned_full as parse_unsigned,
+};
 use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
 use crate::reader::{integer, string, Parser, Scratch, StringReference, Token};
@@ -212,7 +220,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
@@ -220,7 +228,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
@@ -228,7 +236,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
@@ -236,7 +244,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
@@ -244,7 +252,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
@@ -252,7 +260,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_signed(cx, &mut self.parser)
+        parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
@@ -260,7 +268,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_signed(cx, &mut self.parser)
+        parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
@@ -268,7 +276,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_signed(cx, &mut self.parser)
+        parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
@@ -276,7 +284,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_signed(cx, &mut self.parser)
+        parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
@@ -284,7 +292,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_signed(cx, &mut self.parser)
+        parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
@@ -292,7 +300,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, &mut self.parser)
     }
 
     #[inline]
@@ -300,7 +308,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        integer::parse_signed(cx, &mut self.parser)
+        parse_signed(cx, &mut self.parser)
     }
 
     #[inline]
@@ -528,7 +536,7 @@ where
 
     #[inline]
     fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-        integer::parse_unsigned(cx, &mut SliceParser::new(bytes))
+        parse_unsigned(cx, &mut SliceParser::new(bytes))
     }
 }
 
@@ -558,7 +566,7 @@ where
 
     #[inline]
     fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-        integer::parse_signed(cx, &mut SliceParser::new(bytes))
+        parse_signed(cx, &mut SliceParser::new(bytes))
     }
 }
 

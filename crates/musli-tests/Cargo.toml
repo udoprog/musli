@@ -25,6 +25,7 @@ std = ["alloc", "musli/std", "musli-wire?/std", "musli-storage?/std", "musli-jso
 alloc = ["musli/alloc", "musli-wire?/alloc", "musli-storage?/alloc", "musli-json?/alloc"]
 test = ["musli-wire", "musli-storage", "musli-descriptive"]
 simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptive?/simdutf8", "musli-json?/simdutf8"]
+parse-full = ["musli-json?/parse-full"]
 arrayvec = ["musli-wire?/arrayvec", "musli-storage?/arrayvec", "musli-descriptive?/arrayvec", "musli-json?/arrayvec"]
 musli-wire = ["musli", "dep:musli-wire"]
 musli-descriptive = ["musli", "dep:musli-descriptive"]

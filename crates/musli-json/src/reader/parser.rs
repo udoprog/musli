@@ -2,7 +2,8 @@ use musli::de::NumberVisitor;
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};
-use crate::reader::{integer, string, Scratch, StringReference, Token};
+use crate::reader::integer::decode_signed_full;
+use crate::reader::{string, Scratch, StringReference, Token};
 
 mod private {
     pub trait Sealed {}
@@ -166,7 +167,7 @@ pub trait Parser<'de>: private::Sealed {
         C: Context<'buf, Input = Error>,
         V: NumberVisitor<'de, 'buf, C>,
     {
-        let signed = integer::decode_signed::<i128, _, _>(cx, self)?;
+        let signed = decode_signed_full::<i128, _, _>(cx, self)?;
 
         if signed.is_negative {
             let value = match signed.compute() {
