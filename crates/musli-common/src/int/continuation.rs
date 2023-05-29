@@ -5,16 +5,14 @@
 //! use musli_common::int::continuation as c;
 //! use musli_common::fixed_bytes::FixedBytes;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let mut cx = musli_common::context::Same::default();
-//!
+//! let mut cx = musli_common::context::Ignore::default();
 //! let mut bytes = FixedBytes::<8>::new();
-//! c::encode(&mut cx, &mut bytes, 5000u32)?;
+//! c::encode(&mut cx, &mut bytes, 5000u32).unwrap();
 //! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let number: u32 = c::decode(&mut cx, bytes.as_slice())?;
+//! let mut cx = musli_common::context::Ignore::default();
+//! let number: u32 = c::decode(&mut cx, bytes.as_slice()).unwrap();
 //! assert_eq!(number, 5000u32);
-//! # Ok(()) }
 //! ```
 
 #![allow(unused)]

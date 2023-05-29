@@ -7,6 +7,7 @@ use musli_common::int::{continuation as c, UsizeEncoding, Variable};
 use musli_common::writer::Writer;
 use musli_storage::en::StorageEncoder;
 
+use crate::error::Error;
 use crate::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use crate::tag::{
     Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, ISIZE, U128, U16, U32, U64, U8, USIZE,
@@ -25,22 +26,20 @@ impl<W, const P: usize> SelfEncoder<W, P> {
     }
 }
 
-pub struct SelfPackEncoder<W, const P: usize>
-where
-    W: Writer,
-{
+pub struct SelfPackEncoder<W, const P: usize> {
     writer: W,
-    pack_buf: FixedBytes<P, W::Error>,
+    pack_buf: FixedBytes<P>,
     count: usize,
 }
 
 impl<W, const P: usize> SelfPackEncoder<W, P>
 where
     W: Writer,
+    Error: From<W::Error>,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(writer: W, pack_buf: FixedBytes<P, W::Error>) -> Self {
+    pub(crate) fn new(writer: W, pack_buf: FixedBytes<P>) -> Self {
         Self {
             writer,
             pack_buf,
@@ -53,9 +52,10 @@ where
 impl<W, const P: usize> Encoder for SelfEncoder<W, P>
 where
     W: Writer,
+    Error: From<W::Error>,
 {
     type Ok = ();
-    type Error = W::Error;
+    type Error = Error;
 
     type Pack = SelfPackEncoder<W, P>;
     type Some = Self;
@@ -76,7 +76,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         self.writer
-            .write_byte(cx, Tag::from_mark(Mark::Unit).byte())?;
+            .write_byte(cx.adapt(), Tag::from_mark(Mark::Unit).byte())?;
         Ok(())
     }
 
@@ -106,7 +106,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         encode_prefix(cx, self.writer.borrow_mut(), Kind::Bytes, bytes.len())?;
-        self.writer.write_bytes(cx, bytes)?;
+        self.writer.write_bytes(cx.adapt(), bytes)?;
         Ok(())
     }
 
@@ -123,7 +123,7 @@ where
         encode_prefix(cx, self.writer.borrow_mut(), Kind::Bytes, len)?;
 
         for bytes in vectors {
-            self.writer.write_bytes(cx, bytes)?;
+            self.writer.write_bytes(cx.adapt(), bytes)?;
         }
 
         Ok(())
@@ -135,7 +135,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         encode_prefix(cx, self.writer.borrow_mut(), Kind::String, string.len())?;
-        self.writer.write_bytes(cx, string.as_bytes())?;
+        self.writer.write_bytes(cx.adapt(), string.as_bytes())?;
         Ok(())
     }
 
@@ -164,7 +164,7 @@ where
         const FALSE: Tag = Tag::from_mark(Mark::False);
 
         self.writer
-            .write_byte(cx, if value { TRUE } else { FALSE }.byte())
+            .write_byte(cx.adapt(), if value { TRUE } else { FALSE }.byte())
     }
 
     #[inline]
@@ -173,8 +173,8 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         const CHAR: Tag = Tag::from_mark(Mark::Char);
-        self.writer.write_byte(cx, CHAR.byte())?;
-        c::encode(cx, self.writer.borrow_mut(), value as u32)
+        self.writer.write_byte(cx.adapt(), CHAR.byte())?;
+        c::encode(cx.adapt(), self.writer.borrow_mut(), value as u32)
     }
 
     #[inline]
@@ -279,7 +279,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         const SOME: Tag = Tag::from_mark(Mark::Some);
-        self.writer.write_byte(cx, SOME.byte())?;
+        self.writer.write_byte(cx.adapt(), SOME.byte())?;
         Ok(self)
     }
 
@@ -289,7 +289,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         const NONE: Tag = Tag::from_mark(Mark::None);
-        self.writer.write_byte(cx, NONE.byte())?;
+        self.writer.write_byte(cx.adapt(), NONE.byte())?;
         Ok(())
     }
 
@@ -339,7 +339,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         const VARIANT: Tag = Tag::from_mark(Mark::Variant);
-        self.writer.write_byte(cx, VARIANT.byte())?;
+        self.writer.write_byte(cx.adapt(), VARIANT.byte())?;
         Ok(self)
     }
 }
@@ -347,10 +347,11 @@ where
 impl<W, const P: usize> SequenceEncoder for SelfPackEncoder<W, P>
 where
     W: Writer,
+    Error: From<W::Error>,
 {
     type Ok = ();
-    type Error = W::Error;
-    type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P, W::Error>, Variable, Variable> where Self: 'this;
+    type Error = Error;
+    type Encoder<'this> = StorageEncoder<&'this mut FixedBytes<P>, Variable, Variable, Error> where Self: 'this;
 
     #[inline]
     fn next<'buf, C>(&mut self, cx: &mut C) -> Result<Self::Encoder<'_>, C::Error>
@@ -376,7 +377,8 @@ where
             Kind::Bytes,
             self.pack_buf.len(),
         )?;
-        self.writer.write_bytes(cx, self.pack_buf.as_slice())?;
+        self.writer
+            .write_bytes(cx.adapt(), self.pack_buf.as_slice())?;
         Ok(())
     }
 }
@@ -384,9 +386,10 @@ where
 impl<W, const P: usize> SequenceEncoder for SelfEncoder<W, P>
 where
     W: Writer,
+    Error: From<W::Error>,
 {
     type Ok = ();
-    type Error = W::Error;
+    type Error = Error;
     type Encoder<'this> = SelfEncoder<W::Mut<'this>, P> where Self: 'this;
 
     #[inline]
@@ -409,9 +412,10 @@ where
 impl<W, const P: usize> PairsEncoder for SelfEncoder<W, P>
 where
     W: Writer,
+    Error: From<W::Error>,
 {
     type Ok = ();
-    type Error = W::Error;
+    type Error = Error;
     type Encoder<'this> = SelfEncoder<W::Mut<'this>, P> where Self: 'this;
 
     #[inline]
@@ -434,9 +438,10 @@ where
 impl<W, const P: usize> PairEncoder for SelfEncoder<W, P>
 where
     W: Writer,
+    Error: From<W::Error>,
 {
     type Ok = ();
-    type Error = W::Error;
+    type Error = Error;
     type First<'this> = SelfEncoder<W::Mut<'this>, P> where Self: 'this;
     type Second<'this> = SelfEncoder<W::Mut<'this>, P> where Self: 'this;
 
@@ -468,9 +473,10 @@ where
 impl<W, const P: usize> VariantEncoder for SelfEncoder<W, P>
 where
     W: Writer,
+    Error: From<W::Error>,
 {
     type Ok = ();
-    type Error = W::Error;
+    type Error = Error;
     type Tag<'this> = SelfEncoder<W::Mut<'this>, P> where Self: 'this;
     type Variant<'this> = SelfEncoder<W::Mut<'this>, P> where Self: 'this;
 
@@ -508,14 +514,15 @@ fn encode_prefix<'buf, C, W>(
     len: usize,
 ) -> Result<(), C::Error>
 where
-    C: Context<'buf, Input = W::Error>,
+    C: Context<'buf, Input = Error>,
     W: Writer,
+    Error: From<W::Error>,
 {
     let (tag, embedded) = Tag::with_len(kind, len);
-    writer.write_byte(cx, tag.byte())?;
+    writer.write_byte(cx.adapt(), tag.byte())?;
 
     if !embedded {
-        Variable::encode_usize(cx, writer, len)?;
+        Variable::encode_usize(cx.adapt(), writer, len)?;
     }
 
     Ok(())

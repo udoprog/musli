@@ -15,13 +15,13 @@ use musli::Context;
 
 use crate::de::WireDecoder;
 use crate::en::WireEncoder;
-use crate::error::BufferError;
+use crate::error::Error;
 use crate::fixed_bytes::FixedBytes;
 use crate::int::{BigEndian, ByteOrder, Fixed, FixedUsize, LittleEndian, NetworkEndian, Variable};
 use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
 use crate::reader::{Reader, SliceReader};
 use crate::tag::MAX_INLINE_LEN;
-use crate::writer::{Buffer, Writer};
+use crate::writer::Writer;
 
 /// The default configuration.
 ///
@@ -41,9 +41,10 @@ pub const DEFAULT: Encoding = Encoding::new();
 /// Encode the given value to the given [Writer] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn encode<W, T>(writer: W, value: &T) -> Result<(), W::Error>
+pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
+    Error: From<W::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -53,7 +54,7 @@ where
 /// configuration.
 #[cfg(feature = "std")]
 #[inline]
-pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), io::Error>
+pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: io::Write,
     T: ?Sized + Encode<DefaultMode>,
@@ -61,19 +62,10 @@ where
     DEFAULT.to_writer(writer, value)
 }
 
-/// Encode the given value to a [Buffer] using the [DEFAULT] configuration.
-#[inline]
-pub fn to_buffer<T>(value: &T) -> Result<Buffer, BufferError>
-where
-    T: ?Sized + Encode<DefaultMode>,
-{
-    DEFAULT.to_buffer(value)
-}
-
 /// Encode the given value to a [Vec] using the [DEFAULT] configuration.
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, BufferError>
+pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
 where
     T: ?Sized + Encode<DefaultMode>,
 {
@@ -83,7 +75,7 @@ where
 /// Encode the given value to a fixed-size bytes using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, BufferError>
+pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, Error>
 where
     T: ?Sized + Encode<DefaultMode>,
 {
@@ -93,9 +85,10 @@ where
 /// Decode the given type `T` from the given [Reader] using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn decode<'de, R, T>(reader: R) -> Result<T, R::Error>
+pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     T: Decode<'de, DefaultMode>,
 {
     DEFAULT.decode(reader)
@@ -104,7 +97,7 @@ where
 /// Decode the given type `T` from the given slice using the [DEFAULT]
 /// configuration.
 #[inline]
-pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, BufferError>
+pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
 where
     T: Decode<'de, DefaultMode>,
 {

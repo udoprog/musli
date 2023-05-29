@@ -2,7 +2,8 @@
 
 use musli::Context;
 
-use crate::reader::{ParseError, Parser, SliceParser};
+use crate::error::{Error, ErrorKind};
+use crate::reader::{Parser, SliceParser};
 
 use crate::reader::Scratch;
 
@@ -55,7 +56,7 @@ pub(crate) fn parse_string_slice_reader<'de, 'buf, 'scratch, C>(
     start: C::Mark,
 ) -> Result<StringReference<'de, 'scratch>, C::Error>
 where
-    C: Context<'buf, Input = ParseError>,
+    C: Context<'buf, Input = Error>,
 {
     // Index of the first byte not yet copied into the scratch space.
     let mut open_mark = cx.mark();
@@ -68,7 +69,7 @@ where
         }
 
         if reader.index == reader.slice.len() {
-            return Err(cx.report(ParseError::Eof));
+            return Err(cx.report(Error::new(ErrorKind::Eof)));
         }
 
         match reader.slice[reader.index] {
@@ -102,7 +103,7 @@ where
                 cx.advance(1);
 
                 if !parse_escape(cx, reader, validate, scratch)? {
-                    return Err(cx.marked_report(open_mark, ParseError::BufferOverflow));
+                    return Err(cx.marked_report(open_mark, Error::new(ErrorKind::BufferOverflow)));
                 }
 
                 open = reader.index;
@@ -110,7 +111,10 @@ where
             }
             _ => {
                 if validate {
-                    return Err(cx.marked_report(open_mark, ParseError::ControlCharacterInString));
+                    return Err(cx.marked_report(
+                        open_mark,
+                        Error::new(ErrorKind::ControlCharacterInString),
+                    ));
                 }
 
                 reader.index = reader.index.wrapping_add(1);
@@ -124,10 +128,10 @@ where
 #[inline]
 fn check_utf8<'buf, C>(cx: &mut C, bytes: &[u8], start: C::Mark) -> Result<(), C::Error>
 where
-    C: Context<'buf, Input = ParseError>,
+    C: Context<'buf, Input = Error>,
 {
     if musli_common::str::from_utf8(bytes).is_err() {
-        Err(cx.marked_report(start, ParseError::InvalidUnicode))
+        Err(cx.marked_report(start, Error::new(ErrorKind::InvalidUnicode)))
     } else {
         Ok(())
     }
@@ -142,7 +146,7 @@ fn parse_escape<'buf, C>(
     scratch: &mut Scratch,
 ) -> Result<bool, C::Error>
 where
-    C: Context<'buf, Input = ParseError>,
+    C: Context<'buf, Input = Error>,
 {
     let start = cx.mark();
     let b = parser.read_byte(cx)?;
@@ -168,7 +172,8 @@ where
             let c = match parser.parse_hex_escape(cx)? {
                 n @ 0xDC00..=0xDFFF => {
                     return if validate {
-                        Err(cx.marked_report(start, ParseError::LoneLeadingSurrogatePair))
+                        Err(cx
+                            .marked_report(start, Error::new(ErrorKind::LoneLeadingSurrogatePair)))
                     } else {
                         Ok(encode_surrogate(scratch, n))
                     };
@@ -183,7 +188,8 @@ where
 
                     if parser.read_byte(cx)? != b'\\' {
                         return if validate {
-                            Err(cx.marked_report(pos, ParseError::UnexpectedHexEscapeEnd))
+                            Err(cx
+                                .marked_report(pos, Error::new(ErrorKind::UnexpectedHexEscapeEnd)))
                         } else {
                             Ok(encode_surrogate(scratch, n1))
                         };
@@ -191,7 +197,8 @@ where
 
                     if parser.read_byte(cx)? != b'u' {
                         return if validate {
-                            Err(cx.marked_report(pos, ParseError::UnexpectedHexEscapeEnd))
+                            Err(cx
+                                .marked_report(pos, Error::new(ErrorKind::UnexpectedHexEscapeEnd)))
                         } else {
                             if !encode_surrogate(scratch, n1) {
                                 return Ok(false);
@@ -209,7 +216,10 @@ where
                     let n2 = parser.parse_hex_escape(cx)?;
 
                     if !(0xDC00..=0xDFFF).contains(&n2) {
-                        return Err(cx.marked_report(start, ParseError::LoneLeadingSurrogatePair));
+                        return Err(cx.marked_report(
+                            start,
+                            Error::new(ErrorKind::LoneLeadingSurrogatePair),
+                        ));
                     }
 
                     let n = (((n1 - 0xD800) as u32) << 10 | (n2 - 0xDC00) as u32) + 0x1_0000;
@@ -217,7 +227,9 @@ where
                     match char::from_u32(n) {
                         Some(c) => c,
                         None => {
-                            return Err(cx.marked_report(start, ParseError::InvalidUnicode));
+                            return Err(
+                                cx.marked_report(start, Error::new(ErrorKind::InvalidUnicode))
+                            );
                         }
                     }
                 }
@@ -230,7 +242,7 @@ where
             scratch.extend_from_slice(c.encode_utf8(&mut [0u8; 4]).as_bytes())
         }
         _ => {
-            return Err(cx.marked_report(start, ParseError::InvalidEscape));
+            return Err(cx.marked_report(start, Error::new(ErrorKind::InvalidEscape)));
         }
     };
 
@@ -277,7 +289,7 @@ pub(crate) fn skip_string<'de, 'buf, C, P>(
     validate: bool,
 ) -> Result<(), C::Error>
 where
-    C: Context<'buf, Input = ParseError>,
+    C: Context<'buf, Input = Error>,
     P: ?Sized + Parser<'de>,
 {
     loop {
@@ -300,7 +312,7 @@ where
             }
             _ => {
                 if validate {
-                    return Err(cx.report(ParseError::ControlCharacterInString));
+                    return Err(cx.report(Error::new(ErrorKind::ControlCharacterInString)));
                 }
             }
         }
@@ -311,7 +323,7 @@ where
 /// the previous byte read was a backslash.
 fn skip_escape<'de, 'buf, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
 where
-    C: Context<'buf, Input = ParseError>,
+    C: Context<'buf, Input = Error>,
     P: ?Sized + Parser<'de>,
 {
     let start = cx.mark();
@@ -323,7 +335,8 @@ where
             match p.parse_hex_escape(cx)? {
                 0xDC00..=0xDFFF => {
                     return if validate {
-                        Err(cx.marked_report(start, ParseError::LoneLeadingSurrogatePair))
+                        Err(cx
+                            .marked_report(start, Error::new(ErrorKind::LoneLeadingSurrogatePair)))
                     } else {
                         Ok(())
                     };
@@ -338,7 +351,8 @@ where
 
                     if p.read_byte(cx)? != b'\\' {
                         return if validate {
-                            Err(cx.marked_report(pos, ParseError::UnexpectedHexEscapeEnd))
+                            Err(cx
+                                .marked_report(pos, Error::new(ErrorKind::UnexpectedHexEscapeEnd)))
                         } else {
                             Ok(())
                         };
@@ -346,7 +360,8 @@ where
 
                     if p.read_byte(cx)? != b'u' {
                         return if validate {
-                            Err(cx.marked_report(pos, ParseError::UnexpectedHexEscapeEnd))
+                            Err(cx
+                                .marked_report(pos, Error::new(ErrorKind::UnexpectedHexEscapeEnd)))
                         } else {
                             // The \ prior to this byte started an escape sequence,
                             // so we need to parse that now. This recursive call
@@ -360,13 +375,16 @@ where
                     let n2 = p.parse_hex_escape(cx)?;
 
                     if !(0xDC00..=0xDFFF).contains(&n2) {
-                        return Err(cx.marked_report(start, ParseError::LoneLeadingSurrogatePair));
+                        return Err(cx.marked_report(
+                            start,
+                            Error::new(ErrorKind::LoneLeadingSurrogatePair),
+                        ));
                     }
 
                     let n = (((n1 - 0xD800) as u32) << 10 | (n2 - 0xDC00) as u32) + 0x1_0000;
 
                     if char::from_u32(n).is_none() {
-                        return Err(cx.marked_report(start, ParseError::InvalidUnicode));
+                        return Err(cx.marked_report(start, Error::new(ErrorKind::InvalidUnicode)));
                     }
                 }
 
@@ -376,7 +394,7 @@ where
             }
         }
         _ => {
-            return Err(cx.marked_report(start, ParseError::InvalidEscape));
+            return Err(cx.marked_report(start, Error::new(ErrorKind::InvalidEscape)));
         }
     };
 

@@ -3,18 +3,15 @@
 
 use musli::Context;
 
-use crate::fixed_bytes::FixedBytes;
+use crate::fixed_bytes::{FixedBytes, FixedBytesOverflow};
 use crate::writer::Writer;
 
 /// A writer which buffers `N` bytes inline.
 ///
 /// Once you're done you must call [BufferedWriter::finish] to flush the
 /// underlying buffer.
-pub struct BufferedWriter<const N: usize, W>
-where
-    W: Writer,
-{
-    buf: FixedBytes<N, W::Error>,
+pub struct BufferedWriter<const N: usize, W> {
+    buf: FixedBytes<N>,
     writer: W,
 }
 
@@ -46,6 +43,7 @@ where
 impl<const N: usize, W> Writer for BufferedWriter<N, W>
 where
     W: Writer,
+    W::Error: From<FixedBytesOverflow>,
 {
     type Error = W::Error;
     type Mut<'this> = &'this mut Self where Self: 'this;
@@ -65,6 +63,6 @@ where
             self.buf.clear();
         }
 
-        self.buf.write_bytes(cx, bytes)
+        self.buf.write_bytes(cx.adapt(), bytes)
     }
 }

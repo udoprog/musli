@@ -24,7 +24,7 @@ struct StructWithOption {
 fn test_decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
     let name = String::from("Aristotle");
 
-    let data = musli_tests::wire::to_buffer(&Struct { name: name.clone() })?;
+    let data = musli_tests::wire::to_vec(&Struct { name: name.clone() })?;
 
     let struct_with_default: StructWithDefault = musli_tests::wire::decode(data.as_slice())?;
 

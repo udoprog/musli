@@ -25,7 +25,6 @@ extern crate alloc;
 
 pub mod buffered_writer;
 pub mod context;
-pub mod error;
 pub mod fixed_bytes;
 pub mod int;
 pub mod reader;

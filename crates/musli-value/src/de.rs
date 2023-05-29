@@ -8,19 +8,18 @@ use musli::de::{
     AsDecoder, Decoder, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
     SizeHint, TypeHint, VariantDecoder, Visitor,
 };
-use musli::error::Error;
 use musli::mode::Mode;
 use musli::Context;
-use musli_common::reader::SliceReader;
+use musli_common::reader::{SliceReader, SliceUnderflow};
 use musli_storage::de::StorageDecoder;
 use musli_storage::int::Variable;
 
-use crate::error::ValueError;
+use crate::error::{Error, ErrorKind};
 use crate::value::{Number, Value};
 use crate::AsValueDecoder;
 
 /// Encoder for a single value.
-pub struct ValueDecoder<'de, E = ValueError> {
+pub struct ValueDecoder<'de, E = Error> {
     value: &'de Value,
     _marker: marker::PhantomData<E>,
 }
@@ -41,7 +40,7 @@ macro_rules! ensure {
             $pat => $block,
             value => {
                 let $hint = value.type_hint();
-                return Err($cx.report(ValueError::$ident $tt));
+                return Err($cx.report(Error::new(ErrorKind::$ident $tt)));
             }
         }
     };
@@ -50,12 +49,12 @@ macro_rules! ensure {
 #[musli::decoder]
 impl<'de, E> Decoder<'de> for ValueDecoder<'de, E>
 where
-    E: Error + From<ValueError>,
+    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
 {
     type Error = E;
     type Buffer = AsValueDecoder<E>;
     type Some = Self;
-    type Pack = StorageDecoder<SliceReader<'de, Self::Error>, Variable, Variable>;
+    type Pack = StorageDecoder<SliceReader<'de>, Variable, Variable, E>;
     type Sequence = IterValueDecoder<'de, E>;
     type Tuple = IterValueDecoder<'de, E>;
     type Map = IterValuePairsDecoder<'de, E>;
@@ -250,7 +249,7 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
-            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| cx.report(ValueError::ArrayOutOfBounds))
+            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| cx.report(Error::new(ErrorKind::ArrayOutOfBounds)))
         })
     }
 
@@ -409,7 +408,7 @@ where
 
 impl<'a, E> AsDecoder for ValueDecoder<'a, E>
 where
-    E: Error + From<ValueError>,
+    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;
@@ -443,7 +442,7 @@ impl<'de, E> IterValueDecoder<'de, E> {
 
 impl<'de, E> PackDecoder<'de> for IterValueDecoder<'de, E>
 where
-    E: Error + From<ValueError>,
+    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -458,7 +457,7 @@ where
     {
         match self.iter.next() {
             Some(value) => Ok(ValueDecoder::new(value)),
-            None => Err(cx.report(ValueError::ExpectedPackValue)),
+            None => Err(cx.report(Error::new(ErrorKind::ExpectedPackValue))),
         }
     }
 
@@ -473,7 +472,7 @@ where
 
 impl<'de, E> SequenceDecoder<'de> for IterValueDecoder<'de, E>
 where
-    E: Error + From<ValueError>,
+    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -525,7 +524,7 @@ impl<'de, E> IterValuePairsDecoder<'de, E> {
 
 impl<'de, E> PairsDecoder<'de> for IterValuePairsDecoder<'de, E>
 where
-    E: Error + From<ValueError>,
+    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -573,7 +572,7 @@ impl<'de, E> IterValuePairDecoder<'de, E> {
 
 impl<'de, E> PairDecoder<'de> for IterValuePairDecoder<'de, E>
 where
-    E: Error + From<ValueError>,
+    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -627,7 +626,7 @@ impl<'de, E> IterValueVariantDecoder<'de, E> {
 
 impl<'de, E> VariantDecoder<'de> for IterValueVariantDecoder<'de, E>
 where
-    E: Error + From<ValueError>,
+    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -676,7 +675,7 @@ where
 trait FromNumber: Sized {
     const NUMBER_HINT: NumberHint;
 
-    fn from_number(number: &Number) -> Result<Self, ValueError>;
+    fn from_number(number: &Number) -> Result<Self, Error>;
 }
 
 macro_rules! integer_from {
@@ -685,7 +684,7 @@ macro_rules! integer_from {
             const NUMBER_HINT: NumberHint = NumberHint::$variant;
 
             #[inline]
-            fn from_number(number: &Number) -> Result<Self, ValueError> {
+            fn from_number(number: &Number) -> Result<Self, Error> {
                 let out = match number {
                     Number::U8(n) => Self::try_from(*n).ok(),
                     Number::U16(n) => Self::try_from(*n).ok(),
@@ -705,10 +704,10 @@ macro_rules! integer_from {
 
                 match out {
                     Some(out) => Ok(out),
-                    None => Err(ValueError::ExpectedNumber(
+                    None => Err(Error::new(ErrorKind::ExpectedNumber(
                         Self::NUMBER_HINT,
                         TypeHint::Number(number.type_hint()),
-                    )),
+                    ))),
                 }
             }
         }
@@ -721,7 +720,7 @@ macro_rules! float_from {
             const NUMBER_HINT: NumberHint = NumberHint::$variant;
 
             #[inline]
-            fn from_number(number: &Number) -> Result<Self, ValueError> {
+            fn from_number(number: &Number) -> Result<Self, Error> {
                 let out = match number {
                     Number::U8(n) => Some(*n as $ty),
                     Number::U16(n) => Some(*n as $ty),
@@ -741,10 +740,10 @@ macro_rules! float_from {
 
                 match out {
                     Some(out) => Ok(out),
-                    None => Err(ValueError::ExpectedNumber(
+                    None => Err(Error::new(ErrorKind::ExpectedNumber(
                         Self::NUMBER_HINT,
                         TypeHint::Number(number.type_hint()),
-                    )),
+                    ))),
                 }
             }
         }

@@ -1,7 +1,8 @@
 use musli::de::NumberVisitor;
 use musli::Context;
 
-use crate::reader::{integer, string, ParseError, Scratch, StringReference, Token};
+use crate::error::{Error, ErrorKind};
+use crate::reader::{integer, string, Scratch, StringReference, Token};
 
 mod private {
     pub trait Sealed {}
@@ -37,22 +38,22 @@ pub trait Parser<'de>: private::Sealed {
         validate: bool,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: Context<'buf, Input = ParseError>;
+        C: Context<'buf, Input = Error>;
 
     #[doc(hidden)]
     fn read_byte<'buf, C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<'buf, Input = ParseError>;
+        C: Context<'buf, Input = Error>;
 
     #[doc(hidden)]
     fn skip<'buf, C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>;
+        C: Context<'buf, Input = Error>;
 
     #[doc(hidden)]
     fn read<'buf, C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>;
+        C: Context<'buf, Input = Error>;
 
     #[doc(hidden)]
     fn pos(&self) -> u32;
@@ -61,18 +62,18 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn skip_whitespace<'buf, C>(&mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>;
+        C: Context<'buf, Input = Error>;
 
     /// Peek the next byte.
     #[doc(hidden)]
     fn peek_byte<'buf, C>(&mut self, cx: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<'buf, Input = ParseError>;
+        C: Context<'buf, Input = Error>;
 
     #[doc(hidden)]
     fn consume_while<'buf, C>(&mut self, cx: &mut C, m: fn(u8) -> bool) -> Result<usize, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         let mut c = 0;
 
@@ -91,7 +92,7 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn peek<'buf, C>(&mut self, cx: &mut C) -> Result<Token, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         self.skip_whitespace(cx)?;
 
@@ -106,17 +107,17 @@ pub trait Parser<'de>: private::Sealed {
     /// Parse a 32-bit floating point number.
     fn parse_f32<'buf, C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
     where
-        C: Context<'buf, Input = ParseError>;
+        C: Context<'buf, Input = Error>;
 
     /// Parse a 64-bit floating point number.
     fn parse_f64<'buf, C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
     where
-        C: Context<'buf, Input = ParseError>;
+        C: Context<'buf, Input = Error>;
 
     #[doc(hidden)]
     fn parse_hex_escape<'buf, C>(&mut self, cx: &mut C) -> Result<u16, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         let mut n = 0;
         let start = cx.mark();
@@ -124,7 +125,7 @@ pub trait Parser<'de>: private::Sealed {
         for _ in 0..4 {
             match string::decode_hex_val(self.read_byte(cx)?) {
                 None => {
-                    return Err(cx.marked_report(start, ParseError::InvalidEscape));
+                    return Err(cx.marked_report(start, Error::new(ErrorKind::InvalidEscape)));
                 }
                 Some(val) => {
                     n = (n << 4) + val;
@@ -140,10 +141,10 @@ pub trait Parser<'de>: private::Sealed {
         &mut self,
         cx: &mut C,
         exact: [u8; N],
-        err: ParseError,
+        err: Error,
     ) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         let mark = cx.mark();
 
@@ -162,7 +163,7 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn parse_number<'buf, C, V>(&mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
         V: NumberVisitor<'de, 'buf, C>,
     {
         let signed = integer::decode_signed::<i128, _, _>(cx, self)?;
@@ -249,7 +250,7 @@ where
         validate: bool,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).parse_string(cx, scratch, validate)
     }
@@ -257,7 +258,7 @@ where
     #[inline]
     fn read_byte<'buf, C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).read_byte(cx)
     }
@@ -265,7 +266,7 @@ where
     #[inline]
     fn peek<'buf, C>(&mut self, cx: &mut C) -> Result<Token, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).peek(cx)
     }
@@ -278,7 +279,7 @@ where
     #[inline]
     fn skip_whitespace<'buf, C>(&mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).skip_whitespace(cx)
     }
@@ -286,7 +287,7 @@ where
     #[inline]
     fn peek_byte<'buf, C>(&mut self, cx: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).peek_byte(cx)
     }
@@ -294,7 +295,7 @@ where
     #[inline]
     fn skip<'buf, C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).skip(cx, n)
     }
@@ -302,7 +303,7 @@ where
     #[inline]
     fn read<'buf, C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).read(cx, buf)
     }
@@ -310,7 +311,7 @@ where
     #[inline]
     fn parse_f32<'buf, C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).parse_f32(cx)
     }
@@ -318,7 +319,7 @@ where
     #[inline]
     fn parse_f64<'buf, C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         (**self).parse_f64(cx)
     }

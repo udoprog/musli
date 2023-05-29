@@ -1,62 +1,57 @@
-use std::boxed::Box;
 use std::fmt;
 use std::vec::Vec;
-
-type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
 use crate::context;
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
 use crate::int::{Signed, Unsigned};
-use crate::writer::Buffer;
 
 #[test]
-fn test_continuation_encoding() -> Result<()> {
+fn test_continuation_encoding() {
     use rand::prelude::*;
 
-    fn rt<T>(expected: T) -> Result<()>
+    fn rt<T>(expected: T)
     where
         T: PartialEq<T> + fmt::Debug + Unsigned,
     {
-        let mut out = Buffer::new();
-        let mut cx = crate::context::Same::default();
-        c::encode(&mut cx, &mut out, expected)?;
-        c::encode(&mut cx, &mut out, expected)?;
+        let mut out = Vec::new();
+        let mut cx = crate::context::Ignore::default();
+        c::encode(&mut cx, &mut out, expected).unwrap();
+        c::encode(&mut cx, &mut out, expected).unwrap();
         let mut data = out.as_slice();
-        let mut cx = context::Capture::default();
-        let a: T = c::decode(&mut cx, &mut data)?;
-        let b: T = c::decode(&mut cx, &mut data)?;
+        let mut cx = context::Ignore::default();
+        let a: T = c::decode(&mut cx, &mut data).unwrap();
+        let b: T = c::decode(&mut cx, &mut data).unwrap();
         assert!(data.is_empty());
         assert_eq!(a, expected);
         assert_eq!(b, expected);
-        Ok(())
     }
 
-    fn encode<T>(value: T) -> Result<Vec<u8>>
+    fn encode<T>(value: T) -> Vec<u8>
     where
         T: Unsigned,
     {
         let mut out = Vec::new();
         let mut cx = crate::context::Same::default();
-        c::encode(&mut cx, crate::wrap::wrap(&mut out), value)?;
-        Ok(out)
+        c::encode(&mut cx, crate::wrap::wrap(&mut out), value).unwrap();
+        out
     }
 
     macro_rules! test {
         ($ty:ty) => {{
-            rt::<$ty>(0)?;
-            rt::<$ty>(1)?;
-            rt::<$ty>(42)?;
-            rt::<$ty>(127)?;
-            rt::<$ty>(128)?;
-            rt::<$ty>(128 << 8)?;
-            rt::<$ty>(<$ty>::MAX)?;
+            rt::<$ty>(0);
+            rt::<$ty>(1);
+            rt::<$ty>(42);
+            rt::<$ty>(127);
+            rt::<$ty>(128);
+            rt::<$ty>(128 << 8);
+            rt::<$ty>(<$ty>::MAX);
 
             let mut rng = StdRng::seed_from_u64(0xfd80fd80fd80fd80);
 
             for _ in 0..10000 {
                 let value = rng.gen::<usize>();
-                rt(value)?;
+                rt(value);
             }
         }};
     }
@@ -67,8 +62,7 @@ fn test_continuation_encoding() -> Result<()> {
     test!(u64);
     test!(u128);
 
-    assert_eq!(encode(1000u128)?, vec![232, 7]);
-    Ok(())
+    assert_eq!(encode(1000u128), vec![232, 7]);
 }
 
 #[test]

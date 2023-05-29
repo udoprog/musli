@@ -8,8 +8,8 @@ pub use self::extra::*;
 pub mod musli_json {
     use alloc::vec::Vec;
 
-    use ::musli_json::error::BufferError;
-    use ::musli_json::{Encoding, ParseError};
+    use ::musli_json::Encoding;
+    use ::musli_json::Error;
     use musli::{Decode, Encode};
 
     const ENCODING: Encoding = Encoding::new();
@@ -23,7 +23,7 @@ pub mod musli_json {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode,
     {
@@ -32,7 +32,7 @@ pub mod musli_json {
     }
 
     #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, ParseError>
+    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, Error>
     where
         T: Decode<'de>,
     {
@@ -44,9 +44,9 @@ pub mod musli_json {
 pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
-    use ::musli_storage::error::BufferError;
     use ::musli_storage::int::{Fixed, Variable};
     use ::musli_storage::Encoding;
+    use ::musli_storage::Error;
     use musli::{Decode, Encode};
 
     use crate::mode::Packed;
@@ -63,7 +63,7 @@ pub mod musli_storage_packed {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode<Packed>,
     {
@@ -72,7 +72,7 @@ pub mod musli_storage_packed {
     }
 
     #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, BufferError>
+    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, Error>
     where
         T: Decode<'de, Packed>,
     {
@@ -84,9 +84,9 @@ pub mod musli_storage_packed {
 pub mod musli_storage {
     use alloc::vec::Vec;
 
-    use ::musli_storage::error::BufferError;
     use ::musli_storage::int::{Fixed, Variable};
     use ::musli_storage::Encoding;
+    use ::musli_storage::Error;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
@@ -101,7 +101,7 @@ pub mod musli_storage {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode,
     {
@@ -110,7 +110,7 @@ pub mod musli_storage {
     }
 
     #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, BufferError>
+    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, Error>
     where
         T: Decode<'de>,
     {
@@ -122,9 +122,9 @@ pub mod musli_storage {
 pub mod musli_wire {
     use alloc::vec::Vec;
 
-    use ::musli_wire::error::BufferError;
     use ::musli_wire::int::Variable;
     use ::musli_wire::Encoding;
+    use ::musli_wire::Error;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
@@ -139,7 +139,7 @@ pub mod musli_wire {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode,
     {
@@ -148,7 +148,7 @@ pub mod musli_wire {
     }
 
     #[inline(always)]
-    pub fn decode<'de, T>(mut data: &'de [u8]) -> Result<T, BufferError>
+    pub fn decode<'de, T>(mut data: &'de [u8]) -> Result<T, Error>
     where
         T: Decode<'de>,
     {
@@ -163,7 +163,7 @@ pub mod musli_descriptive {
     use ::musli_descriptive::Encoding;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
-    use musli_descriptive::error::BufferError;
+    use musli_descriptive::Error;
 
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
@@ -176,7 +176,7 @@ pub mod musli_descriptive {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], BufferError>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode,
     {
@@ -185,7 +185,7 @@ pub mod musli_descriptive {
     }
 
     #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, BufferError>
+    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, Error>
     where
         T: Decode<'de>,
     {

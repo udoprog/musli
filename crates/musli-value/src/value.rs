@@ -17,12 +17,12 @@ use musli::de::{
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
 use musli::en::{PairsEncoder, SequenceEncoder, VariantEncoder};
-use musli::error::Error;
 use musli::mode::Mode;
 use musli::Context;
+use musli_common::reader::SliceUnderflow;
 
 use crate::de::ValueDecoder;
-use crate::error::ValueError;
+use crate::error::Error;
 
 /// A dynamic value capable of representing any [Müsli] type whether it be
 /// complex or simple.
@@ -88,7 +88,7 @@ impl Value {
     #[inline]
     pub fn into_value_decoder<E>(self) -> AsValueDecoder<E>
     where
-        E: Error + From<ValueError>,
+        E: musli::error::Error + From<Error>,
     {
         AsValueDecoder::new(self)
     }
@@ -97,7 +97,7 @@ impl Value {
     #[inline]
     pub(crate) fn decoder<E>(&self) -> ValueDecoder<'_, E>
     where
-        E: Error + From<ValueError>,
+        E: musli::error::Error + From<Error>,
     {
         ValueDecoder::new(self)
     }
@@ -217,7 +217,7 @@ struct AnyVisitor<M, E>(marker::PhantomData<(M, E)>);
 impl<'de, M, E> Visitor<'de> for AnyVisitor<M, E>
 where
     M: Mode,
-    E: Error,
+    E: musli::error::Error,
 {
     type Ok = Value;
     type Error = E;
@@ -700,7 +700,7 @@ impl<E> AsValueDecoder<E> {
 
 impl<E> AsDecoder for AsValueDecoder<E>
 where
-    E: Error + From<ValueError>,
+    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;

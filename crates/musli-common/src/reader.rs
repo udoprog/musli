@@ -12,10 +12,25 @@ use core::ptr;
 use core::slice;
 
 use musli::de::ValueVisitor;
-use musli::error::Error;
 use musli::Context;
 
-use crate::error::BufferError;
+/// Underflow when trying to read from a slice.
+#[derive(Debug)]
+pub struct SliceUnderflow {
+    n: usize,
+    remaining: usize,
+}
+
+impl fmt::Display for SliceUnderflow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let SliceUnderflow { n, remaining } = self;
+
+        write!(
+            f,
+            "tried to read {n} bytes from slice, with {remaining} byte remaining"
+        )
+    }
+}
 
 /// Trait governing how a source of bytes is read.
 ///
@@ -23,7 +38,7 @@ use crate::error::BufferError;
 /// byte source through [Reader::read_bytes].
 pub trait Reader<'de> {
     /// Error type raised by the current reader.
-    type Error: Error;
+    type Error;
 
     /// Type borrowed from self.
     ///
@@ -93,7 +108,8 @@ pub trait Reader<'de> {
         visitor: V,
     ) -> Result<V::Ok, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<'buf>,
+        C::Input: From<Self::Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>;
 
     /// Read a single byte.
@@ -154,8 +170,7 @@ pub trait Reader<'de> {
 }
 
 impl<'de> Reader<'de> for &'de [u8] {
-    type Error = BufferError;
-
+    type Error = SliceUnderflow;
     type Mut<'this> = &'this mut &'de [u8] where Self: 'this;
 
     #[inline]
@@ -169,7 +184,10 @@ impl<'de> Reader<'de> for &'de [u8] {
         C: Context<'buf, Input = Self::Error>,
     {
         if self.len() < n {
-            return Err(cx.custom("buffer underflow"));
+            return Err(cx.report(SliceUnderflow {
+                n,
+                remaining: self.len(),
+            }));
         }
 
         let (_, tail) = self.split_at(n);
@@ -202,7 +220,8 @@ impl<'de> Reader<'de> for &'de [u8] {
         visitor: V,
     ) -> Result<V::Ok, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<'buf>,
+        C::Input: From<Self::Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>,
     {
         if self.len() < n {
@@ -255,12 +274,12 @@ impl<'de> Reader<'de> for &'de [u8] {
 }
 
 /// An efficient [Reader] wrapper around a slice.
-pub struct SliceReader<'de, E = BufferError> {
+pub struct SliceReader<'de> {
     range: Range<*const u8>,
-    _marker: marker::PhantomData<(&'de [u8], E)>,
+    _marker: marker::PhantomData<&'de [u8]>,
 }
 
-impl<'de, E> SliceReader<'de, E> {
+impl<'de> SliceReader<'de> {
     /// Construct a new instance around the specified slice.
     #[inline]
     pub fn new(slice: &'de [u8]) -> Self {
@@ -271,12 +290,8 @@ impl<'de, E> SliceReader<'de, E> {
     }
 }
 
-impl<'de, E> Reader<'de> for SliceReader<'de, E>
-where
-    E: Error,
-{
-    type Error = E;
-
+impl<'de> Reader<'de> for SliceReader<'de> {
+    type Error = SliceUnderflow;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -302,7 +317,8 @@ where
         visitor: V,
     ) -> Result<V::Ok, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<'buf>,
+        C::Input: From<Self::Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>,
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
@@ -348,18 +364,22 @@ where
 }
 
 #[inline]
-fn bounds_check_add<'buf, C, E>(
+fn bounds_check_add<'buf, C>(
     cx: &mut C,
     range: &Range<*const u8>,
     len: usize,
 ) -> Result<*const u8, C::Error>
 where
-    C: Context<'buf, Input = E>,
+    C: Context<'buf>,
+    C::Input: From<SliceUnderflow>,
 {
     let outcome = range.start.wrapping_add(len);
 
     if outcome > range.end || outcome < range.start {
-        Err(cx.custom("buffer underflow"))
+        Err(cx.report(SliceUnderflow {
+            n: len,
+            remaining: (range.end as usize).wrapping_sub(range.start as usize),
+        }))
     } else {
         Ok(outcome)
     }
@@ -379,7 +399,8 @@ where
 {
     fn bounds_check<'buf, C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = R::Error>,
+        C: Context<'buf>,
+        C::Input: From<R::Error>,
     {
         match self.remaining.checked_sub(n) {
             Some(remaining) => {
@@ -421,7 +442,8 @@ where
         visitor: V,
     ) -> Result<V::Ok, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<'buf>,
+        C::Input: From<Self::Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>,
     {
         self.bounds_check(cx, n)?;
@@ -495,7 +517,8 @@ where
         visitor: V,
     ) -> Result<V::Ok, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<'buf>,
+        C::Input: From<Self::Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>,
     {
         (**self).read_bytes(cx, n, visitor)

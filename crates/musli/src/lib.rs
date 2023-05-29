@@ -234,7 +234,7 @@
 //!     age: Option<u32>,
 //! }
 //!
-//! let version2 = musli_wire::to_buffer(&Version2 {
+//! let version2 = musli_wire::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
@@ -256,14 +256,14 @@
 //! # #[derive(Debug, PartialEq, Encode, Decode)]
 //! # struct Version2 { name: String, #[musli(default)] age: Option<u32> }
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let version2 = musli_storage::to_buffer(&Version2 {
+//! let version2 = musli_storage::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
 //!
 //! assert!(musli_storage::decode::<_, Version1>(version2.as_slice()).is_err());
 //!
-//! let version1 = musli_storage::to_buffer(&Version1 {
+//! let version1 = musli_storage::to_vec(&Version1 {
 //!     name: String::from("Aristotle"),
 //! })?;
 //!

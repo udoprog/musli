@@ -14,9 +14,10 @@ use musli::de::{
 use musli::mode::Mode;
 use musli::Context;
 
+use crate::error::{Error, ErrorKind};
 use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
-use crate::reader::{integer, string, ParseError, Parser, Scratch, StringReference, Token};
+use crate::reader::{integer, string, Parser, Scratch, StringReference, Token};
 
 /// A JSON decoder for Müsli.
 pub struct JsonDecoder<'a, P> {
@@ -37,7 +38,7 @@ where
     /// Skip over any values.
     pub(crate) fn skip_any<'buf, C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         let start = cx.mark();
         let actual = self.parser.peek(cx)?;
@@ -74,7 +75,7 @@ where
                 return string::skip_string(cx, &mut self.parser, true);
             }
             actual => {
-                return Err(cx.marked_report(start, ParseError::ExpectedValue(actual)));
+                return Err(cx.marked_report(start, Error::new(ErrorKind::ExpectedValue(actual))));
             }
         }
 
@@ -84,28 +85,28 @@ where
     #[inline]
     fn parse_true<'buf, C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"true", ParseError::ExpectedTrue)
+            .parse_exact(cx, *b"true", Error::new(ErrorKind::ExpectedTrue))
     }
 
     #[inline]
     fn parse_false<'buf, C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"false", ParseError::ExpectedFalse)
+            .parse_exact(cx, *b"false", Error::new(ErrorKind::ExpectedFalse))
     }
 
     #[inline]
     fn parse_null<'buf, C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"null", ParseError::ExpectedNull)
+            .parse_exact(cx, *b"null", Error::new(ErrorKind::ExpectedNull))
     }
 }
 
@@ -114,7 +115,7 @@ impl<'de, 'a, P> Decoder<'de> for JsonDecoder<'a, P>
 where
     P: Parser<'de>,
 {
-    type Error = ParseError;
+    type Error = Error;
     #[cfg(feature = "musli-value")]
     type Buffer = musli_value::AsValueDecoder<Self::Error>;
     type Pack = JsonSequenceDecoder<'a, P>;
@@ -181,7 +182,7 @@ where
                 self.parse_false(cx)?;
                 Ok(false)
             }
-            actual => Err(cx.report(ParseError::ExpectedBool(actual))),
+            actual => Err(cx.report(Error::new(ErrorKind::ExpectedBool(actual)))),
         }
     }
 
@@ -202,7 +203,7 @@ where
 
         match (first, it.next()) {
             (Some(c), None) => Ok(c),
-            _ => Err(cx.marked_report(start, ParseError::CharEmptyString)),
+            _ => Err(cx.marked_report(start, Error::new(ErrorKind::CharEmptyString))),
         }
     }
 
@@ -359,7 +360,7 @@ where
     #[inline]
     fn decode_option<'buf, C>(mut self, cx: &mut C) -> Result<Option<Self::Some>, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         if self.parser.peek(cx)?.is_null() {
             self.parse_null(cx)?;
@@ -420,7 +421,7 @@ where
     #[inline]
     fn decode_any<'buf, C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
         V: Visitor<'de, Error = Self::Error>,
     {
         self.parser.skip_whitespace(cx)?;
@@ -472,7 +473,7 @@ where
     #[inline]
     fn skip_any<'buf, C>(self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         JsonDecoder::new(self.scratch, self.parser).skip_any(cx)
     }
@@ -491,7 +492,7 @@ where
     #[inline]
     fn decode_escaped_bytes<'buf, C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
         V: ValueVisitor<'de, 'buf, C, [u8]>,
     {
         match self.parser.parse_string(cx, self.scratch, true)? {
@@ -515,7 +516,7 @@ impl<C, T> KeyUnsignedVisitor<C, T> {
 
 impl<'de, 'buf, C, T> ValueVisitor<'de, 'buf, C, [u8]> for KeyUnsignedVisitor<C, T>
 where
-    C: Context<'buf, Input = ParseError>,
+    C: Context<'buf, Input = Error>,
     T: Unsigned,
 {
     type Ok = T;
@@ -545,7 +546,7 @@ impl<C, T> KeySignedVisitor<C, T> {
 
 impl<'de, 'buf, C, T> ValueVisitor<'de, 'buf, C, [u8]> for KeySignedVisitor<C, T>
 where
-    C: Context<'buf, Input = ParseError>,
+    C: Context<'buf, Input = Error>,
     T: Signed,
 {
     type Ok = T;
@@ -566,7 +567,7 @@ impl<'de, 'a, P> Decoder<'de> for JsonKeyDecoder<'a, P>
 where
     P: Parser<'de>,
 {
-    type Error = ParseError;
+    type Error = Error;
     type Struct = JsonObjectDecoder<'a, P>;
 
     #[inline]
@@ -726,14 +727,14 @@ where
         mut parser: P,
     ) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         parser.skip_whitespace(cx)?;
 
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(cx.report(ParseError::ExpectedOpenBrace(actual)));
+            return Err(cx.report(Error::new(ErrorKind::ExpectedOpenBrace(actual))));
         }
 
         parser.skip(cx, 1)?;
@@ -751,7 +752,7 @@ impl<'de, 'a, P> PairsDecoder<'de> for JsonObjectDecoder<'a, P>
 where
     P: Parser<'de>,
 {
-    type Error = ParseError;
+    type Error = Error;
 
     type Decoder<'this> = JsonObjectPairDecoder<'this, P::Mut<'this>>
     where
@@ -821,7 +822,7 @@ impl<'de, 'a, P> PairDecoder<'de> for JsonObjectPairDecoder<'a, P>
 where
     P: Parser<'de>,
 {
-    type Error = ParseError;
+    type Error = Error;
 
     type First<'this> = JsonKeyDecoder<'this, P::Mut<'this>>
     where
@@ -892,12 +893,12 @@ where
         mut parser: P,
     ) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBracket) {
-            return Err(cx.report(ParseError::ExpectedOpenBracket(actual)));
+            return Err(cx.report(Error::new(ErrorKind::ExpectedOpenBracket(actual))));
         }
 
         parser.skip(cx, 1)?;
@@ -916,7 +917,7 @@ impl<'de, 'a, P> SequenceDecoder<'de> for JsonSequenceDecoder<'a, P>
 where
     P: Parser<'de>,
 {
-    type Error = ParseError;
+    type Error = Error;
 
     type Decoder<'this> = JsonDecoder<'this, P::Mut<'this>>
     where
@@ -971,7 +972,7 @@ where
             let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.report(ParseError::ExpectedCloseBracket(actual)));
+                return Err(cx.report(Error::new(ErrorKind::ExpectedCloseBracket(actual))));
             }
 
             self.parser.skip(cx, 1)?;
@@ -986,7 +987,7 @@ impl<'de, 'a, P> PackDecoder<'de> for JsonSequenceDecoder<'a, P>
 where
     P: Parser<'de>,
 {
-    type Error = ParseError;
+    type Error = Error;
 
     type Decoder<'this> = JsonDecoder<'this, P::Mut<'this>>
     where
@@ -1036,7 +1037,7 @@ where
             let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.report(ParseError::ExpectedCloseBracket(actual)));
+                return Err(cx.report(Error::new(ErrorKind::ExpectedCloseBracket(actual))));
             }
 
             self.parser.skip(cx, 1)?;
@@ -1063,14 +1064,14 @@ where
         mut parser: P,
     ) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = ParseError>,
+        C: Context<'buf, Input = Error>,
     {
         parser.skip_whitespace(cx)?;
 
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(cx.report(ParseError::ExpectedOpenBrace(actual)));
+            return Err(cx.report(Error::new(ErrorKind::ExpectedOpenBrace(actual))));
         }
 
         parser.skip(cx, 1)?;
@@ -1082,7 +1083,7 @@ impl<'de, 'a, P> VariantDecoder<'de> for JsonVariantDecoder<'a, P>
 where
     P: Parser<'de>,
 {
-    type Error = ParseError;
+    type Error = Error;
 
     type Tag<'this> = JsonKeyDecoder<'this, P::Mut<'this>>
     where
@@ -1106,7 +1107,7 @@ where
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(cx.report(ParseError::ExpectedColon(actual)));
+            return Err(cx.report(Error::new(ErrorKind::ExpectedColon(actual))));
         }
 
         self.parser.skip(cx, 1)?;
@@ -1131,7 +1132,7 @@ where
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::CloseBrace) {
-            return Err(cx.report(ParseError::ExpectedCloseBrace(actual)));
+            return Err(cx.report(Error::new(ErrorKind::ExpectedCloseBrace(actual))));
         }
 
         self.parser.skip(cx, 1)?;

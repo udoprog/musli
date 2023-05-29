@@ -13,6 +13,7 @@ use musli_common::reader::{Limit, Reader};
 use musli_storage::de::StorageDecoder;
 use musli_storage::int::{continuation as c, Variable};
 
+use crate::error::Error;
 use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
 use crate::tag::Kind;
 use crate::tag::Tag;
@@ -45,36 +46,37 @@ where
 impl<'de, R, I, L> WireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any<'buf, C>(&mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = R::Error>,
+        C: Context<'buf, Input = Error>,
     {
-        let tag = Tag::from_byte(self.reader.read_byte(cx)?);
+        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         match tag.kind() {
             Kind::Byte => {
                 if tag.data().is_none() {
-                    self.reader.skip(cx, 1)?;
+                    self.reader.skip(cx.adapt(), 1)?;
                 }
             }
             Kind::Prefix => {
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    L::decode_usize(cx, self.reader.borrow_mut())?
+                    L::decode_usize(cx.adapt(), self.reader.borrow_mut())?
                 };
 
-                self.reader.skip(cx, len)?;
+                self.reader.skip(cx.adapt(), len)?;
             }
             Kind::Sequence => {
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    L::decode_usize(cx, self.reader.borrow_mut())?
+                    L::decode_usize(cx.adapt(), self.reader.borrow_mut())?
                 };
 
                 for _ in 0..len {
@@ -83,7 +85,7 @@ where
             }
             Kind::Continuation => {
                 if tag.data().is_none() {
-                    let _ = c::decode::<_, _, u128>(cx, self.reader.borrow_mut())?;
+                    let _ = c::decode::<_, _, u128>(cx.adapt(), self.reader.borrow_mut())?;
                 }
             }
         }
@@ -94,15 +96,15 @@ where
     #[inline]
     fn decode_sequence_len<'buf, C>(&mut self, cx: &mut C) -> Result<usize, C::Error>
     where
-        C: Context<'buf, Input = R::Error>,
+        C: Context<'buf, Input = Error>,
     {
-        let tag = Tag::from_byte(self.reader.read_byte(cx)?);
+        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         match tag.kind() {
             Kind::Sequence => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                L::decode_usize(cx, self.reader.borrow_mut())?
+                L::decode_usize(cx.adapt(), self.reader.borrow_mut())?
             }),
             _ => Err(cx.message(Expected {
                 expected: Kind::Sequence,
@@ -118,7 +120,7 @@ where
         cx: &mut C,
     ) -> Result<RemainingWireDecoder<R, I, L>, C::Error>
     where
-        C: Context<'buf, Input = R::Error>,
+        C: Context<'buf, Input = Error>,
     {
         let len = self.decode_sequence_len(cx)?;
         Ok(RemainingWireDecoder::new(len / 2, self))
@@ -131,7 +133,7 @@ where
         cx: &mut C,
     ) -> Result<RemainingWireDecoder<R, I, L>, C::Error>
     where
-        C: Context<'buf, Input = R::Error>,
+        C: Context<'buf, Input = Error>,
     {
         let len = self.decode_sequence_len(cx)?;
         Ok(RemainingWireDecoder::new(len, self))
@@ -141,9 +143,9 @@ where
     #[inline]
     fn decode_prefix<'buf, C>(&mut self, cx: &mut C, start: C::Mark) -> Result<usize, C::Error>
     where
-        C: Context<'buf, Input = R::Error>,
+        C: Context<'buf, Input = Error>,
     {
-        let tag = Tag::from_byte(self.reader.read_byte(cx)?);
+        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         if tag.kind() != Kind::Prefix {
             return Err(cx.marked_message(
@@ -158,7 +160,7 @@ where
         Ok(if let Some(len) = tag.data() {
             len as usize
         } else {
-            L::decode_usize(cx, self.reader.borrow_mut())?
+            L::decode_usize(cx.adapt(), self.reader.borrow_mut())?
         })
     }
 }
@@ -181,10 +183,11 @@ where
 impl<'de, R, I, L> Decoder<'de> for WireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    type Error = R::Error;
+    type Error = Error;
     type Pack = WireDecoder<Limit<R>, I, L>;
     type Some = Self;
     type Sequence = RemainingWireDecoder<R, I, L>;
@@ -235,7 +238,7 @@ where
             ));
         }
 
-        self.reader.read_array(cx)
+        self.reader.read_array(cx.adapt())
     }
 
     #[inline(always)]
@@ -301,7 +304,7 @@ where
         const FALSE: Tag = Tag::new(Kind::Byte, 0);
         const TRUE: Tag = Tag::new(Kind::Byte, 1);
 
-        let tag = Tag::from_byte(self.reader.read_byte(cx)?);
+        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         match tag {
             FALSE => Ok(false),
@@ -328,7 +331,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let tag = Tag::from_byte(self.reader.read_byte(cx)?);
+        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         if tag.kind() != Kind::Byte {
             return Err(cx.message(Expected {
@@ -340,7 +343,7 @@ where
         if let Some(b) = tag.data() {
             Ok(b)
         } else {
-            self.reader.read_byte(cx)
+            self.reader.read_byte(cx.adapt())
         }
     }
 
@@ -349,7 +352,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        I::decode_typed_unsigned(cx, self.reader)
+        I::decode_typed_unsigned(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -357,7 +360,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        I::decode_typed_unsigned(cx, self.reader)
+        I::decode_typed_unsigned(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -365,7 +368,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        I::decode_typed_unsigned(cx, self.reader)
+        I::decode_typed_unsigned(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -373,7 +376,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        I::decode_typed_unsigned(cx, self.reader)
+        I::decode_typed_unsigned(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -389,7 +392,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        I::decode_typed_signed(cx, self.reader)
+        I::decode_typed_signed(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -397,7 +400,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        I::decode_typed_signed(cx, self.reader)
+        I::decode_typed_signed(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -405,7 +408,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        I::decode_typed_signed(cx, self.reader)
+        I::decode_typed_signed(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -413,7 +416,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        I::decode_typed_signed(cx, self.reader)
+        I::decode_typed_signed(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -421,7 +424,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        L::decode_typed_usize(cx, self.reader)
+        L::decode_typed_usize(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -463,7 +466,7 @@ where
         const NONE: Tag = Tag::new(Kind::Sequence, 0);
         const SOME: Tag = Tag::new(Kind::Sequence, 1);
 
-        let tag = Tag::from_byte(self.reader.read_byte(cx)?);
+        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         match tag {
             NONE => Ok(None),
@@ -517,7 +520,7 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let tag = Tag::from_byte(self.reader.read_byte(cx)?);
+        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         if tag != Tag::new(Kind::Sequence, 2) {
             return Err(cx.message(Expected {
@@ -533,11 +536,12 @@ where
 impl<'de, R, I, L> PackDecoder<'de> for WireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    type Error = R::Error;
-    type Decoder<'this> = StorageDecoder<R::Mut<'this>, Variable, Variable> where Self: 'this;
+    type Error = Error;
+    type Decoder<'this> = StorageDecoder<R::Mut<'this>, Variable, Variable, Error> where Self: 'this;
 
     #[inline]
     fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
@@ -559,6 +563,7 @@ where
 impl<'de, R, I, L> RemainingWireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
@@ -571,10 +576,11 @@ where
 impl<'de, R, I, L> SequenceDecoder<'de> for RemainingWireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    type Error = R::Error;
+    type Error = Error;
     type Decoder<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]
@@ -612,10 +618,11 @@ where
 impl<'de, R, I, L> PairDecoder<'de> for WireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    type Error = R::Error;
+    type Error = Error;
     type First<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
     type Second = Self;
 
@@ -648,10 +655,11 @@ where
 impl<'de, R, I, L> VariantDecoder<'de> for WireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    type Error = R::Error;
+    type Error = Error;
     type Tag<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
     type Variant<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
@@ -692,10 +700,11 @@ where
 impl<'de, R, I, L> PairsDecoder<'de> for RemainingWireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    type Error = R::Error;
+    type Error = Error;
 
     type Decoder<'this> = WireDecoder<R::Mut<'this>, I, L>
     where
@@ -820,10 +829,11 @@ where
 impl<'de, R, I, L> PackDecoder<'de> for TupleWireDecoder<R, I, L>
 where
     R: Reader<'de>,
+    Error: From<R::Error>,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
-    type Error = R::Error;
+    type Error = Error;
     type Decoder<'this> = WireDecoder<R::Mut<'this>, I, L> where Self: 'this;
 
     #[inline]

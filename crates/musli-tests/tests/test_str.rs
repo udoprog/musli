@@ -9,7 +9,7 @@ struct StructWithStr<'a> {
 
 #[test]
 fn test_deserialize_roundtrip() -> Result<()> {
-    let data = musli_tests::wire::to_buffer(&StructWithStr {
+    let data = musli_tests::wire::to_vec(&StructWithStr {
         name: "Jane Doe",
         age: 42,
     })?;

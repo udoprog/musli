@@ -34,7 +34,7 @@
 //! }
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let version2 = musli_descriptive::to_buffer(&Version2 {
+//! let version2 = musli_descriptive::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
@@ -109,6 +109,7 @@ extern crate std;
 mod de;
 mod en;
 pub mod encoding;
+mod error;
 mod integer_encoding;
 pub mod tag;
 #[cfg(feature = "test")]
@@ -119,7 +120,8 @@ pub mod test;
 pub use self::encoding::to_vec;
 #[cfg(feature = "std")]
 pub use self::encoding::to_writer;
-pub use self::encoding::{decode, encode, from_slice, to_buffer, to_fixed_bytes, Encoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
+pub use self::error::Error;
 #[cfg(feature = "test")]
 pub use self::test::{transcode, Typed};
 #[doc(inline)]

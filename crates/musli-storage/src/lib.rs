@@ -32,14 +32,14 @@
 //! }
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let version2 = musli_storage::to_buffer(&Version2 {
+//! let version2 = musli_storage::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
 //!
 //! assert!(musli_storage::decode::<_, Version1>(version2.as_slice()).is_err());
 //!
-//! let version1 = musli_storage::to_buffer(&Version1 {
+//! let version1 = musli_storage::to_vec(&Version1 {
 //!     name: String::from("Aristotle"),
 //! })?;
 //!
@@ -108,12 +108,14 @@ pub mod de;
 #[doc(hidden)]
 pub mod en;
 pub mod encoding;
+mod error;
 #[cfg(feature = "test")]
 pub mod test;
 
-pub use self::encoding::{decode, encode, from_slice, to_buffer, to_fixed_bytes, Encoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
 #[cfg(feature = "std")]
 pub use self::encoding::{to_vec, to_writer};
+pub use self::error::Error;
 #[cfg(feature = "test")]
 pub use self::test::transcode;
 #[doc(inline)]

@@ -2,25 +2,41 @@
 //!
 //! To adapt [std::io::Write] types, see the [wrap][crate::wrap::wrap] function.
 
+#[cfg(feature = "alloc")]
+use core::convert::Infallible;
+use core::fmt;
 use core::mem::take;
-use core::ops::Deref;
 
-use musli::error::Error;
 use musli::Context;
 
-use crate::error::BufferError;
-#[cfg(not(feature = "alloc"))]
-use crate::fixed_bytes::FixedBytes;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 /// Maximum size used by a fixed length [Buffer].
 pub const MAX_FIXED_BYTES_LEN: usize = 128;
 
+/// Overflow when trying to write to a slice.
+#[derive(Debug)]
+pub struct SliceOverflow {
+    n: usize,
+    capacity: usize,
+}
+
+impl fmt::Display for SliceOverflow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let SliceOverflow { n, capacity } = self;
+
+        write!(
+            f,
+            "tried to write {n} bytes to slice, with a remaining capacity of {capacity}"
+        )
+    }
+}
+
 /// The trait governing how a writer works.
 pub trait Writer {
     /// The error type raised by the writer.
-    type Error: Error;
+    type Error;
 
     /// Reborrowed type.
     ///
@@ -108,104 +124,9 @@ where
     }
 }
 
-/// A buffer that roughly corresponds to a vector. For no-std environments this
-/// has a fixed size and will error in case the size overflows.
-#[derive(Default)]
-pub struct Buffer {
-    #[cfg(feature = "alloc")]
-    buf: Vec<u8>,
-    #[cfg(not(feature = "alloc"))]
-    buf: FixedBytes<MAX_FIXED_BYTES_LEN, BufferError>,
-}
-
-impl Buffer {
-    /// Constructs a new, empty `Buffer` with the specified capacity.
-    ///
-    /// Only available for `std` environment.
-    #[cfg(feature = "alloc")]
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            buf: Vec::with_capacity(capacity),
-        }
-    }
-
-    /// Construct a new empty buffer.
-    pub const fn new() -> Self {
-        Self {
-            #[cfg(feature = "alloc")]
-            buf: Vec::new(),
-            #[cfg(not(feature = "alloc"))]
-            buf: FixedBytes::new(),
-        }
-    }
-
-    /// Get the buffer as a slice.
-    pub fn as_slice(&self) -> &[u8] {
-        self.buf.as_slice()
-    }
-
-    /// Coerce into the backing vector in a std environment.
-    #[cfg(feature = "alloc")]
-    pub fn into_vec(self) -> Vec<u8> {
-        self.buf
-    }
-}
-
-impl Deref for Buffer {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        self.as_slice()
-    }
-}
-
-impl Writer for Buffer {
-    type Error = BufferError;
-    type Mut<'this> = &'this mut Self where Self: 'this;
-
-    #[inline]
-    fn borrow_mut(&mut self) -> Self::Mut<'_> {
-        self
-    }
-
-    #[inline]
-    fn write_bytes<'buf, C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-    {
-        self.buf.extend_from_slice(bytes);
-        cx.advance(bytes.len());
-        Ok(())
-    }
-
-    #[inline]
-    fn write_byte<'buf, C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-    {
-        self.buf.push(b);
-        cx.advance(1);
-        Ok(())
-    }
-
-    #[inline]
-    fn write_array<'buf, C, const N: usize>(
-        &mut self,
-        cx: &mut C,
-        array: [u8; N],
-    ) -> Result<(), C::Error>
-    where
-        C: Context<'buf, Input = Self::Error>,
-    {
-        self.buf.extend_from_slice(&array[..]);
-        cx.advance(N);
-        Ok(())
-    }
-}
-
 #[cfg(feature = "alloc")]
 impl Writer for Vec<u8> {
-    type Error = BufferError;
+    type Error = Infallible;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -249,7 +170,7 @@ impl Writer for Vec<u8> {
 }
 
 impl Writer for &mut [u8] {
-    type Error = BufferError;
+    type Error = SliceOverflow;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -263,11 +184,10 @@ impl Writer for &mut [u8] {
         C: Context<'buf, Input = Self::Error>,
     {
         if self.len() < bytes.len() {
-            return Err(cx.message(format_args!(
-                "Buffer overflow, remaining is {} while tried to write {}",
-                self.len(),
-                bytes.len()
-            )));
+            return Err(cx.report(SliceOverflow {
+                n: bytes.len(),
+                capacity: self.len(),
+            }));
         }
 
         let next = take(self);

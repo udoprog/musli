@@ -26,13 +26,14 @@ extern crate std;
 mod de;
 mod en;
 pub mod encoding;
+mod error;
 pub mod reader;
-pub use self::reader::ParseError;
 
-#[cfg(feature = "alloc")]
-pub use self::encoding::to_string;
 #[cfg(feature = "std")]
 pub use self::encoding::to_writer;
-pub use self::encoding::{decode, encode, from_slice, to_buffer, to_fixed_bytes, Encoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
+#[cfg(feature = "alloc")]
+pub use self::encoding::{to_string, to_vec};
+pub use self::error::Error;
 #[doc(inline)]
 pub use musli_common::*;

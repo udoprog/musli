@@ -33,7 +33,7 @@ struct Version2 {
     age: Option<u32>,
 }
 
-let version2 = musli_wire::to_buffer(&Version2 {
+let version2 = musli_wire::to_vec(&Version2 {
     name: String::from("Aristotle"),
     age: Some(62),
 })?;
