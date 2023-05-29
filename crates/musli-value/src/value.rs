@@ -22,7 +22,7 @@ use musli::Context;
 use musli_common::reader::SliceUnderflow;
 
 use crate::de::ValueDecoder;
-use crate::error::Error;
+use crate::error::ErrorKind;
 
 /// A dynamic value capable of representing any [Müsli] type whether it be
 /// complex or simple.
@@ -88,7 +88,7 @@ impl Value {
     #[inline]
     pub fn into_value_decoder<E>(self) -> AsValueDecoder<E>
     where
-        E: musli::error::Error + From<Error>,
+        E: musli::error::Error + From<ErrorKind>,
     {
         AsValueDecoder::new(self)
     }
@@ -97,7 +97,7 @@ impl Value {
     #[inline]
     pub(crate) fn decoder<E>(&self) -> ValueDecoder<'_, E>
     where
-        E: musli::error::Error + From<Error>,
+        E: musli::error::Error + From<ErrorKind>,
     {
         ValueDecoder::new(self)
     }
@@ -700,7 +700,7 @@ impl<E> AsValueDecoder<E> {
 
 impl<E> AsDecoder for AsValueDecoder<E>
 where
-    E: musli::error::Error + From<Error> + From<SliceUnderflow>,
+    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;

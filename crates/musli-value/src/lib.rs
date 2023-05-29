@@ -22,7 +22,7 @@ mod error;
 mod value;
 
 pub use self::value::{AsValueDecoder, Value};
-pub use error::Error;
+pub use error::{Error, ErrorKind};
 
 /// Convenience type alias for error raised by `musli-value`.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

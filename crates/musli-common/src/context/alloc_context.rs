@@ -6,8 +6,7 @@ use core::ptr;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use musli::de;
-use musli::error::Error;
+use musli::context::Error;
 use musli::Context;
 
 use crate::context::rich_error::{RichError, Step};
@@ -73,10 +72,10 @@ impl<'buf, E> AllocContext<'buf, E> {
 
 impl<'buf, E> Context<'buf> for AllocContext<'buf, E>
 where
-    E: Error,
+    E: musli::error::Error,
 {
     type Input = E;
-    type Error = de::Error;
+    type Error = Error;
     type Mark = usize;
 
     #[inline(always)]
@@ -86,7 +85,7 @@ where
     {
         self.errors
             .push((self.path.clone(), self.mark..self.mark, E::from(error)));
-        de::Error
+        Error
     }
 
     #[inline]
@@ -96,7 +95,7 @@ where
     {
         self.errors
             .push((self.path.clone(), mark..self.mark, E::from(message)));
-        de::Error
+        Error
     }
 
     #[inline(always)]
@@ -106,7 +105,7 @@ where
     {
         self.errors
             .push((self.path.clone(), self.mark..self.mark, E::custom(message)));
-        de::Error
+        Error
     }
 
     #[inline(always)]
@@ -116,7 +115,7 @@ where
     {
         self.errors
             .push((self.path.clone(), self.mark..self.mark, E::message(message)));
-        de::Error
+        Error
     }
 
     #[inline]
@@ -126,7 +125,7 @@ where
     {
         self.errors
             .push((self.path.clone(), mark..self.mark, E::message(message)));
-        de::Error
+        Error
     }
 
     #[inline]

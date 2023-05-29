@@ -1,5 +1,12 @@
+//! Things related to working with contexts.
+
+mod error;
+
 use core::fmt;
 use core::marker;
+
+#[doc(inline)]
+pub use self::error::Error;
 
 /// Provides ergonomic access to the serialization context.
 ///

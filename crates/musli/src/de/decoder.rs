@@ -224,16 +224,17 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use std::fmt;
+    /// use core::fmt;
     ///
     /// use musli::Context;
+    /// use musli::context::Error;
     /// use musli::de::{self, Decoder};
     ///
     /// struct MyDecoder;
     ///
     /// #[musli::decoder]
     /// impl Decoder<'_> for MyDecoder {
-    ///     type Error = de::Error;
+    ///     type Error = Error;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")

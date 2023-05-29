@@ -8,30 +8,33 @@ use alloc::string::ToString;
 use musli::de::{NumberHint, TypeHint};
 use musli_common::reader::SliceUnderflow;
 
-/// An error raised when encoding or decoding [Value][crate::Value].
+/// An error raised when encoding or decoding [`Value`][crate::Value].
 #[derive(Debug)]
 pub struct Error {
-    kind: ErrorKind,
+    err: ErrorImpl,
 }
 
 impl Error {
     #[inline(always)]
     pub(crate) fn new(kind: ErrorKind) -> Self {
-        Self { kind }
+        Self {
+            err: ErrorImpl::ValueError(kind),
+        }
     }
 }
 
 impl fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.kind.fmt(f)
+        self.err.fmt(f)
     }
 }
 
-#[allow(missing_docs)]
+/// Errors specifically produced by value decoding.
 #[derive(Debug)]
 #[non_exhaustive]
-pub(crate) enum ErrorKind {
+#[allow(missing_docs)]
+pub enum ErrorKind {
     #[cfg(feature = "alloc")]
     ArrayOutOfBounds,
     ExpectedPackValue,
@@ -53,11 +56,6 @@ pub(crate) enum ErrorKind {
     ExpectedMap(TypeHint),
     #[cfg(feature = "alloc")]
     ExpectedVariant(TypeHint),
-    SliceUnderflow(SliceUnderflow),
-    #[cfg(feature = "alloc")]
-    Message(Box<str>),
-    #[cfg(not(feature = "alloc"))]
-    Message,
 }
 
 impl fmt::Display for ErrorKind {
@@ -88,11 +86,31 @@ impl fmt::Display for ErrorKind {
             ErrorKind::ExpectedMap(hint) => write!(f, "expected map, but found {hint}"),
             #[cfg(feature = "alloc")]
             ErrorKind::ExpectedVariant(hint) => write!(f, "expected struct, but found {hint}"),
-            ErrorKind::SliceUnderflow(error) => error.fmt(f),
+        }
+    }
+}
+
+#[allow(missing_docs)]
+#[derive(Debug)]
+#[non_exhaustive]
+pub(crate) enum ErrorImpl {
+    ValueError(ErrorKind),
+    SliceUnderflow(SliceUnderflow),
+    #[cfg(feature = "alloc")]
+    Message(Box<str>),
+    #[cfg(not(feature = "alloc"))]
+    Message,
+}
+
+impl fmt::Display for ErrorImpl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ErrorImpl::ValueError(error) => error.fmt(f),
+            ErrorImpl::SliceUnderflow(error) => error.fmt(f),
             #[cfg(feature = "alloc")]
-            ErrorKind::Message(message) => message.fmt(f),
+            ErrorImpl::Message(message) => message.fmt(f),
             #[cfg(not(feature = "alloc"))]
-            ErrorKind::Message => write!(f, "message error (see diagnostics)"),
+            ErrorImpl::Message => write!(f, "message error (see diagnostics)"),
         }
     }
 }
@@ -100,7 +118,16 @@ impl fmt::Display for ErrorKind {
 impl From<SliceUnderflow> for Error {
     #[inline]
     fn from(error: SliceUnderflow) -> Self {
-        Self::new(ErrorKind::SliceUnderflow(error))
+        Self {
+            err: ErrorImpl::SliceUnderflow(error),
+        }
+    }
+}
+
+impl From<ErrorKind> for Error {
+    #[inline]
+    fn from(error: ErrorKind) -> Self {
+        Self::new(error)
     }
 }
 
@@ -124,9 +151,9 @@ impl musli::error::Error for Error {
     {
         Self {
             #[cfg(feature = "alloc")]
-            kind: ErrorKind::Message(message.to_string().into()),
+            err: ErrorImpl::Message(message.to_string().into()),
             #[cfg(not(feature = "alloc"))]
-            kind: ErrorKind::Message,
+            err: ErrorImpl::Message,
         }
     }
 }
