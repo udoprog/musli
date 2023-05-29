@@ -67,7 +67,6 @@
 //!     age: u32,
 //! }
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut out = Vec::new();
 //!
 //! let expected = Struct {
@@ -79,7 +78,7 @@
 //! let actual = CONFIG.decode(&out[..])?;
 //!
 //! assert_eq!(expected, actual);
-//! # Ok(()) }
+//! # Ok::<_, musli_wire::Error>(())
 //! ```
 //!
 //! <br>
@@ -118,6 +117,9 @@ pub mod tag;
 #[cfg(feature = "test")]
 #[macro_use]
 pub mod test;
+
+/// Convenient result alias for use with `musli_wire`.
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[cfg(feature = "alloc")]
 pub use self::encoding::to_vec;

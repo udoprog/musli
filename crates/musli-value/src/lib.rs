@@ -21,11 +21,11 @@ mod en;
 mod error;
 mod value;
 
+/// Convenient result alias for use with `musli_value`.
+pub type Result<T, E = Error> = core::result::Result<T, E>;
+
 pub use self::value::{AsValueDecoder, Value};
 pub use error::{Error, ErrorKind};
-
-/// Convenience type alias for error raised by `musli-value`.
-pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 use en::ValueEncoder;
 use musli::{Decode, Encode};
