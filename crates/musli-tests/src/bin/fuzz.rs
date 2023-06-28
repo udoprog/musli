@@ -149,7 +149,7 @@ fn main() -> Result<()> {
                         samples: Vec::new(),
                     };
 
-                    for var in &$name {
+                    for (_, var) in &$name {
                         utils::$base::reset(&mut buf, $size_hint, var);
 
                         match utils::$base::encode(&mut buf, var) {
