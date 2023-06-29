@@ -9,17 +9,6 @@ use core::num::{
     NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize, NonZeroU128,
     NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, Wrapping,
 };
-use core::sync::atomic::{
-    AtomicBool, AtomicUsize, AtomicIsize,
-};
-#[cfg(feature = "atomic-8")]
-use core::sync::atomic::{AtomicI8, AtomicU8};
-#[cfg(feature = "atomic-16")]
-use core::sync::atomic::{AtomicI16, AtomicU16};
-#[cfg(feature = "atomic-32")]
-use core::sync::atomic::{AtomicI32, AtomicU32};
-#[cfg(feature = "atomic-64")]
-use core::sync::atomic::{AtomicI64, AtomicU64};
 use core::{fmt, marker};
 
 use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
@@ -83,42 +72,35 @@ where
     }
 }
 
-macro_rules! atomic_impl {
-    ($ty:ty) => {
-        impl<'de, M> Decode<'de, M> for $ty
-        where
-            M: Mode,
-        {
-            fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
-            where
-                C: Context<'buf, Input = D::Error>,
-                D: Decoder<'de>,
-            {
-                Decode::<M>::decode(cx, decoder).map(Self::new)
-            }
-        }
+macro_rules! atomic_impls {
+    ($($width:literal { $($name:ident),* }),* $(,)?) => {
+        $(
+            $(
+                #[cfg(target_has_atomic = $width)]
+                impl<'de, M> Decode<'de, M> for core::sync::atomic::$name
+                where
+                    M: Mode,
+                {
+                    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+                    where
+                        C: Context<'buf, Input = D::Error>,
+                        D: Decoder<'de>,
+                    {
+                        Decode::<M>::decode(cx, decoder).map(Self::new)
+                    }
+                }
+            )*
+        )*
     };
 }
 
-atomic_impl!(AtomicBool);
-#[cfg(feature = "atomic-16")]
-atomic_impl!(AtomicI16);
-#[cfg(feature = "atomic-32")]
-atomic_impl!(AtomicI32);
-#[cfg(feature = "atomic-64")]
-atomic_impl!(AtomicI64);
-#[cfg(feature = "atomic-8")]
-atomic_impl!(AtomicI8);
-atomic_impl!(AtomicIsize);
-#[cfg(feature = "atomic-16")]
-atomic_impl!(AtomicU16);
-#[cfg(feature = "atomic-32")]
-atomic_impl!(AtomicU32);
-#[cfg(feature = "atomic-64")]
-atomic_impl!(AtomicU64);
-#[cfg(feature = "atomic-8")]
-atomic_impl!(AtomicU8);
-atomic_impl!(AtomicUsize);
+atomic_impls! {
+    "8" { AtomicBool, AtomicU8, AtomicI8 },
+    "16" { AtomicI16, AtomicU16 },
+    "32" { AtomicI32, AtomicU32 },
+    "64" { AtomicU64, AtomicI64 },
+    "ptr" { AtomicUsize, AtomicIsize },
+}
 
 macro_rules! non_zero {
     ($ty:ty) => {
