@@ -21,14 +21,14 @@ musli_tests::miri! {
     const ALLOCATED: usize = 100, 2;
 }
 
-fn generate<T>(rng: &mut StdRng, count: usize) -> Vec<(usize, T)>
+fn generate<T>(rng: &mut StdRng, count: usize) -> Vec<T>
 where
     T: Generate,
 {
     let mut out = Vec::with_capacity(count);
 
-    for index in 0..count {
-        out.push((index, T::generate(rng)));
+    for _ in 0..count {
+        out.push(T::generate(rng));
     }
 
     out
@@ -149,7 +149,7 @@ fn main() -> Result<()> {
                         samples: Vec::new(),
                     };
 
-                    for (_, var) in &$name {
+                    for var in &$name {
                         utils::$base::reset(&mut buf, $size_hint, var);
 
                         match utils::$base::encode(&mut buf, var) {
@@ -188,7 +188,7 @@ fn main() -> Result<()> {
                             o.flush()?;
                         }
 
-                        for &(index, ref var) in &$name {
+                        for (index, var) in $name.iter().enumerate() {
                             utils::$base::reset(&mut buf, $size_hint, var);
 
                             let out = match utils::$base::encode(&mut buf, var) {
