@@ -18,13 +18,14 @@ pub(super) enum Ty {
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Extra {
     None,
+    Buffer,
     Visitor(Option<Ty>),
 }
 
 pub(super) const ENCODER_TYPES: [(&str, Extra); 8] = [
     ("Error", Extra::None),
     ("Some", Extra::None),
-    ("Pack", Extra::None),
+    ("Pack", Extra::Buffer),
     ("Sequence", Extra::None),
     ("Tuple", Extra::None),
     ("Map", Extra::None),
@@ -139,27 +140,26 @@ impl Types {
 
         for (ident, extra) in missing {
             let generics = match extra {
-                Extra::Visitor(..) => {
+                Extra::Buffer => {
                     let mut where_clause = syn::WhereClause {
                         where_token: <Token![where]>::default(),
                         predicates: Punctuated::default(),
                     };
 
-                    let c_param: syn::Ident = syn::Ident::new("C", Span::call_site());
-                    let buf_lt: syn::Lifetime = syn::Lifetime::new("'buf", Span::call_site());
+                    let b_param: syn::Ident = syn::Ident::new("B", Span::call_site());
 
                     let mut predicate = syn::PredicateType {
                         lifetimes: None,
                         bounded_ty: syn::Type::Path(syn::TypePath {
                             qself: None,
-                            path: ident_path(c_param.clone()),
+                            path: ident_path(b_param.clone()),
                         }),
                         colon_token: <Token![:]>::default(),
                         bounds: Punctuated::default(),
                     };
 
                     predicate.bounds.push(syn::TypeParamBound::Verbatim(quote!(
-                        musli::Context<#buf_lt, Input = Self::Error>
+                        musli::context::Buffer
                     )));
 
                     where_clause
@@ -168,12 +168,26 @@ impl Types {
 
                     let mut params = Punctuated::default();
 
-                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
+                    params.push(syn::GenericParam::Type(syn::TypeParam {
                         attrs: Vec::new(),
-                        lifetime: buf_lt,
+                        ident: b_param,
                         colon_token: None,
                         bounds: Punctuated::default(),
+                        eq_token: None,
+                        default: None,
                     }));
+
+                    syn::Generics {
+                        lt_token: Some(<Token![<]>::default()),
+                        params,
+                        gt_token: Some(<Token![>]>::default()),
+                        where_clause: Some(where_clause),
+                    }
+                }
+                Extra::Visitor(..) => {
+                    let c_param: syn::Ident = syn::Ident::new("C", Span::call_site());
+
+                    let mut params = Punctuated::default();
 
                     params.push(syn::GenericParam::Type(syn::TypeParam {
                         attrs: Vec::new(),
@@ -188,7 +202,7 @@ impl Types {
                         lt_token: Some(<Token![<]>::default()),
                         params,
                         gt_token: Some(<Token![>]>::default()),
-                        where_clause: Some(where_clause),
+                        where_clause: None,
                     }
                 }
                 Extra::None => syn::Generics::default(),
@@ -279,10 +293,6 @@ fn never_type<const N: usize>(
 
         if let Extra::Visitor(ty) = extra {
             let mut it = generics.params.iter();
-
-            let Some(syn::GenericParam::Lifetime(syn::LifetimeParam { lifetime: syn::Lifetime { .. }, .. })) = it.next() else {
-                return Err(syn::Error::new_spanned(generics, "Missing generic lifetime in associated type (usually `'buf`)"));
-            };
 
             let Some(syn::GenericParam::Type(syn::TypeParam { ident: c_param, .. })) = it.next() else {
                 return Err(syn::Error::new_spanned(generics, "Missing generic parameter in associated type (usually `C`)"));

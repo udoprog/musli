@@ -1,7 +1,8 @@
+use musli::context::Buffer;
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};
-use crate::reader::{Parser, Scratch, StringReference, Token};
+use crate::reader::{Parser, StringReference, Token};
 
 /// An efficient [Reader] wrapper around a slice.
 pub struct SliceParser<'de> {
@@ -26,14 +27,15 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn parse_string<'scratch, 'buf, C>(
+    fn parse_string<'scratch, C, S>(
         &mut self,
         cx: &mut C,
-        scratch: &'scratch mut Scratch,
         validate: bool,
+        scratch: &'scratch mut S,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
+        S: ?Sized + Buffer,
     {
         let start = cx.mark();
         let actual = self.peek(cx)?;
@@ -43,16 +45,15 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         }
 
         self.skip(cx, 1)?;
-        scratch.bytes.clear();
         let out =
-            crate::reader::string::parse_string_slice_reader(cx, self, scratch, validate, start);
+            crate::reader::string::parse_string_slice_reader(cx, self, validate, start, scratch);
         out
     }
 
     #[inline]
-    fn read_byte<'buf, C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
+    fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
     {
         let mut byte = [0];
         self.read(cx, &mut byte[..])?;
@@ -60,9 +61,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn skip<'buf, C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
     {
         let outcome = self.index.wrapping_add(n);
 
@@ -76,9 +77,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn read<'buf, C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
     {
         let outcome = self.index.wrapping_add(buf.len());
 
@@ -93,9 +94,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn skip_whitespace<'buf, C>(&mut self, cx: &mut C) -> Result<(), C::Error>
+    fn skip_whitespace<C>(&mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
     {
         while matches!(
             self.slice.get(self.index),
@@ -114,17 +115,17 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn peek_byte<'buf, C>(&mut self, _: &mut C) -> Result<Option<u8>, C::Error>
+    fn peek_byte<C>(&mut self, _: &mut C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
     {
         Ok(self.slice.get(self.index).copied())
     }
 
     #[inline]
-    fn parse_f32<'buf, C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
+    fn parse_f32<C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
     {
         use lexical::parse_float_options::JSON;
         const FORMAT: u128 = lexical::format::STANDARD;
@@ -145,9 +146,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn parse_f64<'buf, C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
+    fn parse_f64<C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
     {
         use lexical::parse_float_options::JSON;
         const FORMAT: u128 = lexical::format::STANDARD;

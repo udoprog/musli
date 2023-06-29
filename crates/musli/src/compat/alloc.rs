@@ -17,9 +17,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<'buf, Input = E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         encoder.encode_bytes(cx, self.0.as_slice())
@@ -31,16 +31,16 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         struct Visitor;
 
-        impl<'de, 'buf, C> ValueVisitor<'de, 'buf, C, [u8]> for Visitor
+        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
         where
-            C: Context<'buf>,
+            C: Context,
         {
             type Ok = Vec<u8>;
 
@@ -69,9 +69,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<'buf, Input = E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         let (first, second) = self.0.as_slices();
@@ -84,9 +84,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         <Bytes<Vec<u8>> as Decode<M>>::decode(cx, decoder)

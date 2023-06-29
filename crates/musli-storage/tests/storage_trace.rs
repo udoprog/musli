@@ -1,7 +1,8 @@
 #![allow(unused)]
 
 use musli::{Decode, Encode};
-use musli_common::context::{AllocBuf, AllocContext};
+use musli_common::allocator::Alloc;
+use musli_common::context::AllocContext;
 
 #[derive(Encode)]
 enum InnerFrom {
@@ -29,8 +30,8 @@ struct To {
 
 #[test]
 fn storage_trace() {
-    let mut buf = AllocBuf::default();
-    let mut cx = AllocContext::new(&mut buf);
+    let mut alloc = Alloc::default();
+    let mut cx = AllocContext::new(&alloc);
 
     let from = From {
         ok: 10,

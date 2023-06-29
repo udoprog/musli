@@ -9,9 +9,11 @@
 
 use core::fmt;
 use core::marker;
+use core::ptr;
 
 use crate::no_std::ToOwned;
 
+use crate::context::Buffer;
 use crate::de::{
     AsDecoder, Decoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
     SizeHint, ValueVisitor, VariantDecoder,
@@ -19,6 +21,43 @@ use crate::de::{
 use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use crate::error::Error;
 use crate::Context;
+
+/// An empty buffer.
+pub enum NeverBuffer {}
+
+impl Buffer for NeverBuffer {
+    #[inline(always)]
+    fn write(&mut self, _: &[u8]) -> bool {
+        false
+    }
+
+    #[inline(always)]
+    fn write_at(&mut self, _: usize, _: &[u8]) -> bool {
+        false
+    }
+
+    #[inline(always)]
+    fn copy_back<B>(&mut self, _: B) -> bool
+    where
+        B: Buffer,
+    {
+        false
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        0
+    }
+
+    fn raw_parts(&self) -> (*const u8, usize, usize) {
+        (ptr::null(), 0, 0)
+    }
+
+    #[inline(always)]
+    unsafe fn as_slice(&self) -> &[u8] {
+        &[]
+    }
+}
 
 /// Marker type used for the [`Never`] type.
 #[doc(hidden)]
@@ -44,9 +83,9 @@ pub enum NeverMarker {}
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32<'buf, C>(self, cx: &mut C) -> Result<u32, C::Error>
+///     fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
 ///     where
-///         C: Context<'buf, Input = Self::Error>
+///         C: Context<Input = Self::Error>
 ///     {
 ///         if self.0 == 42 {
 ///             return Ok(self.0);
@@ -94,9 +133,9 @@ where
         Self: 'this;
 
     #[inline]
-    fn as_decoder<'buf, C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn as_decoder<C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -115,25 +154,25 @@ where
     type Second = Self;
 
     #[inline]
-    fn first<'buf, C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn second<'buf, C>(self, _: &mut C) -> Result<Self::Second, C::Error>
+    fn second<C>(self, _: &mut C) -> Result<Self::Second, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn skip_second<'buf, C>(self, _: &mut C) -> Result<bool, C::Error>
+    fn skip_second<C>(self, _: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -152,33 +191,33 @@ where
     type Variant<'this> = Self where Self: 'this;
 
     #[inline]
-    fn tag<'buf, C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn variant<'buf, C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn skip_variant<'buf, C>(&mut self, _: &mut C) -> Result<bool, C::Error>
+    fn skip_variant<C>(&mut self, _: &mut C) -> Result<bool, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn end<'buf, C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -200,17 +239,17 @@ where
     }
 
     #[inline]
-    fn next<'buf, C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn end<'buf, C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -232,17 +271,17 @@ where
     }
 
     #[inline]
-    fn next<'buf, C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn end<'buf, C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -259,17 +298,17 @@ where
         Self: 'this;
 
     #[inline]
-    fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn end<'buf, C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -281,7 +320,7 @@ where
 {
     type Ok = O;
     type Error = E;
-    type Pack = Self;
+    type Pack<B> = Self where B: Buffer;
     type Some = Self;
     type Sequence = Self;
     type Tuple = Self;
@@ -296,9 +335,9 @@ where
     }
 }
 
-impl<'de, 'buf, O, C> NumberVisitor<'de, 'buf, C> for Never<O, C>
+impl<'de, O, C> NumberVisitor<'de, C> for Never<O, C>
 where
-    C: Context<'buf>,
+    C: Context,
 {
     type Ok = O;
 
@@ -307,10 +346,10 @@ where
     }
 }
 
-impl<'de, 'buf, O, T, C> ValueVisitor<'de, 'buf, C, T> for Never<O, T, C>
+impl<'de, O, T, C> ValueVisitor<'de, C, T> for Never<O, T, C>
 where
     T: ?Sized + ToOwned,
-    C: Context<'buf>,
+    C: Context,
 {
     type Ok = O;
 
@@ -331,17 +370,17 @@ where
         Self: 'this;
 
     #[inline]
-    fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
     where
-        C: Context<'buf, Input = E>,
+        C: Context<Input = E>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<'buf, Input = E>,
+        C: Context<Input = E>,
     {
         match self._never {}
     }
@@ -356,16 +395,16 @@ where
     type Encoder<'this> = Self where Self: 'this;
 
     #[inline]
-    fn next<'buf, C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
-    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -383,25 +422,25 @@ where
     type Second<'this> = Self where Self: 'this;
 
     #[inline]
-    fn first<'buf, C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn second<'buf, C>(&mut self, _: &mut C) -> Result<Self::Second<'_>, C::Error>
+    fn second<C>(&mut self, _: &mut C) -> Result<Self::Second<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
@@ -419,25 +458,25 @@ where
     type Variant<'this> = Self where Self: 'this;
 
     #[inline]
-    fn tag<'buf, C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn variant<'buf, C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
     #[inline]
-    fn end<'buf, C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         match self._never {}
     }

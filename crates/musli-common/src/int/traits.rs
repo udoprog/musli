@@ -64,16 +64,16 @@ pub trait Unsigned:
 pub trait ByteOrderIo: Unsigned {
     /// Write the current byte array to the given writer in little-endian
     /// encoding.
-    fn write_bytes_unsigned<'buf, C, W, B>(self, cx: &mut C, writer: W) -> Result<(), C::Error>
+    fn write_bytes_unsigned<C, W, B>(self, cx: &mut C, writer: W) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = W::Error>,
+        C: Context<Input = W::Error>,
         W: Writer,
         B: ByteOrder;
 
     /// Read the current value from the reader in little-endian encoding.
-    fn read_bytes_unsigned<'de, 'buf, C, R, B>(cx: &mut C, reader: R) -> Result<Self, C::Error>
+    fn read_bytes_unsigned<'de, C, R, B>(cx: &mut C, reader: R) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = R::Error>,
+        C: Context<Input = R::Error>,
         R: Reader<'de>,
         B: ByteOrder;
 }
@@ -175,13 +175,13 @@ macro_rules! implement_io {
 
         impl ByteOrderIo for $unsigned {
             #[inline]
-            fn write_bytes_unsigned<'buf, C, W, B>(
+            fn write_bytes_unsigned<C, W, B>(
                 self,
                 cx: &mut C,
                 mut writer: W,
             ) -> Result<(), C::Error>
             where
-                C: Context<'buf, Input = W::Error>,
+                C: Context<Input = W::Error>,
                 W: Writer,
                 B: ByteOrder,
             {
@@ -189,12 +189,12 @@ macro_rules! implement_io {
             }
 
             #[inline]
-            fn read_bytes_unsigned<'de, 'buf, C, R, B>(
+            fn read_bytes_unsigned<'de, C, R, B>(
                 cx: &mut C,
                 mut reader: R,
             ) -> Result<Self, C::Error>
             where
-                C: Context<'buf, Input = R::Error>,
+                C: Context<Input = R::Error>,
                 R: Reader<'de>,
                 B: ByteOrder,
             {

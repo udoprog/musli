@@ -5,6 +5,7 @@ use core::fmt;
 use core::mem::MaybeUninit;
 use core::ptr;
 
+use musli::context::Buffer;
 use musli::Context;
 
 use crate::writer::Writer;
@@ -155,9 +156,9 @@ impl<const N: usize> FixedBytes<N> {
 
     /// Try and extend from the given slice.
     #[inline]
-    pub fn write_bytes<'buf, C>(&mut self, cx: &mut C, source: &[u8]) -> Result<(), C::Error>
+    pub fn write_bytes<C>(&mut self, cx: &mut C, source: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = FixedBytesOverflow>,
+        C: Context<Input = FixedBytesOverflow>,
     {
         if !self.extend_from_slice(source) {
             return Err(cx.report(FixedBytesOverflow {
@@ -188,9 +189,19 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline]
-    fn write_bytes<'buf, C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
+        B: Buffer,
+    {
+        // SAFETY: the buffer never outlives this function call.
+        self.write_bytes(cx, unsafe { buffer.as_slice() })
+    }
+
+    #[inline]
+    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
     {
         FixedBytes::write_bytes(self, cx, bytes)?;
         cx.advance(bytes.len());
@@ -198,13 +209,9 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline(always)]
-    fn write_array<'buf, C, const U: usize>(
-        &mut self,
-        cx: &mut C,
-        array: [u8; U],
-    ) -> Result<(), C::Error>
+    fn write_array<C, const U: usize>(&mut self, cx: &mut C, array: [u8; U]) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
     {
         if U > N.saturating_sub(self.init) {
             return Err(cx.report(FixedBytesOverflow {

@@ -14,7 +14,6 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let encoder_var = e.cx.ident("encoder");
     let ctx_var = e.cx.ident("ctx");
-    let buf_lt = e.cx.lifetime("'buf");
     let c_param = e.cx.ident("C");
     let e_param = e.cx.ident("E");
 
@@ -53,9 +52,9 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
         #[automatically_derived]
         impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
-            fn encode<#buf_lt, #c_param, #e_param>(&self, #ctx_var: &mut #c_param, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t>::Ok, <#c_param as #context_t<#buf_lt>>::Error>
+            fn encode<#c_param, #e_param>(&self, #ctx_var: &mut #c_param, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t>::Ok, <#c_param as #context_t>::Error>
             where
-                #c_param: #context_t<#buf_lt, Input = <#e_param as #encoder_t>::Error>,
+                #c_param: #context_t<Input = <#e_param as #encoder_t>::Error>,
                 #e_param: #encoder_t
             {
                 #body

@@ -23,6 +23,7 @@ extern crate std;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+pub mod allocator;
 pub mod buffered_writer;
 pub mod context;
 pub mod fixed_bytes;

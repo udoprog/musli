@@ -20,7 +20,6 @@ use crate::de::JsonDecoder;
 use crate::en::JsonEncoder;
 use crate::error::Error;
 use crate::fixed_bytes::FixedBytes;
-use crate::reader::Scratch;
 use crate::reader::{Parser, SliceParser};
 use crate::writer::Writer;
 
@@ -184,14 +183,9 @@ where
     /// This is the same as [`Encoding::encode`] but allows for using a
     /// configurable [`Context`].
     #[inline]
-    pub fn encode_with<'buf, C, W, T>(
-        self,
-        cx: &mut C,
-        writer: W,
-        value: &T,
-    ) -> Result<(), C::Error>
+    pub fn encode_with<C, W, T>(self, cx: &mut C, writer: W, value: &T) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
         W: Writer,
         Error: From<W::Error>,
         T: ?Sized + Encode<M>,
@@ -206,7 +200,8 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        let mut cx = musli_common::context::Same::default();
+        let alloc = musli_common::allocator::Default::default();
+        let mut cx = musli_common::context::Same::new(&alloc);
         self.to_string_with(&mut cx, value)
     }
 
@@ -216,9 +211,9 @@ where
     /// configurable [`Context`].
     #[cfg(feature = "alloc")]
     #[inline]
-    pub fn to_string_with<'buf, T, C>(self, cx: &mut C, value: &T) -> Result<String, C::Error>
+    pub fn to_string_with<T, C>(self, cx: &mut C, value: &T) -> Result<String, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
         T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
@@ -235,7 +230,8 @@ where
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
-        let mut cx = musli_common::context::Same::default();
+        let alloc = musli_common::allocator::Default::default();
+        let mut cx = musli_common::context::Same::new(&alloc);
         self.decode_with(&mut cx, parser)
     }
 
@@ -245,14 +241,13 @@ where
     /// This is the same as [`Encoding::decode`] but allows for using a
     /// configurable [`Context`].
     #[inline]
-    pub fn decode_with<'de, 'buf, C, P, T>(self, cx: &mut C, parser: P) -> Result<T, C::Error>
+    pub fn decode_with<'de, C, P, T>(self, cx: &mut C, parser: P) -> Result<T, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
-        let mut scratch = Scratch::new();
-        T::decode(cx, JsonDecoder::new(&mut scratch, parser))
+        T::decode(cx, JsonDecoder::new(parser))
     }
 
     /// Decode the given type `T` from the given string using the current
@@ -271,9 +266,9 @@ where
     /// This is the same as [`Encoding::from_str`] but allows for using a
     /// configurable [`Context`].
     #[inline]
-    pub fn from_str_with<'de, 'buf, C, T>(self, cx: &mut C, string: &'de str) -> Result<T, C::Error>
+    pub fn from_str_with<'de, C, T>(self, cx: &mut C, string: &'de str) -> Result<T, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
         T: Decode<'de, M>,
     {
         self.from_slice_with(cx, string.as_bytes())
@@ -286,7 +281,8 @@ where
     where
         T: Decode<'de, M>,
     {
-        let mut cx = musli_common::context::Same::default();
+        let alloc = musli_common::allocator::Default::default();
+        let mut cx = musli_common::context::Same::new(&alloc);
         self.from_slice_with(&mut cx, bytes)
     }
 
@@ -296,18 +292,13 @@ where
     /// This is the same as [`Encoding::from_slice`] but allows for using a
     /// configurable [`Context`].
     #[inline]
-    pub fn from_slice_with<'de, 'buf, C, T>(
-        self,
-        cx: &mut C,
-        bytes: &'de [u8],
-    ) -> Result<T, C::Error>
+    pub fn from_slice_with<'de, C, T>(self, cx: &mut C, bytes: &'de [u8]) -> Result<T, C::Error>
     where
-        C: Context<'buf, Input = Error>,
+        C: Context<Input = Error>,
         T: Decode<'de, M>,
     {
-        let mut scratch = Scratch::new();
         let mut reader = SliceParser::new(bytes);
-        T::decode(cx, JsonDecoder::new(&mut scratch, &mut reader))
+        T::decode(cx, JsonDecoder::new(&mut reader))
     }
 
     musli_common::encode_with_extensions!();

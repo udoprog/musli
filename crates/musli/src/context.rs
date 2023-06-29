@@ -8,16 +8,126 @@ use core::marker;
 #[doc(inline)]
 pub use self::error::Error;
 
+/// A buffer allocated from a context.
+///
+/// Buffers are allocated from a context through [`Context::alloc`].
+pub trait Buffer {
+    /// Write the given number of bytes.
+    ///
+    /// Returns `true` if the bytes could be successfully written. A `false`
+    /// value indicates that we are out of buffer capacity.
+    fn write(&mut self, bytes: &[u8]) -> bool;
+
+    /// Write bytes at the given offset.
+    fn write_at(&mut self, at: usize, bytes: &[u8]) -> bool;
+
+    /// Write a single byte.
+    ///
+    /// Returns `true` if the bytes could be successfully written. A `false`
+    /// value indicates that we are out of buffer capacity.
+    #[inline(always)]
+    fn push(&mut self, byte: u8) -> bool {
+        self.write(&[byte])
+    }
+
+    /// Copy *back* from another buffer.
+    ///
+    /// The provided argument has the following guarantees:
+    /// * It's a buffer from a completely different allocator, at which point
+    ///   `raw_parts` must return a base pointer which differs from the current
+    ///   buffer, or;
+    /// * It's a buffer from the same allocator, at which point `raw_parts`
+    ///   returns the same base pointer. The `other` argument is then located
+    ///   *after* the current buffer in memory as relative to its base pointer.
+    ///   If this does not hold, an implementor must panic.
+    ///
+    /// The latter property is guaranteed by how the allocator functions.
+    ///
+    /// Calling `copy_back` multiple times does not lead to any unsafety, but if
+    /// both the source and target buffer come from the same allocator the
+    /// resulting content might become garbled.
+    fn copy_back<B>(&mut self, other: B) -> bool
+    where
+        B: Buffer;
+
+    /// Get the length of the buffer in bytes.
+    fn len(&self) -> usize;
+
+    /// Test if the buffer is empty.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Return the buffer pair in terms of a base pointer and length.
+    ///
+    /// Users of this function must take care not to construct a reference which
+    /// lives for "too long", as per the documentation in `as_slice`.
+    ///
+    /// The triple is consists of:
+    /// * A base pointer.
+    /// * A base pointer offset where the data is located.
+    /// * A length.
+    fn raw_parts(&self) -> (*const u8, usize, usize);
+
+    /// Get the buffer as its initialized slice.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe, because holding onto a slice for "too long" could lead
+    /// to undefined behavior.
+    unsafe fn as_slice(&self) -> &[u8];
+}
+
+impl Buffer for [u8] {
+    #[inline(always)]
+    fn write(&mut self, _: &[u8]) -> bool {
+        false
+    }
+
+    #[inline(always)]
+    fn write_at(&mut self, _: usize, _: &[u8]) -> bool {
+        false
+    }
+
+    #[inline(always)]
+    fn copy_back<B>(&mut self, _: B) -> bool
+    where
+        B: Buffer,
+    {
+        false
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        <[_]>::len(self)
+    }
+
+    #[inline(always)]
+    fn raw_parts(&self) -> (*const u8, usize, usize) {
+        (self.as_ptr(), 0, self.len())
+    }
+
+    #[inline(always)]
+    unsafe fn as_slice(&self) -> &[u8] {
+        self
+    }
+}
+
 /// Provides ergonomic access to the serialization context.
 ///
 /// This is used to among other things report diagnostics.
-pub trait Context<'buf> {
+pub trait Context {
     /// The error type which is collected by the context.
     type Input;
     /// Error produced by context.
     type Error;
     /// A mark during processing.
     type Mark: Copy + Default;
+    /// A growable buffer.
+    type Buf: Buffer;
+
+    /// Allocate a buffer.
+    fn alloc(&mut self) -> Self::Buf;
 
     /// Adapt the current context so that it can convert an error from a
     /// different type convertible to the current input
@@ -40,9 +150,9 @@ pub trait Context<'buf> {
     ///     }
     /// }
     ///
-    /// fn function1<'buf, C>(cx: &mut C) -> Result<(), C::Error>
+    /// fn function1<C>(cx: &mut C) -> Result<(), C::Error>
     /// where
-    ///     C: Context<'buf, Input = Function1Error>
+    ///     C: Context<Input = Function1Error>
     /// {
     ///     function2(cx.adapt())
     /// }
@@ -52,9 +162,9 @@ pub trait Context<'buf> {
     /// }
     ///
     /// // This function uses a different error as input.
-    /// fn function2<'buf, C>(cx: &mut C) -> Result<(), C::Error>
+    /// fn function2<C>(cx: &mut C) -> Result<(), C::Error>
     /// where
-    ///     C: Context<'buf, Input = Function2Error>
+    ///     C: Context<Input = Function2Error>
     /// {
     ///     /* .. */
     ///     Ok(())
@@ -163,13 +273,13 @@ pub trait Context<'buf> {
         self.message(format_args!("invalid field tag: {tag:?}"))
     }
 
-    /// Encountered an unsupported field tag, where the tag has been stored
-    /// using [`store_string`].
-    ///
-    /// [`store_string`]: Context::store_string
+    /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_string_tag(&mut self, _: &'static str) -> Self::Error {
-        if let Some(string) = self.get_string() {
+    fn invalid_field_string_tag(&mut self, _: &'static str, field: Self::Buf) -> Self::Error {
+        // SAFETY: Getting the slice does not overlap any interleaving operations.
+        let bytes = unsafe { field.as_slice() };
+
+        if let Ok(string) = core::str::from_utf8(bytes) {
             self.message(format_args!("invalid field tag: {string}"))
         } else {
             self.message(format_args!("invalid field tag"))
@@ -209,24 +319,6 @@ pub trait Context<'buf> {
         self.message(format_args!(
             "invalid variant field tag: variant: {variant:?}, tag: {tag:?}",
         ))
-    }
-
-    /// For named (string) variants, stores the tag string in the context.
-    ///
-    /// It should be possible to recall the string later using [`get_string`].
-    ///
-    /// [`get_string`]: Context::get_string
-    #[allow(unused_variables)]
-    #[inline(always)]
-    fn store_string(&mut self, string: &str) {}
-
-    /// Access the last string stored with [`store_string`], referenced from the
-    /// internal buffer.
-    ///
-    /// [`store_string`]: Context::store_string
-    #[inline(always)]
-    fn get_string(&self) -> Option<&'buf str> {
-        None
     }
 
     /// Indicate that we've entered a struct with the given `name`.
@@ -411,14 +503,20 @@ where
     context: C,
 }
 
-impl<'buf, E, C> Context<'buf> for Adapt<C, E>
+impl<E, C> Context for Adapt<C, E>
 where
-    C: Context<'buf>,
+    C: Context,
     C::Input: From<E>,
 {
     type Input = E;
     type Error = C::Error;
     type Mark = C::Mark;
+    type Buf = C::Buf;
+
+    #[inline(always)]
+    fn alloc(&mut self) -> Self::Buf {
+        self.context.alloc()
+    }
 
     #[inline(always)]
     fn report<T>(&mut self, error: T) -> Self::Error
@@ -500,8 +598,8 @@ where
     }
 
     #[inline(always)]
-    fn invalid_field_string_tag(&mut self, name: &'static str) -> Self::Error {
-        self.context.invalid_field_string_tag(name)
+    fn invalid_field_string_tag(&mut self, name: &'static str, field: Self::Buf) -> Self::Error {
+        self.context.invalid_field_string_tag(name, field)
     }
 
     #[inline(always)]
@@ -529,16 +627,6 @@ where
         T: fmt::Debug,
     {
         self.context.invalid_variant_field_tag(name, variant, tag)
-    }
-
-    #[inline(always)]
-    fn store_string(&mut self, string: &str) {
-        self.context.store_string(string)
-    }
-
-    #[inline(always)]
-    fn get_string(&self) -> Option<&'buf str> {
-        self.context.get_string()
     }
 
     #[inline(always)]

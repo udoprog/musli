@@ -167,7 +167,7 @@ where
     }
 
     musli_common::encoding_impls! {
-        SelfEncoder::<_, P>::new,
+        SelfEncoder::<_>::new,
         SelfDecoder::new
     }
 
@@ -178,7 +178,8 @@ where
     where
         T: Decode<'de, M>,
     {
-        let mut cx = musli_common::context::Same::default();
+        let alloc = musli_common::allocator::Default::default();
+        let mut cx = musli_common::context::Same::new(&alloc);
         let mut reader = SliceReader::new(bytes);
         T::decode(&mut cx, SelfDecoder::<_>::new(&mut reader))
     }

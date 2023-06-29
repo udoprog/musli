@@ -13,7 +13,7 @@ pub mod serde_json {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> serde_json::Result<&'buf [u8]>
+    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> serde_json::Result<&'buf [u8]>
     where
         T: Serialize,
     {
@@ -45,7 +45,7 @@ pub mod serde_bincode {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> bincode::Result<&'buf [u8]>
+    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> bincode::Result<&'buf [u8]>
     where
         T: Serialize,
     {
@@ -77,7 +77,7 @@ pub mod serde_cbor {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> serde_cbor::Result<&'buf [u8]>
+    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> serde_cbor::Result<&'buf [u8]>
     where
         T: Serialize,
     {
@@ -128,7 +128,7 @@ pub mod postcard {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> postcard::Result<&'buf [u8]>
+    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> postcard::Result<&'buf [u8]>
     where
         T: Serialize,
     {

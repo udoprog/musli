@@ -5,7 +5,8 @@ use crate::reader::SliceParser;
 
 #[test]
 fn test_decode_exponent() {
-    let mut cx = musli_common::context::Same::default();
+    let alloc = musli_common::allocator::Default::default();
+    let mut cx = musli_common::context::Same::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr, $expected:expr) => {
@@ -40,7 +41,8 @@ fn test_decode_exponent() {
 
 #[test]
 fn test_decode_unsigned() {
-    let mut cx = musli_common::context::Same::default();
+    let alloc = musli_common::allocator::Default::default();
+    let mut cx = musli_common::context::Same::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
@@ -106,7 +108,8 @@ fn test_decode_unsigned() {
 
 #[test]
 fn test_decode_signed() {
-    let mut cx = musli_common::context::Same::default();
+    let alloc = musli_common::allocator::Default::default();
+    let mut cx = musli_common::context::Same::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
