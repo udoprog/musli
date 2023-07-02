@@ -354,7 +354,10 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let len = len.checked_mul(2).ok_or_else(|| cx.message(Overflow))?;
+        let Some(len) = len.checked_mul(2) else {
+            return Err(cx.message("map length overflow"));
+        };
+
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(cx.adapt(), tag.byte())?;
 
@@ -370,7 +373,10 @@ where
     where
         C: Context<'buf, Input = Self::Error>,
     {
-        let len = len.checked_mul(2).ok_or_else(|| cx.message(Overflow))?;
+        let Some(len) = len.checked_mul(2) else {
+            return Err(cx.message("struct length overflow"));
+        };
+
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(cx.adapt(), tag.byte())?;
 
@@ -550,14 +556,6 @@ where
         C: Context<'buf, Input = Self::Error>,
     {
         Ok(())
-    }
-}
-
-struct Overflow;
-
-impl fmt::Display for Overflow {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "integer overflow")
     }
 }
 

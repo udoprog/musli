@@ -1,5 +1,3 @@
-use core::fmt::{Debug, Display};
-
 use musli::Context;
 use musli_common::int::continuation as c;
 use musli_common::int::zigzag as zig;
@@ -101,7 +99,7 @@ impl WireIntegerEncoding for Variable {
         let tag = Tag::from_byte(reader.read_byte(cx)?);
 
         if tag.kind() != Kind::Continuation {
-            return Err(cx.custom("Expected Continuation"));
+            return Err(cx.message("expected continuation"));
         }
 
         if let Some(data) = tag.data() {
@@ -163,7 +161,7 @@ impl WireUsizeEncoding for Variable {
         let tag = Tag::from_byte(reader.read_byte(cx)?);
 
         if tag.kind() != Kind::Continuation {
-            return Err(cx.custom("Expected Continuation"));
+            return Err(cx.message("expected continuation"));
         }
 
         if let Some(data) = tag.data() {
@@ -201,7 +199,7 @@ where
         T: ByteOrderIo,
     {
         if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::BYTES) {
-            return Err(cx.custom("expected fixed integer"));
+            return Err(cx.message("expected fixed integer"));
         }
 
         T::read_bytes_unsigned::<_, _, B>(cx, reader)
@@ -232,7 +230,7 @@ where
         T::Unsigned: ByteOrderIo<Signed = T>,
     {
         if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::Unsigned::BYTES) {
-            return Err(cx.custom("expected fixed integer"));
+            return Err(cx.message("expected fixed integer"));
         }
 
         Ok(T::Unsigned::read_bytes_unsigned::<_, _, B>(cx, reader)?.signed())
@@ -244,8 +242,6 @@ where
     B: ByteOrder,
     usize: TryFrom<L>,
     L: ByteOrderIo + TryFrom<usize>,
-    L::Error: 'static + Debug + Display + Send + Sync,
-    <usize as TryFrom<L>>::Error: 'static + Debug + Display + Send + Sync,
 {
     #[inline]
     fn encode_typed_usize<'buf, C, W>(
@@ -258,7 +254,11 @@ where
         W: Writer,
     {
         writer.write_byte(cx, Tag::new(Kind::Prefix, L::BYTES).byte())?;
-        let value: L = value.try_into().map_err(|err| cx.custom(err))?;
+
+        let Ok(value) = L::try_from(value) else {
+            return Err(cx.message("usize out of bounds for value type"));
+        };
+
         value.write_bytes_unsigned::<_, _, B>(cx, writer)
     }
 
@@ -268,11 +268,19 @@ where
         C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
     {
-        if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, L::BYTES) {
-            return Err(cx.custom("expected fixed integer"));
+        let tag = Tag::from_byte(reader.read_byte(cx)?);
+
+        if tag != Tag::new(Kind::Prefix, L::BYTES) {
+            return Err(cx.message(format_args!(
+                "expected fixed {} bytes prefix tag, but got {tag:?}",
+                L::BYTES
+            )));
         }
 
-        usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?)
-            .map_err(|err| cx.custom(err))
+        let Ok(value) = usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?) else {
+            return Err(cx.message("value type out of bounds for usize"));
+        };
+
+        Ok(value)
     }
 }

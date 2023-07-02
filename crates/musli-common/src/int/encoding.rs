@@ -1,4 +1,4 @@
-use core::fmt::{Debug, Display};
+use core::fmt::Debug;
 use core::hash::Hash;
 
 use musli::Context;
@@ -193,10 +193,7 @@ impl<L, B> UsizeEncoding for FixedUsize<L, B>
 where
     B: ByteOrder,
     usize: TryFrom<L>,
-    L: ByteOrderIo,
-    L: TryFrom<usize>,
-    L::Error: 'static + Debug + Display + Send + Sync,
-    <usize as TryFrom<L>>::Error: 'static + Debug + Display + Send + Sync,
+    L: ByteOrderIo + TryFrom<usize>,
 {
     #[inline]
     fn encode_usize<'buf, C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
@@ -204,8 +201,11 @@ where
         C: Context<'buf, Input = W::Error>,
         W: Writer,
     {
-        let value: L = value.try_into().map_err(|err| cx.custom(err))?;
-        value.write_bytes_unsigned::<_, _, B>(cx, writer)
+        let Ok(value) = L::try_from(value) else {
+            return Err(cx.message("usize out of bounds for value type"));
+        };
+
+        L::write_bytes_unsigned::<_, _, B>(value, cx, writer)
     }
 
     #[inline]
@@ -214,7 +214,10 @@ where
         C: Context<'buf, Input = R::Error>,
         R: Reader<'de>,
     {
-        usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?)
-            .map_err(|error| cx.custom(error))
+        let Ok(value) = usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?) else {
+            return Err(cx.message("value type out of bounds for usize"));
+        };
+
+        Ok(value)
     }
 }
