@@ -9,7 +9,7 @@ use musli_storage::int::Variable;
 
 use crate::error::Error;
 use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
-use crate::tag::{Kind, Tag};
+use crate::tag::{Kind, Tag, MAX_INLINE_LEN};
 
 /// A very simple encoder.
 pub struct WireEncoder<W, I, L>
@@ -105,7 +105,13 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        Ok(WirePackEncoder::new(self.writer, cx.alloc()))
+        let mut buffer = cx.alloc();
+
+        if !buffer.write(&[0]) {
+            return Err(cx.message("pack buffer too small"));
+        }
+
+        Ok(WirePackEncoder::new(self.writer, buffer))
     }
 
     #[inline(always)]
@@ -180,7 +186,7 @@ where
     {
         self.writer.write_byte(
             cx.adapt(),
-            Tag::new(Kind::Byte, if value { 1 } else { 0 }).byte(),
+            Tag::new(Kind::Continuation, if value { 1 } else { 0 }).byte(),
         )
     }
 
@@ -197,14 +203,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        let (tag, embedded) = Tag::with_byte(Kind::Byte, value);
-        self.writer.write_byte(cx.adapt(), tag.byte())?;
-
-        if !embedded {
-            self.writer.write_byte(cx.adapt(), value)?;
-        }
-
-        Ok(())
+        I::encode_typed_unsigned(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -419,9 +418,40 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        let buffer = self.buffer.into_inner();
-        encode_prefix::<_, _, L>(cx.adapt(), &mut self.writer, buffer.len())?;
+        static PAD: [u8; 1024] = [0; 1024];
+
+        let mut buffer = self.buffer.into_inner();
+        let len = buffer.len().wrapping_sub(1);
+
+        let (tag, mut rem) = if len <= MAX_INLINE_LEN {
+            (Tag::new(Kind::Prefix, len as u8), 0)
+        } else {
+            let pow = len.next_power_of_two();
+            let rem = len - pow;
+
+            let Ok(pow) = usize::try_from(pow.trailing_zeros()) else {
+                return Err(cx.message("pack too large"));
+            };
+
+            if pow > MAX_INLINE_LEN {
+                return Err(cx.message("pack too large"));
+            }
+
+            (Tag::new(Kind::Pack, pow as u8), rem)
+        };
+
+        if !buffer.write_at(0, &[tag.byte()]) {
+            return Err(cx.message("pack buffer overflow"));
+        }
+
         self.writer.write_buffer(cx.adapt(), buffer)?;
+
+        while rem > 0 {
+            let len = rem.min(PAD.len());
+            self.writer.write_bytes(cx.adapt(), &PAD[..len])?;
+            rem -= len;
+        }
+
         Ok(())
     }
 }

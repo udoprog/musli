@@ -2,15 +2,19 @@
 //! continuation of the sequence or not.
 //!
 //! ```
+//! use musli_common::context::Ignore;
+//! use musli_common::fixed_bytes::{FixedBytes, FixedBytesOverflow};
 //! use musli_common::int::continuation as c;
-//! use musli_common::fixed_bytes::FixedBytes;
+//! use musli_common::reader::SliceUnderflow;
 //!
-//! let mut cx = musli_common::context::Ignore::default();
+//! let alloc = musli_common::allocator::Default::default();
+//!
+//! let mut cx: Ignore<_, FixedBytesOverflow> = Ignore::new(&alloc);
 //! let mut bytes = FixedBytes::<8>::new();
 //! c::encode(&mut cx, &mut bytes, 5000u32).unwrap();
 //! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let mut cx = musli_common::context::Ignore::default();
+//! let mut cx: Ignore<_, SliceUnderflow> = Ignore::new(&alloc);
 //! let number: u32 = c::decode(&mut cx, bytes.as_slice()).unwrap();
 //! assert_eq!(number, 5000u32);
 //! ```

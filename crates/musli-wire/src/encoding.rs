@@ -20,7 +20,6 @@ use crate::fixed_bytes::FixedBytes;
 use crate::int::{BigEndian, ByteOrder, Fixed, FixedUsize, LittleEndian, NetworkEndian, Variable};
 use crate::integer_encoding::{WireIntegerEncoding, WireUsizeEncoding};
 use crate::reader::{Reader, SliceReader};
-use crate::tag::MAX_INLINE_LEN;
 use crate::writer::Writer;
 
 /// The default configuration.
@@ -29,10 +28,6 @@ use crate::writer::Writer;
 ///
 /// The variable length encoding uses [zigzag] with [continuation] encoding for
 /// numbers.
-///
-/// The maximum pack length permitted equals to [MAX_INLINE_LEN], which is 62.
-/// Trying to encode larger packs will result in a runtime error. This can be
-/// modified with [Encoding::with_max_pack].
 ///
 /// [zigzag]: musli_common::int::zigzag
 /// [continuation]: musli_common::int::continuation
@@ -105,7 +100,7 @@ where
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = DefaultMode, I = Variable, L = Variable, const P: usize = MAX_INLINE_LEN>
+pub struct Encoding<M = DefaultMode, I = Variable, L = Variable>
 where
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
@@ -113,7 +108,7 @@ where
     _marker: marker::PhantomData<(M, I, L)>,
 }
 
-impl Encoding<DefaultMode, Variable, Variable, MAX_INLINE_LEN> {
+impl Encoding<DefaultMode, Variable, Variable> {
     /// Construct a new [Encoding] instance which uses [Variable] integer
     /// encoding.
     ///
@@ -155,14 +150,14 @@ impl Encoding<DefaultMode, Variable, Variable, MAX_INLINE_LEN> {
     }
 }
 
-impl<M, const P: usize, I, L> Encoding<M, I, L, P>
+impl<M, I, L> Encoding<M, I, L>
 where
     M: Mode,
     I: WireIntegerEncoding,
     L: WireUsizeEncoding,
 {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T, I, L, P>
+    pub const fn with_mode<T>(self) -> Encoding<T, I, L>
     where
         T: Mode,
     {
@@ -172,28 +167,28 @@ where
     }
 
     /// Configure the encoding to use variable integer encoding.
-    pub const fn with_variable_integers(self) -> Encoding<M, Variable, L, P> {
+    pub const fn with_variable_integers(self) -> Encoding<M, Variable, L> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     /// Configure the encoding to use fixed integer encoding.
-    pub const fn with_fixed_integers(self) -> Encoding<M, Fixed, L, P> {
+    pub const fn with_fixed_integers(self) -> Encoding<M, Fixed, L> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     /// Configure the encoding to use fixed integer little-endian encoding.
-    pub const fn with_fixed_integers_le(self) -> Encoding<M, Fixed<LittleEndian>, L, P> {
+    pub const fn with_fixed_integers_le(self) -> Encoding<M, Fixed<LittleEndian>, L> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     /// Configure the encoding to use fixed integer big-endian encoding.
-    pub const fn with_fixed_integers_be(self) -> Encoding<M, Fixed<BigEndian>, L, P> {
+    pub const fn with_fixed_integers_be(self) -> Encoding<M, Fixed<BigEndian>, L> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -201,14 +196,14 @@ where
 
     /// Configure the encoding to use fixed integer network-endian encoding
     /// (Default).
-    pub const fn with_fixed_integers_ne(self) -> Encoding<M, Fixed<NetworkEndian>, L, P> {
+    pub const fn with_fixed_integers_ne(self) -> Encoding<M, Fixed<NetworkEndian>, L> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     /// Configure the encoding to use fixed integer custom endian encoding.
-    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, Fixed<E>, L, P>
+    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, Fixed<E>, L>
     where
         E: ByteOrder,
     {
@@ -218,7 +213,7 @@ where
     }
 
     /// Configure the encoding to use variable length encoding.
-    pub const fn with_variable_lengths(self) -> Encoding<M, I, Variable, P> {
+    pub const fn with_variable_lengths(self) -> Encoding<M, I, Variable> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -226,7 +221,7 @@ where
 
     /// Configure the encoding to use fixed length 32-bit encoding when encoding
     /// lengths.
-    pub const fn with_fixed_lengths(self) -> Encoding<M, I, FixedUsize<u32>, P> {
+    pub const fn with_fixed_lengths(self) -> Encoding<M, I, FixedUsize<u32>> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -234,16 +229,7 @@ where
 
     /// Configure the encoding to use fixed length 64-bit encoding when encoding
     /// lengths.
-    pub const fn with_fixed_lengths64(self) -> Encoding<M, I, FixedUsize<u64>, P> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Modify the maximum pack sized allowwed in the wire format. This defaults
-    /// to [MAX_INLINE_LEN], a value that will fit unencoded in the
-    /// [Tag][crate::tag::Tag] of the type.
-    pub const fn with_max_pack<const N: usize>(self) -> Encoding<M, I, L, N> {
+    pub const fn with_fixed_lengths64(self) -> Encoding<M, I, FixedUsize<u64>> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -260,7 +246,7 @@ where
     }
 }
 
-impl<M, I, L, const P: usize> Clone for Encoding<M, I, L, P>
+impl<M, I, L> Clone for Encoding<M, I, L>
 where
     M: Mode,
     I: WireIntegerEncoding,
@@ -274,7 +260,7 @@ where
     }
 }
 
-impl<M, I, L, const P: usize> Copy for Encoding<M, I, L, P>
+impl<M, I, L> Copy for Encoding<M, I, L>
 where
     M: Mode,
     I: WireIntegerEncoding,

@@ -17,7 +17,6 @@ use crate::en::SelfEncoder;
 use crate::error::Error;
 use crate::fixed_bytes::FixedBytes;
 use crate::reader::{Reader, SliceReader};
-use crate::tag::MAX_INLINE_LEN;
 use crate::writer::Writer;
 
 /// The default configuration.
@@ -26,10 +25,6 @@ use crate::writer::Writer;
 ///
 /// The variable length encoding uses [zigzag] with [continuation] encoding for
 /// numbers.
-///
-/// The maximum pack length permitted equals to [MAX_INLINE_LEN], which is 62.
-/// Trying to encode larger packs will result in a runtime error. This can be
-/// modified with [Encoding::with_max_pack].
 ///
 /// [zigzag]: musli_common::int::zigzag
 /// [continuation]: musli_common::int::continuation
@@ -102,11 +97,11 @@ where
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = DefaultMode, const P: usize = MAX_INLINE_LEN> {
+pub struct Encoding<M = DefaultMode> {
     _marker: marker::PhantomData<M>,
 }
 
-impl Encoding<DefaultMode, MAX_INLINE_LEN> {
+impl Encoding<DefaultMode> {
     /// Construct a new [`Encoding`] instance.
     ///
     /// ```rust
@@ -143,24 +138,15 @@ impl Encoding<DefaultMode, MAX_INLINE_LEN> {
     }
 }
 
-impl<M, const P: usize> Encoding<M, P>
+impl<M> Encoding<M>
 where
     M: Mode,
 {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T, P>
+    pub const fn with_mode<T>(self) -> Encoding<T>
     where
         T: Mode,
     {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Modify the maximum pack sized allowwed in the wire format. This defaults
-    /// to [MAX_INLINE_LEN], a value that will fit unencoded in the
-    /// [Tag][crate::tag::Tag] of the type.
-    pub const fn with_max_pack<const N: usize>(self) -> Encoding<M, N> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -185,7 +171,7 @@ where
     }
 }
 
-impl<M, const P: usize> Clone for Encoding<M, P>
+impl<M> Clone for Encoding<M>
 where
     M: Mode,
 {
@@ -197,4 +183,4 @@ where
     }
 }
 
-impl<M, const P: usize> Copy for Encoding<M, P> where M: Mode {}
+impl<M> Copy for Encoding<M> where M: Mode {}

@@ -60,8 +60,7 @@ use musli_descriptive::Encoding;
 use musli::{Encode, Decode};
 use musli::mode::DefaultMode;
 
-const CONFIG: Encoding<DefaultMode, 128> = Encoding::new()
-    .with_max_pack::<128>();
+const CONFIG: Encoding<DefaultMode> = Encoding::new();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Struct<'a> {
@@ -92,6 +91,5 @@ the type which is contained in the field.
 [default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 [MAX_INLINE_LEN]: https://docs.rs/musli-wire/latest/musli_descriptive/tag/constant.MAX_INLINE_LEN.html
 [Müsli]: https://docs.rs/musli
-[Encoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_descriptive/encoding/struct.Encoding.html#method.with_max_pack
 [Encoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 [Value]: https://docs.rs/musli-value

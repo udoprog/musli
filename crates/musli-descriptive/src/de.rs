@@ -9,7 +9,7 @@ use musli::de::{
 };
 use musli::Context;
 use musli_common::int::{continuation as c, UsizeEncoding, Variable};
-use musli_common::reader::Reader;
+use musli_common::reader::{Limit, Reader};
 use musli_storage::de::StorageDecoder;
 
 use crate::error::Error;
@@ -31,16 +31,12 @@ impl<R> SelfDecoder<R> {
 
 pub struct SelfPackDecoder<R> {
     reader: R,
-    remaining: usize,
 }
 
 impl<R> SelfPackDecoder<R> {
     #[inline]
-    pub(crate) fn new(reader: R, end: usize) -> Self {
-        Self {
-            reader,
-            remaining: end,
-        }
+    pub(crate) fn new(reader: R) -> Self {
+        Self { reader }
     }
 }
 
@@ -165,6 +161,31 @@ where
             Variable::decode_usize(cx.adapt(), self.reader.borrow_mut())?
         })
     }
+
+    /// Decode the length of a prefix.
+    #[inline]
+    fn decode_pack_length<C>(&mut self, cx: &mut C, start: C::Mark) -> Result<usize, C::Error>
+    where
+        C: Context<Input = Error>,
+    {
+        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
+
+        match tag.kind() {
+            Kind::Bytes => Ok(if let Some(len) = tag.data() {
+                len as usize
+            } else {
+                Variable::decode_usize(cx.adapt(), self.reader.borrow_mut())?
+            }),
+            Kind::Pack => {
+                let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
+                    return Err(cx.message("pack tag overflowed"));
+                };
+
+                Ok(len)
+            }
+            _ => Err(cx.marked_message(start, "expected prefix or pack")),
+        }
+    }
 }
 
 /// A length-prefixed decode wrapper.
@@ -184,7 +205,7 @@ where
     Error: From<R::Error>,
 {
     type Error = Error;
-    type Pack = SelfPackDecoder<R>;
+    type Pack = SelfPackDecoder<Limit<R>>;
     type Some = Self;
     type Sequence = RemainingSelfDecoder<R>;
     type Tuple = SelfTupleDecoder<R>;
@@ -278,8 +299,8 @@ where
         C: Context<Input = Self::Error>,
     {
         let pos = cx.mark();
-        let len = self.decode_prefix(cx, Kind::Bytes, pos)?;
-        Ok(SelfPackDecoder::new(self.reader, len))
+        let len = self.decode_pack_length(cx, pos)?;
+        Ok(SelfPackDecoder::new(self.reader.limit(len)))
     }
 
     #[inline]
@@ -797,15 +818,10 @@ where
     type Decoder<'this> = StorageDecoder<R::Mut<'this>, Variable, Variable, Error> where Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, cx: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
-        self.remaining = match self.remaining.checked_sub(1) {
-            Some(remaining) => remaining,
-            None => return Err(cx.message("tried to decode past the pack")),
-        };
-
         Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 

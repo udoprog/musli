@@ -57,9 +57,8 @@
 //! use musli::{Encode, Decode};
 //! use musli::mode::DefaultMode;
 //!
-//! const CONFIG: Encoding<DefaultMode, Fixed, Variable, 128> = Encoding::new()
-//!     .with_fixed_integers()
-//!     .with_max_pack::<128>();
+//! const CONFIG: Encoding<DefaultMode, Fixed, Variable> = Encoding::new()
+//!     .with_fixed_integers();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Struct<'a> {

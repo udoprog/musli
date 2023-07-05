@@ -185,7 +185,30 @@ impl Types {
                     }
                 }
                 Extra::Visitor(..) => {
+                    let mut where_clause = syn::WhereClause {
+                        where_token: <Token![where]>::default(),
+                        predicates: Punctuated::default(),
+                    };
+
                     let c_param: syn::Ident = syn::Ident::new("C", Span::call_site());
+
+                    let mut predicate = syn::PredicateType {
+                        lifetimes: None,
+                        bounded_ty: syn::Type::Path(syn::TypePath {
+                            qself: None,
+                            path: ident_path(c_param.clone()),
+                        }),
+                        colon_token: <Token![:]>::default(),
+                        bounds: Punctuated::default(),
+                    };
+
+                    predicate.bounds.push(syn::TypeParamBound::Verbatim(quote!(
+                        musli::Context<Input = Self::Error>
+                    )));
+
+                    where_clause
+                        .predicates
+                        .push(syn::WherePredicate::Type(predicate));
 
                     let mut params = Punctuated::default();
 
@@ -202,7 +225,7 @@ impl Types {
                         lt_token: Some(<Token![<]>::default()),
                         params,
                         gt_token: Some(<Token![>]>::default()),
-                        where_clause: None,
+                        where_clause: Some(where_clause),
                     }
                 }
                 Extra::None => syn::Generics::default(),

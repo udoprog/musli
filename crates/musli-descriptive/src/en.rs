@@ -10,7 +10,8 @@ use musli_storage::en::StorageEncoder;
 use crate::error::Error;
 use crate::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use crate::tag::{
-    Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, ISIZE, U128, U16, U32, U64, U8, USIZE,
+    Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, ISIZE, MAX_INLINE_LEN, U128, U16, U32, U64,
+    U8, USIZE,
 };
 
 /// A very simple encoder.
@@ -86,7 +87,13 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        Ok(SelfPackEncoder::new(self.writer, cx.alloc()))
+        let mut buffer = cx.alloc();
+
+        if !buffer.write(&[0]) {
+            return Err(cx.message("pack buffer too small"));
+        }
+
+        Ok(SelfPackEncoder::new(self.writer, buffer))
     }
 
     #[inline]
@@ -364,9 +371,40 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        let buffer = self.buffer.into_inner();
-        encode_prefix(cx, self.writer.borrow_mut(), Kind::Bytes, buffer.len())?;
+        static PAD: [u8; 1024] = [0; 1024];
+
+        let mut buffer = self.buffer.into_inner();
+        let len = buffer.len().wrapping_sub(1);
+
+        let (tag, mut rem) = if len <= MAX_INLINE_LEN {
+            (Tag::new(Kind::Bytes, len as u8), 0)
+        } else {
+            let pow = len.next_power_of_two();
+            let rem = len - pow;
+
+            let Ok(pow) = usize::try_from(pow.trailing_zeros()) else {
+                return Err(cx.message("pack too large"));
+            };
+
+            if pow > MAX_INLINE_LEN {
+                return Err(cx.message("pack too large"));
+            }
+
+            (Tag::new(Kind::Pack, pow as u8), rem)
+        };
+
+        if !buffer.write_at(0, &[tag.byte()]) {
+            return Err(cx.message("pack buffer overflow"));
+        }
+
         self.writer.write_buffer(cx.adapt(), buffer)?;
+
+        while rem > 0 {
+            let len = rem.min(PAD.len());
+            self.writer.write_bytes(cx.adapt(), &PAD[..len])?;
+            rem -= len;
+        }
+
         Ok(())
     }
 }

@@ -58,10 +58,9 @@ where
         let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         match tag.kind() {
-            Kind::Byte => {
-                if tag.data().is_none() {
-                    self.reader.skip(cx.adapt(), 1)?;
-                }
+            Kind::Pack => {
+                let len = 2usize.pow(tag.data_raw() as u32);
+                self.reader.skip(cx.adapt(), len)?;
             }
             Kind::Prefix => {
                 let len = if let Some(len) = tag.data() {
@@ -141,27 +140,27 @@ where
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_prefix<C>(&mut self, cx: &mut C, start: C::Mark) -> Result<usize, C::Error>
+    fn decode_len<C>(&mut self, cx: &mut C, start: C::Mark) -> Result<usize, C::Error>
     where
         C: Context<Input = Error>,
     {
         let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
-        if tag.kind() != Kind::Prefix {
-            return Err(cx.marked_message(
-                start,
-                Expected {
-                    expected: Kind::Prefix,
-                    actual: tag,
-                },
-            ));
-        }
+        match tag.kind() {
+            Kind::Prefix => Ok(if let Some(len) = tag.data() {
+                len as usize
+            } else {
+                L::decode_usize(cx.adapt(), self.reader.borrow_mut())?
+            }),
+            Kind::Pack => {
+                let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
+                    return Err(cx.message("pack tag overflowed"));
+                };
 
-        Ok(if let Some(len) = tag.data() {
-            len as usize
-        } else {
-            L::decode_usize(cx.adapt(), self.reader.borrow_mut())?
-        })
+                Ok(len)
+            }
+            _ => Err(cx.marked_message(start, "expected prefix or pack")),
+        }
     }
 }
 
@@ -216,7 +215,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mark = cx.mark();
-        let len = self.decode_prefix(cx, mark)?;
+        let len = self.decode_len(cx, mark)?;
         Ok(WireDecoder::new(self.reader.limit(len)))
     }
 
@@ -226,7 +225,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mark = cx.mark();
-        let len = self.decode_prefix(cx, mark)?;
+        let len = self.decode_len(cx, mark)?;
 
         if len != N {
             return Err(cx.marked_message(
@@ -248,7 +247,7 @@ where
         V: ValueVisitor<'de, C, [u8]>,
     {
         let start = cx.mark();
-        let len = self.decode_prefix(cx, start)?;
+        let len = self.decode_len(cx, start)?;
         self.reader.read_bytes(cx, len, visitor)
     }
 
@@ -301,8 +300,8 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        const FALSE: Tag = Tag::new(Kind::Byte, 0);
-        const TRUE: Tag = Tag::new(Kind::Byte, 1);
+        const FALSE: Tag = Tag::new(Kind::Continuation, 0);
+        const TRUE: Tag = Tag::new(Kind::Continuation, 1);
 
         let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
@@ -327,24 +326,11 @@ where
     }
 
     #[inline(always)]
-    fn decode_u8<C>(mut self, cx: &mut C) -> Result<u8, C::Error>
+    fn decode_u8<C>(self, cx: &mut C) -> Result<u8, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
-        let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
-
-        if tag.kind() != Kind::Byte {
-            return Err(cx.message(Expected {
-                expected: Kind::Byte,
-                actual: tag,
-            }));
-        }
-
-        if let Some(b) = tag.data() {
-            Ok(b)
-        } else {
-            self.reader.read_byte(cx.adapt())
-        }
+        I::decode_typed_unsigned(cx.adapt(), self.reader)
     }
 
     #[inline(always)]

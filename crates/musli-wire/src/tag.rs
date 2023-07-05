@@ -19,9 +19,9 @@ pub const MAX_INLINE_LEN: usize = (DATA_MASK - 1) as usize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Kind {
-    /// A single byte. If it fits in 6 bits that is used, but if all data bits
-    /// are 1s the following byte is used.
-    Byte = 0b00_000000,
+    /// A packed sequence. The length of the packed sequence is the 2 to the
+    /// power of the mask as an unsigned integer.
+    Pack = 0b00_000000,
     /// A fixed element where data indicates how many bytes it consists of. Data
     /// contains the prefix length unless it's set to all 1s after which a
     /// continuation sequence indicating the length should be decoded.
@@ -32,7 +32,7 @@ pub enum Kind {
     Sequence = 0b10_000000,
     /// A continuation-encoded value. Data is the immediate value embedded if
     /// it's small enough to fit in 6 bits. All bits as 1s is reserved to
-    /// indicate when it's empty.
+    /// indicate when a continuation sequence is used.
     Continuation = 0b11_000000,
 }
 
@@ -92,7 +92,7 @@ impl Tag {
     /// Perform raw access over the data payload. Will return [DATA_MASK] if
     /// data is empty.
     #[inline]
-    const fn data_raw(self) -> u8 {
+    pub(crate) const fn data_raw(self) -> u8 {
         self.repr & DATA_MASK
     }
 

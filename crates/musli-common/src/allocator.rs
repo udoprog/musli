@@ -45,7 +45,7 @@ use musli::context::Buffer;
 /// use musli_common::allocator::{self, Allocator};
 /// use musli::context::Buffer;
 ///
-/// let alloc = allocator::Alloc::default();
+/// let alloc = musli_common::allocator::Default::default();
 /// let alloc = &alloc;
 ///
 /// let mut a = alloc.alloc();
