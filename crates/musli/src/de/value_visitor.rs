@@ -23,9 +23,9 @@ use crate::Context;
 /// [Decoder]: crate::de::Decoder
 /// [Decoder::decode_bytes]: crate::de::Decoder::decode_bytes
 /// [Decoder::decode_string]: crate::de::Decoder::decode_string
-pub trait ValueVisitor<'de, 'buf, C, T>: Sized
+pub trait ValueVisitor<'de, C, T>: Sized
 where
-    C: Context<'buf>,
+    C: Context,
     T: ?Sized + ToOwned,
 {
     /// The value produced.
@@ -84,10 +84,10 @@ where
     }
 }
 
-impl<'de, 'buf, U, C, T> Expecting for ExpectingWrapper<U, C, T>
+impl<'de, U, C, T> Expecting for ExpectingWrapper<U, C, T>
 where
-    U: ValueVisitor<'de, 'buf, C, T>,
-    C: Context<'buf>,
+    U: ValueVisitor<'de, C, T>,
+    C: Context,
     T: ?Sized + ToOwned,
 {
     #[inline]

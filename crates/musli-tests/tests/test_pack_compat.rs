@@ -56,8 +56,7 @@ struct IgnoreBoth {
 
 #[test]
 fn test_packed_compat() {
-    const ENCODING: Encoding<DefaultMode, Variable, Variable, 128> =
-        Encoding::new().with_max_pack();
+    const ENCODING: Encoding<DefaultMode, Variable, Variable> = Encoding::new();
 
     let data = ENCODING
         .to_vec(&SmallPackCompat {

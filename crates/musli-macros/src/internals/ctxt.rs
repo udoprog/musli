@@ -65,14 +65,4 @@ impl Ctxt {
         let name = format!("__{name}");
         syn::Ident::new(&name, Span::call_site())
     }
-
-    /// Build an identifier with the given name, escaped so it's harder to conflict with.
-    pub(crate) fn lifetime(&self, name: &str) -> syn::Lifetime {
-        let Some(lt) = name.strip_prefix('\'') else {
-            panic!("should start with `'`: {name}")
-        };
-
-        let name = format!("'__{lt}");
-        syn::Lifetime::new(&name, Span::call_site())
-    }
 }

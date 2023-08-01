@@ -92,9 +92,9 @@ pub enum Kind {
     /// A marker value.
     Mark = 0b110_00000,
     /// Reserved.
-    Reserved0 = 0b101_00000,
+    Pack = 0b101_00000,
     /// Reserved.
-    Reserved1 = 0b111_00000,
+    Reserved0 = 0b111_00000,
 }
 
 /// A type tag.
@@ -169,7 +169,7 @@ impl Tag {
     /// Perform raw access over the data payload. Will return [DATA_MASK] if
     /// data is empty.
     #[inline]
-    const fn data_raw(self) -> u8 {
+    pub(crate) const fn data_raw(self) -> u8 {
         self.repr & DATA_MASK
     }
 
@@ -227,9 +227,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>,
     {
         Ok(Self::from_byte(decoder.decode_u8(cx)?))

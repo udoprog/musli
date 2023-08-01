@@ -12,9 +12,9 @@ where
     M: Mode,
 {
     /// Decode the given input.
-    fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>;
 }
 
@@ -31,8 +31,8 @@ where
     M: Mode,
 {
     /// Decode the given input.
-    fn trace_decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn trace_decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<'buf, Input = D::Error>,
+        C: Context<Input = D::Error>,
         D: Decoder<'de>;
 }

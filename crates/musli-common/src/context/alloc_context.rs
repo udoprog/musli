@@ -1,7 +1,5 @@
 use core::fmt;
-use core::marker::PhantomData;
 use core::ops::Range;
-use core::ptr;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -9,49 +7,31 @@ use alloc::vec::Vec;
 use musli::context::Error;
 use musli::Context;
 
+use crate::allocator::Allocator;
 use crate::context::rich_error::{RichError, Step};
-
-/// Buffer used in combination with [`AllocContext`].
-///
-/// This can be safely re-used.
-#[derive(Default)]
-pub struct AllocBuf {
-    string: String,
-}
-
-impl AllocBuf {
-    /// De-allocate the underlying buffer, this can be useful if you're dealing
-    /// with infrequent decodings which uses large keys and you don't want the
-    /// memory to keep being reserved.
-    pub fn free(&mut self) {
-        self.string = String::new();
-    }
-}
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
-pub struct AllocContext<'buf, E> {
+pub struct AllocContext<E, A> {
     mark: usize,
-    buf: ptr::NonNull<AllocBuf>,
+    alloc: A,
     errors: Vec<(Vec<Step<String>>, Range<usize>, E)>,
     path: Vec<Step<String>>,
     include_type: bool,
-    _marker: PhantomData<(&'buf mut AllocBuf, E)>,
 }
 
-impl<'buf, E> AllocContext<'buf, E> {
+impl<E, A> AllocContext<E, A> {
     /// Construct a new context which uses allocations to store arbitrary
     /// amounts of diagnostics about decoding.
     ///
     /// Or at least until we run out of memory.
-    pub fn new(buf: &'buf mut AllocBuf) -> Self {
+    pub fn new(alloc: A) -> Self {
         Self {
             mark: 0,
-            buf: buf.into(),
+            alloc,
             errors: Vec::new(),
             path: Vec::new(),
             include_type: false,
-            _marker: PhantomData,
         }
     }
 
@@ -70,13 +50,20 @@ impl<'buf, E> AllocContext<'buf, E> {
     }
 }
 
-impl<'buf, E> Context<'buf> for AllocContext<'buf, E>
+impl<E, A> Context for AllocContext<E, A>
 where
     E: musli::error::Error,
+    A: Allocator,
 {
     type Input = E;
     type Error = Error;
     type Mark = usize;
+    type Buf = A::Buf;
+
+    #[inline(always)]
+    fn alloc(&mut self) -> Self::Buf {
+        self.alloc.alloc()
+    }
 
     #[inline(always)]
     fn report<T>(&mut self, error: T) -> Self::Error
@@ -136,23 +123,6 @@ where
     #[inline]
     fn advance(&mut self, n: usize) {
         self.mark = self.mark.wrapping_add(n);
-    }
-
-    #[inline(always)]
-    fn store_string(&mut self, s: &str) {
-        // SAFETY: we're holding onto a mutable reference to the string so it
-        // must be live for the duration of the context.
-        let buf = unsafe { self.buf.as_mut() };
-        buf.string.clear();
-        buf.string.push_str(s);
-    }
-
-    #[inline(always)]
-    fn get_string<'a>(&self) -> Option<&'buf str> {
-        // SAFETY: we're holding onto a mutable reference to the string so it
-        // must be live for the duration of the context.
-        let buf = unsafe { self.buf.as_ref() };
-        Some(&buf.string)
     }
 
     #[inline]

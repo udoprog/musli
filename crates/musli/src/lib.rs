@@ -124,9 +124,9 @@
 //! }
 //!
 //! impl<'de, M> Decode<'de, M> for MyType where M: Mode {
-//!     fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+//!     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
 //!     where
-//!         C: Context<'buf, Input = D::Error>,
+//!         C: Context<Input = D::Error>,
 //!         D: Decoder<'de>,
 //!     {
 //!         let mut seq = decoder.decode_sequence(cx)?;
@@ -497,9 +497,9 @@ pub use self::mode::Mode;
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn encode_u32<'buf, C>(self, cx: &mut C, value: u32) -> Result<(), C::Error>
+///     fn encode_u32<C>(self, cx: &mut C, value: u32) -> Result<(), C::Error>
 ///     where
-///         C: Context<'buf, Input = Self::Error>
+///         C: Context<Input = Self::Error>
 ///     {
 ///         *self.value = Some(value);
 ///         Ok(())
@@ -537,9 +537,9 @@ pub use musli_macros::encoder;
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32<'buf, C>(self, _: &mut C) -> Result<u32, C::Error>
+///     fn decode_u32<C>(self, _: &mut C) -> Result<u32, C::Error>
 ///     where
-///         C: Context<'buf, Input = Self::Error>
+///         C: Context<Input = Self::Error>
 ///     {
 ///         Ok(42)
 ///     }

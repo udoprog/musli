@@ -66,56 +66,56 @@ pub enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorKind::IntegerOverflow => write!(f, "arithmetic overflow"),
-            ErrorKind::Decimal => write!(f, "decimal number"),
-            ErrorKind::InvalidNumeric => write!(f, "invalid numeric"),
+            ErrorKind::IntegerOverflow => write!(f, "Arithmetic overflow"),
+            ErrorKind::Decimal => write!(f, "Decimal number"),
+            ErrorKind::InvalidNumeric => write!(f, "Invalid numeric"),
             ErrorKind::ControlCharacterInString => {
-                write!(f, "control character while parsing string")
+                write!(f, "Control character while parsing string")
             }
             ErrorKind::LoneLeadingSurrogatePair => {
-                write!(f, "lone leading surrogate in hex escape")
+                write!(f, "Lone leading surrogate in hex escape")
             }
             ErrorKind::ExpectedColon(actual) => {
-                write!(f, "expected `:`, found {actual}")
+                write!(f, "Expected `:`, found {actual}")
             }
             ErrorKind::ExpectedOpenBrace(actual) => {
-                write!(f, "expected opening brace, found {actual}")
+                write!(f, "Expected opening brace, found {actual}")
             }
             ErrorKind::ExpectedCloseBrace(actual) => {
-                write!(f, "expected closing brace, found {actual}")
+                write!(f, "Expected closing brace, found {actual}")
             }
             ErrorKind::ExpectedOpenBracket(actual) => {
-                write!(f, "expected opening bracket, found {actual}")
+                write!(f, "Expected opening bracket, found {actual}")
             }
             ErrorKind::ExpectedCloseBracket(actual) => {
-                write!(f, "expected closing bracket, found {actual}")
+                write!(f, "Expected closing bracket, found {actual}")
             }
-            ErrorKind::InvalidEscape => write!(f, "invalid string escape"),
-            ErrorKind::BufferUnderflow => write!(f, "buffer underflow"),
-            ErrorKind::BufferOverflow => write!(f, "buffer overflow"),
+            ErrorKind::InvalidEscape => write!(f, "Invalid string escape"),
+            ErrorKind::BufferUnderflow => write!(f, "Buffer underflow"),
+            ErrorKind::BufferOverflow => write!(f, "Buffer overflow"),
             ErrorKind::UnexpectedHexEscapeEnd => {
-                write!(f, "unexpected end of hex escape")
+                write!(f, "Unexpected end of hex escape")
             }
-            ErrorKind::InvalidUnicode => write!(f, "invalid unicode"),
+            ErrorKind::InvalidUnicode => write!(f, "Invalid unicode"),
             ErrorKind::CharEmptyString => {
-                write!(f, "expected string with a single character")
+                write!(f, "Expected string with a single character")
             }
-            ErrorKind::ExpectedNull => write!(f, "expected `null`"),
-            ErrorKind::ExpectedTrue => write!(f, "expected `true`"),
-            ErrorKind::ExpectedFalse => write!(f, "expected `false`"),
+            ErrorKind::ExpectedNull => write!(f, "Expected `null`"),
+            ErrorKind::ExpectedTrue => write!(f, "Expected `true`"),
+            ErrorKind::ExpectedFalse => write!(f, "Expected `false`"),
             ErrorKind::ExpectedBool(actual) => {
-                write!(f, "expected boolean, found {actual}")
+                write!(f, "Expected boolean, found {actual}")
             }
             ErrorKind::ExpectedString(actual) => {
-                write!(f, "expected string, found {actual}")
+                write!(f, "Expected string, found {actual}")
             }
             ErrorKind::ExpectedValue(actual) => {
-                write!(f, "expected value, found {actual}")
+                write!(f, "Expected value, found {actual}")
             }
             ErrorKind::ParseFloat(error) => {
-                write!(f, "expected float, got {error}")
+                write!(f, "Expected float, got {error}")
             }
-            ErrorKind::Eof => write!(f, "eof while parsing"),
+            ErrorKind::Eof => write!(f, "Eof while parsing"),
         }
     }
 }

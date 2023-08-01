@@ -24,16 +24,16 @@ use crate::Context;
 /// where
 ///     M: Mode,
 /// {
-///     fn decode<'buf, C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+///     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
 ///     where
-///         C: Context<'buf, Input = D::Error>,
+///         C: Context<Input = D::Error>,
 ///         D: Decoder<'de>,
 ///     {
 ///         decoder.decode_string(cx, musli::utils::visit_owned_fn("a string variant for Enum", |cx: &mut C, variant: &str| {
 ///             match variant {
 ///                 "A" => Ok(Enum::A),
 ///                 "B" => Ok(Enum::A),
-///                 other => Err(cx.message("expected either 'A' or 'B'")),
+///                 other => Err(cx.message("Expected either 'A' or 'B'")),
 ///             }
 ///         }))
 ///     }
@@ -44,14 +44,14 @@ use crate::Context;
 /// assert_eq!(musli_value::decode::<Enum>(&value)?, Enum::A);
 /// Ok::<_, musli_value::Error>(())
 /// ```
-pub fn visit_owned_fn<'de, 'buf, E, U, C, T, O>(
+pub fn visit_owned_fn<'de, E, U, C, T, O>(
     expected: E,
     function: U,
-) -> impl ValueVisitor<'de, 'buf, C, T, Ok = O>
+) -> impl ValueVisitor<'de, C, T, Ok = O>
 where
     E: fmt::Display,
     U: FnOnce(&mut C, &T) -> Result<O, C::Error>,
-    C: Context<'buf>,
+    C: Context,
     T: ?Sized + ToOwned,
 {
     FromFn { expected, function }
@@ -62,12 +62,12 @@ struct FromFn<E, U> {
     function: U,
 }
 
-impl<'de, 'buf, W, U, C, T, O> ValueVisitor<'de, 'buf, C, T> for FromFn<W, U>
+impl<'de, W, U, C, T, O> ValueVisitor<'de, C, T> for FromFn<W, U>
 where
     W: fmt::Display,
     U: FnOnce(&mut C, &T) -> Result<O, C::Error>,
     T: ?Sized + ToOwned,
-    C: Context<'buf>,
+    C: Context,
 {
     type Ok = O;
 

@@ -26,7 +26,7 @@ impl<'a, S, E> RichError<'a, S, E> {
     }
 }
 
-impl<'buf, S, E> fmt::Display for RichError<'buf, S, E>
+impl<'a, S, E> fmt::Display for RichError<'a, S, E>
 where
     S: AsRef<str>,
     E: fmt::Display,

@@ -1,11 +1,10 @@
 #![allow(clippy::zero_prefixed_literal)]
 
+use musli::context::Buffer;
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};
 use crate::reader::{Parser, SliceParser};
-
-use crate::reader::Scratch;
 
 // Copied and adapter form the serde-json project under the MIT and Apache 2.0
 // license.
@@ -48,15 +47,16 @@ pub enum StringReference<'de, 'scratch> {
 }
 
 /// Specialized reader implementation from a slice.
-pub(crate) fn parse_string_slice_reader<'de, 'buf, 'scratch, C>(
+pub(crate) fn parse_string_slice_reader<'de, 'scratch, C, S>(
     cx: &mut C,
     reader: &mut SliceParser<'de>,
-    scratch: &'scratch mut Scratch,
     validate: bool,
     start: C::Mark,
+    scratch: &'scratch mut S,
 ) -> Result<StringReference<'de, 'scratch>, C::Error>
 where
-    C: Context<'buf, Input = Error>,
+    C: Context<Input = Error>,
+    S: ?Sized + Buffer,
 {
     // Index of the first byte not yet copied into the scratch space.
     let mut open_mark = cx.mark();
@@ -87,18 +87,26 @@ where
                 } else {
                     let slice = &reader.slice[open..reader.index];
                     check_utf8(cx, slice, start)?;
-                    scratch.extend_from_slice(slice);
+
+                    if !scratch.write(slice) {
+                        return Err(cx.message("Scratch buffer overflow"));
+                    }
+
                     reader.index = reader.index.wrapping_add(1);
                     cx.advance(1);
                     // SAFETY: we've checked each segment to be valid UTF-8.
-                    let scratch = unsafe { core::str::from_utf8_unchecked(scratch.as_bytes()) };
+                    let scratch = unsafe { core::str::from_utf8_unchecked(scratch.as_slice()) };
                     return Ok(StringReference::Scratch(scratch));
                 }
             }
             b'\\' => {
                 let slice = &reader.slice[open..reader.index];
                 check_utf8(cx, slice, start)?;
-                scratch.extend_from_slice(slice);
+
+                if !scratch.write(slice) {
+                    return Err(cx.message("Scratch buffer overflow"));
+                }
+
                 reader.index = reader.index.wrapping_add(1);
                 cx.advance(1);
 
@@ -126,9 +134,9 @@ where
 
 /// Check that the given slice is valid UTF-8.
 #[inline]
-fn check_utf8<'buf, C>(cx: &mut C, bytes: &[u8], start: C::Mark) -> Result<(), C::Error>
+fn check_utf8<C>(cx: &mut C, bytes: &[u8], start: C::Mark) -> Result<(), C::Error>
 where
-    C: Context<'buf, Input = Error>,
+    C: Context<Input = Error>,
 {
     if musli_common::str::from_utf8(bytes).is_err() {
         Err(cx.marked_report(start, Error::new(ErrorKind::InvalidUnicode)))
@@ -139,14 +147,15 @@ where
 
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
-fn parse_escape<'buf, C>(
+fn parse_escape<C, B>(
     cx: &mut C,
     parser: &mut SliceParser<'_>,
     validate: bool,
-    scratch: &mut Scratch,
+    scratch: &mut B,
 ) -> Result<bool, C::Error>
 where
-    C: Context<'buf, Input = Error>,
+    C: Context<Input = Error>,
+    B: ?Sized + Buffer,
 {
     let start = cx.mark();
     let b = parser.read_byte(cx)?;
@@ -161,8 +170,11 @@ where
         b'r' => scratch.push(b'\r'),
         b't' => scratch.push(b'\t'),
         b'u' => {
-            fn encode_surrogate(scratch: &mut Scratch, n: u16) -> bool {
-                scratch.extend_from_slice(&[
+            fn encode_surrogate<B>(scratch: &mut B, n: u16) -> bool
+            where
+                B: ?Sized + Buffer,
+            {
+                scratch.write(&[
                     (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,
                     (n >> 6 & 0b0011_1111) as u8 | 0b1000_0000,
                     (n & 0b0011_1111) as u8 | 0b1000_0000,
@@ -239,7 +251,7 @@ where
                 n => char::from_u32(n as u32).unwrap(),
             };
 
-            scratch.extend_from_slice(c.encode_utf8(&mut [0u8; 4]).as_bytes())
+            scratch.write(c.encode_utf8(&mut [0u8; 4]).as_bytes())
         }
         _ => {
             return Err(cx.marked_report(start, Error::new(ErrorKind::InvalidEscape)));
@@ -283,13 +295,9 @@ pub(crate) fn decode_hex_val(val: u8) -> Option<u16> {
 }
 
 /// Specialized reader implementation from a slice.
-pub(crate) fn skip_string<'de, 'buf, C, P>(
-    cx: &mut C,
-    p: &mut P,
-    validate: bool,
-) -> Result<(), C::Error>
+pub(crate) fn skip_string<'de, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
 where
-    C: Context<'buf, Input = Error>,
+    C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,
 {
     loop {
@@ -321,9 +329,9 @@ where
 
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
-fn skip_escape<'de, 'buf, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
+fn skip_escape<'de, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
 where
-    C: Context<'buf, Input = Error>,
+    C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,
 {
     let start = cx.mark();

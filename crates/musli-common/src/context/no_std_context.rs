@@ -1,21 +1,12 @@
 use core::fmt;
-use core::marker::PhantomData;
 use core::ops::Range;
-use core::ptr;
 
 use arrayvec::{ArrayString, ArrayVec};
 use musli::context::Error;
 use musli::Context;
 
+use crate::allocator::Allocator;
 use crate::context::rich_error::{RichError, Step};
-
-const STRING_SIZE: usize = 64;
-
-/// Buffer used in no-std environments.
-#[derive(Default)]
-pub struct NoStdBuf {
-    string: ArrayString<STRING_SIZE>,
-}
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
@@ -26,40 +17,38 @@ pub struct NoStdBuf {
 ///   indicator is used instead.
 /// * The `S` parameter indicates the maximum size in bytes (UTF-8) of a stored
 ///   map key.
-pub struct NoStdContext<'buf, const P: usize, const S: usize, E> {
+pub struct NoStdContext<const P: usize, const S: usize, A, E> {
     mark: usize,
-    buf: ptr::NonNull<NoStdBuf>,
+    alloc: A,
     error: Option<(Range<usize>, E)>,
     path: ArrayVec<Step<ArrayString<S>>, P>,
     path_cap: usize,
     include_type: bool,
-    _marker: PhantomData<(&'buf mut NoStdBuf, E)>,
 }
 
-impl<'buf, E> NoStdContext<'buf, 16, 32, E> {
+impl<A, E> NoStdContext<16, 32, A, E> {
     /// Construct a new context which uses allocations to a fixed number of
     /// diagnostics.
     ///
     /// This uses the default values of:
     /// * 16 path elements stored.
     /// * A maximum map key of 32 bytes (UTF-8).
-    pub fn new(buf: &'buf mut NoStdBuf) -> Self {
-        Self::new_with(buf)
+    pub fn new(alloc: A) -> Self {
+        Self::new_with(alloc)
     }
 }
 
-impl<'buf, const P: usize, const S: usize, E> NoStdContext<'buf, P, S, E> {
+impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
-    pub fn new_with(buf: &'buf mut NoStdBuf) -> Self {
+    pub fn new_with(alloc: A) -> Self {
         Self {
             mark: 0,
-            buf: buf.into(),
+            alloc,
             error: None,
             path: ArrayVec::new(),
             path_cap: 0,
             include_type: false,
-            _marker: PhantomData,
         }
     }
 
@@ -100,13 +89,20 @@ impl<'buf, const P: usize, const S: usize, E> NoStdContext<'buf, P, S, E> {
     }
 }
 
-impl<'buf, const V: usize, const S: usize, E> Context<'buf> for NoStdContext<'buf, V, S, E>
+impl<const V: usize, const S: usize, A, E> Context for NoStdContext<V, S, A, E>
 where
+    A: Allocator,
     E: musli::error::Error,
 {
     type Input = E;
     type Error = Error;
     type Mark = usize;
+    type Buf = A::Buf;
+
+    #[inline(always)]
+    fn alloc(&mut self) -> Self::Buf {
+        self.alloc.alloc()
+    }
 
     #[inline(always)]
     fn report<T>(&mut self, error: T) -> Self::Error
@@ -161,36 +157,6 @@ where
     #[inline]
     fn advance(&mut self, n: usize) {
         self.mark = self.mark.wrapping_add(n);
-    }
-
-    #[inline(always)]
-    fn store_string(&mut self, mut s: &str) {
-        // SAFETY: we're holding onto a mutable reference to the string so it
-        // must be live for the duration of the context.
-        let buf = unsafe { self.buf.as_mut() };
-        buf.string.clear();
-
-        // If the string is longer than capacity, push up until a character
-        // boundary and clip the rest.
-        if s.len() > buf.string.capacity() {
-            let mut index = buf.string.capacity();
-
-            while !s.is_char_boundary(index) {
-                index = index.wrapping_sub(1);
-            }
-
-            s = &s[..index];
-        }
-
-        let _ = buf.string.try_push_str(s);
-    }
-
-    #[inline(always)]
-    fn get_string<'a>(&self) -> Option<&'buf str> {
-        // SAFETY: we're holding onto a mutable reference to the string so it
-        // must be live for the duration of the context.
-        let buf = unsafe { self.buf.as_ref() };
-        Some(&buf.string)
     }
 
     #[inline]

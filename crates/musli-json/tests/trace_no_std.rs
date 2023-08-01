@@ -3,7 +3,8 @@
 use std::collections::HashMap;
 
 use musli::{Decode, Encode};
-use musli_common::context::{NoStdBuf, NoStdContext};
+use musli_common::allocator::NoStd;
+use musli_common::context::NoStdContext;
 
 #[derive(Encode)]
 struct From {
@@ -18,9 +19,8 @@ struct Collection {
 
 #[test]
 fn trace_no_std() {
-    let mut buf = NoStdBuf::default();
-
-    let mut cx = NoStdContext::new(&mut buf);
+    let alloc = NoStd::<1024>::new();
+    let mut cx = NoStdContext::new(&alloc);
 
     let mut values = HashMap::new();
 
@@ -38,16 +38,16 @@ fn trace_no_std() {
         unreachable!()
     };
 
-    let mut cx = NoStdContext::new(&mut buf);
+    let mut cx = NoStdContext::new(&alloc);
 
     let Ok(..) = encoding.from_slice_with::<_, Collection>(&mut cx, &bytes) else {
         if let Some(error) = cx.iter().next() {
-            assert_eq!(error.to_string(), ".values[Hello]: invalid numeric (at bytes 15-16)");
+            assert_eq!(error.to_string(), ".values[Hello]: Invalid numeric (at bytes 15-16)");
             return;
         }
 
         unreachable!()
     };
 
-    panic!("expected decoding to error");
+    panic!("Expected decoding to error");
 }

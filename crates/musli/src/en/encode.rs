@@ -10,9 +10,9 @@ where
     M: Mode,
 {
     /// Encode the given output.
-    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<'buf, Input = E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder;
 }
 
@@ -29,9 +29,9 @@ where
     M: Mode,
 {
     /// Encode the given output.
-    fn trace_encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn trace_encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<'buf, Input = E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder;
 }
 
@@ -41,9 +41,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<'buf, Input = E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         T::encode(*self, cx, encoder)
@@ -56,9 +56,9 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<'buf, C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<'buf, Input = E::Error>,
+        C: Context<Input = E::Error>,
         E: Encoder,
     {
         T::encode(*self, cx, encoder)

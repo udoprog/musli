@@ -17,10 +17,7 @@ pub mod serde_dlhn {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(
-        buf: &'buf mut Vec<u8>,
-        value: &T,
-    ) -> Result<&'buf [u8], dlhn::ser::Error>
+    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], dlhn::ser::Error>
     where
         T: Serialize,
     {
@@ -85,7 +82,7 @@ pub mod rkyv {
     >;
 
     #[inline(always)]
-    pub fn encode<'buf, T>(
+    pub fn encode<T>(
         buf: &'buf mut Buffers,
         value: &T,
     ) -> Result<&'buf [u8], <S<'buf> as Fallible>::Error>
@@ -131,7 +128,7 @@ pub mod serde_rmp {
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(
+    pub fn encode<T>(
         buf: &'buf mut Vec<u8>,
         value: &T,
     ) -> Result<&'buf [u8], rmp_serde::encode::Error>
@@ -167,7 +164,7 @@ pub mod serde_bitcode {
     pub fn reset<T>(_: &mut Buffer, _: usize, _: &T) {}
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
+    pub fn encode<T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
     where
         T: Serialize,
     {
@@ -199,7 +196,7 @@ pub mod derive_bitcode {
     pub fn reset<T>(_: &mut Buffer, _: usize, _: &T) {}
 
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
+    pub fn encode<T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
     where
         T: Encode,
     {

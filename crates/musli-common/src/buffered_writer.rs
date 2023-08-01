@@ -1,6 +1,7 @@
 //! A writer which buffers the writes before it outputs it into the backing
 //! storage.
 
+use musli::context::Buffer;
 use musli::Context;
 
 use crate::fixed_bytes::{FixedBytes, FixedBytesOverflow};
@@ -28,9 +29,9 @@ where
     }
 
     /// Finish writing.
-    pub fn finish<'buf, C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    pub fn finish<C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = W::Error>,
+        C: Context<Input = W::Error>,
     {
         if !self.buf.is_empty() {
             self.writer.write_bytes(cx, self.buf.as_slice())?;
@@ -54,9 +55,19 @@ where
     }
 
     #[inline]
-    fn write_bytes<'buf, C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
+        B: Buffer,
+    {
+        // SAFETY: the buffer never outlives this function call.
+        self.write_bytes(cx, unsafe { buffer.as_slice() })
+    }
+
+    #[inline]
+    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
     {
         if self.buf.remaining() < bytes.len() {
             self.writer.write_bytes(cx, self.buf.as_slice())?;

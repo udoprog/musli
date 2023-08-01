@@ -65,27 +65,27 @@ impl fmt::Display for ErrorKind {
             ErrorKind::ArrayOutOfBounds => {
                 write!(f, "tried to decode array that is out-of-bounds")
             }
-            ErrorKind::ExpectedPackValue => write!(f, "expected pack value"),
-            ErrorKind::ExpectedUnit(hint) => write!(f, "expected unit, but found {hint}"),
-            ErrorKind::ExpectedBool(hint) => write!(f, "expected boolean, but found {hint}"),
-            ErrorKind::ExpectedChar(hint) => write!(f, "expected character, but found {hint}"),
+            ErrorKind::ExpectedPackValue => write!(f, "Expected pack value"),
+            ErrorKind::ExpectedUnit(hint) => write!(f, "Expected unit, but found {hint}"),
+            ErrorKind::ExpectedBool(hint) => write!(f, "Expected boolean, but found {hint}"),
+            ErrorKind::ExpectedChar(hint) => write!(f, "Expected character, but found {hint}"),
             ErrorKind::ExpectedNumber(number, hint) => {
-                write!(f, "expected {number}, but found {hint}")
+                write!(f, "Expected {number}, but found {hint}")
             }
             #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedBytes(hint) => write!(f, "expected bytes, but found {hint}"),
+            ErrorKind::ExpectedBytes(hint) => write!(f, "Expected bytes, but found {hint}"),
             #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedString(hint) => write!(f, "expected string, but found {hint}"),
+            ErrorKind::ExpectedString(hint) => write!(f, "Expected string, but found {hint}"),
             #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedOption(hint) => write!(f, "expected option, but found {hint}"),
+            ErrorKind::ExpectedOption(hint) => write!(f, "Expected option, but found {hint}"),
             #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedSequence(hint) => write!(f, "expected sequence, but found {hint}"),
+            ErrorKind::ExpectedSequence(hint) => write!(f, "Expected sequence, but found {hint}"),
             #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedPack(hint) => write!(f, "expected pack, but found {hint}"),
+            ErrorKind::ExpectedPack(hint) => write!(f, "Expected pack, but found {hint}"),
             #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedMap(hint) => write!(f, "expected map, but found {hint}"),
+            ErrorKind::ExpectedMap(hint) => write!(f, "Expected map, but found {hint}"),
             #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedVariant(hint) => write!(f, "expected struct, but found {hint}"),
+            ErrorKind::ExpectedVariant(hint) => write!(f, "Expected struct, but found {hint}"),
         }
     }
 }

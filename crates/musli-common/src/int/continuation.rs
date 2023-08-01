@@ -2,15 +2,19 @@
 //! continuation of the sequence or not.
 //!
 //! ```
+//! use musli_common::context::Ignore;
+//! use musli_common::fixed_bytes::{FixedBytes, FixedBytesOverflow};
 //! use musli_common::int::continuation as c;
-//! use musli_common::fixed_bytes::FixedBytes;
+//! use musli_common::reader::SliceUnderflow;
 //!
-//! let mut cx = musli_common::context::Ignore::default();
+//! let alloc = musli_common::allocator::Default::default();
+//!
+//! let mut cx: Ignore<_, FixedBytesOverflow> = Ignore::new(&alloc);
 //! let mut bytes = FixedBytes::<8>::new();
 //! c::encode(&mut cx, &mut bytes, 5000u32).unwrap();
 //! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let mut cx = musli_common::context::Ignore::default();
+//! let mut cx: Ignore<_, SliceUnderflow> = Ignore::new(&alloc);
 //! let number: u32 = c::decode(&mut cx, bytes.as_slice()).unwrap();
 //! assert_eq!(number, 5000u32);
 //! ```
@@ -32,9 +36,9 @@ const CONT_BYTE: u8 = 0b1000_0000;
 
 /// Decode the given length using variable int encoding.
 #[inline(never)]
-pub fn decode<'de, 'buf, C, R, T>(cx: &mut C, mut r: R) -> Result<T, C::Error>
+pub fn decode<'de, C, R, T>(cx: &mut C, mut r: R) -> Result<T, C::Error>
 where
-    C: Context<'buf, Input = R::Error>,
+    C: Context<Input = R::Error>,
     R: Reader<'de>,
     T: int::Unsigned,
 {
@@ -51,7 +55,7 @@ where
         shift += 7;
 
         if shift >= T::BITS {
-            return Err(cx.custom("bits overflow"));
+            return Err(cx.custom("Bits overflow"));
         }
 
         b = r.read_byte(cx)?;
@@ -63,9 +67,9 @@ where
 
 /// Encode the given length using variable length encoding.
 #[inline(never)]
-pub fn encode<'buf, C, W, T>(cx: &mut C, mut w: W, mut value: T) -> Result<(), C::Error>
+pub fn encode<C, W, T>(cx: &mut C, mut w: W, mut value: T) -> Result<(), C::Error>
 where
-    C: Context<'buf, Input = W::Error>,
+    C: Context<Input = W::Error>,
     W: Writer,
     T: int::Unsigned,
 {

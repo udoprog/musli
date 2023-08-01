@@ -5,6 +5,8 @@
 //! an adapter around an I/O type to work with musli.
 
 #[cfg(feature = "std")]
+use musli::context::Buffer;
+#[cfg(feature = "std")]
 use musli::Context;
 
 /// Wrapper constructed with [wrap].
@@ -35,9 +37,19 @@ where
     }
 
     #[inline]
-    fn write_bytes<'buf, C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<'buf, Input = Self::Error>,
+        C: Context<Input = Self::Error>,
+        B: Buffer,
+    {
+        // SAFETY: the buffer never outlives this function call.
+        self.write_bytes(cx, unsafe { buffer.as_slice() })
+    }
+
+    #[inline]
+    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
     {
         self.inner.write_all(bytes).map_err(|err| cx.report(err))?;
         cx.advance(bytes.len());

@@ -12,7 +12,8 @@ macro_rules! encode_with_extensions {
             Error: From<W::Error>,
             T: ?Sized + Encode<M>,
         {
-            let mut cx = musli_common::context::Same::default();
+            let alloc = musli_common::allocator::Default::default();
+            let mut cx = musli_common::context::Same::new(&alloc);
             self.encode_with(&mut cx, writer, value)
         }
 
@@ -48,9 +49,9 @@ macro_rules! encode_with_extensions {
         /// configurable [`Context`].
         #[cfg(feature = "alloc")]
         #[inline]
-        pub fn to_vec_with<'buf, C, T>(self, cx: &mut C, value: &T) -> Result<Vec<u8>, C::Error>
+        pub fn to_vec_with<C, T>(self, cx: &mut C, value: &T) -> Result<Vec<u8>, C::Error>
         where
-            C: Context<'buf, Input = Error>,
+            C: Context<Input = Error>,
             T: ?Sized + Encode<M>,
         {
             let mut vec = Vec::new();
@@ -65,20 +66,21 @@ macro_rules! encode_with_extensions {
         where
             T: ?Sized + Encode<M>,
         {
-            let mut cx = musli_common::context::Same::default();
+            let alloc = musli_common::allocator::Default::default();
+            let mut cx = musli_common::context::Same::new(&alloc);
             self.to_fixed_bytes_with(&mut cx, value)
         }
 
         /// Encode the given value to a fixed-size bytes using the current
         /// configuration.
         #[inline]
-        pub fn to_fixed_bytes_with<'buf, C, const N: usize, T>(
+        pub fn to_fixed_bytes_with<C, const N: usize, T>(
             self,
             cx: &mut C,
             value: &T,
         ) -> Result<FixedBytes<N>, C::Error>
         where
-            C: Context<'buf, Input = Error>,
+            C: Context<Input = Error>,
             T: ?Sized + Encode<M>,
         {
             let mut bytes = FixedBytes::new();
@@ -100,7 +102,8 @@ macro_rules! encoding_from_slice_impls {
         where
             T: Decode<'de, M>,
         {
-            let mut cx = musli_common::context::Same::default();
+            let alloc = musli_common::allocator::Default::default();
+            let mut cx = musli_common::context::Same::new(&alloc);
             let reader = SliceReader::new(bytes);
             T::decode(&mut cx, $decoder_new(reader))
         }
@@ -111,13 +114,9 @@ macro_rules! encoding_from_slice_impls {
         /// This is the same as [`Encoding::from_slice`], but allows for using a
         /// configurable [`Context`].
         #[inline]
-        pub fn from_slice_with<'de, 'buf, C, T>(
-            self,
-            cx: &mut C,
-            bytes: &'de [u8],
-        ) -> Result<T, C::Error>
+        pub fn from_slice_with<'de, C, T>(self, cx: &mut C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
-            C: Context<'buf, Input = Error>,
+            C: Context<Input = Error>,
             T: Decode<'de, M>,
         {
             let reader = SliceReader::new(bytes);
@@ -137,14 +136,9 @@ macro_rules! encoding_impls {
         /// This is the same as [`Encoding::encode`] but allows for using a
         /// configurable [`Context`].
         #[inline]
-        pub fn encode_with<'buf, C, W, T>(
-            self,
-            cx: &mut C,
-            writer: W,
-            value: &T,
-        ) -> Result<(), C::Error>
+        pub fn encode_with<C, W, T>(self, cx: &mut C, writer: W, value: &T) -> Result<(), C::Error>
         where
-            C: Context<'buf, Input = Error>,
+            C: Context<Input = Error>,
             W: Writer,
             Error: From<W::Error>,
             T: ?Sized + Encode<M>,
@@ -158,9 +152,9 @@ macro_rules! encoding_impls {
         /// This is the same as [`Encoding::decode`] but allows for using a
         /// configurable [`Context`].
         #[inline]
-        pub fn decode_with<'de, 'buf, C, R, T>(self, cx: &mut C, reader: R) -> Result<T, C::Error>
+        pub fn decode_with<'de, C, R, T>(self, cx: &mut C, reader: R) -> Result<T, C::Error>
         where
-            C: Context<'buf, Input = Error>,
+            C: Context<Input = Error>,
             R: Reader<'de>,
             Error: From<R::Error>,
             T: Decode<'de, M>,
@@ -177,7 +171,8 @@ macro_rules! encoding_impls {
             Error: From<R::Error>,
             T: Decode<'de, M>,
         {
-            let mut cx = musli_common::context::Same::default();
+            let alloc = musli_common::allocator::Default::default();
+            let mut cx = musli_common::context::Same::new(&alloc);
             self.decode_with(&mut cx, reader)
         }
 

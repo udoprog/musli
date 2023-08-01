@@ -14,7 +14,6 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let encoder_var = e.cx.ident("encoder");
     let ctx_var = e.cx.ident("ctx");
-    let buf_lt = e.cx.lifetime("'buf");
     let c_param = e.cx.ident("C");
     let e_param = e.cx.ident("E");
 
@@ -32,30 +31,28 @@ pub(crate) fn expand_encode_entry(e: Build<'_>) -> Result<TokenStream> {
     let encoder_t = &e.tokens.encoder_t;
     let core_result = &e.tokens.core_result;
 
-    let (impl_generics, mode_ident, mut where_clause) = e
+    let (mut impl_generics, mode_ident) = e
         .expansion
         .as_impl_generics(e.input.generics.clone(), e.tokens);
 
     if !e.bounds.is_empty() {
-        let where_clause = where_clause.get_or_insert_with(|| syn::WhereClause {
-            where_token: <Token![where]>::default(),
-            predicates: Default::default(),
-        });
+        let where_clause = impl_generics.make_where_clause();
 
         where_clause
             .predicates
             .extend(e.bounds.iter().map(|(_, v)| v.clone()));
     }
 
-    let type_generics = &e.input.generics;
+    let (impl_generics, _, where_clause) = impl_generics.split_for_impl();
+    let (_, type_generics, _) = e.input.generics.split_for_impl();
 
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
-            fn encode<#buf_lt, #c_param, #e_param>(&self, #ctx_var: &mut #c_param, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t>::Ok, <#c_param as #context_t<#buf_lt>>::Error>
+            fn encode<#c_param, #e_param>(&self, #ctx_var: &mut #c_param, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t>::Ok, <#c_param as #context_t>::Error>
             where
-                #c_param: #context_t<#buf_lt, Input = <#e_param as #encoder_t>::Error>,
+                #c_param: #context_t<Input = <#e_param as #encoder_t>::Error>,
                 #e_param: #encoder_t
             {
                 #body

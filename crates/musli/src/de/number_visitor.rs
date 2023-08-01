@@ -6,9 +6,9 @@ use crate::expecting::{self, Expecting};
 use crate::Context;
 
 /// A visitor capable of processing arbitrary number values.
-pub trait NumberVisitor<'de, 'buf, C>: Sized
+pub trait NumberVisitor<'de, C>: Sized
 where
-    C: Context<'buf>,
+    C: Context,
 {
     /// The output of the visitor.
     type Ok;
@@ -174,10 +174,10 @@ impl<T, C> ExpectingWrapper<T, C> {
     }
 }
 
-impl<'de, 'buf, T, C> Expecting for ExpectingWrapper<T, C>
+impl<'de, T, C> Expecting for ExpectingWrapper<T, C>
 where
-    C: Context<'buf>,
-    T: NumberVisitor<'de, 'buf, C>,
+    C: Context,
+    T: NumberVisitor<'de, C>,
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
