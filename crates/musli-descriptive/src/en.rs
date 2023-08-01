@@ -380,7 +380,7 @@ where
             (Tag::new(Kind::Bytes, len as u8), 0)
         } else {
             let pow = len.next_power_of_two();
-            let rem = len - pow;
+            let rem = pow - len;
 
             let Ok(pow) = usize::try_from(pow.trailing_zeros()) else {
                 return Err(cx.message("pack too large"));

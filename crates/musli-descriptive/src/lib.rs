@@ -102,6 +102,9 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(test)]
+mod tests;
+
 mod de;
 mod en;
 pub mod encoding;
