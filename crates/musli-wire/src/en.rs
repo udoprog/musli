@@ -108,7 +108,7 @@ where
         let mut buffer = cx.alloc();
 
         if !buffer.write(&[0]) {
-            return Err(cx.message("pack buffer too small"));
+            return Err(cx.message("Pack buffer too small"));
         }
 
         Ok(WirePackEncoder::new(self.writer, buffer))
@@ -350,7 +350,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let Some(len) = len.checked_mul(2) else {
-            return Err(cx.message("map length overflow"));
+            return Err(cx.message("Map length overflow"));
         };
 
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
@@ -369,7 +369,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let Some(len) = len.checked_mul(2) else {
-            return Err(cx.message("struct length overflow"));
+            return Err(cx.message("Struct length overflow"));
         };
 
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
@@ -430,18 +430,18 @@ where
             let rem = pow - len;
 
             let Ok(pow) = usize::try_from(pow.trailing_zeros()) else {
-                return Err(cx.message("pack too large"));
+                return Err(cx.message("Pack too large"));
             };
 
             if pow > MAX_INLINE_LEN {
-                return Err(cx.message("pack too large"));
+                return Err(cx.message("Pack too large"));
             }
 
             (Tag::new(Kind::Pack, pow as u8), rem)
         };
 
         if !buffer.write_at(0, &[tag.byte()]) {
-            return Err(cx.message("pack buffer overflow"));
+            return Err(cx.message("Pack buffer overflow"));
         }
 
         self.writer.write_buffer(cx.adapt(), buffer)?;

@@ -91,7 +91,7 @@ impl WireIntegerEncoding for Variable {
         let tag = Tag::from_byte(reader.read_byte(cx)?);
 
         if tag.kind() != Kind::Continuation {
-            return Err(cx.message("expected continuation"));
+            return Err(cx.message("Expected continuation"));
         }
 
         if let Some(data) = tag.data() {
@@ -149,7 +149,7 @@ impl WireUsizeEncoding for Variable {
         let tag = Tag::from_byte(reader.read_byte(cx)?);
 
         if tag.kind() != Kind::Continuation {
-            return Err(cx.message("expected continuation"));
+            return Err(cx.message("Expected continuation"));
         }
 
         if let Some(data) = tag.data() {
@@ -183,7 +183,7 @@ where
         T: ByteOrderIo,
     {
         if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::BYTES) {
-            return Err(cx.message("expected fixed integer"));
+            return Err(cx.message("Expected fixed integer"));
         }
 
         T::read_bytes_unsigned::<_, _, B>(cx, reader)
@@ -210,7 +210,7 @@ where
         T::Unsigned: ByteOrderIo<Signed = T>,
     {
         if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::Unsigned::BYTES) {
-            return Err(cx.message("expected fixed integer"));
+            return Err(cx.message("Expected fixed integer"));
         }
 
         Ok(T::Unsigned::read_bytes_unsigned::<_, _, B>(cx, reader)?.signed())
@@ -232,7 +232,7 @@ where
         writer.write_byte(cx, Tag::new(Kind::Prefix, L::BYTES).byte())?;
 
         let Ok(value) = L::try_from(value) else {
-            return Err(cx.message("usize out of bounds for value type"));
+            return Err(cx.message("Usize out of bounds for value type"));
         };
 
         value.write_bytes_unsigned::<_, _, B>(cx, writer)
@@ -248,13 +248,13 @@ where
 
         if tag != Tag::new(Kind::Prefix, L::BYTES) {
             return Err(cx.message(format_args!(
-                "expected fixed {} bytes prefix tag, but got {tag:?}",
+                "Expected fixed {} bytes prefix tag, but got {tag:?}",
                 L::BYTES
             )));
         }
 
         let Ok(value) = usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?) else {
-            return Err(cx.message("value type out of bounds for usize"));
+            return Err(cx.message("Value type out of bounds for usize"));
         };
 
         Ok(value)

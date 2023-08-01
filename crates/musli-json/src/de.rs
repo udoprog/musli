@@ -791,7 +791,7 @@ where
                 }
                 token => {
                     return Err(cx.message(format_args!(
-                        "expected value, or closing brace `}}` {token:?}"
+                        "Expected value, or closing brace `}}` {token:?}"
                     )));
                 }
             }
@@ -846,7 +846,7 @@ where
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(cx.message(format_args!("expected colon `:`, was {actual}")));
+            return Err(cx.message(format_args!("Expected colon `:`, was {actual}")));
         }
 
         self.parser.skip(cx, 1)?;
@@ -861,7 +861,7 @@ where
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(cx.message(format_args!("expected colon `:`, was {actual}")));
+            return Err(cx.message(format_args!("Expected colon `:`, was {actual}")));
         }
 
         self.parser.skip(cx, 1)?;
@@ -943,7 +943,7 @@ where
                 }
                 _ => {
                     return Err(cx.message(format_args!(
-                        "expected value or closing bracket `]`, but found {token}"
+                        "Expected value or closing bracket `]`, but found {token}"
                     )));
                 }
             }
@@ -1003,12 +1003,12 @@ where
                     self.terminated = true;
 
                     return Err(
-                        cx.message(format_args!("encountered short array, but found {token}"))
+                        cx.message(format_args!("Encountered short array, but found {token}"))
                     );
                 }
                 _ => {
                     return Err(cx.message(format_args!(
-                        "expected value or closing bracket `]`, but found {token}"
+                        "Expected value or closing bracket `]`, but found {token}"
                     )));
                 }
             }

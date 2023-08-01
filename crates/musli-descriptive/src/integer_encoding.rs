@@ -65,7 +65,7 @@ where
     let tag = Tag::from_byte(reader.read_byte(cx.adapt())?);
 
     if tag.kind() != kind {
-        return Err(cx.message(format_args!("expected {kind:?}, got {tag:?}")));
+        return Err(cx.message(format_args!("Expected {kind:?}, got {tag:?}")));
     }
 
     c::decode(cx.adapt(), reader)

@@ -90,7 +90,7 @@ where
         let mut buffer = cx.alloc();
 
         if !buffer.write(&[0]) {
-            return Err(cx.message("pack buffer too small"));
+            return Err(cx.message("Pack buffer too small"));
         }
 
         Ok(SelfPackEncoder::new(self.writer, buffer))
@@ -383,18 +383,18 @@ where
             let rem = pow - len;
 
             let Ok(pow) = usize::try_from(pow.trailing_zeros()) else {
-                return Err(cx.message("pack too large"));
+                return Err(cx.message("Pack too large"));
             };
 
             if pow > MAX_INLINE_LEN {
-                return Err(cx.message("pack too large"));
+                return Err(cx.message("Pack too large"));
             }
 
             (Tag::new(Kind::Pack, pow as u8), rem)
         };
 
         if !buffer.write_at(0, &[tag.byte()]) {
-            return Err(cx.message("pack buffer overflow"));
+            return Err(cx.message("Pack buffer overflow"));
         }
 
         self.writer.write_buffer(cx.adapt(), buffer)?;

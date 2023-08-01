@@ -202,7 +202,7 @@ where
         W: Writer,
     {
         let Ok(value) = L::try_from(value) else {
-            return Err(cx.message("usize out of bounds for value type"));
+            return Err(cx.message("Size type out of bounds for value type"));
         };
 
         L::write_bytes_unsigned::<_, _, B>(value, cx, writer)
@@ -215,7 +215,7 @@ where
         R: Reader<'de>,
     {
         let Ok(value) = usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?) else {
-            return Err(cx.message("value type out of bounds for usize"));
+            return Err(cx.message("Value type out of bounds for usize"));
         };
 
         Ok(value)

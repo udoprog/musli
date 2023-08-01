@@ -26,10 +26,10 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     // Figure out which lifetime to use for what. We use the first lifetime in
     // the type (if any is available) as the decoder lifetime. Else we generate
     // a new anonymous lifetime `'de` to use for the `Decode` impl.
-    let mut impl_generics = e.input.generics.clone();
+    let mut generics = e.input.generics.clone();
     let type_ident = &e.input.ident;
 
-    let (lt, exists) = if let Some(existing) = impl_generics.lifetimes().next() {
+    let (lt, exists) = if let Some(existing) = generics.lifetimes().next() {
         (existing.clone(), true)
     } else {
         let lt = syn::LifetimeParam::new(syn::Lifetime::new("'de", e.input.span()));
@@ -37,25 +37,18 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     };
 
     if !exists {
-        impl_generics.params.push(lt.clone().into());
+        generics.params.push(lt.clone().into());
     }
 
     let decode_t = &e.tokens.decode_t;
     let context_t = &e.tokens.context_t;
     let core_result: &syn::Path = &e.tokens.core_result;
     let decoder_t = &e.tokens.decoder_t;
-    let original_generics = &e.input.generics;
 
-    let (impl_generics, mode_ident, mut where_clause) =
-        e.expansion.as_impl_generics(impl_generics, e.tokens);
+    let (mut generics, mode_ident) = e.expansion.as_impl_generics(generics, e.tokens);
 
     if !e.bounds.is_empty() && !e.decode_bounds.is_empty() {
-        let where_clause = where_clause.get_or_insert_with(|| syn::WhereClause {
-            where_token: <Token![where]>::default(),
-            predicates: Default::default(),
-        });
-
-        where_clause.predicates.extend(
+        generics.make_where_clause().predicates.extend(
             e.bounds
                 .iter()
                 .chain(e.decode_bounds.iter())
@@ -66,11 +59,14 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     let c_param = e.cx.ident("C");
     let d_param = e.cx.ident("D");
 
+    let (impl_generics, _, where_clause) = generics.split_for_impl();
+    let (_, type_generics, _) = e.input.generics.split_for_impl();
+
     Ok(quote! {
         #[automatically_derived]
         #[allow(clippy::init_numbered_fields)]
         #[allow(clippy::let_unit_value)]
-        impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #original_generics #where_clause {
+        impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
             fn decode<#c_param, #d_param>(#ctx_var: &mut #c_param, #root_decoder_var: #d_param) -> #core_result<Self, <#c_param as #context_t>::Error>
             where

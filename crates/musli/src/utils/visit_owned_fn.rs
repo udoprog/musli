@@ -33,7 +33,7 @@ use crate::Context;
 ///             match variant {
 ///                 "A" => Ok(Enum::A),
 ///                 "B" => Ok(Enum::A),
-///                 other => Err(cx.message("expected either 'A' or 'B'")),
+///                 other => Err(cx.message("Expected either 'A' or 'B'")),
 ///             }
 ///         }))
 ///     }

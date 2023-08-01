@@ -154,12 +154,12 @@ where
             }),
             Kind::Pack => {
                 let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
-                    return Err(cx.message("pack tag overflowed"));
+                    return Err(cx.message("Pack tag overflowed"));
                 };
 
                 Ok(len)
             }
-            _ => Err(cx.marked_message(start, "expected prefix or pack")),
+            _ => Err(cx.marked_message(start, "Expected prefix or pack")),
         }
     }
 }
@@ -519,7 +519,7 @@ where
     }
 }
 
-impl<'de, R, I, L> PackDecoder<'de> for WireDecoder<R, I, L>
+impl<'de, R, I, L> PackDecoder<'de> for WireDecoder<Limit<R>, I, L>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
@@ -527,7 +527,7 @@ where
     L: WireUsizeEncoding,
 {
     type Error = Error;
-    type Decoder<'this> = StorageDecoder<R::Mut<'this>, Variable, Variable, Error> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, Variable, Variable, Error> where Self: 'this;
 
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
@@ -538,10 +538,14 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
+        if self.reader.remaining() > 0 {
+            self.reader.skip(cx.adapt(), self.reader.remaining())?;
+        }
+
         Ok(())
     }
 }

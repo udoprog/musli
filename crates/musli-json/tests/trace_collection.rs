@@ -42,12 +42,12 @@ fn trace_collection() {
 
     let Ok(..) = encoding.from_slice_with::<_, Collection>(&mut cx, &bytes) else {
         if let Some(error) = cx.iter().next() {
-            assert_eq!(error.to_string(), ".values[Hello]: invalid numeric (at bytes 15-16)");
+            assert_eq!(error.to_string(), ".values[Hello]: Invalid numeric (at bytes 15-16)");
             return;
         }
 
         unreachable!()
     };
 
-    panic!("expected decoding to error");
+    panic!("Expected decoding to error");
 }

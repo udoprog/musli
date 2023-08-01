@@ -62,12 +62,12 @@ fn trace_complex() {
 
     let Ok(..) = encoding.from_slice_with::<_, To>(&mut cx, &bytes) else {
         if let Some(error) = cx.iter().next() {
-            assert_eq!(error.to_string(), ".field[hello] = Variant2 { .vector[0] }: expected string, found <number> (at byte 36)");
+            assert_eq!(error.to_string(), ".field[hello] = Variant2 { .vector[0] }: Expected string, found <number> (at byte 36)");
             return;
         }
 
         unreachable!()
     };
 
-    panic!("expected decoding to error");
+    panic!("Expected decoding to error");
 }

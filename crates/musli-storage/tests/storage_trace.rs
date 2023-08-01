@@ -60,5 +60,5 @@ fn storage_trace() {
         unreachable!()
     };
 
-    panic!("expected decoding to error");
+    panic!("Expected decoding to error");
 }

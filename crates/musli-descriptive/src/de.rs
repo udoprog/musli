@@ -29,17 +29,6 @@ impl<R> SelfDecoder<R> {
     }
 }
 
-pub struct SelfPackDecoder<R> {
-    reader: R,
-}
-
-impl<R> SelfPackDecoder<R> {
-    #[inline]
-    pub(crate) fn new(reader: R) -> Self {
-        Self { reader }
-    }
-}
-
 pub struct SelfTupleDecoder<R> {
     reader: R,
 }
@@ -84,6 +73,10 @@ where
 
                 self.reader.skip(cx.adapt(), len)?;
             }
+            Kind::Pack => {
+                let len = 2usize.pow(tag.data_raw() as u32);
+                self.reader.skip(cx.adapt(), len)?;
+            }
             Kind::Sequence => {
                 let len = if let Some(len) = tag.data() {
                     len as usize
@@ -108,7 +101,7 @@ where
                 }
             }
             kind => {
-                return Err(cx.message(format_args!("unsupported kind {kind:?}")));
+                return Err(cx.message(format_args!("Unsupported kind {kind:?}")));
             }
         }
 
@@ -178,12 +171,12 @@ where
             }),
             Kind::Pack => {
                 let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
-                    return Err(cx.message("pack tag overflowed"));
+                    return Err(cx.message("Pack tag overflowed"));
                 };
 
                 Ok(len)
             }
-            _ => Err(cx.marked_message(start, "expected prefix or pack")),
+            _ => Err(cx.marked_message(start, "Expected prefix or pack")),
         }
     }
 }
@@ -205,7 +198,7 @@ where
     Error: From<R::Error>,
 {
     type Error = Error;
-    type Pack = SelfPackDecoder<Limit<R>>;
+    type Pack = SelfDecoder<Limit<R>>;
     type Some = Self;
     type Sequence = RemainingSelfDecoder<R>;
     type Tuple = SelfTupleDecoder<R>;
@@ -300,7 +293,7 @@ where
     {
         let pos = cx.mark();
         let len = self.decode_pack_length(cx, pos)?;
-        Ok(SelfPackDecoder::new(self.reader.limit(len)))
+        Ok(SelfDecoder::new(self.reader.limit(len)))
     }
 
     #[inline]
@@ -414,14 +407,14 @@ where
         let tag = Tag::from_byte(self.reader.read_byte(cx.adapt())?);
 
         if tag != CHAR {
-            return Err(cx.marked_message(pos, format_args!("expected {CHAR:?}, got {tag:?}")));
+            return Err(cx.marked_message(pos, format_args!("Expected {CHAR:?}, got {tag:?}")));
         }
 
         let num = c::decode(cx.adapt(), self.reader.borrow_mut())?;
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(cx.marked_message(pos, format_args!("bad character"))),
+            None => Err(cx.marked_message(pos, format_args!("Bad character"))),
         }
     }
 
@@ -483,9 +476,9 @@ where
                     let value = self.decode_f64(cx)?;
                     visitor.visit_f64(cx, value)
                 }
-                _ => Err(cx.message(format_args!("unsupported number tag, got {tag:?}"))),
+                _ => Err(cx.message(format_args!("Unsupported number tag, got {tag:?}"))),
             },
-            _ => Err(cx.message(format_args!("expected number, but got {tag:?}"))),
+            _ => Err(cx.message(format_args!("Expected number, but got {tag:?}"))),
         }
     }
 
@@ -625,7 +618,7 @@ where
             tag => Err(cx.marked_message(
                 pos,
                 format_args! {
-                    "expected option, was {tag:?}"
+                    "Expected option, was {tag:?}"
                 },
             )),
         }
@@ -809,13 +802,13 @@ where
     }
 }
 
-impl<'de, R> PackDecoder<'de> for SelfPackDecoder<R>
+impl<'de, R> PackDecoder<'de> for SelfDecoder<Limit<R>>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
-    type Decoder<'this> = StorageDecoder<R::Mut<'this>, Variable, Variable, Error> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, Variable, Variable, Error> where Self: 'this;
 
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
@@ -826,10 +819,14 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
+        if self.reader.remaining() > 0 {
+            self.reader.skip(cx.adapt(), self.reader.remaining())?;
+        }
+
         Ok(())
     }
 }

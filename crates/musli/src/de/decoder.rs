@@ -1012,7 +1012,7 @@ pub trait Decoder<'de>: Sized {
     /// assert_eq!(musli_value::decode::<BytesReference>(&value)?, BytesReference { data: &[0, 1, 2, 3] });
     ///
     /// let value = musli_value::Value::Number(42u32.into());
-    /// assert_eq!(musli_value::decode::<BytesReference>(&value).unwrap_err().to_string(), "expected bytes, but found number");
+    /// assert_eq!(musli_value::decode::<BytesReference>(&value).unwrap_err().to_string(), "Expected bytes, but found number");
     /// Ok::<_, musli_value::Error>(())
     /// ```
     #[inline]
@@ -1079,7 +1079,7 @@ pub trait Decoder<'de>: Sized {
     /// assert_eq!(musli_value::decode::<StringReference>(&value)?, StringReference { data: "Hello!" });
     ///
     /// let value = musli_value::Value::Number(42u32.into());
-    /// assert_eq!(musli_value::decode::<StringReference>(&value).unwrap_err().to_string(), "expected string, but found number");
+    /// assert_eq!(musli_value::decode::<StringReference>(&value).unwrap_err().to_string(), "Expected string, but found number");
     /// Ok::<_, musli_value::Error>(())
     /// ```
     #[inline]

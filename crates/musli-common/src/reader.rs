@@ -378,6 +378,13 @@ pub struct Limit<R> {
     reader: R,
 }
 
+impl<R> Limit<R> {
+    /// Get the remaining data in the limited reader.
+    pub fn remaining(&self) -> usize {
+        self.remaining
+    }
+}
+
 impl<'de, R> Limit<R>
 where
     R: Reader<'de>,

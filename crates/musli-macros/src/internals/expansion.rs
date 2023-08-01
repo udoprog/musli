@@ -35,26 +35,20 @@ impl<'a> Expansion<'a> {
     /// Coerce into impl generics.
     pub(crate) fn as_impl_generics(
         &self,
-        generics: syn::Generics,
+        mut generics: syn::Generics,
         tokens: &Tokens,
-    ) -> (syn::Generics, syn::Path, Option<syn::WhereClause>) {
+    ) -> (syn::Generics, syn::Path) {
         match *self {
             Expansion::Generic { mode_ident } => {
-                let mut impl_generics = generics;
-
-                impl_generics
+                generics
                     .params
                     .push(syn::TypeParam::from(mode_ident.clone()).into());
 
                 let path = syn::Path::from(mode_ident.clone());
 
-                let mut where_clause = syn::WhereClause {
-                    where_token: <syn::Token![where]>::default(),
-                    predicates: Default::default(),
-                };
+                let where_clause = generics.make_where_clause();
 
-                let mut bounds: syn::punctuated::Punctuated<syn::TypeParamBound, _> =
-                    Default::default();
+                let mut bounds = syn::punctuated::Punctuated::default();
 
                 bounds.push(syn::TypeParamBound::Trait(syn::TraitBound {
                     paren_token: Default::default(),
@@ -75,10 +69,10 @@ impl<'a> Expansion<'a> {
                         bounds,
                     }));
 
-                (impl_generics, path, Some(where_clause))
+                (generics, path)
             }
-            Expansion::Default => (generics, tokens.default_mode.clone(), None),
-            Expansion::Moded { mode_ident } => (generics, mode_ident.clone(), None),
+            Expansion::Default => (generics, tokens.default_mode.clone()),
+            Expansion::Moded { mode_ident } => (generics, mode_ident.clone()),
         }
     }
 }

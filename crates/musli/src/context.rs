@@ -246,7 +246,7 @@ pub trait Context {
     where
         T: fmt::Debug,
     {
-        self.message(format_args!("invalid variant tag: {tag:?}"))
+        self.message(format_args!("Invalid variant tag: {tag:?}"))
     }
 
     /// The value for the given tag could not be collected.
@@ -255,13 +255,13 @@ pub trait Context {
     where
         T: fmt::Debug,
     {
-        self.message(format_args!("expected tag: {tag:?}"))
+        self.message(format_args!("Expected tag: {tag:?}"))
     }
 
     /// Trying to decode an uninhabitable type.
     #[inline(always)]
     fn uninhabitable(&mut self, _: &'static str) -> Self::Error {
-        self.message(format_args!("cannot decode uninhabitable types",))
+        self.message(format_args!("Cannot decode uninhabitable types"))
     }
 
     /// Encountered an unsupported field tag.
@@ -270,7 +270,7 @@ pub trait Context {
     where
         T: fmt::Debug,
     {
-        self.message(format_args!("invalid field tag: {tag:?}"))
+        self.message(format_args!("Invalid field tag: {tag:?}"))
     }
 
     /// Encountered an unsupported field tag.
@@ -280,9 +280,9 @@ pub trait Context {
         let bytes = unsafe { field.as_slice() };
 
         if let Ok(string) = core::str::from_utf8(bytes) {
-            self.message(format_args!("invalid field tag: {string}"))
+            self.message(format_args!("Invalid field tag: {string}"))
         } else {
-            self.message(format_args!("invalid field tag"))
+            self.message(format_args!("Invalid field tag"))
         }
     }
 
@@ -293,14 +293,14 @@ pub trait Context {
     where
         T: fmt::Debug,
     {
-        self.message(format_args!("missing variant field: {tag:?}"))
+        self.message(format_args!("Missing variant field: {tag:?}"))
     }
 
     /// Indicate that a variant tag could not be determined.
     #[allow(unused_variables)]
     #[inline(always)]
     fn missing_variant_tag(&mut self, name: &'static str) -> Self::Error {
-        self.message(format_args!("missing variant tag"))
+        self.message(format_args!("Missing variant tag"))
     }
 
     /// Encountered an unsupported variant field.
