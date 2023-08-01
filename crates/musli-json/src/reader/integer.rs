@@ -852,7 +852,7 @@ mod traits {
     );
 
     macro_rules! float {
-        ($float:ty) => {
+        ($float:ty, $libm:path) => {
             impl Float for $float {
                 #[inline]
                 fn negate(self) -> Self {
@@ -860,8 +860,15 @@ mod traits {
                 }
 
                 #[inline]
+                #[cfg(feature = "std")]
                 fn pow10(self, e: i32) -> Self {
                     self * <$float>::powi(10.0, e)
+                }
+
+                #[inline]
+                #[cfg(not(feature = "std"))]
+                fn pow10(self, e: i32) -> Self {
+                    self * $libm(10.0, e as $float)
                 }
             }
 
@@ -897,6 +904,6 @@ mod traits {
         };
     }
 
-    float!(f32);
-    float!(f64);
+    float!(f32, libm::powf);
+    float!(f64, libm::pow);
 }

@@ -1,0 +1,9 @@
+[package]
+name = "no-std-examples"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+musli = { path = "../musli", default-features = false }
+musli-json = { path = "../musli-json", default-features = false, features = ["arrayvec", "parse-full"] }
