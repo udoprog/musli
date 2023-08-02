@@ -16,12 +16,11 @@ keywords = ["no_std", "serialization"]
 categories = ["encoding"]
 
 [features]
-default = ["std", "arrayvec"]
-std = ["musli/std", "simdutf8?/std", "arrayvec?/std"]
+default = ["std"]
+std = ["musli/std", "simdutf8?/std"]
 alloc = []
 
 [dependencies]
-arrayvec = { version = "0.7.2", optional = true, default-features = false }
 musli = { path = "../musli", version = "0.0.49", default-features = false }
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 

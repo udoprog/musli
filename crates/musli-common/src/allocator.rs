@@ -9,9 +9,7 @@ pub use self::alloc::Alloc;
 mod disabled;
 pub use self::disabled::Disabled;
 
-#[cfg(feature = "arrayvec")]
 mod no_std;
-#[cfg(feature = "arrayvec")]
 pub use self::no_std::NoStd;
 
 mod default_alloc {
@@ -19,10 +17,8 @@ mod default_alloc {
 
     #[cfg(all(feature = "alloc"))]
     pub type Default = super::Alloc;
-    #[cfg(all(feature = "arrayvec", not(feature = "alloc")))]
+    #[cfg(all(not(feature = "alloc")))]
     pub type Default = super::NoStd<1024>;
-    #[cfg(all(not(feature = "arrayvec"), not(feature = "alloc")))]
-    pub type Default = super::Disabled;
 }
 
 /// The default allocator.
@@ -30,8 +26,7 @@ mod default_alloc {
 /// The exact implementation depends on which features are enabled (first one
 /// takes preference):
 /// * If `alloc` is enabled, this is the [`Alloc`] allocator.
-/// * If `arrayvec` is enabled, this is the [`NoStd`] allocator.
-/// * Otherwise this is the [`Disabled`] allocator.
+/// * Otherwise this is the [`NoStd`] allocator.
 #[doc(inline)]
 pub use self::default_alloc::Default;
 
