@@ -76,11 +76,11 @@
 //! my machine (built with `--release`):
 //!
 //! ```
-//! # use anyhow::Result;
 //! # use musli::{Decode, Encode};
 //! # use musli::mode::DefaultMode;
 //! # use musli_storage::encoding::Encoding;
 //! # use musli_storage::int::{Fixed, NativeEndian, Variable};
+//! # type Result<T, E = musli_storage::Error> = core::result::Result<T, E>;
 //! const ENCODING: Encoding<DefaultMode, Fixed<NativeEndian>, Variable> =
 //!     Encoding::new().with_fixed_integers_endian();
 //!
