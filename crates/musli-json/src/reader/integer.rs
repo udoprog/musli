@@ -662,11 +662,13 @@ mod traits {
                         $($pows),*
                     ];
 
-                    if let Some(e) = POWS.get(e as usize) {
-                        self.checked_mul(*e)
+                    let n = if let Some(e) = POWS.get(e as usize) {
+                        *e
                     } else {
-                        self.checked_mul(10.checked_pow(e)?)
-                    }
+                        10.checked_pow(e)?
+                    };
+
+                    self.checked_mul(n)
                 }
 
                 #[inline(always)]
@@ -852,7 +854,7 @@ mod traits {
     );
 
     macro_rules! float {
-        ($float:ty, $libm:path) => {
+        ($float:ty, $fallback:path) => {
             impl Float for $float {
                 #[inline]
                 fn negate(self) -> Self {
@@ -868,7 +870,7 @@ mod traits {
                 #[inline]
                 #[cfg(not(feature = "std"))]
                 fn pow10(self, e: i32) -> Self {
-                    self * $libm(10.0, e as $float)
+                    self * $fallback(10.0, e)
                 }
             }
 
@@ -904,6 +906,45 @@ mod traits {
         };
     }
 
-    float!(f32, libm::powf);
-    float!(f64, libm::pow);
+    float!(f32, self::no_std::powf32);
+    float!(f64, self::no_std::powf64);
+
+    #[cfg(not(feature = "std"))]
+    mod no_std {
+        macro_rules! powf {
+            ($ty:ty, $name:ident) => {
+                #[inline(never)]
+                pub(crate) fn $name(mut base: $ty, mut exp: i32) -> $ty {
+                    if exp == 0 {
+                        return 1.0;
+                    }
+
+                    while exp & 1 == 0 {
+                        base = base * base;
+                        exp >>= 1;
+                    }
+
+                    if exp == 1 {
+                        return base;
+                    }
+
+                    let mut acc = base;
+
+                    while exp > 1 {
+                        exp >>= 1;
+                        base = base * base;
+
+                        if exp & 1 == 1 {
+                            acc = acc * base;
+                        }
+                    }
+
+                    acc
+                }
+            };
+        }
+
+        powf!(f32, powf32);
+        powf!(f64, powf64);
+    }
 }

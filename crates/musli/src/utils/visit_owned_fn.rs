@@ -29,7 +29,7 @@ use crate::Context;
 ///         C: Context<Input = D::Error>,
 ///         D: Decoder<'de>,
 ///     {
-///         decoder.decode_string(cx, musli::utils::visit_owned_fn("a string variant for Enum", |cx: &mut C, variant: &str| {
+///         decoder.decode_string(cx, musli::utils::visit_owned_fn("A string variant for Enum", |cx: &mut C, variant: &str| {
 ///             match variant {
 ///                 "A" => Ok(Enum::A),
 ///                 "B" => Ok(Enum::A),
@@ -73,7 +73,7 @@ where
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.expected)
+        self.expected.fmt(f)
     }
 
     #[inline]

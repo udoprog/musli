@@ -30,7 +30,7 @@ impl fmt::Display for SliceOverflow {
 
         write!(
             f,
-            "tried to write {n} bytes to slice, with a remaining capacity of {capacity}"
+            "Tried to write {n} bytes to slice, with a remaining capacity of {capacity}"
         )
     }
 }

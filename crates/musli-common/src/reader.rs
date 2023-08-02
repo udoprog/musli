@@ -27,7 +27,7 @@ impl fmt::Display for SliceUnderflow {
 
         write!(
             f,
-            "tried to read {n} bytes from slice, with {remaining} byte remaining"
+            "Tried to read {n} bytes from slice, with {remaining} byte remaining"
         )
     }
 }
@@ -197,7 +197,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         C: Context<Input = Self::Error>,
     {
         if self.len() < buf.len() {
-            return Err(cx.custom("buffer underflow"));
+            return Err(cx.message("Buffer underflow"));
         }
 
         let (head, tail) = self.split_at(buf.len());
@@ -215,7 +215,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         V: ValueVisitor<'de, C, [u8]>,
     {
         if self.len() < n {
-            return Err(cx.custom("buffer underflow"));
+            return Err(cx.message("Buffer underflow"));
         }
 
         let (head, tail) = self.split_at(n);
@@ -231,7 +231,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         C: Context<Input = Self::Error>,
     {
         let &[first, ref tail @ ..] = *self else {
-            return Err(cx.custom("buffer underflow"));
+            return Err(cx.message("Buffer underflow"));
         };
 
         *self = tail;
@@ -245,7 +245,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         C: Context<Input = Self::Error>,
     {
         if self.len() < N {
-            return Err(cx.custom("buffer underflow"));
+            return Err(cx.message("Buffer underflow"));
         }
 
         let (head, tail) = self.split_at(N);

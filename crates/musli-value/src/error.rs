@@ -110,7 +110,7 @@ impl fmt::Display for ErrorImpl {
             #[cfg(feature = "alloc")]
             ErrorImpl::Message(message) => message.fmt(f),
             #[cfg(not(feature = "alloc"))]
-            ErrorImpl::Message => write!(f, "message error (see diagnostics)"),
+            ErrorImpl::Message => write!(f, "Message error (see diagnostics)"),
         }
     }
 }
