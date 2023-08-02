@@ -27,7 +27,7 @@ jobs:
       if: matrix.rust == 'stable'
 
   no_std:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: each_package
     strategy:
       fail-fast: false
@@ -56,7 +56,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: miri
-    - run: cargo miri test --exclude musli-common
+    - run: cargo miri test --workspace --exclude no-std-examples --exclude musli-common
     - run: cargo miri run --bin fuzz
     - run: cargo miri run --bin fuzz -- --random
 

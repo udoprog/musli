@@ -41,8 +41,8 @@ extern "C" fn rust_begin_panic(_: &core::panic::PanicInfo) -> ! {
 extern "C" fn eh_personality() {}
 
 #[cfg(unix)]
-#[lang = "eh_unwind_resume"]
-extern "C" fn eh_unwind_resume() {}
+#[no_mangle]
+pub extern "C" fn _Unwind_Resume() {}
 
 #[derive(Debug, Encode, Decode)]
 struct Value<'a> {
