@@ -1,12 +1,12 @@
 use core::fmt;
 use core::ops::Range;
 
-use arrayvec::{ArrayString, ArrayVec};
 use musli::context::Error;
 use musli::Context;
 
 use crate::allocator::Allocator;
 use crate::context::rich_error::{RichError, Step};
+use crate::fixed::{FixedString, FixedVec};
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
@@ -21,7 +21,7 @@ pub struct NoStdContext<const P: usize, const S: usize, A, E> {
     mark: usize,
     alloc: A,
     error: Option<(Range<usize>, E)>,
-    path: ArrayVec<Step<ArrayString<S>>, P>,
+    path: FixedVec<Step<FixedString<S>>, P>,
     path_cap: usize,
     include_type: bool,
 }
@@ -46,7 +46,7 @@ impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
             mark: 0,
             alloc,
             error: None,
-            path: ArrayVec::new(),
+            path: FixedVec::new(),
             path_cap: 0,
             include_type: false,
         }
@@ -60,7 +60,7 @@ impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
     }
 
     /// Iterate over all collected errors.
-    pub fn iter(&self) -> impl Iterator<Item = RichError<'_, ArrayString<S>, E>> {
+    pub fn iter(&self) -> impl Iterator<Item = RichError<'_, impl AsRef<str>, E>> {
         self.error
             .iter()
             .map(|(range, error)| RichError::new(&self.path, self.path_cap, range.clone(), error))
@@ -72,7 +72,7 @@ impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
     }
 
     /// Push a path.
-    fn push_path(&mut self, step: Step<ArrayString<S>>) {
+    fn push_path(&mut self, step: Step<FixedString<S>>) {
         if self.path.try_push(step).is_err() {
             self.path_cap += 1;
         }
@@ -234,7 +234,7 @@ where
         T: fmt::Display,
     {
         use core::fmt::Write;
-        let mut string = ArrayString::new();
+        let mut string = FixedString::new();
         let _ = write!(string, "{}", field);
         self.push_path(Step::Key(string));
     }

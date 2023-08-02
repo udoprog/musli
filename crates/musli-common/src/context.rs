@@ -2,9 +2,7 @@
 
 #[cfg(feature = "alloc")]
 mod alloc_context;
-#[cfg(feature = "arrayvec")]
 mod no_std_context;
-#[cfg(any(feature = "alloc", feature = "arrayvec"))]
 mod rich_error;
 
 use core::fmt;
@@ -18,10 +16,8 @@ use crate::allocator::Allocator;
 #[cfg(feature = "alloc")]
 pub use self::alloc_context::AllocContext;
 
-#[cfg(feature = "arrayvec")]
 pub use self::no_std_context::NoStdContext;
 
-#[cfg(any(feature = "alloc", feature = "arrayvec"))]
 pub use self::rich_error::RichError;
 
 /// A simple non-diagnostical capturing context which simply emits the original

@@ -3,10 +3,10 @@ use core::mem;
 use core::ptr;
 use core::slice;
 
-use arrayvec::ArrayVec;
 use musli::context::Buffer;
 
 use crate::allocator::Allocator;
+use crate::fixed::FixedVec;
 
 /// Buffer used in combination with a `Context`.
 ///
@@ -17,14 +17,14 @@ pub struct NoStd<const C: usize> {
     // immutable pointers. We simply make sure that those accesses do not
     // clobber each other, which we can do since the API is restricted through
     // the `Buffer` trait.
-    scratch: UnsafeCell<ArrayVec<u8, C>>,
+    scratch: UnsafeCell<FixedVec<u8, C>>,
 }
 
 impl<const C: usize> NoStd<C> {
     /// Build a new no-std allocator.
     pub const fn new() -> Self {
         Self {
-            scratch: UnsafeCell::new(ArrayVec::new_const()),
+            scratch: UnsafeCell::new(FixedVec::new()),
         }
     }
 }
@@ -57,7 +57,7 @@ impl<'a, const C: usize> Allocator for &'a NoStd<C> {
 pub struct Buf<'a, const C: usize> {
     base: usize,
     len: usize,
-    data: &'a UnsafeCell<ArrayVec<u8, C>>,
+    data: &'a UnsafeCell<FixedVec<u8, C>>,
 }
 
 impl<'a, const C: usize> Buffer for Buf<'a, C> {
