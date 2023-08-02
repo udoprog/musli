@@ -19,12 +19,25 @@ jobs:
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{matrix.rust}}
-    - run: cargo build --workspace
+    - run: cargo build
       if: matrix.rust != 'stable'
-    - run: cargo test --workspace --all-targets
+    - run: cargo test --all-targets
       if: matrix.rust == 'stable'
-    - run: cargo test --workspace --doc
+    - run: cargo test --doc
       if: matrix.rust == 'stable'
+
+  no_std:
+    runs-on: windows-latest
+    needs: each_package
+    strategy:
+      fail-fast: false
+      matrix:
+        example: ['json']
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo build
+      - run: cargo +nightly run -p no-std-examples --example no-std-${{matrix.example}}
 
   fuzz:
     needs: each_package
@@ -43,7 +56,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: miri
-    - run: cargo miri test --workspace --exclude musli-common
+    - run: cargo miri test --workspace --exclude no-std-examples --exclude musli-common
     - run: cargo miri run --bin fuzz
     - run: cargo miri run --bin fuzz -- --random
 
@@ -72,7 +85,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@1.68
       with:
         components: clippy
-    - run: cargo clippy --workspace --all-targets -- -D warnings
+    - run: cargo clippy --all-targets -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest

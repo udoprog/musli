@@ -20,7 +20,7 @@ mod default_alloc {
     #[cfg(all(feature = "alloc"))]
     pub type Default = super::Alloc;
     #[cfg(all(feature = "arrayvec", not(feature = "alloc")))]
-    pub type Default = super::NoStd;
+    pub type Default = super::NoStd<1024>;
     #[cfg(all(not(feature = "arrayvec"), not(feature = "alloc")))]
     pub type Default = super::Disabled;
 }

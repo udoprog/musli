@@ -4,7 +4,4 @@ opt-level = 3
 [workspace]
 resolver = "2"
 members = ["crates/*"]
-
-[patch.crates-io]
-# https://github.com/SoftbearStudios/bitcode/issues/2
-bitcode = { git = "https://github.com/softbearstudios/bitcode" }
+default-members = ["crates/musli*"]

@@ -1,0 +1,12 @@
+[package]
+name = "no-std-examples"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+musli = { path = "../musli", default-features = false }
+musli-json = { path = "../musli-json", default-features = false, features = ["arrayvec", "parse-full"] }
+
+[target.'cfg(unix)'.dependencies]
+compiler_builtins = { git = "https://github.com/rust-lang/compiler-builtins", features = ["mem"] }
