@@ -3,7 +3,7 @@ use core::hash::Hash;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::buf::{AnyRef, Buf};
+use crate::buf::{AnyValue, Buf};
 use crate::error::{Error, ErrorKind};
 use crate::map::hashing::{displace, hash, HashKey, Hashes};
 use crate::pair::Pair;
@@ -23,8 +23,8 @@ pub(crate) struct HashState {
 
 pub(crate) fn generate_hash<'a, K, V>(buf: &Buf, entries: &[Pair<K, V>]) -> Result<HashState, Error>
 where
-    K: AnyRef,
-    K::Target: Hash + PartialEq,
+    K: AnyValue,
+    K::Target: Hash,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
         if let Some(hash) = try_generate_hash(buf, &entries, key)? {
@@ -41,8 +41,8 @@ fn try_generate_hash<'a, K, V>(
     key: HashKey,
 ) -> Result<Option<HashState>, Error>
 where
-    K: AnyRef,
-    K::Target: Hash + PartialEq,
+    K: AnyValue,
+    K::Target: Hash,
 {
     let mut hashes = Vec::new();
 
@@ -54,8 +54,8 @@ where
             }));
         };
 
-        let entry = buf.load(entry)?;
-        hashes.push(hash(entry, &key));
+        let h = entry.visit(buf, |entry| hash(entry, &key))?;
+        hashes.push(h);
     }
 
     let buckets_len = (hashes.len() + DEFAULT_LAMBDA - 1) / DEFAULT_LAMBDA;

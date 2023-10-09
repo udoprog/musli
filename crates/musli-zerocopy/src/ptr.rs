@@ -1,8 +1,7 @@
 use core::fmt;
 
-use crate::buf::Buf;
+use crate::buf::{Buf, BufMut};
 use crate::error::Error;
-use crate::owned_buf::OwnedBuf;
 use crate::zero_copy::ZeroCopy;
 
 /// A pointer to a location in a buffer.
@@ -39,12 +38,19 @@ impl fmt::Debug for Ptr {
 }
 
 unsafe impl ZeroCopy for Ptr {
-    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
+    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
         buf.write(&self.offset)
     }
 
-    fn validate(buf: &Buf) -> Result<&Self, Error> {
+    fn read_from(buf: &Buf) -> Result<&Self, Error> {
         // SAFETY: Ptr is repr transparent over usize.
-        unsafe { Ok(&*(usize::validate(buf)? as *const usize).cast()) }
+        unsafe { Ok(&*(usize::read_from(buf)? as *const usize).cast()) }
+    }
+
+    unsafe fn validate_aligned(_: &Buf) -> Result<(), Error> {
+        Ok(())
     }
 }

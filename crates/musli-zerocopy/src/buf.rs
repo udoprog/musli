@@ -10,13 +10,71 @@ use crate::slice_ref::SliceRef;
 use crate::unsized_ref::UnsizedRef;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 
-/// Trait used for any kind of pointer or reference.
+/// A mutable buffer to write zero copy types to.
+///
+/// This is implemented by [`OwnedBuf`].
+///
+/// [`OwnedBuf`]: crate::OwnedBuf
+pub trait BufMut {
+    /// Extend the current buffer from the given slice.
+    fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error>;
+
+    /// Write the given zero copy type to the buffer.
+    fn write<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+    where
+        T: ZeroCopy;
+}
+
+impl<B: ?Sized> BufMut for &mut B
+where
+    B: BufMut,
+{
+    fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
+        (**self).extend_from_slice(bytes)
+    }
+
+    fn write<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+    where
+        T: ZeroCopy,
+    {
+        (**self).write(value)
+    }
+}
+
+/// Trait used for loading any kind of reference.
 pub unsafe trait AnyRef {
     /// The target being read.
     type Target: ?Sized;
 
     /// Validate the value.
-    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error>;
+    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error>;
+}
+
+/// Trait used for handling any kind of zero copy value, be they references or
+/// not.
+pub unsafe trait AnyValue {
+    /// The target being read.
+    type Target: ?Sized;
+
+    /// Validate the value.
+    fn visit<V, O>(&self, buf: &Buf, visitor: V) -> Result<O, Error>
+    where
+        V: FnOnce(&Self::Target) -> O;
+}
+
+unsafe impl<T: ?Sized> AnyValue for T
+where
+    T: AnyRef,
+{
+    type Target = T::Target;
+
+    fn visit<V, O>(&self, buf: &Buf, visitor: V) -> Result<O, Error>
+    where
+        V: FnOnce(&Self::Target) -> O,
+    {
+        let value = buf.load(self)?;
+        Ok(visitor(value))
+    }
 }
 
 // SAFETY: Blanket implementation is fine over known sound implementations.
@@ -27,8 +85,8 @@ where
     type Target = T::Target;
 
     #[inline]
-    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        T::validate(self, buf)
+    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        T::read_from(self, buf)
     }
 }
 
@@ -38,7 +96,7 @@ where
 {
     type Target = T;
 
-    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_unsized(*self)
     }
 }
@@ -49,7 +107,7 @@ where
 {
     type Target = T;
 
-    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_sized(*self)
     }
 }
@@ -60,7 +118,7 @@ where
 {
     type Target = [T];
 
-    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_slice(*self)
     }
 }
@@ -160,7 +218,7 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.len());
-        T::validate(self.get(start..end, T::ALIGN)?)
+        T::read_from(self.get(start..end, T::ALIGN)?)
     }
 
     /// Load the given sized value as a reference.
@@ -170,7 +228,7 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(T::SIZE);
-        T::validate(self.get(start..end, T::ALIGN)?)
+        T::read_from(self.get(start..end, T::ALIGN)?)
     }
 
     /// Load the given slice.
@@ -184,11 +242,17 @@ impl Buf {
 
         let len = buf.len().wrapping_div(T::SIZE);
 
-        for chunk in buf.as_bytes().chunks_exact(T::SIZE) {
-            // SAFETY: The passed in buffer is required to be aligned per the
-            // requirements of this trait, so any T::SIZE chunks are aligned
-            // too.
-            T::validate(unsafe { Buf::new_unchecked(chunk) })?;
+        // Only validate each element if they cannot inhabit all possible bit
+        // patterns.
+        if !T::ANY_BITS {
+            for chunk in buf.as_bytes().chunks_exact(T::SIZE) {
+                // SAFETY: The passed in buffer is required to be aligned per the
+                // requirements of this trait, so any T::SIZE chunks are aligned
+                // too.
+                unsafe {
+                    T::validate_aligned(Buf::new_unchecked(chunk))?;
+                }
+            }
         }
 
         Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), len) })
@@ -199,7 +263,7 @@ impl Buf {
     where
         T: AnyRef,
     {
-        ptr.validate(self)
+        ptr.read_from(self)
     }
 
     /// Cast the current buffer into the given type.
@@ -212,7 +276,7 @@ impl Buf {
     }
 
     /// Construct a validator over the current buffer.
-    pub fn validator<T>(&self) -> Result<Validator<'_>, Error> {
+    pub fn validate<T>(&self) -> Result<Validator<'_>, Error> {
         if !self.is_compatible(Layout::new::<T>()) {
             return Err(Error::new(ErrorKind::LayoutMismatch {
                 layout: Layout::new::<T>(),
@@ -220,6 +284,16 @@ impl Buf {
             }));
         }
 
+        Ok(Validator { data: &self.data })
+    }
+
+    /// Construct a validator over the current buffer which assumes it's
+    /// correctly aligned.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer is appropriately aligned.
+    pub unsafe fn validate_aligned(&self) -> Result<Validator<'_>, Error> {
         Ok(Validator { data: &self.data })
     }
 }
@@ -237,7 +311,7 @@ pub struct Validator<'a> {
 
 impl Validator<'_> {
     /// Validate the given type.
-    pub fn validate<T>(&mut self) -> Result<(), Error>
+    pub fn field<T>(&mut self) -> Result<(), Error>
     where
         T: ZeroCopy,
     {
@@ -266,7 +340,7 @@ impl Validator<'_> {
         let (head, tail) = self.data.split_at(T::SIZE);
 
         // SAFETY: We've ensured that the provided buffer is aligned above.
-        T::validate(unsafe { Buf::new_unchecked(head) })?;
+        T::read_from(unsafe { Buf::new_unchecked(head) })?;
         self.data = tail;
         Ok(())
     }

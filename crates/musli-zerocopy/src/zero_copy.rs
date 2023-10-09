@@ -2,9 +2,8 @@ use core::alloc::Layout;
 use core::mem;
 use core::str;
 
-use crate::buf::Buf;
+use crate::buf::{AnyValue, Buf, BufMut};
 use crate::error::{Error, ErrorKind};
-use crate::owned_buf::OwnedBuf;
 
 /// Trait governing how to write an unsized buffer.
 pub unsafe trait UnsizedZeroCopy {
@@ -16,10 +15,12 @@ pub unsafe trait UnsizedZeroCopy {
     fn len(&self) -> usize;
 
     /// Write to the owned buffer.
-    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error>;
+    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut;
 
     /// Validate the buffer as this type.
-    fn validate(buf: &Buf) -> Result<&Self, Error>;
+    fn read_from(buf: &Buf) -> Result<&Self, Error>;
 }
 
 /// Trait governing how to write a sized buffer.
@@ -34,11 +35,26 @@ pub unsafe trait ZeroCopy: Sized {
     /// Alignment of the pointed to data.
     const ALIGN: usize = mem::align_of::<Self>();
 
+    /// Indicates if the type can inhabit all possible bit patterns within its
+    /// `SIZE`.
+    const ANY_BITS: bool = false;
+
     /// Write to the owned buffer.
-    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error>;
+    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut;
 
     /// Validate the buffer as this type.
-    fn validate(buf: &Buf) -> Result<&Self, Error>;
+    fn read_from(buf: &Buf) -> Result<&Self, Error>;
+
+    /// Just validate the current buffer under the assumption that it is
+    /// correctly aligned for the current type.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer is correctly sized and aligned
+    /// per the requirements of this type.
+    unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error>;
 }
 
 unsafe impl UnsizedZeroCopy for str {
@@ -48,11 +64,14 @@ unsafe impl UnsizedZeroCopy for str {
         <str>::len(self)
     }
 
-    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
+    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
         buf.extend_from_slice(self.as_bytes())
     }
 
-    fn validate(buf: &Buf) -> Result<&Self, Error> {
+    fn read_from(buf: &Buf) -> Result<&Self, Error> {
         str::from_utf8(buf.as_bytes()).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))
     }
 }
@@ -64,11 +83,14 @@ unsafe impl UnsizedZeroCopy for [u8] {
         <[_]>::len(self)
     }
 
-    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
+    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
         buf.extend_from_slice(self)
     }
 
-    fn validate(buf: &Buf) -> Result<&Self, Error> {
+    fn read_from(buf: &Buf) -> Result<&Self, Error> {
         Ok(buf.as_bytes())
     }
 }
@@ -76,11 +98,16 @@ unsafe impl UnsizedZeroCopy for [u8] {
 macro_rules! impl_number {
     ($ty:ty) => {
         unsafe impl ZeroCopy for $ty {
-            fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
+            const ANY_BITS: bool = true;
+
+            fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+            where
+                B: BufMut,
+            {
                 buf.extend_from_slice(&<$ty>::to_ne_bytes(*self)[..])
             }
 
-            fn validate(buf: &Buf) -> Result<&Self, Error> {
+            fn read_from(buf: &Buf) -> Result<&Self, Error> {
                 if !buf.is_compatible(core::alloc::Layout::new::<$ty>()) {
                     return Err(Error::new(ErrorKind::LayoutMismatch {
                         layout: Layout::new::<$ty>(),
@@ -89,6 +116,22 @@ macro_rules! impl_number {
                 }
 
                 Ok(unsafe { buf.cast() })
+            }
+
+            // NB: Numerical types can inhabit any bit pattern.
+            unsafe fn validate_aligned(_: &Buf) -> Result<(), Error> {
+                Ok(())
+            }
+        }
+
+        unsafe impl AnyValue for $ty {
+            type Target = $ty;
+
+            fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
+            where
+                V: FnOnce(&Self::Target) -> O,
+            {
+                Ok(visitor(self))
             }
         }
     };

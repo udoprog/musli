@@ -1,8 +1,7 @@
 use core::marker::PhantomData;
 
-use crate::buf::Buf;
+use crate::buf::{Buf, BufMut};
 use crate::error::Error;
-use crate::owned_buf::OwnedBuf;
 use crate::ptr::Ptr;
 use crate::zero_copy::ZeroCopy;
 
@@ -36,18 +35,28 @@ impl<T: ?Sized> UnsizedRef<T> {
 }
 
 unsafe impl<T: ?Sized> ZeroCopy for UnsizedRef<T> {
-    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
+    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
         buf.write(&self.ptr)?;
         buf.write(&self.len)?;
         Ok(())
     }
 
-    fn validate(buf: &Buf) -> Result<&Self, Error> {
-        let mut validator = buf.validator::<Self>()?;
-        validator.validate::<Ptr>()?;
-        validator.validate::<usize>()?;
-        validator.finalize()?;
+    fn read_from(buf: &Buf) -> Result<&Self, Error> {
+        let mut v = buf.validate::<Self>()?;
+        v.field::<Ptr>()?;
+        v.field::<usize>()?;
+        v.finalize()?;
         Ok(unsafe { buf.cast() })
+    }
+
+    unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
+        let mut v = buf.validate_aligned()?;
+        v.field::<Ptr>()?;
+        v.field::<usize>()?;
+        v.finalize()
     }
 }
 

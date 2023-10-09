@@ -113,11 +113,11 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         return Err(());
     }
 
-    let zero_copy: syn::Path = syn::parse_quote!(musli_zerocopy::ZeroCopy);
-    let owned_buf: syn::Path = syn::parse_quote!(musli_zerocopy::OwnedBuf);
-    let error: syn::Path = syn::parse_quote!(musli_zerocopy::Error);
+    let buf_mut: syn::Path = syn::parse_quote!(musli_zerocopy::BufMut);
     let buf: syn::Path = syn::parse_quote!(musli_zerocopy::Buf);
+    let error: syn::Path = syn::parse_quote!(musli_zerocopy::Error);
     let validator: syn::Path = syn::parse_quote!(musli_zerocopy::Validator);
+    let zero_copy: syn::Path = syn::parse_quote!(musli_zerocopy::ZeroCopy);
 
     let mut writes = Vec::new();
     let mut validates = Vec::new();
@@ -129,13 +129,13 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         };
 
         writes.push(quote! {
-            #owned_buf::write(buf, &self.#member)?;
+            #buf_mut::write(buf, &self.#member)?;
         });
 
         let ty = &field.ty;
 
         validates.push(quote! {
-            #validator::validate::<#ty>(&mut validator)?;
+            #validator::field::<#ty>(&mut validator)?;
         });
     }
 
@@ -143,18 +143,30 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
+    let validates = &validates[..];
+
     Ok(quote::quote! {
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
-            fn write_to(&self, buf: &mut #owned_buf) -> Result<(), #error> {
+            fn write_to<__B: ?Sized>(&self, buf: &mut __B) -> Result<(), #error>
+            where
+                __B: #buf_mut
+            {
                 #(#writes)*
                 Ok(())
             }
 
-            fn validate(buf: &#buf) -> Result<&Self, #error> {
-                let mut validator = #buf::validator::<Self>(buf)?;
+            fn read_from(buf: &#buf) -> Result<&Self, #error> {
+                let mut validator = #buf::validate::<Self>(buf)?;
                 #(#validates)*
                 #validator::finalize(validator)?;
                 Ok(unsafe { #buf::cast(buf) })
+            }
+
+            unsafe fn validate_aligned(buf: &#buf) -> Result<(), #error> {
+                let mut validator = #buf::validate_aligned(buf)?;
+                #(#validates)*
+                #validator::finalize(validator)?;
+                Ok(())
             }
         }
     })

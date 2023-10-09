@@ -1,7 +1,7 @@
 use core::borrow::Borrow;
 use core::hash::Hash;
 
-use crate::buf::{AnyRef, Buf};
+use crate::buf::{AnyValue, Buf};
 use crate::error::Error;
 use crate::map::hashing::HashKey;
 use crate::pair::Pair;
@@ -9,6 +9,10 @@ use crate::slice_ref::SliceRef;
 use crate::zero_copy::ZeroCopy;
 
 /// The reference to a map.
+///
+/// Constructed through [`OwnedBuf::insert_map`].
+///
+/// [`OwnedBuf::insert_map`]: crate::OwnedBuf::insert_map
 #[derive(Debug, Clone, Copy)]
 pub struct MapRef<K, V> {
     key: HashKey,
@@ -35,11 +39,11 @@ where
     K: ZeroCopy,
     V: ZeroCopy,
 {
-    /// Get a value from the map.
+    /// Get a value from a map.
     pub fn get<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<&'a V>, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: 'a + AnyRef,
+        K: 'a + AnyValue,
         K::Target: Borrow<T>,
     {
         let Some(entry) = self.get_entry(buf, key)? else {
@@ -53,7 +57,7 @@ where
     pub fn get_entry<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<(&'a K, &'a V)>, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: 'a + AnyRef,
+        K: 'a + AnyValue,
         K::Target: Borrow<T>,
     {
         let displacements = buf.load(self.displacements)?;
@@ -72,7 +76,7 @@ where
             return Ok(None);
         };
 
-        if buf.load(&e.a)?.borrow() == key {
+        if e.a.visit(buf, |v| v.borrow() == key)? {
             Ok(Some((&e.a, &e.b)))
         } else {
             Ok(None)
