@@ -3,6 +3,7 @@ use core::hash::Hash;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use crate::Buf;
 use crate::error::{Error, ErrorKind};
 use crate::map::hashing::{displace, hash, HashKey, Hashes};
 use crate::slice::Slice;
@@ -23,8 +24,9 @@ pub(crate) struct HashState {
 
 pub(crate) fn generate_hash<'a, K, V>(entries: Slice<'a, (K, V)>) -> Result<HashState, Error>
 where
-    K: Hash + Size + Read<'a>,
-    V: Size + Read<'a>,
+    K: Size + Read,
+    K::Output<'a>: Hash,
+    V: Size + Read,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
         if let Some(hash) = try_generate_hash(&entries, key)? {
@@ -40,8 +42,9 @@ fn try_generate_hash<'a, K, V>(
     key: HashKey,
 ) -> Result<Option<HashState>, Error>
 where
-    K: Hash + Size + Read<'a>,
-    V: Size + Read<'a>,
+    K: Size + Read,
+    K::Output<'a>: Hash,
+    V: Size + Read,
 {
     let mut hashes = Vec::new();
 

@@ -16,21 +16,21 @@ pub struct Map<'a, K: 'a, V: 'a> {
 
 impl<'a, K: 'a, V: 'a> Map<'a, K, V> {
     /// Get a value from the map.
-    pub fn get<T>(&self, key: &T) -> Result<Option<V>, Error>
+    pub fn get<T>(&self, key: &T) -> Result<Option<V::Output<'a>>, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: Borrow<T> + Size + Read<'a>,
-        V: Size + Read<'a>,
+        K: Borrow<T> + Size + Read,
+        V: Size + Read,
     {
         Ok(self.get_entry(key)?.map(|e| e.1))
     }
 
     /// Get an entry from the map.
-    pub fn get_entry<T>(&self, key: &T) -> Result<Option<(K, V)>, Error>
+    pub fn get_entry<T>(&self, key: &T) -> Result<Option<(K::Output<'a>, V::Output<'a>)>, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: Borrow<T> + Size + Read<'a>,
-        V: Size + Read<'a>,
+        K: Borrow<T> + Size + Read,
+        V: Size + Read,
     {
         if self.displacements.is_empty() {
             return Ok(None);
@@ -73,15 +73,15 @@ impl<K, V> MapRef<K, V> {
     }
 }
 
-impl<'a, K: 'a, V: 'a> Bind<'a> for MapRef<K, V>
+impl<K, V> Bind for MapRef<K, V>
 where
-    K: Bind<'a>,
-    V: Bind<'a>,
+    K: Bind,
+    V: Bind,
 {
-    type Output = Map<'a, K::Output, V::Output>;
+    type Output<'a> = Map<'a, K::Output<'a>, V::Output<'a>> where <K as Bind>::Output<'a>: 'a, <V as Bind>::Output<'a>: 'a;
 
     #[inline]
-    fn bind(self, buf: &'a Buf) -> Result<Self::Output, Error> {
+    fn bind(self, buf: &Buf) -> Result<Self::Output<'_>, Error> {
         Ok(Map {
             key: self.key,
             entries: self.entries.bind(buf)?,

@@ -1,55 +1,50 @@
 use core::fmt;
-use core::mem;
 
 use crate::buf::Buf;
 use crate::error::Error;
 use crate::owned_buf::OwnedBuf;
-use crate::traits::{Read, Size, Write};
+use crate::to_buf::ZeroCopy;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// A pointer to a location in a buffer.
+#[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct Ptr(usize);
+pub struct Ptr {
+    offset: usize,
+}
 
 impl Ptr {
     #[inline]
-    pub(crate) fn new(at: usize) -> Self {
-        Self(at)
+    pub(crate) fn new(offset: usize) -> Self {
+        Self { offset }
     }
 
     #[inline]
-    pub(crate) fn wrapping_add(self, rhs: usize) -> Self {
-        Self(self.0.wrapping_add(rhs))
-    }
-
-    #[inline]
-    pub(crate) fn as_usize(self) -> usize {
-        self.0
+    pub(crate) fn offset(&self) -> usize {
+        self.offset
     }
 }
 
-impl Write for Ptr {
-    #[inline]
-    fn write(&self, buf: &mut OwnedBuf) {
-        self.0.write(buf);
-    }
-}
-
-impl Read<'_> for Ptr {
-    fn read(buf: &'_ Buf, ptr: Ptr) -> Result<Self, Error> {
-        Ok(Ptr(usize::read(buf, ptr)?))
-    }
-}
-
-impl Size for Ptr {
-    #[inline]
-    fn size() -> usize {
-        mem::size_of::<usize>()
-    }
-}
-
-impl fmt::Display for Ptr {
-    #[inline]
+impl fmt::Debug for Ptr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "0x{:x}", self.0)
+        struct Pointer(usize);
+
+        impl fmt::Debug for Pointer {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Pointer::fmt(&(self.0 as *const ()), f)
+            }
+        }
+
+        f.debug_tuple("Ptr").field(&Pointer(self.offset)).finish()
+    }
+}
+
+unsafe impl ZeroCopy for Ptr {
+    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
+        buf.write(&self.offset)
+    }
+
+    fn validate(buf: &Buf) -> Result<&Self, Error> {
+        // SAFETY: Ptr is repr transparent over usize.
+        unsafe { Ok(&*(usize::validate(buf)? as *const usize).cast()) }
     }
 }

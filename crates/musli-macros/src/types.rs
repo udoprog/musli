@@ -317,8 +317,12 @@ fn never_type<const N: usize>(
         if let Extra::Visitor(ty) = extra {
             let mut it = generics.params.iter();
 
-            let Some(syn::GenericParam::Type(syn::TypeParam { ident: c_param, .. })) = it.next() else {
-                return Err(syn::Error::new_spanned(generics, "Missing generic parameter in associated type (usually `C`)"));
+            let Some(syn::GenericParam::Type(syn::TypeParam { ident: c_param, .. })) = it.next()
+            else {
+                return Err(syn::Error::new_spanned(
+                    generics,
+                    "Missing generic parameter in associated type (usually `C`)",
+                ));
             };
 
             if let Some(ty) = ty {
@@ -343,7 +347,10 @@ fn never_type<const N: usize>(
                         args.push(syn::GenericArgument::Type(syn::Type::Slice(
                             syn::TypeSlice {
                                 bracket_token: syn::token::Bracket::default(),
-                                elem: Box::new(syn::Type::Path(syn::TypePath { qself: None, path })),
+                                elem: Box::new(syn::Type::Path(syn::TypePath {
+                                    qself: None,
+                                    path,
+                                })),
                             },
                         )));
                     }

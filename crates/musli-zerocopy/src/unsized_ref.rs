@@ -1,41 +1,56 @@
 use core::marker::PhantomData;
-use core::str;
 
 use crate::buf::Buf;
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::owned_buf::OwnedBuf;
 use crate::ptr::Ptr;
-use crate::traits::{Bind, Read, Size, Write};
+use crate::to_buf::ZeroCopy;
 
-/// Reference to an unsized value.
-#[derive(Debug)]
-pub struct UnsizedRef<T>
-where
-    T: ?Sized,
-{
-    pub(crate) ptr: Ptr,
-    pub(crate) len: usize,
+/// An unsized reference.
+#[repr(C)]
+pub struct UnsizedRef<T: ?Sized> {
+    ptr: Ptr,
+    len: usize,
     _marker: PhantomData<T>,
 }
 
-impl<T> UnsizedRef<T>
-where
-    T: ?Sized,
-{
-    pub(crate) const fn new(ptr: Ptr, len: usize) -> Self {
+impl<T: ?Sized> UnsizedRef<T> {
+    pub(crate) fn new(ptr: Ptr, len: usize) -> Self {
         Self {
             ptr,
             len,
             _marker: PhantomData,
         }
     }
+
+    #[inline]
+    pub(crate) fn ptr(&self) -> Ptr {
+        self.ptr
+    }
+
+    #[inline]
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
 }
 
-impl<T> Clone for UnsizedRef<T>
-where
-    T: ?Sized,
-{
-    #[inline]
+unsafe impl<T: ?Sized> ZeroCopy for UnsizedRef<T> {
+    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
+        buf.write(&self.ptr)?;
+        buf.write(&self.len)?;
+        Ok(())
+    }
+
+    fn validate(buf: &Buf) -> Result<&Self, Error> {
+        let mut validator = buf.validator::<Self>()?;
+        validator.validate::<Ptr>()?;
+        validator.validate::<usize>()?;
+        validator.finalize()?;
+        Ok(unsafe { buf.cast() })
+    }
+}
+
+impl<T: ?Sized> Clone for UnsizedRef<T> {
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr,
@@ -45,66 +60,4 @@ where
     }
 }
 
-impl<T> Copy for UnsizedRef<T> where T: ?Sized {}
-
-impl<'a, T> Read<'a> for UnsizedRef<T>
-where
-    T: ?Sized,
-{
-    #[inline]
-    fn read(buf: &'a Buf, base: Ptr) -> Result<Self, Error> {
-        let ptr = Ptr::read(buf, base)?;
-        let len = base.wrapping_add(Ptr::size());
-        let len = usize::read(buf, len)?;
-
-        Ok(UnsizedRef {
-            ptr,
-            len,
-            _marker: PhantomData,
-        })
-    }
-}
-
-impl<T> Size for UnsizedRef<T>
-where
-    T: ?Sized,
-{
-    #[inline]
-    fn size() -> usize {
-        Ptr::size() + usize::size()
-    }
-}
-
-impl<T> Write for UnsizedRef<T>
-where
-    T: ?Sized,
-{
-    fn write(&self, buf: &mut OwnedBuf) {
-        self.ptr.write(buf);
-        self.len.write(buf);
-    }
-}
-
-impl<'a> Bind<'a> for UnsizedRef<[u8]> {
-    type Output = &'a [u8];
-
-    #[inline]
-    fn bind(self, buf: &'a Buf) -> Result<Self::Output, Error> {
-        buf.get_slice(self.ptr, self.len)
-    }
-}
-
-impl<'a> Bind<'a> for UnsizedRef<str> {
-    type Output = &'a str;
-
-    #[inline]
-    fn bind(self, buf: &'a Buf) -> Result<Self::Output, Error> {
-        let data = buf.get_slice(self.ptr, self.len)?;
-
-        let Ok(string) = str::from_utf8(data) else {
-            return Err(Error::new(ErrorKind::BadUtf8));
-        };
-
-        Ok(string)
-    }
-}
+impl<T: ?Sized> Copy for UnsizedRef<T> {}

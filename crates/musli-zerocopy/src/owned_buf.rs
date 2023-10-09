@@ -1,24 +1,35 @@
 #[cfg(test)]
 mod tests;
 
-use alloc::vec::Vec;
 use core::ptr;
 
+use alloc::vec::Vec;
+
 use crate::buf::Buf;
+use crate::error::{Error, ErrorKind};
 use crate::ptr::Ptr;
-use crate::traits::{UnsizedToBuf, Write};
+use crate::ref_::Ref;
+use crate::to_buf::{UnsizedZeroCopy, ZeroCopy};
 use crate::unsized_ref::UnsizedRef;
-use crate::value_ref::ValueRef;
 
 /// An owned buffer.
 pub struct OwnedBuf {
     data: Vec<u8>,
+    align: usize,
 }
 
 impl OwnedBuf {
     /// Construct a new empty buffer.
     pub const fn new() -> Self {
-        Self { data: Vec::new() }
+        Self {
+            data: Vec::new(),
+            align: 0,
+        }
+    }
+
+    /// Alignment of the buffer.
+    pub fn align(&self) -> usize {
+        self.align
     }
 
     /// Get the buffer as a slice.
@@ -27,38 +38,110 @@ impl OwnedBuf {
     }
 
     /// Write a value to the buffer.
-    pub fn insert<T>(&mut self, value: T) -> ValueRef<T>
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let first = buf.insert_unsized("first")?;
+    /// let second = buf.insert_unsized("second")?;
+    ///
+    /// let buf = buf.as_buf()?;
+    ///
+    /// assert_eq!(buf.load(first)?, "first");
+    /// assert_eq!(buf.load(second)?, "second");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn insert_unsized<T>(&mut self, value: &T) -> Result<UnsizedRef<T>, Error>
     where
-        T: Write,
+        T: ?Sized + UnsizedZeroCopy,
     {
-        let ptr = self.ptr();
-        value.write(self);
-        ValueRef::new(ptr)
+        let ptr = self.ptr(value.align());
+        value.write_to(self)?;
+        Ok(UnsizedRef::new(ptr, value.len()))
     }
 
-    /// Write a value to the buffer.
-    pub fn insert_unsized<T>(&mut self, value: &T) -> UnsizedRef<T>
+    /// Insert a value with the given size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    /// use musli_zerocopy::{Error, OwnedBuf, UnsizedRef};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Custom {
+    ///     field: u32,
+    ///     string: UnsizedRef<str>,
+    /// }
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let string = buf.insert_unsized("string")?;
+    /// let custom = buf.insert_sized(Custom { field: 1, string })?;
+    /// let custom2 = buf.insert_sized(Custom { field: 2, string })?;
+    ///
+    /// let buf = buf.as_buf()?;
+    ///
+    /// let custom = buf.load(custom)?;
+    /// assert_eq!(custom.field, 1);
+    /// assert_eq!(buf.load(custom.string)?, "string");
+    ///
+    /// let custom2 = buf.load(custom2)?;
+    /// assert_eq!(custom2.field, 2);
+    /// assert_eq!(buf.load(custom2.string)?, "string");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn insert_sized<T>(&mut self, value: T) -> Result<Ref<T>, Error>
     where
-        T: ?Sized + UnsizedToBuf,
+        T: ZeroCopy,
     {
-        let ptr = self.ptr();
-        value.write(self);
-        UnsizedRef::new(ptr, value.len())
+        let ptr = self.ptr(T::ALIGN);
+        value.write_to(self)?;
+        Ok(Ref::new(ptr))
+    }
+
+    /// Write the bytes of a value.
+    pub fn write<T>(&mut self, value: &T) -> Result<(), Error>
+    where
+        T: ZeroCopy,
+    {
+        self.align_buf(T::ALIGN);
+        value.write_to(self)?;
+        Ok(())
     }
 
     /// Extend the buffer from a slice.
     #[inline]
-    pub(crate) fn extend_from_slice(&mut self, bytes: &[u8]) {
+    pub(crate) fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
         self.data.extend_from_slice(bytes);
+        Ok(())
     }
 
     /// Access the current buffer for reading.
-    pub fn as_buf(&self) -> &Buf {
-        Buf::new(&self.data)
+    pub fn as_buf(&self) -> Result<&Buf, Error> {
+        if (self.data.as_ptr() as usize) % self.align != 0 {
+            return Err(Error::new(ErrorKind::BadAlignment {
+                ptr: self.data.as_ptr() as usize,
+                align: self.align,
+            }));
+        }
+
+        Ok(Buf::new(&self.data))
     }
 
-    /// Get the current pointer.
-    pub(crate) fn ptr(&mut self) -> Ptr {
+    /// Align the current write cursor.
+    pub(crate) fn align_buf(&mut self, align: usize) {
+        let len = self.data.len().next_multiple_of(align);
+        self.align = self.align.max(align);
+        self.data.resize(len, 0);
+    }
+
+    /// Get an aligned pointer.
+    pub(crate) fn ptr(&mut self, align: usize) -> Ptr {
+        self.align_buf(align);
         Ptr::new(self.data.len())
     }
 

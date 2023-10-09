@@ -33,8 +33,8 @@ where
     /// Write a slice onto the slice builder.
     pub fn build(mut self, buf: &mut OwnedBuf) -> Result<MapRef<K, V>, Error>
     where
-        K: Hash + for<'u> Read<'u>,
-        V: for<'u> Read<'u>,
+        K: Read,
+        V: Read,
     {
         let mut hash_state = crate::map::generator::generate_hash(self.entries.as_slice())?;
 
@@ -42,12 +42,10 @@ where
             loop {
                 let b = hash_state.map[a];
 
-                if hash_state.map[a] == a {
-                    break;
+                if hash_state.map[a] != a {
+                    self.entries.swap(a, b);
+                    hash_state.map.swap(a, b);
                 }
-
-                self.entries.swap(a, b);
-                hash_state.map.swap(a, b);
             }
         }
 
