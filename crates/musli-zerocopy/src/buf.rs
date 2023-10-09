@@ -170,8 +170,14 @@ impl Buf {
         self.is_aligned_to(layout.align()) && self.data.len() == layout.size()
     }
 
+    /// Test if the buffer is aligned to the given alignment.
     pub fn is_aligned_to(&self, align: usize) -> bool {
         is_aligned_to(self.data.as_ptr(), align)
+    }
+
+    /// Test if the entire buffer is zeroed.
+    pub fn is_zeroed(&self) -> bool {
+        self.data.iter().all(|b| *b == 0)
     }
 
     /// Get the length of the current buffer.
@@ -250,8 +256,6 @@ impl Buf {
         let end = start.wrapping_add(ptr.len().wrapping_mul(T::SIZE));
         let buf = self.get(start..end, T::ALIGN)?;
 
-        let len = buf.len().wrapping_div(T::SIZE);
-
         // Only validate each element if they cannot inhabit all possible bit
         // patterns.
         if !T::ANY_BITS {
@@ -265,7 +269,7 @@ impl Buf {
             }
         }
 
-        Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), len) })
+        Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), ptr.len()) })
     }
 
     /// Load the given value as a reference.

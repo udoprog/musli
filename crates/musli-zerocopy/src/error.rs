@@ -40,6 +40,7 @@ pub(crate) enum ErrorKind {
     OutOfBounds { range: Range<usize>, len: usize },
     OutOfStartBound { start: usize, len: usize },
     IndexOutOfBounds { index: usize, len: usize },
+    NonZeroZeroed { range: Range<usize> },
     FailedPhf,
     Utf8Error { error: Utf8Error },
 }
@@ -65,6 +66,9 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::IndexOutOfBounds { index, len } => {
                 write!(f, "Index {index} out of bounds, expected 0-{len}")
+            }
+            ErrorKind::NonZeroZeroed { range } => {
+                write!(f, "Expected non-zero range at {range:?}")
             }
             ErrorKind::FailedPhf => {
                 write!(f, "Failed to construct perfect hash for map")

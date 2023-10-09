@@ -13,7 +13,9 @@ mod buf;
 pub use self::error::Error;
 mod error;
 
+pub use self::ptr::Ptr;
 mod ptr;
+
 mod sip;
 
 #[cfg(feature = "alloc")]

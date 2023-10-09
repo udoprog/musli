@@ -4,7 +4,7 @@ use crate::buf::{Buf, BufMut};
 use crate::error::Error;
 use crate::zero_copy::ZeroCopy;
 
-/// A pointer to a location in a buffer.
+/// An absolute pointer to a location in a [`Buf`].
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct Ptr {
@@ -12,6 +12,9 @@ pub struct Ptr {
 }
 
 impl Ptr {
+    /// A pointer pointing to the start of a buffer.
+    pub const ZERO: Self = Self { offset: 0 };
+
     #[inline]
     pub(crate) fn new(offset: usize) -> Self {
         Self { offset }
