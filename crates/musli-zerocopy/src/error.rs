@@ -1,4 +1,4 @@
-use core::alloc::Layout;
+use core::alloc::{Layout, LayoutError};
 use core::fmt;
 use core::ops::Range;
 use core::str::Utf8Error;
@@ -37,11 +37,12 @@ impl std::error::Error for Error {
 pub(crate) enum ErrorKind {
     BadAlignment { ptr: usize, align: usize },
     LayoutMismatch { layout: Layout, buf: Range<usize> },
-    OutOfBounds { range: Range<usize>, len: usize },
+    OutOfBounds { len: usize },
     OutOfStartBound { start: usize, len: usize },
     IndexOutOfBounds { index: usize, len: usize },
     NonZeroZeroed { range: Range<usize> },
     FailedPhf,
+    LayoutError { error: LayoutError },
     Utf8Error { error: Utf8Error },
 }
 
@@ -58,8 +59,8 @@ impl fmt::Display for ErrorKind {
                     buf.start, buf.end
                 )
             }
-            ErrorKind::OutOfBounds { range, len } => {
-                write!(f, "Out of bounds {range:?}, expected 0-{len}")
+            ErrorKind::OutOfBounds { len } => {
+                write!(f, "Out of bounds 0-{len}")
             }
             ErrorKind::OutOfStartBound { start, len } => {
                 write!(f, "Out of start bound {start}, expected 0-{len}")
@@ -73,6 +74,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::FailedPhf => {
                 write!(f, "Failed to construct perfect hash for map")
             }
+            ErrorKind::LayoutError { error } => error.fmt(f),
             ErrorKind::Utf8Error { error } => error.fmt(f),
         }
     }
