@@ -27,3 +27,15 @@ where
         self.ptr
     }
 }
+
+impl<T> Clone for Ref<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            ptr: self.ptr,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T> Copy for Ref<T> {}

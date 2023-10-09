@@ -5,7 +5,6 @@ use core::slice;
 
 use crate::error::{Error, ErrorKind};
 use crate::owned_buf::is_aligned_to;
-use crate::ptr::Ptr;
 use crate::ref_::Ref;
 use crate::slice_ref::SliceRef;
 use crate::unsized_ref::UnsizedRef;
@@ -13,23 +12,11 @@ use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 
 /// Trait used for any kind of pointer or reference.
 pub unsafe trait AnyRef {
-    const ALIGN: usize;
-
-    /// The target of the pointer.
+    /// The target being read.
     type Target: ?Sized;
 
-    /// The base pointer.
-    fn ptr(&self) -> Ptr;
-
-    /// The length of the value to load.
-    ///
-    /// # Safety
-    ///
-    /// Must be a multiple of align.
-    fn len(&self) -> usize;
-
     /// Validate the value.
-    fn validate(buf: &Buf) -> Result<&Self::Target, Error>;
+    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error>;
 }
 
 // SAFETY: Blanket implementation is fine over known sound implementations.
@@ -37,23 +24,11 @@ unsafe impl<T: ?Sized> AnyRef for &T
 where
     T: AnyRef,
 {
-    const ALIGN: usize = T::ALIGN;
-
     type Target = T::Target;
 
     #[inline]
-    fn ptr(&self) -> Ptr {
-        (**self).ptr()
-    }
-
-    #[inline]
-    fn len(&self) -> usize {
-        (**self).len()
-    }
-
-    #[inline]
-    fn validate(buf: &Buf) -> Result<&Self::Target, Error> {
-        T::validate(buf)
+    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        T::validate(self, buf)
     }
 }
 
@@ -61,20 +36,10 @@ unsafe impl<T: ?Sized> AnyRef for UnsizedRef<T>
 where
     T: UnsizedZeroCopy,
 {
-    const ALIGN: usize = T::ALIGN;
-
     type Target = T;
 
-    fn ptr(&self) -> Ptr {
-        UnsizedRef::ptr(self)
-    }
-
-    fn len(&self) -> usize {
-        UnsizedRef::len(self)
-    }
-
-    fn validate(buf: &Buf) -> Result<&Self::Target, Error> {
-        T::validate(buf)
+    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        buf.load_unsized(*self)
     }
 }
 
@@ -82,20 +47,10 @@ unsafe impl<T: ?Sized> AnyRef for Ref<T>
 where
     T: ZeroCopy,
 {
-    const ALIGN: usize = T::ALIGN;
-
     type Target = T;
 
-    fn ptr(&self) -> Ptr {
-        Ref::ptr(self)
-    }
-
-    fn len(&self) -> usize {
-        T::SIZE
-    }
-
-    fn validate(buf: &Buf) -> Result<&Self::Target, Error> {
-        T::validate(buf)
+    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        buf.load_sized(*self)
     }
 }
 
@@ -103,29 +58,10 @@ unsafe impl<T> AnyRef for SliceRef<T>
 where
     T: ZeroCopy,
 {
-    const ALIGN: usize = T::ALIGN;
-
     type Target = [T];
 
-    fn ptr(&self) -> Ptr {
-        SliceRef::ptr(self)
-    }
-
-    fn len(&self) -> usize {
-        SliceRef::len(self).wrapping_mul(T::SIZE)
-    }
-
-    fn validate(buf: &Buf) -> Result<&Self::Target, Error> {
-        let len = buf.len().wrapping_div(T::SIZE);
-
-        for chunk in buf.as_bytes().chunks_exact(T::SIZE) {
-            // SAFETY: The passed in buffer is required to be aligned per the
-            // requirements of this trait, so any T::SIZE chunks are aligned
-            // too.
-            T::validate(unsafe { Buf::new_unchecked(chunk) })?;
-        }
-
-        Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), len) })
+    fn validate<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        buf.load_slice(*self)
     }
 }
 
@@ -181,7 +117,7 @@ impl Buf {
     }
 
     /// Get the given range while checking its required alignment.
-    fn get(&self, range: Range<usize>, align: usize) -> Result<&Buf, Error> {
+    pub fn get(&self, range: Range<usize>, align: usize) -> Result<&Buf, Error> {
         let Some(data) = self.data.get(range.clone()) else {
             return Err(Error::new(ErrorKind::OutOfBounds {
                 range,
@@ -237,14 +173,33 @@ impl Buf {
         T::validate(self.get(start..end, T::ALIGN)?)
     }
 
+    /// Load the given slice.
+    pub fn load_slice<T>(&self, ptr: SliceRef<T>) -> Result<&[T], Error>
+    where
+        T: ZeroCopy,
+    {
+        let start = ptr.ptr().offset();
+        let end = start.wrapping_add(ptr.len().wrapping_mul(T::SIZE));
+        let buf = self.get(start..end, T::ALIGN)?;
+
+        let len = buf.len().wrapping_div(T::SIZE);
+
+        for chunk in buf.as_bytes().chunks_exact(T::SIZE) {
+            // SAFETY: The passed in buffer is required to be aligned per the
+            // requirements of this trait, so any T::SIZE chunks are aligned
+            // too.
+            T::validate(unsafe { Buf::new_unchecked(chunk) })?;
+        }
+
+        Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), len) })
+    }
+
     /// Load the given value as a reference.
     pub fn load<T>(&self, ptr: T) -> Result<&T::Target, Error>
     where
         T: AnyRef,
     {
-        let start = ptr.ptr().offset();
-        let end = start.wrapping_add(ptr.len());
-        T::validate(self.get(start..end, T::ALIGN)?)
+        ptr.validate(self)
     }
 
     /// Cast the current buffer into the given type.
