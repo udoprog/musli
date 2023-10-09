@@ -323,6 +323,16 @@ impl OwnedBuf {
 
     /// Insert a map into the buffer.
     ///
+    /// This will utilize a perfect hash functions derived from the [`phf`
+    /// crate] to construt a persistent hash map.
+    ///
+    /// This returns a [`MapRef`] which can be bound into a [`Map`] through the
+    /// [`bind()`] method for convenience.
+    ///
+    /// [`phf` crate]: https://crates.io/crates/phf
+    /// [`Map`]: crate::Map
+    /// [`bind()`]: Self::bind
+    ///
     /// # Examples
     ///
     /// ```
@@ -336,12 +346,12 @@ impl OwnedBuf {
     /// pairs.push(Pair::new(buf.insert_unsized("second")?, 2u32));
     ///
     /// let map = buf.insert_map(&mut pairs)?;
-    ///
     /// let buf = buf.as_aligned_buf();
+    /// let map = buf.bind(map)?;
     ///
-    /// assert_eq!(map.get(buf, &"first")?, Some(&1));
-    /// assert_eq!(map.get(buf, &"second")?, Some(&2));
-    /// assert_eq!(map.get(buf, &"third")?, None);
+    /// assert_eq!(map.get(&"first")?, Some(&1));
+    /// assert_eq!(map.get(&"second")?, Some(&2));
+    /// assert_eq!(map.get(&"third")?, None);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     ///

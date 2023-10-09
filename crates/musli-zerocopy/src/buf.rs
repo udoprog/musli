@@ -271,7 +271,48 @@ impl Buf {
         ptr.read_from(self)
     }
 
-    /// Bind the given reference to its underlying value.
+    /// Bind the current buffer to a value.
+    ///
+    /// This provides a more conveninent API for complex types like [`MapRef`],
+    /// and makes sure that all the internals related to the type being bound
+    /// has been validated and initialized.
+    ///
+    /// Binding a type can therefore be faster in cases where you interact with
+    /// the bound type a lot because most validation associated with the type
+    /// can be performed up front. But slower if you just intend to perform the
+    /// casual lookup.
+    ///
+    /// [`MapRef`]: crate::MapRef
+    ///
+    /// ## Examples
+    ///
+    /// Binding a [`Map`] ensures that all the internals of the map have been
+    /// validated:
+    ///
+    /// ```
+    /// use musli_zerocopy::{OwnedBuf, Pair};
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let mut map = Vec::new();
+    ///
+    /// map.push(Pair::new(1, 2));
+    /// map.push(Pair::new(2, 3));
+    ///
+    /// let map = buf.insert_map(&mut map)?;
+    /// let buf = buf.as_aligned_buf();
+    /// let map = buf.bind(map)?;
+    ///
+    /// assert_eq!(map.get(&1)?, Some(&2));
+    /// assert_eq!(map.get(&2)?, Some(&3));
+    /// assert_eq!(map.get(&3)?, None);
+    ///
+    /// assert!(map.contains_key(&1)?);
+    /// assert!(!map.contains_key(&3)?);
+    /// Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    ///
+    /// [`Map`]: crate::Map
     pub fn bind<T>(&self, ptr: T) -> Result<T::Bound<'_>, Error>
     where
         T: Bindable,

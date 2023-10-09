@@ -6,5 +6,5 @@
 pub(crate) mod generator;
 mod hashing;
 
-pub use self::map_ref::{Map, MapRef};
-mod map_ref;
+pub use self::map::{Map, MapRef};
+mod map;
