@@ -166,6 +166,7 @@ macro_rules! impl_number {
             }
 
             // NB: Numerical types can inhabit any bit pattern.
+            #[allow(clippy::missing_safety_doc)]
             unsafe fn validate_aligned(_: &Buf) -> Result<(), Error> {
                 Ok(())
             }
@@ -260,6 +261,7 @@ macro_rules! impl_nonzero_number {
                 Ok(unsafe { buf.cast() })
             }
 
+            #[allow(clippy::missing_safety_doc)]
             unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
                 if buf.is_zeroed() {
                     return Err(Error::new(ErrorKind::NonZeroZeroed { range: buf.range() }));
@@ -333,6 +335,7 @@ macro_rules! impl_zst {
                 Ok(&$expr)
             }
 
+            #[allow(clippy::missing_safety_doc)]
             unsafe fn validate_aligned(_: &Buf) -> Result<(), Error> {
                 Ok(())
             }
