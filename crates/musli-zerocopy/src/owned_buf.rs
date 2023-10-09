@@ -12,9 +12,9 @@ use crate::error::{Error, ErrorKind};
 use crate::map::MapRef;
 use crate::pair::Pair;
 use crate::ptr::Ptr;
-use crate::ref_::Ref;
-use crate::slice_ref::SliceRef;
-use crate::unsized_ref::UnsizedRef;
+use crate::r#ref::Ref;
+use crate::r#unsized::Unsized;
+use crate::slice::Slice;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 
 /// An owned buffer.
@@ -229,13 +229,13 @@ impl OwnedBuf {
     /// assert_eq!(buf.load(second)?, "second");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert_unsized<T>(&mut self, value: &T) -> Result<UnsizedRef<T>, Error>
+    pub fn insert_unsized<T>(&mut self, value: &T) -> Result<Unsized<T>, Error>
     where
         T: ?Sized + UnsizedZeroCopy,
     {
         let ptr = self.next_pointer(T::ALIGN);
         value.write_to(self)?;
-        Ok(UnsizedRef::new(ptr, value.len()))
+        Ok(Unsized::new(ptr, value.len()))
     }
 
     /// Insert a value with the given size.
@@ -244,13 +244,13 @@ impl OwnedBuf {
     ///
     /// ```
     /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{Error, OwnedBuf, UnsizedRef};
+    /// use musli_zerocopy::{OwnedBuf, Unsized};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
     /// struct Custom {
     ///     field: u32,
-    ///     string: UnsizedRef<str>,
+    ///     string: Unsized<str>,
     /// }
     ///
     /// let mut buf = OwnedBuf::new();
@@ -274,7 +274,7 @@ impl OwnedBuf {
     where
         T: ZeroCopy,
     {
-        let ptr = self.next_pointer(T::ALIGN);
+        let ptr = self.next_pointer(align_of::<T>());
         value.write_to(self)?;
         Ok(Ref::new(ptr))
     }
@@ -284,7 +284,7 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Error, OwnedBuf};
+    /// use musli_zerocopy::OwnedBuf;
     ///
     /// let mut buf = OwnedBuf::new();
     ///
@@ -308,17 +308,17 @@ impl OwnedBuf {
     /// assert_eq!(&strings, &["first", "second"][..]);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert_slice<T>(&mut self, values: &[T]) -> Result<SliceRef<T>, Error>
+    pub fn insert_slice<T>(&mut self, values: &[T]) -> Result<Slice<T>, Error>
     where
         T: ZeroCopy,
     {
-        let ptr = self.next_pointer(T::ALIGN);
+        let ptr = self.next_pointer(align_of::<T>());
 
         for value in values {
             value.write_to(self)?;
         }
 
-        Ok(SliceRef::new(ptr, values.len()))
+        Ok(Slice::new(ptr, values.len()))
     }
 
     /// Insert a map into the buffer.
@@ -408,7 +408,7 @@ impl OwnedBuf {
     where
         T: ZeroCopy,
     {
-        self.in_place_align(T::ALIGN);
+        self.in_place_align(align_of::<T>());
         value.write_to(self)?;
         Ok(())
     }
@@ -686,14 +686,15 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
+    /// use core::mem::align_of;
+    /// use musli_zerocopy::{OwnedBuf, Ref};
     ///
     /// let mut buf = OwnedBuf::new();
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer(u32::ALIGN));
+    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer(align_of::<u32>()));
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its intereior alignment:

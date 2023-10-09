@@ -5,7 +5,7 @@ use crate::error::Error;
 use crate::zero_copy::ZeroCopy;
 
 /// An absolute pointer to a location in a [`Buf`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Ptr {
     offset: usize,

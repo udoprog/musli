@@ -28,14 +28,14 @@ pub use self::owned_buf::OwnedBuf;
 #[cfg(feature = "alloc")]
 mod owned_buf;
 
-pub use self::ref_::Ref;
-mod ref_;
+pub use self::r#ref::Ref;
+mod r#ref;
 
-pub use self::slice_ref::SliceRef;
-mod slice_ref;
+pub use self::slice::Slice;
+mod slice;
 
-pub use self::unsized_ref::UnsizedRef;
-mod unsized_ref;
+pub use self::r#unsized::Unsized;
+mod r#unsized;
 
 pub use self::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 mod zero_copy;

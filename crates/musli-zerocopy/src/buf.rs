@@ -1,13 +1,14 @@
 use core::alloc::Layout;
 use core::fmt;
+use core::mem::{align_of, size_of};
 use core::ops::Range;
-use core::slice;
+use core::slice::{self, SliceIndex};
 
 use crate::error::{Error, ErrorKind};
 use crate::owned_buf::is_aligned_to;
-use crate::ref_::Ref;
-use crate::slice_ref::SliceRef;
-use crate::unsized_ref::UnsizedRef;
+use crate::r#ref::Ref;
+use crate::r#unsized::Unsized;
+use crate::slice::Slice;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 
 /// A mutable buffer to write zero copy types to.
@@ -95,7 +96,7 @@ where
     }
 }
 
-unsafe impl<T: ?Sized> AnyRef for UnsizedRef<T>
+unsafe impl<T: ?Sized> AnyRef for Unsized<T>
 where
     T: UnsizedZeroCopy,
 {
@@ -117,7 +118,7 @@ where
     }
 }
 
-unsafe impl<T> AnyRef for SliceRef<T>
+unsafe impl<T> AnyRef for Slice<T>
 where
     T: ZeroCopy,
 {
@@ -191,10 +192,12 @@ impl Buf {
     }
 
     /// Get the given range while checking its required alignment.
-    pub fn get(&self, range: Range<usize>, align: usize) -> Result<&Buf, Error> {
-        let Some(data) = self.data.get(range.clone()) else {
+    pub fn get<I>(&self, range: I, align: usize) -> Result<&Buf, Error>
+    where
+        I: SliceIndex<[u8], Output = [u8]>,
+    {
+        let Some(data) = self.data.get(range) else {
             return Err(Error::new(ErrorKind::OutOfBounds {
-                range,
                 len: self.data.len(),
             }));
         };
@@ -228,12 +231,12 @@ impl Buf {
     /// assert_eq!(buf.load_unsized(second)?, "second");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn load_unsized<T: ?Sized>(&self, ptr: UnsizedRef<T>) -> Result<&T, Error>
+    pub fn load_unsized<T: ?Sized>(&self, ptr: Unsized<T>) -> Result<&T, Error>
     where
         T: UnsizedZeroCopy,
     {
         let start = ptr.ptr().offset();
-        let end = start.wrapping_add(ptr.len());
+        let end = start.wrapping_add(ptr.size());
         T::read_from(self.get(start..end, T::ALIGN)?)
     }
 
@@ -243,32 +246,19 @@ impl Buf {
         T: ZeroCopy,
     {
         let start = ptr.ptr().offset();
-        let end = start.wrapping_add(T::SIZE);
-        T::read_from(self.get(start..end, T::ALIGN)?)
+        let end = start.wrapping_add(size_of::<T>());
+        T::read_from(self.get(start..end, align_of::<T>())?)
     }
 
     /// Load the given slice.
-    pub fn load_slice<T>(&self, ptr: SliceRef<T>) -> Result<&[T], Error>
+    pub fn load_slice<T>(&self, ptr: Slice<T>) -> Result<&[T], Error>
     where
         T: ZeroCopy,
     {
         let start = ptr.ptr().offset();
-        let end = start.wrapping_add(ptr.len().wrapping_mul(T::SIZE));
-        let buf = self.get(start..end, T::ALIGN)?;
-
-        // Only validate each element if they cannot inhabit all possible bit
-        // patterns.
-        if !T::ANY_BITS {
-            for chunk in buf.as_bytes().chunks_exact(T::SIZE) {
-                // SAFETY: The passed in buffer is required to be aligned per the
-                // requirements of this trait, so any T::SIZE chunks are aligned
-                // too.
-                unsafe {
-                    T::validate_aligned(Buf::new_unchecked(chunk))?;
-                }
-            }
-        }
-
+        let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
+        let buf = self.get(start..end, align_of::<T>())?;
+        validate_array::<T>(buf, ptr.len())?;
         Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), ptr.len()) })
     }
 
@@ -290,6 +280,43 @@ impl Buf {
     }
 
     /// Construct a validator over the current buffer.
+    ///
+    /// This is a struct validator, which checks that the fields specified in
+    /// order of subsequent calls to [`field`] conform to the `repr(C)`
+    /// representation.
+    ///
+    /// [`field`]: Validator::field
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Custom {
+    ///     field: u32,
+    ///     field2: u64,
+    /// }
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let custom = Custom {
+    ///     field: 42,
+    ///     field2: 85,
+    /// };
+    ///
+    /// let custom = buf.insert_sized(custom)?;
+    ///
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// let mut v = buf.validate::<Custom>()?;
+    /// v.field::<u32>()?;
+    /// v.field::<u64>()?;
+    /// v.end()?;
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     pub fn validate<T>(&self) -> Result<Validator<'_>, Error> {
         if !self.is_compatible(Layout::new::<T>()) {
             return Err(Error::new(ErrorKind::LayoutMismatch {
@@ -312,27 +339,64 @@ impl Buf {
     }
 }
 
+pub(crate) fn validate_array<T>(buf: &Buf, len: usize) -> Result<(), Error>
+where
+    T: ZeroCopy,
+{
+    let layout =
+        Layout::array::<T>(len).map_err(|error| Error::new(ErrorKind::LayoutError { error }))?;
+
+    if !buf.is_compatible(layout) {
+        return Err(Error::new(ErrorKind::LayoutMismatch {
+            layout,
+            buf: buf.range(),
+        }));
+    }
+
+    validate_array_aligned::<T>(buf)?;
+    Ok(())
+}
+
+pub(crate) fn validate_array_aligned<T>(buf: &Buf) -> Result<(), Error>
+where
+    T: ZeroCopy,
+{
+    if !T::ANY_BITS && size_of::<T>() > 0 {
+        for chunk in buf.as_bytes().chunks_exact(size_of::<T>()) {
+            // SAFETY: The passed in buffer is required to be aligned per the
+            // requirements of this trait, so any size_of::<T>() chunks are aligned
+            // too.
+            unsafe {
+                T::validate_aligned(Buf::new_unchecked(chunk))?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 impl fmt::Debug for Buf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Buf").field(&self.data.len()).finish()
     }
 }
 
-/// Validator over a [Buf].
+/// Validator over a [`Buf`] constructed using [`Buf::validate`].
+#[must_use = "Must call `Validator::end` when validation is completed"]
 pub struct Validator<'a> {
     data: &'a [u8],
 }
 
 impl Validator<'_> {
-    /// Validate the given type.
+    /// Validate an additional field in the struct.
     pub fn field<T>(&mut self) -> Result<(), Error>
     where
         T: ZeroCopy,
     {
-        let rem = (self.data.as_ptr() as usize) % T::ALIGN;
+        let rem = (self.data.as_ptr() as usize) % align_of::<T>();
 
         if rem != 0 {
-            let start = T::ALIGN - rem;
+            let start = align_of::<T>() - rem;
 
             let Some(d) = self.data.get(start..) else {
                 return Err(Error::new(ErrorKind::OutOfStartBound {
@@ -344,23 +408,27 @@ impl Validator<'_> {
             self.data = d;
         }
 
-        if T::SIZE > self.data.len() {
+        if size_of::<T>() > self.data.len() {
             return Err(Error::new(ErrorKind::OutOfStartBound {
-                start: T::SIZE,
+                start: size_of::<T>(),
                 len: self.data.len(),
             }));
         }
 
-        let (head, tail) = self.data.split_at(T::SIZE);
+        let (head, tail) = self.data.split_at(size_of::<T>());
 
-        // SAFETY: We've ensured that the provided buffer is aligned above.
-        T::read_from(unsafe { Buf::new_unchecked(head) })?;
+        // SAFETY: We've ensured that the provided buffer is aligned and sized
+        // appropriately above.
+        unsafe {
+            T::validate_aligned(Buf::new_unchecked(head))?;
+        };
+
         self.data = tail;
         Ok(())
     }
 
     /// Ensure that the buffer is empty.
-    pub fn finalize(self) -> Result<(), Error> {
+    pub fn end(self) -> Result<(), Error> {
         // NB: due to alignment and padding, the buffer might not be completely
         // consumed at this point.
         Ok(())

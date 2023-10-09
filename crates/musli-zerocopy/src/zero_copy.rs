@@ -2,7 +2,7 @@
 
 use core::alloc::Layout;
 use core::marker::PhantomData;
-use core::mem;
+use core::mem::{align_of, size_of};
 use core::str;
 
 use crate::buf::{AnyValue, Buf, BufMut};
@@ -40,17 +40,11 @@ pub unsafe trait UnsizedZeroCopy {
 /// This can only be implemented correctly by types under certain conditions:
 /// * The type has a strict, well-defined layout or is `repr(C)`.
 pub unsafe trait ZeroCopy: Sized {
-    /// Size of the pointed to data.
-    const SIZE: usize = mem::size_of::<Self>();
-
-    /// Alignment of the pointed to data.
-    const ALIGN: usize = mem::align_of::<Self>();
-
     /// Indicates if the type can inhabit all possible bit patterns within its
-    /// `SIZE`.
+    /// `size_of::<Self>()` bytes.
     ///
     /// By default ZSTs set this as true.
-    const ANY_BITS: bool = mem::size_of::<Self>() == 0;
+    const ANY_BITS: bool = size_of::<Self>() == 0;
 
     /// Write to the owned buffer.
     fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
@@ -71,7 +65,7 @@ pub unsafe trait ZeroCopy: Sized {
 }
 
 unsafe impl UnsizedZeroCopy for str {
-    const ALIGN: usize = mem::align_of::<u8>();
+    const ALIGN: usize = align_of::<u8>();
 
     fn len(&self) -> usize {
         <str>::len(self)
@@ -90,7 +84,7 @@ unsafe impl UnsizedZeroCopy for str {
 }
 
 unsafe impl UnsizedZeroCopy for [u8] {
-    const ALIGN: usize = mem::align_of::<u8>();
+    const ALIGN: usize = align_of::<u8>();
 
     fn len(&self) -> usize {
         <[_]>::len(self)
@@ -305,7 +299,7 @@ macro_rules! impl_zst {
         ///
         /// ```
         $(#[doc = concat!("use ", stringify!($import), ";")])*
-        /// use musli_zerocopy::{ZeroCopy, SliceRef, OwnedBuf};
+        /// use musli_zerocopy::{ZeroCopy, Slice, OwnedBuf};
         ///
         /// #[derive(Default, Clone, Copy, ZeroCopy)]
         /// #[repr(C)]
@@ -356,3 +350,31 @@ macro_rules! impl_zst {
 
 impl_zst!((), (), { () });
 impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::PhantomData});
+
+unsafe impl<T, const N: usize> ZeroCopy for [T; N]
+where
+    T: ZeroCopy,
+{
+    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
+        for element in self {
+            element.write_to(buf)?;
+        }
+
+        Ok(())
+    }
+
+    fn read_from(buf: &Buf) -> Result<&Self, Error> {
+        crate::buf::validate_array::<T>(buf, N)?;
+        // SAFETY: All preconditions above have been tested.
+        Ok(unsafe { buf.cast() })
+    }
+
+    #[allow(clippy::missing_safety_doc)]
+    unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
+        crate::buf::validate_array_aligned::<T>(buf)?;
+        Ok(())
+    }
+}

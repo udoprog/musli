@@ -5,7 +5,7 @@ use crate::buf::{AnyValue, Buf};
 use crate::error::Error;
 use crate::map::hashing::HashKey;
 use crate::pair::Pair;
-use crate::slice_ref::SliceRef;
+use crate::slice::Slice;
 use crate::zero_copy::ZeroCopy;
 
 /// The reference to a map.
@@ -16,15 +16,15 @@ use crate::zero_copy::ZeroCopy;
 #[derive(Debug, Clone, Copy)]
 pub struct MapRef<K, V> {
     key: HashKey,
-    entries: SliceRef<Pair<K, V>>,
-    displacements: SliceRef<Pair<u32, u32>>,
+    entries: Slice<Pair<K, V>>,
+    displacements: Slice<Pair<u32, u32>>,
 }
 
 impl<K, V> MapRef<K, V> {
     pub(crate) fn new(
         key: HashKey,
-        entries: SliceRef<Pair<K, V>>,
-        displacements: SliceRef<Pair<u32, u32>>,
+        entries: Slice<Pair<K, V>>,
+        displacements: Slice<Pair<u32, u32>>,
     ) -> Self {
         Self {
             key,

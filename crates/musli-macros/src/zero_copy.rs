@@ -163,14 +163,14 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             fn read_from(buf: &#buf) -> Result<&Self, #error> {
                 let mut validator = #buf::validate::<Self>(buf)?;
                 #(#validates)*
-                #validator::finalize(validator)?;
+                #validator::end(validator)?;
                 Ok(unsafe { #buf::cast(buf) })
             }
 
             unsafe fn validate_aligned(buf: &#buf) -> Result<(), #error> {
                 let mut validator = #buf::validate_aligned(buf)?;
                 #(#validates)*
-                #validator::finalize(validator)?;
+                #validator::end(validator)?;
                 Ok(())
             }
         }

@@ -1,10 +1,10 @@
-use musli_zerocopy::{Error, OwnedBuf, Pair, UnsizedRef, ZeroCopy};
+use musli_zerocopy::{Error, OwnedBuf, Pair, Unsized, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
 struct Custom {
     field: u32,
-    string: UnsizedRef<str>,
+    string: Unsized<str>,
 }
 
 fn main() -> Result<(), Error> {
