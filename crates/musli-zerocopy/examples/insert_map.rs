@@ -11,9 +11,10 @@ fn main() -> Result<(), Error> {
     let values = buf.insert_map(&mut values)?;
 
     let buf = buf.as_aligned_buf();
+    let values = buf.bind(values)?;
 
-    assert_eq!(values.get(buf, &10u32)?, Some(&1));
-    assert_eq!(values.get(buf, &20u32)?, Some(&2));
-    assert_eq!(values.get(buf, &30u32)?, None);
+    assert_eq!(values.get(&10u32)?, Some(&1));
+    assert_eq!(values.get(&20u32)?, Some(&2));
+    assert_eq!(values.get(&30u32)?, None);
     Ok(())
 }

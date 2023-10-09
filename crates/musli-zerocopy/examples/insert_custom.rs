@@ -23,23 +23,18 @@ fn main() -> Result<(), Error> {
     let map = buf.insert_map(&mut map)?;
 
     let buf = buf.as_aligned_buf();
+    let map = buf.bind(map)?;
 
-    if let Some(custom1) = map.get(buf, &1)? {
-        let custom1 = buf.load(custom1)?;
-        assert_eq!(custom1.field, 1);
-        assert_eq!(buf.load(custom1.string)?, "string");
-    } else {
-        panic!("Missing key 1")
-    }
+    let custom1 = map.get(&1)?.expect("Missing key 1");
+    let custom1 = buf.load(custom1)?;
+    assert_eq!(custom1.field, 1);
+    assert_eq!(buf.load(custom1.string)?, "string");
 
-    if let Some(custom2) = map.get(buf, &2)? {
-        let custom2 = buf.load(custom2)?;
-        assert_eq!(custom2.field, 2);
-        assert_eq!(buf.load(custom2.string)?, "string");
-    } else {
-        panic!("Missing key 2");
-    }
+    let custom2 = map.get(&2)?.expect("Missing key 2");
+    let custom2 = buf.load(custom2)?;
+    assert_eq!(custom2.field, 2);
+    assert_eq!(buf.load(custom2.string)?, "string");
 
-    assert!(map.get(buf, &3)?.is_none());
+    assert!(map.get(&3)?.is_none());
     Ok(())
 }

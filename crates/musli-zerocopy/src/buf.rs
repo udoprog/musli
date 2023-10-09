@@ -4,6 +4,7 @@ use core::mem::{align_of, size_of};
 use core::ops::Range;
 use core::slice::{self, SliceIndex};
 
+use crate::bind::Bindable;
 use crate::error::{Error, ErrorKind};
 use crate::owned_buf::is_aligned_to;
 use crate::r#ref::Ref;
@@ -268,6 +269,14 @@ impl Buf {
         T: AnyRef,
     {
         ptr.read_from(self)
+    }
+
+    /// Bind the given reference to its underlying value.
+    pub fn bind<T>(&self, ptr: T) -> Result<T::Bound<'_>, Error>
+    where
+        T: Bindable,
+    {
+        ptr.bind(self)
     }
 
     /// Cast the current buffer into the given type.

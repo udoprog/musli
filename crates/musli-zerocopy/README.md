@@ -15,7 +15,7 @@ copying during deserialization.
 ## Examples
 
 ```rust
-use musli_zerocopy::{Error, OwnedBuf, Pair, Unsized, ZeroCopy};
+use musli_zerocopy::{OwnedBuf, Pair, Unsized, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
