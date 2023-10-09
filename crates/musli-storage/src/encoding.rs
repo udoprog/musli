@@ -256,9 +256,7 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            _marker: marker::PhantomData,
-        }
+        *self
     }
 }
 

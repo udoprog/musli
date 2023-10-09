@@ -307,9 +307,7 @@ where
 impl<M> Clone for Encoding<M> {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            _marker: marker::PhantomData,
-        }
+        *self
     }
 }
 

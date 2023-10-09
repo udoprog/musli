@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(internal_features)]
 #![feature(alloc_error_handler, start, core_intrinsics, lang_items, link_cfg)]
 
 use core::alloc::GlobalAlloc;
@@ -33,7 +34,7 @@ fn err_handler(_: core::alloc::Layout) -> ! {
 
 #[panic_handler]
 #[lang = "panic_impl"]
-extern "C" fn rust_begin_panic(_: &core::panic::PanicInfo) -> ! {
+fn rust_begin_panic(_: &core::panic::PanicInfo) -> ! {
     core::intrinsics::abort();
 }
 

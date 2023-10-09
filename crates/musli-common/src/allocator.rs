@@ -15,9 +15,9 @@ pub use self::no_std::NoStd;
 mod default_alloc {
     #![allow(missing_docs)]
 
-    #[cfg(all(feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     pub type Default = super::Alloc;
-    #[cfg(all(not(feature = "alloc")))]
+    #[cfg(not(feature = "alloc"))]
     pub type Default = super::NoStd<1024>;
 }
 

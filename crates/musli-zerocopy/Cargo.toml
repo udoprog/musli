@@ -1,0 +1,17 @@
+[package]
+name = "musli-zerocopy"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["std", "build"]
+std = ["alloc"]
+alloc = []
+build = ["alloc"]
+
+[dependencies]
+musli-macros = { version = "=0.0.49", path = "../musli-macros" }
+rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
+
+[dev-dependencies]
+anyhow = "1.0.72"

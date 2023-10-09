@@ -281,12 +281,16 @@ fn decode_enum(
             })
         });
 
-        let enter = trace.then(|| quote! {
-            #context_t::enter_enum(#ctx_var, #type_name);
+        let enter = trace.then(|| {
+            quote! {
+                #context_t::enter_enum(#ctx_var, #type_name);
+            }
         });
 
-        let leave = trace.then(|| quote! {
-            #context_t::leave_enum(#ctx_var);
+        let leave = trace.then(|| {
+            quote! {
+                #context_t::leave_enum(#ctx_var);
+            }
         });
 
         return Ok(quote! {{

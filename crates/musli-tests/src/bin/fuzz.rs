@@ -299,7 +299,10 @@ fn main() -> Result<()> {
             write!(o, "| {framework}{footnote} |")?;
 
             for suite in &columns {
-                let Some(mut set) = index.remove(&(suite, framework)).filter(|s| !s.samples.is_empty()) else {
+                let Some(mut set) = index
+                    .remove(&(suite, framework))
+                    .filter(|s| !s.samples.is_empty())
+                else {
                     write!(o, " - |")?;
                     continue;
                 };

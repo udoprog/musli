@@ -50,7 +50,7 @@ pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
 #[inline(always)]
 #[cfg(all(feature = "alloc", feature = "simdutf8"))]
 pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
-    if let Err(..) = from_utf8(&bytes) {
+    if from_utf8(&bytes).is_err() {
         return Err(Utf8Error);
     }
 

@@ -20,6 +20,7 @@ mod internals;
 #[cfg(feature = "test")]
 mod test;
 mod types;
+mod zero_copy;
 
 /// Please refer to the main [musli documentation](https://docs.rs/musli).
 #[proc_macro_derive(Encode, attributes(musli))]
@@ -130,6 +131,17 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     ) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
+    }
+}
+
+#[proc_macro_derive(ZeroCopy, attributes(zero_copy))]
+pub fn zero_copy(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    let expander = zero_copy::Expander::new(&input);
+
+    match expander.expand() {
+        Ok(stream) => stream.into(),
+        Err(errors) => to_compile_errors(errors).into(),
     }
 }
 
