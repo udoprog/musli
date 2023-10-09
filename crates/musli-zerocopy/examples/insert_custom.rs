@@ -19,10 +19,10 @@ fn main() -> Result<(), Error> {
 
     let custom = buf.load(custom)?;
     assert_eq!(custom.field, 1);
-    assert_eq!(buf.load_unsized(custom.string)?, "string");
+    assert_eq!(buf.load(custom.string)?, "string");
 
     let custom2 = buf.load(custom2)?;
     assert_eq!(custom2.field, 2);
-    assert_eq!(buf.load_unsized(custom2.string)?, "string");
+    assert_eq!(buf.load(custom2.string)?, "string");
     Ok(())
 }

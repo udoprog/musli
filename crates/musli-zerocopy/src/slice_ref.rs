@@ -4,17 +4,17 @@ use crate::buf::Buf;
 use crate::error::Error;
 use crate::owned_buf::OwnedBuf;
 use crate::ptr::Ptr;
-use crate::zero_copy::ZeroCopy;
+use crate::ZeroCopy;
 
-/// An unsized reference.
+/// A slice reference.
 #[repr(C)]
-pub struct UnsizedRef<T: ?Sized> {
+pub struct SliceRef<T> {
     ptr: Ptr,
     len: usize,
     _marker: PhantomData<T>,
 }
 
-impl<T: ?Sized> UnsizedRef<T> {
+impl<T> SliceRef<T> {
     pub(crate) fn new(ptr: Ptr, len: usize) -> Self {
         Self {
             ptr,
@@ -34,7 +34,7 @@ impl<T: ?Sized> UnsizedRef<T> {
     }
 }
 
-unsafe impl<T: ?Sized> ZeroCopy for UnsizedRef<T> {
+unsafe impl<T> ZeroCopy for SliceRef<T> {
     fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
         buf.write(&self.ptr)?;
         buf.write(&self.len)?;
@@ -50,7 +50,7 @@ unsafe impl<T: ?Sized> ZeroCopy for UnsizedRef<T> {
     }
 }
 
-impl<T: ?Sized> Clone for UnsizedRef<T> {
+impl<T> Clone for SliceRef<T> {
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr,
@@ -60,4 +60,4 @@ impl<T: ?Sized> Clone for UnsizedRef<T> {
     }
 }
 
-impl<T: ?Sized> Copy for UnsizedRef<T> {}
+impl<T> Copy for SliceRef<T> {}

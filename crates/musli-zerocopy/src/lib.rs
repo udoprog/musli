@@ -14,16 +14,19 @@ mod owned_buf;
 mod ptr;
 mod ref_;
 mod sip;
-mod to_buf;
+mod slice_ref;
 mod unsized_ref;
+mod zero_copy;
 
-pub use self::buf::{Buf, Validator};
+pub use self::buf::{Buf, CowBuf, Validator};
 pub use self::error::Error;
 #[cfg(feature = "alloc")]
 pub use self::owned_buf::OwnedBuf;
 pub use self::ref_::Ref;
-pub use self::to_buf::{UnsizedZeroCopy, ZeroCopy};
 pub use self::unsized_ref::UnsizedRef;
+pub use self::zero_copy::{SliceZeroCopy, UnsizedZeroCopy, ZeroCopy};
+
+pub use self::slice_ref::SliceRef;
 
 /// Implement the necessary traits for a type to be zero copy.
 pub use musli_macros::ZeroCopy;

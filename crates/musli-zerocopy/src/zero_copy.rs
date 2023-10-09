@@ -39,6 +39,21 @@ pub unsafe trait ZeroCopy: Sized {
     fn validate(buf: &Buf) -> Result<&Self, Error>;
 }
 
+/// Trait governing slices.
+pub unsafe trait SliceZeroCopy {
+    /// Alignment of the pointed to data in the slice.
+    fn align(&self) -> usize;
+
+    /// The length of the slice.
+    fn len(&self) -> usize;
+
+    /// Write to the owned buffer.
+    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error>;
+
+    /// Validate the buffer as this type.
+    fn validate(buf: &Buf) -> Result<&Self, Error>;
+}
+
 unsafe impl UnsizedZeroCopy for str {
     fn align(&self) -> usize {
         mem::align_of::<u8>()
@@ -72,6 +87,31 @@ unsafe impl UnsizedZeroCopy for [u8] {
 
     fn validate(buf: &Buf) -> Result<&Self, Error> {
         Ok(buf.as_bytes())
+    }
+}
+
+unsafe impl<T> SliceZeroCopy for [T]
+where
+    T: ZeroCopy,
+{
+    fn align(&self) -> usize {
+        T::ALIGN
+    }
+
+    fn len(&self) -> usize {
+        <[_]>::len(self)
+    }
+
+    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
+        for value in self {
+            buf.write(value)?;
+        }
+
+        Ok(())
+    }
+
+    fn validate(buf: &Buf) -> Result<&Self, Error> {
+        todo!()
     }
 }
 

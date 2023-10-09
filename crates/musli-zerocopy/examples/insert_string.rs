@@ -8,7 +8,7 @@ fn main() -> Result<(), Error> {
 
     let buf = buf.as_buf()?;
 
-    assert_eq!(buf.load_unsized(first)?, "first");
-    assert_eq!(buf.load_unsized(second)?, "second");
+    assert_eq!(buf.load(first)?, "first");
+    assert_eq!(buf.load(second)?, "second");
     Ok(())
 }

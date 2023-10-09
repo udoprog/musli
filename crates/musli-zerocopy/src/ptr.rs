@@ -3,7 +3,7 @@ use core::fmt;
 use crate::buf::Buf;
 use crate::error::Error;
 use crate::owned_buf::OwnedBuf;
-use crate::to_buf::ZeroCopy;
+use crate::zero_copy::ZeroCopy;
 
 /// A pointer to a location in a buffer.
 #[derive(Clone, Copy)]

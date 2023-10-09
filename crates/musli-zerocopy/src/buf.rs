@@ -3,10 +3,63 @@ use core::fmt;
 use core::ops::Range;
 
 use crate::error::{Error, ErrorKind};
+use crate::owned_buf::OwnedBuf;
 use crate::ptr::Ptr;
 use crate::ref_::Ref;
-use crate::to_buf::{UnsizedZeroCopy, ZeroCopy};
 use crate::unsized_ref::UnsizedRef;
+use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+
+/// Our own cow implementation.
+///
+/// We cannot use [`Cow`] since conversion from an [`OwnedBuf`] to a [`Buf`] is
+/// not lossless and that alignment has to be checked during conversion.
+///
+/// [`Cow`]: alloc::borrow::Cow
+pub struct CowBuf<'a> {
+    inner: CowBufInner<'a>,
+}
+
+impl<'a> CowBuf<'a> {
+    pub(crate) fn borrowed(buf: &'a Buf) -> Self {
+        Self {
+            inner: CowBufInner::Borrowed(buf),
+        }
+    }
+
+    /// Construct an owned buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer is aligned per it's
+    /// [`requested()`].
+    ///
+    /// [`requested()`]: OwnedBuf::requested
+    pub(crate) unsafe fn owned(buf: OwnedBuf) -> Self {
+        Self {
+            inner: CowBufInner::Owned(buf),
+        }
+    }
+}
+
+enum CowBufInner<'a> {
+    /// The buffer is borrowed.
+    Borrowed(&'a Buf),
+    /// The buffer is owned.
+    Owned(OwnedBuf),
+}
+
+impl AsRef<Buf> for CowBuf<'_> {
+    fn as_ref(&self) -> &Buf {
+        match &self.inner {
+            CowBufInner::Borrowed(buf) => buf,
+            CowBufInner::Owned(owned) => {
+                // SAFETY: owned construction is unsafe and ensures that the
+                // buffer alignment is valid.
+                unsafe { owned.as_buf_unchecked() }
+            }
+        }
+    }
+}
 
 /// Trait used for any kind of pointer or reference.
 pub trait AnyRef {
