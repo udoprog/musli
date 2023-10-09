@@ -331,7 +331,7 @@ impl OwnedBuf {
     ///
     /// [`phf` crate]: https://crates.io/crates/phf
     /// [`Map`]: crate::Map
-    /// [`bind()`]: Self::bind
+    /// [`bind()`]: Buf::bind
     ///
     /// # Examples
     ///

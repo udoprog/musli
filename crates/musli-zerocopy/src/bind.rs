@@ -1,7 +1,7 @@
 use crate::buf::Buf;
 use crate::error::Error;
 
-/// Trait used for binding a reference to a [`Buf`].
+/// Trait used for binding a reference to a [`Buf`] through [`Buf::bind()`].
 ///
 /// This is used to make reference types easier to work with. Bound values
 /// provide more natural APIs and can dereference to the underlying types.
