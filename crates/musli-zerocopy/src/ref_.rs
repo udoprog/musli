@@ -1,5 +1,7 @@
 use core::marker::PhantomData;
 
+use crate::buf::{Buf, BufMut};
+use crate::error::Error;
 use crate::ptr::Ptr;
 use crate::zero_copy::ZeroCopy;
 
@@ -25,6 +27,29 @@ where
     #[inline]
     pub(crate) fn ptr(&self) -> Ptr {
         self.ptr
+    }
+}
+
+unsafe impl<T> ZeroCopy for Ref<T> {
+    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
+        buf.write(&self.ptr)?;
+        Ok(())
+    }
+
+    fn read_from(buf: &Buf) -> Result<&Self, Error> {
+        let mut v = buf.validate::<Self>()?;
+        v.field::<Ptr>()?;
+        v.finalize()?;
+        Ok(unsafe { buf.cast() })
+    }
+
+    unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
+        let mut v = buf.validate_aligned()?;
+        v.field::<Ptr>()?;
+        v.finalize()
     }
 }
 

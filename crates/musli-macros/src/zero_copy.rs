@@ -92,7 +92,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     meta.input.parse::<Token![=]>()?;
                     let content;
                     syn::braced!(content in meta.input);
-                    generics.make_where_clause().predicates.extend(Punctuated::<syn::WherePredicate, Token![,]>::parse_terminated(&content)?);
+                    generics.make_where_clause().predicates.extend(Punctuated::<
+                        syn::WherePredicate,
+                        Token![,],
+                    >::parse_terminated(
+                        &content
+                    )?);
                     return Ok(());
                 }
 
