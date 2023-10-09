@@ -7,7 +7,7 @@ use crate::zero_copy::ZeroCopy;
 
 /// A sized reference.
 ///
-/// This is used to type a pointer with a [`ZeroType`] parameter so that it can
+/// This is used to type a pointer with a [`ZeroCopy`] parameter so that it can
 /// be used in combination with [`Buf`] to load the value from a buffer.
 ///
 /// Note that the constructor is safe, because alignment and validation checks

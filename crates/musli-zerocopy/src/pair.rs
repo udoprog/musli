@@ -11,7 +11,9 @@ use crate::ZeroCopy;
 #[zero_copy(bounds = {A: ZeroCopy, B: ZeroCopy})]
 #[repr(C)]
 pub struct Pair<A, B> {
+    /// The first element in the pair.
     pub a: A,
+    /// The second element in the pair.
     pub b: B,
 }
 

@@ -53,6 +53,7 @@
 
 #![no_std]
 #![allow(clippy::module_inception)]
+#![deny(missing_docs)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

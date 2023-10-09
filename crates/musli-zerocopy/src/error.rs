@@ -3,6 +3,7 @@ use core::fmt;
 use core::ops::Range;
 use core::str::Utf8Error;
 
+/// Müsli's zero copy error type.
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
