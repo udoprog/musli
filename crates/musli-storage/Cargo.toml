@@ -3,7 +3,7 @@ name = "musli-storage"
 version = "0.0.49"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.72"
+rust-version = "1.73"
 description = """
 Partially upgrade stable format for Müsli suitable for storage.
 """
