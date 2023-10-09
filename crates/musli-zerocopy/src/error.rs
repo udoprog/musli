@@ -38,10 +38,10 @@ impl std::error::Error for Error {
 pub(crate) enum ErrorKind {
     BadAlignment { ptr: usize, align: usize },
     LayoutMismatch { layout: Layout, buf: Range<usize> },
-    OutOfBounds { len: usize },
-    OutOfStartBound { start: usize, len: usize },
+    OutOfRangeBounds { range: Range<usize>, len: usize },
     IndexOutOfBounds { index: usize, len: usize },
     NonZeroZeroed { range: Range<usize> },
+    BufferUnderflow { expected: usize, len: usize },
     FailedPhf,
     LayoutError { error: LayoutError },
     Utf8Error { error: Utf8Error },
@@ -60,17 +60,20 @@ impl fmt::Display for ErrorKind {
                     buf.start, buf.end
                 )
             }
-            ErrorKind::OutOfBounds { len } => {
-                write!(f, "Out of bounds 0-{len}")
-            }
-            ErrorKind::OutOfStartBound { start, len } => {
-                write!(f, "Out of start bound {start}, expected 0-{len}")
+            ErrorKind::OutOfRangeBounds { range, len } => {
+                write!(f, "Range {range:?} out of bound 0-{len}")
             }
             ErrorKind::IndexOutOfBounds { index, len } => {
                 write!(f, "Index {index} out of bounds, expected 0-{len}")
             }
             ErrorKind::NonZeroZeroed { range } => {
                 write!(f, "Expected non-zero range at {range:?}")
+            }
+            ErrorKind::BufferUnderflow { expected, len } => {
+                write!(
+                    f,
+                    "Buffer underflow, expected end at {expected} but was {len}"
+                )
             }
             ErrorKind::FailedPhf => {
                 write!(f, "Failed to construct perfect hash for map")

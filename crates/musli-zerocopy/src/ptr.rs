@@ -32,7 +32,7 @@ impl fmt::Debug for Ptr {
 
         impl fmt::Debug for Pointer {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                fmt::Pointer::fmt(&(self.0 as *const ()), f)
+                write!(f, "{:x}", self.0)
             }
         }
 

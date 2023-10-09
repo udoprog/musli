@@ -106,7 +106,7 @@ unsafe impl<T: ?Sized> ZeroCopy for Unsized<T> {
     }
 
     unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
-        let mut v = buf.validate_aligned()?;
+        let mut v = buf.validate_unchecked::<Self>()?;
         v.field::<Ptr>()?;
         v.field::<usize>()?;
         v.end()

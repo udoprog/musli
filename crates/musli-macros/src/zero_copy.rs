@@ -168,7 +168,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             }
 
             unsafe fn validate_aligned(buf: &#buf) -> Result<(), #error> {
-                let mut validator = #buf::validate_aligned(buf)?;
+                let mut validator = #buf::validate_unchecked::<Self>(buf)?;
                 #(#validates)*
                 #validator::end(validator)?;
                 Ok(())

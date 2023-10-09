@@ -98,6 +98,20 @@ impl OwnedBuf {
     /// The buffer must allocate for at least the given `capacity`, but might
     /// allocate more. If the capacity specified is `0` it will not allocate.
     ///
+    /// # Panics
+    ///
+    /// Panics if the specified capacity and memory layout are illegal, which
+    /// happens if:
+    /// * The alignment is not a power of two.
+    /// * The specified capacity causes the needed memory to overflow
+    ///   `isize::MAX`.
+    ///
+    /// ```should_panic
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// OwnedBuf::with_capacity_and_alignment(usize::MAX << 1, 64);
+    /// ```
+    ///
     /// # Examples
     ///
     /// ```
@@ -116,7 +130,7 @@ impl OwnedBuf {
         let align = align.next_power_of_two();
 
         unsafe {
-            let layout = Layout::from_size_align_unchecked(capacity, align);
+            let layout = Layout::from_size_align(capacity, align).expect("Illegal memory layout");
 
             let data = alloc::alloc(layout);
 
@@ -443,7 +457,7 @@ impl OwnedBuf {
     /// ```
     /// use musli_zerocopy::{OwnedBuf, Ref};
     ///
-    /// let mut buf = OwnedBuf::with_alignment(1);
+    /// let mut buf = OwnedBuf::with_alignment(4);
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
@@ -451,7 +465,7 @@ impl OwnedBuf {
     /// let ptr: Ref<u32> = Ref::new(buf.next_pointer(1));
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
-    /// // This will succeed because the buffer follows its intereior alignment:
+    /// // This will succeed because the buffer follows its interior alignment:
     /// let buf = buf.as_buf()?;
     ///
     /// // This will fail, because the buffer is not aligned.
@@ -472,7 +486,7 @@ impl OwnedBuf {
     /// let ptr: Ref<u32> = Ref::new(buf.next_pointer(4));
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
-    /// // This will succeed because the buffer follows its intereior alignment:
+    /// // This will succeed because the buffer follows its interior alignment:
     /// let buf = buf.as_buf()?;
     ///
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
@@ -596,17 +610,9 @@ impl OwnedBuf {
     /// let buf = OwnedBuf::new();
     /// buf.is_aligned_to(0);
     /// ```
+    #[inline]
     pub fn is_aligned_to(&self, align: usize) -> bool {
-        is_aligned_to(self.data.as_ptr(), align)
-    }
-
-    fn layouts(&self, new_capacity: usize) -> (Layout, Layout) {
-        // SAFETY: type invariants ensures that alignment is correct.
-        unsafe {
-            let old_layout = Layout::from_size_align_unchecked(self.capacity, self.align);
-            let layout = Layout::from_size_align_unchecked(new_capacity, self.requested);
-            (old_layout, layout)
-        }
+        crate::buf::is_aligned_to(self.data.as_ptr(), align)
     }
 
     /// Request that the current buffer should have at least the specified
@@ -647,6 +653,13 @@ impl OwnedBuf {
     /// # Panics
     ///
     /// Panics if the specified alignment is not a power of two.
+    ///
+    /// ```should_panic
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    /// buf.in_place_align(3);
+    /// ````
     ///
     /// # Examples
     ///
@@ -707,7 +720,7 @@ impl OwnedBuf {
     /// let ptr: Ref<u32> = Ref::new(buf.next_pointer(align_of::<u32>()));
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
-    /// // This will succeed because the buffer follows its intereior alignment:
+    /// // This will succeed because the buffer follows its interior alignment:
     /// let buf = buf.as_buf()?;
     ///
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
@@ -726,16 +739,28 @@ impl OwnedBuf {
         let new_capacity = new_capacity.next_power_of_two().max(self.requested);
 
         unsafe {
-            let (old_layout, layout) = self.layouts(new_capacity);
+            let (old_layout, new_layout) = self.layouts(new_capacity);
 
             if old_layout.size() == 0 {
-                self.allocate(layout);
-            } else if layout.align() == old_layout.align() {
+                self.allocate(new_layout);
+            } else if new_layout.align() == old_layout.align() {
                 self.resize(old_layout, new_capacity);
             } else {
-                self.reallocate(old_layout, layout, new_capacity);
+                self.reallocate(old_layout, new_layout, new_capacity);
             }
         }
+    }
+
+    /// Return a pair of the currently allocated layout, and new layout that is
+    /// requested with the given capacity.
+    fn layouts(&self, new_capacity: usize) -> (Layout, Layout) {
+        // SAFETY: The existing layout cannot be invalid since it's either
+        // checked as it's replacing the old layout, or is initialized with
+        // known good values.
+        let old_layout = unsafe { Layout::from_size_align_unchecked(self.capacity, self.align) };
+        let layout =
+            Layout::from_size_align(new_capacity, self.requested).expect("Proposed layout invalid");
+        (old_layout, layout)
     }
 
     /// Perform the initial allocation with the given layout and capacity.
@@ -792,11 +817,6 @@ impl Drop for OwnedBuf {
             }
         }
     }
-}
-
-pub(crate) fn is_aligned_to(ptr: *const u8, align: usize) -> bool {
-    assert!(align.is_power_of_two(), "alignment is not a power-of-two");
-    (ptr as usize) & (align - 1) == 0
 }
 
 impl BufMut for OwnedBuf {

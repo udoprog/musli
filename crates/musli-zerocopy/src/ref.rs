@@ -28,6 +28,7 @@ use crate::zero_copy::ZeroCopy;
 /// assert_eq!(*buf.load(number)?, u32::from_ne_bytes([1, 2, 3, 4]));
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
+#[derive(Debug)]
 #[repr(C)]
 pub struct Ref<T> {
     ptr: Ptr,
@@ -69,7 +70,7 @@ unsafe impl<T> ZeroCopy for Ref<T> {
     }
 
     unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
-        let mut v = buf.validate_aligned()?;
+        let mut v = buf.validate_unchecked::<Self>()?;
         v.field::<Ptr>()?;
         v.end()
     }

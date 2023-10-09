@@ -1,12 +1,12 @@
 use core::alloc::Layout;
 use core::fmt;
+use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 use core::ops::Range;
-use core::slice::{self, SliceIndex};
+use core::slice;
 
 use crate::bind::Bindable;
 use crate::error::{Error, ErrorKind};
-use crate::owned_buf::is_aligned_to;
 use crate::r#ref::Ref;
 use crate::r#unsized::Unsized;
 use crate::slice::Slice;
@@ -151,34 +151,40 @@ impl Buf {
         unsafe { &*(data.as_ref() as *const _ as *const Buf) }
     }
 
-    /// Access the underlying slice as a pointer.
-    pub fn as_ptr(&self) -> *const u8 {
-        self.data.as_ptr()
-    }
-
     /// Get the underlying bytes of the buffer.
     pub fn as_bytes(&self) -> &[u8] {
         &self.data
     }
 
+    /// Access the underlying slice as a pointer.
+    pub(crate) fn as_ptr(&self) -> *const u8 {
+        self.data.as_ptr()
+    }
+
     /// The numerical range of the buffer.
-    pub fn range(&self) -> Range<usize> {
+    pub(crate) fn range(&self) -> Range<usize> {
         let range = self.data.as_ptr_range();
         range.start as usize..range.end as usize
     }
 
     /// Test if the current buffer is compatible with the given layout.
-    pub fn is_compatible(&self, layout: Layout) -> bool {
+    pub(crate) fn is_compatible(&self, layout: Layout) -> bool {
         self.is_aligned_to(layout.align()) && self.data.len() == layout.size()
     }
 
-    /// Test if the buffer is aligned to the given alignment.
-    pub fn is_aligned_to(&self, align: usize) -> bool {
+    /// Test if the buffer is aligned with the given alignment.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `align` is not a power of two.
+    #[inline]
+    pub(crate) fn is_aligned_to(&self, align: usize) -> bool {
         is_aligned_to(self.data.as_ptr(), align)
     }
 
     /// Test if the entire buffer is zeroed.
-    pub fn is_zeroed(&self) -> bool {
+    #[inline]
+    pub(crate) fn is_zeroed(&self) -> bool {
         self.data.iter().all(|b| *b == 0)
     }
 
@@ -193,25 +199,32 @@ impl Buf {
     }
 
     /// Get the given range while checking its required alignment.
-    pub fn get<I>(&self, range: I, align: usize) -> Result<&Buf, Error>
-    where
-        I: SliceIndex<[u8], Output = [u8]>,
-    {
-        let Some(data) = self.data.get(range) else {
-            return Err(Error::new(ErrorKind::OutOfBounds {
+    pub(crate) fn get(&self, range: Range<usize>, align: usize) -> Result<&Buf, Error> {
+        // SAFETY: We specifically test for alignment.
+        unsafe {
+            let data = self.get_unchecked(range)?;
+
+            if !data.is_aligned_to(align) {
+                return Err(Error::new(ErrorKind::BadAlignment {
+                    ptr: data.as_ptr() as usize,
+                    align,
+                }));
+            }
+
+            Ok(data)
+        }
+    }
+
+    /// Get the given range without checking that it corresponds to any given alignment.
+    pub(crate) unsafe fn get_unchecked(&self, range: Range<usize>) -> Result<&Buf, Error> {
+        let Some(data) = self.data.get(range.clone()) else {
+            return Err(Error::new(ErrorKind::OutOfRangeBounds {
+                range,
                 len: self.data.len(),
             }));
         };
 
-        if !is_aligned_to(data.as_ptr(), align) {
-            return Err(Error::new(ErrorKind::BadAlignment {
-                ptr: data.as_ptr() as usize,
-                align,
-            }));
-        }
-
-        // SAFETY: Alignment is tested for above.
-        Ok(unsafe { Buf::new_unchecked(data) })
+        Ok(Buf::new_unchecked(data))
     }
 
     /// Load an unsized reference.
@@ -352,13 +365,10 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let custom = Custom {
+    /// let custom = buf.insert_sized(Custom {
     ///     field: 42,
     ///     field2: 85,
-    /// };
-    ///
-    /// let custom = buf.insert_sized(custom)?;
-    ///
+    /// })?;
     /// let buf = buf.as_aligned_buf();
     ///
     /// let mut v = buf.validate::<Custom>()?;
@@ -367,7 +377,10 @@ impl Buf {
     /// v.end()?;
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn validate<T>(&self) -> Result<Validator<'_>, Error> {
+    pub fn validate<T>(&self) -> Result<Validator<'_, T>, Error>
+    where
+        T: ZeroCopy,
+    {
         if !self.is_compatible(Layout::new::<T>()) {
             return Err(Error::new(ErrorKind::LayoutMismatch {
                 layout: Layout::new::<T>(),
@@ -375,7 +388,11 @@ impl Buf {
             }));
         }
 
-        Ok(Validator { data: &self.data })
+        Ok(Validator {
+            data: self,
+            offset: 0,
+            _marker: PhantomData,
+        })
     }
 
     /// Construct a validator over the current buffer which assumes it's
@@ -384,8 +401,154 @@ impl Buf {
     /// # Safety
     ///
     /// The caller must ensure that the buffer is appropriately aligned.
-    pub unsafe fn validate_aligned(&self) -> Result<Validator<'_>, Error> {
-        Ok(Validator { data: &self.data })
+    pub unsafe fn validate_unchecked<T>(&self) -> Result<Validator<'_, T>, Error>
+    where
+        T: ZeroCopy,
+    {
+        Ok(Validator {
+            data: self,
+            offset: 0,
+            _marker: PhantomData,
+        })
+    }
+}
+
+impl fmt::Debug for Buf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Buf").field(&self.data.len()).finish()
+    }
+}
+
+/// Validator over a [`Buf`] constructed using [`Buf::validate`].
+#[must_use = "Must call `Validator::end` when validation is completed"]
+pub struct Validator<'a, T> {
+    data: &'a Buf,
+    offset: usize,
+    _marker: PhantomData<T>,
+}
+
+impl<T> Validator<'_, T> {
+    /// Validate an additional field in the struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Custom {
+    ///     field: u32,
+    ///     field2: u64,
+    /// }
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let custom = buf.insert_sized(Custom {
+    ///     field: 42,
+    ///     field2: 85,
+    /// })?;
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// let mut v = buf.validate::<Custom>()?;
+    /// v.field::<u32>()?;
+    /// v.field::<u64>()?;
+    /// v.end()?;
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn field<F>(&mut self) -> Result<(), Error>
+    where
+        F: ZeroCopy,
+    {
+        let start = self.offset.next_multiple_of(align_of::<F>());
+        let end = start.wrapping_add(size_of::<F>());
+
+        // SAFETY: We've ensured that the provided buffer is aligned and sized
+        // appropriately above.
+        unsafe {
+            let data = self.data.get_unchecked(start..end)?;
+            F::validate_aligned(data)?;
+        };
+
+        self.offset = end;
+        Ok(())
+    }
+
+    /// Finish validation.
+    ///
+    /// # Errors
+    ///
+    /// If there is any buffer left uncomsumed at this point, this will return
+    /// an [`Error`].
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Custom {
+    ///     field: u32,
+    ///     field2: u64,
+    /// }
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let custom = buf.insert_sized(Custom {
+    ///     field: 42,
+    ///     field2: 85,
+    /// })?;
+    /// buf.extend_from_slice(&[0]);
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// // We can only cause the error if we assert that the buffer is aligned.
+    /// let mut v = unsafe { buf.validate_unchecked::<Custom>()? };
+    /// v.field::<u32>()?;
+    /// v.field::<u64>()?;
+    /// // Will error since the buffer is too large.
+    /// assert!(v.end().is_err());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Custom {
+    ///     field: u32,
+    ///     field2: u64,
+    /// }
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let custom = buf.insert_sized(Custom {
+    ///     field: 42,
+    ///     field2: 85,
+    /// })?;
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// let mut v = buf.validate::<Custom>()?;
+    /// v.field::<u32>()?;
+    /// v.field::<u64>()?;
+    /// v.end()?;
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn end(self) -> Result<(), Error> {
+        let offset = self.offset.next_multiple_of(size_of::<T>());
+
+        if offset != self.data.len() {
+            return Err(Error::new(ErrorKind::BufferUnderflow {
+                expected: offset,
+                len: self.data.len(),
+            }));
+        }
+
+        Ok(())
     }
 }
 
@@ -425,62 +588,7 @@ where
     Ok(())
 }
 
-impl fmt::Debug for Buf {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Buf").field(&self.data.len()).finish()
-    }
-}
-
-/// Validator over a [`Buf`] constructed using [`Buf::validate`].
-#[must_use = "Must call `Validator::end` when validation is completed"]
-pub struct Validator<'a> {
-    data: &'a [u8],
-}
-
-impl Validator<'_> {
-    /// Validate an additional field in the struct.
-    pub fn field<T>(&mut self) -> Result<(), Error>
-    where
-        T: ZeroCopy,
-    {
-        let rem = (self.data.as_ptr() as usize) % align_of::<T>();
-
-        if rem != 0 {
-            let start = align_of::<T>() - rem;
-
-            let Some(d) = self.data.get(start..) else {
-                return Err(Error::new(ErrorKind::OutOfStartBound {
-                    start,
-                    len: self.data.len(),
-                }));
-            };
-
-            self.data = d;
-        }
-
-        if size_of::<T>() > self.data.len() {
-            return Err(Error::new(ErrorKind::OutOfStartBound {
-                start: size_of::<T>(),
-                len: self.data.len(),
-            }));
-        }
-
-        let (head, tail) = self.data.split_at(size_of::<T>());
-
-        // SAFETY: We've ensured that the provided buffer is aligned and sized
-        // appropriately above.
-        unsafe {
-            T::validate_aligned(Buf::new_unchecked(head))?;
-        };
-
-        self.data = tail;
-        Ok(())
-    }
-
-    /// Ensure that the buffer is empty.
-    pub fn end(self) -> Result<(), Error> {
-        // NB: due to alignment and padding, the buffer might not be completely
-        // consumed at this point.
-        Ok(())
-    }
+pub(crate) fn is_aligned_to(ptr: *const u8, align: usize) -> bool {
+    assert!(align.is_power_of_two(), "alignment is not a power-of-two");
+    (ptr as usize) & (align - 1) == 0
 }
