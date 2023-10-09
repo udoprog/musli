@@ -1,6 +1,6 @@
 [package]
 name = "musli-json"
-version = "0.0.51"
+version = "0.0.52"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
@@ -24,9 +24,9 @@ simdutf8 = ["musli-common/simdutf8"]
 parse-full = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.51", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.51", default-features = false }
-musli-value = { path = "../musli-value", version = "0.0.51", default-features = false, optional = true }
+musli = { path = "../musli", version = "0.0.52", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.52", default-features = false }
+musli-value = { path = "../musli-value", version = "0.0.52", default-features = false, optional = true }
 
 itoa = "1.0.6"
 ryu = "1.0.13"
