@@ -32,6 +32,31 @@ pub unsafe trait AnyRef {
     fn validate(buf: &Buf) -> Result<&Self::Target, Error>;
 }
 
+// SAFETY: Blanket implementation is fine over known sound implementations.
+unsafe impl<T: ?Sized> AnyRef for &T
+where
+    T: AnyRef,
+{
+    const ALIGN: usize = T::ALIGN;
+
+    type Target = T::Target;
+
+    #[inline]
+    fn ptr(&self) -> Ptr {
+        (**self).ptr()
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        (**self).len()
+    }
+
+    #[inline]
+    fn validate(buf: &Buf) -> Result<&Self::Target, Error> {
+        T::validate(buf)
+    }
+}
+
 unsafe impl<T: ?Sized> AnyRef for UnsizedRef<T>
 where
     T: UnsizedZeroCopy,

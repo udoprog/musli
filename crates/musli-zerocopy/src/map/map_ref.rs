@@ -32,7 +32,7 @@ impl<K, V> MapRef<K, V> {
 
 impl<K, V> MapRef<K, V>
 where
-    K: Copy + ZeroCopy,
+    K: ZeroCopy,
     V: ZeroCopy,
 {
     /// Get a value from the map.
@@ -72,7 +72,7 @@ where
             return Ok(None);
         };
 
-        if buf.load(e.a)?.borrow() == key {
+        if buf.load(&e.a)?.borrow() == key {
             Ok(Some((&e.a, &e.b)))
         } else {
             Ok(None)

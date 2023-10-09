@@ -23,7 +23,7 @@ pub(crate) struct HashState {
 
 pub(crate) fn generate_hash<'a, K, V>(buf: &Buf, entries: &[Pair<K, V>]) -> Result<HashState, Error>
 where
-    K: Copy + AnyRef,
+    K: AnyRef,
     K::Target: Hash + PartialEq,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
@@ -41,7 +41,7 @@ fn try_generate_hash<'a, K, V>(
     key: HashKey,
 ) -> Result<Option<HashState>, Error>
 where
-    K: Copy + AnyRef,
+    K: AnyRef,
     K::Target: Hash + PartialEq,
 {
     let mut hashes = Vec::new();
@@ -54,7 +54,7 @@ where
             }));
         };
 
-        let entry = buf.load(*entry)?;
+        let entry = buf.load(entry)?;
         hashes.push(hash(entry, &key));
     }
 

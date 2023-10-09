@@ -289,7 +289,7 @@ impl OwnedBuf {
     /// ```
     pub fn insert_map<K, V>(&mut self, entries: &mut [Pair<K, V>]) -> Result<MapRef<K, V>, Error>
     where
-        K: AnyRef + Copy + ZeroCopy,
+        K: AnyRef + ZeroCopy,
         V: ZeroCopy,
         K::Target: Hash + Eq,
     {
