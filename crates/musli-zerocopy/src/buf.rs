@@ -1,68 +1,20 @@
 use core::alloc::Layout;
 use core::fmt;
 use core::ops::Range;
+use core::slice;
 
 use crate::error::{Error, ErrorKind};
-use crate::owned_buf::OwnedBuf;
+use crate::owned_buf::is_aligned_to;
 use crate::ptr::Ptr;
 use crate::ref_::Ref;
+use crate::slice_ref::SliceRef;
 use crate::unsized_ref::UnsizedRef;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 
-/// Our own cow implementation.
-///
-/// We cannot use [`Cow`] since conversion from an [`OwnedBuf`] to a [`Buf`] is
-/// not lossless and that alignment has to be checked during conversion.
-///
-/// [`Cow`]: alloc::borrow::Cow
-pub struct CowBuf<'a> {
-    inner: CowBufInner<'a>,
-}
-
-impl<'a> CowBuf<'a> {
-    pub(crate) fn borrowed(buf: &'a Buf) -> Self {
-        Self {
-            inner: CowBufInner::Borrowed(buf),
-        }
-    }
-
-    /// Construct an owned buffer.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the buffer is aligned per it's
-    /// [`requested()`].
-    ///
-    /// [`requested()`]: OwnedBuf::requested
-    pub(crate) unsafe fn owned(buf: OwnedBuf) -> Self {
-        Self {
-            inner: CowBufInner::Owned(buf),
-        }
-    }
-}
-
-enum CowBufInner<'a> {
-    /// The buffer is borrowed.
-    Borrowed(&'a Buf),
-    /// The buffer is owned.
-    Owned(OwnedBuf),
-}
-
-impl AsRef<Buf> for CowBuf<'_> {
-    fn as_ref(&self) -> &Buf {
-        match &self.inner {
-            CowBufInner::Borrowed(buf) => buf,
-            CowBufInner::Owned(owned) => {
-                // SAFETY: owned construction is unsafe and ensures that the
-                // buffer alignment is valid.
-                unsafe { owned.as_buf_unchecked() }
-            }
-        }
-    }
-}
-
 /// Trait used for any kind of pointer or reference.
-pub trait AnyRef {
+pub unsafe trait AnyRef {
+    const ALIGN: usize;
+
     /// The target of the pointer.
     type Target: ?Sized;
 
@@ -70,16 +22,22 @@ pub trait AnyRef {
     fn ptr(&self) -> Ptr;
 
     /// The length of the value to load.
+    ///
+    /// # Safety
+    ///
+    /// Must be a multiple of align.
     fn len(&self) -> usize;
 
     /// Validate the value.
     fn validate(buf: &Buf) -> Result<&Self::Target, Error>;
 }
 
-impl<T: ?Sized> AnyRef for UnsizedRef<T>
+unsafe impl<T: ?Sized> AnyRef for UnsizedRef<T>
 where
     T: UnsizedZeroCopy,
 {
+    const ALIGN: usize = T::ALIGN;
+
     type Target = T;
 
     fn ptr(&self) -> Ptr {
@@ -95,10 +53,12 @@ where
     }
 }
 
-impl<T: ?Sized> AnyRef for Ref<T>
+unsafe impl<T: ?Sized> AnyRef for Ref<T>
 where
     T: ZeroCopy,
 {
+    const ALIGN: usize = T::ALIGN;
+
     type Target = T;
 
     fn ptr(&self) -> Ptr {
@@ -114,6 +74,36 @@ where
     }
 }
 
+unsafe impl<T> AnyRef for SliceRef<T>
+where
+    T: ZeroCopy,
+{
+    const ALIGN: usize = T::ALIGN;
+
+    type Target = [T];
+
+    fn ptr(&self) -> Ptr {
+        SliceRef::ptr(self)
+    }
+
+    fn len(&self) -> usize {
+        SliceRef::len(self).wrapping_mul(T::SIZE)
+    }
+
+    fn validate(buf: &Buf) -> Result<&Self::Target, Error> {
+        let len = buf.len().wrapping_div(T::SIZE);
+
+        for chunk in buf.as_bytes().chunks_exact(T::SIZE) {
+            // SAFETY: The passed in buffer is required to be aligned per the
+            // requirements of this trait, so any T::SIZE chunks are aligned
+            // too.
+            T::validate(unsafe { Buf::new_unchecked(chunk) })?;
+        }
+
+        Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), len) })
+    }
+}
+
 /// A raw slice buffer.
 #[repr(transparent)]
 pub struct Buf {
@@ -122,12 +112,22 @@ pub struct Buf {
 
 impl Buf {
     /// Wrap the given slice as a buffer.
-    pub fn new<T>(data: &T) -> &Buf
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer is aligned per the requirements
+    /// of the types you intend to read from it.
+    pub unsafe fn new_unchecked<T>(data: &T) -> &Buf
     where
         T: ?Sized + AsRef<[u8]>,
     {
         // SAFETY: The struct is repr(transparent) over [u8].
         unsafe { &*(data.as_ref() as *const _ as *const Buf) }
+    }
+
+    /// Access the underlying slice as a pointer.
+    pub fn as_ptr(&self) -> *const u8 {
+        self.data.as_ptr()
     }
 
     /// Get the underlying bytes of the buffer.
@@ -143,12 +143,36 @@ impl Buf {
 
     /// Test if the current buffer is compatible with the given layout.
     pub fn is_compatible(&self, layout: Layout) -> bool {
-        self.data.as_ptr() as usize % layout.align() == 0 && self.data.len() == layout.size()
+        self.is_aligned_to(layout.align()) && self.data.len() == layout.size()
+    }
+
+    pub fn is_aligned_to(&self, align: usize) -> bool {
+        is_aligned_to(self.data.as_ptr(), align)
     }
 
     /// Get the length of the current buffer.
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+
+    /// Get the given range while checking its required alignment.
+    fn get(&self, range: Range<usize>, align: usize) -> Result<&Buf, Error> {
+        let Some(data) = self.data.get(range.clone()) else {
+            return Err(Error::new(ErrorKind::OutOfBounds {
+                range,
+                len: self.data.len(),
+            }));
+        };
+
+        if !is_aligned_to(data.as_ptr(), align) {
+            return Err(Error::new(ErrorKind::BadAlignment {
+                ptr: data.as_ptr() as usize,
+                align,
+            }));
+        }
+
+        // SAFETY: Alignment is tested for above.
+        Ok(unsafe { Buf::new_unchecked(data) })
     }
 
     /// Load an unsized reference.
@@ -175,16 +199,7 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.len());
-
-        let Some(d) = self.data.get(start..end) else {
-            return Err(Error::new(ErrorKind::OutOfBounds {
-                start,
-                end,
-                len: self.data.len(),
-            }));
-        };
-
-        T::validate(Buf::new(d))
+        T::validate(self.get(start..end, T::ALIGN)?)
     }
 
     /// Load the given sized value as a reference.
@@ -194,16 +209,7 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(T::SIZE);
-
-        let Some(d) = self.data.get(start..end) else {
-            return Err(Error::new(ErrorKind::OutOfBounds {
-                start,
-                end,
-                len: self.data.len(),
-            }));
-        };
-
-        T::validate(Buf::new(d))
+        T::validate(self.get(start..end, T::ALIGN)?)
     }
 
     /// Load the given value as a reference.
@@ -213,16 +219,7 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.len());
-
-        let Some(d) = self.data.get(start..end) else {
-            return Err(Error::new(ErrorKind::OutOfBounds {
-                start,
-                end,
-                len: self.data.len(),
-            }));
-        };
-
-        T::validate(Buf::new(d))
+        T::validate(self.get(start..end, T::ALIGN)?)
     }
 
     /// Cast the current buffer into the given type.
@@ -237,7 +234,10 @@ impl Buf {
     /// Construct a validator over the current buffer.
     pub fn validator<T>(&self) -> Result<Validator<'_>, Error> {
         if !self.is_compatible(Layout::new::<T>()) {
-            return Err(Error::layout_mismatch(Layout::new::<T>(), self.range()));
+            return Err(Error::new(ErrorKind::LayoutMismatch {
+                layout: Layout::new::<T>(),
+                buf: self.range(),
+            }));
         }
 
         Ok(Validator { data: &self.data })
@@ -284,19 +284,17 @@ impl Validator<'_> {
         }
 
         let (head, tail) = self.data.split_at(T::SIZE);
-        T::validate(Buf::new(head))?;
+
+        // SAFETY: We've ensured that the provided buffer is aligned above.
+        T::validate(unsafe { Buf::new_unchecked(head) })?;
         self.data = tail;
         Ok(())
     }
 
     /// Ensure that the buffer is empty.
     pub fn finalize(self) -> Result<(), Error> {
-        if self.data.len() > 0 {
-            return Err(Error::new(ErrorKind::BufferUnderflow {
-                remaining: self.data.len(),
-            }));
-        }
-
+        // NB: due to alignment and padding, the buffer might not be completely
+        // consumed at this point.
         Ok(())
     }
 }

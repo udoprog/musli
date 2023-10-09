@@ -134,7 +134,7 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-#[proc_macro_derive(ZeroCopy, attributes(musli))]
+#[proc_macro_derive(ZeroCopy, attributes(zero_copy))]
 pub fn zero_copy(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let expander = zero_copy::Expander::new(&input);

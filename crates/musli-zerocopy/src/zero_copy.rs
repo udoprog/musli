@@ -1,3 +1,4 @@
+use core::alloc::Layout;
 use core::mem;
 use core::str;
 
@@ -7,8 +8,9 @@ use crate::owned_buf::OwnedBuf;
 
 /// Trait governing how to write an unsized buffer.
 pub unsafe trait UnsizedZeroCopy {
-    /// Alignment of the pointed to data.
-    fn align(&self) -> usize;
+    /// Alignment of the pointed to data. We can only support unsized types
+    /// which have a known alignment.
+    const ALIGN: usize;
 
     /// The length of the unsized value.
     fn len(&self) -> usize;
@@ -39,25 +41,8 @@ pub unsafe trait ZeroCopy: Sized {
     fn validate(buf: &Buf) -> Result<&Self, Error>;
 }
 
-/// Trait governing slices.
-pub unsafe trait SliceZeroCopy {
-    /// Alignment of the pointed to data in the slice.
-    fn align(&self) -> usize;
-
-    /// The length of the slice.
-    fn len(&self) -> usize;
-
-    /// Write to the owned buffer.
-    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error>;
-
-    /// Validate the buffer as this type.
-    fn validate(buf: &Buf) -> Result<&Self, Error>;
-}
-
 unsafe impl UnsizedZeroCopy for str {
-    fn align(&self) -> usize {
-        mem::align_of::<u8>()
-    }
+    const ALIGN: usize = mem::align_of::<u8>();
 
     fn len(&self) -> usize {
         <str>::len(self)
@@ -73,9 +58,7 @@ unsafe impl UnsizedZeroCopy for str {
 }
 
 unsafe impl UnsizedZeroCopy for [u8] {
-    fn align(&self) -> usize {
-        mem::align_of::<u8>()
-    }
+    const ALIGN: usize = mem::align_of::<u8>();
 
     fn len(&self) -> usize {
         <[_]>::len(self)
@@ -90,31 +73,6 @@ unsafe impl UnsizedZeroCopy for [u8] {
     }
 }
 
-unsafe impl<T> SliceZeroCopy for [T]
-where
-    T: ZeroCopy,
-{
-    fn align(&self) -> usize {
-        T::ALIGN
-    }
-
-    fn len(&self) -> usize {
-        <[_]>::len(self)
-    }
-
-    fn write_to(&self, buf: &mut OwnedBuf) -> Result<(), Error> {
-        for value in self {
-            buf.write(value)?;
-        }
-
-        Ok(())
-    }
-
-    fn validate(buf: &Buf) -> Result<&Self, Error> {
-        todo!()
-    }
-}
-
 macro_rules! impl_number {
     ($ty:ty) => {
         unsafe impl ZeroCopy for $ty {
@@ -124,11 +82,10 @@ macro_rules! impl_number {
 
             fn validate(buf: &Buf) -> Result<&Self, Error> {
                 if !buf.is_compatible(core::alloc::Layout::new::<$ty>()) {
-                    let buf = buf.range();
-                    return Err(Error::layout_mismatch(
-                        core::alloc::Layout::new::<$ty>(),
-                        buf,
-                    ));
+                    return Err(Error::new(ErrorKind::LayoutMismatch {
+                        layout: Layout::new::<$ty>(),
+                        buf: buf.range(),
+                    }));
                 }
 
                 Ok(unsafe { buf.cast() })

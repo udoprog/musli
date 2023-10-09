@@ -7,6 +7,7 @@ use crate::ptr::Ptr;
 use crate::ZeroCopy;
 
 /// A slice reference.
+#[derive(Debug)]
 #[repr(C)]
 pub struct SliceRef<T> {
     ptr: Ptr,

@@ -2,8 +2,10 @@ use std::cell::RefCell;
 
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::meta::ParseNestedMeta;
 use syn::parse::ParseStream;
-use syn::DeriveInput;
+use syn::punctuated::Punctuated;
+use syn::{DeriveInput, Token};
 
 #[derive(Default)]
 struct Ctxt {
@@ -63,6 +65,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         }
     };
 
+    let mut generics = input.generics.clone();
+
     let mut is_repr_c = false;
 
     for attr in &input.attrs {
@@ -72,6 +76,24 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
                 if ident == "C" {
                     is_repr_c = true;
+                }
+
+                Ok(())
+            });
+
+            if let Err(error) = result {
+                cx.error(error);
+            }
+        }
+
+        if attr.path().is_ident("zero_copy") {
+            let result = attr.parse_nested_meta(|meta: ParseNestedMeta| {
+                if meta.path.is_ident("bounds") {
+                    meta.input.parse::<Token![=]>()?;
+                    let content;
+                    syn::braced!(content in meta.input);
+                    generics.make_where_clause().predicates.extend(Punctuated::<syn::WherePredicate, Token![,]>::parse_terminated(&content)?);
+                    return Ok(());
                 }
 
                 Ok(())
@@ -119,11 +141,11 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
     let name = &input.ident;
 
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     Ok(quote::quote! {
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
-            fn write_to(&self, buf: &mut #owned_buf) -> Result<(), Error> {
+            fn write_to(&self, buf: &mut #owned_buf) -> Result<(), #error> {
                 #(#writes)*
                 Ok(())
             }

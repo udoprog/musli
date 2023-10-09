@@ -9,24 +9,35 @@ extern crate std;
 
 mod buf;
 mod error;
-#[cfg(feature = "alloc")]
-mod owned_buf;
-mod ptr;
-mod ref_;
-mod sip;
-mod slice_ref;
-mod unsized_ref;
-mod zero_copy;
 
-pub use self::buf::{Buf, CowBuf, Validator};
-pub use self::error::Error;
+mod ptr;
+mod sip;
+
 #[cfg(feature = "alloc")]
 pub use self::owned_buf::OwnedBuf;
+#[cfg(feature = "alloc")]
+mod owned_buf;
+
 pub use self::ref_::Ref;
-pub use self::unsized_ref::UnsizedRef;
-pub use self::zero_copy::{SliceZeroCopy, UnsizedZeroCopy, ZeroCopy};
+mod ref_;
 
 pub use self::slice_ref::SliceRef;
+mod slice_ref;
 
-/// Implement the necessary traits for a type to be zero copy.
+pub use self::unsized_ref::UnsizedRef;
+mod unsized_ref;
+
+pub use self::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+mod zero_copy;
+
+/// Implement the [`ZeroCopy`] trait.
 pub use musli_macros::ZeroCopy;
+
+pub use self::buf::{Buf, Validator};
+pub use self::error::Error;
+
+mod map;
+pub use self::map::MapRef;
+
+pub use self::pair::Pair;
+mod pair;

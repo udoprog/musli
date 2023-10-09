@@ -13,11 +13,6 @@ impl Error {
     pub(crate) const fn new(kind: ErrorKind) -> Self {
         Self { kind }
     }
-
-    /// Report a layout mismatch.
-    pub(crate) fn layout_mismatch(layout: Layout, buf: Range<usize>) -> Self {
-        Self::new(ErrorKind::LayoutMismatch { layout, buf })
-    }
 }
 
 impl fmt::Display for Error {
@@ -40,29 +35,13 @@ impl std::error::Error for Error {
 #[derive(Debug)]
 #[non_exhaustive]
 pub(crate) enum ErrorKind {
-    BadAlignment {
-        ptr: usize,
-        align: usize,
-    },
-    LayoutMismatch {
-        layout: Layout,
-        buf: Range<usize>,
-    },
-    OutOfBounds {
-        start: usize,
-        end: usize,
-        len: usize,
-    },
-    OutOfStartBound {
-        start: usize,
-        len: usize,
-    },
-    BufferUnderflow {
-        remaining: usize,
-    },
-    Utf8Error {
-        error: Utf8Error,
-    },
+    BadAlignment { ptr: usize, align: usize },
+    LayoutMismatch { layout: Layout, buf: Range<usize> },
+    OutOfBounds { range: Range<usize>, len: usize },
+    OutOfStartBound { start: usize, len: usize },
+    IndexOutOfBounds { index: usize, len: usize },
+    FailedPhf,
+    Utf8Error { error: Utf8Error },
 }
 
 impl fmt::Display for ErrorKind {
@@ -78,14 +57,17 @@ impl fmt::Display for ErrorKind {
                     buf.start, buf.end
                 )
             }
-            ErrorKind::OutOfBounds { start, end, len } => {
-                write!(f, "Out of bounds {start}-{end}, expected 0-{len}")
+            ErrorKind::OutOfBounds { range, len } => {
+                write!(f, "Out of bounds {range:?}, expected 0-{len}")
             }
             ErrorKind::OutOfStartBound { start, len } => {
                 write!(f, "Out of start bound {start}, expected 0-{len}")
             }
-            ErrorKind::BufferUnderflow { remaining } => {
-                write!(f, "Buffer underflow, remaining {remaining}")
+            ErrorKind::IndexOutOfBounds { index, len } => {
+                write!(f, "Index {index} out of bounds, expected 0-{len}")
+            }
+            ErrorKind::FailedPhf => {
+                write!(f, "Failed to construct perfect hash for map")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
         }

@@ -1,9 +1,8 @@
 use core::hash::Hash;
 
-use crate::sip::{Hash128, Hasher128, SipHasher13};
-
 use crate::error::{Error, ErrorKind};
-use crate::slice::Slice;
+use crate::pair::Pair;
+use crate::sip::{Hash128, Hasher128, SipHasher13};
 
 #[non_exhaustive]
 pub(crate) struct Hashes {
@@ -39,12 +38,12 @@ where
 #[inline]
 pub(crate) fn get_index(
     &Hashes { g, f1, f2 }: &Hashes,
-    displacements: &Slice<(u32, u32)>,
+    displacements: &[Pair<u32, u32>],
     len: usize,
 ) -> Result<usize, Error> {
     let index = g % displacements.len();
 
-    let Some((d1, d2)) = displacements.get(index)? else {
+    let Some(&Pair { a: d1, b: d2 }) = displacements.get(index) else {
         return Err(Error::new(ErrorKind::IndexOutOfBounds {
             index,
             len: displacements.len(),

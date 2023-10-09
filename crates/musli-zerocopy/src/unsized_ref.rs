@@ -7,6 +7,7 @@ use crate::ptr::Ptr;
 use crate::zero_copy::ZeroCopy;
 
 /// An unsized reference.
+#[derive(Debug)]
 #[repr(C)]
 pub struct UnsizedRef<T: ?Sized> {
     ptr: Ptr,

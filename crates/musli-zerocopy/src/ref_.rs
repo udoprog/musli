@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::ptr::Ptr;
+use crate::zero_copy::ZeroCopy;
 
 /// A sized reference.
 #[repr(C)]
@@ -9,8 +10,12 @@ pub struct Ref<T> {
     _marker: PhantomData<T>,
 }
 
-impl<T> Ref<T> {
-    pub(crate) fn new(ptr: Ptr) -> Self {
+impl<T> Ref<T>
+where
+    T: ZeroCopy,
+{
+    /// Construct a reference wrapping the given type at the specified address.
+    pub fn new(ptr: Ptr) -> Self {
         Self {
             ptr,
             _marker: PhantomData,
