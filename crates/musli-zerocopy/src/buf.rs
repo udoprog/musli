@@ -42,6 +42,11 @@ where
 }
 
 /// Trait used for loading any kind of reference.
+///
+/// # Safety
+///
+/// This can only be implemented correctly by types under certain conditions:
+/// * The type has a strict, well-defined layout or is `repr(C)`.
 pub unsafe trait AnyRef {
     /// The target being read.
     type Target: ?Sized;
@@ -52,7 +57,7 @@ pub unsafe trait AnyRef {
 
 /// Trait used for handling any kind of zero copy value, be they references or
 /// not.
-pub unsafe trait AnyValue {
+pub trait AnyValue {
     /// The target being read.
     type Target: ?Sized;
 
@@ -62,7 +67,7 @@ pub unsafe trait AnyValue {
         V: FnOnce(&Self::Target) -> O;
 }
 
-unsafe impl<T: ?Sized> AnyValue for T
+impl<T: ?Sized> AnyValue for T
 where
     T: AnyRef,
 {
@@ -172,6 +177,11 @@ impl Buf {
     /// Get the length of the current buffer.
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+
+    /// Test if the current buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 
     /// Get the given range while checking its required alignment.

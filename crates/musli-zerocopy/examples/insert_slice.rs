@@ -3,10 +3,7 @@ use musli_zerocopy::{Error, OwnedBuf};
 fn main() -> Result<(), Error> {
     let mut buf = OwnedBuf::new();
 
-    let mut values = Vec::new();
-
-    values.push(buf.insert_unsized("first")?);
-    values.push(buf.insert_unsized("second")?);
+    let values = vec![buf.insert_unsized("first")?, buf.insert_unsized("second")?];
 
     let slice_ref = buf.insert_slice(&values)?;
 

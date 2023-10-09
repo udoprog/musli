@@ -56,10 +56,7 @@ unsafe impl<T> ZeroCopy for Ref<T> {
 impl<T> Clone for Ref<T> {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            ptr: self.ptr,
-            _marker: PhantomData,
-        }
+        *self
     }
 }
 

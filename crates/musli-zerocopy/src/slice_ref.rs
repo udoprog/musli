@@ -62,11 +62,7 @@ unsafe impl<T> ZeroCopy for SliceRef<T> {
 
 impl<T> Clone for SliceRef<T> {
     fn clone(&self) -> Self {
-        Self {
-            ptr: self.ptr,
-            len: self.len,
-            _marker: PhantomData,
-        }
+        *self
     }
 }
 

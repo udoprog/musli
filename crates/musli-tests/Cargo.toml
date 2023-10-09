@@ -3,7 +3,7 @@ name = "musli-tests"
 version = "0.0.3"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.66"
+rust-version = "1.72"
 description = """
 Müsli is a flexible and generic binary serialization framework.
 """

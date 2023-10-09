@@ -21,13 +21,13 @@ pub(crate) struct HashState {
     pub(crate) map: Vec<usize>,
 }
 
-pub(crate) fn generate_hash<'a, K, V>(buf: &Buf, entries: &[Pair<K, V>]) -> Result<HashState, Error>
+pub(crate) fn generate_hash<K, V>(buf: &Buf, entries: &[Pair<K, V>]) -> Result<HashState, Error>
 where
     K: AnyValue,
     K::Target: Hash,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
-        if let Some(hash) = try_generate_hash(buf, &entries, key)? {
+        if let Some(hash) = try_generate_hash(buf, entries, key)? {
             return Ok(hash);
         }
     }
@@ -35,7 +35,7 @@ where
     Err(Error::new(ErrorKind::FailedPhf))
 }
 
-fn try_generate_hash<'a, K, V>(
+fn try_generate_hash<K, V>(
     buf: &Buf,
     entries: &[Pair<K, V>],
     key: HashKey,
@@ -62,11 +62,11 @@ where
     let mut buckets = vec![Vec::<usize>::new(); buckets_len];
 
     for (index, hash) in hashes.iter().enumerate() {
-        let to = hash.g as usize % buckets.len();
+        let to = hash.g % buckets.len();
         buckets[to].push(index);
     }
 
-    buckets.sort_by(|a, b| b.len().cmp(&a.len()));
+    buckets.sort_by_key(|a| a.len());
 
     let table_len = hashes.len();
     let mut map = vec![usize::MAX; table_len];

@@ -3,7 +3,7 @@ name = "musli-value"
 version = "0.0.49"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.66"
+rust-version = "1.72"
 description = """
 Buffered value support for Müsli.
 """

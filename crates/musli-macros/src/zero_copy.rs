@@ -32,7 +32,7 @@ impl<'a> Expander<'a> {
     pub fn expand(&self) -> Result<TokenStream, Vec<syn::Error>> {
         let cx = Ctxt::default();
 
-        let Ok(output) = expand(&cx, &self.input) else {
+        let Ok(output) = expand(&cx, self.input) else {
             return Err(cx.errors.into_inner());
         };
 

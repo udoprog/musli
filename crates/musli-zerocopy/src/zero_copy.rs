@@ -1,3 +1,5 @@
+#![allow(clippy::len_without_is_empty)]
+
 use core::alloc::Layout;
 use core::mem;
 use core::str;
@@ -6,6 +8,13 @@ use crate::buf::{AnyValue, Buf, BufMut};
 use crate::error::{Error, ErrorKind};
 
 /// Trait governing how to write an unsized buffer.
+///
+/// # Safety
+///
+/// This can only be implemented correctly by types under certain conditions:
+/// * The type has a strict, well-defined layout or is `repr(C)`.
+/// * The base type has a statically known alignment, such as how `[u32]` is
+///   aligned on 4 bytes.
 pub unsafe trait UnsizedZeroCopy {
     /// Alignment of the pointed to data. We can only support unsized types
     /// which have a known alignment.
@@ -27,7 +36,8 @@ pub unsafe trait UnsizedZeroCopy {
 ///
 /// # Safety
 ///
-/// Caller must ensure that the pointed to data is `repr(C)`.
+/// This can only be implemented correctly by types under certain conditions:
+/// * The type has a strict, well-defined layout or is `repr(C)`.
 pub unsafe trait ZeroCopy: Sized {
     /// Size of the pointed to data.
     const SIZE: usize = mem::size_of::<Self>();
@@ -124,7 +134,7 @@ macro_rules! impl_number {
             }
         }
 
-        unsafe impl AnyValue for $ty {
+        impl AnyValue for $ty {
             type Target = $ty;
 
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>

@@ -62,11 +62,7 @@ unsafe impl<T: ?Sized> ZeroCopy for UnsizedRef<T> {
 
 impl<T: ?Sized> Clone for UnsizedRef<T> {
     fn clone(&self) -> Self {
-        Self {
-            ptr: self.ptr,
-            len: self.len,
-            _marker: PhantomData,
-        }
+        *self
     }
 }
 
