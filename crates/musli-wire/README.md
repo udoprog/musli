@@ -87,7 +87,12 @@ assert_eq!(expected, actual);
 Each field is prefix *typed* with a single byte tag that allows a receiver
 to figure out exactly how much should be skipped over.
 
+Packed items are prefix-length encoded, and have a limited size. Its exact
+length is defined by [MAX_INLINE_LEN] and can be modified with
+[Encoding::with_max_pack].
+
 [default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 [MAX_INLINE_LEN]: https://docs.rs/musli-wire/latest/musli_wire/tag/constant.MAX_INLINE_LEN.html
 [Müsli]: https://docs.rs/musli
+[Encoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_wire/encoding/struct.Encoding.html#method.with_max_pack
 [Encoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html

@@ -14,4 +14,31 @@ JSON encoding is fully upgrade stable:
   `#[musli(default)]`.
 * ✔ Can skip over unknown fields.
 
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct Version1 {
+    name: String,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct Version2 {
+    name: String,
+    #[musli(default)]
+    age: Option<u32>,
+}
+
+let version2 = musli_json::to_vec(&Version2 {
+    name: String::from("Aristotle"),
+    age: Some(62),
+})?;
+
+let version1: Version1 = musli_json::from_slice(version2.as_slice())?;
+
+assert_eq!(version1, Version1 {
+    name: String::from("Aristotle"),
+});
+```
+
 [Müsli]: https://github.com/udoprog/musli
