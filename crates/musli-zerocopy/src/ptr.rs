@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::zero_copy::ZeroCopy;
+use crate::ZeroCopy;
 
 /// An absolute pointer to a location in a [`Buf`].
 ///

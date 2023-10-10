@@ -147,7 +147,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let validator: syn::Path = syn::parse_quote!(#krate::Validator);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::ZeroCopy);
-    let result: syn::Path = syn::parse_quote!(core::result::Result);
+    let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
 
     let mut const_asserts = Vec::new();
     let mut padding = Vec::new();

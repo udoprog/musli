@@ -7,9 +7,6 @@ use core::str;
 use crate::buf::{AnyValue, Buf, BufMut};
 use crate::error::{Error, ErrorKind};
 
-#[doc(inline)]
-pub use musli_macros::ZeroCopy;
-
 /// Trait governing which `T` in [`Unsized<T>`] the wrapper can handle.
 ///
 /// We only support slice-like, unaligned unsized types, such as `str` and

@@ -88,6 +88,73 @@ pub use self::r#unsized::Unsized;
 mod r#unsized;
 
 pub use self::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+
+/// Derive macro to implement [`ZeroCopy`].
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C, align(128))]
+/// struct Custom {
+///     field: u32,
+/// }
+///
+/// let mut buf = AlignedBuf::new();
+/// buf.write(&Custom { field: 10 });
+/// ```
+///
+/// # Attributes
+///
+/// ## Type attributes
+///
+/// The following `repr` attributes are supported:
+/// * repr(C) - Ensures that the type has the mandatory represention.
+/// * repr(transparent) - If there is a single field inside of the marked struct
+///   which implements `ZeroCopy`.
+/// * repr(align(..)) - Allows for control over the struct alignment.
+///
+/// The following `zero_copy(..)` attribute are supported:
+///
+/// ### `zero_copy(bounds = {<bound>,*})`
+///
+/// Allows for adding additional bounds to implement `ZeroCopy` for generic
+/// types:
+///
+/// ```
+/// use musli_zerocopy::ZeroCopy;
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C)]
+/// #[zero_copy(bounds = {A: ZeroCopy, B: ZeroCopy})]
+/// struct Pair<A, B> {
+///     left: A,
+///     right: B,
+/// }
+/// ```
+///
+/// ### `zero_copy(crate = <path>)`
+///
+/// Allows for specifying a custom path to the `musli_zerocopy`` crate
+/// (default).
+///
+/// ```
+/// use musli_zerocopy as zerocopy;
+///
+/// use zerocopy::ZeroCopy;
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C)]
+/// #[zero_copy(crate = zerocopy)]
+/// struct Custom {
+///     field: u32,
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_macros::ZeroCopy;
+
 mod zero_copy;
 
 mod map;
@@ -105,3 +172,8 @@ mod tests;
 // Sentinel used to allow for `#[zero_copy(ignore)]` to work in this crate.
 #[allow(unused)]
 const ZERO_COPY_IGNORE_IS_NOT_SAFE_TO_USE: () = ();
+
+#[doc(hidden)]
+pub mod __private {
+    pub use ::core::result;
+}

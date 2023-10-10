@@ -1,4 +1,4 @@
-use crate::zero_copy::ZeroCopy;
+use crate::ZeroCopy;
 
 /// A pair of values which can be stored inside of any other zero copy
 /// structure.

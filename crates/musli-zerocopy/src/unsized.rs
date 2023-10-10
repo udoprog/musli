@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::ptr::Ptr;
-use crate::zero_copy::ZeroCopy;
+use crate::ZeroCopy;
 
 /// A reference to an unsized value packed as a wide pointer.
 ///
