@@ -41,7 +41,7 @@ pub unsafe trait UnsizedZeroCopy {
 /// * The type has a strict, well-defined layout or is `repr(C)`.
 pub unsafe trait ZeroCopy {
     /// Indicates if the type can inhabit all possible bit patterns within its
-    /// `size_of::<Self::Output>()` bytes.
+    /// `size_of::<Self>()` bytes.
     const ANY_BITS: bool;
 
     /// Write to the owned buffer.
