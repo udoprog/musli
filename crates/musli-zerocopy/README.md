@@ -12,6 +12,13 @@ copying during deserialization.
 
 <br>
 
+## Limits
+
+Offset, the size of unsized values, and slice lengths are all limited to
+32-bit, that is the longest unsized value that can be stored in 2**32 bytes.
+
+<br>
+
 ## Examples
 
 ```rust
@@ -40,13 +47,11 @@ let map = buf.insert_map(&mut map)?;
 let buf = buf.as_aligned();
 let map = buf.bind(map)?;
 
-let c1 = map.get(&1)?.expect("Missing key 1");
-let c1 = buf.load(c1)?;
+let c1 = buf.load(map.get(&1)?.context("Missing key 1")?)?;
 assert_eq!(c1.field, 1);
 assert_eq!(buf.load(c1.string)?, "string");
 
-let c2 = map.get(&2)?.expect("Missing key 2");
-let c2 = buf.load(c2)?;
+let c2 = buf.load(map.get(&2)?.context("Missing key 2")?)?;
 assert_eq!(c2.field, 2);
 assert_eq!(buf.load(c2.string)?, "string");
 
