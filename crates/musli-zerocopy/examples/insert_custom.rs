@@ -10,10 +10,10 @@ struct Custom {
 fn main() -> Result<(), Error> {
     let mut buf = AlignedBuf::new();
 
-    let string = buf.insert_unsized("string")?;
+    let string = buf.write_unsized("string")?;
 
-    let custom1 = buf.insert_sized(Custom { field: 1, string })?;
-    let custom2 = buf.insert_sized(Custom { field: 2, string })?;
+    let custom1 = buf.write(&Custom { field: 1, string })?;
+    let custom2 = buf.write(&Custom { field: 2, string })?;
 
     let mut map = Vec::new();
 

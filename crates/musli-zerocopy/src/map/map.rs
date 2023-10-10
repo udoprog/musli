@@ -33,7 +33,7 @@ use crate::zero_copy::ZeroCopy;
 ///
 /// assert!(map.contains_key(&1)?);
 /// assert!(!map.contains_key(&3)?);
-/// Ok::<_, musli_zerocopy::Error>(())
+/// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 pub struct Map<'a, K, V> {
     key: HashKey,
@@ -68,7 +68,7 @@ where
     /// assert_eq!(map.get(&1)?, Some(&2));
     /// assert_eq!(map.get(&2)?, Some(&3));
     /// assert_eq!(map.get(&3)?, None);
-    /// Ok::<_, musli_zerocopy::Error>(())
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn get<T>(&self, key: &T) -> Result<Option<&V>, Error>
     where
@@ -104,7 +104,7 @@ where
     /// assert!(map.contains_key(&1)?);
     /// assert!(map.contains_key(&2)?);
     /// assert!(!map.contains_key(&3)?);
-    /// Ok::<_, musli_zerocopy::Error>(())
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn contains_key<T>(&self, key: &T) -> Result<bool, Error>
     where
@@ -136,7 +136,7 @@ where
     /// assert_eq!(map.get_entry(&1)?, Some((&1, &2)));
     /// assert_eq!(map.get_entry(&2)?, Some((&2, &3)));
     /// assert_eq!(map.get_entry(&3)?, None);
-    /// Ok::<_, musli_zerocopy::Error>(())
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn get_entry<T>(&self, key: &T) -> Result<Option<(&K, &V)>, Error>
     where
@@ -209,7 +209,7 @@ where
 ///
 /// assert!(map.contains_key(buf, &1)?);
 /// assert!(!map.contains_key(buf, &3)?);
-/// Ok::<_, musli_zerocopy::Error>(())
+/// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[derive(Debug)]
 pub struct MapRef<K, V> {
@@ -265,7 +265,7 @@ where
     /// assert_eq!(map.get(buf, &1)?, Some(&2));
     /// assert_eq!(map.get(buf, &2)?, Some(&3));
     /// assert_eq!(map.get(buf, &3)?, None);
-    /// Ok::<_, musli_zerocopy::Error>(())
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn get<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<&'a V>, Error>
     where
@@ -300,7 +300,7 @@ where
     /// assert!(map.contains_key(buf, &1)?);
     /// assert!(map.contains_key(buf, &2)?);
     /// assert!(!map.contains_key(buf, &3)?);
-    /// Ok::<_, musli_zerocopy::Error>(())
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn contains_key<T>(&self, buf: &Buf, key: &T) -> Result<bool, Error>
     where
@@ -331,7 +331,7 @@ where
     /// assert_eq!(map.get_entry(buf, &1)?, Some((&1, &2)));
     /// assert_eq!(map.get_entry(buf, &2)?, Some((&2, &3)));
     /// assert_eq!(map.get_entry(buf, &3)?, None);
-    /// Ok::<_, musli_zerocopy::Error>(())
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn get_entry<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<(&'a K, &'a V)>, Error>
     where

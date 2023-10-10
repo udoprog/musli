@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::meta::ParseNestedMeta;
 use syn::punctuated::Punctuated;
-use syn::{DeriveInput, Token};
+use syn::{DeriveInput, Token, parenthesized};
 
 #[derive(Default)]
 struct Ctxt {
@@ -67,6 +67,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let mut generics = input.generics.clone();
 
     let mut is_repr_c = false;
+    let mut repr_align = None;
 
     for attr in &input.attrs {
         if attr.path().is_ident("repr") {
@@ -75,9 +76,18 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     is_repr_c = true;
                     return Ok(());
                 }
+                
+                // #[repr(align(N))]
+                if meta.path.is_ident("align") {
+                    let content;
+                    parenthesized!(content in meta.input);
+                    let lit: syn::LitInt = content.parse()?;
+                    let n: usize = lit.base10_parse()?;
+                    repr_align = Some(n);
+                    return Ok(());
+                }
 
-                meta.input.parse::<TokenStream>()?;
-                Ok(())
+                Err(syn::Error::new_spanned(meta.path, "ZeroCopy: only repr(C) is supported"))
             });
 
             if let Err(error) = result {
@@ -118,6 +128,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     }
 
     let buf_mut: syn::Path = syn::parse_quote!(musli_zerocopy::BufMut);
+    let struct_writer: syn::Path = syn::parse_quote!(musli_zerocopy::StructWriter);
     let buf: syn::Path = syn::parse_quote!(musli_zerocopy::Buf);
     let error: syn::Path = syn::parse_quote!(musli_zerocopy::Error);
     let validator: syn::Path = syn::parse_quote!(musli_zerocopy::Validator);
@@ -128,17 +139,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
     let mut any_bits = Vec::new();
 
-    for (index, field) in st.fields.iter().enumerate() {
-        let member = match &field.ident {
-            Some(ident) => syn::Member::Named(ident.clone()),
-            None => syn::Member::Unnamed(syn::Index::from(index)),
-        };
+    for field in st.fields.iter() {
+        let ty = &field.ty;
 
         writes.push(quote! {
-            #buf_mut::write(buf, &self.#member)?;
+            #struct_writer::pad::<#ty>(&mut writer);
         });
-
-        let ty = &field.ty;
 
         validates.push(quote! {
             #validator::field::<#ty>(&mut validator)?;
@@ -167,7 +173,16 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             where
                 __B: #buf_mut
             {
+                let mut writer = #buf_mut::writer(buf, self);
+
                 #(#writes)*
+
+                // SAFETY: We've systematically ensured to pad all fields on the
+                // struct.
+                unsafe {
+                    #struct_writer::finish(writer)?;
+                }
+
                 Ok(())
             }
 

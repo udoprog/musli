@@ -5,6 +5,7 @@ use core::mem::{align_of, size_of};
 use core::ops::Range;
 use core::slice;
 
+use crate::aligned_buf::StructWriter;
 use crate::bind::Bindable;
 use crate::error::{Error, ErrorKind};
 use crate::r#ref::Ref;
@@ -25,21 +26,88 @@ pub trait BufMut {
     fn write<T>(&mut self, value: &T) -> Result<(), Error>
     where
         T: ZeroCopy;
+
+    /// Setup a writer for the given type.
+    ///
+    /// This API writes the type directly using an unaligned pointer write and
+    /// just ensures that any padding is zeroed.
+    ///
+    /// # Safety
+    ///
+    /// While calling just this function is not unsafe, finishing writing with
+    /// [`StructWriter::finish`] is unsafe.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{ZeroCopy, AlignedBuf, BufMut};
+    ///
+    /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
+    /// #[repr(C)]
+    /// struct ZeroPadded {
+    ///     a: u8,
+    ///     b: u64,
+    ///     c: u16,
+    ///     d: u32,
+    /// }
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// let padded = ZeroPadded {
+    ///     a: 0x01u8,
+    ///     b: 0x0203_0405_0607_0809u64,
+    ///     c: 0x0e0fu16,
+    ///     d: 0x0a0b_0c0du32,
+    /// };
+    ///
+    /// let mut w = buf.writer(&padded);
+    /// w.pad::<u8>();
+    /// w.pad::<u64>();
+    /// w.pad::<u16>();
+    /// w.pad::<u32>();
+    ///
+    /// // SAFETY: We've asserted that the struct fields have been correctly padded.
+    /// let ptr = unsafe { w.finish()? };
+    ///
+    /// if cfg!(target_endian = "big") {
+    ///     assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 12, 13, 14, 15]);
+    /// } else {
+    ///     assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 9, 8, 7, 6, 5, 4, 3, 2, 15, 14, 0, 0, 13, 12, 11, 10]);
+    /// }
+    ///
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// assert_eq!(buf.load(ptr)?, &padded);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    fn writer<T>(&mut self, value: &T) -> StructWriter<'_, T>
+    where
+        T: ZeroCopy;
 }
 
 impl<B: ?Sized> BufMut for &mut B
 where
     B: BufMut,
 {
+    #[inline]
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
         (**self).extend_from_slice(bytes)
     }
 
+    #[inline]
     fn write<T>(&mut self, value: &T) -> Result<(), Error>
     where
         T: ZeroCopy,
     {
         (**self).write(value)
+    }
+
+    #[inline]
+    fn writer<T>(&mut self, value: &T) -> StructWriter<'_, T>
+    where
+        T: ZeroCopy,
+    {
+        (**self).writer(value)
     }
 }
 
@@ -274,8 +342,8 @@ impl Buf {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let first = buf.insert_unsized("first")?;
-    /// let second = buf.insert_unsized("second")?;
+    /// let first = buf.write_unsized("first")?;
+    /// let second = buf.write_unsized("second")?;
     ///
     /// let buf = buf.as_buf()?;
     ///
@@ -413,7 +481,7 @@ impl Buf {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let custom = buf.insert_sized(Custom {
+    /// let custom = buf.write(&Custom {
     ///     field: 42,
     ///     field2: 85,
     /// })?;
@@ -488,7 +556,7 @@ impl<T> Validator<'_, T> {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let custom = buf.insert_sized(Custom {
+    /// let custom = buf.write(&Custom {
     ///     field: 42,
     ///     field2: 85,
     /// })?;
@@ -538,7 +606,7 @@ impl<T> Validator<'_, T> {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let custom = buf.insert_sized(Custom {
+    /// let custom = buf.write(&Custom {
     ///     field: 42,
     ///     field2: 85,
     /// })?;
@@ -569,7 +637,7 @@ impl<T> Validator<'_, T> {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let custom = buf.insert_sized(Custom {
+    /// let custom = buf.write(&Custom {
     ///     field: 42,
     ///     field2: 85,
     /// })?;

@@ -7,8 +7,15 @@ use crate::zero_copy::ZeroCopy;
 
 /// A reference to an unsized value packed as a wide pointer.
 ///
+/// The `T` that can be stored in here is determined by [`UnsizedZeroCopy`], is
+/// inserted through [`AlignedBuf::write_unsized`], and is represented by this
+/// type.
+///
 /// This contains a pointer to the unsized element and the length of the
 /// element.
+///
+/// [`UnsizedZeroCopy`]: crate::zero_copy::UnsizedZeroCopy
+/// [`AlignedBuf::write_unsized`]: crate::aligned_buf::AlignedBuf::write_unsized
 ///
 /// # Examples
 ///
@@ -17,7 +24,7 @@ use crate::zero_copy::ZeroCopy;
 /// use musli_zerocopy::{AlignedBuf, Unsized, Ptr};
 ///
 /// let mut buf = AlignedBuf::new();
-/// let ptr = buf.next_pointer(align_of::<u8>());
+/// let ptr = buf.next_pointer::<u8>();
 /// buf.extend_from_slice(b"Hello World!")?;
 ///
 /// let buf = buf.as_buf()?;

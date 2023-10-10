@@ -3,8 +3,8 @@ use musli_zerocopy::{AlignedBuf, Error};
 fn main() -> Result<(), Error> {
     let mut buf = AlignedBuf::new();
 
-    let first = buf.insert_unsized("first")?;
-    let second = buf.insert_unsized("second")?;
+    let first = buf.write_unsized("first")?;
+    let second = buf.write_unsized("second")?;
 
     let buf = buf.as_buf()?;
 

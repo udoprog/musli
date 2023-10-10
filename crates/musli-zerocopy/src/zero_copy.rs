@@ -7,25 +7,43 @@ use core::str;
 use crate::buf::{AnyValue, Buf, BufMut};
 use crate::error::{Error, ErrorKind};
 
-/// Trait governing how to write an unsized buffer.
+/// Trait governing which `T` in [`Unsized<T>`] the wrapper can handle.
 ///
-/// We only support slice-like unsized types, such as `str` and `[u8]`. We can't
-/// support types such as `dyn Debug` because metadata is a vtable which can't
-/// be serialized.
+/// We only support slice-like, unaligned unsized types, such as `str` and
+/// `[u8]`. We can't support types such as `dyn Debug` because metadata is a
+/// vtable which can't be serialized.
+///
+/// For nested slices or arrays, use [`Slice<T>`] instead.
+///
+/// [`Unsized<T>`]: crate::unsized::Unsized
+/// [`Slice<T>`]: crate::slice::Slice
 ///
 /// # Safety
 ///
 /// This can only be implemented correctly by types under certain conditions:
 /// * The type has a strict, well-defined layout or is `repr(C)`.
-/// * The base type has a statically known alignment, such as how `[u32]` is
-///   aligned on 4 bytes.
+/// * The base type has a statically known alignment, such as how `[u8]` is
+///   aligned on 1 bytes and this alignment must be specified in `ALIGN`.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::AlignedBuf;
+///
+/// let mut buf = AlignedBuf::with_alignment(1);
+///
+/// let bytes = buf.write_unsized(&b"Hello World!"[..])?;
+/// let buf = buf.as_buf()?;
+/// assert_eq!(buf.load(bytes)?, b"Hello World!");
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
 pub unsafe trait UnsizedZeroCopy {
     /// Alignment of the pointed to data. We can only support unsized types
     /// which have a known alignment.
     const ALIGN: usize;
 
-    /// The length of the unsized value.
-    fn len(&self) -> usize;
+    /// The size in bytes of the pointed to value.
+    fn size(&self) -> usize;
 
     /// Write to the owned buffer.
     fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
@@ -97,7 +115,7 @@ pub unsafe trait ZeroCopy {
 unsafe impl UnsizedZeroCopy for str {
     const ALIGN: usize = align_of::<u8>();
 
-    fn len(&self) -> usize {
+    fn size(&self) -> usize {
         <str>::len(self)
     }
 
@@ -116,7 +134,7 @@ unsafe impl UnsizedZeroCopy for str {
 unsafe impl UnsizedZeroCopy for [u8] {
     const ALIGN: usize = align_of::<u8>();
 
-    fn len(&self) -> usize {
+    fn size(&self) -> usize {
         <[_]>::len(self)
     }
 
@@ -331,7 +349,7 @@ macro_rules! impl_zst {
         ///
         /// let mut empty = AlignedBuf::new();
         /// let values = [Struct::default(); 100];
-        /// let slice = empty.insert_slice(&values[..])?;
+        /// let slice = empty.write_slice(&values[..])?;
         /// let buf = empty.as_aligned_buf();
         /// assert_eq!(buf.len(), 0);
         ///

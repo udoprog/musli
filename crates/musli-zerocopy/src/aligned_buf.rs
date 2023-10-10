@@ -1,7 +1,7 @@
 use core::alloc::Layout;
 use core::hash::Hash;
-use core::mem::align_of;
-use core::mem::ManuallyDrop;
+use core::marker::PhantomData;
+use core::mem::{align_of, size_of, ManuallyDrop};
 use core::ops::Range;
 use core::ptr;
 use core::slice;
@@ -319,32 +319,12 @@ impl AlignedBuf {
         unsafe { slice::from_raw_parts_mut(self.as_ptr_mut(), self.len()) }
     }
 
-    /// Write a value to the buffer.
-    ///
-    /// ```
-    /// use musli_zerocopy::AlignedBuf;
-    ///
-    /// let mut buf = AlignedBuf::new();
-    ///
-    /// let first = buf.insert_unsized("first")?;
-    /// let second = buf.insert_unsized("second")?;
-    ///
-    /// let buf = buf.as_aligned_buf();
-    ///
-    /// assert_eq!(buf.load(first)?, "first");
-    /// assert_eq!(buf.load(second)?, "second");
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    pub fn insert_unsized<T>(&mut self, value: &T) -> Result<Unsized<T>, Error>
-    where
-        T: ?Sized + UnsizedZeroCopy,
-    {
-        let ptr = self.next_pointer(T::ALIGN);
-        value.write_to(self)?;
-        Ok(Unsized::new(ptr, value.len()))
-    }
-
     /// Insert a value with the given size.
+    ///
+    /// To get the pointer where the value will be written, call
+    /// [`next_pointer<T>()`] before writing it.
+    ///
+    /// [`next_pointer<T>()`]: Self::next_pointer
     ///
     /// # Examples
     ///
@@ -361,9 +341,9 @@ impl AlignedBuf {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let string = buf.insert_unsized("string")?;
-    /// let custom = buf.insert_sized(Custom { field: 1, string })?;
-    /// let custom2 = buf.insert_sized(Custom { field: 2, string })?;
+    /// let string = buf.write_unsized("string")?;
+    /// let custom = buf.write(&Custom { field: 1, string })?;
+    /// let custom2 = buf.write(&Custom { field: 2, string })?;
     ///
     /// let buf = buf.as_aligned_buf();
     ///
@@ -376,13 +356,123 @@ impl AlignedBuf {
     /// assert_eq!(buf.load(custom2.string)?, "string");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert_sized<T>(&mut self, value: T) -> Result<Ref<T>, Error>
+    pub fn write<T>(&mut self, value: &T) -> Result<Ref<T>, Error>
     where
         T: ZeroCopy,
     {
-        let ptr = self.next_pointer(align_of::<T>());
+        let ptr = self.next_pointer::<T>();
         value.write_to(self)?;
         Ok(Ref::new(ptr))
+    }
+
+    /// Setup a writer for the given type.
+    ///
+    /// This API writes the type directly using an unaligned pointer write and
+    /// just ensures that any padding is zeroed.
+    ///
+    /// # Safety
+    ///
+    /// While calling just this function is not unsafe, finishing writing with
+    /// [`StructWriter::finish`] is unsafe.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{ZeroCopy, AlignedBuf};
+    ///
+    /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
+    /// #[repr(C)]
+    /// struct ZeroPadded {
+    ///     a: u8,
+    ///     b: u64,
+    ///     c: u16,
+    ///     d: u32,
+    /// }
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// let padded = ZeroPadded {
+    ///     a: 0x01u8,
+    ///     b: 0x0203_0405_0607_0809u64,
+    ///     c: 0x0e0fu16,
+    ///     d: 0x0a0b_0c0du32,
+    /// };
+    ///
+    /// let mut w = buf.writer(&padded);
+    /// w.pad::<u8>();
+    /// w.pad::<u64>();
+    /// w.pad::<u16>();
+    /// w.pad::<u32>();
+    ///
+    /// // SAFETY: We've asserted that the struct fields have been correctly padded.
+    /// let ptr = unsafe { w.finish()? };
+    ///
+    /// if cfg!(target_endian = "big") {
+    ///     assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 12, 13, 14, 15]);
+    /// } else {
+    ///     assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 9, 8, 7, 6, 5, 4, 3, 2, 15, 14, 0, 0, 13, 12, 11, 10]);
+    /// }
+    ///
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// assert_eq!(buf.load(ptr)?, &padded);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn writer<T>(&mut self, value: &T) -> StructWriter<'_, T>
+    where
+        T: ZeroCopy,
+    {
+        self.ensure_capacity(self.len.wrapping_add(size_of::<T>()));
+
+        unsafe {
+            ptr::copy_nonoverlapping(value, self.as_ptr_mut().wrapping_add(self.len).cast(), 1);
+        }
+
+        let len = self.len;
+
+        StructWriter {
+            buf: self,
+            len,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Write a [`ZeroCopy`] value directly into the buffer.
+    ///
+    /// If you want to know the pointer where this value will be written, use
+    /// `next_pointer::<T>()` before calling this function.
+    fn write_inner<T>(&mut self, value: &T) -> Result<(), Error>
+    where
+        T: ZeroCopy,
+    {
+        self.request_align(align_of::<T>());
+        value.write_to(self)?;
+        Ok(())
+    }
+
+    /// Write a value to the buffer.
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// let first = buf.write_unsized("first")?;
+    /// let second = buf.write_unsized("second")?;
+    ///
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// assert_eq!(buf.load(first)?, "first");
+    /// assert_eq!(buf.load(second)?, "second");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn write_unsized<T>(&mut self, value: &T) -> Result<Unsized<T>, Error>
+    where
+        T: ?Sized + UnsizedZeroCopy,
+    {
+        let ptr = self.next_pointer_with(T::ALIGN);
+        value.write_to(self)?;
+        Ok(Unsized::new(ptr, value.size()))
     }
 
     /// Insert a slice into the buffer.
@@ -396,10 +486,10 @@ impl AlignedBuf {
     ///
     /// let mut values = Vec::new();
     ///
-    /// values.push(buf.insert_unsized("first")?);
-    /// values.push(buf.insert_unsized("second")?);
+    /// values.push(buf.write_unsized("first")?);
+    /// values.push(buf.write_unsized("second")?);
     ///
-    /// let slice_ref = buf.insert_slice(&values)?;
+    /// let slice_ref = buf.write_slice(&values)?;
     ///
     /// let buf = buf.as_aligned_buf();
     ///
@@ -414,11 +504,11 @@ impl AlignedBuf {
     /// assert_eq!(&strings, &["first", "second"][..]);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert_slice<T>(&mut self, values: &[T]) -> Result<Slice<T>, Error>
+    pub fn write_slice<T>(&mut self, values: &[T]) -> Result<Slice<T>, Error>
     where
         T: ZeroCopy,
     {
-        let ptr = self.next_pointer(align_of::<T>());
+        let ptr = self.next_pointer::<T>();
 
         for value in values {
             value.write_to(self)?;
@@ -448,8 +538,8 @@ impl AlignedBuf {
     ///
     /// let mut pairs = Vec::new();
     ///
-    /// pairs.push(Pair::new(buf.insert_unsized("first")?, 1u32));
-    /// pairs.push(Pair::new(buf.insert_unsized("second")?, 2u32));
+    /// pairs.push(Pair::new(buf.write_unsized("first")?, 1u32));
+    /// pairs.push(Pair::new(buf.write_unsized("second")?, 2u32));
     ///
     /// let map = buf.insert_map(&mut pairs)?;
     /// let buf = buf.as_aligned_buf();
@@ -506,7 +596,7 @@ impl AlignedBuf {
             }
         }
 
-        let entries = self.insert_slice(entries)?;
+        let entries = self.write_slice(entries)?;
 
         let mut displacements = Vec::new();
 
@@ -514,18 +604,8 @@ impl AlignedBuf {
             displacements.push(Pair { a, b });
         }
 
-        let displacements = self.insert_slice(&displacements)?;
+        let displacements = self.write_slice(&displacements)?;
         Ok(MapRef::new(hash_state.key, entries, displacements))
-    }
-
-    /// Write the bytes of a value.
-    pub fn write<T>(&mut self, value: &T) -> Result<(), Error>
-    where
-        T: ZeroCopy,
-    {
-        self.request_align(align_of::<T>());
-        value.write_to(self)?;
-        Ok(())
     }
 
     /// Extend the buffer from a slice.
@@ -553,7 +633,7 @@ impl AlignedBuf {
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer(1));
+    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer_with(1));
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
@@ -574,7 +654,7 @@ impl AlignedBuf {
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer(4));
+    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer_with(4));
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
@@ -775,10 +855,8 @@ impl AlignedBuf {
         }
     }
 
-    /// Construct an aligned pointer into the current buffer which points to the
-    /// next location that will be written.
-    ///
-    /// This ensures that the alignment of the pointer is a multiple of `align`.
+    /// Construct a pointer aligned for `align` into the current buffer which
+    /// points to the next location that will be written.
     ///
     /// # Panics
     ///
@@ -795,7 +873,7 @@ impl AlignedBuf {
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer(align_of::<u32>()));
+    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer::<u32>());
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
@@ -804,8 +882,41 @@ impl AlignedBuf {
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn next_pointer(&mut self, align: usize) -> Ptr {
+    pub fn next_pointer_with(&mut self, align: usize) -> Ptr {
         self.request_align(align);
+        Ptr::new(self.len)
+    }
+
+    /// Construct a pointer aligned for `T` into the current buffer which points
+    /// to the next location that will be written.
+    ///
+    /// This ensures that the alignment of the pointer is a multiple of `align`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::mem::align_of;
+    /// use musli_zerocopy::{AlignedBuf, Ref};
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// // Add one byte of padding to throw of any incidental alignment.
+    /// buf.extend_from_slice(&[1]);
+    ///
+    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer::<u32>());
+    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    ///
+    /// // This will succeed because the buffer follows its interior alignment:
+    /// let buf = buf.as_buf()?;
+    ///
+    /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn next_pointer<T>(&mut self) -> Ptr
+    where
+        T: ZeroCopy,
+    {
+        self.request_align(align_of::<T>());
         Ptr::new(self.len)
     }
 
@@ -962,6 +1073,93 @@ impl BufMut for AlignedBuf {
     where
         T: ZeroCopy,
     {
-        AlignedBuf::write(self, value)
+        AlignedBuf::write_inner(self, value)
+    }
+
+    #[inline]
+    fn writer<T>(&mut self, value: &T) -> StructWriter<'_, T>
+    where
+        T: ZeroCopy,
+    {
+        AlignedBuf::writer::<T>(self, value)
+    }
+}
+
+/// A writer as returned from [AlignedBuf::writer].
+#[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StructWriter::finish`"]
+pub struct StructWriter<'a, T> {
+    buf: &'a mut AlignedBuf,
+    len: usize,
+    _marker: PhantomData<T>,
+}
+
+impl<'a, T> StructWriter<'a, T>
+where
+    T: ZeroCopy,
+{
+    /// Pad around the given field with zeros.
+    ///
+    /// Note that this is necessary to do correctly in order to satisfy the
+    /// requirements imposed by [`finish()`].
+    ///
+    /// [`finish()`]: Self::finish
+    pub fn pad<F>(&mut self)
+    where
+        F: ZeroCopy,
+    {
+        self.zero_pad_align::<F>();
+        self.len = self.len.wrapping_add(size_of::<F>());
+    }
+
+    /// Finish writing the current buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that they've called [`pad`] in order for every
+    /// field in a struct being serialized. Otherwise we might not have written
+    /// the necessary padding, and the [`AlignedBuf`] we're writing to might
+    /// contain uninitialized data in the form of uninitialized padding.
+    ///
+    /// [`pad`]: Self::pad
+    pub unsafe fn finish(mut self) -> Result<Ref<T>, Error> {
+        self.zero_pad_align::<T>();
+
+        let ptr = Ptr::new(self.buf.len);
+
+        if self.len > self.buf.capacity {
+            return Err(Error::new(ErrorKind::BufferOverflow {
+                offset: self.len,
+                capacity: self.buf.capacity,
+            }));
+        }
+
+        self.buf.set_len(self.len);
+        Ok(Ref::new(ptr))
+    }
+
+    /// Zero pad around a field with the given type `T`.
+    ///
+    /// # Safety
+    ///
+    /// This requires that the non-padding bytes of the given field have been
+    /// initialized.
+    fn zero_pad_align<F>(&mut self)
+    where
+        F: ZeroCopy,
+    {
+        let o = self.len.next_multiple_of(align_of::<F>());
+
+        // zero out padding.
+        if o > self.len {
+            if o <= self.buf.capacity {
+                let start = self.buf.as_ptr_mut().wrapping_add(self.len);
+
+                unsafe {
+                    ptr::write_bytes(start, 0, o - self.len);
+                }
+            }
+
+            self.len = o;
+        }
     }
 }

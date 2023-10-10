@@ -23,10 +23,10 @@
 //!
 //! let mut buf = AlignedBuf::new();
 //!
-//! let string = buf.insert_unsized("string")?;
+//! let string = buf.write_unsized("string")?;
 //!
-//! let c1 = buf.insert_sized(Custom { field: 1, string })?;
-//! let c2 = buf.insert_sized(Custom { field: 2, string })?;
+//! let c1 = buf.write(&Custom { field: 1, string })?;
+//! let c2 = buf.write(&Custom { field: 2, string })?;
 //!
 //! let mut map = Vec::new();
 //!
@@ -48,7 +48,7 @@
 //! assert_eq!(buf.load(c2.string)?, "string");
 //!
 //! assert!(map.get(&3)?.is_none());
-//! Ok::<_, musli_zerocopy::Error>(())
+//! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 
 #![no_std]
@@ -73,7 +73,8 @@ mod ptr;
 mod sip;
 
 #[cfg(feature = "alloc")]
-pub use self::aligned_buf::AlignedBuf;
+pub use self::aligned_buf::{AlignedBuf, StructWriter};
+
 #[cfg(feature = "alloc")]
 mod aligned_buf;
 
@@ -100,3 +101,6 @@ mod bind;
 
 /// Implement the [`ZeroCopy`] trait.
 pub use musli_macros::ZeroCopy;
+
+#[cfg(test)]
+mod tests;

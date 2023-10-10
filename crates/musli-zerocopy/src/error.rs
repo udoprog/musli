@@ -55,6 +55,10 @@ pub(crate) enum ErrorKind {
         range: Range<usize>,
         expected: usize,
     },
+    BufferOverflow {
+        offset: usize,
+        capacity: usize,
+    },
     IndexOutOfBounds {
         index: usize,
         len: usize,
@@ -98,6 +102,12 @@ impl fmt::Display for ErrorKind {
                 write!(
                     f,
                     "Expected end of buffer at {expected} in range {range:?} but was {len}"
+                )
+            }
+            ErrorKind::BufferOverflow { offset, capacity } => {
+                write!(
+                    f,
+                    "Offset {offset} is not within the allocated buffer 0-{capacity}"
                 )
             }
             ErrorKind::FailedPhf => {
