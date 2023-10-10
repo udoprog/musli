@@ -390,16 +390,20 @@ macro_rules! impl_number {
                 buf.extend_from_slice(&<$ty>::to_ne_bytes(*self)[..])
             }
 
+            #[allow(clippy::missing_safety_doc)]
+            #[inline]
             unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
                 Ok(buf.cast())
             }
 
+            #[allow(clippy::missing_safety_doc)]
+            #[inline]
             unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
                 Ok(buf.cast_mut())
             }
 
-            // NB: Numerical types can inhabit any bit pattern.
             #[allow(clippy::missing_safety_doc)]
+            #[inline]
             unsafe fn validate(_: &Buf) -> Result<(), Error> {
                 Ok(())
             }
@@ -481,12 +485,16 @@ macro_rules! impl_nonzero_number {
                 buf.extend_from_slice(&self.get().to_ne_bytes()[..])
             }
 
+            #[allow(clippy::missing_safety_doc)]
+            #[inline]
             unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
                 // SAFETY: Layout has been checked.
                 Self::validate(buf)?;
                 Ok(buf.cast())
             }
 
+            #[allow(clippy::missing_safety_doc)]
+            #[inline]
             unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
                 // SAFETY: Layout has been checked.
                 Self::validate(buf)?;
@@ -494,6 +502,7 @@ macro_rules! impl_nonzero_number {
             }
 
             #[allow(clippy::missing_safety_doc)]
+            #[inline]
             unsafe fn validate(buf: &Buf) -> Result<(), Error> {
                 if buf.is_zeroed() {
                     return Err(Error::new(ErrorKind::NonZeroZeroed { range: buf.range() }));
@@ -566,17 +575,20 @@ macro_rules! impl_zst {
                 Ok(())
             }
 
+            #[allow(clippy::missing_safety_doc)]
             #[inline]
             unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
                 Ok(buf.cast())
             }
 
+            #[allow(clippy::missing_safety_doc)]
             #[inline]
             unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
                 Ok(buf.cast_mut())
             }
 
             #[allow(clippy::missing_safety_doc)]
+            #[inline]
             unsafe fn validate(_: &Buf) -> Result<(), Error> {
                 Ok(())
             }

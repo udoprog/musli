@@ -1,10 +1,12 @@
 use core::alloc::Layout;
+use core::any::type_name;
 use core::fmt;
 use core::ops::Range;
 use core::str::Utf8Error;
 
 /// Müsli's zero copy error type.
 #[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Error {
     kind: ErrorKind,
 }
@@ -13,6 +15,14 @@ impl Error {
     #[inline]
     pub(crate) const fn new(kind: ErrorKind) -> Self {
         Self { kind }
+    }
+
+    /// Helper function to indicate that an illegal enum representation has been encountered.
+    #[doc(hidden)]
+    pub fn __enum_illegal_repr<T>() -> Self {
+        Self::new(ErrorKind::IllegalEnumRepr {
+            name: type_name::<T>(),
+        })
     }
 }
 
@@ -34,6 +44,7 @@ impl std::error::Error for Error {
 }
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]
 pub(crate) enum ErrorKind {
     AlignmentMismatch {
@@ -63,6 +74,9 @@ pub(crate) enum ErrorKind {
     IndexOutOfBounds {
         index: usize,
         len: usize,
+    },
+    IllegalEnumRepr {
+        name: &'static str,
     },
     Utf8Error {
         error: Utf8Error,
@@ -109,6 +123,9 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::IndexOutOfBounds { index, len } => {
                 write!(f, "Index {index} out of bound 0-{len}")
+            }
+            ErrorKind::IllegalEnumRepr { name } => {
+                write!(f, "Illegal enum representation for enum {name}")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
             #[cfg(feature = "alloc")]
