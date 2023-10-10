@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::ptr::Ptr;
+use crate::offset::{Offset, OffsetSize};
 use crate::ZeroCopy;
 
 /// A reference to a slice packed as a wide pointer.
@@ -11,14 +11,14 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Slice, Ptr};
+/// use musli_zerocopy::{AlignedBuf, Slice, Offset};
 ///
 /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
 /// buf.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
 ///
 /// let buf = buf.as_ref()?;
 ///
-/// let slice = Slice::<u32>::new(Ptr::ZERO, 2);
+/// let slice = Slice::<u32>::new(Offset::ZERO, 2);
 ///
 /// let expected = [
 ///     u32::from_ne_bytes([1, 2, 3, 4]),
@@ -33,12 +33,12 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Slice, Ptr};
+/// use musli_zerocopy::{AlignedBuf, Slice, Offset};
 ///
 /// let buf = AlignedBuf::with_alignment(align_of::<()>());
 /// let buf = buf.as_ref()?;
 ///
-/// let slice = Slice::<()>::new(Ptr::ZERO, 2);
+/// let slice = Slice::<()>::new(Offset::ZERO, 2);
 ///
 /// let expected = [(), ()];
 ///
@@ -49,8 +49,8 @@ use crate::ZeroCopy;
 #[repr(C)]
 #[zero_copy(crate)]
 pub struct Slice<T: ?Sized> {
-    ptr: Ptr,
-    len: usize,
+    ptr: Offset,
+    len: OffsetSize,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
@@ -61,12 +61,19 @@ impl<T: ?Sized> Slice<T> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Slice, Ptr};
+    /// use musli_zerocopy::{Slice, Offset};
     ///
-    /// let slice = Slice::<u32>::new(Ptr::ZERO, 2);
+    /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn new(ptr: Ptr, len: usize) -> Self {
+    pub fn new(ptr: Offset, len: usize) -> Self {
+        let Ok(len) = OffsetSize::try_from(len) else {
+            panic!(
+                "Slice length {len} not in the legal range of 0-{}",
+                OffsetSize::MAX
+            );
+        };
+
         Self {
             ptr,
             len,
@@ -79,14 +86,14 @@ impl<T: ?Sized> Slice<T> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Slice, Ptr};
+    /// use musli_zerocopy::{Slice, Offset};
     ///
-    /// let slice = Slice::<u32>::new(Ptr::ZERO, 2);
-    /// assert_eq!(slice.ptr(), Ptr::ZERO);
+    /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
+    /// assert_eq!(slice.ptr(), Offset::ZERO);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn ptr(&self) -> Ptr {
+    pub fn ptr(&self) -> Offset {
         self.ptr
     }
 
@@ -95,15 +102,15 @@ impl<T: ?Sized> Slice<T> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Slice, Ptr};
+    /// use musli_zerocopy::{Slice, Offset};
     ///
-    /// let slice = Slice::<u32>::new(Ptr::ZERO, 2);
+    /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
     /// assert_eq!(slice.len(), 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        self.len as usize
     }
 
     /// If the slice is empty.
@@ -111,12 +118,12 @@ impl<T: ?Sized> Slice<T> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Slice, Ptr};
+    /// use musli_zerocopy::{Slice, Offset};
     ///
-    /// let slice = Slice::<u32>::new(Ptr::ZERO, 0);
+    /// let slice = Slice::<u32>::new(Offset::ZERO, 0);
     /// assert!(slice.is_empty());
     ///
-    /// let slice = Slice::<u32>::new(Ptr::ZERO, 2);
+    /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
     /// assert!(!slice.is_empty());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```

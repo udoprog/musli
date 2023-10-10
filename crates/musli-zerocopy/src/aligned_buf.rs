@@ -12,9 +12,9 @@ use ::alloc::vec::Vec;
 use crate::buf::Buf;
 use crate::buf_mut::BufMut;
 use crate::error::{Error, ErrorKind};
+use crate::offset::Offset;
 use crate::pair::Pair;
 use crate::phf::MapRef;
-use crate::ptr::Ptr;
 use crate::r#ref::Ref;
 use crate::r#unsized::Unsized;
 use crate::slice::Slice;
@@ -985,9 +985,9 @@ impl AlignedBuf {
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn next_pointer_with(&mut self, align: usize) -> Ptr {
+    pub fn next_pointer_with(&mut self, align: usize) -> Offset {
         self.request_align(align);
-        Ptr::new(self.len)
+        Offset::new(self.len)
     }
 
     /// Construct a pointer aligned for `T` into the current buffer which points
@@ -1015,12 +1015,12 @@ impl AlignedBuf {
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn next_pointer<T>(&mut self) -> Ptr
+    pub fn next_pointer<T>(&mut self) -> Offset
     where
         T: ZeroCopy,
     {
         self.request_align(align_of::<T>());
-        Ptr::new(self.len)
+        Offset::new(self.len)
     }
 
     fn ensure_capacity(&mut self, new_capacity: usize) {
@@ -1268,7 +1268,7 @@ where
     unsafe fn finish(mut self) -> Result<Ref<T>, Error> {
         self.zero_pad_align::<T>();
 
-        let ptr = Ptr::new(self.buf.len());
+        let ptr = Offset::new(self.buf.len());
 
         if self.len > self.buf.capacity() {
             return Err(Error::new(ErrorKind::BufferOverflow {

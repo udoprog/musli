@@ -187,7 +187,7 @@ pub unsafe trait ZeroCopy {
     /// ```no_run
     /// use core::mem::align_of;
     ///
-    /// use musli_zerocopy::{AlignedBuf, Buf, Error, Ptr, Ref, ZeroCopy};
+    /// use musli_zerocopy::{AlignedBuf, Buf, Error, Offset, Ref, ZeroCopy};
     ///
     /// unsafe fn unsafe_coerce<T>(buf: &Buf) -> Result<&T, Error>
     /// where
@@ -280,7 +280,7 @@ macro_rules! impl_number {
         /// ```
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{ZeroCopy, Buf, Ptr, Ref};
+        /// use musli_zerocopy::{ZeroCopy, Buf, Offset, Ref};
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
@@ -303,8 +303,8 @@ macro_rules! impl_number {
         ///     Buf::new(bytes)
         /// };
         ///
-        /// assert_eq!(zero.load(Ref::<Struct>::new(Ptr::ZERO))?.field, 0);
-        /// assert_eq!(one.load(Ref::<Struct>::new(Ptr::ZERO))?.field, 1);
+        /// assert_eq!(zero.load(Ref::<Struct>::new(Offset::ZERO))?.field, 0);
+        /// assert_eq!(one.load(Ref::<Struct>::new(Offset::ZERO))?.field, 1);
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
         unsafe impl ZeroCopy for $ty {
@@ -370,7 +370,7 @@ macro_rules! impl_nonzero_number {
         #[doc = concat!("use std::num::", stringify!($ty), ";")]
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{ZeroCopy, Buf, Ptr, Ref};
+        /// use musli_zerocopy::{ZeroCopy, Buf, Offset, Ref};
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
@@ -394,10 +394,10 @@ macro_rules! impl_nonzero_number {
         /// };
         ///
         /// // Non-zero buffer works as expected.
-        /// assert_eq!(one.load(Ref::<Struct>::new(Ptr::ZERO))?.field.get(), 1);
+        /// assert_eq!(one.load(Ref::<Struct>::new(Offset::ZERO))?.field.get(), 1);
         ///
         /// // Trying to use a zeroed buffer with a non-zero type.
-        /// assert!(zero.load(Ref::<Struct>::new(Ptr::ZERO)).is_err());
+        /// assert!(zero.load(Ref::<Struct>::new(Offset::ZERO)).is_err());
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
         unsafe impl ZeroCopy for ::core::num::$ty {

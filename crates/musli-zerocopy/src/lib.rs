@@ -9,6 +9,13 @@
 //!
 //! <br>
 //!
+//! ## Limits
+//!
+//! Offset, the size of unsized values, and slice lengths are all limited to
+//! 32-bit, that is the longest unsized value that can be stored in 2**32 bytes.
+//!
+//! <br>
+//!
 //! ## Examples
 //!
 //! ```
@@ -75,8 +82,8 @@ mod buf_mut;
 pub use self::error::Error;
 mod error;
 
-pub use self::ptr::Ptr;
-mod ptr;
+pub use self::offset::Offset;
+mod offset;
 
 pub use self::store_struct::StoreStruct;
 mod store_struct;

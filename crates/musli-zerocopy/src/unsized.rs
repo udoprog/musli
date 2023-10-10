@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::ptr::Ptr;
+use crate::offset::{Offset, OffsetSize};
 use crate::ZeroCopy;
 
 /// A reference to an unsized value packed as a wide pointer.
@@ -19,7 +19,7 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Unsized, Ptr};
+/// use musli_zerocopy::{AlignedBuf, Unsized, Offset};
 ///
 /// let mut buf = AlignedBuf::new();
 /// let ptr = buf.next_pointer::<u8>();
@@ -36,8 +36,8 @@ use crate::ZeroCopy;
 #[repr(C)]
 #[zero_copy(crate)]
 pub struct Unsized<T: ?Sized> {
-    ptr: Ptr,
-    size: usize,
+    ptr: Offset,
+    size: OffsetSize,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
@@ -48,15 +48,22 @@ impl<T: ?Sized> Unsized<T> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Unsized, Ptr};
+    /// use musli_zerocopy::{Unsized, Offset};
     ///
-    /// let bytes = Unsized::<str>::new(Ptr::ZERO, 2);
+    /// let bytes = Unsized::<str>::new(Offset::ZERO, 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn new(ptr: Ptr, len: usize) -> Self {
+    pub fn new(ptr: Offset, size: usize) -> Self {
+        let Ok(size) = OffsetSize::try_from(size) else {
+            panic!(
+                "Unsized size {size} not in the legal range of 0-{}",
+                OffsetSize::MAX
+            );
+        };
+
         Self {
             ptr,
-            size: len,
+            size,
             _marker: PhantomData,
         }
     }
@@ -66,14 +73,14 @@ impl<T: ?Sized> Unsized<T> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Unsized, Ptr};
+    /// use musli_zerocopy::{Unsized, Offset};
     ///
-    /// let bytes = Unsized::<str>::new(Ptr::ZERO, 2);
-    /// assert_eq!(bytes.ptr(), Ptr::ZERO);
+    /// let bytes = Unsized::<str>::new(Offset::ZERO, 2);
+    /// assert_eq!(bytes.ptr(), Offset::ZERO);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn ptr(&self) -> Ptr {
+    pub fn ptr(&self) -> Offset {
         self.ptr
     }
 
@@ -82,15 +89,15 @@ impl<T: ?Sized> Unsized<T> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Unsized, Ptr};
+    /// use musli_zerocopy::{Unsized, Offset};
     ///
-    /// let bytes = Unsized::<str>::new(Ptr::ZERO, 2);
+    /// let bytes = Unsized::<str>::new(Offset::ZERO, 2);
     /// assert_eq!(bytes.size(), 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn size(&self) -> usize {
-        self.size
+        self.size as usize
     }
 }
 
