@@ -159,11 +159,6 @@ impl Buf {
         range.start as usize..range.end as usize
     }
 
-    /// Test if the current buffer is compatible with the given layout.
-    pub(crate) fn is_compatible(&self, layout: Layout) -> bool {
-        self.is_aligned_to(layout.align()) && self.data.len() == layout.size()
-    }
-
     /// Test if the current buffer is layout compatible with the given `T`.
     ///
     /// # Examples
@@ -183,6 +178,39 @@ impl Buf {
         T: ZeroCopy,
     {
         self.is_compatible(Layout::new::<T>())
+    }
+
+    /// Ensure that the current buffer is layout compatible with the given `T`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::with_alignment(4);
+    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// assert!(buf.ensure_compatible_with::<u32>().is_ok());
+    /// assert!(buf.ensure_compatible_with::<u64>().is_err());
+    /// ```
+    pub fn ensure_compatible_with<T>(&self) -> Result<(), Error>
+    where
+        T: ZeroCopy,
+    {
+        if !self.is_compatible_with::<T>() {
+            return Err(Error::new(ErrorKind::LayoutMismatch {
+                layout: Layout::new::<T>(),
+                range: self.range(),
+            }));
+        }
+
+        Ok(())
+    }
+
+    /// Test if the current buffer is compatible with the given layout.
+    pub(crate) fn is_compatible(&self, layout: Layout) -> bool {
+        self.is_aligned_to(layout.align()) && self.data.len() == layout.size()
     }
 
     /// Test if the buffer is aligned with the given alignment.
@@ -213,23 +241,20 @@ impl Buf {
 
     /// Get the given range while checking its required alignment.
     pub(crate) fn get(&self, range: Range<usize>, align: usize) -> Result<&Buf, Error> {
-        // SAFETY: We specifically test for alignment.
-        unsafe {
-            let data = self.get_unchecked(range)?;
+        let buf = self.get_unaligned(range)?;
 
-            if !data.is_aligned_to(align) {
-                return Err(Error::new(ErrorKind::BadAlignment {
-                    ptr: data.as_ptr() as usize,
-                    align,
-                }));
-            }
-
-            Ok(data)
+        if !buf.is_aligned_to(align) {
+            return Err(Error::new(ErrorKind::AlignmentMismatch {
+                range: self.range(),
+                align,
+            }));
         }
+
+        Ok(buf)
     }
 
     /// Get the given range without checking that it corresponds to any given alignment.
-    pub(crate) unsafe fn get_unchecked(&self, range: Range<usize>) -> Result<&Buf, Error> {
+    pub(crate) fn get_unaligned(&self, range: Range<usize>) -> Result<&Buf, Error> {
         let Some(data) = self.data.get(range.clone()) else {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
                 range,
@@ -293,7 +318,7 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
-        let buf = self.get(start..end, align_of::<T>())?;
+        let buf = self.get_unaligned(start..end)?;
         validate_array::<T>(buf, ptr.len())?;
         Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), ptr.len()) })
     }
@@ -404,12 +429,7 @@ impl Buf {
     where
         T: ZeroCopy,
     {
-        if !self.is_compatible(Layout::new::<T>()) {
-            return Err(Error::new(ErrorKind::LayoutMismatch {
-                layout: Layout::new::<T>(),
-                buf: self.range(),
-            }));
-        }
+        self.ensure_compatible_with::<T>()?;
 
         Ok(Validator {
             data: self,
@@ -490,7 +510,7 @@ impl<T> Validator<'_, T> {
         // SAFETY: We've ensured that the provided buffer is aligned and sized
         // appropriately above.
         unsafe {
-            let data = self.data.get_unchecked(start..end)?;
+            let data = self.data.get_unaligned(start..end)?;
             F::validate(data)?;
         };
 
@@ -566,8 +586,8 @@ impl<T> Validator<'_, T> {
 
         if offset != self.data.len() {
             return Err(Error::new(ErrorKind::BufferUnderflow {
+                range: self.data.range(),
                 expected: offset,
-                len: self.data.len(),
             }));
         }
 
@@ -585,7 +605,7 @@ where
     if !buf.is_compatible(layout) {
         return Err(Error::new(ErrorKind::LayoutMismatch {
             layout,
-            buf: buf.range(),
+            range: buf.range(),
         }));
     }
 

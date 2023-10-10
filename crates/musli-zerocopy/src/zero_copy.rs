@@ -1,6 +1,5 @@
 #![allow(clippy::len_without_is_empty)]
 
-use core::alloc::Layout;
 use core::marker::PhantomData;
 use core::mem::align_of;
 use core::str;
@@ -9,6 +8,10 @@ use crate::buf::{AnyValue, Buf, BufMut};
 use crate::error::{Error, ErrorKind};
 
 /// Trait governing how to write an unsized buffer.
+///
+/// We only support slice-like unsized types, such as `str` and `[u8]`. We can't
+/// support types such as `dyn Debug` because metadata is a vtable which can't
+/// be serialized.
 ///
 /// # Safety
 ///
@@ -176,13 +179,7 @@ macro_rules! impl_number {
             }
 
             fn coerce(buf: &Buf) -> Result<&Self, Error> {
-                if !buf.is_compatible(core::alloc::Layout::new::<$ty>()) {
-                    return Err(Error::new(ErrorKind::LayoutMismatch {
-                        layout: Layout::new::<$ty>(),
-                        buf: buf.range(),
-                    }));
-                }
-
+                buf.ensure_compatible_with::<Self>()?;
                 Ok(unsafe { buf.cast() })
             }
 
@@ -270,15 +267,11 @@ macro_rules! impl_nonzero_number {
             }
 
             fn coerce(buf: &Buf) -> Result<&Self, Error> {
-                if !buf.is_compatible(core::alloc::Layout::new::<::core::num::$ty>()) {
-                    return Err(Error::new(ErrorKind::LayoutMismatch {
-                        layout: Layout::new::<::core::num::$ty>(),
-                        buf: buf.range(),
-                    }));
-                }
+                buf.ensure_compatible_with::<::core::num::$ty>()?;
 
-                if buf.is_zeroed() {
-                    return Err(Error::new(ErrorKind::NonZeroZeroed { range: buf.range() }));
+                // SAFETY: Layout has been checked.
+                unsafe {
+                    Self::validate(buf)?;
                 }
 
                 Ok(unsafe { buf.cast() })

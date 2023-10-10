@@ -36,43 +36,68 @@ impl std::error::Error for Error {
 #[derive(Debug)]
 #[non_exhaustive]
 pub(crate) enum ErrorKind {
-    BadAlignment { ptr: usize, align: usize },
-    LayoutMismatch { layout: Layout, buf: Range<usize> },
-    OutOfRangeBounds { range: Range<usize>, len: usize },
-    IndexOutOfBounds { index: usize, len: usize },
-    NonZeroZeroed { range: Range<usize> },
-    BufferUnderflow { expected: usize, len: usize },
+    AlignmentMismatch {
+        range: Range<usize>,
+        align: usize,
+    },
+    LayoutMismatch {
+        range: Range<usize>,
+        layout: Layout,
+    },
+    OutOfRangeBounds {
+        range: Range<usize>,
+        len: usize,
+    },
+    NonZeroZeroed {
+        range: Range<usize>,
+    },
+    BufferUnderflow {
+        range: Range<usize>,
+        expected: usize,
+    },
+    IndexOutOfBounds {
+        index: usize,
+        len: usize,
+    },
     FailedPhf,
-    LayoutError { error: LayoutError },
-    Utf8Error { error: Utf8Error },
+    LayoutError {
+        error: LayoutError,
+    },
+    Utf8Error {
+        error: Utf8Error,
+    },
 }
 
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorKind::BadAlignment { ptr, align } => {
-                write!(f, "Bad alignment {align} for pointer {ptr}")
-            }
-            ErrorKind::LayoutMismatch { layout, buf } => {
+            ErrorKind::AlignmentMismatch { range, align } => {
                 write!(
                     f,
-                    "Layout mismatch, expected {layout:?}, but buffer is 0x{:x}-0x{:x}",
-                    buf.start, buf.end
+                    "Alignment mismatch, expected alignment {align} for range {range:?}"
                 )
+            }
+            ErrorKind::LayoutMismatch { range, layout } => {
+                write!(
+                    f,
+                    "Layout mismatch, expected {layout:?} for range {range:?}"
+                )
+            }
+            ErrorKind::IndexOutOfBounds { index, len } => {
+                write!(f, "Index {index} out of bound 0-{len}")
             }
             ErrorKind::OutOfRangeBounds { range, len } => {
                 write!(f, "Range {range:?} out of bound 0-{len}")
             }
-            ErrorKind::IndexOutOfBounds { index, len } => {
-                write!(f, "Index {index} out of bounds, expected 0-{len}")
-            }
             ErrorKind::NonZeroZeroed { range } => {
                 write!(f, "Expected non-zero range at {range:?}")
             }
-            ErrorKind::BufferUnderflow { expected, len } => {
+            ErrorKind::BufferUnderflow { range, expected } => {
+                let len = range.len();
+
                 write!(
                     f,
-                    "Buffer underflow, expected end at {expected} but was {len}"
+                    "Expected end of buffer at {expected} in range {range:?} but was {len}"
                 )
             }
             ErrorKind::FailedPhf => {

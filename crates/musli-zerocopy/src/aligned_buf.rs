@@ -2,8 +2,7 @@ use core::alloc::Layout;
 use core::hash::Hash;
 use core::mem::align_of;
 use core::mem::ManuallyDrop;
-use core::ops::Deref;
-use core::ops::DerefMut;
+use core::ops::Range;
 use core::ptr;
 use core::slice;
 
@@ -635,8 +634,8 @@ impl AlignedBuf {
     /// [`requested()`]: Self::requested
     pub fn as_buf(&self) -> Result<&Buf, Error> {
         if !self.is_aligned_to(self.requested) {
-            return Err(Error::new(ErrorKind::BadAlignment {
-                ptr: self.as_ptr() as usize,
+            return Err(Error::new(ErrorKind::AlignmentMismatch {
+                range: self.range(),
                 align: self.requested,
             }));
         }
@@ -890,6 +889,12 @@ impl AlignedBuf {
             self.align = self.requested;
         }
     }
+
+    /// Return representation of the pointer range.
+    pub(crate) fn range(&self) -> Range<usize> {
+        let end = self.data.as_ptr().wrapping_add(self.len);
+        self.data.as_ptr() as usize..end as usize
+    }
 }
 
 /// Clone the [`AlignedBuf`].
@@ -958,54 +963,5 @@ impl BufMut for AlignedBuf {
         T: ZeroCopy,
     {
         AlignedBuf::write(self, value)
-    }
-}
-
-/// `DerefMut` for `AlignedBuf` which derefs to `&[u8]`.
-///
-/// # Examples
-///
-/// ```
-/// use musli_zerocopy::AlignedBuf;
-///
-/// let mut buf = AlignedBuf::new();
-/// buf.extend_from_slice(b"hello world");
-///
-/// fn takes_slice(bytes: &[u8]) {
-///     assert_eq!(bytes, b"hello world");
-/// }
-///
-/// takes_slice(&buf);
-/// ```
-impl Deref for AlignedBuf {
-    type Target = [u8];
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        self.as_slice()
-    }
-}
-
-/// `DerefMut` for `AlignedBuf` which derefs to `&mut [u8]`.
-///
-/// # Examples
-///
-/// ```
-/// use musli_zerocopy::AlignedBuf;
-///
-/// let mut buf = AlignedBuf::new();
-/// buf.extend_from_slice(b"hello world");
-///
-/// fn takes_slice(bytes: &mut [u8]) {
-///     bytes.make_ascii_uppercase();
-/// }
-///
-/// takes_slice(&mut buf);
-/// assert_eq!(buf.as_slice(), b"HELLO WORLD");
-/// ```
-impl DerefMut for AlignedBuf {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_mut_slice()
     }
 }
