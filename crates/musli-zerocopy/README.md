@@ -15,7 +15,7 @@ copying during deserialization.
 ## Examples
 
 ```rust
-use musli_zerocopy::{OwnedBuf, Pair, Unsized, ZeroCopy};
+use musli_zerocopy::{AlignedBuf, Pair, Unsized, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
@@ -24,7 +24,7 @@ struct Custom {
     string: Unsized<str>,
 }
 
-let mut buf = OwnedBuf::new();
+let mut buf = AlignedBuf::new();
 
 let string = buf.insert_unsized("string")?;
 

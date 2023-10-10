@@ -7,7 +7,7 @@ use crate::ZeroCopy;
 /// Note that this primarily exists because tuples are not support. The layout
 /// of a tuple is `repr(Rust)`, so there is no way to construct legal references
 /// to them.
-#[derive(Debug, Clone, Copy, ZeroCopy)]
+#[derive(Debug, ZeroCopy)]
 #[zero_copy(bounds = {A: ZeroCopy, B: ZeroCopy})]
 #[repr(C)]
 pub struct Pair<A, B> {

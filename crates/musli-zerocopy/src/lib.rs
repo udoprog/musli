@@ -12,7 +12,7 @@
 //! ## Examples
 //!
 //! ```
-//! use musli_zerocopy::{OwnedBuf, Pair, Unsized, ZeroCopy};
+//! use musli_zerocopy::{AlignedBuf, Pair, Unsized, ZeroCopy};
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
@@ -21,7 +21,7 @@
 //!     string: Unsized<str>,
 //! }
 //!
-//! let mut buf = OwnedBuf::new();
+//! let mut buf = AlignedBuf::new();
 //!
 //! let string = buf.insert_unsized("string")?;
 //!
@@ -73,9 +73,9 @@ mod ptr;
 mod sip;
 
 #[cfg(feature = "alloc")]
-pub use self::owned_buf::OwnedBuf;
+pub use self::aligned_buf::AlignedBuf;
 #[cfg(feature = "alloc")]
-mod owned_buf;
+mod aligned_buf;
 
 pub use self::r#ref::Ref;
 mod r#ref;

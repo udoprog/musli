@@ -14,15 +14,15 @@ use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 
 /// A mutable buffer to write zero copy types to.
 ///
-/// This is implemented by [`OwnedBuf`].
+/// This is implemented by [`AlignedBuf`].
 ///
-/// [`OwnedBuf`]: crate::OwnedBuf
+/// [`AlignedBuf`]: crate::AlignedBuf
 pub trait BufMut {
     /// Extend the current buffer from the given slice.
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error>;
 
     /// Write the given zero copy type to the buffer.
-    fn write<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+    fn write<T>(&mut self, value: &T) -> Result<(), Error>
     where
         T: ZeroCopy;
 }
@@ -35,7 +35,7 @@ where
         (**self).extend_from_slice(bytes)
     }
 
-    fn write<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+    fn write<T>(&mut self, value: &T) -> Result<(), Error>
     where
         T: ZeroCopy,
     {
@@ -108,7 +108,7 @@ where
     }
 }
 
-unsafe impl<T: ?Sized> AnyRef for Ref<T>
+unsafe impl<T> AnyRef for Ref<T>
 where
     T: ZeroCopy,
 {
@@ -232,9 +232,9 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let first = buf.insert_unsized("first")?;
     /// let second = buf.insert_unsized("second")?;
@@ -255,7 +255,7 @@ impl Buf {
     }
 
     /// Load the given sized value as a reference.
-    pub fn load_sized<T: ?Sized>(&self, ptr: Ref<T>) -> Result<&T, Error>
+    pub fn load_sized<T>(&self, ptr: Ref<T>) -> Result<&T, Error>
     where
         T: ZeroCopy,
     {
@@ -303,9 +303,9 @@ impl Buf {
     /// validated:
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
@@ -354,7 +354,7 @@ impl Buf {
     ///
     /// ```
     /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    /// use musli_zerocopy::{AlignedBuf, Unsized};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -363,7 +363,7 @@ impl Buf {
     ///     field2: u64,
     /// }
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let custom = buf.insert_sized(Custom {
     ///     field: 42,
@@ -434,7 +434,7 @@ impl<T> Validator<'_, T> {
     ///
     /// ```
     /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    /// use musli_zerocopy::{AlignedBuf, Unsized};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -443,7 +443,7 @@ impl<T> Validator<'_, T> {
     ///     field2: u64,
     /// }
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let custom = buf.insert_sized(Custom {
     ///     field: 42,
@@ -484,7 +484,7 @@ impl<T> Validator<'_, T> {
     ///
     /// ```
     /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    /// use musli_zerocopy::{AlignedBuf, Unsized};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -493,7 +493,7 @@ impl<T> Validator<'_, T> {
     ///     field2: u64,
     /// }
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let custom = buf.insert_sized(Custom {
     ///     field: 42,
@@ -515,7 +515,7 @@ impl<T> Validator<'_, T> {
     ///
     /// ```
     /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    /// use musli_zerocopy::{AlignedBuf, Unsized};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -524,7 +524,7 @@ impl<T> Validator<'_, T> {
     ///     field2: u64,
     /// }
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let custom = buf.insert_sized(Custom {
     ///     field: 42,

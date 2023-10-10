@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::meta::ParseNestedMeta;
-use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::{DeriveInput, Token};
 
@@ -71,13 +70,13 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
     for attr in &input.attrs {
         if attr.path().is_ident("repr") {
-            let result = attr.parse_args_with(|input: ParseStream| {
-                let ident: syn::Ident = input.parse()?;
-
-                if ident == "C" {
+            let result = attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("C") {
                     is_repr_c = true;
+                    return Ok(());
                 }
 
+                meta.input.parse::<TokenStream>()?;
                 Ok(())
             });
 
@@ -152,6 +151,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
     Ok(quote::quote! {
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
+            const ANY_BITS: bool = false;
+
             fn write_to<__B: ?Sized>(&self, buf: &mut __B) -> Result<(), #error>
             where
                 __B: #buf_mut

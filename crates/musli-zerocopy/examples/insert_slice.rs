@@ -1,7 +1,7 @@
-use musli_zerocopy::{Error, OwnedBuf};
+use musli_zerocopy::{AlignedBuf, Error};
 
 fn main() -> Result<(), Error> {
-    let mut buf = OwnedBuf::new();
+    let mut buf = AlignedBuf::new();
 
     let values = vec![buf.insert_unsized("first")?, buf.insert_unsized("second")?];
 

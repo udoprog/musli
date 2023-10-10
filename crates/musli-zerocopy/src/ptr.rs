@@ -41,6 +41,8 @@ impl fmt::Debug for Ptr {
 }
 
 unsafe impl ZeroCopy for Ptr {
+    const ANY_BITS: bool = true;
+
     fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,

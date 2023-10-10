@@ -17,9 +17,9 @@ use crate::zero_copy::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{OwnedBuf, Ref, Ptr};
+/// use musli_zerocopy::{AlignedBuf, Ref, Ptr};
 ///
-/// let mut buf = OwnedBuf::with_alignment(align_of::<u32>());
+/// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 ///
 /// let buf = buf.as_buf()?;
@@ -54,6 +54,8 @@ where
 }
 
 unsafe impl<T> ZeroCopy for Ref<T> {
+    const ANY_BITS: bool = true;
+
     fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,

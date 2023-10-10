@@ -1,6 +1,9 @@
 use core::alloc::Layout;
 use core::hash::Hash;
 use core::mem::align_of;
+use core::mem::ManuallyDrop;
+use core::ops::Deref;
+use core::ops::DerefMut;
 use core::ptr;
 use core::slice;
 
@@ -17,9 +20,30 @@ use crate::r#unsized::Unsized;
 use crate::slice::Slice;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 
-/// An owned buffer.
-#[derive(Clone)]
-pub struct OwnedBuf {
+/// Default alignment to use with [`AlignedBuf`].
+const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
+
+/// An allocating buffer with dynamic alignment.
+///
+/// By default this buffer starts out having the same alignment as `usize`,
+/// making it platform specific. But this alignment can grow in demand to the
+/// types being used.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C, align(128))]
+/// struct Custom {
+///     field: u32,
+/// }
+///
+/// let mut buf = AlignedBuf::new();
+/// buf.write(&Custom { field: 10 });
+/// ```
+pub struct AlignedBuf {
     data: ptr::NonNull<u8>,
     /// The initialized length of the buffer.
     len: usize,
@@ -31,7 +55,7 @@ pub struct OwnedBuf {
     align: usize,
 }
 
-impl OwnedBuf {
+impl AlignedBuf {
     /// Construct a new empty buffer with the default alignment.
     ///
     /// The default alignment is guaranteed to be larger than 0.
@@ -39,15 +63,15 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::new();
+    /// let buf = AlignedBuf::new();
     /// assert!(buf.is_empty());
     /// assert!(buf.align() > 0);
     /// assert_eq!(buf.align(), buf.requested());
     /// ```
     pub const fn new() -> Self {
-        Self::with_alignment(align_of::<u64>())
+        Self::with_alignment(DEFAULT_ALIGNMENT)
     }
 
     /// Construct a new empty buffer with the specified alignment.
@@ -57,9 +81,9 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::with_alignment(8);
+    /// let buf = AlignedBuf::with_alignment(8);
     /// assert!(buf.is_empty());
     /// assert_eq!(buf.align(), 8);
     /// assert_eq!(buf.requested(), 8);
@@ -84,13 +108,13 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::with_capacity(6);
+    /// let buf = AlignedBuf::with_capacity(6);
     /// assert!(buf.capacity() >= 6);
     /// ```
     pub fn with_capacity(capacity: usize) -> Self {
-        Self::with_capacity_and_alignment(capacity, align_of::<u64>())
+        Self::with_capacity_and_alignment(capacity, DEFAULT_ALIGNMENT)
     }
 
     /// Allocate a new buffer with the given capacity and default alignment.
@@ -107,17 +131,20 @@ impl OwnedBuf {
     ///   `isize::MAX`.
     ///
     /// ```should_panic
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// OwnedBuf::with_capacity_and_alignment(usize::MAX << 1, 64);
+    /// let align = 8usize;
+    /// let max = isize::MAX as usize - (align - 1);
+    ///
+    /// AlignedBuf::with_capacity_and_alignment(max, align);
     /// ```
     ///
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::with_capacity_and_alignment(6, 2);
+    /// let buf = AlignedBuf::with_capacity_and_alignment(6, 2);
     /// assert!(buf.capacity() >= 6);
     /// assert_eq!(buf.align(), 2);
     /// ```
@@ -126,12 +153,9 @@ impl OwnedBuf {
             return Self::with_alignment(align);
         }
 
-        let capacity = capacity.next_power_of_two();
-        let align = align.next_power_of_two();
+        let layout = Layout::from_size_align(capacity, align).expect("Illegal memory layout");
 
         unsafe {
-            let layout = Layout::from_size_align(capacity, align).expect("Illegal memory layout");
-
             let data = alloc::alloc(layout);
 
             if data.is_null() {
@@ -153,13 +177,46 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::new();
+    /// let buf = AlignedBuf::new();
     /// assert_eq!(buf.len(), 0);
     /// ```
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    /// Set the initialized length of this buffer.
+    ///
+    /// # Safety
+    ///
+    /// The buffer must be allocated and initialized up to the given length.
+    /// Failure to abide by this will result in safe APIs exhibiting undefined
+    /// behavior.
+    pub unsafe fn set_len(&mut self, len: usize) {
+        self.len = len;
+    }
+
+    /// Clear the current buffer.
+    ///
+    /// This won't cause any reallocations.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut b = AlignedBuf::new();
+    /// assert_eq!(b.capacity(), 0);
+    /// b.extend_from_slice(&[1, 2, 3, 4]);
+    ///
+    /// assert_eq!(b.len(), 4);
+    /// b.clear();
+    /// assert!(b.capacity() > 0);
+    /// assert_eq!(b.len(), 0);
+    /// ```
+    pub fn clear(&mut self) {
+        self.len = 0;
     }
 
     /// Test if the buffer is empty.
@@ -167,9 +224,9 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::new();
+    /// let buf = AlignedBuf::new();
     /// assert!(buf.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
@@ -181,9 +238,9 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::new();
+    /// let buf = AlignedBuf::new();
     /// assert_eq!(buf.capacity(), 0);
     /// ```
     pub fn capacity(&self) -> usize {
@@ -195,9 +252,9 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::with_alignment(8);
+    /// let buf = AlignedBuf::with_alignment(8);
     /// assert!(buf.is_empty());
     /// assert_eq!(buf.align(), 8);
     /// assert_eq!(buf.requested(), 8);
@@ -211,9 +268,9 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::with_alignment(8);
+    /// let buf = AlignedBuf::with_alignment(8);
     /// assert!(buf.is_empty());
     /// assert_eq!(buf.align(), 8);
     /// assert_eq!(buf.requested(), 8);
@@ -222,17 +279,53 @@ impl OwnedBuf {
         self.align
     }
 
+    /// Get get a raw pointer to the current buffer.
+    pub fn as_ptr(&self) -> *const u8 {
+        self.data.as_ptr() as *const _
+    }
+
+    /// Get get a raw mutable pointer to the current buffer.
+    pub fn as_ptr_mut(&mut self) -> *mut u8 {
+        self.data.as_ptr()
+    }
+
     /// Get the current buffer as a slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut b = AlignedBuf::new();
+    /// b.extend_from_slice(b"hello world");
+    /// assert_eq!(b.as_slice(), b"hello world");
+    /// ```
     pub fn as_slice(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.data.as_ptr() as *const _, self.len) }
+        unsafe { slice::from_raw_parts(self.as_ptr(), self.len()) }
+    }
+
+    /// Get the current buffer as a mutable slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut b = AlignedBuf::new();
+    /// b.extend_from_slice(b"hello world");
+    /// b.as_mut_slice().make_ascii_uppercase();
+    /// assert_eq!(b.as_slice(), b"HELLO WORLD");
+    /// ```
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.as_ptr_mut(), self.len()) }
     }
 
     /// Write a value to the buffer.
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let first = buf.insert_unsized("first")?;
     /// let second = buf.insert_unsized("second")?;
@@ -258,7 +351,7 @@ impl OwnedBuf {
     ///
     /// ```
     /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{OwnedBuf, Unsized};
+    /// use musli_zerocopy::{AlignedBuf, Unsized};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -267,7 +360,7 @@ impl OwnedBuf {
     ///     string: Unsized<str>,
     /// }
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let string = buf.insert_unsized("string")?;
     /// let custom = buf.insert_sized(Custom { field: 1, string })?;
@@ -298,9 +391,9 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut values = Vec::new();
     ///
@@ -350,9 +443,9 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut pairs = Vec::new();
     ///
@@ -372,9 +465,9 @@ impl OwnedBuf {
     /// Using non-references as keys:
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut pairs = Vec::new();
     ///
@@ -382,7 +475,6 @@ impl OwnedBuf {
     /// pairs.push(Pair::new(20u64, 2u32));
     ///
     /// let map = buf.insert_map(&mut pairs)?;
-    ///
     /// let buf = buf.as_aligned_buf();
     ///
     /// assert_eq!(map.get(buf, &10u64)?, Some(&1));
@@ -428,11 +520,11 @@ impl OwnedBuf {
     }
 
     /// Write the bytes of a value.
-    pub fn write<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+    pub fn write<T>(&mut self, value: &T) -> Result<(), Error>
     where
         T: ZeroCopy,
     {
-        self.in_place_align(align_of::<T>());
+        self.request_align(align_of::<T>());
         value.write_to(self)?;
         Ok(())
     }
@@ -442,11 +534,11 @@ impl OwnedBuf {
     /// Note that this only extends the underlying buffer but does not ensure
     /// that any required alignment is abided by.
     ///
-    /// To do this, the caller must call [`in_place_align()`] with the appropriate
+    /// To do this, the caller must call [`request_align()`] with the appropriate
     /// alignment, otherwise the necessary alignment to decode the buffer again
     /// will be lost.
     ///
-    /// [`in_place_align()`]: Self::in_place_align
+    /// [`request_align()`]: Self::request_align
     ///
     /// # Errors
     ///
@@ -455,9 +547,9 @@ impl OwnedBuf {
     /// required a 4-byte alignment:
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Ref};
+    /// use musli_zerocopy::{AlignedBuf, Ref};
     ///
-    /// let mut buf = OwnedBuf::with_alignment(4);
+    /// let mut buf = AlignedBuf::with_alignment(4);
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
@@ -476,9 +568,9 @@ impl OwnedBuf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Ref};
+    /// use musli_zerocopy::{AlignedBuf, Ref};
     ///
-    /// let mut buf = OwnedBuf::with_alignment(1);
+    /// let mut buf = AlignedBuf::with_alignment(1);
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
@@ -501,7 +593,7 @@ impl OwnedBuf {
         self.ensure_capacity(capacity);
 
         unsafe {
-            let dst = self.data.as_ptr().wrapping_add(self.len);
+            let dst = self.as_ptr_mut().wrapping_add(self.len);
             ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
             self.len = self.len.wrapping_add(bytes.len());
         }
@@ -513,36 +605,24 @@ impl OwnedBuf {
     /// [`requested()`] alignment.
     ///
     /// [`requested()`]: Self::requested
+    ///
+    /// # Panics
+    ///
+    /// This panics if the proposed layout is not valid as per
+    /// [`Layout::from_size_align`] using `len()` and `requested()` as
+    /// parameters.
+    ///
+    /// [`len()`]: Self::len
+    /// [`requested()`]: Self::requested
     pub fn as_aligned_owned_buf(&self) -> Self {
-        if !self.is_aligned_to(self.requested) {
-            return self.clone();
-        }
-
-        assert!(
-            self.requested.is_power_of_two(),
-            "Alignment has to be a power of two, but was {}",
-            self.requested
-        );
+        let mut new = Self::with_capacity_and_alignment(self.len, self.requested);
 
         unsafe {
-            let layout = Layout::from_size_align_unchecked(self.len, self.requested);
-
-            let ptr = alloc::alloc(layout);
-
-            if ptr.is_null() {
-                alloc::handle_alloc_error(layout);
-            }
-
-            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr, self.len);
-
-            Self {
-                data: ptr::NonNull::new_unchecked(ptr),
-                len: self.len,
-                capacity: self.len,
-                requested: self.requested,
-                align: self.requested,
-            }
+            ptr::copy_nonoverlapping(self.as_ptr(), new.as_ptr_mut(), self.len);
+            new.set_len(self.len);
         }
+
+        new
     }
 
     /// Access the current buffer for reading.
@@ -556,7 +636,7 @@ impl OwnedBuf {
     pub fn as_buf(&self) -> Result<&Buf, Error> {
         if !self.is_aligned_to(self.requested) {
             return Err(Error::new(ErrorKind::BadAlignment {
-                ptr: self.data.as_ptr() as usize,
+                ptr: self.as_ptr() as usize,
                 align: self.requested,
             }));
         }
@@ -590,8 +670,8 @@ impl OwnedBuf {
         // SAFETY: We're ensuring that the requested alignment is being abided.
         unsafe {
             if self.requested != self.align {
-                let (old_layout, layout) = self.layouts(self.capacity);
-                self.reallocate(old_layout, layout, self.capacity);
+                let (old_layout, new_layout) = self.layouts(self.capacity);
+                self.alloc_new(old_layout, new_layout);
             }
 
             self.as_buf_unchecked()
@@ -605,14 +685,14 @@ impl OwnedBuf {
     /// Panics if the specified alignment is not a power of two.
     ///
     /// ```should_panic
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = OwnedBuf::new();
+    /// let buf = AlignedBuf::new();
     /// buf.is_aligned_to(0);
     /// ```
     #[inline]
     pub fn is_aligned_to(&self, align: usize) -> bool {
-        crate::buf::is_aligned_to(self.data.as_ptr(), align)
+        crate::buf::is_aligned_to(self.as_ptr(), align)
     }
 
     /// Request that the current buffer should have at least the specified
@@ -620,11 +700,11 @@ impl OwnedBuf {
     /// matches the given alignment.
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
-    /// let mut buf = OwnedBuf::new();
+    /// use musli_zerocopy::AlignedBuf;
+    /// let mut buf = AlignedBuf::new();
     ///
     /// buf.extend_from_slice(&[1, 2]);
-    /// buf.in_place_align(4);
+    /// buf.request_align(4);
     ///
     /// assert_eq!(buf.as_slice(), &[1, 2, 0, 0]);
     /// ```
@@ -633,11 +713,11 @@ impl OwnedBuf {
     /// if a reallocation is triggered due to reaching its [`capacity()`].
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
-    /// let mut buf = OwnedBuf::with_capacity_and_alignment(4, 2);
+    /// use musli_zerocopy::AlignedBuf;
+    /// let mut buf = AlignedBuf::with_capacity_and_alignment(4, 2);
     ///
     /// buf.extend_from_slice(&[1, 2]);
-    /// buf.in_place_align(4);
+    /// buf.request_align(4);
     ///
     /// assert_eq!(buf.requested(), 4);
     /// assert_eq!(buf.align(), 2);
@@ -655,25 +735,25 @@ impl OwnedBuf {
     /// Panics if the specified alignment is not a power of two.
     ///
     /// ```should_panic
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = OwnedBuf::new();
-    /// buf.in_place_align(3);
+    /// let mut buf = AlignedBuf::new();
+    /// buf.request_align(3);
     /// ````
     ///
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
-    /// buf.in_place_align(8);
+    /// buf.request_align(8);
     /// buf.extend_from_slice(&[5, 6, 7, 8]);
     ///
     /// assert_eq!(buf.as_slice(), &[1, 2, 3, 4, 0, 0, 0, 0, 5, 6, 7, 8]);
     /// ```
-    pub fn in_place_align(&mut self, align: usize) {
+    pub fn request_align(&mut self, align: usize) {
         assert!(
             align.is_power_of_two(),
             "Alignment has to be a power of two"
@@ -690,7 +770,7 @@ impl OwnedBuf {
             // SAFETY: We've ensured that the capacity is valid by calling
             // `ensure_capacity`.
             unsafe {
-                ptr::write_bytes(self.data.as_ptr().wrapping_add(self.len), 0, len - self.len);
+                ptr::write_bytes(self.as_ptr_mut().wrapping_add(self.len), 0, len - self.len);
             }
 
             self.len = len;
@@ -710,9 +790,9 @@ impl OwnedBuf {
     ///
     /// ```
     /// use core::mem::align_of;
-    /// use musli_zerocopy::{OwnedBuf, Ref};
+    /// use musli_zerocopy::{AlignedBuf, Ref};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
@@ -727,7 +807,7 @@ impl OwnedBuf {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn next_pointer(&mut self, align: usize) -> Ptr {
-        self.in_place_align(align);
+        self.request_align(align);
         Ptr::new(self.len)
     }
 
@@ -736,18 +816,14 @@ impl OwnedBuf {
             return;
         }
 
-        let new_capacity = new_capacity.next_power_of_two().max(self.requested);
+        let (old_layout, new_layout) = self.layouts(new_capacity.max(self.requested));
 
-        unsafe {
-            let (old_layout, new_layout) = self.layouts(new_capacity);
-
-            if old_layout.size() == 0 {
-                self.allocate(new_layout);
-            } else if new_layout.align() == old_layout.align() {
-                self.resize(old_layout, new_capacity);
-            } else {
-                self.reallocate(old_layout, new_layout, new_capacity);
-            }
+        if old_layout.size() == 0 {
+            self.alloc_init(new_layout);
+        } else if new_layout.align() == old_layout.align() {
+            self.alloc_realloc(old_layout, new_layout);
+        } else {
+            self.alloc_new(old_layout, new_layout);
         }
     }
 
@@ -764,70 +840,173 @@ impl OwnedBuf {
     }
 
     /// Perform the initial allocation with the given layout and capacity.
-    fn allocate(&mut self, layout: Layout) {
+    fn alloc_init(&mut self, new_layout: Layout) {
         unsafe {
-            let ptr = alloc::alloc(layout);
+            let ptr = alloc::alloc(new_layout);
 
             if ptr.is_null() {
-                alloc::handle_alloc_error(layout);
+                alloc::handle_alloc_error(new_layout);
             }
 
             self.data = ptr::NonNull::new_unchecked(ptr);
-            self.capacity = layout.size();
+            self.capacity = new_layout.size();
             self.align = self.requested;
         }
     }
 
-    fn reallocate(&mut self, old_layout: Layout, layout: Layout, new_capacity: usize) {
+    /// Reallocate, note that the alignment of the old layout must match the new
+    /// one.
+    fn alloc_realloc(&mut self, old_layout: Layout, new_layout: Layout) {
+        debug_assert_eq!(old_layout.align(), new_layout.align());
+
         unsafe {
-            let ptr = alloc::alloc(layout);
+            let ptr = alloc::realloc(self.as_ptr_mut(), old_layout, new_layout.size());
 
             if ptr.is_null() {
-                alloc::handle_alloc_error(layout);
+                alloc::handle_alloc_error(old_layout);
             }
 
-            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr, self.len);
-
-            alloc::dealloc(self.data.as_ptr(), old_layout);
-
+            // NB: We may simply forget the old allocation, since `realloc` is
+            // responsible for freeing it.
             self.data = ptr::NonNull::new_unchecked(ptr);
-            self.capacity = new_capacity;
-            self.align = self.requested;
+            self.capacity = new_layout.size();
         }
     }
 
-    unsafe fn resize(&mut self, old_layout: Layout, new_capacity: usize) {
-        let ptr = alloc::realloc(self.data.as_ptr(), old_layout, new_capacity);
+    /// Perform a new allocation, deallocating the old one in the process.
+    fn alloc_new(&mut self, old_layout: Layout, new_layout: Layout) {
+        unsafe {
+            let ptr = alloc::alloc(new_layout);
 
-        if ptr.is_null() {
-            alloc::handle_alloc_error(old_layout);
+            if ptr.is_null() {
+                alloc::handle_alloc_error(new_layout);
+            }
+
+            ptr::copy_nonoverlapping(self.as_ptr(), ptr, self.len);
+            alloc::dealloc(self.as_ptr_mut(), old_layout);
+
+            // We've deallocated the old pointer.
+            self.data = ptr::NonNull::new_unchecked(ptr);
+            self.capacity = new_layout.size();
+            self.align = self.requested;
         }
-
-        self.data = ptr::NonNull::new_unchecked(ptr);
-        self.capacity = new_capacity;
     }
 }
 
-impl Drop for OwnedBuf {
+/// Clone the [`AlignedBuf`].
+///
+/// While this causes another allocation, it doesn't ensure that the returned
+/// buffer has the [`requested()`] alignment. To achieve this prefer using
+/// [`as_aligned_owned_buf()`].
+///
+/// [`requested()`]: Self::requested()
+/// [`as_aligned_owned_buf()`]: Self::as_aligned_owned_buf
+///
+/// # Examples
+///
+/// ```
+/// use core::mem::align_of;
+/// use musli_zerocopy::AlignedBuf;
+///
+/// assert_ne!(align_of::<u16>(), align_of::<u32>());
+///
+/// let mut buf = AlignedBuf::with_capacity_and_alignment(4, align_of::<u16>());
+/// buf.extend_from_slice(&[1, 2, 3, 4]);
+/// buf.request_align(align_of::<u32>());
+///
+/// let buf2 = buf.clone();
+/// assert_eq!(buf2.align(), align_of::<u16>());
+///
+/// let buf3 = buf.as_aligned_owned_buf();
+/// assert_eq!(buf3.align(), align_of::<u32>());
+/// ```
+impl Clone for AlignedBuf {
+    fn clone(&self) -> Self {
+        unsafe {
+            let mut new =
+                ManuallyDrop::new(Self::with_capacity_and_alignment(self.len, self.align));
+            ptr::copy_nonoverlapping(self.as_ptr(), new.as_ptr_mut(), self.len);
+            // Set requested to the same as original.
+            new.requested = self.requested;
+            new.set_len(self.len);
+            ManuallyDrop::into_inner(new)
+        }
+    }
+}
+
+impl Drop for AlignedBuf {
     fn drop(&mut self) {
         unsafe {
             if self.capacity != 0 {
+                // SAFETY: This is guaranteed to be valid per the construction
+                // of this type.
                 let layout = Layout::from_size_align_unchecked(self.capacity, self.align);
-                alloc::dealloc(self.data.as_ptr(), layout);
+                alloc::dealloc(self.as_ptr_mut(), layout);
             }
         }
     }
 }
 
-impl BufMut for OwnedBuf {
+impl BufMut for AlignedBuf {
+    #[inline]
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
-        OwnedBuf::extend_from_slice(self, bytes)
+        AlignedBuf::extend_from_slice(self, bytes)
     }
 
-    fn write<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+    #[inline]
+    fn write<T>(&mut self, value: &T) -> Result<(), Error>
     where
         T: ZeroCopy,
     {
-        OwnedBuf::write(self, value)
+        AlignedBuf::write(self, value)
+    }
+}
+
+/// `DerefMut` for `AlignedBuf` which derefs to `&[u8]`.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::AlignedBuf;
+///
+/// let mut buf = AlignedBuf::new();
+/// buf.extend_from_slice(b"hello world");
+///
+/// fn takes_slice(bytes: &[u8]) {
+///     assert_eq!(bytes, b"hello world");
+/// }
+///
+/// takes_slice(&buf);
+/// ```
+impl Deref for AlignedBuf {
+    type Target = [u8];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+/// `DerefMut` for `AlignedBuf` which derefs to `&mut [u8]`.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::AlignedBuf;
+///
+/// let mut buf = AlignedBuf::new();
+/// buf.extend_from_slice(b"hello world");
+///
+/// fn takes_slice(bytes: &mut [u8]) {
+///     bytes.make_ascii_uppercase();
+/// }
+///
+/// takes_slice(&mut buf);
+/// assert_eq!(buf.as_slice(), b"HELLO WORLD");
+/// ```
+impl DerefMut for AlignedBuf {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
     }
 }

@@ -2,7 +2,7 @@
 
 use core::alloc::Layout;
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of};
+use core::mem::align_of;
 use core::str;
 
 use crate::buf::{AnyValue, Buf, BufMut};
@@ -39,12 +39,10 @@ pub unsafe trait UnsizedZeroCopy {
 ///
 /// This can only be implemented correctly by types under certain conditions:
 /// * The type has a strict, well-defined layout or is `repr(C)`.
-pub unsafe trait ZeroCopy: Sized {
+pub unsafe trait ZeroCopy {
     /// Indicates if the type can inhabit all possible bit patterns within its
-    /// `size_of::<Self>()` bytes.
-    ///
-    /// By default ZSTs set this as true.
-    const ANY_BITS: bool = size_of::<Self>() == 0;
+    /// `size_of::<Self::Output>()` bytes.
+    const ANY_BITS: bool;
 
     /// Write to the owned buffer.
     fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
@@ -233,6 +231,8 @@ macro_rules! impl_nonzero_number {
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
         unsafe impl ZeroCopy for ::core::num::$ty {
+            const ANY_BITS: bool = false;
+
             fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
@@ -299,7 +299,7 @@ macro_rules! impl_zst {
         ///
         /// ```
         $(#[doc = concat!("use ", stringify!($import), ";")])*
-        /// use musli_zerocopy::{ZeroCopy, Slice, OwnedBuf};
+        /// use musli_zerocopy::{ZeroCopy, Slice, AlignedBuf};
         ///
         /// #[derive(Default, Clone, Copy, ZeroCopy)]
         /// #[repr(C)]
@@ -307,7 +307,7 @@ macro_rules! impl_zst {
         #[doc = concat!("    field: ", stringify!($example), ",")]
         /// }
         ///
-        /// let mut empty = OwnedBuf::new();
+        /// let mut empty = AlignedBuf::new();
         /// let values = [Struct::default(); 100];
         /// let slice = empty.insert_slice(&values[..])?;
         /// let buf = empty.as_aligned_buf();
@@ -318,6 +318,8 @@ macro_rules! impl_zst {
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
         unsafe impl $(<$name>)* ZeroCopy for $ty {
+            const ANY_BITS: bool = true;
+
             fn write_to<B: ?Sized>(&self, _: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
@@ -355,6 +357,8 @@ unsafe impl<T, const N: usize> ZeroCopy for [T; N]
 where
     T: ZeroCopy,
 {
+    const ANY_BITS: bool = T::ANY_BITS;
+
     fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,

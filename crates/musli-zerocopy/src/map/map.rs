@@ -14,9 +14,9 @@ use crate::zero_copy::ZeroCopy;
 /// ## Examples
 ///
 /// ```
-/// use musli_zerocopy::{OwnedBuf, Pair};
+/// use musli_zerocopy::{AlignedBuf, Pair};
 ///
-/// let mut buf = OwnedBuf::new();
+/// let mut buf = AlignedBuf::new();
 ///
 /// let mut map = Vec::new();
 ///
@@ -52,9 +52,9 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
@@ -88,9 +88,9 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
@@ -120,9 +120,9 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
@@ -184,16 +184,16 @@ where
 
 /// The reference to a map.
 ///
-/// Constructed through [`OwnedBuf::insert_map`].
+/// Constructed through [`AlignedBuf::insert_map`].
 ///
-/// [`OwnedBuf::insert_map`]: crate::OwnedBuf::insert_map
+/// [`AlignedBuf::insert_map`]: crate::AlignedBuf::insert_map
 ///
 /// ## Examples
 ///
 /// ```
-/// use musli_zerocopy::{OwnedBuf, Pair};
+/// use musli_zerocopy::{AlignedBuf, Pair};
 ///
-/// let mut buf = OwnedBuf::new();
+/// let mut buf = AlignedBuf::new();
 ///
 /// let mut map = Vec::new();
 ///
@@ -250,9 +250,9 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
@@ -285,9 +285,9 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
@@ -316,9 +316,9 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, Pair};
+    /// use musli_zerocopy::{AlignedBuf, Pair};
     ///
-    /// let mut buf = OwnedBuf::new();
+    /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///

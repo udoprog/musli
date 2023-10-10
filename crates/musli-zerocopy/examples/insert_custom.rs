@@ -1,4 +1,4 @@
-use musli_zerocopy::{Error, OwnedBuf, Pair, Unsized, ZeroCopy};
+use musli_zerocopy::{AlignedBuf, Error, Pair, Unsized, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
@@ -8,7 +8,7 @@ struct Custom {
 }
 
 fn main() -> Result<(), Error> {
-    let mut buf = OwnedBuf::new();
+    let mut buf = AlignedBuf::new();
 
     let string = buf.insert_unsized("string")?;
 
