@@ -87,7 +87,8 @@ mod slice;
 pub use self::r#unsized::Unsized;
 mod r#unsized;
 
-pub use self::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+pub use self::zero_copy::{UnsizedZeroCopy, ZeroCopy, ZeroSized};
+mod zero_copy;
 
 /// Derive macro to implement [`ZeroCopy`].
 ///
@@ -155,8 +156,6 @@ pub use self::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 #[doc(inline)]
 pub use musli_macros::ZeroCopy;
 
-mod zero_copy;
-
 mod map;
 pub use self::map::{Map, MapRef};
 
@@ -168,10 +167,6 @@ mod bind;
 
 #[cfg(test)]
 mod tests;
-
-// Sentinel used to allow for `#[zero_copy(ignore)]` to work in this crate.
-#[allow(unused)]
-const ZERO_COPY_IGNORE_IS_NOT_SAFE_TO_USE: () = ();
 
 #[doc(hidden)]
 pub mod __private {

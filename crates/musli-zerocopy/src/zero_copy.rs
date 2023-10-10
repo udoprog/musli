@@ -57,6 +57,18 @@ pub unsafe trait UnsizedZeroCopy {
     fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
 }
 
+/// This is a marker trait that must be implemented for a type in order to use
+/// the [`#[zero_copy(ignore)]`] attribute when deriving the [`ZeroCopy`] trait.
+///
+/// Using the attribute incorrectly might lead to unsoundness.
+pub unsafe trait ZeroSized {}
+
+// SAFETY: `()` is zero-sized.
+unsafe impl ZeroSized for () {}
+
+// SAFETY: `PhantomData<T>` is zero-sized.
+unsafe impl<T> ZeroSized for PhantomData<T> {}
+
 /// Trait governing how to write a sized buffer.
 ///
 /// # Safety

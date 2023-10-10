@@ -5,7 +5,7 @@ use quote::{quote, quote_spanned};
 use syn::meta::ParseNestedMeta;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{DeriveInput, Token, parenthesized};
+use syn::{parenthesized, DeriveInput, Token};
 
 #[derive(Default)]
 struct Ctxt {
@@ -84,7 +84,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     is_repr_transparent = true;
                     return Ok(());
                 }
-                
+
                 // #[repr(align(N))]
                 if meta.path.is_ident("align") {
                     let content;
@@ -95,7 +95,10 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     return Ok(());
                 }
 
-                Err(syn::Error::new_spanned(meta.path, "ZeroCopy: only repr(C) is supported"))
+                Err(syn::Error::new_spanned(
+                    meta.path,
+                    "ZeroCopy: only repr(C) is supported",
+                ))
             });
 
             if let Err(error) = result {
@@ -147,12 +150,13 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let validator: syn::Path = syn::parse_quote!(#krate::Validator);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::ZeroCopy);
+    let zero_sized: syn::Path = syn::parse_quote!(#krate::ZeroSized);
     let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
 
-    let mut const_asserts = Vec::new();
     let mut padding = Vec::new();
     let mut validates = Vec::new();
     let mut any_bits = Vec::new();
+    let mut check_zero_sized = Vec::new();
 
     let mut first_field = None;
 
@@ -178,11 +182,39 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
         let ty = &field.ty;
 
+        let member = match &field.ident {
+            Some(ident) => syn::Member::Named(ident.clone()),
+            None => syn::Member::Unnamed(syn::Index::from(index)),
+        };
+
         if let Some(span) = ignore {
-            const_asserts.push(quote_spanned! {
+            fn build_params(ty: &syn::Type) -> Option<&syn::AngleBracketedGenericArguments> {
+                let syn::Type::Path(syn::TypePath { path, .. }) = ty else {
+                    return None;
+                };
+
+                let syn::PathSegment { arguments: syn::PathArguments::AngleBracketed(bracketed), .. } = path.segments.last()? else {
+                    return None;
+                };
+
+                Some(bracketed)
+            }
+
+            let ignore_ident = quote::format_ident!("ignore_ident__{}", member);
+            let ignore_ident_call = quote::format_ident!("ignore_ident_call_{}", member);
+
+            let params = build_params(ty);
+
+            check_zero_sized.push(quote_spanned! {
                 span =>
-                const _: () = crate::ZERO_COPY_IGNORE_IS_NOT_SAFE_TO_USE;
+                const _: () = {
+                    #[allow(unused, non_snake_case)]
+                    fn #ignore_ident<T: #zero_sized>() {}
+                    #[allow(unused, non_snake_case)]
+                    fn #ignore_ident_call #params() { #ignore_ident::<#ty>(); }
+                };
             });
+
             continue;
         }
 
@@ -197,11 +229,6 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         any_bits.push(quote!(<#ty as #zero_copy>::ANY_BITS));
 
         if first_field.is_none() {
-            let member = match &field.ident {
-                Some(ident) => syn::Member::Named(ident.clone()),
-                None => syn::Member::Unnamed(syn::Index::from(index)),
-            };
-
             first_field = Some((ty, member));
         }
     }
@@ -224,14 +251,14 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             };
 
             coerce = quote! {
-                unsafe { 
+                unsafe {
                     <#ty as #zero_copy>::validate(buf)?;
                     #result::Ok(#buf::cast(buf))
                 }
             };
 
             coerce_mut = quote! {
-                unsafe { 
+                unsafe {
                     <#ty as #zero_copy>::validate(buf)?;
                     #result::Ok(#buf::cast_mut(buf))
                 }
@@ -259,7 +286,6 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         }
     } else {
         write_to = quote! {
-            #(#const_asserts)*
             let mut writer = #buf_mut::writer(buf, self);
 
             #(#padding)*
@@ -296,6 +322,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     }
 
     Ok(quote::quote! {
+        #(#check_zero_sized)*
+
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
             const ANY_BITS: bool = true #(&& #any_bits)*;
 
