@@ -59,10 +59,12 @@ pub(crate) enum ErrorKind {
         offset: usize,
         capacity: usize,
     },
+    #[cfg(feature = "alloc")]
     IndexOutOfBounds {
         index: usize,
         len: usize,
     },
+    #[cfg(feature = "alloc")]
     FailedPhf,
     LayoutError {
         error: LayoutError,
@@ -87,9 +89,6 @@ impl fmt::Display for ErrorKind {
                     "Layout mismatch, expected {layout:?} for range {range:?}"
                 )
             }
-            ErrorKind::IndexOutOfBounds { index, len } => {
-                write!(f, "Index {index} out of bound 0-{len}")
-            }
             ErrorKind::OutOfRangeBounds { range, len } => {
                 write!(f, "Range {range:?} out of bound 0-{len}")
             }
@@ -110,6 +109,11 @@ impl fmt::Display for ErrorKind {
                     "Offset {offset} is not within the allocated buffer 0-{capacity}"
                 )
             }
+            #[cfg(feature = "alloc")]
+            ErrorKind::IndexOutOfBounds { index, len } => {
+                write!(f, "Index {index} out of bound 0-{len}")
+            }
+            #[cfg(feature = "alloc")]
             ErrorKind::FailedPhf => {
                 write!(f, "Failed to construct perfect hash for map")
             }

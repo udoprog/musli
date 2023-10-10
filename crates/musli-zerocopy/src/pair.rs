@@ -7,7 +7,7 @@ use crate::ZeroCopy;
 /// of a tuple is `repr(Rust)`, so there is no way to construct legal references
 /// to them.
 #[derive(Debug, ZeroCopy)]
-#[zero_copy(crate = crate, bounds = {A: ZeroCopy, B: ZeroCopy})]
+#[zero_copy(crate, bounds = {A: ZeroCopy, B: ZeroCopy})]
 #[repr(C)]
 pub struct Pair<A, B> {
     /// The first element in the pair.

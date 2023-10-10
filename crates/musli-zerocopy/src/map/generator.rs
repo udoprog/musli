@@ -3,10 +3,11 @@ use core::hash::Hash;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::buf::{AnyValue, Buf};
+use crate::buf::Buf;
 use crate::error::{Error, ErrorKind};
 use crate::map::hashing::{displace, hash, HashKey, Hashes};
 use crate::pair::Pair;
+use crate::visit::Visit;
 
 use rand::distributions::Standard;
 use rand::rngs::SmallRng;
@@ -23,7 +24,7 @@ pub(crate) struct HashState {
 
 pub(crate) fn generate_hash<K, V>(buf: &Buf, entries: &[Pair<K, V>]) -> Result<HashState, Error>
 where
-    K: AnyValue,
+    K: Visit,
     K::Target: Hash,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
@@ -41,7 +42,7 @@ fn try_generate_hash<K, V>(
     key: HashKey,
 ) -> Result<Option<HashState>, Error>
 where
-    K: AnyValue,
+    K: Visit,
     K::Target: Hash,
 {
     let mut hashes = Vec::new();

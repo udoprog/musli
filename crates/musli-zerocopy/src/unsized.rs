@@ -6,14 +6,14 @@ use crate::ZeroCopy;
 /// A reference to an unsized value packed as a wide pointer.
 ///
 /// The `T` that can be stored in here is determined by [`UnsizedZeroCopy`], is
-/// inserted through [`AlignedBuf::write_unsized`], and is represented by this
+/// inserted through [`AlignedBuf::store_unsized`], and is represented by this
 /// type.
 ///
 /// This contains a pointer to the unsized element and the length of the
 /// element.
 ///
 /// [`UnsizedZeroCopy`]: crate::zero_copy::UnsizedZeroCopy
-/// [`AlignedBuf::write_unsized`]: crate::aligned_buf::AlignedBuf::write_unsized
+/// [`AlignedBuf::store_unsized`]: crate::aligned_buf::AlignedBuf::store_unsized
 ///
 /// # Examples
 ///
@@ -34,7 +34,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate = crate)]
+#[zero_copy(crate)]
 pub struct Unsized<T: ?Sized> {
     ptr: Ptr,
     size: usize,

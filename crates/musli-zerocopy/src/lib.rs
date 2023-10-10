@@ -23,10 +23,10 @@
 //!
 //! let mut buf = AlignedBuf::new();
 //!
-//! let string = buf.write_unsized("string")?;
+//! let string = buf.store_unsized("string")?;
 //!
-//! let c1 = buf.write(&Custom { field: 1, string })?;
-//! let c2 = buf.write(&Custom { field: 2, string })?;
+//! let c1 = buf.store(&Custom { field: 1, string })?;
+//! let c2 = buf.store(&Custom { field: 2, string })?;
 //!
 //! let mut map = Vec::new();
 //!
@@ -61,8 +61,17 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-pub use self::buf::{Buf, BufMut, Validator};
+pub use self::load::{Load, LoadMut};
+mod load;
+
+pub use self::visit::Visit;
+mod visit;
+
+pub use self::buf::{Buf, Validator};
 mod buf;
+
+pub use self::buf_mut::BufMut;
+mod buf_mut;
 
 pub use self::error::Error;
 mod error;
@@ -70,10 +79,14 @@ mod error;
 pub use self::ptr::Ptr;
 mod ptr;
 
+pub use self::store_struct::StoreStruct;
+mod store_struct;
+
+#[cfg(feature = "alloc")]
 mod sip;
 
 #[cfg(feature = "alloc")]
-pub use self::aligned_buf::{AlignedBuf, StructWriter};
+pub use self::aligned_buf::AlignedBuf;
 
 #[cfg(feature = "alloc")]
 mod aligned_buf;
@@ -104,7 +117,7 @@ mod zero_copy;
 /// }
 ///
 /// let mut buf = AlignedBuf::new();
-/// buf.write(&Custom { field: 10 });
+/// buf.store(&Custom { field: 10 });
 /// ```
 ///
 /// # Attributes
@@ -156,8 +169,10 @@ mod zero_copy;
 #[doc(inline)]
 pub use musli_macros::ZeroCopy;
 
-mod map;
+#[cfg(feature = "alloc")]
 pub use self::map::{Map, MapRef};
+#[cfg(feature = "alloc")]
+mod map;
 
 pub use self::pair::Pair;
 mod pair;

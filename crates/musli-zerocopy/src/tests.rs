@@ -6,7 +6,7 @@ use crate::{AlignedBuf, Error, ZeroCopy};
 fn test_weird_alignment() -> Result<(), Error> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[repr(C, align(128))]
-    #[zero_copy(crate = crate)]
+    #[zero_copy(crate)]
     struct WeirdAlignment {
         array: [u32; 3],
         field: u128,
@@ -18,7 +18,7 @@ fn test_weird_alignment() -> Result<(), Error> {
     };
 
     let mut buf = AlignedBuf::with_alignment(align_of::<WeirdAlignment>());
-    let w = buf.write(&weird)?;
+    let w = buf.store(&weird)?;
     let buf = buf.as_aligned();
 
     assert_eq!(buf.len(), size_of::<WeirdAlignment>());

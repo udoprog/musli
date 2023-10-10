@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::quote;
 use syn::meta::ParseNestedMeta;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -112,18 +112,21 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     meta.input.parse::<Token![=]>()?;
                     let content;
                     syn::braced!(content in meta.input);
-                    generics.make_where_clause().predicates.extend(Punctuated::<
-                        syn::WherePredicate,
-                        Token![,],
-                    >::parse_terminated(
-                        &content
-                    )?);
+
+                    let predicates =
+                        Punctuated::<syn::WherePredicate, Token![,]>::parse_terminated(&content)?;
+
+                    generics.make_where_clause().predicates.extend(predicates);
                     return Ok(());
                 }
 
                 if meta.path.is_ident("crate") {
-                    meta.input.parse::<Token![=]>()?;
-                    krate = meta.input.parse()?;
+                    if meta.input.parse::<Option<Token![=]>>()?.is_some() {
+                        krate = meta.input.parse()?;
+                    } else {
+                        krate = syn::parse_quote!(crate);
+                    }
+
                     return Ok(());
                 }
 
@@ -145,7 +148,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     }
 
     let buf_mut: syn::Path = syn::parse_quote!(#krate::BufMut);
-    let struct_writer: syn::Path = syn::parse_quote!(#krate::StructWriter);
+    let store_struct: syn::Path = syn::parse_quote!(#krate::StoreStruct);
     let buf: syn::Path = syn::parse_quote!(#krate::Buf);
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let validator: syn::Path = syn::parse_quote!(#krate::Validator);
@@ -153,12 +156,10 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let zero_sized: syn::Path = syn::parse_quote!(#krate::ZeroSized);
     let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
 
-    let mut padding = Vec::new();
-    let mut validates = Vec::new();
-    let mut any_bits = Vec::new();
-    let mut check_zero_sized = Vec::new();
-
+    // Field types.
+    let mut fields = Vec::new();
     let mut first_field = None;
+    let mut check_zero_sized = Vec::new();
 
     for (index, field) in st.fields.iter().enumerate() {
         let mut ignore = None;
@@ -187,46 +188,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             None => syn::Member::Unnamed(syn::Index::from(index)),
         };
 
-        if let Some(span) = ignore {
-            fn build_params(ty: &syn::Type) -> Option<&syn::AngleBracketedGenericArguments> {
-                let syn::Type::Path(syn::TypePath { path, .. }) = ty else {
-                    return None;
-                };
-
-                let syn::PathSegment { arguments: syn::PathArguments::AngleBracketed(bracketed), .. } = path.segments.last()? else {
-                    return None;
-                };
-
-                Some(bracketed)
-            }
-
-            let ignore_ident = quote::format_ident!("ignore_ident__{}", member);
-            let ignore_ident_call = quote::format_ident!("ignore_ident_call_{}", member);
-
-            let params = build_params(ty);
-
-            check_zero_sized.push(quote_spanned! {
-                span =>
-                const _: () = {
-                    #[allow(unused, non_snake_case)]
-                    fn #ignore_ident<T: #zero_sized>() {}
-                    #[allow(unused, non_snake_case)]
-                    fn #ignore_ident_call #params() { #ignore_ident::<#ty>(); }
-                };
-            });
-
+        if ignore.is_some() {
+            check_zero_sized.push(ty);
             continue;
         }
 
-        padding.push(quote! {
-            #struct_writer::pad::<#ty>(&mut writer);
-        });
-
-        validates.push(quote! {
-            #validator::field::<#ty>(&mut validator)?;
-        });
-
-        any_bits.push(quote!(<#ty as #zero_copy>::ANY_BITS));
+        fields.push(ty);
 
         if first_field.is_none() {
             first_field = Some((ty, member));
@@ -237,17 +204,15 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let validates = &validates[..];
-
-    let write_to;
+    let store_to;
     let coerce;
     let coerce_mut;
     let validate;
 
     if is_repr_transparent || first_field.is_none() {
         if let Some((ty, member)) = first_field {
-            write_to = quote! {
-                <#ty as #zero_copy>::write_to(&self.#member, buf)
+            store_to = quote! {
+                <#ty as #zero_copy>::store_to(&self.#member, buf)
             };
 
             coerce = quote! {
@@ -268,7 +233,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 <#ty as #zero_copy>::validate(buf)
             };
         } else {
-            write_to = quote! {
+            store_to = quote! {
                 #result::Ok(())
             };
 
@@ -285,15 +250,15 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             };
         }
     } else {
-        write_to = quote! {
-            let mut writer = #buf_mut::writer(buf, self);
+        store_to = quote! {
+            let mut writer = #buf_mut::store_struct(buf, self);
 
-            #(#padding)*
+            #(#store_struct::pad::<#fields>(&mut writer);)*
 
             // SAFETY: We've systematically ensured to pad all fields on the
             // struct.
             unsafe {
-                #struct_writer::finish(writer)?;
+                #store_struct::finish(writer)?;
             }
 
             #result::Ok(())
@@ -301,37 +266,62 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
         coerce = quote! {
             let mut validator = #buf::validate::<Self>(buf)?;
-            #(#validates)*
+            #(#validator::field::<#fields>(&mut validator)?;)*
             #validator::end(validator)?;
             #result::Ok(unsafe { #buf::cast(buf) })
         };
 
         coerce_mut = quote! {
             let mut validator = #buf::validate::<Self>(buf)?;
-            #(#validates)*
+            #(#validator::field::<#fields>(&mut validator)?;)*
             #validator::end(validator)?;
             #result::Ok(unsafe { #buf::cast_mut(buf) })
         };
 
         validate = quote! {
             let mut validator = #buf::validate_unchecked::<Self>(buf)?;
-            #(#validates)*
+            #(#validator::field::<#fields>(&mut validator)?;)*
             #validator::end(validator)?;
             #result::Ok(())
         };
     }
 
+    let check_zero_sized = (!check_zero_sized.is_empty()).then(|| {
+        let (impl_generics, _, where_clause) = generics.split_for_impl();
+
+        quote! {
+            const _: () = {
+                fn ensure_zero_sized<T: #zero_sized>() {}
+
+                fn ensure_fields #impl_generics() #where_clause {
+                    #(ensure_zero_sized::<#check_zero_sized>();)*
+                }
+            };
+        }
+    });
+
+    let impl_zero_sized = fields.is_empty().then(|| {
+        let (impl_generics, _, where_clause) = generics.split_for_impl();
+
+        quote! {
+            // SAFETY: Type has no fields and has the necessary `repr`.
+            unsafe impl #impl_generics #zero_sized for #name #ty_generics #where_clause {}
+        }
+    });
+
     Ok(quote::quote! {
-        #(#check_zero_sized)*
+        #check_zero_sized
+
+        #impl_zero_sized
 
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
-            const ANY_BITS: bool = true #(&& #any_bits)*;
+            const ANY_BITS: bool = true #(&& <#fields as #zero_copy>::ANY_BITS)*;
 
-            fn write_to<__B: ?Sized>(&self, buf: &mut __B) -> #result<(), #error>
+            fn store_to<__B: ?Sized>(&self, buf: &mut __B) -> #result<(), #error>
             where
                 __B: #buf_mut
             {
-                #write_to
+                #store_to
             }
 
             fn coerce(buf: &#buf) -> #result<&Self, #error> {

@@ -30,7 +30,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate = crate)]
+#[zero_copy(crate)]
 pub struct Ref<T> {
     ptr: Ptr,
     #[zero_copy(ignore)]

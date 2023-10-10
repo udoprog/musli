@@ -4,8 +4,10 @@ use core::marker::PhantomData;
 use core::mem::align_of;
 use core::str;
 
-use crate::buf::{AnyValue, Buf, BufMut};
+use crate::buf::Buf;
+use crate::buf_mut::BufMut;
 use crate::error::{Error, ErrorKind};
+use crate::visit::Visit;
 
 /// Trait governing which `T` in [`Unsized<T>`] the wrapper can handle.
 ///
@@ -32,7 +34,7 @@ use crate::error::{Error, ErrorKind};
 ///
 /// let mut buf = AlignedBuf::with_alignment(1);
 ///
-/// let bytes = buf.write_unsized(&b"Hello World!"[..])?;
+/// let bytes = buf.store_unsized(&b"Hello World!"[..])?;
 /// let buf = buf.as_ref()?;
 /// assert_eq!(buf.load(bytes)?, b"Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
@@ -46,7 +48,7 @@ pub unsafe trait UnsizedZeroCopy {
     fn size(&self) -> usize;
 
     /// Write to the owned buffer.
-    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut;
 
@@ -61,15 +63,99 @@ pub unsafe trait UnsizedZeroCopy {
 /// the [`#[zero_copy(ignore)]`] attribute when deriving the [`ZeroCopy`] trait.
 ///
 /// Using the attribute incorrectly might lead to unsoundness.
+///
+/// # Safety
+///
+/// Any type implementing this trait must be zero-sized.
+///
+/// # Examples
+///
+/// We can use #[zero_copy(ignore)] on generic fields if the implement
+/// [`ZeroSized`].
+///
+/// ```
+/// use musli_zerocopy::{ZeroCopy, ZeroSized};
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(transparent)]
+/// struct Struct<T> where T: ZeroSized {
+///     #[zero_copy(ignore)]
+///     field: T,
+/// }
+/// ```
+///
+/// Types which derive [`ZeroCopy`] also implement [`ZeroSized`] if they are
+/// zero-sized:
+///
+/// ```
+/// use core::marker::PhantomData;
+/// use core::mem::size_of;
+///
+/// use musli_zerocopy::{ZeroCopy, ZeroSized};
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(transparent)]
+/// struct Struct<T> where T: ZeroSized {
+///     #[zero_copy(ignore)]
+///     field: T,
+/// }
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(transparent)]
+/// struct OtherStruct {
+///     #[zero_copy(ignore)]
+///     field: Struct<()>,
+/// }
+///
+/// fn assert_zero_sized<T: ZeroSized>() {
+///     assert_eq!(size_of::<T>(), 0);
+/// }
+///
+/// assert_zero_sized::<()>();
+/// assert_zero_sized::<PhantomData<u32>>();
+/// assert_zero_sized::<OtherStruct>();
+/// assert_zero_sized::<Struct<OtherStruct>>();
+/// ```
 pub unsafe trait ZeroSized {}
 
+/// `()` can be ignored as a zero-sized field.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::ZeroCopy;
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(transparent)]
+/// struct Struct {
+///     #[zero_copy(ignore)]
+///     field: (),
+/// }
+/// ```
 // SAFETY: `()` is zero-sized.
 unsafe impl ZeroSized for () {}
 
-// SAFETY: `PhantomData<T>` is zero-sized.
-unsafe impl<T> ZeroSized for PhantomData<T> {}
+/// `[T; 0]` can be ignored as a zero-sized field.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::ZeroCopy;
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(transparent)]
+/// struct Struct<T> {
+///     #[zero_copy(ignore)]
+///     field: [T; 0],
+/// }
+/// ```
+// SAFETY: `[T; 0]` is zero-sized.
+unsafe impl<T> ZeroSized for [T; 0] {}
 
-/// Trait governing how to write a sized buffer.
+// SAFETY: `PhantomData<T>` is zero-sized.
+unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
+
+/// Trait governing how to store a sized buffer.
 ///
 /// # Safety
 ///
@@ -81,7 +167,7 @@ pub unsafe trait ZeroCopy {
     const ANY_BITS: bool;
 
     /// Write to the owned buffer.
-    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut;
 
@@ -113,7 +199,7 @@ pub unsafe trait ZeroCopy {
     /// }
     ///
     /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
-    /// buf.write(&42u32)?;
+    /// buf.store(&42u32)?;
     ///
     /// let buf = buf.as_ref()?;
     ///
@@ -139,7 +225,7 @@ unsafe impl UnsizedZeroCopy for str {
     }
 
     #[inline]
-    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
     {
@@ -167,7 +253,7 @@ unsafe impl UnsizedZeroCopy for [u8] {
     }
 
     #[inline]
-    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
     {
@@ -224,7 +310,7 @@ macro_rules! impl_number {
         unsafe impl ZeroCopy for $ty {
             const ANY_BITS: bool = true;
 
-            fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+            fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
             {
@@ -248,7 +334,7 @@ macro_rules! impl_number {
             }
         }
 
-        impl AnyValue for $ty {
+        impl Visit for $ty {
             type Target = $ty;
 
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
@@ -317,7 +403,7 @@ macro_rules! impl_nonzero_number {
         unsafe impl ZeroCopy for ::core::num::$ty {
             const ANY_BITS: bool = false;
 
-            fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+            fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
             {
@@ -356,7 +442,7 @@ macro_rules! impl_nonzero_number {
             }
         }
 
-        impl AnyValue for ::core::num::$ty {
+        impl Visit for ::core::num::$ty {
             type Target = ::core::num::$ty;
 
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
@@ -400,7 +486,7 @@ macro_rules! impl_zst {
         ///
         /// let mut empty = AlignedBuf::new();
         /// let values = [Struct::default(); 100];
-        /// let slice = empty.write_slice(&values[..])?;
+        /// let slice = empty.store_slice(&values[..])?;
         /// let buf = empty.as_aligned();
         /// assert_eq!(buf.len(), 0);
         ///
@@ -412,7 +498,7 @@ macro_rules! impl_zst {
             const ANY_BITS: bool = true;
 
             #[inline]
-            fn write_to<B: ?Sized>(&self, _: &mut B) -> Result<(), Error>
+            fn store_to<B: ?Sized>(&self, _: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
             {
@@ -435,7 +521,7 @@ macro_rules! impl_zst {
             }
         }
 
-        impl $(<$name>)* AnyValue for $ty {
+        impl $(<$name>)* Visit for $ty {
             type Target = $ty;
 
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
@@ -457,12 +543,12 @@ where
 {
     const ANY_BITS: bool = T::ANY_BITS;
 
-    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
     {
         for element in self {
-            element.write_to(buf)?;
+            element.store_to(buf)?;
         }
 
         Ok(())

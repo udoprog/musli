@@ -7,7 +7,7 @@ use crate::ZeroCopy;
 /// [`Buf`]: crate::buf::Buf
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ZeroCopy)]
 #[repr(transparent)]
-#[zero_copy(crate = crate)]
+#[zero_copy(crate)]
 pub struct Ptr {
     offset: usize,
 }

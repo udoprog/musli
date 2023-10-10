@@ -2,11 +2,12 @@ use core::borrow::Borrow;
 use core::hash::Hash;
 
 use crate::bind::Bindable;
-use crate::buf::{AnyValue, Buf};
+use crate::buf::Buf;
 use crate::error::Error;
 use crate::map::hashing::HashKey;
 use crate::pair::Pair;
 use crate::slice::Slice;
+use crate::visit::Visit;
 use crate::zero_copy::ZeroCopy;
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
@@ -73,7 +74,7 @@ where
     pub fn get<T>(&self, key: &T) -> Result<Option<&V>, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: AnyValue,
+        K: Visit,
         K::Target: Borrow<T>,
     {
         let Some(entry) = self.get_entry(key)? else {
@@ -109,7 +110,7 @@ where
     pub fn contains_key<T>(&self, key: &T) -> Result<bool, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: AnyValue,
+        K: Visit,
         K::Target: Borrow<T>,
     {
         Ok(self.get_entry(key)?.is_some())
@@ -141,7 +142,7 @@ where
     pub fn get_entry<T>(&self, key: &T) -> Result<Option<(&K, &V)>, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: AnyValue,
+        K: Visit,
         K::Target: Borrow<T>,
     {
         if self.displacements.is_empty() {
@@ -270,7 +271,7 @@ where
     pub fn get<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<&'a V>, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: 'a + AnyValue,
+        K: 'a + Visit,
         K::Target: Borrow<T>,
     {
         let Some(entry) = self.get_entry(buf, key)? else {
@@ -305,7 +306,7 @@ where
     pub fn contains_key<T>(&self, buf: &Buf, key: &T) -> Result<bool, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: AnyValue,
+        K: Visit,
         K::Target: Borrow<T>,
     {
         Ok(self.get_entry(buf, key)?.is_some())
@@ -336,7 +337,7 @@ where
     pub fn get_entry<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<(&'a K, &'a V)>, Error>
     where
         T: ?Sized + Eq + Hash,
-        K: AnyValue,
+        K: Visit,
         K::Target: Borrow<T>,
     {
         if self.displacements.is_empty() {
