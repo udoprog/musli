@@ -270,30 +270,13 @@ impl Buf {
         })
     }
 
-    /// Construct a validator over the current buffer which assumes it's
-    /// correctly aligned.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the buffer is appropriately aligned.
-    pub unsafe fn validate_unchecked<T>(&self) -> Result<Validator<'_, T>, Error>
-    where
-        T: ZeroCopy,
-    {
-        Ok(Validator {
-            data: self,
-            offset: 0,
-            _marker: PhantomData,
-        })
-    }
-
     /// Get the given range while checking its required alignment.
-    pub(crate) fn get(&self, range: Range<usize>, align: usize) -> Result<&Buf, Error> {
-        let buf = self.get_unaligned(range)?;
+    pub(crate) fn get(&self, start: usize, end: usize, align: usize) -> Result<&Buf, Error> {
+        let buf = self.get_unaligned(start, end)?;
 
         if !buf.is_aligned_to(align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
-                range: self.range(),
+                range: start..end,
                 align,
             }));
         }
@@ -302,12 +285,17 @@ impl Buf {
     }
 
     /// Get the given range mutably while checking its required alignment.
-    pub(crate) fn get_mut(&mut self, range: Range<usize>, align: usize) -> Result<&mut Buf, Error> {
-        let buf = self.get_mut_unaligned(range)?;
+    pub(crate) fn get_mut(
+        &mut self,
+        start: usize,
+        end: usize,
+        align: usize,
+    ) -> Result<&mut Buf, Error> {
+        let buf = self.get_mut_unaligned(start, end)?;
 
         if !buf.is_aligned_to(align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
-                range: buf.range(),
+                range: start..end,
                 align,
             }));
         }
@@ -316,22 +304,30 @@ impl Buf {
     }
 
     /// Get the given range without checking that it corresponds to any given alignment.
-    pub(crate) fn get_unaligned(&self, range: Range<usize>) -> Result<&Buf, Error> {
-        let Some(data) = self.data.get(range.clone()) else {
+    pub(crate) fn get_unaligned(&self, start: usize, end: usize) -> Result<&Buf, Error> {
+        let Some(data) = self.data.get(start..end) else {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
-                range,
+                range: start..end,
                 len: self.data.len(),
             }));
         };
 
         Ok(Buf::new(data))
     }
+
     /// Get the given range mutably without checking that it corresponds to any given alignment.
-    pub(crate) fn get_mut_unaligned(&mut self, range: Range<usize>) -> Result<&mut Buf, Error> {
+    pub(crate) fn get_mut_unaligned(
+        &mut self,
+        start: usize,
+        end: usize,
+    ) -> Result<&mut Buf, Error> {
         let len = self.data.len();
 
-        let Some(data) = self.data.get_mut(range.clone()) else {
-            return Err(Error::new(ErrorKind::OutOfRangeBounds { range, len }));
+        let Some(data) = self.data.get_mut(start..end) else {
+            return Err(Error::new(ErrorKind::OutOfRangeBounds {
+                range: start..end,
+                len,
+            }));
         };
 
         Ok(Buf::new_mut(data))
@@ -344,8 +340,11 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.size());
-        let buf = self.get(start..end, T::ALIGN)?;
-        T::coerce(buf)
+        let buf = self.get(start, end, T::ALIGN)?;
+
+        // SAFETY: Alignment and size is checked just above when getting the
+        // buffer slice.
+        unsafe { T::coerce(buf) }
     }
 
     /// Load an unsized mutable reference.
@@ -355,8 +354,11 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.size());
-        let buf = self.get_mut(start..end, T::ALIGN)?;
-        T::coerce_mut(buf)
+        let buf = self.get_mut(start, end, T::ALIGN)?;
+
+        // SAFETY: Alignment and size is checked just above when getting the
+        // buffer slice.
+        unsafe { T::coerce_mut(buf) }
     }
 
     /// Load the given sized value as a reference.
@@ -366,14 +368,16 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(size_of::<T>());
-        let buf = self.get(start..end, align_of::<T>())?;
+        let buf = self.get(start, end, align_of::<T>())?;
 
         if T::ANY_BITS {
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
             // type being coerced into can really inhabit any bit pattern.
             Ok(unsafe { buf.cast() })
         } else {
-            T::coerce(buf)
+            // SAFETY: Alignment and size is checked just above when getting the
+            // buffer slice.
+            unsafe { T::coerce(buf) }
         }
     }
 
@@ -384,14 +388,16 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(size_of::<T>());
-        let buf = self.get_mut(start..end, align_of::<T>())?;
+        let buf = self.get_mut(start, end, align_of::<T>())?;
 
         if T::ANY_BITS {
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
             // type being coerced into can really inhabit any bit pattern.
             Ok(unsafe { buf.cast_mut() })
         } else {
-            T::coerce_mut(buf)
+            // SAFETY: Alignment and size is checked just above when getting the
+            // buffer slice.
+            unsafe { T::coerce_mut(buf) }
         }
     }
 
@@ -402,8 +408,8 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
-        let buf = self.get_unaligned(start..end)?;
-        validate_array::<T>(buf, ptr.len())?;
+        let buf = self.get(start, end, align_of::<T>())?;
+        validate_array::<T>(buf)?;
         Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), ptr.len()) })
     }
 
@@ -414,8 +420,8 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
-        let buf = self.get_mut_unaligned(start..end)?;
-        validate_array::<T>(buf, ptr.len())?;
+        let buf: &mut Buf = self.get_mut_unaligned(start, end)?;
+        validate_array::<T>(buf)?;
         Ok(unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), ptr.len()) })
     }
 
@@ -437,7 +443,7 @@ impl Buf {
 
     /// Test if the current buffer is compatible with the given layout.
     pub(crate) fn is_compatible(&self, layout: Layout) -> bool {
-        self.is_aligned_to(layout.align()) && self.data.len() == layout.size()
+        self.is_aligned_to(layout.align()) && self.data.len() >= layout.size()
     }
 
     /// Test if the buffer is aligned with the given alignment.
@@ -511,7 +517,7 @@ impl<T> Validator<'_, T> {
         // SAFETY: We've ensured that the provided buffer is aligned and sized
         // appropriately above.
         unsafe {
-            let data = self.data.get_unaligned(start..end)?;
+            let data = self.data.get_unaligned(start, end)?;
             F::validate(data)?;
         };
 
@@ -547,7 +553,7 @@ impl<T> Validator<'_, T> {
     /// let buf = buf.as_aligned();
     ///
     /// // We can only cause the error if we assert that the buffer is aligned.
-    /// let mut v = unsafe { buf.validate_unchecked::<Custom>()? };
+    /// let mut v = buf.validate::<Custom>()?;
     /// v.field::<u32>()?;
     /// v.field::<u64>()?;
     /// // Will error since the buffer is too large.
@@ -596,25 +602,7 @@ impl<T> Validator<'_, T> {
     }
 }
 
-pub(crate) fn validate_array<T>(buf: &Buf, len: usize) -> Result<(), Error>
-where
-    T: ZeroCopy,
-{
-    let layout =
-        Layout::array::<T>(len).map_err(|error| Error::new(ErrorKind::LayoutError { error }))?;
-
-    if !buf.is_compatible(layout) {
-        return Err(Error::new(ErrorKind::LayoutMismatch {
-            layout,
-            range: buf.range(),
-        }));
-    }
-
-    validate_array_aligned::<T>(buf)?;
-    Ok(())
-}
-
-pub(crate) fn validate_array_aligned<T>(buf: &Buf) -> Result<(), Error>
+pub(crate) fn validate_array<T>(buf: &Buf) -> Result<(), Error>
 where
     T: ZeroCopy,
 {

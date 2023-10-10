@@ -1,5 +1,6 @@
 #![allow(clippy::len_without_is_empty)]
 
+use core::cell::Cell;
 use core::marker::PhantomData;
 use core::mem::align_of;
 use core::str;
@@ -53,10 +54,24 @@ pub unsafe trait UnsizedZeroCopy {
         B: BufMut;
 
     /// Validate and coerce the buffer as this type.
-    fn coerce(buf: &Buf) -> Result<&Self, Error>;
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the buffer is aligned
+    /// according to [`ALIGN`].
+    ///
+    /// [`ALIGN`]: UnsizedZeroCopy::ALIGN
+    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error>;
 
     /// Validate and coerce the buffer as this type mutably.
-    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the buffer is aligned
+    /// according to [`ALIGN`].
+    ///
+    /// [`ALIGN`]: UnsizedZeroCopy::ALIGN
+    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
 }
 
 /// This is a marker trait that must be implemented for a type in order to use
@@ -118,6 +133,54 @@ pub unsafe trait UnsizedZeroCopy {
 /// ```
 pub unsafe trait ZeroSized {}
 
+/// `Cell<T>` can be ignored as a zero-sized field.
+///
+/// # Examples
+///
+/// ```
+/// use core::cell::Cell;
+///
+/// use musli_zerocopy::ZeroCopy;
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(transparent)]
+/// struct Struct {
+///     #[zero_copy(ignore)]
+///     field: Cell<()>,
+/// }
+/// ```
+// SAFETY: `Cell<T>` is repr-transparent.
+unsafe impl<T> ZeroSized for Cell<T> where T: ZeroSized {}
+
+unsafe impl<T> ZeroCopy for Cell<T>
+where
+    T: Copy + ZeroCopy,
+{
+    const ANY_BITS: bool = T::ANY_BITS;
+
+    fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
+        let value = self.get();
+        T::store_to(&value, buf)
+    }
+
+    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
+        T::validate(buf)?;
+        Ok(buf.cast())
+    }
+
+    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+        T::validate(buf)?;
+        Ok(buf.cast_mut())
+    }
+
+    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
+        T::validate(buf)
+    }
+}
+
 /// `()` can be ignored as a zero-sized field.
 ///
 /// # Examples
@@ -172,10 +235,20 @@ pub unsafe trait ZeroCopy {
         B: BufMut;
 
     /// Coerce and validate the buffer as reference of this type.
-    fn coerce(buf: &Buf) -> Result<&Self, Error>;
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that the provide `buf` is appropriately aligned and
+    /// sized for the type.
+    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error>;
 
     /// Coerce and validate the buffer as a mutable reference of this type.
-    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that the provide `buf` is appropriately aligned and
+    /// sized for the type.
+    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
 
     /// Only validate the provided buffer.
     ///
@@ -233,12 +306,12 @@ unsafe impl UnsizedZeroCopy for str {
     }
 
     #[inline]
-    fn coerce(buf: &Buf) -> Result<&Self, Error> {
+    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
         str::from_utf8(buf.as_slice()).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))
     }
 
     #[inline]
-    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
         str::from_utf8_mut(buf.as_mut_slice())
             .map_err(|error| Error::new(ErrorKind::Utf8Error { error }))
     }
@@ -261,12 +334,12 @@ unsafe impl UnsizedZeroCopy for [u8] {
     }
 
     #[inline]
-    fn coerce(buf: &Buf) -> Result<&Self, Error> {
+    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
         Ok(buf.as_slice())
     }
 
     #[inline]
-    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
         Ok(buf.as_mut_slice())
     }
 }
@@ -317,14 +390,12 @@ macro_rules! impl_number {
                 buf.extend_from_slice(&<$ty>::to_ne_bytes(*self)[..])
             }
 
-            fn coerce(buf: &Buf) -> Result<&Self, Error> {
-                buf.ensure_compatible_with::<Self>()?;
-                Ok(unsafe { buf.cast() })
+            unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
+                Ok(buf.cast())
             }
 
-            fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-                buf.ensure_compatible_with::<Self>()?;
-                Ok(unsafe { buf.cast_mut() })
+            unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+                Ok(buf.cast_mut())
             }
 
             // NB: Numerical types can inhabit any bit pattern.
@@ -410,26 +481,16 @@ macro_rules! impl_nonzero_number {
                 buf.extend_from_slice(&self.get().to_ne_bytes()[..])
             }
 
-            fn coerce(buf: &Buf) -> Result<&Self, Error> {
-                buf.ensure_compatible_with::<::core::num::$ty>()?;
-
+            unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
                 // SAFETY: Layout has been checked.
-                unsafe {
-                    Self::validate(buf)?;
-                }
-
-                Ok(unsafe { buf.cast() })
+                Self::validate(buf)?;
+                Ok(buf.cast())
             }
 
-            fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-                buf.ensure_compatible_with::<::core::num::$ty>()?;
-
+            unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
                 // SAFETY: Layout has been checked.
-                unsafe {
-                    Self::validate(buf)?;
-                }
-
-                Ok(unsafe { buf.cast_mut() })
+                Self::validate(buf)?;
+                Ok(buf.cast_mut())
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -506,13 +567,13 @@ macro_rules! impl_zst {
             }
 
             #[inline]
-            fn coerce(buf: &Buf) -> Result<&Self, Error> {
-                Ok(unsafe { buf.cast() })
+            unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
+                Ok(buf.cast())
             }
 
             #[inline]
-            fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-                Ok(unsafe { buf.cast_mut() })
+            unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+                Ok(buf.cast_mut())
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -554,21 +615,21 @@ where
         Ok(())
     }
 
-    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-        crate::buf::validate_array::<T>(buf, N)?;
+    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+        crate::buf::validate_array::<T>(buf)?;
         // SAFETY: All preconditions above have been tested.
-        Ok(unsafe { buf.cast_mut() })
+        Ok(buf.cast_mut())
     }
 
-    fn coerce(buf: &Buf) -> Result<&Self, Error> {
-        crate::buf::validate_array::<T>(buf, N)?;
+    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
+        crate::buf::validate_array::<T>(buf)?;
         // SAFETY: All preconditions above have been tested.
-        Ok(unsafe { buf.cast() })
+        Ok(buf.cast())
     }
 
     #[allow(clippy::missing_safety_doc)]
     unsafe fn validate(buf: &Buf) -> Result<(), Error> {
-        crate::buf::validate_array_aligned::<T>(buf)?;
+        crate::buf::validate_array::<T>(buf)?;
         Ok(())
     }
 }

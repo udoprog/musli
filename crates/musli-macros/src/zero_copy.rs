@@ -279,7 +279,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         };
 
         validate = quote! {
-            let mut validator = #buf::validate_unchecked::<Self>(buf)?;
+            let mut validator = #buf::validate::<Self>(buf)?;
             #(#validator::field::<#fields>(&mut validator)?;)*
             #validator::end(validator)?;
             #result::Ok(())
@@ -324,11 +324,11 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 #store_to
             }
 
-            fn coerce(buf: &#buf) -> #result<&Self, #error> {
+            unsafe fn coerce(buf: &#buf) -> #result<&Self, #error> {
                 #coerce
             }
 
-            fn coerce_mut(buf: &mut #buf) -> #result<&mut Self, #error> {
+            unsafe fn coerce_mut(buf: &mut #buf) -> #result<&mut Self, #error> {
                 #coerce_mut
             }
 

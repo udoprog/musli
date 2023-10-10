@@ -1,4 +1,4 @@
-use core::alloc::{Layout, LayoutError};
+use core::alloc::Layout;
 use core::fmt;
 use core::ops::Range;
 use core::str::Utf8Error;
@@ -64,9 +64,6 @@ pub(crate) enum ErrorKind {
         index: usize,
         len: usize,
     },
-    LayoutError {
-        error: LayoutError,
-    },
     Utf8Error {
         error: Utf8Error,
     },
@@ -113,7 +110,6 @@ impl fmt::Display for ErrorKind {
             ErrorKind::IndexOutOfBounds { index, len } => {
                 write!(f, "Index {index} out of bound 0-{len}")
             }
-            ErrorKind::LayoutError { error } => error.fmt(f),
             ErrorKind::Utf8Error { error } => error.fmt(f),
             #[cfg(feature = "alloc")]
             ErrorKind::FailedPhf => {
