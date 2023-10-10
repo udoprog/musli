@@ -28,8 +28,8 @@ let mut buf = AlignedBuf::new();
 
 let string = buf.write_unsized("string")?;
 
-let c1 = buf.write(Custom { field: 1, string })?;
-let c2 = buf.write(Custom { field: 2, string })?;
+let c1 = buf.write(&Custom { field: 1, string })?;
+let c2 = buf.write(&Custom { field: 2, string })?;
 
 let mut map = Vec::new();
 
