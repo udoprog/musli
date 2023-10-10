@@ -1,7 +1,5 @@
 use core::marker::PhantomData;
 
-use crate::buf::{Buf, BufMut};
-use crate::error::Error;
 use crate::ptr::Ptr;
 use crate::zero_copy::ZeroCopy;
 
@@ -27,18 +25,20 @@ use crate::zero_copy::ZeroCopy;
 /// let ptr = buf.next_pointer::<u8>();
 /// buf.extend_from_slice(b"Hello World!")?;
 ///
-/// let buf = buf.as_buf()?;
+/// let buf = buf.as_ref()?;
 ///
 /// let bytes = Unsized::<str>::new(ptr, 12);
 ///
 /// assert_eq!(buf.load(bytes)?, "Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, ZeroCopy)]
 #[repr(C)]
+#[zero_copy(crate = crate)]
 pub struct Unsized<T: ?Sized> {
     ptr: Ptr,
     size: usize,
+    #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
@@ -91,34 +91,6 @@ impl<T: ?Sized> Unsized<T> {
     #[inline]
     pub fn size(&self) -> usize {
         self.size
-    }
-}
-
-unsafe impl<T: ?Sized> ZeroCopy for Unsized<T> {
-    const ANY_BITS: bool = true;
-
-    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
-    where
-        B: BufMut,
-    {
-        buf.write(&self.ptr)?;
-        buf.write(&self.size)?;
-        Ok(())
-    }
-
-    fn coerce(buf: &Buf) -> Result<&Self, Error> {
-        let mut v = buf.validate::<Self>()?;
-        v.field::<Ptr>()?;
-        v.field::<usize>()?;
-        v.end()?;
-        Ok(unsafe { buf.cast() })
-    }
-
-    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
-        let mut v = buf.validate_unchecked::<Self>()?;
-        v.field::<Ptr>()?;
-        v.field::<usize>()?;
-        v.end()
     }
 }
 

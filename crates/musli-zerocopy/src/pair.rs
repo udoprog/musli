@@ -1,5 +1,4 @@
-use crate as musli_zerocopy;
-use crate::ZeroCopy;
+use crate::zero_copy::ZeroCopy;
 
 /// A pair of values which can be stored inside of any other zero copy
 /// structure.
@@ -8,7 +7,7 @@ use crate::ZeroCopy;
 /// of a tuple is `repr(Rust)`, so there is no way to construct legal references
 /// to them.
 #[derive(Debug, ZeroCopy)]
-#[zero_copy(bounds = {A: ZeroCopy, B: ZeroCopy})]
+#[zero_copy(crate = crate, bounds = {A: ZeroCopy, B: ZeroCopy})]
 #[repr(C)]
 pub struct Pair<A, B> {
     /// The first element in the pair.

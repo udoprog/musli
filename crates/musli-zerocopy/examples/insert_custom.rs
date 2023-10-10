@@ -22,7 +22,7 @@ fn main() -> Result<(), Error> {
 
     let map = buf.insert_map(&mut map)?;
 
-    let buf = buf.as_aligned_buf();
+    let buf = buf.as_aligned();
     let map = buf.bind(map)?;
 
     let custom1 = map.get(&1)?.expect("Missing key 1");

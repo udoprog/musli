@@ -6,7 +6,7 @@ fn main() -> Result<(), Error> {
     let first = buf.write_unsized("first")?;
     let second = buf.write_unsized("second")?;
 
-    let buf = buf.as_buf()?;
+    let buf = buf.as_ref()?;
 
     assert_eq!(buf.load(first)?, "first");
     assert_eq!(buf.load(second)?, "second");

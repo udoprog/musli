@@ -1,9 +1,10 @@
 use std::cell::RefCell;
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::meta::ParseNestedMeta;
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
 use syn::{DeriveInput, Token, parenthesized};
 
 #[derive(Default)]
@@ -67,13 +68,20 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let mut generics = input.generics.clone();
 
     let mut is_repr_c = false;
+    let mut is_repr_transparent = false;
     let mut repr_align = None;
+    let mut krate: syn::Path = syn::parse_quote!(musli_zerocopy);
 
     for attr in &input.attrs {
         if attr.path().is_ident("repr") {
             let result = attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("C") {
                     is_repr_c = true;
+                    return Ok(());
+                }
+
+                if meta.path.is_ident("transparent") {
+                    is_repr_transparent = true;
                     return Ok(());
                 }
                 
@@ -110,6 +118,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     return Ok(());
                 }
 
+                if meta.path.is_ident("crate") {
+                    meta.input.parse::<Token![=]>()?;
+                    krate = meta.input.parse()?;
+                    return Ok(());
+                }
+
                 Ok(())
             });
 
@@ -119,7 +133,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         }
     }
 
-    if !is_repr_c {
+    if !is_repr_c && !is_repr_transparent {
         cx.error(syn::Error::new_spanned(
             input,
             "ZeroCopy: struct must be marked with repr(C)",
@@ -127,22 +141,52 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         return Err(());
     }
 
-    let buf_mut: syn::Path = syn::parse_quote!(musli_zerocopy::BufMut);
-    let struct_writer: syn::Path = syn::parse_quote!(musli_zerocopy::StructWriter);
-    let buf: syn::Path = syn::parse_quote!(musli_zerocopy::Buf);
-    let error: syn::Path = syn::parse_quote!(musli_zerocopy::Error);
-    let validator: syn::Path = syn::parse_quote!(musli_zerocopy::Validator);
-    let zero_copy: syn::Path = syn::parse_quote!(musli_zerocopy::ZeroCopy);
+    let buf_mut: syn::Path = syn::parse_quote!(#krate::BufMut);
+    let struct_writer: syn::Path = syn::parse_quote!(#krate::StructWriter);
+    let buf: syn::Path = syn::parse_quote!(#krate::Buf);
+    let error: syn::Path = syn::parse_quote!(#krate::Error);
+    let validator: syn::Path = syn::parse_quote!(#krate::Validator);
+    let zero_copy: syn::Path = syn::parse_quote!(#krate::ZeroCopy);
+    let result: syn::Path = syn::parse_quote!(core::result::Result);
 
-    let mut writes = Vec::new();
+    let mut const_asserts = Vec::new();
+    let mut padding = Vec::new();
     let mut validates = Vec::new();
-
     let mut any_bits = Vec::new();
 
-    for field in st.fields.iter() {
+    let mut first_field = None;
+
+    for (index, field) in st.fields.iter().enumerate() {
+        let mut ignore = None;
+
+        for attr in &field.attrs {
+            if attr.path().is_ident("zero_copy") {
+                let result = attr.parse_nested_meta(|meta: ParseNestedMeta| {
+                    if meta.path.is_ident("ignore") {
+                        ignore = Some(meta.path.span());
+                        return Ok(());
+                    }
+
+                    Ok(())
+                });
+
+                if let Err(error) = result {
+                    cx.error(error);
+                }
+            }
+        }
+
         let ty = &field.ty;
 
-        writes.push(quote! {
+        if let Some(span) = ignore {
+            const_asserts.push(quote_spanned! {
+                span =>
+                const _: () = crate::ZERO_COPY_IGNORE_IS_NOT_SAFE_TO_USE;
+            });
+            continue;
+        }
+
+        padding.push(quote! {
             #struct_writer::pad::<#ty>(&mut writer);
         });
 
@@ -151,6 +195,15 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         });
 
         any_bits.push(quote!(<#ty as #zero_copy>::ANY_BITS));
+
+        if first_field.is_none() {
+            let member = match &field.ident {
+                Some(ident) => syn::Member::Named(ident.clone()),
+                None => syn::Member::Unnamed(syn::Index::from(index)),
+            };
+
+            first_field = Some((ty, member));
+        }
     }
 
     let name = &input.ident;
@@ -159,45 +212,110 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
     let validates = &validates[..];
 
-    let any_bits = if any_bits.is_empty() {
-        quote!(true)
+    let write_to;
+    let coerce;
+    let coerce_mut;
+    let validate;
+
+    if is_repr_transparent || first_field.is_none() {
+        if let Some((ty, member)) = first_field {
+            write_to = quote! {
+                <#ty as #zero_copy>::write_to(&self.#member, buf)
+            };
+
+            coerce = quote! {
+                unsafe { 
+                    <#ty as #zero_copy>::validate(buf)?;
+                    #result::Ok(#buf::cast(buf))
+                }
+            };
+
+            coerce_mut = quote! {
+                unsafe { 
+                    <#ty as #zero_copy>::validate(buf)?;
+                    #result::Ok(#buf::cast_mut(buf))
+                }
+            };
+
+            validate = quote! {
+                <#ty as #zero_copy>::validate(buf)
+            };
+        } else {
+            write_to = quote! {
+                #result::Ok(())
+            };
+
+            coerce = quote! {
+                #result::Ok(unsafe { #buf::cast(buf) })
+            };
+
+            coerce_mut = quote! {
+                #result::Ok(unsafe { #buf::cast_mut(buf) })
+            };
+
+            validate = quote! {
+                #result::Ok(())
+            };
+        }
     } else {
-        quote!(true #(&& #any_bits)*)
-    };
+        write_to = quote! {
+            #(#const_asserts)*
+            let mut writer = #buf_mut::writer(buf, self);
+
+            #(#padding)*
+
+            // SAFETY: We've systematically ensured to pad all fields on the
+            // struct.
+            unsafe {
+                #struct_writer::finish(writer)?;
+            }
+
+            #result::Ok(())
+        };
+
+        coerce = quote! {
+            let mut validator = #buf::validate::<Self>(buf)?;
+            #(#validates)*
+            #validator::end(validator)?;
+            #result::Ok(unsafe { #buf::cast(buf) })
+        };
+
+        coerce_mut = quote! {
+            let mut validator = #buf::validate::<Self>(buf)?;
+            #(#validates)*
+            #validator::end(validator)?;
+            #result::Ok(unsafe { #buf::cast_mut(buf) })
+        };
+
+        validate = quote! {
+            let mut validator = #buf::validate_unchecked::<Self>(buf)?;
+            #(#validates)*
+            #validator::end(validator)?;
+            #result::Ok(())
+        };
+    }
 
     Ok(quote::quote! {
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
-            const ANY_BITS: bool = #any_bits;
+            const ANY_BITS: bool = true #(&& #any_bits)*;
 
-            fn write_to<__B: ?Sized>(&self, buf: &mut __B) -> Result<(), #error>
+            fn write_to<__B: ?Sized>(&self, buf: &mut __B) -> #result<(), #error>
             where
                 __B: #buf_mut
             {
-                let mut writer = #buf_mut::writer(buf, self);
-
-                #(#writes)*
-
-                // SAFETY: We've systematically ensured to pad all fields on the
-                // struct.
-                unsafe {
-                    #struct_writer::finish(writer)?;
-                }
-
-                Ok(())
+                #write_to
             }
 
-            fn coerce(buf: &#buf) -> Result<&Self, #error> {
-                let mut validator = #buf::validate::<Self>(buf)?;
-                #(#validates)*
-                #validator::end(validator)?;
-                Ok(unsafe { #buf::cast(buf) })
+            fn coerce(buf: &#buf) -> #result<&Self, #error> {
+                #coerce
             }
 
-            unsafe fn validate(buf: &#buf) -> Result<(), #error> {
-                let mut validator = #buf::validate_unchecked::<Self>(buf)?;
-                #(#validates)*
-                #validator::end(validator)?;
-                Ok(())
+            fn coerce_mut(buf: &mut #buf) -> #result<&mut Self, #error> {
+                #coerce_mut
+            }
+
+            unsafe fn validate(buf: &#buf) -> #result<(), #error> {
+                #validate
             }
         }
     })

@@ -1,9 +1,7 @@
 use core::marker::PhantomData;
 
-use crate::buf::{Buf, BufMut};
-use crate::error::Error;
 use crate::ptr::Ptr;
-use crate::ZeroCopy;
+use crate::zero_copy::ZeroCopy;
 
 /// A reference to a slice packed as a wide pointer.
 ///
@@ -18,7 +16,7 @@ use crate::ZeroCopy;
 /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
 /// buf.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
 ///
-/// let buf = buf.as_buf()?;
+/// let buf = buf.as_ref()?;
 ///
 /// let slice = Slice::<u32>::new(Ptr::ZERO, 2);
 ///
@@ -38,7 +36,7 @@ use crate::ZeroCopy;
 /// use musli_zerocopy::{AlignedBuf, Slice, Ptr};
 ///
 /// let buf = AlignedBuf::with_alignment(align_of::<()>());
-/// let buf = buf.as_buf()?;
+/// let buf = buf.as_ref()?;
 ///
 /// let slice = Slice::<()>::new(Ptr::ZERO, 2);
 ///
@@ -47,11 +45,13 @@ use crate::ZeroCopy;
 /// assert_eq!(buf.load(slice)?, &expected[..]);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, ZeroCopy)]
 #[repr(C)]
+#[zero_copy(crate = crate)]
 pub struct Slice<T: ?Sized> {
     ptr: Ptr,
     len: usize,
+    #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
@@ -122,34 +122,6 @@ impl<T: ?Sized> Slice<T> {
     /// ```
     pub fn is_empty(&self) -> bool {
         self.len == 0
-    }
-}
-
-unsafe impl<T: ?Sized> ZeroCopy for Slice<T> {
-    const ANY_BITS: bool = true;
-
-    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
-    where
-        B: BufMut,
-    {
-        buf.write(&self.ptr)?;
-        buf.write(&self.len)?;
-        Ok(())
-    }
-
-    fn coerce(buf: &Buf) -> Result<&Self, Error> {
-        let mut v = buf.validate::<Self>()?;
-        v.field::<Ptr>()?;
-        v.field::<usize>()?;
-        v.end()?;
-        Ok(unsafe { buf.cast() })
-    }
-
-    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
-        let mut v = buf.validate_unchecked::<Self>()?;
-        v.field::<Ptr>()?;
-        v.field::<usize>()?;
-        v.end()
     }
 }
 

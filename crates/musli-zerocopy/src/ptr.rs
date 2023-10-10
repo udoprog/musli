@@ -1,12 +1,13 @@
 use core::fmt;
 
-use crate::buf::{Buf, BufMut};
-use crate::error::Error;
 use crate::zero_copy::ZeroCopy;
 
 /// An absolute pointer to a location in a [`Buf`].
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+///
+/// [`Buf`]: crate::buf::Buf
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ZeroCopy)]
 #[repr(transparent)]
+#[zero_copy(crate = crate)]
 pub struct Ptr {
     offset: usize,
 }
@@ -37,25 +38,5 @@ impl fmt::Debug for Ptr {
         }
 
         f.debug_tuple("Ptr").field(&Pointer(self.offset)).finish()
-    }
-}
-
-unsafe impl ZeroCopy for Ptr {
-    const ANY_BITS: bool = true;
-
-    fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
-    where
-        B: BufMut,
-    {
-        buf.write(&self.offset)
-    }
-
-    fn coerce(buf: &Buf) -> Result<&Self, Error> {
-        // SAFETY: Ptr is repr transparent over usize.
-        unsafe { Ok(&*(usize::coerce(buf)? as *const usize).cast()) }
-    }
-
-    unsafe fn validate(_: &Buf) -> Result<(), Error> {
-        Ok(())
     }
 }

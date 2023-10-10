@@ -24,7 +24,7 @@ use crate::zero_copy::ZeroCopy;
 /// map.push(Pair::new(2, 3));
 ///
 /// let map = buf.insert_map(&mut map)?;
-/// let buf = buf.as_aligned_buf();
+/// let buf = buf.as_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get(&1)?, Some(&2));
@@ -62,7 +62,7 @@ where
     /// map.push(Pair::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get(&1)?, Some(&2));
@@ -98,7 +98,7 @@ where
     /// map.push(Pair::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert!(map.contains_key(&1)?);
@@ -130,7 +130,7 @@ where
     /// map.push(Pair::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get_entry(&1)?, Some((&1, &2)));
@@ -201,7 +201,7 @@ where
 /// map.push(Pair::new(2, 3));
 ///
 /// let map = buf.insert_map(&mut map)?;
-/// let buf = buf.as_aligned_buf();
+/// let buf = buf.as_aligned();
 ///
 /// assert_eq!(map.get(buf, &1)?, Some(&2));
 /// assert_eq!(map.get(buf, &2)?, Some(&3));
@@ -260,7 +260,7 @@ where
     /// map.push(Pair::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(map.get(buf, &1)?, Some(&2));
     /// assert_eq!(map.get(buf, &2)?, Some(&3));
@@ -295,7 +295,7 @@ where
     /// map.push(Pair::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert!(map.contains_key(buf, &1)?);
     /// assert!(map.contains_key(buf, &2)?);
@@ -326,7 +326,7 @@ where
     /// map.push(Pair::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(map.get_entry(buf, &1)?, Some((&1, &2)));
     /// assert_eq!(map.get_entry(buf, &2)?, Some((&2, &3)));

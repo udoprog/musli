@@ -37,7 +37,7 @@ map.push(Pair::new(1, c1));
 map.push(Pair::new(2, c2));
 
 let map = buf.insert_map(&mut map)?;
-let buf = buf.as_aligned_buf();
+let buf = buf.as_aligned();
 let map = buf.bind(map)?;
 
 let c1 = map.get(&1)?.expect("Missing key 1");

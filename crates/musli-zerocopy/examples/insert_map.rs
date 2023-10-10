@@ -10,7 +10,7 @@ fn main() -> Result<(), Error> {
 
     let values = buf.insert_map(&mut values)?;
 
-    let buf = buf.as_aligned_buf();
+    let buf = buf.as_aligned();
     let values = buf.bind(values)?;
 
     assert_eq!(values.get(&10u32)?, Some(&1));

@@ -345,7 +345,7 @@ impl AlignedBuf {
     /// let custom = buf.write(&Custom { field: 1, string })?;
     /// let custom2 = buf.write(&Custom { field: 2, string })?;
     ///
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// let custom = buf.load(custom)?;
     /// assert_eq!(custom.field, 1);
@@ -413,7 +413,7 @@ impl AlignedBuf {
     ///     assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 9, 8, 7, 6, 5, 4, 3, 2, 15, 14, 0, 0, 13, 12, 11, 10]);
     /// }
     ///
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(buf.load(ptr)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -460,7 +460,7 @@ impl AlignedBuf {
     /// let first = buf.write_unsized("first")?;
     /// let second = buf.write_unsized("second")?;
     ///
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(buf.load(first)?, "first");
     /// assert_eq!(buf.load(second)?, "second");
@@ -491,7 +491,7 @@ impl AlignedBuf {
     ///
     /// let slice_ref = buf.write_slice(&values)?;
     ///
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// let slice = buf.load(slice_ref)?;
     ///
@@ -542,7 +542,7 @@ impl AlignedBuf {
     /// pairs.push(Pair::new(buf.write_unsized("second")?, 2u32));
     ///
     /// let map = buf.insert_map(&mut pairs)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get(&"first")?, Some(&1));
@@ -564,7 +564,7 @@ impl AlignedBuf {
     /// pairs.push(Pair::new(20u64, 2u32));
     ///
     /// let map = buf.insert_map(&mut pairs)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(map.get(buf, &10u64)?, Some(&1));
     /// assert_eq!(map.get(buf, &20u64)?, Some(&2));
@@ -578,7 +578,7 @@ impl AlignedBuf {
         K::Target: Hash,
     {
         let mut hash_state = {
-            let buf = self.as_aligned_buf();
+            let buf = self.as_aligned();
             crate::map::generator::generate_hash(buf, entries)?
         };
 
@@ -637,7 +637,7 @@ impl AlignedBuf {
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
-    /// let buf = buf.as_buf()?;
+    /// let buf = buf.as_ref()?;
     ///
     /// // This will fail, because the buffer is not aligned.
     /// assert!(buf.load(ptr).is_err());
@@ -658,7 +658,7 @@ impl AlignedBuf {
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
-    /// let buf = buf.as_buf()?;
+    /// let buf = buf.as_ref()?;
     ///
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -704,7 +704,8 @@ impl AlignedBuf {
         new
     }
 
-    /// Access the current buffer for reading.
+    /// Access the current buffer immutably while checking that the buffer is
+    /// aligned.
     ///
     /// # Errors
     ///
@@ -712,7 +713,20 @@ impl AlignedBuf {
     /// alignment.
     ///
     /// [`requested()`]: Self::requested
-    pub fn as_buf(&self) -> Result<&Buf, Error> {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let slice = buf.write_unsized("hello world")?;
+    /// let buf = buf.as_ref()?;
+    ///
+    /// assert_eq!(buf.load_unsized(slice)?, "hello world");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn as_ref(&self) -> Result<&Buf, Error> {
         if !self.is_aligned_to(self.requested) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
                 range: self.range(),
@@ -723,6 +737,40 @@ impl AlignedBuf {
         Ok(Buf::new(self.as_slice()))
     }
 
+    /// Access the current buffer mutably while checking that the buffer is
+    /// aligned.
+    ///
+    /// # Errors
+    ///
+    /// This will fail if the buffer isn't aligned per it's [`requested()`]
+    /// alignment.
+    ///
+    /// [`requested()`]: Self::requested
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let slice = buf.write_unsized("hello world")?;
+    /// let buf = buf.as_mut()?;
+    ///
+    /// buf.load_unsized_mut(slice)?.make_ascii_uppercase();
+    /// assert_eq!(buf.load_unsized(slice)?, "HELLO WORLD");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn as_mut(&mut self) -> Result<&mut Buf, Error> {
+        if !self.is_aligned_to(self.requested) {
+            return Err(Error::new(ErrorKind::AlignmentMismatch {
+                range: self.range(),
+                align: self.requested,
+            }));
+        }
+
+        Ok(Buf::new_mut(self.as_mut_slice()))
+    }
+
     /// Unchecked conversion into a [`Buf`].
     ///
     /// # Safety
@@ -731,8 +779,20 @@ impl AlignedBuf {
     /// per its required [`requested()`].
     ///
     /// [`requested()`]: Self::requested
-    pub unsafe fn as_buf_unchecked(&self) -> &Buf {
+    pub unsafe fn as_ref_unchecked(&self) -> &Buf {
         Buf::new(self.as_slice())
+    }
+
+    /// Unchecked conversion into a mutable [`Buf`].
+    ///
+    /// # Safety
+    ///
+    /// The caller must themselves ensure that the current buffer is aligned as
+    /// per its required [`requested()`].
+    ///
+    /// [`requested()`]: Self::requested
+    pub unsafe fn as_mut_unchecked(&mut self) -> &mut Buf {
+        Buf::new_mut(self.as_mut_slice())
     }
 
     /// Convert the current buffer into an aligned buffer and return the aligned
@@ -743,8 +803,21 @@ impl AlignedBuf {
     ///
     /// [`requested()`]: Self::requested
     /// [`align()`]: Self::align
-    /// [`as_buf`]: Self::as_buf
-    pub fn as_aligned_buf(&mut self) -> &Buf {
+    /// [`as_ref`]: Self::as_ref
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::with_alignment(1);
+    /// let number = buf.write(&1u32)?;
+    /// let buf = buf.as_aligned();
+    ///
+    /// assert_eq!(buf.load(number)?, &1u32);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn as_aligned(&mut self) -> &Buf {
         // SAFETY: We're ensuring that the requested alignment is being abided.
         unsafe {
             if self.requested != self.align {
@@ -752,7 +825,42 @@ impl AlignedBuf {
                 self.alloc_new(old_layout, new_layout);
             }
 
-            self.as_buf_unchecked()
+            self.as_ref_unchecked()
+        }
+    }
+
+    /// Convert the current buffer into an aligned mutable buffer and return the
+    /// aligned buffer.
+    ///
+    /// If [`requested()`] does not equal [`align()`] this will cause the buffer
+    /// to be reallocated before it is returned.
+    ///
+    /// [`requested()`]: Self::requested
+    /// [`align()`]: Self::align
+    /// [`as_ref`]: Self::as_ref
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::with_alignment(1);
+    /// let number = buf.write(&1u32)?;
+    /// let buf = buf.as_mut_aligned();
+    ///
+    /// *buf.load_mut(number)? += 1;
+    /// assert_eq!(buf.load(number)?, &2u32);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn as_mut_aligned(&mut self) -> &mut Buf {
+        // SAFETY: We're ensuring that the requested alignment is being abided.
+        unsafe {
+            if self.requested != self.align {
+                let (old_layout, new_layout) = self.layouts(self.capacity);
+                self.alloc_new(old_layout, new_layout);
+            }
+
+            self.as_mut_unchecked()
         }
     }
 
@@ -877,7 +985,7 @@ impl AlignedBuf {
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
-    /// let buf = buf.as_buf()?;
+    /// let buf = buf.as_ref()?;
     ///
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -907,7 +1015,7 @@ impl AlignedBuf {
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
-    /// let buf = buf.as_buf()?;
+    /// let buf = buf.as_ref()?;
     ///
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())

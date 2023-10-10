@@ -7,6 +7,9 @@ use core::str;
 use crate::buf::{AnyValue, Buf, BufMut};
 use crate::error::{Error, ErrorKind};
 
+#[doc(inline)]
+pub use musli_macros::ZeroCopy;
+
 /// Trait governing which `T` in [`Unsized<T>`] the wrapper can handle.
 ///
 /// We only support slice-like, unaligned unsized types, such as `str` and
@@ -33,7 +36,7 @@ use crate::error::{Error, ErrorKind};
 /// let mut buf = AlignedBuf::with_alignment(1);
 ///
 /// let bytes = buf.write_unsized(&b"Hello World!"[..])?;
-/// let buf = buf.as_buf()?;
+/// let buf = buf.as_ref()?;
 /// assert_eq!(buf.load(bytes)?, b"Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -50,8 +53,11 @@ pub unsafe trait UnsizedZeroCopy {
     where
         B: BufMut;
 
-    /// Validate the buffer as this type.
+    /// Validate and coerce the buffer as this type.
     fn coerce(buf: &Buf) -> Result<&Self, Error>;
+
+    /// Validate and coerce the buffer as this type mutably.
+    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
 }
 
 /// Trait governing how to write a sized buffer.
@@ -70,8 +76,11 @@ pub unsafe trait ZeroCopy {
     where
         B: BufMut;
 
-    /// Validate the buffer as this type.
+    /// Coerce and validate the buffer as reference of this type.
     fn coerce(buf: &Buf) -> Result<&Self, Error>;
+
+    /// Coerce and validate the buffer as a mutable reference of this type.
+    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
 
     /// Only validate the provided buffer.
     ///
@@ -97,7 +106,7 @@ pub unsafe trait ZeroCopy {
     /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
     /// buf.write(&42u32)?;
     ///
-    /// let buf = buf.as_buf()?;
+    /// let buf = buf.as_ref()?;
     ///
     /// // Safe variant which performs layout checks for us.
     /// assert_eq!(buf.load(Ref::<u32>::zero())?, &42);
@@ -115,10 +124,12 @@ pub unsafe trait ZeroCopy {
 unsafe impl UnsizedZeroCopy for str {
     const ALIGN: usize = align_of::<u8>();
 
+    #[inline]
     fn size(&self) -> usize {
         <str>::len(self)
     }
 
+    #[inline]
     fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
@@ -126,18 +137,27 @@ unsafe impl UnsizedZeroCopy for str {
         buf.extend_from_slice(self.as_bytes())
     }
 
+    #[inline]
     fn coerce(buf: &Buf) -> Result<&Self, Error> {
-        str::from_utf8(buf.as_bytes()).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))
+        str::from_utf8(buf.as_slice()).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))
+    }
+
+    #[inline]
+    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+        str::from_utf8_mut(buf.as_mut_slice())
+            .map_err(|error| Error::new(ErrorKind::Utf8Error { error }))
     }
 }
 
 unsafe impl UnsizedZeroCopy for [u8] {
     const ALIGN: usize = align_of::<u8>();
 
+    #[inline]
     fn size(&self) -> usize {
         <[_]>::len(self)
     }
 
+    #[inline]
     fn write_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
@@ -145,8 +165,14 @@ unsafe impl UnsizedZeroCopy for [u8] {
         buf.extend_from_slice(self)
     }
 
+    #[inline]
     fn coerce(buf: &Buf) -> Result<&Self, Error> {
-        Ok(buf.as_bytes())
+        Ok(buf.as_slice())
+    }
+
+    #[inline]
+    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+        Ok(buf.as_mut_slice())
     }
 }
 
@@ -199,6 +225,11 @@ macro_rules! impl_number {
             fn coerce(buf: &Buf) -> Result<&Self, Error> {
                 buf.ensure_compatible_with::<Self>()?;
                 Ok(unsafe { buf.cast() })
+            }
+
+            fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+                buf.ensure_compatible_with::<Self>()?;
+                Ok(unsafe { buf.cast_mut() })
             }
 
             // NB: Numerical types can inhabit any bit pattern.
@@ -295,6 +326,17 @@ macro_rules! impl_nonzero_number {
                 Ok(unsafe { buf.cast() })
             }
 
+            fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+                buf.ensure_compatible_with::<::core::num::$ty>()?;
+
+                // SAFETY: Layout has been checked.
+                unsafe {
+                    Self::validate(buf)?;
+                }
+
+                Ok(unsafe { buf.cast_mut() })
+            }
+
             #[allow(clippy::missing_safety_doc)]
             unsafe fn validate(buf: &Buf) -> Result<(), Error> {
                 if buf.is_zeroed() {
@@ -350,7 +392,7 @@ macro_rules! impl_zst {
         /// let mut empty = AlignedBuf::new();
         /// let values = [Struct::default(); 100];
         /// let slice = empty.write_slice(&values[..])?;
-        /// let buf = empty.as_aligned_buf();
+        /// let buf = empty.as_aligned();
         /// assert_eq!(buf.len(), 0);
         ///
         /// let slice = buf.load(slice)?;
@@ -360,6 +402,7 @@ macro_rules! impl_zst {
         unsafe impl $(<$name>)* ZeroCopy for $ty {
             const ANY_BITS: bool = true;
 
+            #[inline]
             fn write_to<B: ?Sized>(&self, _: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
@@ -367,8 +410,14 @@ macro_rules! impl_zst {
                 Ok(())
             }
 
-            fn coerce(_: &Buf) -> Result<&Self, Error> {
-                Ok(&$expr)
+            #[inline]
+            fn coerce(buf: &Buf) -> Result<&Self, Error> {
+                Ok(unsafe { buf.cast() })
+            }
+
+            #[inline]
+            fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+                Ok(unsafe { buf.cast_mut() })
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -408,6 +457,12 @@ where
         }
 
         Ok(())
+    }
+
+    fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
+        crate::buf::validate_array::<T>(buf, N)?;
+        // SAFETY: All preconditions above have been tested.
+        Ok(unsafe { buf.cast_mut() })
     }
 
     fn coerce(buf: &Buf) -> Result<&Self, Error> {

@@ -34,7 +34,7 @@
 //! map.push(Pair::new(2, c2));
 //!
 //! let map = buf.insert_map(&mut map)?;
-//! let buf = buf.as_aligned_buf();
+//! let buf = buf.as_aligned();
 //! let map = buf.bind(map)?;
 //!
 //! let c1 = map.get(&1)?.expect("Missing key 1");
@@ -99,8 +99,9 @@ mod pair;
 pub use self::bind::Bindable;
 mod bind;
 
-/// Implement the [`ZeroCopy`] trait.
-pub use musli_macros::ZeroCopy;
-
 #[cfg(test)]
 mod tests;
+
+// Sentinel used to allow for `#[zero_copy(ignore)]` to work in this crate.
+#[allow(unused)]
+const ZERO_COPY_IGNORE_IS_NOT_SAFE_TO_USE: () = ();

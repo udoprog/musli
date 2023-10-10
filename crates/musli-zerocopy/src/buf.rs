@@ -75,7 +75,7 @@ pub trait BufMut {
     ///     assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 9, 8, 7, 6, 5, 4, 3, 2, 15, 14, 0, 0, 13, 12, 11, 10]);
     /// }
     ///
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(buf.load(ptr)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -117,12 +117,23 @@ where
 ///
 /// This can only be implemented correctly by types under certain conditions:
 /// * The type has a strict, well-defined layout or is `repr(C)`.
-pub unsafe trait AnyRef {
+pub unsafe trait Load {
     /// The target being read.
     type Target: ?Sized;
 
     /// Validate the value.
-    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error>;
+    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error>;
+}
+
+/// Trait used for loading any kind of reference.
+///
+/// # Safety
+///
+/// This can only be implemented correctly by types under certain conditions:
+/// * The type has a strict, well-defined layout or is `repr(C)`.
+pub unsafe trait LoadMut: Load {
+    /// Validate the value.
+    fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error>;
 }
 
 /// Trait used for handling any kind of zero copy value, be they references or
@@ -139,7 +150,7 @@ pub trait AnyValue {
 
 impl<T: ?Sized> AnyValue for T
 where
-    T: AnyRef,
+    T: Load,
 {
     type Target = T::Target;
 
@@ -153,48 +164,99 @@ where
 }
 
 // SAFETY: Blanket implementation is fine over known sound implementations.
-unsafe impl<T: ?Sized> AnyRef for &T
+unsafe impl<T: ?Sized> Load for &T
 where
-    T: AnyRef,
+    T: Load,
 {
     type Target = T::Target;
 
     #[inline]
-    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        T::coerce(self, buf)
+    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        T::load(self, buf)
     }
 }
 
-unsafe impl<T: ?Sized> AnyRef for Unsized<T>
+// SAFETY: Blanket implementation is fine over known sound implementations.
+unsafe impl<T: ?Sized> Load for &mut T
+where
+    T: Load,
+{
+    type Target = T::Target;
+
+    #[inline]
+    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        T::load(self, buf)
+    }
+}
+
+// SAFETY: Blanket implementation is fine over known sound implementations.
+unsafe impl<T: ?Sized> LoadMut for &mut T
+where
+    T: LoadMut,
+{
+    #[inline]
+    fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
+        T::load_mut(self, buf)
+    }
+}
+
+unsafe impl<T: ?Sized> Load for Unsized<T>
 where
     T: UnsizedZeroCopy,
 {
     type Target = T;
 
-    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_unsized(*self)
     }
 }
 
-unsafe impl<T> AnyRef for Ref<T>
+unsafe impl<T: ?Sized> LoadMut for Unsized<T>
+where
+    T: UnsizedZeroCopy,
+{
+    fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
+        buf.load_unsized_mut(*self)
+    }
+}
+
+unsafe impl<T> Load for Ref<T>
 where
     T: ZeroCopy,
 {
     type Target = T;
 
-    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_sized(*self)
     }
 }
 
-unsafe impl<T> AnyRef for Slice<T>
+unsafe impl<T> LoadMut for Ref<T>
+where
+    T: ZeroCopy,
+{
+    fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
+        buf.load_sized_mut(*self)
+    }
+}
+
+unsafe impl<T> Load for Slice<T>
 where
     T: ZeroCopy,
 {
     type Target = [T];
 
-    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_slice(*self)
+    }
+}
+
+unsafe impl<T> LoadMut for Slice<T>
+where
+    T: ZeroCopy,
+{
+    fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
+        buf.load_slice_mut(*self)
     }
 }
 
@@ -211,14 +273,30 @@ impl Buf {
         unsafe { &*(data as *const [u8] as *const Self) }
     }
 
+    /// Wrap the given bytes as a buffer.
+    pub fn new_mut(data: &mut [u8]) -> &mut Buf {
+        // SAFETY: The struct is repr(transparent) over [u8].
+        unsafe { &mut *(data as *mut [u8] as *mut Self) }
+    }
+
     /// Get the underlying bytes of the buffer.
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_slice(&self) -> &[u8] {
         &self.data
+    }
+
+    /// Get the underlying bytes of the buffer mutably.
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.data
     }
 
     /// Access the underlying slice as a pointer.
     pub(crate) fn as_ptr(&self) -> *const u8 {
         self.data.as_ptr()
+    }
+
+    /// Access the underlying slice as a mutable pointer.
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.data.as_mut_ptr()
     }
 
     /// The numerical range of the buffer.
@@ -236,7 +314,7 @@ impl Buf {
     ///
     /// let mut buf = AlignedBuf::with_alignment(4);
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert!(buf.is_compatible_with::<u32>());
     /// assert!(!buf.is_compatible_with::<u64>());
@@ -257,7 +335,7 @@ impl Buf {
     ///
     /// let mut buf = AlignedBuf::with_alignment(4);
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// assert!(buf.ensure_compatible_with::<u32>().is_ok());
     /// assert!(buf.ensure_compatible_with::<u64>().is_err());
@@ -321,6 +399,20 @@ impl Buf {
         Ok(buf)
     }
 
+    /// Get the given range mutably while checking its required alignment.
+    pub(crate) fn get_mut(&mut self, range: Range<usize>, align: usize) -> Result<&mut Buf, Error> {
+        let buf = self.get_mut_unaligned(range)?;
+
+        if !buf.is_aligned_to(align) {
+            return Err(Error::new(ErrorKind::AlignmentMismatch {
+                range: buf.range(),
+                align,
+            }));
+        }
+
+        Ok(buf)
+    }
+
     /// Get the given range without checking that it corresponds to any given alignment.
     pub(crate) fn get_unaligned(&self, range: Range<usize>) -> Result<&Buf, Error> {
         let Some(data) = self.data.get(range.clone()) else {
@@ -331,6 +423,16 @@ impl Buf {
         };
 
         Ok(Buf::new(data))
+    }
+    /// Get the given range mutably without checking that it corresponds to any given alignment.
+    pub(crate) fn get_mut_unaligned(&mut self, range: Range<usize>) -> Result<&mut Buf, Error> {
+        let len = self.data.len();
+
+        let Some(data) = self.data.get_mut(range.clone()) else {
+            return Err(Error::new(ErrorKind::OutOfRangeBounds { range, len }));
+        };
+
+        Ok(Buf::new_mut(data))
     }
 
     /// Load an unsized reference.
@@ -345,7 +447,7 @@ impl Buf {
     /// let first = buf.write_unsized("first")?;
     /// let second = buf.write_unsized("second")?;
     ///
-    /// let buf = buf.as_buf()?;
+    /// let buf = buf.as_ref()?;
     ///
     /// assert_eq!(buf.load_unsized(first)?, "first");
     /// assert_eq!(buf.load_unsized(second)?, "second");
@@ -359,6 +461,36 @@ impl Buf {
         let end = start.wrapping_add(ptr.size());
         let buf = self.get(start..end, T::ALIGN)?;
         T::coerce(buf)
+    }
+
+    /// Load an unsized mutable reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// let first = buf.write_unsized("first")?;
+    /// let second = buf.write_unsized("second")?;
+    ///
+    /// let buf = buf.as_mut()?;
+    ///
+    /// buf.load_unsized_mut(first)?.make_ascii_uppercase();
+    ///
+    /// assert_eq!(buf.load_unsized(first)?, "FIRST");
+    /// assert_eq!(buf.load_unsized(second)?, "second");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn load_unsized_mut<T: ?Sized>(&mut self, ptr: Unsized<T>) -> Result<&mut T, Error>
+    where
+        T: UnsizedZeroCopy,
+    {
+        let start = ptr.ptr().offset();
+        let end = start.wrapping_add(ptr.size());
+        let buf = self.get_mut(start..end, T::ALIGN)?;
+        T::coerce_mut(buf)
     }
 
     /// Load the given sized value as a reference.
@@ -379,6 +511,24 @@ impl Buf {
         }
     }
 
+    /// Load the given sized value as a mutable reference.
+    pub fn load_sized_mut<T>(&mut self, ptr: Ref<T>) -> Result<&mut T, Error>
+    where
+        T: ZeroCopy,
+    {
+        let start = ptr.ptr().offset();
+        let end = start.wrapping_add(size_of::<T>());
+        let buf = self.get_mut(start..end, align_of::<T>())?;
+
+        if T::ANY_BITS {
+            // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
+            // type being coerced into can really inhabit any bit pattern.
+            Ok(unsafe { buf.cast_mut() })
+        } else {
+            T::coerce_mut(buf)
+        }
+    }
+
     /// Load the given slice.
     pub fn load_slice<T>(&self, ptr: Slice<T>) -> Result<&[T], Error>
     where
@@ -391,12 +541,32 @@ impl Buf {
         Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), ptr.len()) })
     }
 
+    /// Load the given slice mutably.
+    pub fn load_slice_mut<T>(&mut self, ptr: Slice<T>) -> Result<&mut [T], Error>
+    where
+        T: ZeroCopy,
+    {
+        let start = ptr.ptr().offset();
+        let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
+        let buf = self.get_mut_unaligned(start..end)?;
+        validate_array::<T>(buf, ptr.len())?;
+        Ok(unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), ptr.len()) })
+    }
+
     /// Load the given value as a reference.
     pub fn load<T>(&self, ptr: T) -> Result<&T::Target, Error>
     where
-        T: AnyRef,
+        T: Load,
     {
-        ptr.coerce(self)
+        ptr.load(self)
+    }
+
+    /// Load the given value as a mutable reference.
+    pub fn load_mut<T>(&mut self, ptr: T) -> Result<&mut T::Target, Error>
+    where
+        T: LoadMut,
+    {
+        ptr.load_mut(self)
     }
 
     /// Bind the current buffer to a value.
@@ -428,7 +598,7 @@ impl Buf {
     /// map.push(Pair::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get(&1)?, Some(&2));
@@ -458,6 +628,16 @@ impl Buf {
         &*self.data.as_ptr().cast()
     }
 
+    /// Cast the current buffer into the given mutable type.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer is correctly sized and aligned
+    /// for the destination type.
+    pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
+        &mut *self.data.as_mut_ptr().cast()
+    }
+
     /// Construct a validator over the current buffer.
     ///
     /// This is a struct validator, which checks that the fields specified in
@@ -485,7 +665,7 @@ impl Buf {
     ///     field: 42,
     ///     field2: 85,
     /// })?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// let mut v = buf.validate::<Custom>()?;
     /// v.field::<u32>()?;
@@ -560,7 +740,7 @@ impl<T> Validator<'_, T> {
     ///     field: 42,
     ///     field2: 85,
     /// })?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// let mut v = buf.validate::<Custom>()?;
     /// v.field::<u32>()?;
@@ -611,7 +791,7 @@ impl<T> Validator<'_, T> {
     ///     field2: 85,
     /// })?;
     /// buf.extend_from_slice(&[0]);
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// // We can only cause the error if we assert that the buffer is aligned.
     /// let mut v = unsafe { buf.validate_unchecked::<Custom>()? };
@@ -641,7 +821,7 @@ impl<T> Validator<'_, T> {
     ///     field: 42,
     ///     field2: 85,
     /// })?;
-    /// let buf = buf.as_aligned_buf();
+    /// let buf = buf.as_aligned();
     ///
     /// let mut v = buf.validate::<Custom>()?;
     /// v.field::<u32>()?;
@@ -686,7 +866,7 @@ where
     T: ZeroCopy,
 {
     if !T::ANY_BITS && size_of::<T>() > 0 {
-        for chunk in buf.as_bytes().chunks_exact(size_of::<T>()) {
+        for chunk in buf.as_slice().chunks_exact(size_of::<T>()) {
             // SAFETY: The passed in buffer is required to be aligned per the
             // requirements of this trait, so any size_of::<T>() chunks are aligned
             // too.
