@@ -12,6 +12,7 @@
 //! ## Examples
 //!
 //! ```
+//! # use anyhow::Context;
 //! use musli_zerocopy::{AlignedBuf, Pair, Unsized, ZeroCopy};
 //!
 //! #[derive(ZeroCopy)]
@@ -37,18 +38,16 @@
 //! let buf = buf.as_aligned();
 //! let map = buf.bind(map)?;
 //!
-//! let c1 = map.get(&1)?.expect("Missing key 1");
-//! let c1 = buf.load(c1)?;
+//! let c1 = buf.load(map.get(&1)?.context("Missing key 1")?)?;
 //! assert_eq!(c1.field, 1);
 //! assert_eq!(buf.load(c1.string)?, "string");
 //!
-//! let c2 = map.get(&2)?.expect("Missing key 2");
-//! let c2 = buf.load(c2)?;
+//! let c2 = buf.load(map.get(&2)?.context("Missing key 2")?)?;
 //! assert_eq!(c2.field, 2);
 //! assert_eq!(buf.load(c2.string)?, "string");
 //!
 //! assert!(map.get(&3)?.is_none());
-//! # Ok::<_, musli_zerocopy::Error>(())
+//! # Ok::<_, anyhow::Error>(())
 //! ```
 
 #![no_std]
@@ -83,9 +82,6 @@ pub use self::store_struct::StoreStruct;
 mod store_struct;
 
 #[cfg(feature = "alloc")]
-mod sip;
-
-#[cfg(feature = "alloc")]
 pub use self::aligned_buf::AlignedBuf;
 
 #[cfg(feature = "alloc")]
@@ -102,6 +98,15 @@ mod r#unsized;
 
 pub use self::zero_copy::{UnsizedZeroCopy, ZeroCopy, ZeroSized};
 mod zero_copy;
+
+pub use self::phf::{Map, MapRef};
+mod phf;
+
+pub use self::pair::Pair;
+mod pair;
+
+pub use self::bind::Bindable;
+mod bind;
 
 /// Derive macro to implement [`ZeroCopy`].
 ///
@@ -168,17 +173,6 @@ mod zero_copy;
 /// ```
 #[doc(inline)]
 pub use musli_macros::ZeroCopy;
-
-#[cfg(feature = "alloc")]
-pub use self::map::{Map, MapRef};
-#[cfg(feature = "alloc")]
-mod map;
-
-pub use self::pair::Pair;
-mod pair;
-
-pub use self::bind::Bindable;
-mod bind;
 
 #[cfg(test)]
 mod tests;

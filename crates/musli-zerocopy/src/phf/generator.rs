@@ -5,8 +5,8 @@ use alloc::vec::Vec;
 
 use crate::buf::Buf;
 use crate::error::{Error, ErrorKind};
-use crate::map::hashing::{displace, hash, HashKey, Hashes};
 use crate::pair::Pair;
+use crate::phf::hashing::{displace, hash, HashKey, Hashes};
 use crate::visit::Visit;
 
 use rand::distributions::Standard;

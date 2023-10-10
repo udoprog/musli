@@ -4,8 +4,8 @@ use core::hash::Hash;
 use crate::bind::Bindable;
 use crate::buf::Buf;
 use crate::error::Error;
-use crate::map::hashing::HashKey;
 use crate::pair::Pair;
+use crate::phf::hashing::HashKey;
 use crate::slice::Slice;
 use crate::visit::Visit;
 use crate::zero_copy::ZeroCopy;
@@ -149,9 +149,9 @@ where
             return Ok(None);
         }
 
-        let hashes = crate::map::hashing::hash(key, &self.key);
+        let hashes = crate::phf::hashing::hash(key, &self.key);
         let index =
-            crate::map::hashing::get_index(&hashes, self.displacements, self.entries.len())?;
+            crate::phf::hashing::get_index(&hashes, self.displacements, self.entries.len())?;
 
         let Some(e) = self.entries.get(index) else {
             return Ok(None);
@@ -228,6 +228,7 @@ impl<K, V> Clone for MapRef<K, V> {
 impl<K, V> Copy for MapRef<K, V> {}
 
 impl<K, V> MapRef<K, V> {
+    #[cfg(feature = "alloc")]
     pub(crate) fn new(
         key: HashKey,
         entries: Slice<Pair<K, V>>,
@@ -347,8 +348,8 @@ where
         let displacements = buf.load(self.displacements)?;
         let entries = buf.load(self.entries)?;
 
-        let hashes = crate::map::hashing::hash(key, &self.key);
-        let index = crate::map::hashing::get_index(&hashes, displacements, entries.len())?;
+        let hashes = crate::phf::hashing::hash(key, &self.key);
+        let index = crate::phf::hashing::get_index(&hashes, displacements, entries.len())?;
 
         let Some(e) = entries.get(index) else {
             return Ok(None);

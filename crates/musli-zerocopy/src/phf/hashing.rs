@@ -2,7 +2,7 @@ use core::hash::Hash;
 
 use crate::error::{Error, ErrorKind};
 use crate::pair::Pair;
-use crate::sip::{Hash128, Hasher128, SipHasher13};
+use crate::phf::sip::{Hash128, Hasher128, SipHasher13};
 
 #[non_exhaustive]
 pub(crate) struct Hashes {

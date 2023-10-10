@@ -9,9 +9,10 @@ use crate::zero_copy::ZeroCopy;
 /// [`AlignedBuf`]: crate::AlignedBuf
 pub trait BufMut {
     /// Interior mutable buffer.
-    type BufMut<'a>: BufMut
+    type StoreStruct<'a, T>: StoreStruct<T>
     where
-        Self: 'a;
+        Self: 'a,
+        T: ZeroCopy;
 
     /// Extend the current buffer from the given slice.
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error>;
@@ -20,18 +21,6 @@ pub trait BufMut {
     fn store<T>(&mut self, value: &T) -> Result<(), Error>
     where
         T: ZeroCopy;
-
-    /// The length of the buffer.
-    fn len(&self) -> usize;
-
-    /// Set the length of the buffer.
-    unsafe fn set_len(&mut self, len: usize);
-
-    /// The capacity of the buffer.
-    fn capacity(&self) -> usize;
-
-    /// Pointer to base.
-    fn as_ptr_mut(&mut self) -> *mut u8;
 
     /// Setup a writer for the given type.
     ///
@@ -46,7 +35,7 @@ pub trait BufMut {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{ZeroCopy, AlignedBuf, BufMut};
+    /// use musli_zerocopy::{AlignedBuf, BufMut, StoreStruct, ZeroCopy};
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]
@@ -83,7 +72,7 @@ pub trait BufMut {
     /// assert_eq!(buf.load(ptr)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    fn store_struct<T>(&mut self, value: &T) -> StoreStruct<Self::BufMut<'_>, T>
+    fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
     where
         T: ZeroCopy;
 }
@@ -92,7 +81,7 @@ impl<B: ?Sized> BufMut for &mut B
 where
     B: BufMut,
 {
-    type BufMut<'a> = B::BufMut<'a> where Self: 'a;
+    type StoreStruct<'a, T> = B::StoreStruct<'a, T> where Self: 'a, T: ZeroCopy;
 
     #[inline]
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
@@ -108,27 +97,7 @@ where
     }
 
     #[inline]
-    fn len(&self) -> usize {
-        (**self).len()
-    }
-
-    #[inline]
-    unsafe fn set_len(&mut self, len: usize) {
-        (**self).set_len(len)
-    }
-
-    #[inline]
-    fn capacity(&self) -> usize {
-        (**self).capacity()
-    }
-
-    #[inline]
-    fn as_ptr_mut(&mut self) -> *mut u8 {
-        (**self).as_ptr_mut()
-    }
-
-    #[inline]
-    fn store_struct<T>(&mut self, value: &T) -> StoreStruct<Self::BufMut<'_>, T>
+    fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
     where
         T: ZeroCopy,
     {

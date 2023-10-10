@@ -55,23 +55,23 @@ pub(crate) enum ErrorKind {
         range: Range<usize>,
         expected: usize,
     },
+    #[cfg(feature = "alloc")]
     BufferOverflow {
         offset: usize,
         capacity: usize,
     },
-    #[cfg(feature = "alloc")]
     IndexOutOfBounds {
         index: usize,
         len: usize,
     },
-    #[cfg(feature = "alloc")]
-    FailedPhf,
     LayoutError {
         error: LayoutError,
     },
     Utf8Error {
         error: Utf8Error,
     },
+    #[cfg(feature = "alloc")]
+    FailedPhf,
 }
 
 impl fmt::Display for ErrorKind {
@@ -103,22 +103,22 @@ impl fmt::Display for ErrorKind {
                     "Expected end of buffer at {expected} in range {range:?} but was {len}"
                 )
             }
+            #[cfg(feature = "alloc")]
             ErrorKind::BufferOverflow { offset, capacity } => {
                 write!(
                     f,
                     "Offset {offset} is not within the allocated buffer 0-{capacity}"
                 )
             }
-            #[cfg(feature = "alloc")]
             ErrorKind::IndexOutOfBounds { index, len } => {
                 write!(f, "Index {index} out of bound 0-{len}")
             }
+            ErrorKind::LayoutError { error } => error.fmt(f),
+            ErrorKind::Utf8Error { error } => error.fmt(f),
             #[cfg(feature = "alloc")]
             ErrorKind::FailedPhf => {
                 write!(f, "Failed to construct perfect hash for map")
             }
-            ErrorKind::LayoutError { error } => error.fmt(f),
-            ErrorKind::Utf8Error { error } => error.fmt(f),
         }
     }
 }

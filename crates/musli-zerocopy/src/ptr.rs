@@ -16,6 +16,7 @@ impl Ptr {
     /// A pointer pointing to the start of a buffer.
     pub const ZERO: Self = Self { offset: 0 };
 
+    #[cfg(feature = "alloc")]
     #[inline]
     pub(crate) fn new(offset: usize) -> Self {
         Self { offset }
