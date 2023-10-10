@@ -99,7 +99,7 @@ unsafe impl<T: ?Sized> ZeroCopy for Unsized<T> {
         Ok(())
     }
 
-    fn read_from(buf: &Buf) -> Result<&Self, Error> {
+    fn coerce(buf: &Buf) -> Result<&Self, Error> {
         let mut v = buf.validate::<Self>()?;
         v.field::<Ptr>()?;
         v.field::<usize>()?;
@@ -107,7 +107,7 @@ unsafe impl<T: ?Sized> ZeroCopy for Unsized<T> {
         Ok(unsafe { buf.cast() })
     }
 
-    unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
+    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
         let mut v = buf.validate_unchecked::<Self>()?;
         v.field::<Ptr>()?;
         v.field::<usize>()?;

@@ -54,7 +54,7 @@ pub unsafe trait AnyRef {
     type Target: ?Sized;
 
     /// Validate the value.
-    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error>;
+    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error>;
 }
 
 /// Trait used for handling any kind of zero copy value, be they references or
@@ -92,8 +92,8 @@ where
     type Target = T::Target;
 
     #[inline]
-    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        T::read_from(self, buf)
+    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        T::coerce(self, buf)
     }
 }
 
@@ -103,7 +103,7 @@ where
 {
     type Target = T;
 
-    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_unsized(*self)
     }
 }
@@ -114,7 +114,7 @@ where
 {
     type Target = T;
 
-    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_sized(*self)
     }
 }
@@ -125,7 +125,7 @@ where
 {
     type Target = [T];
 
-    fn read_from<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+    fn coerce<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_slice(*self)
     }
 }
@@ -137,18 +137,10 @@ pub struct Buf {
 }
 
 impl Buf {
-    /// Wrap the given slice as a buffer.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the buffer is aligned per the requirements
-    /// of the types you intend to read from it.
-    pub unsafe fn new_unchecked<T>(data: &T) -> &Buf
-    where
-        T: ?Sized + AsRef<[u8]>,
-    {
+    /// Wrap the given bytes as a buffer.
+    pub const fn new(data: &[u8]) -> &Buf {
         // SAFETY: The struct is repr(transparent) over [u8].
-        unsafe { &*(data.as_ref() as *const _ as *const Buf) }
+        unsafe { &*(data as *const [u8] as *const Self) }
     }
 
     /// Get the underlying bytes of the buffer.
@@ -170,6 +162,27 @@ impl Buf {
     /// Test if the current buffer is compatible with the given layout.
     pub(crate) fn is_compatible(&self, layout: Layout) -> bool {
         self.is_aligned_to(layout.align()) && self.data.len() == layout.size()
+    }
+
+    /// Test if the current buffer is layout compatible with the given `T`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::with_alignment(4);
+    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    /// let buf = buf.as_aligned_buf();
+    ///
+    /// assert!(buf.is_compatible_with::<u32>());
+    /// assert!(!buf.is_compatible_with::<u64>());
+    /// ```
+    pub fn is_compatible_with<T>(&self) -> bool
+    where
+        T: ZeroCopy,
+    {
+        self.is_compatible(Layout::new::<T>())
     }
 
     /// Test if the buffer is aligned with the given alignment.
@@ -224,7 +237,7 @@ impl Buf {
             }));
         };
 
-        Ok(Buf::new_unchecked(data))
+        Ok(Buf::new(data))
     }
 
     /// Load an unsized reference.
@@ -251,7 +264,8 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(ptr.size());
-        T::read_from(self.get(start..end, T::ALIGN)?)
+        let buf = self.get(start..end, T::ALIGN)?;
+        T::coerce(buf)
     }
 
     /// Load the given sized value as a reference.
@@ -261,7 +275,15 @@ impl Buf {
     {
         let start = ptr.ptr().offset();
         let end = start.wrapping_add(size_of::<T>());
-        T::read_from(self.get(start..end, align_of::<T>())?)
+        let buf = self.get(start..end, align_of::<T>())?;
+
+        if T::ANY_BITS {
+            // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
+            // type being coerced into can really inhabit any bit pattern.
+            Ok(unsafe { buf.cast() })
+        } else {
+            T::coerce(buf)
+        }
     }
 
     /// Load the given slice.
@@ -281,7 +303,7 @@ impl Buf {
     where
         T: AnyRef,
     {
-        ptr.read_from(self)
+        ptr.coerce(self)
     }
 
     /// Bind the current buffer to a value.
@@ -337,7 +359,8 @@ impl Buf {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the buffer is correctly sized and aligned for the destination type.
+    /// The caller must ensure that the buffer is correctly sized and aligned
+    /// for the destination type.
     pub unsafe fn cast<T>(&self) -> &T {
         &*self.data.as_ptr().cast()
     }
@@ -468,7 +491,7 @@ impl<T> Validator<'_, T> {
         // appropriately above.
         unsafe {
             let data = self.data.get_unchecked(start..end)?;
-            F::validate_aligned(data)?;
+            F::validate(data)?;
         };
 
         self.offset = end;
@@ -580,7 +603,7 @@ where
             // requirements of this trait, so any size_of::<T>() chunks are aligned
             // too.
             unsafe {
-                T::validate_aligned(Buf::new_unchecked(chunk))?;
+                T::validate(Buf::new(chunk))?;
             }
         }
     }

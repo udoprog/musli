@@ -641,8 +641,7 @@ impl AlignedBuf {
             }));
         }
 
-        // SAFETY: alignment has been checked above.
-        Ok(unsafe { Buf::new_unchecked(self.as_slice()) })
+        Ok(Buf::new(self.as_slice()))
     }
 
     /// Unchecked conversion into a [`Buf`].
@@ -654,7 +653,7 @@ impl AlignedBuf {
     ///
     /// [`requested()`]: Self::requested
     pub unsafe fn as_buf_unchecked(&self) -> &Buf {
-        Buf::new_unchecked(self.as_slice())
+        Buf::new(self.as_slice())
     }
 
     /// Convert the current buffer into an aligned buffer and return the aligned

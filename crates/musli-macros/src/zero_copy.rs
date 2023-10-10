@@ -126,6 +126,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let mut writes = Vec::new();
     let mut validates = Vec::new();
 
+    let mut any_bits = Vec::new();
+
     for (index, field) in st.fields.iter().enumerate() {
         let member = match &field.ident {
             Some(ident) => syn::Member::Named(ident.clone()),
@@ -141,6 +143,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         validates.push(quote! {
             #validator::field::<#ty>(&mut validator)?;
         });
+
+        any_bits.push(quote!(<#ty as #zero_copy>::ANY_BITS));
     }
 
     let name = &input.ident;
@@ -149,9 +153,15 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
     let validates = &validates[..];
 
+    let any_bits = if any_bits.is_empty() {
+        quote!(true)
+    } else {
+        quote!(true #(&& #any_bits)*)
+    };
+
     Ok(quote::quote! {
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
-            const ANY_BITS: bool = false;
+            const ANY_BITS: bool = #any_bits;
 
             fn write_to<__B: ?Sized>(&self, buf: &mut __B) -> Result<(), #error>
             where
@@ -161,14 +171,14 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 Ok(())
             }
 
-            fn read_from(buf: &#buf) -> Result<&Self, #error> {
+            fn coerce(buf: &#buf) -> Result<&Self, #error> {
                 let mut validator = #buf::validate::<Self>(buf)?;
                 #(#validates)*
                 #validator::end(validator)?;
                 Ok(unsafe { #buf::cast(buf) })
             }
 
-            unsafe fn validate_aligned(buf: &#buf) -> Result<(), #error> {
+            unsafe fn validate(buf: &#buf) -> Result<(), #error> {
                 let mut validator = #buf::validate_unchecked::<Self>(buf)?;
                 #(#validates)*
                 #validator::end(validator)?;

@@ -30,7 +30,7 @@ pub unsafe trait UnsizedZeroCopy {
         B: BufMut;
 
     /// Validate the buffer as this type.
-    fn read_from(buf: &Buf) -> Result<&Self, Error>;
+    fn coerce(buf: &Buf) -> Result<&Self, Error>;
 }
 
 /// Trait governing how to write a sized buffer.
@@ -50,16 +50,45 @@ pub unsafe trait ZeroCopy {
         B: BufMut;
 
     /// Validate the buffer as this type.
-    fn read_from(buf: &Buf) -> Result<&Self, Error>;
+    fn coerce(buf: &Buf) -> Result<&Self, Error>;
 
-    /// Just validate the current buffer under the assumption that it is
-    /// correctly aligned for the current type.
+    /// Only validate the provided buffer.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the buffer is correctly sized and aligned
-    /// per the requirements of this type.
-    unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error>;
+    /// This assumes that the provided buffer is correctly sized and aligned,
+    /// something the caller is responsible for ensuring.
+    ///
+    /// ```no_run
+    /// use core::mem::align_of;
+    ///
+    /// use musli_zerocopy::{AlignedBuf, Buf, Error, Ptr, Ref, ZeroCopy};
+    ///
+    /// unsafe fn unsafe_coerce<T>(buf: &Buf) -> Result<&T, Error>
+    /// where
+    ///     T: ZeroCopy
+    /// {
+    ///     // SAFETY: We've checked that the buffer is compatible.
+    ///     T::validate(buf)?;
+    ///     Ok(buf.cast())
+    /// }
+    ///
+    /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
+    /// buf.write(&42u32)?;
+    ///
+    /// let buf = buf.as_buf()?;
+    ///
+    /// // Safe variant which performs layout checks for us.
+    /// assert_eq!(buf.load(Ref::<u32>::zero())?, &42);
+    ///
+    /// // Achieves the same as above, but we take on the responsibility
+    /// // of never using it with improperly aligned or sized buffers.
+    /// unsafe {
+    ///     assert_eq!(unsafe_coerce::<u32>(buf)?, &42);
+    /// }
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    unsafe fn validate(buf: &Buf) -> Result<(), Error>;
 }
 
 unsafe impl UnsizedZeroCopy for str {
@@ -76,7 +105,7 @@ unsafe impl UnsizedZeroCopy for str {
         buf.extend_from_slice(self.as_bytes())
     }
 
-    fn read_from(buf: &Buf) -> Result<&Self, Error> {
+    fn coerce(buf: &Buf) -> Result<&Self, Error> {
         str::from_utf8(buf.as_bytes()).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))
     }
 }
@@ -95,7 +124,7 @@ unsafe impl UnsizedZeroCopy for [u8] {
         buf.extend_from_slice(self)
     }
 
-    fn read_from(buf: &Buf) -> Result<&Self, Error> {
+    fn coerce(buf: &Buf) -> Result<&Self, Error> {
         Ok(buf.as_bytes())
     }
 }
@@ -124,12 +153,12 @@ macro_rules! impl_number {
         ///
         /// let zero = unsafe {
         ///     let bytes = slice::from_raw_parts(&zero as *const _ as *const u8, size);
-        ///     Buf::new_unchecked(bytes)
+        ///     Buf::new(bytes)
         /// };
         ///
         /// let one = unsafe {
         ///     let bytes = slice::from_raw_parts(&one as *const _ as *const u8, size);
-        ///     Buf::new_unchecked(bytes)
+        ///     Buf::new(bytes)
         /// };
         ///
         /// assert_eq!(zero.load(Ref::<Struct>::new(Ptr::ZERO))?.field, 0);
@@ -146,7 +175,7 @@ macro_rules! impl_number {
                 buf.extend_from_slice(&<$ty>::to_ne_bytes(*self)[..])
             }
 
-            fn read_from(buf: &Buf) -> Result<&Self, Error> {
+            fn coerce(buf: &Buf) -> Result<&Self, Error> {
                 if !buf.is_compatible(core::alloc::Layout::new::<$ty>()) {
                     return Err(Error::new(ErrorKind::LayoutMismatch {
                         layout: Layout::new::<$ty>(),
@@ -159,7 +188,7 @@ macro_rules! impl_number {
 
             // NB: Numerical types can inhabit any bit pattern.
             #[allow(clippy::missing_safety_doc)]
-            unsafe fn validate_aligned(_: &Buf) -> Result<(), Error> {
+            unsafe fn validate(_: &Buf) -> Result<(), Error> {
                 Ok(())
             }
         }
@@ -215,12 +244,12 @@ macro_rules! impl_nonzero_number {
         ///
         /// let zero = unsafe {
         ///     let bytes = slice::from_raw_parts(&zero as *const _ as *const u8, size);
-        ///     Buf::new_unchecked(bytes)
+        ///     Buf::new(bytes)
         /// };
         ///
         /// let one = unsafe {
         ///     let bytes = slice::from_raw_parts(&one as *const _ as *const u8, size);
-        ///     Buf::new_unchecked(bytes)
+        ///     Buf::new(bytes)
         /// };
         ///
         /// // Non-zero buffer works as expected.
@@ -240,7 +269,7 @@ macro_rules! impl_nonzero_number {
                 buf.extend_from_slice(&self.get().to_ne_bytes()[..])
             }
 
-            fn read_from(buf: &Buf) -> Result<&Self, Error> {
+            fn coerce(buf: &Buf) -> Result<&Self, Error> {
                 if !buf.is_compatible(core::alloc::Layout::new::<::core::num::$ty>()) {
                     return Err(Error::new(ErrorKind::LayoutMismatch {
                         layout: Layout::new::<::core::num::$ty>(),
@@ -256,7 +285,7 @@ macro_rules! impl_nonzero_number {
             }
 
             #[allow(clippy::missing_safety_doc)]
-            unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
+            unsafe fn validate(buf: &Buf) -> Result<(), Error> {
                 if buf.is_zeroed() {
                     return Err(Error::new(ErrorKind::NonZeroZeroed { range: buf.range() }));
                 }
@@ -327,12 +356,12 @@ macro_rules! impl_zst {
                 Ok(())
             }
 
-            fn read_from(_: &Buf) -> Result<&Self, Error> {
+            fn coerce(_: &Buf) -> Result<&Self, Error> {
                 Ok(&$expr)
             }
 
             #[allow(clippy::missing_safety_doc)]
-            unsafe fn validate_aligned(_: &Buf) -> Result<(), Error> {
+            unsafe fn validate(_: &Buf) -> Result<(), Error> {
                 Ok(())
             }
         }
@@ -370,14 +399,14 @@ where
         Ok(())
     }
 
-    fn read_from(buf: &Buf) -> Result<&Self, Error> {
+    fn coerce(buf: &Buf) -> Result<&Self, Error> {
         crate::buf::validate_array::<T>(buf, N)?;
         // SAFETY: All preconditions above have been tested.
         Ok(unsafe { buf.cast() })
     }
 
     #[allow(clippy::missing_safety_doc)]
-    unsafe fn validate_aligned(buf: &Buf) -> Result<(), Error> {
+    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
         crate::buf::validate_array_aligned::<T>(buf)?;
         Ok(())
     }

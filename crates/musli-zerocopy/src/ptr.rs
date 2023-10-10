@@ -50,12 +50,12 @@ unsafe impl ZeroCopy for Ptr {
         buf.write(&self.offset)
     }
 
-    fn read_from(buf: &Buf) -> Result<&Self, Error> {
+    fn coerce(buf: &Buf) -> Result<&Self, Error> {
         // SAFETY: Ptr is repr transparent over usize.
-        unsafe { Ok(&*(usize::read_from(buf)? as *const usize).cast()) }
+        unsafe { Ok(&*(usize::coerce(buf)? as *const usize).cast()) }
     }
 
-    unsafe fn validate_aligned(_: &Buf) -> Result<(), Error> {
+    unsafe fn validate(_: &Buf) -> Result<(), Error> {
         Ok(())
     }
 }
