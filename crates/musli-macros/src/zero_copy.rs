@@ -452,7 +452,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 } else {
                     expr
                 };
-    
+
                 let ident = &variant.ident;
                 let types = &output.types;
 
