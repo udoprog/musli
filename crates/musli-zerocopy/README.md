@@ -100,7 +100,7 @@ assert!(buf.requested() <= 8);
 
 This would result in the following buffer:
 
-```rust
+```text
 0000: "Hello World!"
 0012: u32 -> 42
 0016: offset -> 0000

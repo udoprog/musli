@@ -101,7 +101,7 @@
 //!
 //! This would result in the following buffer:
 //!
-//! ```
+//! ```text
 //! 0000: "Hello World!"
 //! 0012: u32 -> 42
 //! 0016: offset -> 0000
