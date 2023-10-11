@@ -1,6 +1,6 @@
 [package]
 name = "musli-tests"
-version = "0.0.13"
+version = "0.0.14"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
@@ -57,13 +57,13 @@ rkyv = ["dep:rkyv", "std"]
 postcard = ["dep:postcard", "serde"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.59", default-features = false, optional = true, features = ["alloc"] }
-musli-wire = { path = "../musli-wire", version = "0.0.59", default-features = false, features = ["alloc", "test"], optional = true }
-musli-descriptive = { path = "../musli-descriptive", version = "0.0.59", default-features = false, features = ["alloc", "test"], optional = true }
-musli-storage = { path = "../musli-storage", version = "0.0.59", default-features = false, features = ["alloc", "test"], optional = true }
-musli-json = { path = "../musli-json", version = "0.0.59", default-features = false, features = ["alloc", "test",], optional = true }
-musli-value = { path = "../musli-value", version = "0.0.59", default-features = false, features = ["alloc", "test"], optional = true }
-musli-macros = { path = "../musli-macros", version = "0.0.59", features = ["test"] }
+musli = { path = "../musli", version = "0.0.60", default-features = false, optional = true, features = ["alloc"] }
+musli-wire = { path = "../musli-wire", version = "0.0.60", default-features = false, features = ["alloc", "test"], optional = true }
+musli-descriptive = { path = "../musli-descriptive", version = "0.0.60", default-features = false, features = ["alloc", "test"], optional = true }
+musli-storage = { path = "../musli-storage", version = "0.0.60", default-features = false, features = ["alloc", "test"], optional = true }
+musli-json = { path = "../musli-json", version = "0.0.60", default-features = false, features = ["alloc", "test",], optional = true }
+musli-value = { path = "../musli-value", version = "0.0.60", default-features = false, features = ["alloc", "test"], optional = true }
+musli-macros = { path = "../musli-macros", version = "0.0.60", features = ["test"] }
 
 anyhow = "1.0.71"
 serde = { version = "1.0.163", default-features = false, optional = true, features = ["derive"] }
@@ -78,7 +78,7 @@ rkyv = { version = "0.7.42", default-features = false, optional = true, features
 postcard = { version = "1.0.4",  default-features = false, optional = true }
 
 [dev-dependencies]
-musli = { path = "../musli", version = "0.0.59", default-features = false, features = ["alloc"] }
+musli = { path = "../musli", version = "0.0.60", default-features = false, features = ["alloc"] }
 criterion = { version = "0.4.0", features = ["html_reports"] }
 trybuild = "1.0.80"
 bstr = "1.4.0"

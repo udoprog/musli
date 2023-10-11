@@ -135,8 +135,8 @@ let unsize = Unsized::<str, usize>::new(0, 1usize << 32);
 
 [`AlignedBuf`] can also be initialized with a custom [`Size`]:
 
-To initialize an [`AlignedBuf`] with a custom [`Size`] you simply
-use this constructor while specifying one of the above parameters:
+To initialize an [`AlignedBuf`] with a custom [`Size`] you simply use this
+constructor while specifying one of the above parameters:
 
 ```rust
 use musli_zerocopy::{AlignedBuf, DEFAULT_ALIGNMENT};
