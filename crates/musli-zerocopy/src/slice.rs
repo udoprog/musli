@@ -1,24 +1,45 @@
 use core::marker::PhantomData;
+use core::mem::size_of;
 
-use crate::offset::{DefaultTargetSize, Offset};
-use crate::{TargetSize, ZeroCopy};
+use crate::offset::DefaultTargetSize;
+use crate::offset::TargetSize;
+use crate::r#ref::Ref;
+use crate::ZeroCopy;
 
 /// A reference to a slice packed as a wide pointer.
 ///
+/// Slices are stored in buffers through [`AlignedBuf::store_slice`].
+///
 /// This contains a pointer to the first element and the length of the slice.
+///
+/// [`AlignedBuf::store_slice`]: crate::aligned_buf::AlignedBuf::store_slice
 ///
 /// # Examples
 ///
 /// ```
+/// use musli_zerocopy::AlignedBuf;
+///
+/// let mut buf = AlignedBuf::new();
+/// let slice = buf.store_slice(&[1, 2, 3, 4])?;
+///
+/// let buf = buf.as_aligned();
+///
+/// assert_eq!(buf.load(slice)?, &[1, 2, 3, 4]);
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
+///
+/// Manually constructing a slice into a buffer:
+///
+/// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Slice, Offset};
+/// use musli_zerocopy::{AlignedBuf, Slice};
 ///
 /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
-/// buf.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+/// buf.extend_from_slice(&[0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8]);
 ///
 /// let buf = buf.as_ref()?;
 ///
-/// let slice = Slice::<u32>::new(Offset::ZERO, 2);
+/// let slice = Slice::<u32>::new(4, 2);
 ///
 /// let expected = [
 ///     u32::from_ne_bytes([1, 2, 3, 4]),
@@ -33,12 +54,12 @@ use crate::{TargetSize, ZeroCopy};
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Slice, Offset};
+/// use musli_zerocopy::{AlignedBuf, Slice};
 ///
 /// let buf = AlignedBuf::with_alignment(align_of::<()>());
 /// let buf = buf.as_ref()?;
 ///
-/// let slice = Slice::<()>::new(Offset::ZERO, 2);
+/// let slice = Slice::<()>::new(0, 2);
 ///
 /// let expected = [(), ()];
 ///
@@ -48,31 +69,38 @@ use crate::{TargetSize, ZeroCopy};
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct Slice<T: ?Sized, O: TargetSize = DefaultTargetSize> {
-    ptr: Offset<O>,
+pub struct Slice<T, O: TargetSize = DefaultTargetSize> {
+    offset: O,
     len: O,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
-impl<T: ?Sized, O: TargetSize> Slice<T, O> {
+impl<T, O: TargetSize> Slice<T, O> {
     /// Construct a new slice reference.
     ///
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Slice, Offset};
+    /// use musli_zerocopy::Slice;
     ///
-    /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
+    /// let slice = Slice::<u32>::new(0, 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn new(ptr: Offset<O>, len: usize) -> Self {
+    pub fn new(offset: usize, len: usize) -> Self {
+        let Some(offset) = O::from_usize(offset) else {
+            panic!(
+                "Slice offset {offset} not in the legal range of 0-{}",
+                O::MAX
+            );
+        };
+
         let Some(len) = O::from_usize(len) else {
             panic!("Slice length {len} not in the legal range of 0-{}", O::MAX);
         };
 
         Self {
-            ptr,
+            offset,
             len,
             _marker: PhantomData,
         }
@@ -83,15 +111,14 @@ impl<T: ?Sized, O: TargetSize> Slice<T, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Slice, Offset};
+    /// use musli_zerocopy::Slice;
     ///
-    /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
-    /// assert_eq!(slice.ptr(), Offset::ZERO);
-    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// let slice = Slice::<u32>::new(0, 2);
+    /// assert_eq!(slice.offset(), 0);
     /// ```
     #[inline]
-    pub fn ptr(&self) -> Offset<O> {
-        self.ptr
+    pub fn offset(&self) -> usize {
+        self.offset.as_usize()
     }
 
     /// The number of elements in the slice.
@@ -99,11 +126,10 @@ impl<T: ?Sized, O: TargetSize> Slice<T, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Slice, Offset};
+    /// use musli_zerocopy::Slice;
     ///
-    /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
+    /// let slice = Slice::<u32>::new(0, 2);
     /// assert_eq!(slice.len(), 2);
-    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
@@ -115,24 +141,60 @@ impl<T: ?Sized, O: TargetSize> Slice<T, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Slice, Offset};
+    /// use musli_zerocopy::Slice;
     ///
-    /// let slice = Slice::<u32>::new(Offset::ZERO, 0);
+    /// let slice = Slice::<u32>::new(0, 0);
     /// assert!(slice.is_empty());
     ///
-    /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
+    /// let slice = Slice::<u32>::new(0, 2);
     /// assert!(!slice.is_empty());
-    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn is_empty(&self) -> bool {
         self.len.is_zero()
     }
+
+    /// Try to get a reference directly out of the slice without validation.
+    ///
+    /// This avoids having to validate every element in a slice in order to
+    /// address them.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
+    ///
+    /// let buf = buf.as_aligned();
+    ///
+    /// let two = slice.get(2).expect("Missing element 2");
+    /// assert_eq!(buf.load(two)?, &3);
+    ///
+    /// assert!(slice.get(4).is_none());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    ///
+    pub fn get(&self, index: usize) -> Option<Ref<T, O>>
+    where
+        T: ZeroCopy,
+    {
+        if index >= self.len() {
+            return None;
+        }
+
+        let ptr = self
+            .offset()
+            .wrapping_add(size_of::<T>().wrapping_mul(index));
+
+        Some(Ref::new(ptr))
+    }
 }
 
-impl<T: ?Sized, O: TargetSize> Clone for Slice<T, O> {
+impl<T, O: TargetSize> Clone for Slice<T, O> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T: ?Sized, O: TargetSize> Copy for Slice<T, O> {}
+impl<T, O: TargetSize> Copy for Slice<T, O> {}

@@ -12,7 +12,7 @@ use ::alloc::vec::Vec;
 use crate::buf::Buf;
 use crate::buf_mut::BufMut;
 use crate::error::{Error, ErrorKind};
-use crate::offset::{DefaultTargetSize, Offset};
+use crate::offset::DefaultTargetSize;
 use crate::pair::Pair;
 use crate::phf::MapRef;
 use crate::r#ref::Ref;
@@ -361,9 +361,9 @@ impl<O: TargetSize> AlignedBuf<O> {
     /// Insert a value with the given size.
     ///
     /// To get the pointer where the value will be written, call
-    /// [`next_pointer<T>()`] before writing it.
+    /// [`next_offset<T>()`] before writing it.
     ///
-    /// [`next_pointer<T>()`]: Self::next_pointer
+    /// [`next_offset<T>()`]: Self::next_offset
     ///
     /// # Examples
     ///
@@ -399,7 +399,7 @@ impl<O: TargetSize> AlignedBuf<O> {
     where
         T: ZeroCopy,
     {
-        let ptr = self.next_pointer::<T>();
+        let ptr = self.next_offset::<T>();
         value.store_to(self)?;
         Ok(Ref::new(ptr))
     }
@@ -471,7 +471,7 @@ impl<O: TargetSize> AlignedBuf<O> {
     /// Write a [`ZeroCopy`] value directly into the buffer.
     ///
     /// If you want to know the pointer where this value will be written, use
-    /// `next_pointer::<T>()` before calling this function.
+    /// `next_offset::<T>()` before calling this function.
     fn store_inner<T>(&mut self, value: &T) -> Result<(), Error>
     where
         T: ZeroCopy,
@@ -501,7 +501,7 @@ impl<O: TargetSize> AlignedBuf<O> {
     where
         T: ?Sized + UnsizedZeroCopy,
     {
-        let ptr = self.next_pointer_with(T::ALIGN);
+        let ptr = self.next_offset_with(T::ALIGN);
         value.store_to(self)?;
         Ok(Unsized::new(ptr, value.size()))
     }
@@ -539,7 +539,7 @@ impl<O: TargetSize> AlignedBuf<O> {
     where
         T: ZeroCopy,
     {
-        let ptr = self.next_pointer::<T>();
+        let ptr = self.next_offset::<T>();
 
         for value in values {
             value.store_to(self)?;
@@ -664,7 +664,7 @@ impl<O: TargetSize> AlignedBuf<O> {
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer_with(1));
+    /// let ptr: Ref<u32> = Ref::new(buf.next_offset_with(1));
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
@@ -685,7 +685,7 @@ impl<O: TargetSize> AlignedBuf<O> {
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer_with(4));
+    /// let ptr: Ref<u32> = Ref::new(buf.next_offset_with(4));
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
@@ -1012,7 +1012,7 @@ impl<O: TargetSize> AlignedBuf<O> {
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer::<u32>());
+    /// let ptr: Ref<u32> = Ref::new(buf.next_offset::<u32>());
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
@@ -1021,9 +1021,9 @@ impl<O: TargetSize> AlignedBuf<O> {
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn next_pointer_with(&mut self, align: usize) -> Offset<O> {
+    pub fn next_offset_with(&mut self, align: usize) -> usize {
         self.request_align(align);
-        Offset::new(self.len)
+        self.len
     }
 
     /// Construct a pointer aligned for `T` into the current buffer which points
@@ -1042,7 +1042,7 @@ impl<O: TargetSize> AlignedBuf<O> {
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_pointer::<u32>());
+    /// let ptr: Ref<u32> = Ref::new(buf.next_offset::<u32>());
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     ///
     /// // This will succeed because the buffer follows its interior alignment:
@@ -1051,12 +1051,12 @@ impl<O: TargetSize> AlignedBuf<O> {
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn next_pointer<T>(&mut self) -> Offset<O>
+    pub fn next_offset<T>(&mut self) -> usize
     where
         T: ZeroCopy,
     {
         self.request_align(align_of::<T>());
-        Offset::new(self.len)
+        self.len
     }
 
     fn ensure_capacity(&mut self, new_capacity: usize) {
@@ -1305,7 +1305,7 @@ where
     unsafe fn finish(mut self) -> Result<Ref<T, O>, Error> {
         self.zero_pad_align::<T>();
 
-        let ptr = Offset::new(self.buf.len());
+        let offset = self.buf.len();
 
         if self.len > self.buf.capacity() {
             return Err(Error::new(ErrorKind::BufferOverflow {
@@ -1315,6 +1315,6 @@ where
         }
 
         self.buf.set_len(self.len);
-        Ok(Ref::new(ptr))
+        Ok(Ref::new(offset))
     }
 }

@@ -78,7 +78,7 @@
 //! # #[repr(C)]
 //! # struct Custom { field: u32, string: Unsized<str> }
 //! use core::mem::size_of;
-//! use musli_zerocopy::{Ref, Offset, Buf};
+//! use musli_zerocopy::{Ref, Buf};
 //!
 //! // Helper to force the static buffer to be aligned like `A`.
 //! #[repr(C)]
@@ -89,7 +89,7 @@
 //! let buf = Buf::new(&BYTES.1);
 //!
 //! // Construct a pointer into the buffer.
-//! let custom = Ref::new(Offset::<u32>::new(BYTES.1.len() - size_of::<Custom>()));
+//! let custom = Ref::<Custom>::new(BYTES.1.len() - size_of::<Custom>());
 //!
 //! let custom: &Custom = buf.load(custom)?;
 //! assert_eq!(custom.field, 42);
@@ -111,22 +111,28 @@
 //! Example of using an [`Offset`] larger than `2^32` causing a panic:
 //!
 //! ```should_panic
-//! # use musli_zerocopy::Offset;
-//! Offset::<u32>::new(1usize << 32);
+//! # use musli_zerocopy::{Ref, ZeroCopy};
+//! # #[derive(ZeroCopy)]
+//! # #[repr(C)]
+//! # struct Custom;
+//! Ref::<Custom>::new(1usize << 32);
 //! ```
 //!
 //! Example panic using a [`Slice`] with a length larger than `2^32`:
 //!
 //! ```should_panic
-//! # use musli_zerocopy::{Offset, Slice};
-//! Slice::<u32>::new(Offset::ZERO, 1usize << 32);
+//! # use musli_zerocopy::{Slice, ZeroCopy};
+//! # #[derive(ZeroCopy)]
+//! # #[repr(C)]
+//! # struct Custom;
+//! Slice::<Custom>::new(0, 1usize << 32);
 //! ```
 //!
 //! Example panic using an [`Unsized`] value with a size larger than `2^32`:
 //!
 //! ```should_panic
-//! # use musli_zerocopy::{Offset, Unsized};
-//! Unsized::<str>::new(Offset::ZERO, 1usize << 32);
+//! # use musli_zerocopy::Unsized;
+//! Unsized::<str>::new(0, 1usize << 32);
 //! ```
 //!
 //! If you want to address data larger than this limit, it is recommended that
@@ -140,11 +146,14 @@
 //! * `usize` for target-dependently sized pointers.
 //!
 //! ```
-//! # use musli_zerocopy::{Offset, Slice, Unsized};
+//! # use musli_zerocopy::{Ref, Slice, Unsized, ZeroCopy};
+//! # #[derive(ZeroCopy)]
+//! # #[repr(C)]
+//! # struct Custom;
 //! // These no longer panic:
-//! let offset = Offset::<usize>::new(1usize << 32);
-//! let slice = Slice::<u32, usize>::new(Offset::ZERO, 1usize << 32);
-//! let unsize = Unsized::<str, usize>::new(Offset::ZERO, 1usize << 32);
+//! let reference = Ref::<Custom, usize>::new(1usize << 32);
+//! let slice = Slice::<Custom, usize>::new(0, 1usize << 32);
+//! let unsize = Unsized::<str, usize>::new(0, 1usize << 32);
 //! ```
 //!
 //! [`AlignedBuf`] can also be initialized with a custom [`TargetSize`]:
@@ -168,18 +177,18 @@
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
 //! struct Custom {
-//!     offset: Ref<u32, usize>,
+//!     reference: Ref<u32, usize>,
 //!     slice: Slice::<u32, usize>,
 //!     unsize: Unsized::<str, usize>,
 //! }
 //!
 //! let mut buf = AlignedBuf::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
 //!
-//! let offset = buf.store(&42u32)?;
+//! let reference = buf.store(&42u32)?;
 //! let slice = buf.store_slice(&[1, 2, 3, 4])?;
 //! let unsize = buf.store_unsized("Hello World")?;
 //!
-//! buf.store(&Custom { offset, slice, unsize })?;
+//! buf.store(&Custom { reference, slice, unsize })?;
 //! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 //!
@@ -227,7 +236,7 @@ mod buf_mut;
 pub use self::error::Error;
 mod error;
 
-pub use self::offset::{Offset, TargetSize};
+pub use self::offset::TargetSize;
 mod offset;
 
 pub use self::store_struct::StoreStruct;

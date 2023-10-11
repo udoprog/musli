@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::offset::{DefaultTargetSize, Offset};
+use crate::offset::DefaultTargetSize;
 use crate::{TargetSize, ZeroCopy};
 
 /// A reference to an unsized value packed as a wide pointer.
@@ -19,10 +19,10 @@ use crate::{TargetSize, ZeroCopy};
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Unsized, Offset};
+/// use musli_zerocopy::{AlignedBuf, Unsized};
 ///
 /// let mut buf = AlignedBuf::new();
-/// let ptr = buf.next_pointer::<u8>();
+/// let ptr = buf.next_offset::<u8>();
 /// buf.extend_from_slice(b"Hello World!")?;
 ///
 /// let buf = buf.as_ref()?;
@@ -36,7 +36,7 @@ use crate::{TargetSize, ZeroCopy};
 #[repr(C)]
 #[zero_copy(crate)]
 pub struct Unsized<T: ?Sized, O: TargetSize = DefaultTargetSize> {
-    ptr: Offset<O>,
+    offset: O,
     size: O,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
@@ -48,18 +48,24 @@ impl<T: ?Sized, O: TargetSize> Unsized<T, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Unsized, Offset};
+    /// use musli_zerocopy::Unsized;
     ///
-    /// let bytes = Unsized::<str>::new(Offset::ZERO, 2);
-    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// let bytes = Unsized::<str>::new(0, 2);
     /// ```
-    pub fn new(ptr: Offset<O>, size: usize) -> Self {
+    pub fn new(offset: usize, size: usize) -> Self {
+        let Some(offset) = O::from_usize(offset) else {
+            panic!(
+                "Unsized offset {offset} not in the legal range of 0-{}",
+                O::MAX
+            );
+        };
+
         let Some(size) = O::from_usize(size) else {
             panic!("Unsized size {size} not in the legal range of 0-{}", O::MAX);
         };
 
         Self {
-            ptr,
+            offset,
             size,
             _marker: PhantomData,
         }
@@ -70,15 +76,14 @@ impl<T: ?Sized, O: TargetSize> Unsized<T, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Unsized, Offset};
+    /// use musli_zerocopy::Unsized;
     ///
-    /// let bytes = Unsized::<str>::new(Offset::ZERO, 2);
-    /// assert_eq!(bytes.ptr(), Offset::ZERO);
-    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// let bytes = Unsized::<str>::new(0, 2);
+    /// assert_eq!(bytes.offset(), 0);
     /// ```
     #[inline]
-    pub fn ptr(&self) -> Offset<O> {
-        self.ptr
+    pub fn offset(&self) -> usize {
+        self.offset.as_usize()
     }
 
     /// Get the size in bytes of the unsized reference.
@@ -86,11 +91,10 @@ impl<T: ?Sized, O: TargetSize> Unsized<T, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Unsized, Offset};
+    /// use musli_zerocopy::Unsized;
     ///
-    /// let bytes = Unsized::<str>::new(Offset::ZERO, 2);
+    /// let bytes = Unsized::<str>::new(0, 2);
     /// assert_eq!(bytes.size(), 2);
-    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn size(&self) -> usize {

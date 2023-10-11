@@ -337,13 +337,13 @@ impl Buf {
     /// Load an unsized reference.
     pub(crate) fn load_unsized<T: ?Sized, O: TargetSize>(
         &self,
-        ptr: Unsized<T, O>,
+        unsize: Unsized<T, O>,
     ) -> Result<&T, Error>
     where
         T: UnsizedZeroCopy,
     {
-        let start = ptr.ptr().offset();
-        let end = start.wrapping_add(ptr.size());
+        let start = unsize.offset();
+        let end = start.wrapping_add(unsize.size());
         let buf = self.get(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
@@ -354,13 +354,13 @@ impl Buf {
     /// Load an unsized mutable reference.
     pub(crate) fn load_unsized_mut<T: ?Sized, O: TargetSize>(
         &mut self,
-        ptr: Unsized<T, O>,
+        unsize: Unsized<T, O>,
     ) -> Result<&mut T, Error>
     where
         T: UnsizedZeroCopy,
     {
-        let start = ptr.ptr().offset();
-        let end = start.wrapping_add(ptr.size());
+        let start = unsize.offset();
+        let end = start.wrapping_add(unsize.size());
         let buf = self.get_mut(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
@@ -373,7 +373,7 @@ impl Buf {
     where
         T: ZeroCopy,
     {
-        let start = ptr.ptr().offset();
+        let start = ptr.offset();
         let end = start.wrapping_add(size_of::<T>());
         let buf = self.get(start, end, align_of::<T>())?;
 
@@ -396,7 +396,7 @@ impl Buf {
     where
         T: ZeroCopy,
     {
-        let start = ptr.ptr().offset();
+        let start = ptr.offset();
         let end = start.wrapping_add(size_of::<T>());
         let buf = self.get_mut(start, end, align_of::<T>())?;
 
@@ -416,7 +416,7 @@ impl Buf {
     where
         T: ZeroCopy,
     {
-        let start = ptr.ptr().offset();
+        let start = ptr.offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
         let buf = self.get(start, end, align_of::<T>())?;
         validate_array::<T>(buf)?;
@@ -431,7 +431,7 @@ impl Buf {
     where
         T: ZeroCopy,
     {
-        let start = ptr.ptr().offset();
+        let start = ptr.offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
         let buf: &mut Buf = self.get_mut_unaligned(start, end)?;
         validate_array::<T>(buf)?;

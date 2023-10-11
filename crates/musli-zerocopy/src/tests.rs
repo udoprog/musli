@@ -56,7 +56,7 @@ fn test_enum_boundaries() -> Result<(), Error> {
             let max = buf.store(&$name::Max)?;
             let min = buf.store(&$name::Min)?;
             let after_min = buf.store(&$name::AfterMin)?;
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX - 1))?.ptr());
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX - 1))?.offset());
 
             let buf = buf.as_aligned();
 
@@ -126,7 +126,7 @@ fn test_signed_wraparound() -> Result<(), Error> {
             let minus_one = buf.store(&$name::MinusOne)?;
             let zero = buf.store(&$name::Zero)?;
             let one = buf.store(&$name::One)?;
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.ptr());
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.offset());
 
             let buf = buf.as_aligned();
 
@@ -168,7 +168,7 @@ fn test_neg0() -> Result<(), Error> {
             let minus_one = buf.store(&$name::MinusOne)?;
             let neg0 = buf.store(&$name::Neg0)?;
             let one = buf.store(&$name::One)?;
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.ptr());
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.offset());
 
             let buf = buf.as_aligned();
 
