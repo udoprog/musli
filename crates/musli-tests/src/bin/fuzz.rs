@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
+#[allow(unused)]
 use std::hint::black_box;
 use std::io::Write;
 use std::time::Instant;
@@ -93,6 +94,10 @@ fn main() -> Result<()> {
         (musli_value $($tt:tt)*) => {
         };
 
+        // musli_zerocopy can't be fuzzed with this framework yet.
+        (musli_zerocopy $($tt:tt)*) => {
+        };
+
         ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
             $({
                 let name = concat!(stringify!($base), "/", stringify!($name), "/random");
@@ -129,11 +134,16 @@ fn main() -> Result<()> {
         };
     }
 
+    #[allow(unused_mut)]
     let mut size_sets = Vec::<SizeSet>::new();
 
     macro_rules! size {
         // musli value is not a bytes-oriented encoding.
         (musli_value $($tt:tt)*) => {
+        };
+
+        // musli zerocopy is not a bytes-oriented encoding.
+        (musli_zerocopy $($tt:tt)*) => {
         };
 
         ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {

@@ -14,6 +14,7 @@ pub struct Validator<'a, T> {
 }
 
 impl<'a, T> Validator<'a, T> {
+    #[inline]
     pub(crate) fn new(data: &'a Buf) -> Self
     where
         T: ZeroCopy,
@@ -53,17 +54,18 @@ impl<'a, T> Validator<'a, T> {
     /// v.end()?;
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    #[inline]
     pub fn field<F>(&mut self) -> Result<(), Error>
     where
         F: ZeroCopy,
     {
         let start = self.offset.next_multiple_of(align_of::<F>());
         let end = start.wrapping_add(size_of::<F>());
+        let data = self.data.get_unaligned(start, end)?;
 
         // SAFETY: We've ensured that the provided buffer is aligned and sized
         // appropriately above.
         unsafe {
-            let data = self.data.get_unaligned(start, end)?;
             F::validate(data)?;
         };
 
@@ -132,6 +134,7 @@ impl<'a, T> Validator<'a, T> {
     /// v.end()?;
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    #[inline]
     pub fn end(self) -> Result<(), Error> {
         let offset = self.offset.next_multiple_of(size_of::<T>());
 

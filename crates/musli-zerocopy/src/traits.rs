@@ -54,7 +54,7 @@ mod sealed {
 /// let mut buf = AlignedBuf::with_alignment(1);
 ///
 /// let bytes = buf.store_unsized(&b"Hello World!"[..])?;
-/// let buf = buf.as_ref()?;
+/// let buf = buf.as_ref();
 /// assert_eq!(buf.load(bytes)?, b"Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -182,7 +182,9 @@ where
     T: Copy + ZeroCopy,
 {
     const ANY_BITS: bool = T::ANY_BITS;
+    const NEEDS_PADDING: bool = T::NEEDS_PADDING;
 
+    #[inline]
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
@@ -191,16 +193,7 @@ where
         T::store_to(&value, buf)
     }
 
-    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
-        T::validate(buf)?;
-        Ok(buf.cast())
-    }
-
-    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-        T::validate(buf)?;
-        Ok(buf.cast_mut())
-    }
-
+    #[inline]
     unsafe fn validate(buf: &Buf) -> Result<(), Error> {
         T::validate(buf)
     }
@@ -300,6 +293,10 @@ pub unsafe trait ZeroCopy {
     /// `size_of::<Self>()` bytes.
     const ANY_BITS: bool;
 
+    /// Indicates that a type needs padding in case it is stored in an array
+    /// that is aligned to `align_of::<Self>()`.
+    const NEEDS_PADDING: bool;
+
     /// Store the current value to the mutable buffer.
     ///
     /// This is usually called indirectly through methods such as
@@ -309,34 +306,6 @@ pub unsafe trait ZeroCopy {
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut;
-
-    /// Validate and coerce the buffer as reference of this type.
-    ///
-    /// This is called indirectly through methods such as [`Buf::load`] which
-    /// ensures all its safety invariants are met.
-    ///
-    /// [`Buf::load`]: crate::buf::Buf::load
-    ///
-    /// # Safety
-    ///
-    /// Caller must ensure that the provide `buf` is appropriately aligned and
-    /// sized for this type. Failure to ensure this can lead to undefined
-    /// behavior, specifically through misaligned coercions.
-    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error>;
-
-    /// Validate and coerce the buffer as a mutable reference of this type.
-    ///
-    /// This is called indirectly through methods such as [`Buf::load_mut`]
-    /// which ensures all its safety invariants are met.
-    ///
-    /// [`Buf::load_mut`]: crate::buf::Buf::load_mut
-    ///
-    /// # Safety
-    ///
-    /// Caller must ensure that the provide `buf` is appropriately aligned and
-    /// sized for this type. Failure to ensure this can lead to undefined
-    /// behavior, specifically through misaligned coercions.
-    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
 
     /// Only validate the provided buffer.
     ///
@@ -363,7 +332,7 @@ pub unsafe trait ZeroCopy {
     /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
     /// buf.store(&42u32)?;
     ///
-    /// let buf = buf.as_ref()?;
+    /// let buf = buf.as_ref();
     ///
     /// // Safe variant which performs layout checks for us.
     /// assert_eq!(buf.load(Ref::<u32>::zero())?, &42);
@@ -472,24 +441,13 @@ macro_rules! impl_number {
         /// ```
         unsafe impl ZeroCopy for $ty {
             const ANY_BITS: bool = true;
+            const NEEDS_PADDING: bool = false;
 
             fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
             {
                 buf.extend_from_slice(&<$ty>::to_ne_bytes(*self)[..])
-            }
-
-            #[allow(clippy::missing_safety_doc)]
-            #[inline]
-            unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
-                Ok(buf.cast())
-            }
-
-            #[allow(clippy::missing_safety_doc)]
-            #[inline]
-            unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-                Ok(buf.cast_mut())
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -526,6 +484,118 @@ impl_number!(i16);
 impl_number!(i32);
 impl_number!(i64);
 impl_number!(i128);
+
+macro_rules! impl_float {
+    ($ty:ty) => {
+        unsafe impl ZeroCopy for $ty {
+            const ANY_BITS: bool = true;
+            const NEEDS_PADDING: bool = false;
+
+            fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+            where
+                B: BufMut,
+            {
+                buf.extend_from_slice(&<$ty>::to_ne_bytes(*self)[..])
+            }
+
+            #[allow(clippy::missing_safety_doc)]
+            #[inline]
+            unsafe fn validate(_: &Buf) -> Result<(), Error> {
+                Ok(())
+            }
+        }
+
+        impl crate::buf::visit::sealed::Sealed for $ty {}
+
+        impl Visit for $ty {
+            type Target = $ty;
+
+            fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
+            where
+                V: FnOnce(&Self::Target) -> O,
+            {
+                Ok(visitor(self))
+            }
+        }
+    };
+}
+
+impl_float!(f32);
+impl_float!(f64);
+
+unsafe impl ZeroCopy for char {
+    const ANY_BITS: bool = false;
+    const NEEDS_PADDING: bool = false;
+
+    #[inline]
+    fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
+        (*self as u32).store_to(buf)
+    }
+
+    #[allow(clippy::missing_safety_doc)]
+    #[inline]
+    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
+        let repr = unsafe { *buf.cast::<u32>() };
+
+        if char::try_from(repr).is_err() {
+            return Err(Error::new(ErrorKind::IllegalChar { repr }));
+        }
+
+        Ok(())
+    }
+}
+
+impl crate::buf::visit::sealed::Sealed for char {}
+
+impl Visit for char {
+    type Target = char;
+
+    fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
+    where
+        V: FnOnce(&Self::Target) -> O,
+    {
+        Ok(visitor(self))
+    }
+}
+
+unsafe impl ZeroCopy for bool {
+    const ANY_BITS: bool = false;
+    const NEEDS_PADDING: bool = false;
+
+    fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
+    where
+        B: BufMut,
+    {
+        (*self as u32).store_to(buf)
+    }
+
+    #[allow(clippy::missing_safety_doc)]
+    #[inline]
+    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
+        match *buf.cast::<u8>() {
+            0 | 1 => (),
+            repr => return Err(Error::new(ErrorKind::IllegalBool { repr })),
+        }
+
+        Ok(())
+    }
+}
+
+impl crate::buf::visit::sealed::Sealed for bool {}
+
+impl Visit for bool {
+    type Target = bool;
+
+    fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
+    where
+        V: FnOnce(&Self::Target) -> O,
+    {
+        Ok(visitor(self))
+    }
+}
 
 macro_rules! impl_nonzero_number {
     ($ty:ident, $example:ty) => {
@@ -570,28 +640,13 @@ macro_rules! impl_nonzero_number {
         /// ```
         unsafe impl ZeroCopy for ::core::num::$ty {
             const ANY_BITS: bool = false;
+            const NEEDS_PADDING: bool = false;
 
             fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
             {
                 buf.extend_from_slice(&self.get().to_ne_bytes()[..])
-            }
-
-            #[allow(clippy::missing_safety_doc)]
-            #[inline]
-            unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
-                // SAFETY: Layout has been checked.
-                Self::validate(buf)?;
-                Ok(buf.cast())
-            }
-
-            #[allow(clippy::missing_safety_doc)]
-            #[inline]
-            unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-                // SAFETY: Layout has been checked.
-                Self::validate(buf)?;
-                Ok(buf.cast_mut())
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -661,6 +716,7 @@ macro_rules! impl_zst {
         /// ```
         unsafe impl $(<$name>)* ZeroCopy for $ty {
             const ANY_BITS: bool = true;
+            const NEEDS_PADDING: bool = false;
 
             #[inline]
             fn store_to<B: ?Sized>(&self, _: &mut B) -> Result<(), Error>
@@ -668,18 +724,6 @@ macro_rules! impl_zst {
                 B: BufMut,
             {
                 Ok(())
-            }
-
-            #[allow(clippy::missing_safety_doc)]
-            #[inline]
-            unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
-                Ok(buf.cast())
-            }
-
-            #[allow(clippy::missing_safety_doc)]
-            #[inline]
-            unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-                Ok(buf.cast_mut())
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -713,31 +757,17 @@ where
     T: ZeroCopy,
 {
     const ANY_BITS: bool = T::ANY_BITS;
+    const NEEDS_PADDING: bool = T::NEEDS_PADDING;
 
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
     {
-        for element in self {
-            element.store_to(buf)?;
-        }
-
-        Ok(())
-    }
-
-    unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error> {
-        crate::buf::validate_array::<T>(buf)?;
-        // SAFETY: All preconditions above have been tested.
-        Ok(buf.cast_mut())
-    }
-
-    unsafe fn coerce(buf: &Buf) -> Result<&Self, Error> {
-        crate::buf::validate_array::<T>(buf)?;
-        // SAFETY: All preconditions above have been tested.
-        Ok(buf.cast())
+        buf.store_array(self)
     }
 
     #[allow(clippy::missing_safety_doc)]
+    #[inline]
     unsafe fn validate(buf: &Buf) -> Result<(), Error> {
         crate::buf::validate_array::<T>(buf)?;
         Ok(())

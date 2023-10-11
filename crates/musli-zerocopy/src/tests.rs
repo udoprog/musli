@@ -1,3 +1,5 @@
+#![allow(clippy::assertions_on_constants)]
+
 use core::mem::{align_of, size_of};
 
 use crate::pointer::Ref;
@@ -213,5 +215,34 @@ fn test_neg0() -> Result<(), Error> {
     // nightly: feature(repr128)
     #[cfg(feature = "nightly")]
     test_case!(I128, i128, i128, __illegal_enum_i128);
+    Ok(())
+}
+
+#[test]
+fn test_needs_padding() -> Result<(), Error> {
+    #[derive(ZeroCopy)]
+    #[repr(transparent)]
+    #[zero_copy(crate)]
+    struct Zst {}
+
+    const _: () = assert!(!Zst::NEEDS_PADDING);
+
+    #[derive(ZeroCopy)]
+    #[repr(transparent)]
+    #[zero_copy(crate)]
+    struct SingleField {
+        not_padded: u32,
+    }
+
+    const _: () = assert!(!SingleField::NEEDS_PADDING);
+
+    #[derive(ZeroCopy)]
+    #[repr(transparent)]
+    #[zero_copy(crate)]
+    struct MightPad {
+        might_pad: [u32; 4],
+    }
+
+    const _: () = assert!(!MightPad::NEEDS_PADDING);
     Ok(())
 }

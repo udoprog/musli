@@ -156,6 +156,22 @@ macro_rules! rt {
     }};
 }
 
+#[macro_export]
+macro_rules! musli_zerocopy_call {
+    ($call:path) => {
+    };
+
+    ($call:path, prim, $ty:ty, $size_hint:expr $(, $tt:tt)*) => {
+        $call!(musli_value, musli_value_buf, prim, $ty, $size_hint);
+        $crate::musli_zerocopy_call!($call $(, $tt)*);
+    };
+
+    // Ignore others.
+    ($call:path, $name:ident, $ty:ty, $size_hint:expr $(, $tt:tt)*) => {
+        $crate::musli_zerocopy_call!($call $(, $tt)*);
+    };
+}
+
 /// Call the given macro with the existing feature matrix.
 #[macro_export]
 macro_rules! feature_matrix {
@@ -178,6 +194,8 @@ macro_rules! feature_matrix {
         $call!(musli_storage_packed, musli_storage_packed_buf $(, $($tt)*)*);
         #[cfg(feature = "musli-value")]
         $call!(musli_value, musli_value_buf $(, $($tt)*)*);
+        #[cfg(feature = "musli-zerocopy")]
+        $call!(musli_zerocopy, musli_zerocopy_buf $(, $($tt)*)*);
         #[cfg(all(feature = "dlhn", not(any(model_128, model_all))))]
         $call!(serde_dlhn, serde_dlhn_buf $(, $($tt)*)*);
         #[cfg(feature = "serde_cbor")]
@@ -196,12 +214,19 @@ macro_rules! feature_matrix {
 #[macro_export]
 macro_rules! types {
     ($call:path $(, $($tt:tt)*)?) => {
+        #[cfg(not(feature = "musli-zerocopy"))]
         $call! {
             $($($tt)*,)?
             prim, Primitives, PRIMITIVES, 1000,
             lg, LargeStruct, LARGE_STRUCTS, 10000,
             allocated, Allocated, ALLOCATED, 5000,
             medium_enum, MediumEnum, MEDIUM_ENUMS, 1000
+        };
+
+        #[cfg(feature = "musli-zerocopy")]
+        $call! {
+            $($($tt)*,)?
+            prim, Primitives, PRIMITIVES, 1000
         };
     }
 }

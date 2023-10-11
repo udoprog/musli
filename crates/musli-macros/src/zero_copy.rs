@@ -285,11 +285,10 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let mut check_zero_sized = Vec::new();
 
     let store_to;
-    let coerce;
-    let coerce_mut;
     let validate;
     let impl_zero_sized;
     let any_bits;
+    let mut needs_padding = quote!(false);
 
     match &input.data {
         syn::Data::Struct(st) => {
@@ -342,39 +341,27 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                         <#ty as #zero_copy>::store_to(&self.#member, buf)
                     };
 
-                    coerce = quote! {
-                        unsafe {
-                            <#ty as #zero_copy>::validate(buf)?;
-                            #result::Ok(#buf::cast(buf))
-                        }
-                    };
-
-                    coerce_mut = quote! {
-                        unsafe {
-                            <#ty as #zero_copy>::validate(buf)?;
-                            #result::Ok(#buf::cast_mut(buf))
-                        }
-                    };
-
                     validate = quote! {
                         <#ty as #zero_copy>::validate(buf)
+                    };
+
+                    // We are either a `repr(C)` with a single field or
+                    // `repr(transparent)`, in which case we can inherit that
+                    // fields padding.
+                    needs_padding = quote! {
+                        <#ty as #zero_copy>::NEEDS_PADDING
                     };
                 } else {
                     store_to = quote! {
                         #result::Ok(())
                     };
 
-                    coerce = quote! {
-                        #result::Ok(unsafe { #buf::cast(buf) })
-                    };
-
-                    coerce_mut = quote! {
-                        #result::Ok(unsafe { #buf::cast_mut(buf) })
-                    };
-
                     validate = quote! {
                         #result::Ok(())
                     };
+
+                    // This is a ZST. No padding needed.
+                    needs_padding = quote!(false);
                 }
             } else {
                 store_to = quote! {
@@ -389,20 +376,6 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     }
 
                     #result::Ok(())
-                };
-
-                coerce = quote! {
-                    let mut validator = #buf::validate::<Self>(buf)?;
-                    #(#validator::field::<#fields>(&mut validator)?;)*
-                    #validator::end(validator)?;
-                    #result::Ok(unsafe { #buf::cast(buf) })
-                };
-
-                coerce_mut = quote! {
-                    let mut validator = #buf::validate::<Self>(buf)?;
-                    #(#validator::field::<#fields>(&mut validator)?;)*
-                    #validator::end(validator)?;
-                    #result::Ok(unsafe { #buf::cast_mut(buf) })
                 };
 
                 validate = quote! {
@@ -517,20 +490,6 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 <#ty as #zero_copy>::store_to(this, buf)
             };
 
-            coerce = quote! {
-                unsafe {
-                    Self::validate(buf)?;
-                    #result::Ok(#buf::cast(buf))
-                }
-            };
-
-            coerce_mut = quote! {
-                unsafe {
-                    Self::validate(buf)?;
-                    #result::Ok(#buf::cast_mut(buf))
-                }
-            };
-
             let illegal_enum = quote::format_ident!("__illegal_enum_{}", num.as_ty());
 
             validate = quote! {
@@ -580,20 +539,13 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
             const ANY_BITS: bool = #any_bits;
+            const NEEDS_PADDING: bool = #needs_padding;
 
             fn store_to<__B: ?Sized>(&self, buf: &mut __B) -> #result<(), #error>
             where
                 __B: #buf_mut
             {
                 #store_to
-            }
-
-            unsafe fn coerce(buf: &#buf) -> #result<&Self, #error> {
-                #coerce
-            }
-
-            unsafe fn coerce_mut(buf: &mut #buf) -> #result<&mut Self, #error> {
-                #coerce_mut
             }
 
             unsafe fn validate(buf: &#buf) -> #result<(), #error> {

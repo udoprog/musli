@@ -82,7 +82,7 @@ pub mod rkyv {
     >;
 
     #[inline(always)]
-    pub fn encode<T>(
+    pub fn encode<'buf, T>(
         buf: &'buf mut Buffers,
         value: &T,
     ) -> Result<&'buf [u8], <S<'buf> as Fallible>::Error>

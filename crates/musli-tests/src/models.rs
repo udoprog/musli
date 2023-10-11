@@ -12,6 +12,9 @@ use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+#[cfg(feature = "musli-zerocopy")]
+use musli_zerocopy::ZeroCopy;
+
 #[cfg(feature = "musli")]
 use musli::{Decode, Encode};
 use musli_macros::Generate;
@@ -30,6 +33,7 @@ miri! {
 }
 
 #[derive(Debug, Clone, PartialEq, Generate)]
+#[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
@@ -40,6 +44,7 @@ miri! {
     archive_attr(derive(Debug))
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
+#[cfg_attr(feature = "musli-zerocopy", repr(C))]
 pub struct Primitives {
     boolean: bool,
     character: char,
@@ -73,6 +78,13 @@ impl PartialEq<Primitives> for &ArchivedPrimitives {
     }
 }
 
+impl PartialEq<Primitives> for &Primitives {
+    #[inline]
+    fn eq(&self, other: &Primitives) -> bool {
+        *other == **self
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -93,6 +105,13 @@ pub struct Allocated {
 
 #[cfg(feature = "rkyv")]
 impl PartialEq<Allocated> for &ArchivedAllocated {
+    #[inline]
+    fn eq(&self, other: &Allocated) -> bool {
+        *other == **self
+    }
+}
+
+impl PartialEq<Allocated> for &Allocated {
     #[inline]
     fn eq(&self, other: &Allocated) -> bool {
         *other == **self
@@ -139,6 +158,13 @@ impl PartialEq<Tuples> for &ArchivedTuples {
     }
 }
 
+impl PartialEq<Tuples> for &Tuples {
+    #[inline]
+    fn eq(&self, other: &Tuples) -> bool {
+        *other == **self
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -167,6 +193,13 @@ pub enum MediumEnum {
 
 #[cfg(feature = "rkyv")]
 impl PartialEq<MediumEnum> for &ArchivedMediumEnum {
+    #[inline]
+    fn eq(&self, other: &MediumEnum) -> bool {
+        *other == **self
+    }
+}
+
+impl PartialEq<MediumEnum> for &MediumEnum {
     #[inline]
     fn eq(&self, other: &MediumEnum) -> bool {
         *other == **self
@@ -204,6 +237,13 @@ pub struct LargeStruct {
 
 #[cfg(feature = "rkyv")]
 impl PartialEq<LargeStruct> for &ArchivedLargeStruct {
+    #[inline]
+    fn eq(&self, other: &LargeStruct) -> bool {
+        *other == **self
+    }
+}
+
+impl PartialEq<LargeStruct> for &LargeStruct {
     #[inline]
     fn eq(&self, other: &LargeStruct) -> bool {
         *other == **self

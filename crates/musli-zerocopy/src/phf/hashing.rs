@@ -52,3 +52,25 @@ pub(crate) fn get_index(
 
     Ok(displace(f1, f2, d1, d2) as usize % len)
 }
+
+#[inline]
+pub(crate) fn get_custom_index<'a, D>(
+    &Hashes { g, f1, f2 }: &Hashes,
+    get: D,
+    displacements_len: usize,
+    len: usize,
+) -> Result<usize, Error>
+where
+    D: FnOnce(usize) -> Result<Option<&'a Entry<u32, u32>>, Error>,
+{
+    let index = g % displacements_len;
+
+    let Some(&Entry { key: d1, value: d2 }) = get(index)? else {
+        return Err(Error::new(ErrorKind::IndexOutOfBounds {
+            index,
+            len: displacements_len,
+        }));
+    };
+
+    Ok(displace(f1, f2, d1, d2) as usize % len)
+}

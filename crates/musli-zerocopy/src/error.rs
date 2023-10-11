@@ -136,6 +136,12 @@ pub(crate) enum ErrorKind {
         name: &'static str,
         repr: EnumRepr,
     },
+    IllegalChar {
+        repr: u32,
+    },
+    IllegalBool {
+        repr: u8,
+    },
     Utf8Error {
         error: Utf8Error,
     },
@@ -184,6 +190,12 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::IllegalEnumRepr { name, repr } => {
                 write!(f, "Illegal enum representation {repr} for enum {name}")
+            }
+            ErrorKind::IllegalChar { repr } => {
+                write!(f, "Illegal char representation {repr}")
+            }
+            ErrorKind::IllegalBool { repr } => {
+                write!(f, "Illegal bool representation {repr}")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
             #[cfg(feature = "alloc")]

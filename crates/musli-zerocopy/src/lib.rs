@@ -322,18 +322,22 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[doc(inline)]
 pub use self::buf::{AlignedBuf, Buf};
 pub mod buf;
 
+#[doc(inline)]
 pub use self::error::Error;
 mod error;
 
+#[doc(inline)]
 pub use self::traits::ZeroCopy;
 pub mod traits;
 
 mod phf;
 
 pub mod map;
+pub mod set;
 
 pub mod pointer;
 

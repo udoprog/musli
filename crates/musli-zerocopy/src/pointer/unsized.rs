@@ -27,7 +27,7 @@ use crate::ZeroCopy;
 /// let ptr = buf.next_offset::<u8>();
 /// buf.extend_from_slice(b"Hello World!")?;
 ///
-/// let buf = buf.as_ref()?;
+/// let buf = buf.as_ref();
 ///
 /// let bytes = Unsized::<str>::new(ptr, 12);
 ///

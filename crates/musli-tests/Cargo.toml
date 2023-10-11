@@ -31,6 +31,7 @@ musli-descriptive = ["musli", "dep:musli-descriptive"]
 musli-storage = ["musli", "dep:musli-storage"]
 musli-json = ["musli", "dep:musli-json"]
 musli-value = ["musli", "dep:musli-value"]
+musli-zerocopy = ["dep:musli-zerocopy"]
 
 model_full = ["model_vec", "model_128", "model_usize", "model_tuple", "model_float", "model_map", "model_map_string_key", "model_cstring"]
 model_minimal = ["model_vec", "model_float"]
@@ -63,6 +64,7 @@ musli-descriptive = { path = "../musli-descriptive", version = "0.0.61", default
 musli-storage = { path = "../musli-storage", version = "0.0.61", default-features = false, features = ["alloc", "test"], optional = true }
 musli-json = { path = "../musli-json", version = "0.0.61", default-features = false, features = ["alloc", "test",], optional = true }
 musli-value = { path = "../musli-value", version = "0.0.61", default-features = false, features = ["alloc", "test"], optional = true }
+musli-zerocopy = { path = "../musli-zerocopy", version = "0.0.61", default-features = false, features = ["alloc"], optional = true }
 musli-macros = { path = "../musli-macros", version = "0.0.61", features = ["test"] }
 
 anyhow = "1.0.71"

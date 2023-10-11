@@ -36,7 +36,7 @@ use crate::ZeroCopy;
 /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
 /// buf.extend_from_slice(&[0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8]);
 ///
-/// let buf = buf.as_ref()?;
+/// let buf = buf.as_ref();
 ///
 /// let slice = Slice::<u32>::new(4, 2);
 ///
@@ -57,7 +57,7 @@ use crate::ZeroCopy;
 /// use musli_zerocopy::pointer::Slice;
 ///
 /// let buf = AlignedBuf::with_alignment(align_of::<()>());
-/// let buf = buf.as_ref()?;
+/// let buf = buf.as_ref();
 ///
 /// let slice = Slice::<()>::new(0, 2);
 ///
