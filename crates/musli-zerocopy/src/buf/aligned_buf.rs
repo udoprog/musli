@@ -9,22 +9,11 @@ use core::slice;
 use ::alloc::alloc;
 use ::alloc::vec::Vec;
 
-use crate::buf::Buf;
-use crate::buf_mut::BufMut;
+use crate::buf::{Buf, BufMut, StoreStruct, Visit, DEFAULT_ALIGNMENT};
 use crate::error::{Error, ErrorKind};
-use crate::pair::Pair;
-use crate::phf::MapRef;
-use crate::r#ref::Ref;
-use crate::r#unsized::Unsized;
-use crate::size::DefaultSize;
-use crate::slice::Slice;
-use crate::store_struct::StoreStruct;
-use crate::visit::Visit;
-use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
-use crate::Size;
-
-/// Default alignment to use with buffers such as [`AlignedBuf`].
-pub const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
+use crate::map::{Entry, MapRef};
+use crate::pointer::{DefaultSize, Ref, Size, Slice, Unsized};
+use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
 /// An allocating buffer with dynamic alignment.
 ///
@@ -145,7 +134,8 @@ impl<O: Size> AlignedBuf<O> {
     /// this constructor while specifying one of the above parameters:
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, DEFAULT_ALIGNMENT};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::buf::DEFAULT_ALIGNMENT;
     ///
     /// let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
     /// ```
@@ -368,8 +358,8 @@ impl<O: Size> AlignedBuf<O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{AlignedBuf, Unsized};
+    /// use musli_zerocopy::{ZeroCopy, AlignedBuf};
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -417,7 +407,8 @@ impl<O: Size> AlignedBuf<O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, StoreStruct, ZeroCopy};
+    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::buf::StoreStruct;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]
@@ -557,20 +548,21 @@ impl<O: Size> AlignedBuf<O> {
     /// [`bind()`] method for convenience.
     ///
     /// [`phf` crate]: https://crates.io/crates/phf
-    /// [`Map`]: crate::Map
+    /// [`Map`]: crate::map::Map
     /// [`bind()`]: Buf::bind
     ///
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut pairs = Vec::new();
     ///
-    /// pairs.push(Pair::new(buf.store_unsized("first")?, 1u32));
-    /// pairs.push(Pair::new(buf.store_unsized("second")?, 2u32));
+    /// pairs.push(Entry::new(buf.store_unsized("first")?, 1u32));
+    /// pairs.push(Entry::new(buf.store_unsized("second")?, 2u32));
     ///
     /// let map = buf.insert_map(&mut pairs)?;
     /// let buf = buf.as_aligned();
@@ -585,14 +577,15 @@ impl<O: Size> AlignedBuf<O> {
     /// Using non-references as keys:
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut pairs = Vec::new();
     ///
-    /// pairs.push(Pair::new(10u64, 1u32));
-    /// pairs.push(Pair::new(20u64, 2u32));
+    /// pairs.push(Entry::new(10u64, 1u32));
+    /// pairs.push(Entry::new(20u64, 2u32));
     ///
     /// let map = buf.insert_map(&mut pairs)?;
     /// let buf = buf.as_aligned();
@@ -602,7 +595,10 @@ impl<O: Size> AlignedBuf<O> {
     /// assert_eq!(map.get(buf, &30u64)?, None);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert_map<K, V>(&mut self, entries: &mut [Pair<K, V>]) -> Result<MapRef<K, V, O>, Error>
+    pub fn insert_map<K, V>(
+        &mut self,
+        entries: &mut [Entry<K, V>],
+    ) -> Result<MapRef<K, V, O>, Error>
     where
         K: Visit + ZeroCopy,
         V: ZeroCopy,
@@ -632,7 +628,7 @@ impl<O: Size> AlignedBuf<O> {
         let mut displacements = Vec::new();
 
         for (a, b) in hash_state.displacements {
-            displacements.push(Pair { a, b });
+            displacements.push(Entry { key: a, value: b });
         }
 
         let displacements = self.store_slice(&displacements)?;
@@ -657,7 +653,8 @@ impl<O: Size> AlignedBuf<O> {
     /// required a 4-byte alignment:
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Ref};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::pointer::Ref;
     ///
     /// let mut buf = AlignedBuf::with_alignment(4);
     ///
@@ -678,7 +675,8 @@ impl<O: Size> AlignedBuf<O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Ref};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::pointer::Ref;
     ///
     /// let mut buf = AlignedBuf::with_alignment(1);
     ///
@@ -1005,7 +1003,8 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// ```
     /// use core::mem::align_of;
-    /// use musli_zerocopy::{AlignedBuf, Ref};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::pointer::Ref;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
@@ -1035,7 +1034,8 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// ```
     /// use core::mem::align_of;
-    /// use musli_zerocopy::{AlignedBuf, Ref};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::pointer::Ref;
     ///
     /// let mut buf = AlignedBuf::new();
     ///

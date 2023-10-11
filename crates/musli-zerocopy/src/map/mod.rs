@@ -1,29 +1,44 @@
+//! A map which implements a hash-map like interface, where values can be looked
+//! up by keys.
+//!
+//! This map are implemented using a perfect hash functions, and are inserted
+//! into a buffering using [`AlignedBuf::insert_map`].
+//!
+//! There's two types provided by this module:
+//! * [`Map<K, V>`] which is a *bound* reference to a map, providing a
+//!   convenient map-like access.
+//! * [`MapRef<K, V>`] which is the *pointer* of the map. This is what you store
+//!   in [`ZeroCopy`] types and is what is returned by
+//!   [`AlignedBuf::insert_map`].
+//!
+//! [`AlignedBuf::insert_map`]: crate::buf::AlignedBuf::insert_map
+
+pub use self::entry::Entry;
+mod entry;
+
 use core::borrow::Borrow;
 use core::hash::Hash;
 
-use crate::bind::Bindable;
-use crate::buf::Buf;
+use crate::buf::{Bindable, Buf, Visit};
 use crate::error::Error;
-use crate::pair::Pair;
 use crate::phf::hashing::HashKey;
-use crate::size::{DefaultSize, Size};
-use crate::slice::Slice;
-use crate::visit::Visit;
-use crate::zero_copy::ZeroCopy;
+use crate::pointer::{DefaultSize, Size, Slice};
+use crate::traits::ZeroCopy;
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///
 /// ## Examples
 ///
 /// ```
-/// use musli_zerocopy::{AlignedBuf, Pair};
+/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::map::Entry;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
 /// let mut map = Vec::new();
 ///
-/// map.push(Pair::new(1, 2));
-/// map.push(Pair::new(2, 3));
+/// map.push(Entry::new(1, 2));
+/// map.push(Entry::new(2, 3));
 ///
 /// let map = buf.insert_map(&mut map)?;
 /// let buf = buf.as_aligned();
@@ -39,8 +54,8 @@ use crate::zero_copy::ZeroCopy;
 /// ```
 pub struct Map<'a, K, V> {
     key: HashKey,
-    entries: &'a [Pair<K, V>],
-    displacements: &'a [Pair<u32, u32>],
+    entries: &'a [Entry<K, V>],
+    displacements: &'a [Entry<u32, u32>],
     buf: &'a Buf,
 }
 
@@ -54,14 +69,15 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
-    /// map.push(Pair::new(1, 2));
-    /// map.push(Pair::new(2, 3));
+    /// map.push(Entry::new(1, 2));
+    /// map.push(Entry::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
     /// let buf = buf.as_aligned();
@@ -90,14 +106,15 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
-    /// map.push(Pair::new(1, 2));
-    /// map.push(Pair::new(2, 3));
+    /// map.push(Entry::new(1, 2));
+    /// map.push(Entry::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
     /// let buf = buf.as_aligned();
@@ -122,14 +139,15 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
-    /// map.push(Pair::new(1, 2));
-    /// map.push(Pair::new(2, 3));
+    /// map.push(Entry::new(1, 2));
+    /// map.push(Entry::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
     /// let buf = buf.as_aligned();
@@ -158,8 +176,8 @@ where
             return Ok(None);
         };
 
-        if e.a.visit(self.buf, |v| v.borrow() == key)? {
-            Ok(Some((&e.a, &e.b)))
+        if e.key.visit(self.buf, |v| v.borrow() == key)? {
+            Ok(Some((&e.key, &e.value)))
         } else {
             Ok(None)
         }
@@ -193,14 +211,15 @@ where
 /// ## Examples
 ///
 /// ```
-/// use musli_zerocopy::{AlignedBuf, Pair};
+/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::map::Entry;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
 /// let mut map = Vec::new();
 ///
-/// map.push(Pair::new(1, 2));
-/// map.push(Pair::new(2, 3));
+/// map.push(Entry::new(1, 2));
+/// map.push(Entry::new(2, 3));
 ///
 /// let map = buf.insert_map(&mut map)?;
 /// let buf = buf.as_aligned();
@@ -220,8 +239,8 @@ where
     V: ZeroCopy,
 {
     key: HashKey,
-    entries: Slice<Pair<K, V>, O>,
-    displacements: Slice<Pair<u32, u32>, O>,
+    entries: Slice<Entry<K, V>, O>,
+    displacements: Slice<Entry<u32, u32>, O>,
 }
 
 impl<K, V, O: Size> MapRef<K, V, O>
@@ -232,8 +251,8 @@ where
     #[cfg(feature = "alloc")]
     pub(crate) fn new(
         key: HashKey,
-        entries: Slice<Pair<K, V>, O>,
-        displacements: Slice<Pair<u32, u32>, O>,
+        entries: Slice<Entry<K, V>, O>,
+        displacements: Slice<Entry<u32, u32>, O>,
     ) -> Self {
         Self {
             key,
@@ -253,14 +272,15 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
-    /// map.push(Pair::new(1, 2));
-    /// map.push(Pair::new(2, 3));
+    /// map.push(Entry::new(1, 2));
+    /// map.push(Entry::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
     /// let buf = buf.as_aligned();
@@ -288,14 +308,15 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
-    /// map.push(Pair::new(1, 2));
-    /// map.push(Pair::new(2, 3));
+    /// map.push(Entry::new(1, 2));
+    /// map.push(Entry::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
     /// let buf = buf.as_aligned();
@@ -319,14 +340,15 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
-    /// map.push(Pair::new(1, 2));
-    /// map.push(Pair::new(2, 3));
+    /// map.push(Entry::new(1, 2));
+    /// map.push(Entry::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
     /// let buf = buf.as_aligned();
@@ -356,8 +378,8 @@ where
             return Ok(None);
         };
 
-        if e.a.visit(buf, |v| v.borrow() == key)? {
-            Ok(Some((&e.a, &e.b)))
+        if e.key.visit(buf, |v| v.borrow() == key)? {
+            Ok(Some((&e.key, &e.value)))
         } else {
             Ok(None)
         }

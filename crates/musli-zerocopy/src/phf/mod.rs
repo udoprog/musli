@@ -6,9 +6,6 @@
 #[cfg(feature = "alloc")]
 pub(crate) mod generator;
 
-mod hashing;
-
-pub use self::map::{Map, MapRef};
-mod map;
+pub(crate) mod hashing;
 
 mod sip;

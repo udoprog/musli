@@ -1,25 +1,52 @@
+//! Types associated within reading and binding to a [`Buf`].
+//!
+//! Buffers are slices of bytes without any inherent alignment. They allow use
+//! to safely convert offset-like types to references for types which implements
+//! [`ZeroCopy`].
+
+pub use self::bind::Bindable;
+mod bind;
+
+pub use self::load::{Load, LoadMut};
+mod load;
+
+pub use self::visit::Visit;
+pub(crate) mod visit;
+
+pub use self::validator::Validator;
+mod validator;
+
+pub use self::store_struct::StoreStruct;
+mod store_struct;
+
+pub use self::buf_mut::BufMut;
+mod buf_mut;
+
+#[cfg(feature = "alloc")]
+pub use self::aligned_buf::AlignedBuf;
+#[cfg(feature = "alloc")]
+mod aligned_buf;
+
+/// Default alignment to use with buffers such as [`AlignedBuf`].
+pub const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
+
 use core::alloc::Layout;
 use core::fmt;
-use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 use core::ops::Range;
 use core::slice;
 
-use crate::bind::Bindable;
 use crate::error::{Error, ErrorKind};
-use crate::load::{Load, LoadMut};
-use crate::r#ref::Ref;
-use crate::r#unsized::Unsized;
-use crate::slice::Slice;
-use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
-use crate::Size;
+use crate::pointer::{Ref, Size, Slice, Unsized};
+use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
 /// A buffer wrapping a slice of bytes.
 ///
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::{Buf, Unsized};
+/// use musli_zerocopy::Buf;
+/// use musli_zerocopy::pointer::Unsized;
 ///
 /// let buf = Buf::new(b"Hello World!");
 /// let unsize = Unsized::<str>::new(0, 12);
@@ -38,7 +65,8 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Buf, Unsized};
+    /// use musli_zerocopy::Buf;
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// let buf = Buf::new(b"Hello World!");
     /// let unsize = Unsized::<str>::new(0, 12);
@@ -56,7 +84,8 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{Buf, Unsized};
+    /// use musli_zerocopy::Buf;
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// let mut bytes: [u8; 12] = *b"Hello World!";
     ///
@@ -241,7 +270,7 @@ impl Buf {
 
     /// Bind the current buffer to a value.
     ///
-    /// This provides a more conveninent API for complex types like [`MapRef`],
+    /// This provides a more convenient API for complex types like [`MapRef`],
     /// and makes sure that all the internals related to the type being bound
     /// has been validated and initialized.
     ///
@@ -250,7 +279,7 @@ impl Buf {
     /// can be performed up front. But slower if you just intend to perform the
     /// casual lookup.
     ///
-    /// [`MapRef`]: crate::MapRef
+    /// [`MapRef`]: crate::map::MapRef
     ///
     /// ## Examples
     ///
@@ -258,14 +287,15 @@ impl Buf {
     /// validated:
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, Pair};
+    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::map::Entry;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut map = Vec::new();
     ///
-    /// map.push(Pair::new(1, 2));
-    /// map.push(Pair::new(2, 3));
+    /// map.push(Entry::new(1, 2));
+    /// map.push(Entry::new(2, 3));
     ///
     /// let map = buf.insert_map(&mut map)?;
     /// let buf = buf.as_aligned();
@@ -280,7 +310,7 @@ impl Buf {
     /// Ok::<_, musli_zerocopy::Error>(())
     /// ```
     ///
-    /// [`Map`]: crate::Map
+    /// [`Map`]: crate::map::Map
     pub fn bind<T>(&self, ptr: T) -> Result<T::Bound<'_>, Error>
     where
         T: Bindable,
@@ -327,8 +357,7 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{AlignedBuf, Unsized};
+    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -356,12 +385,7 @@ impl Buf {
         T: ZeroCopy,
     {
         self.ensure_compatible_with::<T>()?;
-
-        Ok(Validator {
-            data: self,
-            offset: 0,
-            _marker: PhantomData,
-        })
+        Ok(Validator::new(self))
     }
 
     /// Get the given range while checking its required alignment.
@@ -566,139 +590,6 @@ impl Buf {
 impl fmt::Debug for Buf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Buf").field(&self.data.len()).finish()
-    }
-}
-
-/// Validator over a [`Buf`] constructed using [`Buf::validate`].
-#[must_use = "Must call `Validator::end` when validation is completed"]
-pub struct Validator<'a, T> {
-    data: &'a Buf,
-    offset: usize,
-    _marker: PhantomData<T>,
-}
-
-impl<T> Validator<'_, T> {
-    /// Validate an additional field in the struct.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{AlignedBuf, Unsized};
-    ///
-    /// #[derive(ZeroCopy)]
-    /// #[repr(C)]
-    /// struct Custom {
-    ///     field: u32,
-    ///     field2: u64,
-    /// }
-    ///
-    /// let mut buf = AlignedBuf::new();
-    ///
-    /// let custom = buf.store(&Custom {
-    ///     field: 42,
-    ///     field2: 85,
-    /// })?;
-    /// let buf = buf.as_aligned();
-    ///
-    /// let mut v = buf.validate::<Custom>()?;
-    /// v.field::<u32>()?;
-    /// v.field::<u64>()?;
-    /// v.end()?;
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    pub fn field<F>(&mut self) -> Result<(), Error>
-    where
-        F: ZeroCopy,
-    {
-        let start = self.offset.next_multiple_of(align_of::<F>());
-        let end = start.wrapping_add(size_of::<F>());
-
-        // SAFETY: We've ensured that the provided buffer is aligned and sized
-        // appropriately above.
-        unsafe {
-            let data = self.data.get_unaligned(start, end)?;
-            F::validate(data)?;
-        };
-
-        self.offset = end;
-        Ok(())
-    }
-
-    /// Finish validation.
-    ///
-    /// # Errors
-    ///
-    /// If there is any buffer left uncomsumed at this point, this will return
-    /// an [`Error`].
-    ///
-    /// ```
-    /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{AlignedBuf, Unsized};
-    ///
-    /// #[derive(ZeroCopy)]
-    /// #[repr(C)]
-    /// struct Custom {
-    ///     field: u32,
-    ///     field2: u64,
-    /// }
-    ///
-    /// let mut buf = AlignedBuf::new();
-    ///
-    /// let custom = buf.store(&Custom {
-    ///     field: 42,
-    ///     field2: 85,
-    /// })?;
-    /// buf.extend_from_slice(&[0]);
-    /// let buf = buf.as_aligned();
-    ///
-    /// // We can only cause the error if we assert that the buffer is aligned.
-    /// let mut v = buf.validate::<Custom>()?;
-    /// v.field::<u32>()?;
-    /// v.field::<u64>()?;
-    /// // Will error since the buffer is too large.
-    /// assert!(v.end().is_err());
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::ZeroCopy;
-    /// use musli_zerocopy::{AlignedBuf, Unsized};
-    ///
-    /// #[derive(ZeroCopy)]
-    /// #[repr(C)]
-    /// struct Custom {
-    ///     field: u32,
-    ///     field2: u64,
-    /// }
-    ///
-    /// let mut buf = AlignedBuf::new();
-    ///
-    /// let custom = buf.store(&Custom {
-    ///     field: 42,
-    ///     field2: 85,
-    /// })?;
-    /// let buf = buf.as_aligned();
-    ///
-    /// let mut v = buf.validate::<Custom>()?;
-    /// v.field::<u32>()?;
-    /// v.field::<u64>()?;
-    /// v.end()?;
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    pub fn end(self) -> Result<(), Error> {
-        let offset = self.offset.next_multiple_of(size_of::<T>());
-
-        if offset != self.data.len() {
-            return Err(Error::new(ErrorKind::BufferUnderflow {
-                range: self.data.range(),
-                expected: offset,
-            }));
-        }
-
-        Ok(())
     }
 }
 

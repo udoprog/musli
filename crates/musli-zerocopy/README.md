@@ -139,7 +139,8 @@ To initialize an [`AlignedBuf`] with a custom [`Size`] you simply use this
 constructor while specifying one of the above parameters:
 
 ```rust
-use musli_zerocopy::{AlignedBuf, DEFAULT_ALIGNMENT};
+use musli_zerocopy::AlignedBuf;
+use musli_zerocopy::buf::DEFAULT_ALIGNMENT;
 
 let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
 ```
@@ -149,7 +150,7 @@ simply specify the default parameter:
 
 ```rust
 use musli_zerocopy::{ZeroCopy, Ref, Slice, Unsized, AlignedBuf};
-use musli_zerocopy::DEFAULT_ALIGNMENT;
+use musli_zerocopy::buf::DEFAULT_ALIGNMENT;
 
 #[derive(ZeroCopy)]
 #[repr(C)]

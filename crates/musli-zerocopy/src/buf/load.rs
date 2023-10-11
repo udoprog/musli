@@ -1,17 +1,11 @@
 use crate::buf::Buf;
 use crate::error::Error;
-use crate::r#ref::Ref;
-use crate::r#unsized::Unsized;
-use crate::size::Size;
-use crate::slice::Slice;
-use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+use crate::pointer::{Ref, Size, Slice, Unsized};
+use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
 mod sealed {
-    use crate::r#ref::Ref;
-    use crate::r#unsized::Unsized;
-    use crate::size::Size;
-    use crate::slice::Slice;
-    use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+    use crate::pointer::{Ref, Size, Slice, Unsized};
+    use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
     pub trait Sealed {}
 

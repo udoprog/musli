@@ -3,11 +3,10 @@ use core::hash::Hash;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::buf::Buf;
+use crate::buf::{Buf, Visit};
 use crate::error::{Error, ErrorKind};
-use crate::pair::Pair;
+use crate::map::Entry;
 use crate::phf::hashing::{displace, hash, HashKey, Hashes};
-use crate::visit::Visit;
 
 use rand::distributions::Standard;
 use rand::rngs::SmallRng;
@@ -22,7 +21,7 @@ pub(crate) struct HashState {
     pub(crate) map: Vec<usize>,
 }
 
-pub(crate) fn generate_hash<K, V>(buf: &Buf, entries: &[Pair<K, V>]) -> Result<HashState, Error>
+pub(crate) fn generate_hash<K, V>(buf: &Buf, entries: &[Entry<K, V>]) -> Result<HashState, Error>
 where
     K: Visit,
     K::Target: Hash,
@@ -38,7 +37,7 @@ where
 
 fn try_generate_hash<K, V>(
     buf: &Buf,
-    entries: &[Pair<K, V>],
+    entries: &[Entry<K, V>],
     key: HashKey,
 ) -> Result<Option<HashState>, Error>
 where
@@ -48,7 +47,7 @@ where
     let mut hashes = Vec::new();
 
     for n in 0..entries.len() {
-        let Some(Pair { a: entry, .. }) = entries.get(n) else {
+        let Some(Entry { key: entry, .. }) = entries.get(n) else {
             return Err(Error::new(ErrorKind::IndexOutOfBounds {
                 index: n,
                 len: entries.len(),

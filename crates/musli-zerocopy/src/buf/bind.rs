@@ -2,12 +2,12 @@ use crate::buf::Buf;
 use crate::error::Error;
 
 mod sealed {
-    use crate::size::Size;
-    use crate::zero_copy::ZeroCopy;
+    use crate::pointer::Size;
+    use crate::traits::ZeroCopy;
 
     pub trait Sealed {}
 
-    impl<K: 'static, V: 'static, O: Size> Sealed for crate::phf::MapRef<K, V, O>
+    impl<K: 'static, V: 'static, O: Size> Sealed for crate::map::MapRef<K, V, O>
     where
         K: ZeroCopy,
         V: ZeroCopy,

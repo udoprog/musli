@@ -1,24 +1,25 @@
 use crate::error::Error;
-use crate::r#ref::Ref;
-use crate::size::Size;
-use crate::zero_copy::ZeroCopy;
+use crate::pointer::{Ref, Size};
+use crate::traits::ZeroCopy;
 
 mod sealed {
     #[cfg(feature = "alloc")]
-    use crate::size::Size;
+    use crate::pointer::Size;
     #[cfg(feature = "alloc")]
-    use crate::zero_copy::ZeroCopy;
+    use crate::traits::ZeroCopy;
 
     pub trait Sealed {}
 
     #[cfg(feature = "alloc")]
-    impl<'a, T, O: Size> Sealed for crate::aligned_buf::AlignedBufStoreStruct<'a, T, O> where T: ZeroCopy
-    {}
+    impl<'a, T, O: Size> Sealed for crate::buf::aligned_buf::AlignedBufStoreStruct<'a, T, O> where
+        T: ZeroCopy
+    {
+    }
 }
 
 /// A writer as returned from [`BufMut::store_struct`].
 ///
-/// [`BufMut::store_struct`]: crate::buf_mut::BufMut::store_struct
+/// [`BufMut::store_struct`]: crate::buf::BufMut::store_struct
 pub trait StoreStruct<T: ZeroCopy, O: Size>: self::sealed::Sealed {
     /// Pad around the given field with zeros.
     ///
@@ -34,7 +35,8 @@ pub trait StoreStruct<T: ZeroCopy, O: Size>: self::sealed::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, StoreStruct, ZeroCopy};
+    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::buf::StoreStruct;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]
@@ -74,12 +76,13 @@ pub trait StoreStruct<T: ZeroCopy, O: Size>: self::sealed::Sealed {
     /// Fields which are [`ZeroSized`] can be skipped.
     ///
     /// [`pad::<F>()`]: Self::pad
-    /// [`ZeroSized`]: crate::ZeroSized
+    /// [`ZeroSized`]: crate::traits::ZeroSized
     ///
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, StoreStruct, ZeroCopy};
+    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::buf::StoreStruct;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]

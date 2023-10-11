@@ -1,9 +1,8 @@
-use crate::buf::Buf;
+use crate::buf::{Buf, Load};
 use crate::error::Error;
-use crate::load::Load;
 
 pub(crate) mod sealed {
-    use crate::load::Load;
+    use crate::buf::Load;
 
     pub trait Sealed {}
 

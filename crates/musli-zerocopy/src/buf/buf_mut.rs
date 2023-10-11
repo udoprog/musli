@@ -1,16 +1,16 @@
+use crate::buf::StoreStruct;
 use crate::error::Error;
-use crate::size::Size;
-use crate::store_struct::StoreStruct;
-use crate::zero_copy::ZeroCopy;
+use crate::pointer::Size;
+use crate::traits::ZeroCopy;
 
 mod sealed {
     #[cfg(feature = "alloc")]
-    use crate::size::Size;
+    use crate::pointer::Size;
 
     pub trait Sealed {}
 
     #[cfg(feature = "alloc")]
-    impl<O: Size> Sealed for crate::aligned_buf::AlignedBuf<O> {}
+    impl<O: Size> Sealed for crate::buf::AlignedBuf<O> {}
     impl<B: ?Sized> Sealed for &mut B where B: Sealed {}
 }
 
@@ -50,7 +50,8 @@ pub trait BufMut: self::sealed::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, BufMut, StoreStruct, ZeroCopy};
+    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::buf::StoreStruct;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]

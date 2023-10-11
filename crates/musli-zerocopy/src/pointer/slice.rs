@@ -1,9 +1,7 @@
 use core::marker::PhantomData;
 use core::mem::size_of;
 
-use crate::r#ref::Ref;
-use crate::size::DefaultSize;
-use crate::size::Size;
+use crate::pointer::{DefaultSize, Ref, Size};
 use crate::ZeroCopy;
 
 /// A reference to a slice packed as a wide pointer.
@@ -12,7 +10,7 @@ use crate::ZeroCopy;
 ///
 /// This contains a pointer to the first element and the length of the slice.
 ///
-/// [`AlignedBuf::store_slice`]: crate::aligned_buf::AlignedBuf::store_slice
+/// [`AlignedBuf::store_slice`]: crate::buf::AlignedBuf::store_slice
 ///
 /// # Examples
 ///
@@ -32,7 +30,8 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Slice};
+/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::pointer::Slice;
 ///
 /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
 /// buf.extend_from_slice(&[0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8]);
@@ -54,7 +53,8 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Slice};
+/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::pointer::Slice;
 ///
 /// let buf = AlignedBuf::with_alignment(align_of::<()>());
 /// let buf = buf.as_ref()?;
@@ -88,7 +88,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Slice;
+    /// use musli_zerocopy::pointer::Slice;
     ///
     /// let slice = Slice::<u32>::new(0, 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -117,7 +117,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Slice;
+    /// use musli_zerocopy::pointer::Slice;
     ///
     /// let slice = Slice::<u32>::new(0, 2);
     /// assert_eq!(slice.offset(), 0);
@@ -132,7 +132,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Slice;
+    /// use musli_zerocopy::pointer::Slice;
     ///
     /// let slice = Slice::<u32>::new(0, 2);
     /// assert_eq!(slice.len(), 2);
@@ -147,7 +147,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Slice;
+    /// use musli_zerocopy::pointer::Slice;
     ///
     /// let slice = Slice::<u32>::new(0, 0);
     /// assert!(slice.is_empty());

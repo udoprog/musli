@@ -1,12 +1,13 @@
-use musli_zerocopy::{AlignedBuf, Error, Pair};
+use musli_zerocopy::map::Entry;
+use musli_zerocopy::{AlignedBuf, Error};
 
 fn main() -> Result<(), Error> {
     let mut buf = AlignedBuf::new();
 
     let mut values = Vec::new();
 
-    values.push(Pair::new(10u32, 1u32));
-    values.push(Pair::new(20u32, 2u32));
+    values.push(Entry::new(10u32, 1u32));
+    values.push(Entry::new(20u32, 2u32));
 
     let values = buf.insert_map(&mut values)?;
 

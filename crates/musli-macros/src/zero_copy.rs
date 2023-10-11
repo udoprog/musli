@@ -273,14 +273,14 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         return Err(());
     };
 
-    let buf_mut: syn::Path = syn::parse_quote!(#krate::BufMut);
-    let store_struct: syn::Path = syn::parse_quote!(#krate::StoreStruct);
-    let buf: syn::Path = syn::parse_quote!(#krate::Buf);
+    let buf_mut: syn::Path = syn::parse_quote!(#krate::buf::BufMut);
+    let buf: syn::Path = syn::parse_quote!(#krate::buf::Buf);
     let error: syn::Path = syn::parse_quote!(#krate::Error);
-    let validator: syn::Path = syn::parse_quote!(#krate::Validator);
-    let zero_copy: syn::Path = syn::parse_quote!(#krate::ZeroCopy);
-    let zero_sized: syn::Path = syn::parse_quote!(#krate::ZeroSized);
     let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
+    let store_struct: syn::Path = syn::parse_quote!(#krate::buf::StoreStruct);
+    let validator: syn::Path = syn::parse_quote!(#krate::buf::Validator);
+    let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
+    let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
 
     let mut check_zero_sized = Vec::new();
 
@@ -531,12 +531,14 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 }
             };
 
+            let illegal_enum = quote::format_ident!("__illegal_enum_{}", num.as_ty());
+
             validate = quote! {
                 <#ty as #zero_copy>::validate(buf)?;
 
                 match *#buf::cast::<#ty>(buf) {
                     #(#variants => (),)*
-                    _ => return #result::Err(#error::__enum_illegal_repr::<Self>()),
+                    value => return #result::Err(#error::#illegal_enum::<Self>(value)),
                 }
 
                 Ok(())

@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::size::{DefaultSize, Size};
+use crate::pointer::{DefaultSize, Size};
 use crate::ZeroCopy;
 
 /// A sized reference.
@@ -17,7 +17,8 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Ref};
+/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::pointer::Ref;
 ///
 /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
@@ -41,7 +42,16 @@ impl<T, O: Size> Ref<T, O>
 where
     T: ZeroCopy,
 {
-    /// Construct a typed reference to the first position in a buffer.
+    /// Construct a typed reference to the zeroeth offset in a buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let reference = Ref::<u64>::zero();
+    /// assert_eq!(reference.offset(), 0);
+    /// ```
     pub const fn zero() -> Self {
         Self {
             offset: O::ZERO,
@@ -49,7 +59,16 @@ where
         }
     }
 
-    /// Construct a reference wrapping the given type at the specified address.
+    /// Construct a reference wrapping the given type at the specified offset.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let reference = Ref::<u64>::new(42);
+    /// assert_eq!(reference.offset(), 42);
+    /// ```
     pub fn new(offset: usize) -> Self {
         let Some(offset) = O::from_usize(offset) else {
             panic!("Ref offset {offset} not in the legal range of 0-{}", O::MAX);
@@ -61,8 +80,18 @@ where
         }
     }
 
+    /// Get the offset the reference points to.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let reference = Ref::<u64>::new(42);
+    /// assert_eq!(reference.offset(), 42);
+    /// ```
     #[inline]
-    pub(crate) fn offset(&self) -> usize {
+    pub fn offset(&self) -> usize {
         self.offset.as_usize()
     }
 }

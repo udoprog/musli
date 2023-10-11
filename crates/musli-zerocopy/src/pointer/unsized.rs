@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 
-use crate::size::DefaultSize;
-use crate::{Size, UnsizedZeroCopy, ZeroCopy};
+use crate::pointer::{DefaultSize, Size};
+use crate::traits::UnsizedZeroCopy;
+use crate::ZeroCopy;
 
 /// A reference to an unsized value packed as a wide pointer.
 ///
@@ -12,14 +13,15 @@ use crate::{Size, UnsizedZeroCopy, ZeroCopy};
 /// This contains a pointer to the unsized element and the length of the
 /// element.
 ///
-/// [`UnsizedZeroCopy`]: crate::zero_copy::UnsizedZeroCopy
-/// [`AlignedBuf::store_unsized`]: crate::aligned_buf::AlignedBuf::store_unsized
+/// [`UnsizedZeroCopy`]: crate::traits::UnsizedZeroCopy
+/// [`AlignedBuf::store_unsized`]: crate::buf::AlignedBuf::store_unsized
 ///
 /// # Examples
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::{AlignedBuf, Unsized};
+/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::pointer::Unsized;
 ///
 /// let mut buf = AlignedBuf::new();
 /// let ptr = buf.next_offset::<u8>();
@@ -51,7 +53,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Unsized;
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// let bytes = Unsized::<str>::new(0, 2);
     /// ```
@@ -79,7 +81,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Unsized;
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// let bytes = Unsized::<str>::new(0, 2);
     /// assert_eq!(bytes.offset(), 0);
@@ -94,7 +96,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Unsized;
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// let bytes = Unsized::<str>::new(0, 2);
     /// assert_eq!(bytes.size(), 2);

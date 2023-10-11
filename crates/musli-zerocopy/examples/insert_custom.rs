@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
-use musli_zerocopy::{AlignedBuf, Pair, Unsized, ZeroCopy};
+use musli_zerocopy::map::Entry;
+use musli_zerocopy::pointer::Unsized;
+use musli_zerocopy::{AlignedBuf, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
@@ -16,7 +18,7 @@ fn main() -> Result<()> {
     let c1 = buf.store(&Custom { field: 1, string })?;
     let c2 = buf.store(&Custom { field: 2, string })?;
 
-    let mut map = vec![Pair::new(1, c1), Pair::new(2, c2)];
+    let mut map = vec![Entry::new(1, c1), Entry::new(2, c2)];
 
     let map = buf.insert_map(&mut map)?;
     let buf = buf.as_aligned();

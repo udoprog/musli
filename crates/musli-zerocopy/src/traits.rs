@@ -1,14 +1,26 @@
-#![allow(clippy::len_without_is_empty)]
+//! Traits that apply to types which can safely interact with Müsli's zero copy
+//! system.
+//!
+//! Note that all of these traits are `unsafe`, and require care to implement.
+//! Please see their corresponding safety documentation or use the
+//! [`ZeroCopy`][derive@crate::ZeroCopy] derive.
+//!
+//! * [`ZeroCopy`] for types which can safely be coerced from a [`Buf`] to
+//!   `&Self` or `&mut Self`.
+//! * [`UnsizedZeroCopy`] for types which can safely be coerced from an
+//!   [`Unsized<T>`] to `&T` or `&mut T`.
+//! * [`ZeroSized`] for types which can be ingored when deriving
+//!   [`ZeroCopy`][derive@crate::ZeroCopy] using `#[zero_copy(ignore)]`.
+//!
+//! [`Unsized<T>`]: crate::pointer::Unsized
 
 use core::cell::Cell;
 use core::marker::PhantomData;
 use core::mem::align_of;
 use core::str;
 
-use crate::buf::Buf;
-use crate::buf_mut::BufMut;
+use crate::buf::{Buf, BufMut, Visit};
 use crate::error::{Error, ErrorKind};
-use crate::visit::Visit;
 
 mod sealed {
     pub trait Sealed {}
@@ -24,8 +36,8 @@ mod sealed {
 ///
 /// For nested slices or arrays, use [`Slice<T>`] instead.
 ///
-/// [`Unsized<T>`]: crate::unsized::Unsized
-/// [`Slice<T>`]: crate::slice::Slice
+/// [`Unsized<T>`]: crate::pointer::Unsized
+/// [`Slice<T>`]: crate::pointer::Slice
 ///
 /// # Safety
 ///
@@ -60,7 +72,7 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// [`AlignedBuf::store_unsized`].
     ///
     /// [`AlignedBuf::store_unsized`]:
-    ///     crate::aligned_buf::AlignedBuf::store_unsized
+    ///     crate::buf::AlignedBuf::store_unsized
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut;
@@ -87,7 +99,7 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
 }
 
 /// This is a marker trait that must be implemented for a type in order to use
-/// the [`#[zero_copy(ignore)]`] attribute when deriving the [`ZeroCopy`] trait.
+/// the `#[zero_copy(ignore)]` attribute when deriving the [`ZeroCopy`] trait.
 ///
 /// Using the attribute incorrectly might lead to unsoundness.
 ///
@@ -97,11 +109,12 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
 ///
 /// # Examples
 ///
-/// We can use #[zero_copy(ignore)] on generic fields if the implement
-/// [`ZeroSized`].
+/// Using `#[zero_copy(ignore)]`` on generic fields that implements
+/// [`ZeroSized`]:
 ///
 /// ```
-/// use musli_zerocopy::{ZeroCopy, ZeroSized};
+/// use musli_zerocopy::ZeroCopy;
+/// use musli_zerocopy::traits::ZeroSized;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(transparent)]
@@ -117,8 +130,8 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
 /// ```
 /// use core::marker::PhantomData;
 /// use core::mem::size_of;
-///
-/// use musli_zerocopy::{ZeroCopy, ZeroSized};
+/// use musli_zerocopy::ZeroCopy;
+/// use musli_zerocopy::traits::ZeroSized;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(transparent)]
@@ -245,16 +258,23 @@ unsafe impl<T> ZeroSized for [T; 0] {}
 // SAFETY: `PhantomData<T>` is zero-sized.
 unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 
-/// Trait governing types that can be safely coerced from a buffer.
+/// Trait governing types can be safely coerced into a reference from a buffer.
 ///
-/// This is usually implemented automatically by the [`ZeroCopy`] derive.
+/// It is not recommended to implement this trait manually, instead rely on the
+/// [`ZeroCopy`] derive.
 ///
 /// [`ZeroCopy`]: derive@crate::ZeroCopy
 ///
 /// # Safety
 ///
 /// This can only be implemented correctly by types under certain conditions:
-/// * The type has a strict, well-defined layout or is `repr(C)`.
+/// * The type has a strict, well-defined layout like `repr(C)` or an enum with
+///   `repr(u32)`.
+/// * It's size and alignment must be known statically as per [`size_of`] and
+///   [`align_of`]. This excludes enums which are `#[repr(C)]` because for
+///   example their alignment depends on the range of values they can represent.
+///
+/// [`size_of`]: core::mem::size_of
 ///
 /// # Examples
 ///
@@ -285,7 +305,7 @@ pub unsafe trait ZeroCopy {
     /// This is usually called indirectly through methods such as
     /// [`AlignedBuf::store`].
     ///
-    /// [`AlignedBuf::store`]: crate::aligned_buf::AlignedBuf::store
+    /// [`AlignedBuf::store`]: crate::buf::AlignedBuf::store
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut;
@@ -328,7 +348,8 @@ pub unsafe trait ZeroCopy {
     /// ```no_run
     /// use core::mem::align_of;
     ///
-    /// use musli_zerocopy::{AlignedBuf, Buf, Error, Ref, ZeroCopy};
+    /// use musli_zerocopy::{AlignedBuf, Buf, Error, ZeroCopy};
+    /// use musli_zerocopy::pointer::Ref;
     ///
     /// unsafe fn unsafe_coerce<T>(buf: &Buf) -> Result<&T, Error>
     /// where
@@ -421,7 +442,8 @@ macro_rules! impl_number {
         /// ```
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{ZeroCopy, Buf, Ref};
+        /// use musli_zerocopy::{ZeroCopy, Buf};
+        /// use musli_zerocopy::pointer::Ref;
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
@@ -477,7 +499,7 @@ macro_rules! impl_number {
             }
         }
 
-        impl crate::visit::sealed::Sealed for $ty {}
+        impl crate::buf::visit::sealed::Sealed for $ty {}
 
         impl Visit for $ty {
             type Target = $ty;
@@ -515,7 +537,8 @@ macro_rules! impl_nonzero_number {
         #[doc = concat!("use std::num::", stringify!($ty), ";")]
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{ZeroCopy, Buf, Ref};
+        /// use musli_zerocopy::{ZeroCopy, Buf};
+        /// use musli_zerocopy::pointer::Ref;
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
@@ -582,7 +605,7 @@ macro_rules! impl_nonzero_number {
             }
         }
 
-        impl crate::visit::sealed::Sealed for ::core::num::$ty {}
+        impl crate::buf::visit::sealed::Sealed for ::core::num::$ty {}
 
         impl Visit for ::core::num::$ty {
             type Target = ::core::num::$ty;
@@ -618,7 +641,7 @@ macro_rules! impl_zst {
         ///
         /// ```
         $(#[doc = concat!("use ", stringify!($import), ";")])*
-        /// use musli_zerocopy::{ZeroCopy, Slice, AlignedBuf};
+        /// use musli_zerocopy::{ZeroCopy, AlignedBuf};
         ///
         /// #[derive(Default, Clone, Copy, ZeroCopy)]
         /// #[repr(C)]
@@ -666,7 +689,7 @@ macro_rules! impl_zst {
             }
         }
 
-        impl $(<$name>)* crate::visit::sealed::Sealed for $ty {
+        impl $(<$name>)* crate::buf::visit::sealed::Sealed for $ty {
         }
 
         impl $(<$name>)* Visit for $ty {
