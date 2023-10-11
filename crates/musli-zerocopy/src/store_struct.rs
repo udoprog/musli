@@ -1,12 +1,25 @@
 use crate::error::Error;
-use crate::offset::TargetSize;
 use crate::r#ref::Ref;
+use crate::size::Size;
 use crate::zero_copy::ZeroCopy;
+
+mod sealed {
+    #[cfg(feature = "alloc")]
+    use crate::size::Size;
+    #[cfg(feature = "alloc")]
+    use crate::zero_copy::ZeroCopy;
+
+    pub trait Sealed {}
+
+    #[cfg(feature = "alloc")]
+    impl<'a, T, O: Size> Sealed for crate::aligned_buf::AlignedBufStoreStruct<'a, T, O> where T: ZeroCopy
+    {}
+}
 
 /// A writer as returned from [`BufMut::store_struct`].
 ///
 /// [`BufMut::store_struct`]: crate::buf_mut::BufMut::store_struct
-pub trait StoreStruct<T, O: TargetSize> {
+pub trait StoreStruct<T: ZeroCopy, O: Size>: self::sealed::Sealed {
     /// Pad around the given field with zeros.
     ///
     /// Note that this is necessary to do correctly in order to satisfy the

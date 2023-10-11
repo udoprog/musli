@@ -2,9 +2,17 @@ use crate::buf::Buf;
 use crate::error::Error;
 use crate::load::Load;
 
+pub(crate) mod sealed {
+    use crate::load::Load;
+
+    pub trait Sealed {}
+
+    impl<T: ?Sized> Sealed for T where T: Load {}
+}
+
 /// Trait used for handling any kind of zero copy value, be they references or
 /// not.
-pub trait Visit {
+pub trait Visit: self::sealed::Sealed {
     /// The target being read.
     type Target: ?Sized;
 

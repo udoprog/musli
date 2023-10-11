@@ -12,16 +12,16 @@ use ::alloc::vec::Vec;
 use crate::buf::Buf;
 use crate::buf_mut::BufMut;
 use crate::error::{Error, ErrorKind};
-use crate::offset::DefaultTargetSize;
 use crate::pair::Pair;
 use crate::phf::MapRef;
 use crate::r#ref::Ref;
 use crate::r#unsized::Unsized;
+use crate::size::DefaultSize;
 use crate::slice::Slice;
 use crate::store_struct::StoreStruct;
 use crate::visit::Visit;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
-use crate::TargetSize;
+use crate::Size;
 
 /// Default alignment to use with buffers such as [`AlignedBuf`].
 pub const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
@@ -46,7 +46,7 @@ pub const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
 /// let mut buf = AlignedBuf::new();
 /// buf.store(&Custom { field: 10 });
 /// ```
-pub struct AlignedBuf<O: TargetSize = DefaultTargetSize> {
+pub struct AlignedBuf<O: Size = DefaultSize> {
     data: ptr::NonNull<u8>,
     /// The initialized length of the buffer.
     len: usize,
@@ -128,21 +128,21 @@ impl AlignedBuf {
     }
 }
 
-impl<O: TargetSize> AlignedBuf<O> {
+impl<O: Size> AlignedBuf<O> {
     /// Allocate a new buffer with the given capacity and default alignment.
     ///
     /// The buffer must allocate for at least the given `capacity`, but might
     /// allocate more. If the capacity specified is `0` it will not allocate.
     ///
-    /// This constructor also allows for specifying the [`TargetSize`] through
-    /// the `O` parameter.
+    /// This constructor also allows for specifying the [`Size`] through the `O`
+    /// parameter.
     ///
-    /// The available [`TargetSize`] implementations are:
+    /// The available [`Size`] implementations are:
     /// * `u32` for 32-bit sized pointers (the default).
     /// * `usize` for target-dependently sized pointers.
     ///
-    /// To initialize an [`AlignedBuf`] with a custom [`TargetSize`] you simply
-    /// use this constructor while specifying one of the above parameters:
+    /// To initialize an [`AlignedBuf`] with a custom [`Size`] you simply use
+    /// this constructor while specifying one of the above parameters:
     ///
     /// ```
     /// use musli_zerocopy::{AlignedBuf, DEFAULT_ALIGNMENT};
@@ -1174,7 +1174,7 @@ impl<O: TargetSize> AlignedBuf<O> {
 /// let buf3 = buf.as_aligned_owned_buf();
 /// assert_eq!(buf3.align(), align_of::<u32>());
 /// ```
-impl<O: TargetSize> Clone for AlignedBuf<O> {
+impl<O: Size> Clone for AlignedBuf<O> {
     fn clone(&self) -> Self {
         unsafe {
             let mut new =
@@ -1188,7 +1188,7 @@ impl<O: TargetSize> Clone for AlignedBuf<O> {
     }
 }
 
-impl<O: TargetSize> Drop for AlignedBuf<O> {
+impl<O: Size> Drop for AlignedBuf<O> {
     fn drop(&mut self) {
         unsafe {
             if self.capacity != 0 {
@@ -1201,8 +1201,8 @@ impl<O: TargetSize> Drop for AlignedBuf<O> {
     }
 }
 
-impl<O: TargetSize> BufMut for AlignedBuf<O> {
-    type TargetSize = O;
+impl<O: Size> BufMut for AlignedBuf<O> {
+    type Size = O;
     type StoreStruct<'a, T> = AlignedBufStoreStruct<'a, T, O> where T: ZeroCopy;
 
     #[inline]
@@ -1229,13 +1229,13 @@ impl<O: TargetSize> BufMut for AlignedBuf<O> {
 
 /// A writer as returned from [AlignedBuf::writer].
 #[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StoreStruct::finish`"]
-pub struct AlignedBufStoreStruct<'a, T, O: TargetSize> {
+pub struct AlignedBufStoreStruct<'a, T, O: Size> {
     buf: &'a mut AlignedBuf<O>,
     len: usize,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T, O: TargetSize> AlignedBufStoreStruct<'a, T, O>
+impl<'a, T, O: Size> AlignedBufStoreStruct<'a, T, O>
 where
     T: ZeroCopy,
 {
@@ -1274,7 +1274,7 @@ where
     }
 }
 
-impl<'a, T, O: TargetSize> StoreStruct<T, O> for AlignedBufStoreStruct<'a, T, O>
+impl<'a, T, O: Size> StoreStruct<T, O> for AlignedBufStoreStruct<'a, T, O>
 where
     T: ZeroCopy,
 {

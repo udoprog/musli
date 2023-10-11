@@ -1,10 +1,26 @@
 use crate::buf::Buf;
 use crate::error::Error;
-use crate::offset::TargetSize;
 use crate::r#ref::Ref;
 use crate::r#unsized::Unsized;
+use crate::size::Size;
 use crate::slice::Slice;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+
+mod sealed {
+    use crate::r#ref::Ref;
+    use crate::r#unsized::Unsized;
+    use crate::size::Size;
+    use crate::slice::Slice;
+    use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+
+    pub trait Sealed {}
+
+    impl<T, O: Size> Sealed for Ref<T, O> where T: ZeroCopy {}
+    impl<T, O: Size> Sealed for Slice<T, O> where T: ZeroCopy {}
+    impl<T: ?Sized, O: Size> Sealed for Unsized<T, O> where T: UnsizedZeroCopy {}
+    impl<T: ?Sized> Sealed for &T where T: Sealed {}
+    impl<T: ?Sized> Sealed for &mut T where T: Sealed {}
+}
 
 /// Trait used for loading any kind of reference.
 ///
@@ -12,7 +28,7 @@ use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
 ///
 /// This can only be implemented correctly by types under certain conditions:
 /// * The type has a strict, well-defined layout or is `repr(C)`.
-pub unsafe trait Load {
+pub unsafe trait Load: self::sealed::Sealed {
     /// The target being read.
     type Target: ?Sized;
 
@@ -68,7 +84,7 @@ where
     }
 }
 
-unsafe impl<T: ?Sized, O: TargetSize> Load for Unsized<T, O>
+unsafe impl<T: ?Sized, O: Size> Load for Unsized<T, O>
 where
     T: UnsizedZeroCopy,
 {
@@ -79,7 +95,7 @@ where
     }
 }
 
-unsafe impl<T, O: TargetSize> Load for Ref<T, O>
+unsafe impl<T, O: Size> Load for Ref<T, O>
 where
     T: ZeroCopy,
 {
@@ -90,7 +106,7 @@ where
     }
 }
 
-unsafe impl<T, O: TargetSize> Load for Slice<T, O>
+unsafe impl<T, O: Size> Load for Slice<T, O>
 where
     T: ZeroCopy,
 {
@@ -101,7 +117,7 @@ where
     }
 }
 
-unsafe impl<T: ?Sized, O: TargetSize> LoadMut for Unsized<T, O>
+unsafe impl<T: ?Sized, O: Size> LoadMut for Unsized<T, O>
 where
     T: UnsizedZeroCopy,
 {
@@ -110,7 +126,7 @@ where
     }
 }
 
-unsafe impl<T, O: TargetSize> LoadMut for Ref<T, O>
+unsafe impl<T, O: Size> LoadMut for Ref<T, O>
 where
     T: ZeroCopy,
 {
@@ -119,7 +135,7 @@ where
     }
 }
 
-unsafe impl<T, O: TargetSize> LoadMut for Slice<T, O>
+unsafe impl<T, O: Size> LoadMut for Slice<T, O>
 where
     T: ZeroCopy,
 {

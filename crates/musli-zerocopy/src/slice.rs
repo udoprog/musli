@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
 use core::mem::size_of;
 
-use crate::offset::DefaultTargetSize;
-use crate::offset::TargetSize;
 use crate::r#ref::Ref;
+use crate::size::DefaultSize;
+use crate::size::Size;
 use crate::ZeroCopy;
 
 /// A reference to a slice packed as a wide pointer.
@@ -69,14 +69,20 @@ use crate::ZeroCopy;
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct Slice<T, O: TargetSize = DefaultTargetSize> {
+pub struct Slice<T, O: Size = DefaultSize>
+where
+    T: ZeroCopy,
+{
     offset: O,
     len: O,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
-impl<T, O: TargetSize> Slice<T, O> {
+impl<T, O: Size> Slice<T, O>
+where
+    T: ZeroCopy,
+{
     /// Construct a new slice reference.
     ///
     /// # Examples
@@ -175,10 +181,7 @@ impl<T, O: TargetSize> Slice<T, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     ///
-    pub fn get(&self, index: usize) -> Option<Ref<T, O>>
-    where
-        T: ZeroCopy,
-    {
+    pub fn get(&self, index: usize) -> Option<Ref<T, O>> {
         if index >= self.len() {
             return None;
         }
@@ -191,10 +194,13 @@ impl<T, O: TargetSize> Slice<T, O> {
     }
 }
 
-impl<T, O: TargetSize> Clone for Slice<T, O> {
+impl<T, O: Size> Clone for Slice<T, O>
+where
+    T: ZeroCopy,
+{
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T, O: TargetSize> Copy for Slice<T, O> {}
+impl<T, O: Size> Copy for Slice<T, O> where T: ZeroCopy {}

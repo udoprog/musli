@@ -10,6 +10,12 @@ use crate::buf_mut::BufMut;
 use crate::error::{Error, ErrorKind};
 use crate::visit::Visit;
 
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for str {}
+    impl Sealed for [u8] {}
+}
+
 /// Trait governing which `T` in [`Unsized<T>`] the wrapper can handle.
 ///
 /// We only support slice-like, unaligned unsized types, such as `str` and
@@ -40,7 +46,7 @@ use crate::visit::Visit;
 /// assert_eq!(buf.load(bytes)?, b"Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub unsafe trait UnsizedZeroCopy {
+pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// Alignment of the pointed to data. We can only support unsized types
     /// which have a known alignment.
     const ALIGN: usize;
@@ -49,6 +55,12 @@ pub unsafe trait UnsizedZeroCopy {
     fn size(&self) -> usize;
 
     /// Write to the owned buffer.
+    ///
+    /// This is usually called indirectly through methods such as
+    /// [`AlignedBuf::store_unsized`].
+    ///
+    /// [`AlignedBuf::store_unsized`]:
+    ///     crate::aligned_buf::AlignedBuf::store_unsized
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut;
@@ -465,6 +477,8 @@ macro_rules! impl_number {
             }
         }
 
+        impl crate::visit::sealed::Sealed for $ty {}
+
         impl Visit for $ty {
             type Target = $ty;
 
@@ -568,6 +582,8 @@ macro_rules! impl_nonzero_number {
             }
         }
 
+        impl crate::visit::sealed::Sealed for ::core::num::$ty {}
+
         impl Visit for ::core::num::$ty {
             type Target = ::core::num::$ty;
 
@@ -648,6 +664,9 @@ macro_rules! impl_zst {
             unsafe fn validate(_: &Buf) -> Result<(), Error> {
                 Ok(())
             }
+        }
+
+        impl $(<$name>)* crate::visit::sealed::Sealed for $ty {
         }
 
         impl $(<$name>)* Visit for $ty {

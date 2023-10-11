@@ -12,9 +12,21 @@ use crate::r#ref::Ref;
 use crate::r#unsized::Unsized;
 use crate::slice::Slice;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
-use crate::TargetSize;
+use crate::Size;
 
-/// A raw slice buffer.
+/// A buffer wrapping a slice of bytes.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::{Buf, Unsized};
+///
+/// let buf = Buf::new(b"Hello World!");
+/// let unsize = Unsized::<str>::new(0, 12);
+///
+/// assert_eq!(buf.load(unsize)?, "Hello World!");
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
 #[repr(transparent)]
 pub struct Buf {
     data: [u8],
@@ -22,23 +34,75 @@ pub struct Buf {
 
 impl Buf {
     /// Wrap the given bytes as a buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{Buf, Unsized};
+    ///
+    /// let buf = Buf::new(b"Hello World!");
+    /// let unsize = Unsized::<str>::new(0, 12);
+    ///
+    /// assert_eq!(buf.load(unsize)?, "Hello World!");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     pub const fn new(data: &[u8]) -> &Buf {
         // SAFETY: The struct is repr(transparent) over [u8].
         unsafe { &*(data as *const [u8] as *const Self) }
     }
 
-    /// Wrap the given bytes as a buffer.
+    /// Wrap the given bytes as a mutable buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{Buf, Unsized};
+    ///
+    /// let mut bytes: [u8; 12] = *b"Hello World!";
+    ///
+    /// let buf = Buf::new_mut(&mut bytes[..]);
+    /// let unsize = Unsized::<str>::new(0, 12);
+    ///
+    /// buf.load_mut(unsize)?.make_ascii_uppercase();
+    /// assert_eq!(buf.load(unsize)?, "HELLO WORLD!");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     pub fn new_mut(data: &mut [u8]) -> &mut Buf {
         // SAFETY: The struct is repr(transparent) over [u8].
         unsafe { &mut *(data as *mut [u8] as *mut Self) }
     }
 
-    /// Get the underlying bytes of the buffer.
+    /// Access the backing slice of the buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Buf;
+    ///
+    /// let buf = Buf::new(b"Hello World!");
+    ///
+    /// assert_eq!(buf.as_slice(), &b"Hello World!"[..]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     pub fn as_slice(&self) -> &[u8] {
         &self.data
     }
 
-    /// Get the underlying bytes of the buffer mutably.
+    /// Access the backing slice of the buffer mutably.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Buf;
+    ///
+    /// let mut bytes: [u8; 12] = *b"Hello World!";
+    ///
+    /// let buf = Buf::new_mut(&mut bytes[..]);
+    /// buf.as_mut_slice().make_ascii_uppercase();
+    ///
+    /// assert_eq!(buf.as_slice(), &b"HELLO WORLD!"[..]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         &mut self.data
     }
@@ -92,12 +156,33 @@ impl Buf {
         Ok(())
     }
 
-    /// Get the length of the current buffer.
+    /// Get the length of the backing buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Buf;
+    ///
+    /// let buf = Buf::new(b"Hello World!");
+    /// assert_eq!(buf.len(), 12);
+    /// ```
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
-    /// Test if the current buffer is empty.
+    /// Test if the backing buffer is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Buf;
+    ///
+    /// let buf = Buf::new(b"Hello World!");
+    /// assert!(!buf.is_empty());
+    ///
+    /// let buf = Buf::new(b"");
+    /// assert!(buf.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
@@ -205,20 +290,28 @@ impl Buf {
 
     /// Cast the current buffer into the given type.
     ///
+    /// This is usually only used indirectly by deriving [`ZeroCopy`].
+    ///
+    /// [`ZeroCopy`]: derive@crate::ZeroCopy
+    ///
     /// # Safety
     ///
-    /// The caller must ensure that the buffer is correctly sized and aligned
-    /// for the destination type.
+    /// The caller must ensure that the buffer is correctly sized, aligned and
+    /// contains a valid bit pattern for the destination type.
     pub unsafe fn cast<T>(&self) -> &T {
         &*self.data.as_ptr().cast()
     }
 
     /// Cast the current buffer into the given mutable type.
     ///
+    /// This is usually only used indirectly by deriving [`ZeroCopy`].
+    ///
+    /// [`ZeroCopy`]: derive@crate::ZeroCopy
+    ///
     /// # Safety
     ///
-    /// The caller must ensure that the buffer is correctly sized and aligned
-    /// for the destination type.
+    /// The caller must ensure that the buffer is correctly sized, aligned and
+    /// contains a valid bit pattern for the destination type.
     pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
         &mut *self.data.as_mut_ptr().cast()
     }
@@ -335,7 +428,7 @@ impl Buf {
     }
 
     /// Load an unsized reference.
-    pub(crate) fn load_unsized<T: ?Sized, O: TargetSize>(
+    pub(crate) fn load_unsized<T: ?Sized, O: Size>(
         &self,
         unsize: Unsized<T, O>,
     ) -> Result<&T, Error>
@@ -352,7 +445,7 @@ impl Buf {
     }
 
     /// Load an unsized mutable reference.
-    pub(crate) fn load_unsized_mut<T: ?Sized, O: TargetSize>(
+    pub(crate) fn load_unsized_mut<T: ?Sized, O: Size>(
         &mut self,
         unsize: Unsized<T, O>,
     ) -> Result<&mut T, Error>
@@ -369,7 +462,7 @@ impl Buf {
     }
 
     /// Load the given sized value as a reference.
-    pub(crate) fn load_sized<T, O: TargetSize>(&self, ptr: Ref<T, O>) -> Result<&T, Error>
+    pub(crate) fn load_sized<T, O: Size>(&self, ptr: Ref<T, O>) -> Result<&T, Error>
     where
         T: ZeroCopy,
     {
@@ -389,10 +482,7 @@ impl Buf {
     }
 
     /// Load the given sized value as a mutable reference.
-    pub(crate) fn load_sized_mut<T, O: TargetSize>(
-        &mut self,
-        ptr: Ref<T, O>,
-    ) -> Result<&mut T, Error>
+    pub(crate) fn load_sized_mut<T, O: Size>(&mut self, ptr: Ref<T, O>) -> Result<&mut T, Error>
     where
         T: ZeroCopy,
     {
@@ -412,7 +502,7 @@ impl Buf {
     }
 
     /// Load the given slice.
-    pub(crate) fn load_slice<T, O: TargetSize>(&self, ptr: Slice<T, O>) -> Result<&[T], Error>
+    pub(crate) fn load_slice<T, O: Size>(&self, ptr: Slice<T, O>) -> Result<&[T], Error>
     where
         T: ZeroCopy,
     {
@@ -424,10 +514,7 @@ impl Buf {
     }
 
     /// Load the given slice mutably.
-    pub(crate) fn load_slice_mut<T, O: TargetSize>(
-        &mut self,
-        ptr: Slice<T, O>,
-    ) -> Result<&mut [T], Error>
+    pub(crate) fn load_slice_mut<T, O: Size>(&mut self, ptr: Slice<T, O>) -> Result<&mut [T], Error>
     where
         T: ZeroCopy,
     {

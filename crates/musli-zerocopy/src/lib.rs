@@ -139,9 +139,9 @@
 //! you partition your dataset into 32-bit addressable chunks.
 //!
 //! If you really want to change this limit, you can modify it by setting the
-//! default `O` parameter on the various [`TargetSize`]-dependent types:
+//! default `O` parameter on the various [`Size`]-dependent types:
 //!
-//! The available [`TargetSize`] implementations are:
+//! The available [`Size`] implementations are:
 //! * `u32` for 32-bit sized pointers (the default).
 //! * `usize` for target-dependently sized pointers.
 //!
@@ -156,10 +156,10 @@
 //! let unsize = Unsized::<str, usize>::new(0, 1usize << 32);
 //! ```
 //!
-//! [`AlignedBuf`] can also be initialized with a custom [`TargetSize`]:
+//! [`AlignedBuf`] can also be initialized with a custom [`Size`]:
 //!
-//! To initialize an [`AlignedBuf`] with a custom [`TargetSize`] you simply
-//! use this constructor while specifying one of the above parameters:
+//! To initialize an [`AlignedBuf`] with a custom [`Size`] you simply use this
+//! constructor while specifying one of the above parameters:
 //!
 //! ```
 //! use musli_zerocopy::{AlignedBuf, DEFAULT_ALIGNMENT};
@@ -204,8 +204,8 @@
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.Unsized.html
 //! [`AlignedBuf`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.AlignedBuf.html
-//! [`TargetSize`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.TargetSize.html
+//! [`Size`]:
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.Size.html
 //! [`ZeroCopy`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
 
@@ -236,8 +236,8 @@ mod buf_mut;
 pub use self::error::Error;
 mod error;
 
-pub use self::offset::TargetSize;
-mod offset;
+pub use self::size::{DefaultSize, Size};
+mod size;
 
 pub use self::store_struct::StoreStruct;
 mod store_struct;

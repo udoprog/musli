@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
-use crate::offset::DefaultTargetSize;
-use crate::{TargetSize, ZeroCopy};
+use crate::size::DefaultSize;
+use crate::{Size, UnsizedZeroCopy, ZeroCopy};
 
 /// A reference to an unsized value packed as a wide pointer.
 ///
@@ -35,14 +35,17 @@ use crate::{TargetSize, ZeroCopy};
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct Unsized<T: ?Sized, O: TargetSize = DefaultTargetSize> {
+pub struct Unsized<T: ?Sized + UnsizedZeroCopy, O: Size = DefaultSize> {
     offset: O,
     size: O,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
-impl<T: ?Sized, O: TargetSize> Unsized<T, O> {
+impl<T: ?Sized, O: Size> Unsized<T, O>
+where
+    T: UnsizedZeroCopy,
+{
     /// Construct a new unsized reference.
     ///
     /// # Examples
@@ -102,10 +105,10 @@ impl<T: ?Sized, O: TargetSize> Unsized<T, O> {
     }
 }
 
-impl<T: ?Sized, O: TargetSize> Clone for Unsized<T, O> {
+impl<T: ?Sized + UnsizedZeroCopy, O: Size> Clone for Unsized<T, O> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T: ?Sized, O: TargetSize> Copy for Unsized<T, O> {}
+impl<T: ?Sized + UnsizedZeroCopy, O: Size> Copy for Unsized<T, O> {}

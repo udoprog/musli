@@ -1,19 +1,30 @@
 use crate::error::Error;
-use crate::offset::TargetSize;
+use crate::size::Size;
 use crate::store_struct::StoreStruct;
 use crate::zero_copy::ZeroCopy;
+
+mod sealed {
+    #[cfg(feature = "alloc")]
+    use crate::size::Size;
+
+    pub trait Sealed {}
+
+    #[cfg(feature = "alloc")]
+    impl<O: Size> Sealed for crate::aligned_buf::AlignedBuf<O> {}
+    impl<B: ?Sized> Sealed for &mut B where B: Sealed {}
+}
 
 /// A mutable buffer to store zero copy types to.
 ///
 /// This is implemented by [`AlignedBuf`].
 ///
 /// [`AlignedBuf`]: crate::AlignedBuf
-pub trait BufMut {
+pub trait BufMut: self::sealed::Sealed {
     /// Target size buffer is configured to use.
-    type TargetSize: TargetSize;
+    type Size: Size;
 
     /// Interior mutable buffer.
-    type StoreStruct<'a, T>: StoreStruct<T, Self::TargetSize>
+    type StoreStruct<'a, T>: StoreStruct<T, Self::Size>
     where
         Self: 'a,
         T: ZeroCopy;
@@ -85,7 +96,7 @@ impl<B: ?Sized> BufMut for &mut B
 where
     B: BufMut,
 {
-    type TargetSize = B::TargetSize;
+    type Size = B::Size;
     type StoreStruct<'a, T> = B::StoreStruct<'a, T> where Self: 'a, T: ZeroCopy;
 
     #[inline]

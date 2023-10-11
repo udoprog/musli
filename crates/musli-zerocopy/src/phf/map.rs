@@ -4,9 +4,9 @@ use core::hash::Hash;
 use crate::bind::Bindable;
 use crate::buf::Buf;
 use crate::error::Error;
-use crate::offset::{DefaultTargetSize, TargetSize};
 use crate::pair::Pair;
 use crate::phf::hashing::HashKey;
+use crate::size::{DefaultSize, Size};
 use crate::slice::Slice;
 use crate::visit::Visit;
 use crate::zero_copy::ZeroCopy;
@@ -167,7 +167,7 @@ where
 }
 
 /// Bind a [`MapRef`] into a [`Map`].
-impl<K: 'static, V: 'static, O: TargetSize> Bindable for MapRef<K, V, O>
+impl<K: 'static, V: 'static, O: Size> Bindable for MapRef<K, V, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -214,13 +214,21 @@ where
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[derive(Debug)]
-pub struct MapRef<K, V, O: TargetSize = DefaultTargetSize> {
+pub struct MapRef<K, V, O: Size = DefaultSize>
+where
+    K: ZeroCopy,
+    V: ZeroCopy,
+{
     key: HashKey,
     entries: Slice<Pair<K, V>, O>,
     displacements: Slice<Pair<u32, u32>, O>,
 }
 
-impl<K, V, O: TargetSize> MapRef<K, V, O> {
+impl<K, V, O: Size> MapRef<K, V, O>
+where
+    K: ZeroCopy,
+    V: ZeroCopy,
+{
     #[cfg(feature = "alloc")]
     pub(crate) fn new(
         key: HashKey,
@@ -235,7 +243,7 @@ impl<K, V, O: TargetSize> MapRef<K, V, O> {
     }
 }
 
-impl<K, V, O: TargetSize> MapRef<K, V, O>
+impl<K, V, O: Size> MapRef<K, V, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -356,10 +364,19 @@ where
     }
 }
 
-impl<K, V, O: TargetSize> Clone for MapRef<K, V, O> {
+impl<K, V, O: Size> Clone for MapRef<K, V, O>
+where
+    K: ZeroCopy,
+    V: ZeroCopy,
+{
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<K, V, O: TargetSize> Copy for MapRef<K, V, O> {}
+impl<K, V, O: Size> Copy for MapRef<K, V, O>
+where
+    K: ZeroCopy,
+    V: ZeroCopy,
+{
+}
