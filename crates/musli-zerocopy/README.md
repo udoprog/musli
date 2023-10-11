@@ -124,7 +124,7 @@ default `O` parameter on the various [`TargetSize`]-dependent types:
 
 The available [`TargetSize`] implementations are:
 * `u32` for 32-bit sized pointers (the default).
-* `usize` for 64-bit sized pointers.
+* `usize` for target-dependently sized pointers.
 
 ```rust
 // These no longer panic:
