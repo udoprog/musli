@@ -217,3 +217,38 @@ pub mod musli_value {
         musli_value::decode(data)
     }
 }
+
+#[cfg(feature = "musli-zerocopy")]
+pub mod musli_zerocopy {
+    use musli_zerocopy::pointer::Ref;
+    use musli_zerocopy::{AlignedBuf, Buf, Error, ZeroCopy};
+
+    #[inline(always)]
+    pub fn buffer() -> AlignedBuf {
+        AlignedBuf::with_capacity(4096)
+    }
+
+    #[inline(always)]
+    pub fn reset<T>(buf: &mut AlignedBuf, reserve: usize, _: &T) {
+        buf.clear();
+        buf.reserve(reserve);
+    }
+
+    #[inline(always)]
+    pub fn encode<'de, T>(buf: &'de mut AlignedBuf, value: &T) -> Result<(&'de Buf, Ref<T>), Error>
+    where
+        T: ZeroCopy,
+    {
+        let pointer = buf.store(value)?;
+        Ok((buf.as_ref(), pointer))
+    }
+
+    #[inline(always)]
+    pub fn decode<'de, T>(data: &(&'de Buf, Ref<T>)) -> Result<&'de T, Error>
+    where
+        T: ZeroCopy,
+    {
+        let (buf, pointer) = *data;
+        buf.load(pointer)
+    }
+}

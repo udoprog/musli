@@ -84,6 +84,7 @@ where
 {
     type Target = T;
 
+    #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_unsized(*self)
     }
@@ -95,6 +96,7 @@ where
 {
     type Target = T;
 
+    #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_sized(*self)
     }
@@ -106,6 +108,7 @@ where
 {
     type Target = [T];
 
+    #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load_slice(*self)
     }
@@ -115,6 +118,7 @@ unsafe impl<T: ?Sized, O: Size> LoadMut for Unsized<T, O>
 where
     T: UnsizedZeroCopy,
 {
+    #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
         buf.load_unsized_mut(*self)
     }
@@ -124,6 +128,7 @@ unsafe impl<T, O: Size> LoadMut for Ref<T, O>
 where
     T: ZeroCopy,
 {
+    #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
         buf.load_sized_mut(*self)
     }
@@ -133,6 +138,7 @@ unsafe impl<T, O: Size> LoadMut for Slice<T, O>
 where
     T: ZeroCopy,
 {
+    #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
         buf.load_slice_mut(*self)
     }

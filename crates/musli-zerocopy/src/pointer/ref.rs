@@ -23,7 +23,7 @@ use crate::ZeroCopy;
 /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 ///
-/// let buf = buf.as_ref()?;
+/// let buf = buf.as_ref();
 ///
 /// let number = Ref::<u32>::new(0);
 /// assert_eq!(*buf.load(number)?, u32::from_ne_bytes([1, 2, 3, 4]));
