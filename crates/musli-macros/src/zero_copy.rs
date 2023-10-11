@@ -93,7 +93,7 @@ impl Num {
             ($kind:ident, $parse:ty, $ty:ty) => {{
                 macro_rules! handle_neg {
                     (signed, $lit:ident) => {{
-                        if neg {
+                        if neg && $lit != 0 {
                             let Some($lit) = $lit.checked_sub(1) else {
                                 return Err(syn::Error::new_spanned(
                                     $lit,

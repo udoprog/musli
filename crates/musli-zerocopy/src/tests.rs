@@ -146,3 +146,45 @@ fn test_signed_wraparound() -> Result<(), Error> {
     test_case!(I128, i128, i128);
     Ok(())
 }
+
+#[test]
+fn test_neg0() -> Result<(), Error> {
+    macro_rules! test_case {
+        ($name:ident, $repr:ident, $num:ty) => {{
+            #[derive(Debug, PartialEq, ZeroCopy)]
+            #[repr($repr)]
+            #[zero_copy(crate)]
+            enum $name {
+                MinusOne = -1,
+                Neg0 = -0,
+                One,
+            }
+
+            assert_eq!($name::MinusOne as $repr, -1);
+            assert_eq!($name::Neg0 as $repr, 0);
+            assert_eq!($name::One as $repr, 1);
+
+            let mut buf = AlignedBuf::with_alignment(align_of::<$name>());
+            let minus_one = buf.store(&$name::MinusOne)?;
+            let neg0 = buf.store(&$name::Neg0)?;
+            let one = buf.store(&$name::One)?;
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.ptr());
+
+            let buf = buf.as_aligned();
+
+            assert_eq!(buf.load(minus_one)?, &$name::MinusOne);
+            assert_eq!(buf.load(neg0)?, &$name::Neg0);
+            assert_eq!(buf.load(one)?, &$name::One);
+            assert_eq!(buf.load(v4), Err(Error::__enum_illegal_repr::<$name>()));
+        }};
+    }
+
+    test_case!(I8, i8, i8);
+    test_case!(I16, i16, i16);
+    test_case!(I32, i32, i32);
+    test_case!(I64, i64, i64);
+    // nightly: feature(repr128)
+    #[cfg(feature = "nightly")]
+    test_case!(I128, i128, i128);
+    Ok(())
+}

@@ -26,9 +26,9 @@ impl Offset {
     /// A pointer pointing to the start of a buffer.
     pub const ZERO: Self = Self { offset: 0 };
 
-    #[cfg(feature = "alloc")]
+    /// Construct a new offset.
     #[inline]
-    pub(crate) fn new(offset: usize) -> Self {
+    pub fn new(offset: usize) -> Self {
         let Ok(offset) = OffsetSize::try_from(offset) else {
             panic!(
                 "Offset {offset} not in the legal range of 0-{}",
