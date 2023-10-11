@@ -182,6 +182,7 @@ where
     T: Copy + ZeroCopy,
 {
     const ANY_BITS: bool = T::ANY_BITS;
+    const NEEDS_PADDING: bool = T::NEEDS_PADDING;
 
     #[inline]
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
@@ -291,6 +292,10 @@ pub unsafe trait ZeroCopy {
     /// Indicates if the type can inhabit all possible bit patterns within its
     /// `size_of::<Self>()` bytes.
     const ANY_BITS: bool;
+
+    /// Indicates that a type needs padding. Conservatively this should almost
+    /// always be set to true.
+    const NEEDS_PADDING: bool;
 
     /// Store the current value to the mutable buffer.
     ///
@@ -436,6 +441,7 @@ macro_rules! impl_number {
         /// ```
         unsafe impl ZeroCopy for $ty {
             const ANY_BITS: bool = true;
+            const NEEDS_PADDING: bool = false;
 
             fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
@@ -483,6 +489,7 @@ macro_rules! impl_float {
     ($ty:ty) => {
         unsafe impl ZeroCopy for $ty {
             const ANY_BITS: bool = true;
+            const NEEDS_PADDING: bool = false;
 
             fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
@@ -518,6 +525,7 @@ impl_float!(f64);
 
 unsafe impl ZeroCopy for char {
     const ANY_BITS: bool = false;
+    const NEEDS_PADDING: bool = false;
 
     #[inline]
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
@@ -555,6 +563,7 @@ impl Visit for char {
 
 unsafe impl ZeroCopy for bool {
     const ANY_BITS: bool = false;
+    const NEEDS_PADDING: bool = false;
 
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
@@ -631,6 +640,7 @@ macro_rules! impl_nonzero_number {
         /// ```
         unsafe impl ZeroCopy for ::core::num::$ty {
             const ANY_BITS: bool = false;
+            const NEEDS_PADDING: bool = false;
 
             fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
@@ -706,6 +716,7 @@ macro_rules! impl_zst {
         /// ```
         unsafe impl $(<$name>)* ZeroCopy for $ty {
             const ANY_BITS: bool = true;
+            const NEEDS_PADDING: bool = false;
 
             #[inline]
             fn store_to<B: ?Sized>(&self, _: &mut B) -> Result<(), Error>
@@ -746,16 +757,13 @@ where
     T: ZeroCopy,
 {
     const ANY_BITS: bool = T::ANY_BITS;
+    const NEEDS_PADDING: bool = T::NEEDS_PADDING;
 
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
     {
-        for element in self {
-            element.store_to(buf)?;
-        }
-
-        Ok(())
+        buf.store_array(self)
     }
 
     #[allow(clippy::missing_safety_doc)]

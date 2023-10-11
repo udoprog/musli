@@ -1283,6 +1283,27 @@ impl<O: Size> BufMut for AlignedBuf<O> {
     {
         AlignedBuf::store_struct::<T>(self, value)
     }
+
+    #[inline]
+    fn store_array<T, const N: usize>(&mut self, array: &[T; N]) -> Result<(), Error>
+    where
+        T: ZeroCopy,
+    {
+        let mut s = self.store_struct(array);
+
+        if T::NEEDS_PADDING {
+            for _ in 0..array.len() {
+                s.pad::<T>();
+            }
+        }
+
+        // SAFETY: we've padded every element in the array.
+        unsafe {
+            s.finish()?;
+        }
+
+        Ok(())
+    }
 }
 
 /// A writer as returned from [AlignedBuf::writer].

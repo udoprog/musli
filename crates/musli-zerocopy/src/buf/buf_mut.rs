@@ -91,6 +91,11 @@ pub trait BufMut: self::sealed::Sealed {
     fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
     where
         T: ZeroCopy;
+
+    /// Store the contents of a `ZeroCopy` array.
+    fn store_array<T, const N: usize>(&mut self, array: &[T; N]) -> Result<(), Error>
+    where
+        T: ZeroCopy;
 }
 
 impl<B: ?Sized> BufMut for &mut B
@@ -119,5 +124,13 @@ where
         T: ZeroCopy,
     {
         (**self).store_struct(value)
+    }
+
+    #[inline]
+    fn store_array<T, const N: usize>(&mut self, array: &[T; N]) -> Result<(), Error>
+    where
+        T: ZeroCopy,
+    {
+        (**self).store_array(array)
     }
 }

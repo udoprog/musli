@@ -528,6 +528,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
             const ANY_BITS: bool = #any_bits;
+            const NEEDS_PADDING: bool = true;
 
             fn store_to<__B: ?Sized>(&self, buf: &mut __B) -> #result<(), #error>
             where
