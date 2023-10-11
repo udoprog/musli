@@ -13,6 +13,7 @@ use crate::buf::{Buf, BufMut, StoreStruct, Visit, DEFAULT_ALIGNMENT};
 use crate::error::{Error, ErrorKind};
 use crate::map::{Entry, MapRef};
 use crate::pointer::{DefaultSize, Ref, Size, Slice, Unsized};
+use crate::set::SetRef;
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
 /// An allocating buffer with dynamic alignment.
@@ -542,13 +543,101 @@ impl<O: Size> AlignedBuf<O> {
     /// Insert a map into the buffer.
     ///
     /// This will utilize a perfect hash functions derived from the [`phf`
-    /// crate] to construt a persistent hash map.
+    /// crate] to construct a persistent hash map.
     ///
     /// This returns a [`MapRef`] which can be bound into a [`Map`] through the
     /// [`bind()`] method for convenience.
     ///
     /// [`phf` crate]: https://crates.io/crates/phf
     /// [`Map`]: crate::map::Map
+    /// [`bind()`]: Buf::bind
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// let mut values = [
+    ///     buf.store_unsized("first")?,
+    ///     buf.store_unsized("second")?,
+    /// ];
+    ///
+    /// let set = buf.insert_set(&mut values)?;
+    /// let buf = buf.as_aligned();
+    /// let set = buf.bind(set)?;
+    ///
+    /// assert!(set.contains(&"first")?);
+    /// assert!(set.contains(&"second")?);
+    /// assert!(!set.contains(&"third")?);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    ///
+    /// Using non-references as keys:
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// let mut values = [10u64, 20u64];
+    ///
+    /// let set = buf.insert_set(&mut values)?;
+    /// let buf = buf.as_aligned();
+    /// let set = buf.bind(set)?;
+    ///
+    /// assert!(set.contains(&10u64)?);
+    /// assert!(set.contains(&20u64)?);
+    /// assert!(!set.contains(&30u64)?);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn insert_set<T>(&mut self, entries: &mut [T]) -> Result<SetRef<T, O>, Error>
+    where
+        T: Visit + ZeroCopy,
+        T::Target: Hash,
+    {
+        let mut hash_state = {
+            let buf = self.as_aligned();
+            crate::phf::generator::generate_hash(buf, entries, |value| value)?
+        };
+
+        for a in 0..hash_state.map.len() {
+            loop {
+                let b = hash_state.map[a];
+
+                if hash_state.map[a] != a {
+                    entries.swap(a, b);
+                    hash_state.map.swap(a, b);
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+        let entries = self.store_slice(entries)?;
+
+        let mut displacements = Vec::new();
+
+        for (a, b) in hash_state.displacements {
+            displacements.push(Entry { key: a, value: b });
+        }
+
+        let displacements = self.store_slice(&displacements)?;
+        Ok(SetRef::new(hash_state.key, entries, displacements))
+    }
+
+    /// Insert a set into the buffer.
+    ///
+    /// This will utilize a perfect hash functions derived from the [`phf`
+    /// crate] to construct a persistent hash set.
+    ///
+    /// This returns a [`SetRef`] which can be bound into a [`Set`] through the
+    /// [`bind()`] method for convenience.
+    ///
+    /// [`phf` crate]: https://crates.io/crates/phf
+    /// [`Set`]: crate::set::Set
     /// [`bind()`]: Buf::bind
     ///
     /// # Examples
@@ -606,7 +695,7 @@ impl<O: Size> AlignedBuf<O> {
     {
         let mut hash_state = {
             let buf = self.as_aligned();
-            crate::phf::generator::generate_hash(buf, entries)?
+            crate::phf::generator::generate_hash(buf, entries, |entry| &entry.key)?
         };
 
         for a in 0..hash_state.map.len() {

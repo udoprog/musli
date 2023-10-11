@@ -5,7 +5,6 @@ use alloc::vec::Vec;
 
 use crate::buf::{Buf, Visit};
 use crate::error::{Error, ErrorKind};
-use crate::map::Entry;
 use crate::phf::hashing::{displace, hash, HashKey, Hashes};
 
 use rand::distributions::Standard;
@@ -21,13 +20,18 @@ pub(crate) struct HashState {
     pub(crate) map: Vec<usize>,
 }
 
-pub(crate) fn generate_hash<K, V>(buf: &Buf, entries: &[Entry<K, V>]) -> Result<HashState, Error>
+pub(crate) fn generate_hash<K, E, F>(
+    buf: &Buf,
+    entries: &[E],
+    access: F,
+) -> Result<HashState, Error>
 where
     K: Visit,
     K::Target: Hash,
+    F: Fn(&E) -> &K,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
-        if let Some(hash) = try_generate_hash(buf, entries, key)? {
+        if let Some(hash) = try_generate_hash(buf, entries, key, &access)? {
             return Ok(hash);
         }
     }
@@ -35,24 +39,28 @@ where
     Err(Error::new(ErrorKind::FailedPhf))
 }
 
-fn try_generate_hash<K, V>(
+fn try_generate_hash<K, E, F>(
     buf: &Buf,
-    entries: &[Entry<K, V>],
+    entries: &[E],
     key: HashKey,
+    access: &F,
 ) -> Result<Option<HashState>, Error>
 where
     K: Visit,
     K::Target: Hash,
+    F: ?Sized + Fn(&E) -> &K,
 {
     let mut hashes = Vec::new();
 
     for n in 0..entries.len() {
-        let Some(Entry { key: entry, .. }) = entries.get(n) else {
+        let Some(entry) = entries.get(n) else {
             return Err(Error::new(ErrorKind::IndexOutOfBounds {
                 index: n,
                 len: entries.len(),
             }));
         };
+
+        let entry = access(entry);
 
         let h = entry.visit(buf, |entry| hash(entry, &key))?;
         hashes.push(h);

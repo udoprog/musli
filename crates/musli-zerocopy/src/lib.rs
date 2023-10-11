@@ -334,6 +334,7 @@ pub mod traits;
 mod phf;
 
 pub mod map;
+pub mod set;
 
 pub mod pointer;
 

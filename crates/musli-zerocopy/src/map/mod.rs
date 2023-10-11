@@ -185,12 +185,12 @@ where
 }
 
 /// Bind a [`MapRef`] into a [`Map`].
-impl<K: 'static, V: 'static, O: Size> Bindable for MapRef<K, V, O>
+impl<K, V, O: Size> Bindable for MapRef<K, V, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
-    type Bound<'a> = Map<'a, K, V>;
+    type Bound<'a> = Map<'a, K, V> where Self: 'a;
 
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {
         Ok(Map {
@@ -202,11 +202,17 @@ where
     }
 }
 
-/// The reference to a map.
+/// A stored reference to a map.
+///
+/// Note that operating over the methods provided in [`MapRef`] does not demand
+/// that the entire contents of the set is validated as would be the case when
+/// [`bind()`] is used and might result in better performance if the data is
+/// infrequently accessed.
 ///
 /// Constructed through [`AlignedBuf::insert_map`].
 ///
-/// [`AlignedBuf::insert_map`]: crate::AlignedBuf::insert_map
+/// [`AlignedBuf::insert_map`]: crate:buf::AlignedBuf::insert_map
+/// [`bind()`]: crate::buf::Buf::bind
 ///
 /// ## Examples
 ///
@@ -368,15 +374,25 @@ where
             return Ok(None);
         }
 
-        let displacements = buf.load(self.displacements)?;
-        let entries = buf.load(self.entries)?;
-
         let hashes = crate::phf::hashing::hash(key, &self.key);
-        let index = crate::phf::hashing::get_index(&hashes, displacements, entries.len())?;
 
-        let Some(e) = entries.get(index) else {
+        let displacements = |index| match self.displacements.get(index) {
+            Some(entry) => Ok(Some(buf.load(entry)?)),
+            None => Ok(None),
+        };
+
+        let index = crate::phf::hashing::get_custom_index(
+            &hashes,
+            displacements,
+            self.displacements.len(),
+            self.entries.len(),
+        )?;
+
+        let Some(e) = self.entries.get(index) else {
             return Ok(None);
         };
+
+        let e = buf.load(e)?;
 
         if e.key.visit(buf, |v| v.borrow() == key)? {
             Ok(Some((&e.key, &e.value)))

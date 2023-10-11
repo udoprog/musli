@@ -7,12 +7,14 @@ mod sealed {
 
     pub trait Sealed {}
 
-    impl<K: 'static, V: 'static, O: Size> Sealed for crate::map::MapRef<K, V, O>
+    impl<K, V, O: Size> Sealed for crate::map::MapRef<K, V, O>
     where
         K: ZeroCopy,
         V: ZeroCopy,
     {
     }
+
+    impl<T, O: Size> Sealed for crate::set::SetRef<T, O> where T: ZeroCopy {}
 }
 
 /// Trait used for binding a reference to a [`Buf`] through [`Buf::bind()`].
@@ -21,7 +23,9 @@ mod sealed {
 /// provide more natural APIs and can dereference to the underlying types.
 pub trait Bindable: self::sealed::Sealed {
     /// The target of the binding.
-    type Bound<'a>;
+    type Bound<'a>
+    where
+        Self: 'a;
 
     /// Bind the current value to a [`Buf`].
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error>;

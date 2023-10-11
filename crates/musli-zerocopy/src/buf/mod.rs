@@ -270,16 +270,16 @@ impl Buf {
 
     /// Bind the current buffer to a value.
     ///
-    /// This provides a more convenient API for complex types like [`MapRef`],
-    /// and makes sure that all the internals related to the type being bound
-    /// has been validated and initialized.
+    /// This provides a more convenient API for complex types like [`MapRef`]
+    /// and [`SetRef`], and makes sure that all the internals related to the
+    /// type being bound have been validated.
     ///
-    /// Binding a type can therefore be faster in cases where you interact with
-    /// the bound type a lot because most validation associated with the type
-    /// can be performed up front. But slower if you just intend to perform the
-    /// casual lookup.
+    /// Binding a type can be be faster in cases where you interact with the
+    /// bound type a lot since accesses do not require validation, but might be
+    /// slower if the access is a "one of", or infrequent.
     ///
     /// [`MapRef`]: crate::map::MapRef
+    /// [`SetRef`]: crate::set::SetRef
     ///
     /// ## Examples
     ///
