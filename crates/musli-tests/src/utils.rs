@@ -240,7 +240,7 @@ pub mod musli_zerocopy {
         T: ZeroCopy,
     {
         let pointer = buf.store(value)?;
-        Ok((buf.as_ref(), pointer))
+        Ok(((*buf).as_ref(), pointer))
     }
 
     #[inline(always)]

@@ -20,7 +20,7 @@ use crate::error::Error;
 use crate::map::Entry;
 use crate::phf::hashing::HashKey;
 use crate::pointer::{DefaultSize, Size, Slice};
-use crate::traits::ZeroCopy;
+use crate::ZeroCopy;
 
 /// A set bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///
@@ -142,7 +142,9 @@ where
 /// assert!(!set.contains(buf, &3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, ZeroCopy)]
+#[repr(C)]
+#[zero_copy(crate)]
 pub struct SetRef<T, O: Size = DefaultSize>
 where
     T: ZeroCopy,

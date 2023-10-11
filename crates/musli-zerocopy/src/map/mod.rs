@@ -23,7 +23,7 @@ use crate::buf::{Bindable, Buf, Visit};
 use crate::error::Error;
 use crate::phf::hashing::HashKey;
 use crate::pointer::{DefaultSize, Size, Slice};
-use crate::traits::ZeroCopy;
+use crate::ZeroCopy;
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///
@@ -238,7 +238,9 @@ where
 /// assert!(!map.contains_key(buf, &3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, ZeroCopy)]
+#[repr(C)]
+#[zero_copy(crate)]
 pub struct MapRef<K, V, O: Size = DefaultSize>
 where
     K: ZeroCopy,
