@@ -10,18 +10,14 @@ Zero copy primitives for use in Müsli.
 This provides a base set of tools to deal with types which do not require
 copying during deserialization.
 
-<br>
-
-## Limits
-
-Offset, the size of unsized values, and slice lengths are all limited to
-32-bit, that is the longest unsized value that can be stored in 2**32 bytes.
+To implement zero-copy support for a Rust type, see the [`ZeroCopy`] derive.
 
 <br>
 
-## Examples
+## Guide
 
 ```rust
+use core::mem::size_of;
 use musli_zerocopy::{AlignedBuf, Pair, Unsized, ZeroCopy};
 
 #[derive(ZeroCopy)]
@@ -33,27 +29,158 @@ struct Custom {
 
 let mut buf = AlignedBuf::new();
 
-let string = buf.store_unsized("string")?;
+let string = buf.store_unsized("Hello World!")?;
+let custom = buf.store(&Custom { field: 42, string })?;
 
-let c1 = buf.store(&Custom { field: 1, string })?;
-let c2 = buf.store(&Custom { field: 2, string })?;
-
-let mut map = Vec::new();
-
-map.push(Pair::new(1, c1));
-map.push(Pair::new(2, c2));
-
-let map = buf.insert_map(&mut map)?;
-let buf = buf.as_aligned();
-let map = buf.bind(map)?;
-
-let c1 = buf.load(map.get(&1)?.context("Missing key 1")?)?;
-assert_eq!(c1.field, 1);
-assert_eq!(buf.load(c1.string)?, "string");
-
-let c2 = buf.load(map.get(&2)?.context("Missing key 2")?)?;
-assert_eq!(c2.field, 2);
-assert_eq!(buf.load(c2.string)?, "string");
-
-assert!(map.get(&3)?.is_none());
+// The buffer stores both the unsized string and the Custom element.
+assert!(buf.len() >= 24);
+// We assert that the produced alignment is smaller or equal to 8
+// since we'll be relying on this below.
+assert!(buf.requested() <= 8);
 ```
+
+Later when we want to use the type, we take the buffer we've generated and
+include it somewhere else.
+
+There's a few pieces of data (called DNA) we need to have to read a type
+back from a raw buffer:
+* The type being read which implements [`ZeroCopy`]. This is `Custom` above.
+  The [`ZeroCopy`] derive ensures that we can safely coerce a buffer into a
+  reference of the type.
+* The alignment of the buffer, which you can access through the
+  [`requested()`]. On the receiving end we need to ensure that the buffer
+  follow this alignment. Dynamically this can be achieved by loading the
+  buffer back into an appropriately constructed [`AlignedBuf`] instance.
+  Other tricks include embedding a static buffer inside of an aligned
+  newtype which we'll showcase below.
+* The [`Offset`] at where the [`ZeroCopy`] structure is read. To read a
+  structure we combine a pointer and a type into the [`Ref`] type.
+* The endianness of the machine which produced the buffer. Any numerical
+  elements will have been encoded in native endian ordering, so they would
+  have to be adjusted on the receiving side if it differs.
+
+If the goal is to both produce and read the buffer on the same system
+certain assumptions can be made. But even if those assumptions are wrong,
+the worst outcome will only ever be an error as long as you're using the
+safe APIs or abide by the safety documentation of the unsafe APIs.
+
+The following is an example of reading the type directly out of a newtype
+aligned `&'static [u8]` buffer:
+
+```rust
+use core::mem::size_of;
+use musli_zerocopy::{Ref, Offset, Buf};
+
+// Helper to force the static buffer to be aligned.
+#[repr(align(8))]
+struct Align(&'static [u8]);
+
+static BYTES: Align = Align(include_bytes!("custom.bin"));
+
+let buf = Buf::new(BYTES.0);
+
+// Construct a pointer into the buffer.
+let custom = Ref::new(Offset::<u32>::new(BYTES.0.len() - size_of::<Custom>()));
+
+let custom: &Custom = buf.load(custom)?;
+assert_eq!(custom.field, 42);
+assert_eq!(buf.load(custom.string)?, "Hello World!");
+```
+
+<br>
+
+## Limits
+
+Offset, the size of unsized values, and slice lengths are all limited to
+32-bit. The system you're using must have a `usize` type which is at least
+32-bits wide. This is done to save space by default.
+
+The pointer width on the system is checked at compile time, while trying to
+use an offset or a size larger than `2^32` will result in a panic.
+
+Example of using an [`Offset`] larger than `2^32` causing a panic:
+
+```rust
+Offset::<u32>::new(1usize << 32);
+```
+
+Example panic using a [`Slice`] with a length larger than `2^32`:
+
+```rust
+Slice::<u32>::new(Offset::ZERO, 1usize << 32);
+```
+
+Example panic using an [`Unsized`] value with a size larger than `2^32`:
+
+```rust
+Unsized::<str>::new(Offset::ZERO, 1usize << 32);
+```
+
+If you want to address data larger than this limit, it is recommended that
+you partition your dataset into 32-bit addressable chunks.
+
+If you really want to change this limit, you can modify it by setting the
+default `O` parameter on the various [`TargetSize`]-dependent types:
+
+The available [`TargetSize`] implementations are:
+* `u32` for 32-bit sized pointers (the default).
+* `usize` for 64-bit sized pointers.
+
+```rust
+// These no longer panic:
+let offset = Offset::<usize>::new(1usize << 32);
+let slice = Slice::<u32, usize>::new(Offset::ZERO, 1usize << 32);
+let unsize = Unsized::<str, usize>::new(Offset::ZERO, 1usize << 32);
+```
+
+[`AlignedBuf`] can also be initialized with a custom [`TargetSize`]:
+
+To initialize an [`AlignedBuf`] with a custom [`TargetSize`] you simply
+use this constructor while specifying one of the above parameters:
+
+```rust
+use musli_zerocopy::{AlignedBuf, DEFAULT_ALIGNMENT};
+
+let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
+```
+
+And to use a custom target size in a struct using the [`ZeroCopy`], you
+simply specify the default parameter:
+
+```rust
+use musli_zerocopy::{ZeroCopy, Ref, Slice, Unsized, AlignedBuf};
+use musli_zerocopy::DEFAULT_ALIGNMENT;
+
+#[derive(ZeroCopy)]
+#[repr(C)]
+struct Custom {
+    offset: Ref<u32, usize>,
+    slice: Slice::<u32, usize>,
+    unsize: Unsized::<str, usize>,
+}
+
+let mut buf = AlignedBuf::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
+
+let offset = buf.store(&42u32)?;
+let slice = buf.store_slice(&[1, 2, 3, 4])?;
+let unsize = buf.store_unsized("Hello World")?;
+
+buf.store(&Custom { offset, slice, unsize })?;
+```
+
+[`requested()`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.AlignedBuf.html#method.requested
+[`Ref`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.Ref.html
+[`Offset`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.Offset.html
+[`Slice`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.Slice.html
+[`Unsized`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.Unsized.html
+[`AlignedBuf`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.AlignedBuf.html
+[`TargetSize`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.TargetSize.html
+[`ZeroCopy`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
