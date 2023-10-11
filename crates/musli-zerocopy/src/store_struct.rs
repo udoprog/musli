@@ -1,11 +1,12 @@
 use crate::error::Error;
+use crate::offset::TargetSize;
 use crate::r#ref::Ref;
 use crate::zero_copy::ZeroCopy;
 
 /// A writer as returned from [`BufMut::store_struct`].
 ///
 /// [`BufMut::store_struct`]: crate::buf_mut::BufMut::store_struct
-pub trait StoreStruct<T> {
+pub trait StoreStruct<T, O: TargetSize> {
     /// Pad around the given field with zeros.
     ///
     /// Note that this is necessary to do correctly in order to satisfy the
@@ -90,5 +91,5 @@ pub trait StoreStruct<T> {
     /// assert_eq!(buf.load(ptr)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    unsafe fn finish(self) -> Result<Ref<T>, Error>;
+    unsafe fn finish(self) -> Result<Ref<T, O>, Error>;
 }

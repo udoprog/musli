@@ -89,7 +89,7 @@
 //! let buf = Buf::new(BYTES.0);
 //!
 //! // Construct a pointer into the buffer.
-//! let custom = Ref::new(Offset::new(BYTES.0.len() - size_of::<Custom>()));
+//! let custom = Ref::new(Offset::<u32>::new(BYTES.0.len() - size_of::<Custom>()));
 //!
 //! let custom: &Custom = buf.load(custom)?;
 //! assert_eq!(custom.field, 42);
@@ -112,7 +112,7 @@
 //!
 //! ```should_panic
 //! # use musli_zerocopy::Offset;
-//! Offset::new(1usize << 32);
+//! Offset::<u32>::new(1usize << 32);
 //! ```
 //!
 //! Example panic using a [`Slice`] with a length larger than `2^32`:
@@ -132,6 +132,57 @@
 //! If you want to address data larger than this limit, it is recommended that
 //! you partition your dataset into 32-bit addressable chunks.
 //!
+//! If you really want to change this limit, you can modify it by setting the
+//! default `O` parameter on the various [`TargetSize`]-dependent types:
+//!
+//! The available [`TargetSize`] implementations are:
+//! * `u32` for 32-bit sized pointers (the default).
+//! * `usize` for 64-bit sized pointers.
+//!
+//! ```
+//! # use musli_zerocopy::{Offset, Slice, Unsized};
+//! // These no longer panic:
+//! let offset = Offset::<usize>::new(1usize << 32);
+//! let slice = Slice::<u32, usize>::new(Offset::ZERO, 1usize << 32);
+//! let unsize = Unsized::<str, usize>::new(Offset::ZERO, 1usize << 32);
+//! ```
+//!
+//! [`AlignedBuf`] can also be initialized with a custom [`TargetSize`]:
+//!
+//! To initialize an [`AlignedBuf`] with a custom [`TargetSize`] you simply
+//! use this constructor while specifying one of the above parameters:
+//!
+//! ```
+//! use musli_zerocopy::{AlignedBuf, DEFAULT_ALIGNMENT};
+//!
+//! let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
+//! ```
+//!
+//! And to use a custom target size in a struct using the [`ZeroCopy`], you
+//! simply specify the default parameter:
+//!
+//! ```
+//! use musli_zerocopy::{ZeroCopy, Ref, Slice, Unsized, AlignedBuf};
+//! use musli_zerocopy::DEFAULT_ALIGNMENT;
+//!
+//! #[derive(ZeroCopy)]
+//! #[repr(C)]
+//! struct Custom {
+//!     offset: Ref<u32, usize>,
+//!     slice: Slice::<u32, usize>,
+//!     unsize: Unsized::<str, usize>,
+//! }
+//!
+//! let mut buf = AlignedBuf::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
+//!
+//! let offset = buf.store(&42u32)?;
+//! let slice = buf.store_slice(&[1, 2, 3, 4])?;
+//! let unsize = buf.store_unsized("Hello World")?;
+//!
+//! buf.store(&Custom { offset, slice, unsize })?;
+//! # Ok::<_, musli_zerocopy::Error>(())
+//! ```
+//!
 //! [`requested()`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.AlignedBuf.html#method.requested
 //! [`Ref`]:
@@ -144,6 +195,8 @@
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.Unsized.html
 //! [`AlignedBuf`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.AlignedBuf.html
+//! [`TargetSize`]:
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.TargetSize.html
 //! [`ZeroCopy`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
 
@@ -174,14 +227,14 @@ mod buf_mut;
 pub use self::error::Error;
 mod error;
 
-pub use self::offset::Offset;
+pub use self::offset::{Offset, TargetSize};
 mod offset;
 
 pub use self::store_struct::StoreStruct;
 mod store_struct;
 
 #[cfg(feature = "alloc")]
-pub use self::aligned_buf::AlignedBuf;
+pub use self::aligned_buf::{AlignedBuf, DEFAULT_ALIGNMENT};
 
 #[cfg(feature = "alloc")]
 mod aligned_buf;

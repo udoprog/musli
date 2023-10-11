@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::offset::Offset;
+use crate::offset::{DefaultTargetSize, Offset, TargetSize};
 use crate::ZeroCopy;
 
 /// A sized reference.
@@ -31,8 +31,8 @@ use crate::ZeroCopy;
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct Ref<T> {
-    ptr: Offset,
+pub struct Ref<T, O: TargetSize = DefaultTargetSize> {
+    ptr: Offset<O>,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
@@ -45,9 +45,14 @@ where
     pub const fn zero() -> Self {
         Self::new(Offset::ZERO)
     }
+}
 
+impl<T, O: TargetSize> Ref<T, O>
+where
+    T: ZeroCopy,
+{
     /// Construct a reference wrapping the given type at the specified address.
-    pub const fn new(ptr: Offset) -> Self {
+    pub const fn new(ptr: Offset<O>) -> Self {
         Self {
             ptr,
             _marker: PhantomData,
@@ -55,16 +60,16 @@ where
     }
 
     #[inline]
-    pub(crate) fn ptr(&self) -> Offset {
+    pub(crate) fn ptr(&self) -> Offset<O> {
         self.ptr
     }
 }
 
-impl<T> Clone for Ref<T> {
+impl<T, O: TargetSize> Clone for Ref<T, O> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T> Copy for Ref<T> {}
+impl<T, O: TargetSize> Copy for Ref<T, O> {}

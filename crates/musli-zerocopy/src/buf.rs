@@ -12,6 +12,7 @@ use crate::r#ref::Ref;
 use crate::r#unsized::Unsized;
 use crate::slice::Slice;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+use crate::TargetSize;
 
 /// A raw slice buffer.
 #[repr(transparent)]
@@ -334,7 +335,10 @@ impl Buf {
     }
 
     /// Load an unsized reference.
-    pub(crate) fn load_unsized<T: ?Sized>(&self, ptr: Unsized<T>) -> Result<&T, Error>
+    pub(crate) fn load_unsized<T: ?Sized, O: TargetSize>(
+        &self,
+        ptr: Unsized<T, O>,
+    ) -> Result<&T, Error>
     where
         T: UnsizedZeroCopy,
     {
@@ -348,7 +352,10 @@ impl Buf {
     }
 
     /// Load an unsized mutable reference.
-    pub(crate) fn load_unsized_mut<T: ?Sized>(&mut self, ptr: Unsized<T>) -> Result<&mut T, Error>
+    pub(crate) fn load_unsized_mut<T: ?Sized, O: TargetSize>(
+        &mut self,
+        ptr: Unsized<T, O>,
+    ) -> Result<&mut T, Error>
     where
         T: UnsizedZeroCopy,
     {
@@ -362,7 +369,7 @@ impl Buf {
     }
 
     /// Load the given sized value as a reference.
-    pub(crate) fn load_sized<T>(&self, ptr: Ref<T>) -> Result<&T, Error>
+    pub(crate) fn load_sized<T, O: TargetSize>(&self, ptr: Ref<T, O>) -> Result<&T, Error>
     where
         T: ZeroCopy,
     {
@@ -382,7 +389,10 @@ impl Buf {
     }
 
     /// Load the given sized value as a mutable reference.
-    pub(crate) fn load_sized_mut<T>(&mut self, ptr: Ref<T>) -> Result<&mut T, Error>
+    pub(crate) fn load_sized_mut<T, O: TargetSize>(
+        &mut self,
+        ptr: Ref<T, O>,
+    ) -> Result<&mut T, Error>
     where
         T: ZeroCopy,
     {
@@ -402,7 +412,7 @@ impl Buf {
     }
 
     /// Load the given slice.
-    pub(crate) fn load_slice<T>(&self, ptr: Slice<T>) -> Result<&[T], Error>
+    pub(crate) fn load_slice<T, O: TargetSize>(&self, ptr: Slice<T, O>) -> Result<&[T], Error>
     where
         T: ZeroCopy,
     {
@@ -414,7 +424,10 @@ impl Buf {
     }
 
     /// Load the given slice mutably.
-    pub(crate) fn load_slice_mut<T>(&mut self, ptr: Slice<T>) -> Result<&mut [T], Error>
+    pub(crate) fn load_slice_mut<T, O: TargetSize>(
+        &mut self,
+        ptr: Slice<T, O>,
+    ) -> Result<&mut [T], Error>
     where
         T: ZeroCopy,
     {

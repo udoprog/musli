@@ -1,5 +1,6 @@
 use crate::buf::Buf;
 use crate::error::Error;
+use crate::offset::TargetSize;
 use crate::r#ref::Ref;
 use crate::r#unsized::Unsized;
 use crate::slice::Slice;
@@ -67,7 +68,7 @@ where
     }
 }
 
-unsafe impl<T: ?Sized> Load for Unsized<T>
+unsafe impl<T: ?Sized, O: TargetSize> Load for Unsized<T, O>
 where
     T: UnsizedZeroCopy,
 {
@@ -78,7 +79,7 @@ where
     }
 }
 
-unsafe impl<T> Load for Ref<T>
+unsafe impl<T, O: TargetSize> Load for Ref<T, O>
 where
     T: ZeroCopy,
 {
@@ -89,7 +90,7 @@ where
     }
 }
 
-unsafe impl<T> Load for Slice<T>
+unsafe impl<T, O: TargetSize> Load for Slice<T, O>
 where
     T: ZeroCopy,
 {
@@ -100,7 +101,7 @@ where
     }
 }
 
-unsafe impl<T: ?Sized> LoadMut for Unsized<T>
+unsafe impl<T: ?Sized, O: TargetSize> LoadMut for Unsized<T, O>
 where
     T: UnsizedZeroCopy,
 {
@@ -109,7 +110,7 @@ where
     }
 }
 
-unsafe impl<T> LoadMut for Ref<T>
+unsafe impl<T, O: TargetSize> LoadMut for Ref<T, O>
 where
     T: ZeroCopy,
 {
@@ -118,7 +119,7 @@ where
     }
 }
 
-unsafe impl<T> LoadMut for Slice<T>
+unsafe impl<T, O: TargetSize> LoadMut for Slice<T, O>
 where
     T: ZeroCopy,
 {

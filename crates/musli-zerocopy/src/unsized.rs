@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
-use crate::offset::{Offset, OffsetSize};
-use crate::ZeroCopy;
+use crate::offset::{DefaultTargetSize, Offset};
+use crate::{TargetSize, ZeroCopy};
 
 /// A reference to an unsized value packed as a wide pointer.
 ///
@@ -35,14 +35,14 @@ use crate::ZeroCopy;
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct Unsized<T: ?Sized> {
-    ptr: Offset,
-    size: OffsetSize,
+pub struct Unsized<T: ?Sized, O: TargetSize = DefaultTargetSize> {
+    ptr: Offset<O>,
+    size: O,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
-impl<T: ?Sized> Unsized<T> {
+impl<T: ?Sized, O: TargetSize> Unsized<T, O> {
     /// Construct a new unsized reference.
     ///
     /// # Examples
@@ -53,12 +53,9 @@ impl<T: ?Sized> Unsized<T> {
     /// let bytes = Unsized::<str>::new(Offset::ZERO, 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn new(ptr: Offset, size: usize) -> Self {
-        let Ok(size) = OffsetSize::try_from(size) else {
-            panic!(
-                "Unsized size {size} not in the legal range of 0-{}",
-                OffsetSize::MAX
-            );
+    pub fn new(ptr: Offset<O>, size: usize) -> Self {
+        let Some(size) = O::from_usize(size) else {
+            panic!("Unsized size {size} not in the legal range of 0-{}", O::MAX);
         };
 
         Self {
@@ -80,7 +77,7 @@ impl<T: ?Sized> Unsized<T> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn ptr(&self) -> Offset {
+    pub fn ptr(&self) -> Offset<O> {
         self.ptr
     }
 
@@ -97,14 +94,14 @@ impl<T: ?Sized> Unsized<T> {
     /// ```
     #[inline]
     pub fn size(&self) -> usize {
-        self.size as usize
+        self.size.as_usize()
     }
 }
 
-impl<T: ?Sized> Clone for Unsized<T> {
+impl<T: ?Sized, O: TargetSize> Clone for Unsized<T, O> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T: ?Sized> Copy for Unsized<T> {}
+impl<T: ?Sized, O: TargetSize> Copy for Unsized<T, O> {}

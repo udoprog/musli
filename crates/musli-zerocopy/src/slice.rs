@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
-use crate::offset::{Offset, OffsetSize};
-use crate::ZeroCopy;
+use crate::offset::{DefaultTargetSize, Offset};
+use crate::{TargetSize, ZeroCopy};
 
 /// A reference to a slice packed as a wide pointer.
 ///
@@ -48,14 +48,14 @@ use crate::ZeroCopy;
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct Slice<T: ?Sized> {
-    ptr: Offset,
-    len: OffsetSize,
+pub struct Slice<T: ?Sized, O: TargetSize = DefaultTargetSize> {
+    ptr: Offset<O>,
+    len: O,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
-impl<T: ?Sized> Slice<T> {
+impl<T: ?Sized, O: TargetSize> Slice<T, O> {
     /// Construct a new slice reference.
     ///
     /// # Examples
@@ -66,12 +66,9 @@ impl<T: ?Sized> Slice<T> {
     /// let slice = Slice::<u32>::new(Offset::ZERO, 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn new(ptr: Offset, len: usize) -> Self {
-        let Ok(len) = OffsetSize::try_from(len) else {
-            panic!(
-                "Slice length {len} not in the legal range of 0-{}",
-                OffsetSize::MAX
-            );
+    pub fn new(ptr: Offset<O>, len: usize) -> Self {
+        let Some(len) = O::from_usize(len) else {
+            panic!("Slice length {len} not in the legal range of 0-{}", O::MAX);
         };
 
         Self {
@@ -93,7 +90,7 @@ impl<T: ?Sized> Slice<T> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn ptr(&self) -> Offset {
+    pub fn ptr(&self) -> Offset<O> {
         self.ptr
     }
 
@@ -110,7 +107,7 @@ impl<T: ?Sized> Slice<T> {
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        self.len as usize
+        self.len.as_usize()
     }
 
     /// If the slice is empty.
@@ -128,14 +125,14 @@ impl<T: ?Sized> Slice<T> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn is_empty(&self) -> bool {
-        self.len == 0
+        self.len.is_zero()
     }
 }
 
-impl<T: ?Sized> Clone for Slice<T> {
+impl<T: ?Sized, O: TargetSize> Clone for Slice<T, O> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T: ?Sized> Copy for Slice<T> {}
+impl<T: ?Sized, O: TargetSize> Copy for Slice<T, O> {}

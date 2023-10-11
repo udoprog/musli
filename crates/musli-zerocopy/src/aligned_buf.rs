@@ -12,7 +12,7 @@ use ::alloc::vec::Vec;
 use crate::buf::Buf;
 use crate::buf_mut::BufMut;
 use crate::error::{Error, ErrorKind};
-use crate::offset::Offset;
+use crate::offset::{DefaultTargetSize, Offset};
 use crate::pair::Pair;
 use crate::phf::MapRef;
 use crate::r#ref::Ref;
@@ -21,9 +21,10 @@ use crate::slice::Slice;
 use crate::store_struct::StoreStruct;
 use crate::visit::Visit;
 use crate::zero_copy::{UnsizedZeroCopy, ZeroCopy};
+use crate::TargetSize;
 
-/// Default alignment to use with [`AlignedBuf`].
-const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
+/// Default alignment to use with buffers such as [`AlignedBuf`].
+pub const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
 
 /// An allocating buffer with dynamic alignment.
 ///
@@ -45,7 +46,7 @@ const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
 /// let mut buf = AlignedBuf::new();
 /// buf.store(&Custom { field: 10 });
 /// ```
-pub struct AlignedBuf {
+pub struct AlignedBuf<O: TargetSize = DefaultTargetSize> {
     data: ptr::NonNull<u8>,
     /// The initialized length of the buffer.
     len: usize,
@@ -55,6 +56,8 @@ pub struct AlignedBuf {
     requested: usize,
     /// The current alignment.
     align: usize,
+    /// Holding onto the current pointer size.
+    _marker: PhantomData<O>,
 }
 
 impl AlignedBuf {
@@ -76,32 +79,6 @@ impl AlignedBuf {
         Self::with_alignment(DEFAULT_ALIGNMENT)
     }
 
-    /// Construct a new empty buffer with the specified alignment.
-    ///
-    /// The alignment will be rounded up to the next power of two.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::AlignedBuf;
-    ///
-    /// let buf = AlignedBuf::with_alignment(8);
-    /// assert!(buf.is_empty());
-    /// assert_eq!(buf.align(), 8);
-    /// assert_eq!(buf.requested(), 8);
-    /// ```
-    pub const fn with_alignment(align: usize) -> Self {
-        let align = align.next_power_of_two();
-
-        Self {
-            data: ptr::NonNull::dangling(),
-            len: 0,
-            capacity: 0,
-            requested: align,
-            align,
-        }
-    }
-
     /// Allocate a new buffer with the given capacity and default alignment.
     ///
     /// The buffer must allocate for at least the given `capacity`, but might
@@ -119,10 +96,59 @@ impl AlignedBuf {
         Self::with_capacity_and_alignment(capacity, DEFAULT_ALIGNMENT)
     }
 
+    /// Construct a new empty buffer with the specified alignment.
+    ///
+    /// The alignment will be rounded up to the next power of two.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the specified alignment is not a power of two.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let buf = AlignedBuf::with_alignment(8);
+    /// assert!(buf.is_empty());
+    /// assert_eq!(buf.align(), 8);
+    /// assert_eq!(buf.requested(), 8);
+    /// ```
+    pub const fn with_alignment(align: usize) -> Self {
+        assert!(align.is_power_of_two(), "Alignment has to be power of two");
+
+        Self {
+            data: ptr::NonNull::dangling(),
+            len: 0,
+            capacity: 0,
+            requested: align,
+            align,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<O: TargetSize> AlignedBuf<O> {
     /// Allocate a new buffer with the given capacity and default alignment.
     ///
     /// The buffer must allocate for at least the given `capacity`, but might
     /// allocate more. If the capacity specified is `0` it will not allocate.
+    ///
+    /// This constructor also allows for specifying the [`TargetSize`] through
+    /// the `O` parameter.
+    ///
+    /// The available [`TargetSize`] implementations are:
+    /// * `u32` for 32-bit sized pointers (the default).
+    /// * `usize` for 64-bit sized pointers.
+    ///
+    /// To initialize an [`AlignedBuf`] with a custom [`TargetSize`] you simply
+    /// use this constructor while specifying one of the above parameters:
+    ///
+    /// ```
+    /// use musli_zerocopy::{AlignedBuf, DEFAULT_ALIGNMENT};
+    ///
+    /// let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
+    /// ```
     ///
     /// # Panics
     ///
@@ -138,7 +164,7 @@ impl AlignedBuf {
     /// let align = 8usize;
     /// let max = isize::MAX as usize - (align - 1);
     ///
-    /// AlignedBuf::with_capacity_and_alignment(max, align);
+    /// AlignedBuf::<u32>::with_capacity_and_alignment(max, align);
     /// ```
     ///
     /// # Examples
@@ -146,13 +172,22 @@ impl AlignedBuf {
     /// ```
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = AlignedBuf::with_capacity_and_alignment(6, 2);
+    /// let buf = AlignedBuf::<u32>::with_capacity_and_alignment(6, 2);
     /// assert!(buf.capacity() >= 6);
     /// assert_eq!(buf.align(), 2);
     /// ```
     pub fn with_capacity_and_alignment(capacity: usize, align: usize) -> Self {
         if capacity == 0 {
-            return Self::with_alignment(align);
+            assert!(align.is_power_of_two(), "Alignment has to be power of two");
+
+            return Self {
+                data: ptr::NonNull::dangling(),
+                len: 0,
+                capacity: 0,
+                requested: align,
+                align,
+                _marker: PhantomData,
+            };
         }
 
         let layout = Layout::from_size_align(capacity, align).expect("Illegal memory layout");
@@ -170,6 +205,7 @@ impl AlignedBuf {
                 capacity,
                 requested: align,
                 align,
+                _marker: PhantomData,
             }
         }
     }
@@ -359,7 +395,7 @@ impl AlignedBuf {
     /// assert_eq!(buf.load(custom2.string)?, "string");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn store<T>(&mut self, value: &T) -> Result<Ref<T>, Error>
+    pub fn store<T>(&mut self, value: &T) -> Result<Ref<T, O>, Error>
     where
         T: ZeroCopy,
     {
@@ -418,7 +454,7 @@ impl AlignedBuf {
     /// assert_eq!(buf.load(ptr)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn store_struct<T>(&mut self, value: &T) -> AlignedBufStoreStruct<'_, T>
+    pub fn store_struct<T>(&mut self, value: &T) -> AlignedBufStoreStruct<'_, T, O>
     where
         T: ZeroCopy,
     {
@@ -461,7 +497,7 @@ impl AlignedBuf {
     /// assert_eq!(buf.load(second)?, "second");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn store_unsized<T>(&mut self, value: &T) -> Result<Unsized<T>, Error>
+    pub fn store_unsized<T>(&mut self, value: &T) -> Result<Unsized<T, O>, Error>
     where
         T: ?Sized + UnsizedZeroCopy,
     {
@@ -499,7 +535,7 @@ impl AlignedBuf {
     /// assert_eq!(&strings, &["first", "second"][..]);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn store_slice<T>(&mut self, values: &[T]) -> Result<Slice<T>, Error>
+    pub fn store_slice<T>(&mut self, values: &[T]) -> Result<Slice<T, O>, Error>
     where
         T: ZeroCopy,
     {
@@ -566,7 +602,7 @@ impl AlignedBuf {
     /// assert_eq!(map.get(buf, &30u64)?, None);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert_map<K, V>(&mut self, entries: &mut [Pair<K, V>]) -> Result<MapRef<K, V>, Error>
+    pub fn insert_map<K, V>(&mut self, entries: &mut [Pair<K, V>]) -> Result<MapRef<K, V, O>, Error>
     where
         K: Visit + ZeroCopy,
         V: ZeroCopy,
@@ -895,7 +931,7 @@ impl AlignedBuf {
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// let mut buf = AlignedBuf::with_capacity_and_alignment(4, 2);
+    /// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment(4, 2);
     ///
     /// buf.extend_from_slice(&[1, 2]);
     /// buf.request_align(4);
@@ -985,7 +1021,7 @@ impl AlignedBuf {
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn next_pointer_with(&mut self, align: usize) -> Offset {
+    pub fn next_pointer_with(&mut self, align: usize) -> Offset<O> {
         self.request_align(align);
         Offset::new(self.len)
     }
@@ -1015,7 +1051,7 @@ impl AlignedBuf {
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn next_pointer<T>(&mut self) -> Offset
+    pub fn next_pointer<T>(&mut self) -> Offset<O>
     where
         T: ZeroCopy,
     {
@@ -1128,7 +1164,7 @@ impl AlignedBuf {
 ///
 /// assert_ne!(align_of::<u16>(), align_of::<u32>());
 ///
-/// let mut buf = AlignedBuf::with_capacity_and_alignment(4, align_of::<u16>());
+/// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment(4, align_of::<u16>());
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 /// buf.request_align(align_of::<u32>());
 ///
@@ -1138,7 +1174,7 @@ impl AlignedBuf {
 /// let buf3 = buf.as_aligned_owned_buf();
 /// assert_eq!(buf3.align(), align_of::<u32>());
 /// ```
-impl Clone for AlignedBuf {
+impl<O: TargetSize> Clone for AlignedBuf<O> {
     fn clone(&self) -> Self {
         unsafe {
             let mut new =
@@ -1152,7 +1188,7 @@ impl Clone for AlignedBuf {
     }
 }
 
-impl Drop for AlignedBuf {
+impl<O: TargetSize> Drop for AlignedBuf<O> {
     fn drop(&mut self) {
         unsafe {
             if self.capacity != 0 {
@@ -1165,8 +1201,9 @@ impl Drop for AlignedBuf {
     }
 }
 
-impl BufMut for AlignedBuf {
-    type StoreStruct<'a, T> = AlignedBufStoreStruct<'a, T> where T: ZeroCopy;
+impl<O: TargetSize> BufMut for AlignedBuf<O> {
+    type TargetSize = O;
+    type StoreStruct<'a, T> = AlignedBufStoreStruct<'a, T, O> where T: ZeroCopy;
 
     #[inline]
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
@@ -1192,17 +1229,17 @@ impl BufMut for AlignedBuf {
 
 /// A writer as returned from [AlignedBuf::writer].
 #[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StoreStruct::finish`"]
-pub struct AlignedBufStoreStruct<'a, T> {
-    buf: &'a mut AlignedBuf,
+pub struct AlignedBufStoreStruct<'a, T, O: TargetSize> {
+    buf: &'a mut AlignedBuf<O>,
     len: usize,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> AlignedBufStoreStruct<'a, T>
+impl<'a, T, O: TargetSize> AlignedBufStoreStruct<'a, T, O>
 where
     T: ZeroCopy,
 {
-    pub(crate) fn new(buf: &'a mut AlignedBuf, len: usize) -> Self {
+    pub(crate) fn new(buf: &'a mut AlignedBuf<O>, len: usize) -> Self {
         Self {
             buf,
             len,
@@ -1237,7 +1274,7 @@ where
     }
 }
 
-impl<'a, T> StoreStruct<T> for AlignedBufStoreStruct<'a, T>
+impl<'a, T, O: TargetSize> StoreStruct<T, O> for AlignedBufStoreStruct<'a, T, O>
 where
     T: ZeroCopy,
 {
@@ -1265,7 +1302,7 @@ where
     /// contain uninitialized data in the form of uninitialized padding.
     ///
     /// [`pad`]: Self::pad
-    unsafe fn finish(mut self) -> Result<Ref<T>, Error> {
+    unsafe fn finish(mut self) -> Result<Ref<T, O>, Error> {
         self.zero_pad_align::<T>();
 
         let ptr = Offset::new(self.buf.len());

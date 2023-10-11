@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::offset::TargetSize;
 use crate::store_struct::StoreStruct;
 use crate::zero_copy::ZeroCopy;
 
@@ -8,8 +9,11 @@ use crate::zero_copy::ZeroCopy;
 ///
 /// [`AlignedBuf`]: crate::AlignedBuf
 pub trait BufMut {
+    /// Target size buffer is configured to use.
+    type TargetSize: TargetSize;
+
     /// Interior mutable buffer.
-    type StoreStruct<'a, T>: StoreStruct<T>
+    type StoreStruct<'a, T>: StoreStruct<T, Self::TargetSize>
     where
         Self: 'a,
         T: ZeroCopy;
@@ -81,6 +85,7 @@ impl<B: ?Sized> BufMut for &mut B
 where
     B: BufMut,
 {
+    type TargetSize = B::TargetSize;
     type StoreStruct<'a, T> = B::StoreStruct<'a, T> where Self: 'a, T: ZeroCopy;
 
     #[inline]
