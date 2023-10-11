@@ -258,9 +258,9 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// }
 ///
 /// let mut buf = AlignedBuf::new();
-/// let ptr = buf.store(&Custom { field: 42, () })?;
+/// let ptr = buf.store(&Custom { field: 42, ignore: () })?;
 /// let buf = buf.as_aligned();
-/// assert_eq!(buf.load(ptr)?, &Custom { field: 42, () });
+/// assert_eq!(buf.load(ptr)?, &Custom { field: 42, ignore: () });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 pub unsafe trait ZeroCopy {
