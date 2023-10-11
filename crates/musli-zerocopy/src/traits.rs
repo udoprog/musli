@@ -16,7 +16,7 @@
 
 use core::cell::Cell;
 use core::marker::PhantomData;
-use core::mem::align_of;
+use core::mem::{align_of, size_of};
 use core::str;
 
 use crate::buf::{Buf, BufMut, Visit};
@@ -293,8 +293,8 @@ pub unsafe trait ZeroCopy {
     /// `size_of::<Self>()` bytes.
     const ANY_BITS: bool;
 
-    /// Indicates that a type needs padding. Conservatively this should almost
-    /// always be set to true.
+    /// Indicates that a type needs padding in case it is stored in an array
+    /// that is aligned to `align_of::<Self>()`.
     const NEEDS_PADDING: bool;
 
     /// Store the current value to the mutable buffer.
@@ -757,7 +757,7 @@ where
     T: ZeroCopy,
 {
     const ANY_BITS: bool = T::ANY_BITS;
-    const NEEDS_PADDING: bool = T::NEEDS_PADDING;
+    const NEEDS_PADDING: bool = T::NEEDS_PADDING && size_of::<[T; N]>() % align_of::<T>() == 0;
 
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where

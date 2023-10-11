@@ -288,6 +288,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let validate;
     let impl_zero_sized;
     let any_bits;
+    let mut needs_padding = quote!(false);
 
     match &input.data {
         syn::Data::Struct(st) => {
@@ -343,6 +344,13 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     validate = quote! {
                         <#ty as #zero_copy>::validate(buf)
                     };
+
+                    // We are either a `repr(C)` with a single field or
+                    // `repr(transparent)`, in which case we can inherit that
+                    // fields padding.
+                    needs_padding = quote! {
+                        <#ty as #zero_copy>::NEEDS_PADDING
+                    };
                 } else {
                     store_to = quote! {
                         #result::Ok(())
@@ -351,6 +359,9 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     validate = quote! {
                         #result::Ok(())
                     };
+
+                    // This is a ZST. No padding needed.
+                    needs_padding = quote!(false);
                 }
             } else {
                 store_to = quote! {
@@ -528,7 +539,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
             const ANY_BITS: bool = #any_bits;
-            const NEEDS_PADDING: bool = true;
+            const NEEDS_PADDING: bool = #needs_padding;
 
             fn store_to<__B: ?Sized>(&self, buf: &mut __B) -> #result<(), #error>
             where

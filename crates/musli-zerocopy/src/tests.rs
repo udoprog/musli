@@ -215,3 +215,32 @@ fn test_neg0() -> Result<(), Error> {
     test_case!(I128, i128, i128, __illegal_enum_i128);
     Ok(())
 }
+
+#[test]
+fn test_needs_padding() -> Result<(), Error> {
+    #[derive(ZeroCopy)]
+    #[repr(transparent)]
+    #[zero_copy(crate)]
+    struct ZST {}
+
+    assert!(!ZST::NEEDS_PADDING);
+
+    #[derive(ZeroCopy)]
+    #[repr(transparent)]
+    #[zero_copy(crate)]
+    struct SingleField {
+        not_padded: u32,
+    }
+
+    assert!(!SingleField::NEEDS_PADDING);
+
+    #[derive(ZeroCopy)]
+    #[repr(transparent)]
+    #[zero_copy(crate)]
+    struct MightPad {
+        might_pad: [u32; 4],
+    }
+
+    assert!(!MightPad::NEEDS_PADDING);
+    Ok(())
+}
