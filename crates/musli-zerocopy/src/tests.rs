@@ -1,3 +1,5 @@
+#![allow(clippy::assertions_on_constants)]
+
 use core::mem::{align_of, size_of};
 
 use crate::pointer::Ref;
@@ -221,9 +223,9 @@ fn test_needs_padding() -> Result<(), Error> {
     #[derive(ZeroCopy)]
     #[repr(transparent)]
     #[zero_copy(crate)]
-    struct ZST {}
+    struct Zst {}
 
-    assert!(!ZST::NEEDS_PADDING);
+    const _: () = assert!(!Zst::NEEDS_PADDING);
 
     #[derive(ZeroCopy)]
     #[repr(transparent)]
@@ -232,7 +234,7 @@ fn test_needs_padding() -> Result<(), Error> {
         not_padded: u32,
     }
 
-    assert!(!SingleField::NEEDS_PADDING);
+    const _: () = assert!(!SingleField::NEEDS_PADDING);
 
     #[derive(ZeroCopy)]
     #[repr(transparent)]
@@ -241,6 +243,6 @@ fn test_needs_padding() -> Result<(), Error> {
         might_pad: [u32; 4],
     }
 
-    assert!(!MightPad::NEEDS_PADDING);
+    const _: () = assert!(!MightPad::NEEDS_PADDING);
     Ok(())
 }
