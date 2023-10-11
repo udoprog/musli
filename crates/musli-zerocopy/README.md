@@ -71,16 +71,16 @@ aligned `&'static [u8]` buffer:
 use core::mem::size_of;
 use musli_zerocopy::{Ref, Offset, Buf};
 
-// Helper to force the static buffer to be aligned.
-#[repr(align(8))]
-struct Align(&'static [u8]);
+// Helper to force the static buffer to be aligned like `A`.
+#[repr(C)]
+struct Align<A, T: ?Sized>([A; 0], T);
 
-static BYTES: Align = Align(include_bytes!("custom.bin"));
+static BYTES: &Align<u64, [u8]> = &Align([], *include_bytes!("custom.bin"));
 
-let buf = Buf::new(BYTES.0);
+let buf = Buf::new(&BYTES.1);
 
 // Construct a pointer into the buffer.
-let custom = Ref::new(Offset::<u32>::new(BYTES.0.len() - size_of::<Custom>()));
+let custom = Ref::new(Offset::<u32>::new(BYTES.1.len() - size_of::<Custom>()));
 
 let custom: &Custom = buf.load(custom)?;
 assert_eq!(custom.field, 42);

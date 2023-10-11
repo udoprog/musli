@@ -1,6 +1,6 @@
 [package]
 name = "musli-zerocopy"
-version = "0.0.57"
+version = "0.0.58"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
@@ -22,7 +22,7 @@ alloc = []
 nightly = []
 
 [dependencies]
-musli-macros = { version = "=0.0.57", path = "../musli-macros" }
+musli-macros = { version = "=0.0.58", path = "../musli-macros" }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 
 [dev-dependencies]
