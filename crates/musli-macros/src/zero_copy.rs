@@ -47,6 +47,68 @@ impl<'a> Expander<'a> {
     }
 }
 
+#[derive(Default)]
+struct ReprAttr {
+    repr: Option<Repr>,
+    repr_align: Option<usize>,
+}
+
+impl ReprAttr {
+    fn parse_attr(&mut self, cx: &Ctxt, attr: &syn::Attribute) {
+        let result = attr.parse_nested_meta(|meta| {
+            macro_rules! repr {
+                ($ident:ident, $variant:expr) => {
+                    if meta.path.is_ident(stringify!($ident)) {
+                        if self.repr.is_some() {
+                            return Err(syn::Error::new_spanned(
+                                meta.path,
+                                "ZeroCopy: only one kind of repr is supported",
+                            ));
+                        }
+
+                        self.repr = Some($variant);
+                        return Ok(());
+                    }
+                };
+            }
+
+            repr!(C, Repr::C);
+            repr!(transparent, Repr::Transparent);
+            repr!(u8, Repr::Num(meta.path.span(), Num::U8));
+            repr!(u16, Repr::Num(meta.path.span(), Num::U16));
+            repr!(u32, Repr::Num(meta.path.span(), Num::U32));
+            repr!(u64, Repr::Num(meta.path.span(), Num::U64));
+            repr!(u128, Repr::Num(meta.path.span(), Num::U128));
+            repr!(i8, Repr::Num(meta.path.span(), Num::I8));
+            repr!(i16, Repr::Num(meta.path.span(), Num::I16));
+            repr!(i32, Repr::Num(meta.path.span(), Num::I32));
+            repr!(i64, Repr::Num(meta.path.span(), Num::I64));
+            repr!(i128, Repr::Num(meta.path.span(), Num::I128));
+            repr!(isize, Repr::Num(meta.path.span(), Num::Isize));
+            repr!(Usize, Repr::Num(meta.path.span(), Num::Usize));
+
+            // #[repr(align(N))]
+            if meta.path.is_ident("align") {
+                let content;
+                parenthesized!(content in meta.input);
+                let lit: syn::LitInt = content.parse()?;
+                let n: usize = lit.base10_parse()?;
+                self.repr_align = Some(n);
+                return Ok(());
+            }
+
+            Err(syn::Error::new_spanned(
+                meta.path,
+                "ZeroCopy: not a support representation",
+            ))
+        });
+
+        if let Err(error) = result {
+            cx.error(error);
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum Repr {
     C,
@@ -173,63 +235,12 @@ impl Repr {
 fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let mut generics = input.generics.clone();
 
-    let mut repr = None;
-    let mut repr_align = None;
+    let mut repr = ReprAttr::default();
     let mut krate: syn::Path = syn::parse_quote!(musli_zerocopy);
 
     for attr in &input.attrs {
         if attr.path().is_ident("repr") {
-            let result = attr.parse_nested_meta(|meta| {
-                macro_rules! repr {
-                    ($ident:ident, $variant:expr) => {
-                        if meta.path.is_ident(stringify!($ident)) {
-                            if repr.is_some() {
-                                return Err(syn::Error::new_spanned(
-                                    meta.path,
-                                    "ZeroCopy: only one kind of repr is supported",
-                                ));
-                            }
-
-                            repr = Some($variant);
-                            return Ok(());
-                        }
-                    };
-                }
-
-                repr!(C, Repr::C);
-                repr!(transparent, Repr::Transparent);
-                repr!(u8, Repr::Num(meta.path.span(), Num::U8));
-                repr!(u16, Repr::Num(meta.path.span(), Num::U16));
-                repr!(u32, Repr::Num(meta.path.span(), Num::U32));
-                repr!(u64, Repr::Num(meta.path.span(), Num::U64));
-                repr!(u128, Repr::Num(meta.path.span(), Num::U128));
-                repr!(i8, Repr::Num(meta.path.span(), Num::I8));
-                repr!(i16, Repr::Num(meta.path.span(), Num::I16));
-                repr!(i32, Repr::Num(meta.path.span(), Num::I32));
-                repr!(i64, Repr::Num(meta.path.span(), Num::I64));
-                repr!(i128, Repr::Num(meta.path.span(), Num::I128));
-                repr!(isize, Repr::Num(meta.path.span(), Num::Isize));
-                repr!(Usize, Repr::Num(meta.path.span(), Num::Usize));
-
-                // #[repr(align(N))]
-                if meta.path.is_ident("align") {
-                    let content;
-                    parenthesized!(content in meta.input);
-                    let lit: syn::LitInt = content.parse()?;
-                    let n: usize = lit.base10_parse()?;
-                    repr_align = Some(n);
-                    return Ok(());
-                }
-
-                Err(syn::Error::new_spanned(
-                    meta.path,
-                    "ZeroCopy: not a support representation",
-                ))
-            });
-
-            if let Err(error) = result {
-                cx.error(error);
-            }
+            repr.parse_attr(cx, attr);
         }
 
         if attr.path().is_ident("zero_copy") {
@@ -265,7 +276,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         }
     }
 
-    let Some(repr) = repr else {
+    let Some(repr) = repr.repr else {
         cx.error(syn::Error::new_spanned(
             input,
             "ZeroCopy: struct must be marked with repr(C), repr(transparent), repr(u*), or repr(i*)",
@@ -282,61 +293,21 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
 
-    let mut check_zero_sized = Vec::new();
-
     let store_to;
     let validate;
     let impl_zero_sized;
     let any_bits;
     let mut needs_padding = quote!(false);
+    let mut check_zero_sized = Vec::new();
 
     match &input.data {
         syn::Data::Struct(st) => {
             // Field types.
-            let mut fields = Vec::new();
-            let mut first_field = None;
+            let mut output = process_fields(cx, &st.fields);
+            check_zero_sized.append(&mut output.check_zero_sized);
 
-            for (index, field) in st.fields.iter().enumerate() {
-                let mut ignore = None;
-
-                for attr in &field.attrs {
-                    if attr.path().is_ident("zero_copy") {
-                        let result = attr.parse_nested_meta(|meta: ParseNestedMeta| {
-                            if meta.path.is_ident("ignore") {
-                                ignore = Some(meta.path.span());
-                                return Ok(());
-                            }
-
-                            Ok(())
-                        });
-
-                        if let Err(error) = result {
-                            cx.error(error);
-                        }
-                    }
-                }
-
-                let ty = &field.ty;
-
-                let member = match &field.ident {
-                    Some(ident) => syn::Member::Named(ident.clone()),
-                    None => syn::Member::Unnamed(syn::Index::from(index)),
-                };
-
-                if ignore.is_some() {
-                    check_zero_sized.push(ty);
-                    continue;
-                }
-
-                fields.push(ty);
-
-                if first_field.is_none() {
-                    first_field = Some((ty, member));
-                }
-            }
-
-            if matches!(repr, Repr::Transparent) || first_field.is_none() {
-                if let Some((ty, member)) = first_field {
+            if matches!(repr, Repr::Transparent) || output.first_field.is_none() {
+                if let Some((ty, member)) = output.first_field {
                     store_to = quote! {
                         <#ty as #zero_copy>::store_to(&self.#member, buf)
                     };
@@ -364,10 +335,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     needs_padding = quote!(false);
                 }
             } else {
+                let types = &output.types;
+
                 store_to = quote! {
                     let mut writer = #buf_mut::store_struct(buf, self);
 
-                    #(#store_struct::pad::<#fields>(&mut writer);)*
+                    #(#store_struct::pad::<#types>(&mut writer);)*
 
                     // SAFETY: We've systematically ensured to pad all fields on the
                     // struct.
@@ -380,15 +353,16 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
                 validate = quote! {
                     let mut validator = #buf::validate::<Self>(buf)?;
-                    #(#validator::field::<#fields>(&mut validator)?;)*
+                    #(#validator::field::<#types>(&mut validator)?;)*
                     #validator::end(validator)?;
                     #result::Ok(())
                 };
             }
 
             let name = &input.ident;
+            let types = &output.types;
 
-            impl_zero_sized = fields.is_empty().then(|| {
+            impl_zero_sized = output.types.is_empty().then(|| {
                 let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
                 quote! {
@@ -397,7 +371,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 }
             });
 
-            any_bits = quote!(true #(&& <#fields as #zero_copy>::ANY_BITS)*);
+            any_bits = quote!(true #(&& <#types as #zero_copy>::ANY_BITS)*);
         }
         syn::Data::Enum(en) => {
             let Some((span, num)) = repr.as_numerical_repr() else {
@@ -412,6 +386,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             let ty = syn::Ident::new(num.as_ty(), span);
 
             let mut variants = Vec::new();
+            let mut store_to_variants = Vec::new();
 
             let mut current = (
                 false,
@@ -422,13 +397,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             for variant in &en.variants {
                 let first = take(&mut first);
 
-                if !variant.fields.is_empty() {
-                    cx.error(syn::Error::new_spanned(
-                        &variant.fields,
-                        "Only empty fields are supported in enum variants",
-                    ));
-                    continue;
-                }
+                let mut output = process_fields(cx, &variant.fields);
+                check_zero_sized.append(&mut output.check_zero_sized);
 
                 fn as_int(expr: &syn::Expr) -> Option<(bool, &syn::LitInt)> {
                     match expr {
@@ -473,33 +443,62 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     lit: syn::Lit::Int(current.clone()),
                 });
 
-                if *neg {
-                    variants.push(syn::Expr::Unary(syn::ExprUnary {
+                let discriminator = if *neg {
+                    syn::Expr::Unary(syn::ExprUnary {
                         attrs: Vec::new(),
                         op: syn::UnOp::Neg(<Token![-]>::default()),
                         expr: Box::new(expr),
-                    }));
+                    })
                 } else {
-                    variants.push(expr);
-                }
+                    expr
+                };
+    
+                let ident = &variant.ident;
+                let types = &output.types;
+
+                variants.push(quote! {
+                    #discriminator => {
+                        #(#validator::field::<#types>(&mut validator)?;)*
+                    }
+                });
+
+                store_to_variants.push(quote! {
+                    Self::#ident { .. } => {
+                        #(#store_struct::pad::<#types>(&mut writer);)*
+                    }
+                });
             }
 
             store_to = quote! {
-                // SAFETY: The enum is repr transparent over the underlying type.
-                let this = unsafe { &*(self as *const _ as *const #ty) };
-                <#ty as #zero_copy>::store_to(this, buf)
+                let mut writer = #buf_mut::store_struct(buf, self);
+
+                #store_struct::pad::<#ty>(&mut writer);
+
+                match self {
+                    #(#store_to_variants,)*
+                }
+
+                // SAFETY: We've systematically ensured to pad all fields on the
+                // struct.
+                unsafe {
+                    #store_struct::finish(writer)?;
+                }
+
+                #result::Ok(())
             };
 
             let illegal_enum = quote::format_ident!("__illegal_enum_{}", num.as_ty());
 
             validate = quote! {
-                <#ty as #zero_copy>::validate(buf)?;
+                let mut validator = #buf::validate::<Self>(buf)?;
+                let discriminator = #validator::field::<#ty>(&mut validator)?;
 
-                match *#buf::cast::<#ty>(buf) {
-                    #(#variants => (),)*
+                match *discriminator {
+                    #(#variants,)*
                     value => return #result::Err(#error::#illegal_enum::<Self>(value)),
                 }
 
+                #validator::end(validator)?;
                 Ok(())
             };
 
@@ -553,4 +552,56 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             }
         }
     })
+}
+
+#[derive(Default)]
+struct Fields<'a> {
+    types: Vec<&'a syn::Type>,
+    first_field: Option<(&'a syn::Type, syn::Member)>,
+    check_zero_sized: Vec<&'a syn::Type>,
+}
+
+fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
+    let mut output = Fields::default();
+
+    for (index, field) in fields.iter().enumerate() {
+        let mut ignore = None;
+
+        for attr in &field.attrs {
+            if attr.path().is_ident("zero_copy") {
+                let result = attr.parse_nested_meta(|meta: ParseNestedMeta| {
+                    if meta.path.is_ident("ignore") {
+                        ignore = Some(meta.path.span());
+                        return Ok(());
+                    }
+
+                    Ok(())
+                });
+
+                if let Err(error) = result {
+                    cx.error(error);
+                }
+            }
+        }
+
+        let ty = &field.ty;
+
+        let member = match &field.ident {
+            Some(ident) => syn::Member::Named(ident.clone()),
+            None => syn::Member::Unnamed(syn::Index::from(index)),
+        };
+
+        if ignore.is_some() {
+            output.check_zero_sized.push(ty);
+            continue;
+        }
+
+        output.types.push(ty);
+
+        if output.first_field.is_none() {
+            output.first_field = Some((ty, member));
+        }
+    }
+
+    output
 }

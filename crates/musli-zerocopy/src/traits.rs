@@ -689,7 +689,7 @@ impl_nonzero_number!(NonZeroI64, i64);
 impl_nonzero_number!(NonZeroI128, i128);
 
 macro_rules! impl_zst {
-    ($({$name:ident},)? $ty:ty, $expr:expr , {$example:ty $(, $import:path)?}) => {
+    ($({$($bounds:tt)*},)? $ty:ty, $expr:expr , {$example:ty $(, $import:path)?}) => {
         #[doc = concat!(" [`ZeroCopy`] implementation for `", stringify!($ty), "`")]
         ///
         /// # Examples
@@ -714,7 +714,7 @@ macro_rules! impl_zst {
         /// assert_eq!(slice.len(), 100);
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
-        unsafe impl $(<$name>)* ZeroCopy for $ty {
+        unsafe impl $(<$($bounds)*>)* ZeroCopy for $ty {
             const ANY_BITS: bool = true;
             const NEEDS_PADDING: bool = false;
 
@@ -733,10 +733,10 @@ macro_rules! impl_zst {
             }
         }
 
-        impl $(<$name>)* crate::buf::visit::sealed::Sealed for $ty {
+        impl $(<$($bounds)*>)* crate::buf::visit::sealed::Sealed for $ty {
         }
 
-        impl $(<$name>)* Visit for $ty {
+        impl $(<$($bounds)*>)* Visit for $ty {
             type Target = $ty;
 
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
@@ -752,6 +752,32 @@ macro_rules! impl_zst {
 impl_zst!((), (), { () });
 impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::PhantomData});
 
+/// [`ZeroCopy`] implementation for `[T; 0]`.
+///
+/// # Examples
+///
+/// ```
+/// use core::mem::align_of;
+///
+/// use musli_zerocopy::{ZeroCopy, AlignedBuf};
+///
+/// #[derive(Default, Clone, Copy, ZeroCopy)]
+/// #[repr(C)]
+/// struct Struct<T> {
+///     #[zero_copy(ignore)]
+///     field: [T; 0],
+/// }
+///
+/// let mut empty = AlignedBuf::with_alignment(align_of::<u128>());
+/// let values = [Struct::<u128>::default(); 100];
+/// let slice = empty.store_slice(&values[..])?;
+/// let buf = empty.as_aligned();
+/// assert_eq!(buf.len(), 0);
+///
+/// let slice = buf.load(slice)?;
+/// assert_eq!(slice.len(), 100);
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
 unsafe impl<T, const N: usize> ZeroCopy for [T; N]
 where
     T: ZeroCopy,
@@ -771,5 +797,18 @@ where
     unsafe fn validate(buf: &Buf) -> Result<(), Error> {
         crate::buf::validate_array::<T>(buf)?;
         Ok(())
+    }
+}
+
+impl<T> crate::buf::visit::sealed::Sealed for [T; 0] {}
+
+impl<T> Visit for [T; 0] {
+    type Target = [T; 0];
+
+    fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
+    where
+        V: FnOnce(&Self::Target) -> O,
+    {
+        Ok(visitor(self))
     }
 }

@@ -55,7 +55,7 @@ impl<'a, T> Validator<'a, T> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn field<F>(&mut self) -> Result<(), Error>
+    pub fn field<F>(&mut self) -> Result<&F, Error>
     where
         F: ZeroCopy,
     {
@@ -70,7 +70,7 @@ impl<'a, T> Validator<'a, T> {
         };
 
         self.offset = end;
-        Ok(())
+        Ok(unsafe { data.cast() })
     }
 
     /// Finish validation.

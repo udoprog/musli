@@ -104,10 +104,8 @@ impl AlignedBuf {
     /// assert_eq!(buf.requested(), 8);
     /// ```
     pub const fn with_alignment(align: usize) -> Self {
-        assert!(align.is_power_of_two(), "Alignment has to be power of two");
-
         Self {
-            data: ptr::NonNull::dangling(),
+            data: dangling(align),
             len: 0,
             capacity: 0,
             requested: align,
@@ -171,7 +169,7 @@ impl<O: Size> AlignedBuf<O> {
             assert!(align.is_power_of_two(), "Alignment has to be power of two");
 
             return Self {
-                data: ptr::NonNull::dangling(),
+                data: dangling(align),
                 len: 0,
                 capacity: 0,
                 requested: align,
@@ -467,14 +465,15 @@ impl<O: Size> AlignedBuf<O> {
     where
         T: ZeroCopy,
     {
-        self.ensure_capacity(self.len.wrapping_add(size_of::<T>()));
+        let end = self.len.wrapping_add(size_of::<T>());
+        self.ensure_capacity(end);
 
         unsafe {
             ptr::copy_nonoverlapping(value, self.as_ptr_mut().wrapping_add(self.len).cast(), 1);
         }
 
         let len = self.len;
-        AlignedBufStoreStruct::new(self, len)
+        AlignedBufStoreStruct::new(self, len, end)
     }
 
     /// Write a [`ZeroCopy`] value directly into the buffer.
@@ -1314,7 +1313,8 @@ impl<O: Size> BufMut for AlignedBuf<O> {
 #[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StoreStruct::finish`"]
 pub struct AlignedBufStoreStruct<'a, T, O: Size> {
     buf: &'a mut AlignedBuf<O>,
-    len: usize,
+    initialized: usize,
+    end: usize,
     _marker: PhantomData<T>,
 }
 
@@ -1322,37 +1322,38 @@ impl<'a, T, O: Size> AlignedBufStoreStruct<'a, T, O>
 where
     T: ZeroCopy,
 {
-    pub(crate) fn new(buf: &'a mut AlignedBuf<O>, len: usize) -> Self {
+    pub(crate) fn new(buf: &'a mut AlignedBuf<O>, len: usize, end: usize) -> Self {
         Self {
             buf,
-            len,
+            initialized: len,
+            end,
             _marker: PhantomData,
         }
     }
 
     /// Zero pad around a field with the given type `T`.
     ///
-    /// # Safety
+    /// Note that if calling this overflows the current type we will simply just
+    /// not write zero byte paddings.
     ///
-    /// This requires that the non-padding bytes of the given field have been
-    /// initialized.
+    /// Instead if this happens, once `finish()` is called it will error.
     fn zero_pad_align<F>(&mut self)
     where
         F: ZeroCopy,
     {
-        let o = self.len.next_multiple_of(align_of::<F>());
+        let o = self.initialized.next_multiple_of(align_of::<F>());
 
         // zero out padding.
-        if o > self.len {
-            if o <= self.buf.capacity() {
-                let start = self.buf.as_ptr_mut().wrapping_add(self.len);
+        if o > self.initialized {
+            if o <= self.end {
+                let start = self.buf.as_ptr_mut().wrapping_add(self.initialized);
 
                 unsafe {
-                    ptr::write_bytes(start, 0, o - self.len);
+                    ptr::write_bytes(start, 0, o - self.initialized);
                 }
             }
 
-            self.len = o;
+            self.initialized = o;
         }
     }
 }
@@ -1372,7 +1373,7 @@ where
         F: ZeroCopy,
     {
         self.zero_pad_align::<F>();
-        self.len = self.len.wrapping_add(size_of::<F>());
+        self.initialized = self.initialized.wrapping_add(size_of::<F>());
     }
 
     /// Finish writing the current buffer.
@@ -1390,14 +1391,39 @@ where
 
         let offset = self.buf.len();
 
-        if self.len > self.buf.capacity() {
+        if self.initialized > self.end {
             return Err(Error::new(ErrorKind::BufferOverflow {
-                offset: self.len,
-                capacity: self.buf.capacity(),
+                offset: self.initialized,
+                capacity: self.end,
             }));
         }
 
-        self.buf.set_len(self.len);
+        // Pad last segment for the type being written.
+        if self.initialized < self.end {
+            let ptr = self.buf.as_ptr_mut().wrapping_add(self.initialized);
+
+            unsafe {
+                ptr::write_bytes(ptr, 0, self.end - self.initialized);
+            }
+        }
+
+        self.buf.set_len(self.end);
         Ok(Ref::new(offset))
     }
+}
+
+const fn dangling(align: usize) -> ptr::NonNull<u8> {
+    assert!(align.is_power_of_two(), "Alignment has to be power of two");
+    unsafe { ptr::NonNull::new_unchecked(invalid_mut(align)) }
+}
+
+// Replace with `core::ptr::invalid_mut` once stable.
+#[allow(clippy::useless_transmute)]
+const fn invalid_mut<T>(addr: usize) -> *mut T {
+    // FIXME(strict_provenance_magic): I am magic and should be a compiler
+    // intrinsic. We use transmute rather than a cast so tools like Miri can
+    // tell that this is *not* the same as from_exposed_addr. SAFETY: every
+    // valid integer is also a valid pointer (as long as you don't dereference
+    // that pointer).
+    unsafe { core::mem::transmute(addr) }
 }

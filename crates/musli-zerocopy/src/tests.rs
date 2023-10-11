@@ -1,5 +1,6 @@
 #![allow(clippy::assertions_on_constants)]
 
+use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 
 use crate::pointer::Ref;
@@ -244,5 +245,48 @@ fn test_needs_padding() -> Result<(), Error> {
     }
 
     const _: () = assert!(!MightPad::NEEDS_PADDING);
+    Ok(())
+}
+
+#[test]
+fn test_enum_with_fields() -> Result<(), Error> {
+    #[derive(Debug, PartialEq, ZeroCopy)]
+    #[repr(u8)]
+    #[zero_copy(crate)]
+    enum Types {
+        Variant {
+            field: u32,
+            field2: u64,
+        },
+        Variant2(u32),
+        Variant3,
+        Empty {
+            #[zero_copy(ignore)]
+            empty: PhantomData<u64>,
+        },
+    }
+
+    let mut buf = AlignedBuf::new();
+    let variant = buf.store(&Types::Variant {
+        field: 10,
+        field2: 20,
+    })?;
+    let variant2 = buf.store(&Types::Variant2(40))?;
+    let variant3 = buf.store(&Types::Variant3)?;
+    let empty = buf.store(&Types::Empty { empty: PhantomData })?;
+
+    let buf = buf.as_aligned();
+
+    assert_eq!(
+        buf.load(variant)?,
+        &Types::Variant {
+            field: 10,
+            field2: 20
+        }
+    );
+
+    assert_eq!(buf.load(variant2)?, &Types::Variant2(40));
+    assert_eq!(buf.load(variant3)?, &Types::Variant3);
+    assert_eq!(buf.load(empty)?, &Types::Empty { empty: PhantomData });
     Ok(())
 }
