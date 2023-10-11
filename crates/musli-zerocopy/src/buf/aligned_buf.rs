@@ -839,61 +839,6 @@ impl<O: Size> AlignedBuf<O> {
         new
     }
 
-    /// Access the current buffer immutably while checking that the buffer is
-    /// aligned.
-    ///
-    /// # Errors
-    ///
-    /// This will fail if the buffer isn't aligned per it's [`requested()`]
-    /// alignment.
-    ///
-    /// [`requested()`]: Self::requested
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::AlignedBuf;
-    ///
-    /// let mut buf = AlignedBuf::new();
-    /// let slice = buf.store_unsized("hello world")?;
-    /// let buf = buf.as_ref();
-    ///
-    /// assert_eq!(buf.load(slice)?, "hello world");
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    #[inline]
-    pub fn as_ref(&self) -> &Buf {
-        Buf::new(self.as_slice())
-    }
-
-    /// Access the current buffer mutably while checking that the buffer is
-    /// aligned.
-    ///
-    /// # Errors
-    ///
-    /// This will fail if the buffer isn't aligned per it's [`requested()`]
-    /// alignment.
-    ///
-    /// [`requested()`]: Self::requested
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::AlignedBuf;
-    ///
-    /// let mut buf = AlignedBuf::new();
-    /// let slice = buf.store_unsized("hello world")?;
-    /// let buf = buf.as_mut();
-    ///
-    /// buf.load_mut(slice)?.make_ascii_uppercase();
-    /// assert_eq!(buf.load(slice)?, "HELLO WORLD");
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    #[inline]
-    pub fn as_mut(&mut self) -> &mut Buf {
-        Buf::new_mut(self.as_mut_slice())
-    }
-
     /// Convert the current buffer into an aligned buffer and return the aligned
     /// buffer.
     ///
@@ -922,7 +867,7 @@ impl<O: Size> AlignedBuf<O> {
             self.alloc_new(old_layout, new_layout);
         }
 
-        self.as_ref()
+        Buf::new(self.as_slice())
     }
 
     /// Convert the current buffer into an aligned mutable buffer and return the
@@ -954,7 +899,7 @@ impl<O: Size> AlignedBuf<O> {
             self.alloc_new(old_layout, new_layout);
         }
 
-        self.as_mut()
+        Buf::new_mut(self.as_mut_slice())
     }
 
     /// Test if the current allocation uses the specified allocation.
@@ -1202,6 +1147,65 @@ impl<O: Size> AlignedBuf<O> {
             self.capacity = new_layout.size();
             self.align = self.requested;
         }
+    }
+}
+
+impl<O: Size> AsRef<Buf> for AlignedBuf<O> {
+    /// Access the current buffer immutably while checking that the buffer is
+    /// aligned.
+    ///
+    /// # Errors
+    ///
+    /// This will fail if the buffer isn't aligned per it's [`requested()`]
+    /// alignment.
+    ///
+    /// [`requested()`]: Self::requested
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let slice = buf.store_unsized("hello world")?;
+    /// let buf = buf.as_ref();
+    ///
+    /// assert_eq!(buf.load(slice)?, "hello world");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    fn as_ref(&self) -> &Buf {
+        Buf::new(self.as_slice())
+    }
+}
+
+impl<O: Size> AsMut<Buf> for AlignedBuf<O> {
+    /// Access the current buffer mutably while checking that the buffer is
+    /// aligned.
+    ///
+    /// # Errors
+    ///
+    /// This will fail if the buffer isn't aligned per it's [`requested()`]
+    /// alignment.
+    ///
+    /// [`requested()`]: Self::requested
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let slice = buf.store_unsized("hello world")?;
+    /// let buf = buf.as_mut();
+    ///
+    /// buf.load_mut(slice)?.make_ascii_uppercase();
+    /// assert_eq!(buf.load(slice)?, "HELLO WORLD");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    fn as_mut(&mut self) -> &mut Buf {
+        Buf::new_mut(self.as_mut_slice())
     }
 }
 

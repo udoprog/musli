@@ -211,7 +211,7 @@ where
 ///
 /// Constructed through [`AlignedBuf::insert_map`].
 ///
-/// [`AlignedBuf::insert_map`]: crate:buf::AlignedBuf::insert_map
+/// [`AlignedBuf::insert_map`]: crate::buf::AlignedBuf::insert_map
 /// [`bind()`]: crate::buf::Buf::bind
 ///
 /// ## Examples

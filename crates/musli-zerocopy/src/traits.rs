@@ -16,7 +16,7 @@
 
 use core::cell::Cell;
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of};
+use core::mem::align_of;
 use core::str;
 
 use crate::buf::{Buf, BufMut, Visit};
@@ -757,7 +757,7 @@ where
     T: ZeroCopy,
 {
     const ANY_BITS: bool = T::ANY_BITS;
-    const NEEDS_PADDING: bool = T::NEEDS_PADDING && size_of::<[T; N]>() % align_of::<T>() == 0;
+    const NEEDS_PADDING: bool = T::NEEDS_PADDING;
 
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
