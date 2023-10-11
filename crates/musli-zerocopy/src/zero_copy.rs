@@ -215,39 +215,95 @@ unsafe impl ZeroSized for () {}
 // SAFETY: `[T; 0]` is zero-sized.
 unsafe impl<T> ZeroSized for [T; 0] {}
 
+/// `PhantomData<T>` can be ignored as a zero-sized field.
+///
+/// # Examples
+///
+/// ```
+/// use core::marker::PhantomData;
+/// use musli_zerocopy::ZeroCopy;
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(transparent)]
+/// struct Struct<T> {
+///     #[zero_copy(ignore)]
+///     field: PhantomData<T>,
+/// }
+/// ```
 // SAFETY: `PhantomData<T>` is zero-sized.
 unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 
-/// Trait governing how to store a sized buffer.
+/// Trait governing types that can be safely coerced from a buffer.
+///
+/// This is usually implemented automatically by the [`ZeroCopy`] derive.
+///
+/// [`ZeroCopy`]: derive@crate::ZeroCopy
 ///
 /// # Safety
 ///
 /// This can only be implemented correctly by types under certain conditions:
 /// * The type has a strict, well-defined layout or is `repr(C)`.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+///
+/// #[derive(Debug, PartialEq, ZeroCopy)]
+/// #[repr(C)]
+/// struct Custom {
+///     field: u32,
+///     #[zero_copy(ignore)]
+///     ignore: (),
+/// }
+///
+/// let mut buf = AlignedBuf::new();
+/// let ptr = buf.store(&Custom { field: 42, () })?;
+/// let buf = buf.as_aligned();
+/// assert_eq!(buf.load(ptr)?, &Custom { field: 42, () });
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
 pub unsafe trait ZeroCopy {
     /// Indicates if the type can inhabit all possible bit patterns within its
     /// `size_of::<Self>()` bytes.
     const ANY_BITS: bool;
 
-    /// Write to the owned buffer.
+    /// Store the current value to the mutable buffer.
+    ///
+    /// This is usually called indirectly through methods such as
+    /// [`AlignedBuf::store`].
+    ///
+    /// [`AlignedBuf::store`]: crate::aligned_buf::AlignedBuf::store
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut;
 
-    /// Coerce and validate the buffer as reference of this type.
+    /// Validate and coerce the buffer as reference of this type.
+    ///
+    /// This is called indirectly through methods such as [`Buf::load`] which
+    /// ensures all its safety invariants are met.
+    ///
+    /// [`Buf::load`]: crate::buf::Buf::load
     ///
     /// # Safety
     ///
     /// Caller must ensure that the provide `buf` is appropriately aligned and
-    /// sized for the type.
+    /// sized for this type. Failure to ensure this can lead to undefined
+    /// behavior, specifically through misaligned coercions.
     unsafe fn coerce(buf: &Buf) -> Result<&Self, Error>;
 
-    /// Coerce and validate the buffer as a mutable reference of this type.
+    /// Validate and coerce the buffer as a mutable reference of this type.
+    ///
+    /// This is called indirectly through methods such as [`Buf::load_mut`]
+    /// which ensures all its safety invariants are met.
+    ///
+    /// [`Buf::load_mut`]: crate::buf::Buf::load_mut
     ///
     /// # Safety
     ///
     /// Caller must ensure that the provide `buf` is appropriately aligned and
-    /// sized for the type.
+    /// sized for this type. Failure to ensure this can lead to undefined
+    /// behavior, specifically through misaligned coercions.
     unsafe fn coerce_mut(buf: &mut Buf) -> Result<&mut Self, Error>;
 
     /// Only validate the provided buffer.
