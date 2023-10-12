@@ -20,7 +20,7 @@ use crate::ZeroCopy;
 /// use musli_zerocopy::AlignedBuf;
 /// use musli_zerocopy::pointer::Ref;
 ///
-/// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
+/// let mut buf = AlignedBuf::with_alignment::<u32>();
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 ///
 /// let buf = buf.as_ref();

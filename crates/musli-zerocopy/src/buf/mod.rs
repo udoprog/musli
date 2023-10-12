@@ -150,7 +150,7 @@ impl Buf {
     /// ```
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = AlignedBuf::with_alignment(4);
+    /// let mut buf = AlignedBuf::with_alignment::<u32>();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     /// let buf = buf.as_aligned();
     ///
@@ -172,7 +172,7 @@ impl Buf {
     /// ```
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = AlignedBuf::with_alignment(4);
+    /// let mut buf = AlignedBuf::with_alignment::<u32>();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     /// let buf = buf.as_aligned();
     ///

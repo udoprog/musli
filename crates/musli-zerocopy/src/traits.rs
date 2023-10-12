@@ -51,7 +51,7 @@ mod sealed {
 /// ```
 /// use musli_zerocopy::AlignedBuf;
 ///
-/// let mut buf = AlignedBuf::with_alignment(1);
+/// let mut buf = AlignedBuf::with_alignment::<u8>();
 ///
 /// let bytes = buf.store_unsized(&b"Hello World!"[..])?;
 /// let buf = buf.as_ref();
@@ -334,7 +334,7 @@ pub unsafe trait ZeroCopy {
     ///     Ok(cursor.cast())
     /// }
     ///
-    /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
+    /// let mut buf = AlignedBuf::with_alignment::<u32>();
     /// buf.store(&42u32)?;
     ///
     /// let buf = buf.as_ref();
@@ -791,7 +791,7 @@ impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::Phan
 ///     field: [T; 0],
 /// }
 ///
-/// let mut empty = AlignedBuf::with_alignment(align_of::<u128>());
+/// let mut empty = AlignedBuf::with_alignment::<u128>();
 /// let values = [Struct::<u128>::default(); 100];
 /// let slice = empty.store_slice(&values[..])?;
 /// let buf = empty.as_aligned();

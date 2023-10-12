@@ -115,7 +115,7 @@ impl AlignedBuf {
             len: 0,
             capacity: 0,
             requested: align,
-            align: align,
+            align,
             _marker: PhantomData,
         }
     }
@@ -141,7 +141,7 @@ impl<O: Size> AlignedBuf<O> {
     /// use musli_zerocopy::AlignedBuf;
     /// use musli_zerocopy::buf::DefaultAlignment;
     ///
-    /// let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DefaultAlignment);
+    /// let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment::<DefaultAlignment>(0);
     /// ```
     ///
     /// # Panics
@@ -155,10 +155,8 @@ impl<O: Size> AlignedBuf<O> {
     /// ```should_panic
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let align = 8usize;
-    /// let max = isize::MAX as usize - (align - 1);
-    ///
-    /// AlignedBuf::<u32>::with_capacity_and_alignment(max, align);
+    /// let max = isize::MAX as usize - (8 - 1);
+    /// AlignedBuf::<u32>::with_capacity_and_alignment::<u64>(max);
     /// ```
     ///
     /// # Examples
@@ -166,7 +164,7 @@ impl<O: Size> AlignedBuf<O> {
     /// ```
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = AlignedBuf::<u32>::with_capacity_and_alignment(6, 2);
+    /// let buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(6);
     /// assert!(buf.capacity() >= 6);
     /// assert_eq!(buf.align(), 2);
     /// ```
@@ -175,9 +173,7 @@ impl<O: Size> AlignedBuf<O> {
         T: ZeroCopy,
     {
         // SAFETY: Alignment of `T` is always a power of two.
-        unsafe {
-            Self::new_inner(capacity, align_of::<T>())
-        }
+        unsafe { Self::new_inner(capacity, align_of::<T>()) }
     }
 
     // # Safety
@@ -298,7 +294,7 @@ impl<O: Size> AlignedBuf<O> {
     /// ```
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = AlignedBuf::with_alignment(8);
+    /// let buf = AlignedBuf::with_alignment::<u64>();
     /// assert!(buf.is_empty());
     /// assert_eq!(buf.align(), 8);
     /// assert_eq!(buf.requested(), 8);
@@ -314,7 +310,7 @@ impl<O: Size> AlignedBuf<O> {
     /// ```
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let buf = AlignedBuf::with_alignment(8);
+    /// let buf = AlignedBuf::with_alignment::<u64>();
     /// assert!(buf.is_empty());
     /// assert_eq!(buf.align(), 8);
     /// assert_eq!(buf.requested(), 8);
@@ -705,7 +701,7 @@ impl<O: Size> AlignedBuf<O> {
     /// use musli_zerocopy::AlignedBuf;
     /// use musli_zerocopy::pointer::Ref;
     ///
-    /// let mut buf = AlignedBuf::with_alignment(4);
+    /// let mut buf = AlignedBuf::with_alignment::<u32>();
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
@@ -727,7 +723,7 @@ impl<O: Size> AlignedBuf<O> {
     /// use musli_zerocopy::AlignedBuf;
     /// use musli_zerocopy::pointer::Ref;
     ///
-    /// let mut buf = AlignedBuf::with_alignment(1);
+    /// let mut buf = AlignedBuf::with_alignment::<()>();
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
     /// buf.extend_from_slice(&[1]);
@@ -769,9 +765,7 @@ impl<O: Size> AlignedBuf<O> {
     #[inline]
     pub fn as_aligned_owned_buf(&self) -> Self {
         // SAFETY: Alignment of `requested` is always a power of two.
-        let mut new = unsafe {
-            Self::new_inner(self.len, self.requested)
-        };
+        let mut new = unsafe { Self::new_inner(self.len, self.requested) };
 
         unsafe {
             new.as_ptr_mut()
@@ -797,7 +791,7 @@ impl<O: Size> AlignedBuf<O> {
     /// ```
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = AlignedBuf::with_alignment(1);
+    /// let mut buf = AlignedBuf::with_alignment::<()>();
     /// let number = buf.store(&1u32)?;
     /// let buf = buf.as_aligned();
     ///
@@ -829,7 +823,7 @@ impl<O: Size> AlignedBuf<O> {
     /// ```
     /// use musli_zerocopy::AlignedBuf;
     ///
-    /// let mut buf = AlignedBuf::with_alignment(1);
+    /// let mut buf = AlignedBuf::with_alignment::<()>();
     /// let number = buf.store(&1u32)?;
     /// let buf = buf.as_mut_aligned();
     ///
@@ -883,7 +877,7 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment(4, 2);
+    /// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(4);
     ///
     /// buf.extend_from_slice(&[1, 2]);
     /// assert_eq!(buf.align(), 2);
@@ -983,7 +977,9 @@ impl<O: Size> AlignedBuf<O> {
     #[inline]
     fn ensure_aligned(&mut self, align: usize) {
         const PAD: [u8; 128] = [0; 128];
-        let extra = (align - (self.len & (align - 1))) & (align - 1);
+
+        let mask = align - 1;
+        let extra = (align - (self.len & mask)) & mask;
         self.reserve(extra);
 
         // SAFETY: The length is ensures to be within the address space.
@@ -993,6 +989,7 @@ impl<O: Size> AlignedBuf<O> {
                 .as_ptr()
                 .add(self.len)
                 .copy_from_nonoverlapping(PAD.as_ptr(), extra);
+            self.len = self.len.wrapping_add(extra);
         }
     }
 
@@ -1204,7 +1201,7 @@ impl<O: Size> AsMut<Buf> for AlignedBuf<O> {
 ///
 /// assert_ne!(align_of::<u16>(), align_of::<u32>());
 ///
-/// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment(4, align_of::<u16>());
+/// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(4);
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 /// buf.request_align::<u32>();
 ///

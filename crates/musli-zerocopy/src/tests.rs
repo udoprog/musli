@@ -1,7 +1,7 @@
 #![allow(clippy::assertions_on_constants)]
 
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of};
+use core::mem::size_of;
 
 use crate::pointer::Ref;
 use crate::{AlignedBuf, Error, ZeroCopy};
@@ -21,7 +21,7 @@ fn test_weird_alignment() -> Result<(), Error> {
         field: 0x0000ffff0000ffff0000ffff0000ffffu128,
     };
 
-    let mut buf = AlignedBuf::with_alignment(align_of::<WeirdAlignment>());
+    let mut buf = AlignedBuf::with_alignment::<WeirdAlignment>();
     let w = buf.store(&weird)?;
     let buf = buf.as_aligned();
 
@@ -53,7 +53,7 @@ fn test_enum_boundaries() -> Result<(), Error> {
             assert_eq!($name::Min as $repr, $min);
             assert_eq!($name::AfterMin as $repr, $min + 1);
 
-            let mut buf = AlignedBuf::with_alignment(align_of::<$name>());
+            let mut buf = AlignedBuf::with_alignment::<$name>();
             let v1 = buf.store(&$name::Variant1)?;
             let v2 = buf.store(&$name::Variant2)?;
             let v3 = buf.store(&$name::Variant3)?;
@@ -146,7 +146,7 @@ fn test_signed_wraparound() -> Result<(), Error> {
             assert_eq!($name::Zero as $repr, 0);
             assert_eq!($name::One as $repr, 1);
 
-            let mut buf = AlignedBuf::with_alignment(align_of::<$name>());
+            let mut buf = AlignedBuf::with_alignment::<$name>();
             let minus_one = buf.store(&$name::MinusOne)?;
             let zero = buf.store(&$name::Zero)?;
             let one = buf.store(&$name::One)?;
@@ -191,7 +191,7 @@ fn test_neg0() -> Result<(), Error> {
             assert_eq!($name::Neg0 as $repr, 0);
             assert_eq!($name::One as $repr, 1);
 
-            let mut buf = AlignedBuf::with_alignment(align_of::<$name>());
+            let mut buf = AlignedBuf::with_alignment::<$name>();
             let minus_one = buf.store(&$name::MinusOne)?;
             let neg0 = buf.store(&$name::Neg0)?;
             let one = buf.store(&$name::One)?;
