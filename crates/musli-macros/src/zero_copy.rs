@@ -287,7 +287,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let buf_mut: syn::Path = syn::parse_quote!(#krate::buf::BufMut);
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
-    let store_struct: syn::Path = syn::parse_quote!(#krate::buf::StoreStruct);
+    let struct_padder: syn::Path = syn::parse_quote!(#krate::buf::StructPadder);
     let validator: syn::Path = syn::parse_quote!(#krate::buf::Validator);
     let cursor: syn::Path = syn::parse_quote!(#krate::buf::Cursor);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
@@ -342,8 +342,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     // struct.
                     unsafe {
                         let mut writer = #buf_mut::store_struct(buf, self);
-                        #(#store_struct::pad::<#types>(&mut writer);)*
-                        #store_struct::finish(writer)?;
+                        #(#struct_padder::pad::<#types>(&mut writer);)*
+                        #struct_padder::end(writer)?;
                     }
 
                     #result::Ok(())
@@ -465,7 +465,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
                 store_to_variants.push(quote! {
                     Self::#ident { .. } => {
-                        #(#store_struct::pad::<#types>(&mut writer);)*
+                        #(#struct_padder::pad::<#types>(&mut writer);)*
                     }
                 });
             }
@@ -475,13 +475,13 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 // struct.
                 unsafe {
                     let mut writer = #buf_mut::store_struct(buf, self);
-                    #store_struct::pad::<#ty>(&mut writer);
+                    #struct_padder::pad::<#ty>(&mut writer);
 
                     match self {
                         #(#store_to_variants,)*
                     }
 
-                    #store_struct::finish(writer)?;
+                    #struct_padder::end(writer)?;
                 }
 
                 #result::Ok(())

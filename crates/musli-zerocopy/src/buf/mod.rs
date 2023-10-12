@@ -16,8 +16,8 @@ pub(crate) mod visit;
 pub use self::validator::Validator;
 mod validator;
 
-pub use self::store_struct::StoreStruct;
-mod store_struct;
+pub use self::struct_padder::StructPadder;
+mod struct_padder;
 
 pub use self::buf_mut::BufMut;
 mod buf_mut;

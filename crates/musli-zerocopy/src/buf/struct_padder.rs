@@ -5,17 +5,20 @@ use core::ptr;
 use crate::error::Error;
 use crate::traits::ZeroCopy;
 
-/// A writer as returned from [`BufMut::store_struct`].
+/// A struct padder as returned from [`BufMut::store_struct`].
+///
+/// This knows how to find and initialize padding regions in `repr(C)` types,
+/// and provides a builder-like API to doing so.
 ///
 /// [`BufMut::store_struct`]: crate::buf::BufMut::store_struct
-#[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StoreStruct::finish`"]
-pub struct StoreStruct<'a, T> {
+#[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StructPadder::finish`"]
+pub struct StructPadder<'a, T> {
     start: *mut u8,
     end: *mut u8,
     _marker: PhantomData<&'a mut T>,
 }
 
-impl<'a, T> StoreStruct<'a, T>
+impl<'a, T> StructPadder<'a, T>
 where
     T: ZeroCopy,
 {
@@ -39,11 +42,16 @@ where
     /// [`finish()`]: Self::finish
     /// [`ZeroCopy`]: derive@crate::ZeroCopy
     ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the field type `F` is an actual field in
+    /// order in the struct being padded.
+    ///
     /// # Examples
     ///
     /// ```
     /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
-    /// use musli_zerocopy::buf::StoreStruct;
+    /// use musli_zerocopy::buf::BufMut;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]
@@ -59,7 +67,7 @@ where
     ///     let mut w = buf.store_struct(&padded);
     ///     w.pad::<u8>();
     ///     w.pad::<u16>();
-    ///     w.finish();
+    ///     w.end();
     /// }
     ///
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
@@ -67,20 +75,14 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn pad<F>(&mut self)
+    pub unsafe fn pad<F>(&mut self)
     where
         F: ZeroCopy,
     {
-        unsafe {
-            let offset = self.start.align_offset(align_of::<F>());
-
-            // zero out padding.
-            if offset > 0 {
-                ptr::write_bytes(self.start, 0, offset);
-            }
-
-            self.start = self.start.wrapping_add(offset).wrapping_add(size_of::<F>());
-        }
+        let offset = self.start.align_offset(align_of::<F>());
+        // zero out padding.
+        ptr::write_bytes(self.start, 0, offset);
+        self.start = self.start.wrapping_add(offset.wrapping_add(size_of::<F>()));
     }
 
     /// Finish writing the current buffer.
@@ -107,7 +109,7 @@ where
     ///
     /// ```
     /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
-    /// use musli_zerocopy::buf::StoreStruct;
+    /// use musli_zerocopy::buf::BufMut;
     /// use musli_zerocopy::pointer::Ref;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
@@ -126,7 +128,7 @@ where
     ///     let mut w = buf.store_struct(&padded);
     ///     w.pad::<u8>();
     ///     w.pad::<u16>();
-    ///     w.finish();
+    ///     w.end();
     /// }
     ///
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
@@ -138,13 +140,13 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn finish(self) -> Result<(), Error> {
+    pub unsafe fn end(self) -> Result<(), Error> {
         let distance = self.start.offset_from(self.end);
-
-        if distance > 0 {
-            ptr::write_bytes(self.start, 0, distance as usize);
-        }
-
+        ptr::write_bytes(
+            self.start,
+            0,
+            usize::from(distance > 0) * (distance as usize),
+        );
         Ok(())
     }
 }
