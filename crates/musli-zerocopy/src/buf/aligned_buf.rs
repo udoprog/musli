@@ -426,6 +426,8 @@ impl<O: Size> AlignedBuf<O> {
     /// # Examples
     ///
     /// ```
+    /// use core::mem::size_of;
+    ///
     /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::StoreStruct;
     /// use musli_zerocopy::pointer::Ref;
@@ -441,8 +443,8 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let padded = ZeroPadded {
-    ///     a: 0x01u8.to_be(),
+    /// let mut padded = ZeroPadded {
+    ///     a: 0,
     ///     b: 0x0203_0405_0607_0809u64.to_be(),
     ///     c: 0x0a0bu16.to_be(),
     ///     d: 0x0c0d_0e0fu32.to_be(),
@@ -450,22 +452,29 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// let reference = Ref::<ZeroPadded>::new(buf.next_offset::<ZeroPadded>());
     ///
-    /// // SAFETY: We do not pad beyond known fields and are
-    /// // making sure to initialize all of the buffer.
-    /// unsafe {
-    ///     let mut w = buf.store_struct(&padded);
-    ///     w.pad::<u8>();
-    ///     w.pad::<u64>();
-    ///     w.pad::<u16>();
-    ///     w.pad::<u32>();
-    ///     w.finish();
-    /// };
+    /// for _ in 0..10 {
+    ///     // SAFETY: We do not pad beyond known fields and are
+    ///     // making sure to initialize all of the buffer.
+    ///     unsafe {
+    ///         let mut w = buf.store_struct(&padded);
+    ///         w.pad::<u8>();
+    ///         w.pad::<u64>();
+    ///         w.pad::<u16>();
+    ///         w.pad::<u32>();
+    ///         w.finish();
+    ///     };
     ///
-    /// // Note: The bytes are explicitly convert to big-endian encoding above.
-    /// assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 12, 13, 14, 15]);
+    ///     padded.a += 1;
+    /// }
+    ///
+    /// for (index, chunk) in buf.as_slice().chunks_exact(size_of::<ZeroPadded>()).enumerate() {
+    ///     // Note: The bytes are explicitly convert to big-endian encoding above.
+    ///     assert_eq!(chunk, &[index as u8, 0, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 12, 13, 14, 15]);
+    /// }
     ///
     /// let buf = buf.as_aligned();
     ///
+    /// padded.a = 0;
     /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
@@ -473,18 +482,21 @@ impl<O: Size> AlignedBuf<O> {
     where
         T: ZeroCopy,
     {
-        let end = self.len.wrapping_add(size_of::<T>());
-        self.ensure_capacity(end);
+        let len = self.len.wrapping_add(size_of::<T>());
 
-        unsafe {
-            ptr::copy_nonoverlapping(value, self.as_ptr_mut().wrapping_add(self.len).cast(), 1);
-        }
+        self.ensure_capacity(len);
+
+        let start = self.as_ptr_mut().wrapping_add(self.len);
 
         // This is what makes calling `store_struct` unsafe, we're preemptively
         // pretending that the buffer has been initialized, while in reality
         // that is the job of the caller.
-        self.len = end;
-        let start = self.data.as_ptr();
+        self.len = len;
+
+        unsafe {
+            ptr::copy_nonoverlapping(value, start.cast(), 1);
+        }
+
         let end = start.wrapping_add(size_of::<T>());
         StoreStruct::new(start, end)
     }
