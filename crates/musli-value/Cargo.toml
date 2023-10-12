@@ -26,6 +26,6 @@ musli = { path = "../musli", version = "0.0.64", default-features = false }
 musli-common = { path = "../musli-common", version = "0.0.64", default-features = false }
 musli-storage = { path = "../musli-storage", version = "0.0.64", default-features = false }
 
-itoa = "1.0.6"
-ryu = "1.0.13"
+itoa = "1.0.9"
+ryu = "1.0.15"
 lexical = "6.1.1"
