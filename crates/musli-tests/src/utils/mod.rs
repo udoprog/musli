@@ -40,7 +40,7 @@ pub mod musli_json {
         where
             T: Decode<'buf>,
         {
-            ENCODING.from_slice(&self.buffer)
+            ENCODING.from_slice(self.buffer)
         }
     }
 }

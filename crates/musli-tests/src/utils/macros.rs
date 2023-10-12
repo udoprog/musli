@@ -55,6 +55,7 @@ macro_rules! benchmarker {
 
         #[inline(always)]
         $(#[$($decode_meta)*])*
+        #[allow(clippy::extra_unused_lifetimes)]
         $decode_vis fn decode<$lt, T>(buffer: $encode_return) -> Result<$decode_return, $decode_error>
         $(where
             $(for<$for_lt>)* T: $decode_bound,)*
@@ -92,6 +93,7 @@ macro_rules! benchmarker {
             }
         }
 
+        #[allow(clippy::extra_unused_lifetimes)]
         pub struct State<$lt> {
             #[allow(unused)]
             buffer: &$lt mut $buffer,
@@ -131,6 +133,7 @@ macro_rules! benchmarker {
                 {$($($options)*)*},
 
                 #[inline(always)]
+                #[allow(clippy::len_without_is_empty)]
                 pub fn len(&self) -> usize {
                     self.buffer.len()
                 }
