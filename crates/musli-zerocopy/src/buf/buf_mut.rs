@@ -1,6 +1,5 @@
 use crate::buf::StructPadder;
 use crate::error::Error;
-use crate::pointer::Size;
 use crate::traits::ZeroCopy;
 
 mod sealed {
@@ -20,11 +19,13 @@ mod sealed {
 ///
 /// [`AlignedBuf`]: crate::AlignedBuf
 pub trait BufMut: self::sealed::Sealed {
-    /// Target size buffer is configured to use.
-    type Size: Size;
-
     /// Extend the current buffer from the given slice.
-    fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error>;
+    fn extend_from_slice(&mut self, bytes: &[u8]);
+
+    /// Store the exact bits of the given ZeroCopy type.
+    fn store_bits<T>(&mut self, value: T)
+    where
+        T: ZeroCopy;
 
     /// Write the given zero copy type to the buffer.
     fn store<T>(&mut self, value: &T) -> Result<(), Error>
@@ -100,45 +101,4 @@ pub trait BufMut: self::sealed::Sealed {
     unsafe fn store_struct<T>(&mut self, value: &T) -> StructPadder<'_, T>
     where
         T: ZeroCopy;
-
-    /// Store the contents of a `ZeroCopy` array.
-    fn store_array<T, const N: usize>(&mut self, array: &[T; N]) -> Result<(), Error>
-    where
-        T: ZeroCopy;
-}
-
-impl<B: ?Sized> BufMut for &mut B
-where
-    B: BufMut,
-{
-    type Size = B::Size;
-
-    #[inline]
-    fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
-        (**self).extend_from_slice(bytes)
-    }
-
-    #[inline]
-    fn store<T>(&mut self, value: &T) -> Result<(), Error>
-    where
-        T: ZeroCopy,
-    {
-        (**self).store(value)
-    }
-
-    #[inline]
-    unsafe fn store_struct<T>(&mut self, value: &T) -> StructPadder<'_, T>
-    where
-        T: ZeroCopy,
-    {
-        (**self).store_struct(value)
-    }
-
-    #[inline]
-    fn store_array<T, const N: usize>(&mut self, array: &[T; N]) -> Result<(), Error>
-    where
-        T: ZeroCopy,
-    {
-        (**self).store_array(array)
-    }
 }

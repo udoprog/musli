@@ -10,6 +10,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     macro_rules! group {
         ($group_name:expr, $name:ident, $it:ident) => {{
+            #[allow(unused)]
             let mut g = c.benchmark_group($group_name);
 
             macro_rules! bench {
@@ -32,43 +33,44 @@ fn criterion_benchmark(c: &mut Criterion) {
             $({
                 let $name: $ty = Generate::generate(&mut rng);
 
+                #[allow(unused)]
                 macro_rules! it {
                     ($b:expr, $framework:ident, $buf:ident) => {{
                         $buf.with(|mut state| {
-                            state.reset($size_hint, &$name);
-
                             $b.iter(|| {
-                                black_box(state.encode(&$name).unwrap());
-                            })
-                        })
+                                state.reset($size_hint, &$name);
+                                let _ = black_box(state.encode(&$name));
+                            });
+                        });
                     }};
                 }
 
                 group!(concat!("enc/", stringify!($name)), $name, it);
 
+                #[allow(unused)]
                 macro_rules! it {
                     ($b:expr, $framework:ident, $buf:ident) => {{
                         $buf.with(|mut state| {
                             state.reset($size_hint, &$name);
                             let data = state.encode(&$name).unwrap();
-                            $b.iter(move || data.decode::<$ty>().unwrap())
-                        })
+                            $b.iter(move || data.decode::<$ty>().unwrap());
+                        });
                     }};
                 }
 
                 group!(concat!("dec/", stringify!($name)), $name, it);
 
+                #[allow(unused)]
                 macro_rules! it {
                     ($b:expr, $framework:ident, $buf:ident) => {{
                         $buf.with(|mut state| {
-                            state.reset($size_hint, &$name);
-
                             $b.iter(|| {
+                                state.reset($size_hint, &$name);
                                 let out = state.encode(&$name).unwrap();
                                 let actual = out.decode::<$ty>().unwrap();
                                 debug_assert_eq!(actual, $name);
                                 black_box(actual);
-                            })
+                            });
                         })
                     }};
                 }

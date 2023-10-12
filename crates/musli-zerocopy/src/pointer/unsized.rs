@@ -25,7 +25,7 @@ use crate::ZeroCopy;
 ///
 /// let mut buf = AlignedBuf::new();
 /// let ptr = buf.next_offset::<u8>();
-/// buf.extend_from_slice(b"Hello World!")?;
+/// buf.extend_from_slice(b"Hello World!");
 ///
 /// let buf = buf.as_ref();
 ///

@@ -260,9 +260,9 @@
 //!
 //! ```
 //! use musli_zerocopy::AlignedBuf;
-//! use musli_zerocopy::buf::DEFAULT_ALIGNMENT;
+//! use musli_zerocopy::buf::DefaultAlignment;
 //!
-//! let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
+//! let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DefaultAlignment);
 //! ```
 //!
 //! And to use a custom target size in a struct using the [`ZeroCopy`], you
@@ -270,7 +270,7 @@
 //!
 //! ```
 //! use musli_zerocopy::{ZeroCopy, AlignedBuf};
-//! use musli_zerocopy::buf::DEFAULT_ALIGNMENT;
+//! use musli_zerocopy::buf::DefaultAlignment;
 //! use musli_zerocopy::pointer::{Ref, Slice, Unsized};
 //!
 //! #[derive(ZeroCopy)]
@@ -281,7 +281,7 @@
 //!     unsize: Unsized::<str, usize>,
 //! }
 //!
-//! let mut buf = AlignedBuf::with_capacity_and_alignment(0, DEFAULT_ALIGNMENT);
+//! let mut buf = AlignedBuf::with_capacity_and_alignment(0, DefaultAlignment);
 //!
 //! let reference = buf.store(&42u32)?;
 //! let slice = buf.store_slice(&[1, 2, 3, 4])?;

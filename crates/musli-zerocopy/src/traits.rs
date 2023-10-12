@@ -61,6 +61,10 @@ mod sealed {
 pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// Alignment of the pointed to data. We can only support unsized types
     /// which have a known alignment.
+    ///
+    /// # Safety
+    ///
+    /// This must be a power of two.
     const ALIGN: usize;
 
     /// The size in bytes of the pointed to value.
@@ -361,7 +365,8 @@ unsafe impl UnsizedZeroCopy for str {
     where
         B: BufMut,
     {
-        buf.extend_from_slice(self.as_bytes())
+        buf.extend_from_slice(self.as_bytes());
+        Ok(())
     }
 
     #[inline]
@@ -389,7 +394,8 @@ unsafe impl UnsizedZeroCopy for [u8] {
     where
         B: BufMut,
     {
-        buf.extend_from_slice(self)
+        buf.extend_from_slice(self);
+        Ok(())
     }
 
     #[inline]
@@ -444,11 +450,13 @@ macro_rules! impl_number {
             const ANY_BITS: bool = true;
             const NEEDS_PADDING: bool = false;
 
+            #[inline]
             fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
             {
-                buf.extend_from_slice(&<$ty>::to_ne_bytes(*self)[..])
+                buf.store_bits(*self);
+                Ok(())
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -463,6 +471,7 @@ macro_rules! impl_number {
         impl Visit for $ty {
             type Target = $ty;
 
+            #[inline]
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
             where
                 V: FnOnce(&Self::Target) -> O,
@@ -492,11 +501,13 @@ macro_rules! impl_float {
             const ANY_BITS: bool = true;
             const NEEDS_PADDING: bool = false;
 
+            #[inline]
             fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
             {
-                buf.extend_from_slice(&<$ty>::to_ne_bytes(*self)[..])
+                buf.store_bits(*self);
+                Ok(())
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -511,6 +522,7 @@ macro_rules! impl_float {
         impl Visit for $ty {
             type Target = $ty;
 
+            #[inline]
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
             where
                 V: FnOnce(&Self::Target) -> O,
@@ -533,7 +545,8 @@ unsafe impl ZeroCopy for char {
     where
         B: BufMut,
     {
-        (*self as u32).store_to(buf)
+        buf.store_bits(*self as u32);
+        Ok(())
     }
 
     #[allow(clippy::missing_safety_doc)]
@@ -554,6 +567,7 @@ impl crate::buf::visit::sealed::Sealed for char {}
 impl Visit for char {
     type Target = char;
 
+    #[inline]
     fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
     where
         V: FnOnce(&Self::Target) -> O,
@@ -566,11 +580,13 @@ unsafe impl ZeroCopy for bool {
     const ANY_BITS: bool = false;
     const NEEDS_PADDING: bool = false;
 
+    #[inline]
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
     {
-        (*self as u32).store_to(buf)
+        buf.store_bits(*self as u8);
+        Ok(())
     }
 
     #[allow(clippy::missing_safety_doc)]
@@ -590,6 +606,7 @@ impl crate::buf::visit::sealed::Sealed for bool {}
 impl Visit for bool {
     type Target = bool;
 
+    #[inline]
     fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
     where
         V: FnOnce(&Self::Target) -> O,
@@ -643,11 +660,13 @@ macro_rules! impl_nonzero_number {
             const ANY_BITS: bool = false;
             const NEEDS_PADDING: bool = false;
 
+            #[inline]
             fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
             where
                 B: BufMut,
             {
-                buf.extend_from_slice(&self.get().to_ne_bytes()[..])
+                buf.store_bits(self.get());
+                Ok(())
             }
 
             #[allow(clippy::missing_safety_doc)]
@@ -742,6 +761,7 @@ macro_rules! impl_zst {
         impl $(<$($bounds)*>)* Visit for $ty {
             type Target = $ty;
 
+            #[inline]
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
             where
                 V: FnOnce(&Self::Target) -> O,
@@ -788,11 +808,26 @@ where
     const ANY_BITS: bool = T::ANY_BITS;
     const NEEDS_PADDING: bool = T::NEEDS_PADDING;
 
+    #[inline]
     fn store_to<B: ?Sized>(&self, buf: &mut B) -> Result<(), Error>
     where
         B: BufMut,
     {
-        buf.store_array(self)
+        // SAFETY: We're both allocating space for the array, and applying the
+        // correct padding to it.
+        unsafe {
+            let mut s = buf.store_struct(self);
+
+            if T::NEEDS_PADDING {
+                for _ in 0..self.len() {
+                    s.pad::<T>();
+                }
+
+                s.end()?;
+            }
+        }
+
+        Ok(())
     }
 
     #[allow(clippy::missing_safety_doc)]
@@ -808,6 +843,7 @@ impl<T> crate::buf::visit::sealed::Sealed for [T; 0] {}
 impl<T> Visit for [T; 0] {
     type Target = [T; 0];
 
+    #[inline]
     fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
     where
         V: FnOnce(&Self::Target) -> O,

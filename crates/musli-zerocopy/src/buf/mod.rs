@@ -30,8 +30,8 @@ pub use self::aligned_buf::AlignedBuf;
 #[cfg(feature = "alloc")]
 mod aligned_buf;
 
-/// Default alignment to use with buffers such as [`AlignedBuf`].
-pub const DEFAULT_ALIGNMENT: usize = align_of::<usize>();
+/// The type used to calculate default alignment for [`AlignedBuf`].
+pub type DefaultAlignment = usize;
 
 use core::alloc::Layout;
 use core::fmt;
