@@ -15,6 +15,7 @@ pub struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
+    /// Construct a new cursor from a checked slice.
     pub(crate) fn new(data: &'a [u8]) -> Cursor<'a> {
         // SAFETY: The pointer is guaranteed to be non-null.
         unsafe {
@@ -32,6 +33,12 @@ impl<'a> Cursor<'a> {
     /// representation.
     ///
     /// [`field`]: Validator::field
+    ///
+    /// # Safety
+    ///
+    /// The returned validator will have an unbounded lifetime, so it's up to
+    /// the caller to ensure that the it's not coerced into something
+    /// inappropriate.
     ///
     /// # Examples
     ///
@@ -51,15 +58,19 @@ impl<'a> Cursor<'a> {
     ///     field: 42,
     ///     field2: 85,
     /// })?;
+    ///
     /// let buf = buf.as_aligned();
     ///
-    /// let mut v = buf.validate::<Custom>()?;
-    /// v.field::<u32>()?;
-    /// v.field::<u64>()?;
+    /// unsafe {
+    ///     let mut v = buf.validate_struct::<Custom>()?;
+    ///     v.field::<u32>()?;
+    ///     v.field::<u64>()?;
+    /// }
+    ///
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn validate<T>(self) -> Validator<'a, T>
+    pub unsafe fn validate_struct<T>(self) -> Validator<'a, T>
     where
         T: ZeroCopy,
     {
@@ -68,7 +79,7 @@ impl<'a> Cursor<'a> {
 
     /// Raw advance function.
     #[inline]
-    unsafe fn advance_raw(&mut self, len: usize) {
+    pub(crate) unsafe fn advance_raw(&mut self, len: usize) {
         self.pointer = NonNull::new_unchecked(self.pointer.as_ptr().add(len));
     }
 
@@ -83,6 +94,11 @@ impl<'a> Cursor<'a> {
         self.advance_raw(size_of::<T>());
     }
 
+    /// Get the align offset needed to align `T`.
+    pub(crate) unsafe fn align_offset<T>(&self) -> usize {
+        self.pointer.as_ptr().align_offset(align_of::<T>())
+    }
+
     /// Align the pointer to the alignment needed by type `T`.
     ///
     /// # Safety
@@ -90,12 +106,14 @@ impl<'a> Cursor<'a> {
     /// Caller must ensure that advancing the pointer to the alignment of `T`
     /// doesn't wrap around the address space.
     #[inline]
-    pub unsafe fn align<T>(&mut self) {
-        let offset = self.pointer.as_ptr().align_offset(align_of::<T>());
+    pub unsafe fn align<T>(&mut self) -> usize {
+        let offset = self.align_offset::<T>();
 
         if offset > 0 {
             self.advance_raw(offset);
         }
+
+        offset
     }
 
     /// Cast the current buffer into the given type.
@@ -108,8 +126,11 @@ impl<'a> Cursor<'a> {
     ///
     /// The caller must ensure that the buffer is correctly sized, aligned and
     /// contains a valid bit pattern for the destination type.
+    ///
+    /// This also returns an unbounded lifetime, which the caller is required to
+    /// ensure doesn't get coerced to something inappropriate.
     #[inline]
-    pub unsafe fn cast<T>(&self) -> &'a T {
+    pub unsafe fn cast<T>(self) -> &'a T {
         &*(self.pointer.as_ptr() as *const u8).cast()
     }
 
@@ -123,8 +144,11 @@ impl<'a> Cursor<'a> {
     ///
     /// The caller must ensure that the buffer is correctly sized, aligned and
     /// contains a valid bit pattern for the destination type.
+    ///
+    /// This also returns an unbounded lifetime, which the caller is required to
+    /// ensure doesn't get coerced to something inappropriate.
     #[inline]
-    pub unsafe fn cast_mut<T>(&mut self) -> &'a mut T {
+    pub unsafe fn cast_mut<T>(self) -> &'a mut T {
         &mut *self.pointer.as_ptr().cast()
     }
 

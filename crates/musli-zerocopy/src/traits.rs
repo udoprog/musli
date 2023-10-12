@@ -321,7 +321,7 @@ pub unsafe trait ZeroCopy {
     /// use musli_zerocopy::pointer::Ref;
     /// use musli_zerocopy::buf::Cursor;
     ///
-    /// unsafe fn unsafe_coerce<T>(cursor: Cursor<'_>) -> Result<&T, Error>
+    /// unsafe fn unsafe_coerce<'a, T>(cursor: Cursor<'a>) -> Result<&'a T, Error>
     /// where
     ///     T: ZeroCopy
     /// {

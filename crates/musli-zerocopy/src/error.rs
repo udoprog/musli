@@ -119,11 +119,6 @@ pub(crate) enum ErrorKind {
     NonZeroZeroed {
         range: Range<usize>,
     },
-    #[cfg(feature = "alloc")]
-    BufferOverflow {
-        offset: usize,
-        capacity: usize,
-    },
     IndexOutOfBounds {
         index: usize,
         len: usize,
@@ -165,13 +160,6 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::NonZeroZeroed { range } => {
                 write!(f, "Expected non-zero range at {range:?}")
-            }
-            #[cfg(feature = "alloc")]
-            ErrorKind::BufferOverflow { offset, capacity } => {
-                write!(
-                    f,
-                    "Offset {offset} is not within the allocated buffer 0-{capacity}"
-                )
             }
             ErrorKind::IndexOutOfBounds { index, len } => {
                 write!(f, "Index {index} out of bound 0-{len}")

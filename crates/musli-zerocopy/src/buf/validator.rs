@@ -45,9 +45,15 @@ impl<'a, T> Validator<'a, T> {
     /// })?;
     /// let buf = buf.as_aligned();
     ///
-    /// let mut v = buf.validate::<Custom>()?;
-    /// v.field::<u32>()?;
-    /// v.field::<u64>()?;
+    /// let mut v = buf.validate_struct::<Custom>()?;
+    ///
+    /// // SAFETY: We're only validating fields we know are
+    /// // part of the struct, and do not go beyond.
+    /// unsafe {
+    ///     v.field::<u32>()?;
+    ///     v.field::<u64>()?;
+    /// }
+    ///
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]

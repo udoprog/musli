@@ -1,26 +1,20 @@
 use crate::error::Error;
-use crate::pointer::{Ref, Size};
 use crate::traits::ZeroCopy;
 
 mod sealed {
-    #[cfg(feature = "alloc")]
-    use crate::pointer::Size;
     #[cfg(feature = "alloc")]
     use crate::traits::ZeroCopy;
 
     pub trait Sealed {}
 
     #[cfg(feature = "alloc")]
-    impl<'a, T, O: Size> Sealed for crate::buf::aligned_buf::AlignedBufStoreStruct<'a, T, O> where
-        T: ZeroCopy
-    {
-    }
+    impl<'a, T> Sealed for crate::buf::aligned_buf::AlignedBufStoreStruct<'a, T> where T: ZeroCopy {}
 }
 
 /// A writer as returned from [`BufMut::store_struct`].
 ///
 /// [`BufMut::store_struct`]: crate::buf::BufMut::store_struct
-pub trait StoreStruct<T: ZeroCopy, O: Size>: self::sealed::Sealed {
+pub trait StoreStruct<T: ZeroCopy>: self::sealed::Sealed {
     /// Pad around the given field with zeros.
     ///
     /// Note that this is necessary to do correctly in order to satisfy the
@@ -46,12 +40,17 @@ pub trait StoreStruct<T: ZeroCopy, O: Size>: self::sealed::Sealed {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut w = buf.store_struct(&padded);
-    /// w.pad::<u8>();
-    /// w.pad::<u16>();
+    /// // SAFETY: We do not pad beyond known fields and are
+    /// // making sure to initialize all of the buffer.
+    /// unsafe {
+    ///     let mut w = buf.store_struct(&padded);
+    ///     w.pad::<u8>();
+    ///     w.pad::<u16>();
+    ///     w.finish();
+    /// }
     ///
-    /// // Since we never called finished, the buffer has not been extended.
-    /// assert_eq!(buf.as_slice(), &[]);
+    /// // Note: The bytes are explicitly convert to big-endian encoding above.
+    /// assert_eq!(buf.as_slice(), &[1, 0, 2, 3]);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     fn pad<F>(&mut self)
@@ -83,6 +82,7 @@ pub trait StoreStruct<T: ZeroCopy, O: Size>: self::sealed::Sealed {
     /// ```
     /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::StoreStruct;
+    /// use musli_zerocopy::pointer::Ref;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]
@@ -92,20 +92,24 @@ pub trait StoreStruct<T: ZeroCopy, O: Size>: self::sealed::Sealed {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut w = buf.store_struct(&padded);
-    /// w.pad::<u8>();
-    /// w.pad::<u16>();
+    /// let reference = Ref::<ZeroPadded>::new(buf.next_offset::<ZeroPadded>());
     ///
-    /// // SAFETY: We've asserted that the struct fields have been correctly padded.
-    /// let ptr = unsafe { w.finish()? };
+    /// // SAFETY: We do not pad beyond known fields and are
+    /// // making sure to initialize all of the buffer.
+    /// unsafe {
+    ///     let mut w = buf.store_struct(&padded);
+    ///     w.pad::<u8>();
+    ///     w.pad::<u16>();
+    ///     w.finish();
+    /// }
     ///
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
     /// assert_eq!(buf.as_slice(), &[1, 0, 2, 3]);
     ///
     /// let buf = buf.as_aligned();
     ///
-    /// assert_eq!(buf.load(ptr)?, &padded);
+    /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    unsafe fn finish(self) -> Result<Ref<T, O>, Error>;
+    unsafe fn finish(self) -> Result<(), Error>;
 }

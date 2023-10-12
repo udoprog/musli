@@ -338,13 +338,11 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 let types = &output.types;
 
                 store_to = quote! {
-                    let mut writer = #buf_mut::store_struct(buf, self);
-
-                    #(#store_struct::pad::<#types>(&mut writer);)*
-
                     // SAFETY: We've systematically ensured to pad all fields on the
                     // struct.
                     unsafe {
+                        let mut writer = #buf_mut::store_struct(buf, self);
+                        #(#store_struct::pad::<#types>(&mut writer);)*
                         #store_struct::finish(writer)?;
                     }
 
@@ -352,8 +350,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 };
 
                 validate = quote! {
-                    let mut validator = #cursor::validate::<Self>(cursor);
-                    #(#validator::field::<#types>(&mut validator)?;)*
+                    // SAFETY: We've systematically ensured that we're only
+                    // validating over fields within the size of this type.
+                    unsafe {
+                        let mut validator = #cursor::validate_struct::<Self>(cursor);
+                        #(#validator::field::<#types>(&mut validator)?;)*
+                    }
                     #result::Ok(())
                 };
             }
@@ -469,17 +471,16 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             }
 
             store_to = quote! {
-                let mut writer = #buf_mut::store_struct(buf, self);
-
-                #store_struct::pad::<#ty>(&mut writer);
-
-                match self {
-                    #(#store_to_variants,)*
-                }
-
                 // SAFETY: We've systematically ensured to pad all fields on the
                 // struct.
                 unsafe {
+                    let mut writer = #buf_mut::store_struct(buf, self);
+                    #store_struct::pad::<#ty>(&mut writer);
+
+                    match self {
+                        #(#store_to_variants,)*
+                    }
+
                     #store_struct::finish(writer)?;
                 }
 
@@ -489,12 +490,16 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             let illegal_enum = quote::format_ident!("__illegal_enum_{}", num.as_ty());
 
             validate = quote! {
-                let mut validator = #cursor::validate::<Self>(cursor);
-                let discriminator = #validator::field::<#ty>(&mut validator)?;
+                // SAFETY: We've systematically ensured that we're only
+                // validating over fields within the size of this type.
+                unsafe {
+                    let mut validator = #cursor::validate_struct::<Self>(cursor);
+                    let discriminator = #validator::field::<#ty>(&mut validator)?;
 
-                match *discriminator {
-                    #(#variants,)*
-                    value => return #result::Err(#error::#illegal_enum::<Self>(value)),
+                    match *discriminator {
+                        #(#variants,)*
+                        value => return #result::Err(#error::#illegal_enum::<Self>(value)),
+                    }
                 }
 
                 Ok(())

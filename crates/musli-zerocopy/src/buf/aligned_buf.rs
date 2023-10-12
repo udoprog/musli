@@ -9,7 +9,7 @@ use ::alloc::alloc;
 use ::alloc::vec::Vec;
 
 use crate::buf::{Buf, BufMut, StoreStruct, Visit, DEFAULT_ALIGNMENT};
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::map::{Entry, MapRef};
 use crate::pointer::{DefaultSize, Ref, Size, Slice, Unsized};
 use crate::set::SetRef;
@@ -417,14 +417,18 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// # Safety
     ///
-    /// While calling just this function is not unsafe, finishing writing with
-    /// [`StoreStruct::finish`] is unsafe.
+    /// The caller must ensure to [`pad()`] the output correctly according to
+    /// the type being encoded, or else the aligned buffer will end up with
+    /// uninitialized bytes.
+    ///
+    /// [`pad()`]: StoreStruct::pad
     ///
     /// # Examples
     ///
     /// ```
     /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::StoreStruct;
+    /// use musli_zerocopy::pointer::Ref;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]
@@ -444,24 +448,28 @@ impl<O: Size> AlignedBuf<O> {
     ///     d: 0x0c0d_0e0fu32.to_be(),
     /// };
     ///
-    /// let mut w = buf.store_struct(&padded);
-    /// w.pad::<u8>();
-    /// w.pad::<u64>();
-    /// w.pad::<u16>();
-    /// w.pad::<u32>();
+    /// let reference = Ref::<ZeroPadded>::new(buf.next_offset::<ZeroPadded>());
     ///
-    /// // SAFETY: We've asserted that the struct fields have been correctly padded.
-    /// let ptr = unsafe { w.finish()? };
+    /// // SAFETY: We do not pad beyond known fields and are
+    /// // making sure to initialize all of the buffer.
+    /// unsafe {
+    ///     let mut w = buf.store_struct(&padded);
+    ///     w.pad::<u8>();
+    ///     w.pad::<u64>();
+    ///     w.pad::<u16>();
+    ///     w.pad::<u32>();
+    ///     w.finish();
+    /// };
     ///
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
     /// assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 12, 13, 14, 15]);
     ///
     /// let buf = buf.as_aligned();
     ///
-    /// assert_eq!(buf.load(ptr)?, &padded);
+    /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn store_struct<T>(&mut self, value: &T) -> AlignedBufStoreStruct<'_, T, O>
+    pub unsafe fn store_struct<T>(&mut self, value: &T) -> AlignedBufStoreStruct<'_, T>
     where
         T: ZeroCopy,
     {
@@ -472,8 +480,13 @@ impl<O: Size> AlignedBuf<O> {
             ptr::copy_nonoverlapping(value, self.as_ptr_mut().wrapping_add(self.len).cast(), 1);
         }
 
-        let len = self.len;
-        AlignedBufStoreStruct::new(self, len, end)
+        // This is what makes calling `store_struct` unsafe, we're preemptively
+        // pretending that the buffer has been initialized, while in reality
+        // that is the job of the caller.
+        self.len = end;
+        let start = self.data.as_ptr();
+        let end = start.wrapping_add(size_of::<T>());
+        AlignedBufStoreStruct::new(start, end)
     }
 
     /// Write a [`ZeroCopy`] value directly into the buffer.
@@ -1264,7 +1277,7 @@ impl<O: Size> Drop for AlignedBuf<O> {
 
 impl<O: Size> BufMut for AlignedBuf<O> {
     type Size = O;
-    type StoreStruct<'a, T> = AlignedBufStoreStruct<'a, T, O> where T: ZeroCopy;
+    type StoreStruct<'a, T> = AlignedBufStoreStruct<'a, T> where Self: 'a, T: 'a + ZeroCopy;
 
     #[inline]
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
@@ -1280,7 +1293,7 @@ impl<O: Size> BufMut for AlignedBuf<O> {
     }
 
     #[inline]
-    fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
     where
         T: ZeroCopy,
     {
@@ -1292,16 +1305,17 @@ impl<O: Size> BufMut for AlignedBuf<O> {
     where
         T: ZeroCopy,
     {
-        let mut s = self.store_struct(array);
-
-        if T::NEEDS_PADDING {
-            for _ in 0..array.len() {
-                s.pad::<T>();
-            }
-        }
-
-        // SAFETY: we've padded every element in the array.
+        // SAFETY: We're both allocating space for the array, and applying the
+        // correct padding to it.
         unsafe {
+            let mut s = self.store_struct(array);
+
+            if T::NEEDS_PADDING {
+                for _ in 0..array.len() {
+                    s.pad::<T>();
+                }
+            }
+
             s.finish()?;
         }
 
@@ -1311,54 +1325,26 @@ impl<O: Size> BufMut for AlignedBuf<O> {
 
 /// A writer as returned from [AlignedBuf::writer].
 #[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StoreStruct::finish`"]
-pub struct AlignedBufStoreStruct<'a, T, O: Size> {
-    buf: &'a mut AlignedBuf<O>,
-    initialized: usize,
-    end: usize,
-    _marker: PhantomData<T>,
+pub struct AlignedBufStoreStruct<'a, T> {
+    start: *mut u8,
+    end: *mut u8,
+    _marker: PhantomData<&'a mut T>,
 }
 
-impl<'a, T, O: Size> AlignedBufStoreStruct<'a, T, O>
+impl<'a, T> AlignedBufStoreStruct<'a, T>
 where
     T: ZeroCopy,
 {
-    pub(crate) fn new(buf: &'a mut AlignedBuf<O>, len: usize, end: usize) -> Self {
+    pub(crate) fn new(start: *mut u8, end: *mut u8) -> Self {
         Self {
-            buf,
-            initialized: len,
+            start,
             end,
             _marker: PhantomData,
         }
     }
-
-    /// Zero pad around a field with the given type `T`.
-    ///
-    /// Note that if calling this overflows the current type we will simply just
-    /// not write zero byte paddings.
-    ///
-    /// Instead if this happens, once `finish()` is called it will error.
-    fn zero_pad_align<F>(&mut self)
-    where
-        F: ZeroCopy,
-    {
-        let o = self.initialized.next_multiple_of(align_of::<F>());
-
-        // zero out padding.
-        if o > self.initialized {
-            if o <= self.end {
-                let start = self.buf.as_ptr_mut().wrapping_add(self.initialized);
-
-                unsafe {
-                    ptr::write_bytes(start, 0, o - self.initialized);
-                }
-            }
-
-            self.initialized = o;
-        }
-    }
 }
 
-impl<'a, T, O: Size> StoreStruct<T, O> for AlignedBufStoreStruct<'a, T, O>
+impl<'a, T> StoreStruct<T> for AlignedBufStoreStruct<'a, T>
 where
     T: ZeroCopy,
 {
@@ -1372,8 +1358,16 @@ where
     where
         F: ZeroCopy,
     {
-        self.zero_pad_align::<F>();
-        self.initialized = self.initialized.wrapping_add(size_of::<F>());
+        unsafe {
+            let offset = self.start.align_offset(align_of::<F>());
+
+            // zero out padding.
+            if offset > 0 {
+                ptr::write_bytes(self.start, 0, offset);
+            }
+
+            self.start = self.start.wrapping_add(offset).wrapping_add(size_of::<F>());
+        }
     }
 
     /// Finish writing the current buffer.
@@ -1386,29 +1380,14 @@ where
     /// contain uninitialized data in the form of uninitialized padding.
     ///
     /// [`pad`]: Self::pad
-    unsafe fn finish(mut self) -> Result<Ref<T, O>, Error> {
-        self.zero_pad_align::<T>();
+    unsafe fn finish(self) -> Result<(), Error> {
+        let distance = self.start.offset_from(self.end);
 
-        let offset = self.buf.len();
-
-        if self.initialized > self.end {
-            return Err(Error::new(ErrorKind::BufferOverflow {
-                offset: self.initialized,
-                capacity: self.end,
-            }));
+        if distance > 0 {
+            ptr::write_bytes(self.start, 0, distance as usize);
         }
 
-        // Pad last segment for the type being written.
-        if self.initialized < self.end {
-            let ptr = self.buf.as_ptr_mut().wrapping_add(self.initialized);
-
-            unsafe {
-                ptr::write_bytes(ptr, 0, self.end - self.initialized);
-            }
-        }
-
-        self.buf.set_len(self.end);
-        Ok(Ref::new(offset))
+        Ok(())
     }
 }
 

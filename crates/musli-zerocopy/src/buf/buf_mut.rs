@@ -24,10 +24,10 @@ pub trait BufMut: self::sealed::Sealed {
     type Size: Size;
 
     /// Interior mutable buffer.
-    type StoreStruct<'a, T>: StoreStruct<T, Self::Size>
+    type StoreStruct<'a, T>: StoreStruct<T>
     where
         Self: 'a,
-        T: ZeroCopy;
+        T: 'a + ZeroCopy;
 
     /// Extend the current buffer from the given slice.
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error>;
@@ -52,6 +52,7 @@ pub trait BufMut: self::sealed::Sealed {
     /// ```
     /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::StoreStruct;
+    /// use musli_zerocopy::pointer::Ref;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]
@@ -71,24 +72,28 @@ pub trait BufMut: self::sealed::Sealed {
     ///     d: 0x0c0d_0e0fu32.to_be(),
     /// };
     ///
-    /// let mut w = buf.store_struct(&padded);
-    /// w.pad::<u8>();
-    /// w.pad::<u64>();
-    /// w.pad::<u16>();
-    /// w.pad::<u32>();
+    /// let reference = Ref::<ZeroPadded>::new(buf.next_offset::<ZeroPadded>());
     ///
-    /// // SAFETY: We've asserted that the struct fields have been correctly padded.
-    /// let ptr = unsafe { w.finish()? };
+    /// // SAFETY: We do not pad beyond known fields and are
+    /// // making sure to initialize all of the buffer.
+    /// unsafe {
+    ///     let mut w = buf.store_struct(&padded);
+    ///     w.pad::<u8>();
+    ///     w.pad::<u64>();
+    ///     w.pad::<u16>();
+    ///     w.pad::<u32>();
+    ///     w.finish();
+    /// }
     ///
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
     /// assert_eq!(buf.as_slice(), &[1, 0, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 12, 13, 14, 15]);
     ///
     /// let buf = buf.as_aligned();
     ///
-    /// assert_eq!(buf.load(ptr)?, &padded);
+    /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
     where
         T: ZeroCopy;
 
@@ -103,7 +108,7 @@ where
     B: BufMut,
 {
     type Size = B::Size;
-    type StoreStruct<'a, T> = B::StoreStruct<'a, T> where Self: 'a, T: ZeroCopy;
+    type StoreStruct<'a, T> = B::StoreStruct<'a, T> where Self: 'a, T: 'a + ZeroCopy;
 
     #[inline]
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
@@ -119,7 +124,7 @@ where
     }
 
     #[inline]
-    fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
     where
         T: ZeroCopy,
     {

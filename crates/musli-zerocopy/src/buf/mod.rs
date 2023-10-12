@@ -390,13 +390,18 @@ impl Buf {
     /// })?;
     /// let buf = buf.as_aligned();
     ///
-    /// let mut v = buf.validate::<Custom>()?;
-    /// v.field::<u32>()?;
-    /// v.field::<u64>()?;
+    /// let mut v = buf.validate_struct::<Custom>()?;
+    ///
+    /// // SAFETY: We're only validating fields we know are
+    /// // part of the struct, and do not go beyond.
+    /// unsafe {
+    ///     v.field::<u32>()?;
+    ///     v.field::<u64>()?;
+    /// }
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn validate<T>(&self) -> Result<Validator<'_, T>, Error>
+    pub fn validate_struct<T>(&self) -> Result<Validator<'_, T>, Error>
     where
         T: ZeroCopy,
     {
@@ -407,7 +412,7 @@ impl Buf {
     /// Construct a cursor over the current buffer.
     ///
     /// This is a raw, low-level API to access the underlying buffer. The safety of most cursor methods depend on not violating.
-    pub fn cursor(&self) -> Cursor<'_> {
+    pub fn cursor(&self) -> Cursor {
         Cursor::new(&self.data)
     }
 
