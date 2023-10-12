@@ -94,42 +94,42 @@ fn main() -> Result<()> {
         (musli_value $($tt:tt)*) => {
         };
 
-        // musli_zerocopy can't be fuzzed with this framework yet.
-        (musli_zerocopy $($tt:tt)*) => {
-        };
-
-        ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
+        ($framework:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
             $({
-                let name = concat!(stringify!($base), "/", stringify!($name), "/random");
+                musli_tests::if_supported! {
+                    $framework, $name, {
 
-                if random && condition(name) {
-                    write!(o, "{name}: ")?;
-                    o.flush()?;
-                    let start = Instant::now();
+                    let name = concat!(stringify!($framework), "/", stringify!($name), "/random");
 
-                    let step = random_bytes.len() / 10;
+                    if random && condition(name) {
+                        write!(o, "{name}: ")?;
+                        o.flush()?;
+                        let start = Instant::now();
 
-                    for (n, bytes) in random_bytes.iter().enumerate() {
-                        if step == 0 || n % step == 0 {
-                            write!(o, ".")?;
-                            o.flush()?;
+                        let step = random_bytes.len() / 10;
+
+                        for (n, bytes) in random_bytes.iter().enumerate() {
+                            if step == 0 || n % step == 0 {
+                                write!(o, ".")?;
+                                o.flush()?;
+                            }
+
+                            match utils::$framework::decode::<$ty>(&bytes) {
+                                Ok(value) => {
+                                    // values *can* occur.
+                                    black_box(value);
+                                }
+                                Err(error) => {
+                                    // errors are expected, so don't log them.
+                                    black_box(error);
+                                }
+                            }
                         }
 
-                        match utils::$base::decode::<$ty>(&bytes) {
-                            Ok(value) => {
-                                // values *can* occur.
-                                black_box(value);
-                            }
-                            Err(error) => {
-                                // errors are expected, so don't log them.
-                                black_box(error);
-                            }
-                        }
+                        let duration = Instant::now().duration_since(start);
+                        writeln!(o, " {duration:?}")?;
                     }
-
-                    let duration = Instant::now().duration_since(start);
-                    writeln!(o, " {duration:?}")?;
-                }
+                }}
             })*
         };
     }
@@ -142,99 +142,113 @@ fn main() -> Result<()> {
         (musli_value $($tt:tt)*) => {
         };
 
-        // musli zerocopy is not a bytes-oriented encoding.
-        (musli_zerocopy $($tt:tt)*) => {
-        };
-
-        ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
+        ($framework:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
             $({
-                let name = concat!(stringify!($base), "/", stringify!($name), "/size");
+                musli_tests::if_supported! {
+                    $framework, $name, {
+                    let name = concat!(stringify!($framework), "/", stringify!($name), "/size");
 
-                if size && condition(name) {
-                    let mut buf = utils::$base::buffer();
+                    if size && condition(name) {
+                        let mut buf = utils::$framework::new();
 
-                    let mut set = SizeSet {
-                        framework: stringify!($base),
-                        suite: stringify!($name),
-                        samples: Vec::new(),
-                    };
+                        let mut set = SizeSet {
+                            framework: stringify!($framework),
+                            suite: stringify!($name),
+                            samples: Vec::new(),
+                        };
 
-                    for var in &$name {
-                        utils::$base::reset(&mut buf, $size_hint, var);
+                        for var in &$name {
+                            buf.with(|mut state| {
+                                state.reset($size_hint, var);
 
-                        match utils::$base::encode(&mut buf, var) {
-                            Ok(value) => {
-                                set.samples.push(value.len() as i64);
-                            }
-                            Err(error) => {
-                                writeln!(o, "{name}: error during encode: {error}")?;
-                            }
+                                match state.encode(var) {
+                                    Ok(value) => {
+                                        set.samples.push(value.len() as i64);
+                                    }
+                                    Err(error) => {
+                                        writeln!(o, "{name}: error during encode: {error}")?;
+                                    }
+                                }
+
+                                Ok::<_, anyhow::Error>(())
+                            })?;
                         }
-                    }
 
-                    size_sets.push(set);
-                }
+                        size_sets.push(set);
+                    }
+                }}
             })*
         };
     }
 
     macro_rules! run {
-        ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
+        ($framework:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {
             $({
-                let name = concat!(stringify!($base), "/", stringify!($name));
+                musli_tests::if_supported! {
+                    $framework, $name, {
+                    let name = concat!(stringify!($framework), "/", stringify!($name));
 
-                if (!random && !size) && condition(name) {
-                    write!(o, "{name}: ")?;
-                    o.flush()?;
-                    let start = Instant::now();
-                    let step = iter / 10;
+                    if (!random && !size) && condition(name) {
+                        write!(o, "{name}: ")?;
+                        o.flush()?;
+                        let start = Instant::now();
+                        let step = iter / 10;
 
-                    let mut buf = utils::$base::buffer();
+                        let mut buf = utils::$framework::new();
 
-                    'outer:
-                    for n in 0..iter {
-                        if step == 0 || n % step == 0 {
-                            write!(o, ".")?;
-                            o.flush()?;
-                        }
+                        'outer:
+                        for n in 0..iter {
+                            if step == 0 || n % step == 0 {
+                                write!(o, ".")?;
+                                o.flush()?;
+                            }
 
-                        for (index, var) in $name.iter().enumerate() {
-                            utils::$base::reset(&mut buf, $size_hint, var);
+                            for (index, var) in $name.iter().enumerate() {
+                                let break_outer = buf.with(|mut state| {
+                                    state.reset($size_hint, var);
 
-                            let out = match utils::$base::encode(&mut buf, var) {
-                                Ok(value) => value,
-                                Err(error) => {
-                                    write!(o, "E")?;
-                                    writeln!(o)?;
-                                    writeln!(o, "{index}: error during encode: {error}")?;
+                                    let out = match state.encode(var) {
+                                        Ok(value) => value,
+                                        Err(error) => {
+                                            write!(o, "E")?;
+                                            writeln!(o)?;
+                                            writeln!(o, "{index}: error during encode: {error}")?;
+                                            return Ok(true);
+                                        }
+                                    };
+
+                                    let actual = match out.decode::<$ty>() {
+                                        Ok(value) => value,
+                                        Err(error) => {
+                                            write!(o, "E")?;
+                                            writeln!(o)?;
+                                            writeln!(o, "{index}: error during decode: {error}")?;
+                                            return Ok(true);
+                                        }
+                                    };
+
+                                    if actual != *var {
+                                        write!(o, "C")?;
+                                        writeln!(o)?;
+                                        writeln!(o, "{name}: model mismatch: {} struct {index}", stringify!($name))?;
+                                        writeln!(o, "  Actual: {actual:?}")?;
+                                        writeln!(o, "Expected: {var:?}")?;
+                                        return Ok(true);
+                                    }
+
+                                    Ok::<_, anyhow::Error>(false)
+                                })?;
+
+                                if break_outer {
                                     break 'outer;
                                 }
-                            };
-
-                            let actual = match utils::$base::decode::<$ty>(&out) {
-                                Ok(value) => value,
-                                Err(error) => {
-                                    write!(o, "E")?;
-                                    writeln!(o)?;
-                                    writeln!(o, "{index}: error during decode: {error}")?;
-                                    break 'outer;
-                                }
-                            };
-
-                            if actual != *var {
-                                write!(o, "C")?;
-                                writeln!(o)?;
-                                writeln!(o, "{name}: model mismatch: {} struct {index}", stringify!($name))?;
-                                writeln!(o, "  Actual: {actual:?}")?;
-                                writeln!(o, "Expected: {var:?}")?;
-                                break 'outer;
                             }
                         }
-                    }
 
-                    let duration = Instant::now().duration_since(start);
-                    writeln!(o, " {duration:?}")?;
-                }
+                        let duration = Instant::now().duration_since(start);
+                        writeln!(o, " {duration:?}")?;
+                    }
+                }}
             })*
         };
     }

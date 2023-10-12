@@ -9,13 +9,17 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut rng = musli_tests::rng();
 
     macro_rules! group {
-        ($name:expr, $it:ident) => {{
-            let mut g = c.benchmark_group($name);
+        ($group_name:expr, $name:ident, $it:ident) => {{
+            let mut g = c.benchmark_group($group_name);
 
             macro_rules! bench {
-                ($base:ident, $buf:ident) => {{
-                    let mut $buf = utils::$base::buffer();
-                    g.bench_function(stringify!($base), |b| $it!(b, $base, $buf));
+                ($framework:ident, $buf:ident) => {{
+                    musli_tests::if_supported! {
+                        $framework, $name, {
+                            let mut $buf = utils::$framework::new();
+                            g.bench_function(stringify!($framework), |b| $it!(b, $framework, $buf));
+                        }
+                    }
                 }};
             }
 
@@ -24,46 +28,52 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     macro_rules! setup {
-        ($($var:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
+        ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
             $({
-                let $var: $ty = Generate::generate(&mut rng);
+                let $name: $ty = Generate::generate(&mut rng);
 
                 macro_rules! it {
-                    ($b:expr, $base:ident, $buf:ident) => {{
-                        utils::$base::reset(&mut $buf, $size_hint, &$var);
-                        $b.iter(|| {
-                            black_box(utils::$base::encode(&mut $buf, &$var).unwrap());
+                    ($b:expr, $framework:ident, $buf:ident) => {{
+                        $buf.with(|mut state| {
+                            state.reset($size_hint, &$name);
+
+                            $b.iter(|| {
+                                black_box(state.encode(&$name).unwrap());
+                            })
                         })
                     }};
                 }
 
-                group!(concat!("enc/", stringify!($var)), it);
+                group!(concat!("enc/", stringify!($name)), $name, it);
 
                 macro_rules! it {
-                    ($b:expr, $base:ident, $buf:ident) => {{
-                        utils::$base::reset(&mut $buf, $size_hint, &$var);
-                        let data = utils::$base::encode(&mut $buf, &$var).unwrap();
-                        $b.iter(|| utils::$base::decode::<$ty>(&data).unwrap())
-                    }};
-                }
-
-                group!(concat!("dec/", stringify!($var)), it);
-
-                macro_rules! it {
-                    ($b:expr, $base:ident, $buf:ident) => {{
-                        utils::$base::reset(&mut $buf, $size_hint, &$var);
-
-                        $b.iter(|| {
-                            let out = utils::$base::encode(&mut $buf, &$var).unwrap();
-                            let actual = utils::$base::decode::<$ty>(&out).unwrap();
-                            debug_assert_eq!(actual, $var);
-                            black_box(actual);
-                            black_box(out);
+                    ($b:expr, $framework:ident, $buf:ident) => {{
+                        $buf.with(|mut state| {
+                            state.reset($size_hint, &$name);
+                            let data = state.encode(&$name).unwrap();
+                            $b.iter(move || data.decode::<$ty>().unwrap())
                         })
                     }};
                 }
 
-                group!(concat!("rt/", stringify!($var)), it);
+                group!(concat!("dec/", stringify!($name)), $name, it);
+
+                macro_rules! it {
+                    ($b:expr, $framework:ident, $buf:ident) => {{
+                        $buf.with(|mut state| {
+                            state.reset($size_hint, &$name);
+
+                            $b.iter(|| {
+                                let out = state.encode(&$name).unwrap();
+                                let actual = out.decode::<$ty>().unwrap();
+                                debug_assert_eq!(actual, $name);
+                                black_box(actual);
+                            })
+                        })
+                    }};
+                }
+
+                group!(concat!("rt/", stringify!($name)), $name, it);
             })*
         };
     }

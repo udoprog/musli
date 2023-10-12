@@ -21,7 +21,7 @@ extra = ["rkyv", "dlhn", "bitcode", "serde_cbor"]
 full = ["rmp-serde", "bincode", "postcard", "musli-json", "serde_json"]
 builtin = ["musli-wire", "musli-descriptive", "musli-storage"]
 text = ["musli-json", "serde_json"]
-std = ["alloc", "musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std", "rkyv?/std"]
+std = ["alloc", "musli/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "rand/std", "serde_json?/std", "rkyv?/std", "serde?/std"]
 alloc = ["musli/alloc", "musli-wire?/alloc", "musli-storage?/alloc", "musli-json?/alloc"]
 test = ["musli-wire", "musli-storage", "musli-descriptive"]
 simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptive?/simdutf8", "musli-json?/simdutf8"]
@@ -49,11 +49,11 @@ model_bitcode = ["model_vec", "model_usize", "model_tuple", "model_float", "mode
 model_serde_cbor = ["model_vec", "model_usize", "model_tuple", "model_float", "model_map", "model_map_string_key", "model_cstring"]
 
 dlhn = ["dep:dlhn", "serde"]
-serde_json = ["dep:serde_json", "serde"]
+serde_json = ["dep:serde_json", "serde", "std"]
 serde_cbor = ["dep:serde_cbor", "serde"]
 bincode = ["dep:bincode", "serde"]
 rmp-serde = ["dep:rmp-serde", "serde"]
-serde = ["dep:serde", "bitcode?/serde"]
+serde = ["dep:serde", "bitcode?/serde", "std"]
 rkyv = ["dep:rkyv", "std"]
 postcard = ["dep:postcard", "serde"]
 
@@ -68,7 +68,7 @@ musli-zerocopy = { path = "../musli-zerocopy", version = "0.0.63", default-featu
 musli-macros = { path = "../musli-macros", version = "0.0.63", features = ["test"] }
 
 anyhow = "1.0.71"
-serde = { version = "1.0.163", default-features = false, optional = true, features = ["derive"] }
+serde = { version = "1.0.188", default-features = false, optional = true, features = ["derive"] }
 rand = { version = "0.8.5", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.1", optional = true }
 bincode = { version = "1.3.3", default-features = false, optional = true }

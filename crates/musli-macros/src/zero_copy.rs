@@ -285,11 +285,11 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     };
 
     let buf_mut: syn::Path = syn::parse_quote!(#krate::buf::BufMut);
-    let buf: syn::Path = syn::parse_quote!(#krate::buf::Buf);
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
     let store_struct: syn::Path = syn::parse_quote!(#krate::buf::StoreStruct);
     let validator: syn::Path = syn::parse_quote!(#krate::buf::Validator);
+    let cursor: syn::Path = syn::parse_quote!(#krate::buf::Cursor);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
 
@@ -313,7 +313,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     };
 
                     validate = quote! {
-                        <#ty as #zero_copy>::validate(buf)
+                        <#ty as #zero_copy>::validate(cursor)
                     };
 
                     // We are either a `repr(C)` with a single field or
@@ -352,9 +352,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 };
 
                 validate = quote! {
-                    let mut validator = #buf::validate::<Self>(buf)?;
+                    let mut validator = #cursor::validate::<Self>(cursor);
                     #(#validator::field::<#types>(&mut validator)?;)*
-                    #validator::end(validator)?;
                     #result::Ok(())
                 };
             }
@@ -490,7 +489,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             let illegal_enum = quote::format_ident!("__illegal_enum_{}", num.as_ty());
 
             validate = quote! {
-                let mut validator = #buf::validate::<Self>(buf)?;
+                let mut validator = #cursor::validate::<Self>(cursor);
                 let discriminator = #validator::field::<#ty>(&mut validator)?;
 
                 match *discriminator {
@@ -498,7 +497,6 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     value => return #result::Err(#error::#illegal_enum::<Self>(value)),
                 }
 
-                #validator::end(validator)?;
                 Ok(())
             };
 
@@ -547,7 +545,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 #store_to
             }
 
-            unsafe fn validate(buf: &#buf) -> #result<(), #error> {
+            unsafe fn validate(cursor: #cursor<'_>) -> #result<(), #error> {
                 #validate
             }
         }

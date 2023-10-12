@@ -4,29 +4,31 @@ pub mod serde_json {
 
     use serde::{Deserialize, Serialize};
 
-    pub fn buffer() -> Vec<u8> {
-        Vec::with_capacity(4096)
-    }
+    benchmarker! {
+        'buf
 
-    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
-        buf.clear();
-    }
+        pub fn buffer() -> Vec<u8> {
+            Vec::with_capacity(4096)
+        }
 
-    #[inline(always)]
-    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> serde_json::Result<&'buf [u8]>
-    where
-        T: Serialize,
-    {
-        serde_json::to_writer(&mut *buf, value)?;
-        Ok(buf.as_slice())
-    }
+        pub fn reset<T>(&mut self, _: usize, _: &T) {
+            self.buffer.clear();
+        }
 
-    #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> serde_json::Result<T>
-    where
-        T: Deserialize<'de>,
-    {
-        serde_json::from_slice(data)
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], serde_json::Error>
+        where
+            T: Serialize,
+        {
+            serde_json::to_writer(&mut *self.buffer, value)?;
+            Ok(self.buffer.as_slice())
+        }
+
+        pub fn decode<T>(&self) -> Result<T, serde_json::Error>
+        where
+            T: Deserialize<'buf>,
+        {
+            serde_json::from_slice(self.buffer)
+        }
     }
 }
 
@@ -36,29 +38,31 @@ pub mod serde_bincode {
 
     use serde::{Deserialize, Serialize};
 
-    pub fn buffer() -> Vec<u8> {
-        Vec::with_capacity(4096)
-    }
+    benchmarker! {
+        'buf
 
-    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
-        buf.clear();
-    }
+        pub fn buffer() -> Vec<u8> {
+            Vec::with_capacity(4096)
+        }
 
-    #[inline(always)]
-    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> bincode::Result<&'buf [u8]>
-    where
-        T: Serialize,
-    {
-        bincode::serialize_into(&mut *buf, value)?;
-        Ok(buf.as_slice())
-    }
+        pub fn reset<T>(&mut self, _: usize, _: &T) {
+            self.buffer.clear();
+        }
 
-    #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> bincode::Result<T>
-    where
-        T: Deserialize<'de>,
-    {
-        bincode::deserialize(data)
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], bincode::Error>
+        where
+            T: Serialize,
+        {
+            bincode::serialize_into(&mut *self.buffer, value)?;
+            Ok(self.buffer.as_slice())
+        }
+
+        pub fn decode<T>(&self) -> Result<T, bincode::Error>
+        where
+            T: Deserialize<'buf>,
+        {
+            bincode::deserialize(self.buffer)
+        }
     }
 }
 
@@ -68,29 +72,31 @@ pub mod serde_cbor {
 
     use serde::{Deserialize, Serialize};
 
-    pub fn buffer() -> Vec<u8> {
-        Vec::with_capacity(4096)
-    }
+    benchmarker! {
+        'buf
 
-    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
-        buf.clear();
-    }
+        pub fn buffer() -> Vec<u8> {
+            Vec::with_capacity(4096)
+        }
 
-    #[inline(always)]
-    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> serde_cbor::Result<&'buf [u8]>
-    where
-        T: Serialize,
-    {
-        serde_cbor::to_writer(&mut *buf, value)?;
-        Ok(buf.as_slice())
-    }
+        pub fn reset<T>(&mut self, _: usize, _: &T) {
+            self.buffer.clear();
+        }
 
-    #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> serde_cbor::Result<T>
-    where
-        T: Deserialize<'de>,
-    {
-        serde_cbor::from_slice(data)
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], serde_cbor::Error>
+        where
+            T: Serialize,
+        {
+            serde_cbor::to_writer(&mut *self.buffer, value)?;
+            Ok(self.buffer.as_slice())
+        }
+
+        pub fn decode<T>(&self) -> Result<T, serde_cbor::Error>
+        where
+            T: Deserialize<'buf>,
+        {
+            serde_cbor::from_slice(self.buffer)
+        }
     }
 }
 
@@ -100,47 +106,49 @@ pub mod postcard {
 
     use serde::{Deserialize, Serialize};
 
-    pub fn buffer() -> Vec<u8> {
-        Vec::new()
-    }
+    benchmarker! {
+        'buf
 
-    pub fn reset<T>(buf: &mut Vec<u8>, size_hint: usize, value: &T)
-    where
-        T: Serialize,
-    {
-        if buf.len() < size_hint {
-            buf.resize(size_hint, 0);
+        pub fn buffer() -> Vec<u8> {
+            Vec::new()
         }
 
-        // Figure out the size of the buffer to use. Don't worry, anything we do
-        // in `reset` doesn't count towards benchmarking.
-        while let Err(error) = postcard::to_slice(value, buf) {
-            match error {
-                postcard::Error::SerializeBufferFull => {
-                    let new_size = (buf.len() as f32 * 1.5f32) as usize;
-                    buf.resize(new_size, 0);
-                }
-                error => {
-                    panic!("{}", error)
+        pub fn reset<T>(&mut self, size_hint: usize, value: &T)
+        where
+            T: Serialize,
+        {
+            if self.buffer.len() < size_hint {
+                self.buffer.resize(size_hint, 0);
+            }
+
+            // Figure out the size of the buffer to use. Don't worry, anything we do
+            // in `reset` doesn't count towards benchmarking.
+            while let Err(error) = postcard::to_slice(value, &mut self.buffer) {
+                match error {
+                    postcard::Error::SerializeBufferFull => {
+                        let new_size = (self.buffer.len() as f32 * 1.5f32) as usize;
+                        self.buffer.resize(new_size, 0);
+                    }
+                    error => {
+                        panic!("{}", error)
+                    }
                 }
             }
         }
-    }
 
-    #[inline(always)]
-    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> postcard::Result<&'buf [u8]>
-    where
-        T: Serialize,
-    {
-        let buf = postcard::to_slice(value, buf)?;
-        Ok(buf)
-    }
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], postcard::Error>
+        where
+            T: Serialize,
+        {
+            let buf = postcard::to_slice(value, &mut self.buffer)?;
+            Ok(buf)
+        }
 
-    #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> postcard::Result<T>
-    where
-        T: Deserialize<'de>,
-    {
-        postcard::from_bytes(data)
+        pub fn decode<T>(&self) -> Result<T, postcard::Error>
+        where
+            T: Deserialize<'buf>,
+        {
+            postcard::from_bytes(self.buffer)
+        }
     }
 }

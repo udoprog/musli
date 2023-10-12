@@ -119,10 +119,6 @@ pub(crate) enum ErrorKind {
     NonZeroZeroed {
         range: Range<usize>,
     },
-    BufferUnderflow {
-        range: Range<usize>,
-        expected: usize,
-    },
     #[cfg(feature = "alloc")]
     BufferOverflow {
         offset: usize,
@@ -169,14 +165,6 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::NonZeroZeroed { range } => {
                 write!(f, "Expected non-zero range at {range:?}")
-            }
-            ErrorKind::BufferUnderflow { range, expected } => {
-                let len = range.len();
-
-                write!(
-                    f,
-                    "Expected end of buffer at {expected} in range {range:?} but was {len}"
-                )
             }
             #[cfg(feature = "alloc")]
             ErrorKind::BufferOverflow { offset, capacity } => {

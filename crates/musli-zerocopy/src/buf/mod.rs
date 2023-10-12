@@ -22,6 +22,9 @@ mod store_struct;
 pub use self::buf_mut::BufMut;
 mod buf_mut;
 
+pub use self::cursor::Cursor;
+mod cursor;
+
 #[cfg(feature = "alloc")]
 pub use self::aligned_buf::AlignedBuf;
 #[cfg(feature = "alloc")]
@@ -390,7 +393,6 @@ impl Buf {
     /// let mut v = buf.validate::<Custom>()?;
     /// v.field::<u32>()?;
     /// v.field::<u64>()?;
-    /// v.end()?;
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
@@ -399,7 +401,14 @@ impl Buf {
         T: ZeroCopy,
     {
         self.ensure_compatible_with::<T>()?;
-        Ok(Validator::new(self))
+        Ok(Validator::new(self.cursor()))
+    }
+
+    /// Construct a cursor over the current buffer.
+    ///
+    /// This is a raw, low-level API to access the underlying buffer. The safety of most cursor methods depend on not violating.
+    pub fn cursor(&self) -> Cursor<'_> {
+        Cursor::new(&self.data)
     }
 
     /// Get the given range while checking its required alignment.
@@ -517,8 +526,11 @@ impl Buf {
         let buf = self.get(start, end, align_of::<T>())?;
 
         if !T::ANY_BITS {
+            // SAFETY: We've checked the size and alignment of the buffer above.
+            // The remaining safety requirements depend on the implementation of
+            // validate.
             unsafe {
-                T::validate(buf)?;
+                T::validate(buf.cursor())?;
             }
         }
 
@@ -537,25 +549,32 @@ impl Buf {
         let end = start.wrapping_add(size_of::<T>());
         let buf = self.get_mut(start, end, align_of::<T>())?;
 
+        if !T::ANY_BITS {
+            // SAFETY: We've checked the size and alignment of the buffer above.
+            // The remaining safety requirements depend on the implementation of
+            // validate.
+            unsafe {
+                T::validate(buf.cursor())?;
+            }
+        }
+
         // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
         // type being coerced into can really inhabit any bit pattern.
-        Ok(unsafe {
-            T::validate(buf)?;
-            buf.cast_mut()
-        })
+        Ok(unsafe { buf.cast_mut() })
     }
 
     /// Load the given slice.
     #[inline]
-    pub(crate) fn load_slice<T, O: Size>(&self, ptr: Slice<T, O>) -> Result<&[T], Error>
+    pub(crate) fn load_slice<T, O: Size>(&self, slice: Slice<T, O>) -> Result<&[T], Error>
     where
         T: ZeroCopy,
     {
-        let start = ptr.offset();
-        let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
+        let start = slice.offset();
+        let end = start.wrapping_add(slice.len().wrapping_mul(size_of::<T>()));
         let buf = self.get(start, end, align_of::<T>())?;
-        validate_array::<T>(buf)?;
-        Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), ptr.len()) })
+        let len = buf.len();
+        validate_array::<T>(buf.cursor(), len)?;
+        Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), slice.len()) })
     }
 
     /// Load the given slice mutably.
@@ -567,7 +586,8 @@ impl Buf {
         let start = ptr.offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
         let buf: &mut Buf = self.get_mut_unaligned(start, end)?;
-        validate_array::<T>(buf)?;
+        let len = buf.len();
+        validate_array::<T>(buf.cursor(), len)?;
         Ok(unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), ptr.len()) })
     }
 
@@ -602,12 +622,6 @@ impl Buf {
     pub(crate) fn is_aligned_to(&self, align: usize) -> bool {
         is_aligned_to(self.data.as_ptr(), align)
     }
-
-    /// Test if the entire buffer is zeroed.
-    #[inline]
-    pub(crate) fn is_zeroed(&self) -> bool {
-        self.data.iter().all(|b| *b == 0)
-    }
 }
 
 impl fmt::Debug for Buf {
@@ -617,17 +631,18 @@ impl fmt::Debug for Buf {
 }
 
 #[inline]
-pub(crate) fn validate_array<T>(buf: &Buf) -> Result<(), Error>
+pub(crate) fn validate_array<T>(mut cursor: Cursor<'_>, len: usize) -> Result<(), Error>
 where
     T: ZeroCopy,
 {
     if !T::ANY_BITS && size_of::<T>() > 0 {
-        for chunk in buf.as_slice().chunks_exact(size_of::<T>()) {
+        for _ in 0..len / size_of::<T>() {
             // SAFETY: The passed in buffer is required to be aligned per the
             // requirements of this trait, so any size_of::<T>() chunks are aligned
             // too.
             unsafe {
-                T::validate(Buf::new(chunk))?;
+                T::validate(cursor)?;
+                cursor.advance::<T>();
             }
         }
     }

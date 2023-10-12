@@ -211,22 +211,26 @@ macro_rules! feature_matrix {
     };
 }
 
+/// Only expand `$block` if the given test is supported by this framework.
+#[macro_export]
+macro_rules! if_supported {
+    (musli_zerocopy, lg, $block:block) => {};
+    (musli_zerocopy, allocated, $block:block) => {};
+    (musli_zerocopy, medium_enum, $block:block) => {};
+    ($framework:ident, $test:ident, $block:block) => {
+        $block
+    };
+}
+
 #[macro_export]
 macro_rules! types {
     ($call:path $(, $($tt:tt)*)?) => {
-        #[cfg(not(feature = "musli-zerocopy"))]
         $call! {
             $($($tt)*,)?
             prim, Primitives, PRIMITIVES, 1000,
             lg, LargeStruct, LARGE_STRUCTS, 10000,
             allocated, Allocated, ALLOCATED, 5000,
             medium_enum, MediumEnum, MEDIUM_ENUMS, 1000
-        };
-
-        #[cfg(feature = "musli-zerocopy")]
-        $call! {
-            $($($tt)*,)?
-            prim, Primitives, PRIMITIVES, 1000
         };
     }
 }

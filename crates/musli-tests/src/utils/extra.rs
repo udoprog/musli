@@ -8,31 +8,34 @@ pub mod serde_dlhn {
     use dlhn::ser::Serializer;
     use serde::{Deserialize, Serialize};
 
-    pub fn buffer() -> Vec<u8> {
-        Vec::with_capacity(4096)
-    }
+    benchmarker! {
+        'buf
 
-    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
-        buf.clear();
-    }
+        pub fn buffer() -> Vec<u8> {
+            Vec::with_capacity(4096)
+        }
 
-    #[inline(always)]
-    pub fn encode<T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], dlhn::ser::Error>
-    where
-        T: Serialize,
-    {
-        let mut serializer = Serializer::new(&mut *buf);
-        value.serialize(&mut serializer)?;
-        Ok(buf.as_slice())
-    }
+        pub fn reset<T>(&mut self, _: usize, _: &T) {
+            self.buffer.clear();
+        }
 
-    #[inline(always)]
-    pub fn decode<T>(mut data: &[u8]) -> Result<T, dlhn::de::Error>
-    where
-        T: for<'de> Deserialize<'de>,
-    {
-        let mut deserializer = Deserializer::new(&mut data);
-        T::deserialize(&mut deserializer)
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], dlhn::ser::Error>
+        where
+            T: Serialize,
+        {
+            let mut serializer = Serializer::new(&mut *self.buffer);
+            value.serialize(&mut serializer)?;
+            Ok(self.buffer.as_slice())
+        }
+
+        pub fn decode<T>(&self) -> Result<T, dlhn::de::Error>
+        where
+            for<'de> T: Deserialize<'de>,
+        {
+            let mut buffer = &self.buffer[..];
+            let mut deserializer = Deserializer::new(&mut buffer);
+            T::deserialize(&mut deserializer)
+        }
     }
 }
 
@@ -51,12 +54,12 @@ pub mod rkyv {
     const BUFFER_LEN: usize = 10_000_000;
     const SCRATCH_LEN: usize = 512_000;
 
-    pub struct Buffers {
+    pub struct Benchmarker {
         serialize_buffer: AlignedVec,
         serialize_scratch: AlignedVec,
     }
 
-    pub fn buffer() -> Buffers {
+    pub fn new() -> Benchmarker {
         let serialize_buffer = AlignedVec::with_capacity(BUFFER_LEN);
         let mut serialize_scratch = AlignedVec::with_capacity(SCRATCH_LEN);
 
@@ -65,14 +68,10 @@ pub mod rkyv {
             serialize_scratch.set_len(SCRATCH_LEN);
         }
 
-        Buffers {
+        Benchmarker {
             serialize_buffer,
             serialize_scratch,
         }
-    }
-
-    pub fn reset<T>(buf: &mut Buffers, _: usize, _: &T) {
-        buf.serialize_buffer.clear();
     }
 
     type S<'buf> = CompositeSerializer<
@@ -81,34 +80,79 @@ pub mod rkyv {
         Infallible,
     >;
 
-    #[inline(always)]
-    pub fn encode<'buf, T>(
-        buf: &'buf mut Buffers,
-        value: &T,
-    ) -> Result<&'buf [u8], <S<'buf> as Fallible>::Error>
-    where
-        T: for<'value> Serialize<S<'value>>,
-    {
-        let mut serializer = CompositeSerializer::new(
-            AlignedSerializer::new(&mut buf.serialize_buffer),
-            BufferScratch::new(&mut buf.serialize_scratch),
-            Infallible,
-        );
+    pub struct State<'buf, 'scratch> {
+        serialize_buffer: &'buf mut AlignedVec,
+        serialize_scratch: &'scratch mut AlignedVec,
+    }
 
-        serializer.serialize_value(value)?;
-        let bytes = serializer.into_serializer().into_inner();
-        Ok(bytes)
+    impl Benchmarker {
+        pub fn with<T, O>(&mut self, runner: T) -> O
+        where
+            T: FnOnce(State<'_, '_>) -> O,
+        {
+            runner(State {
+                serialize_buffer: &mut self.serialize_buffer,
+                serialize_scratch: &mut self.serialize_scratch,
+            })
+        }
+    }
+
+    pub struct DecodeState<'buf> {
+        bytes: &'buf [u8],
     }
 
     #[inline(always)]
     pub fn decode<'de, T>(
-        data: &'de [u8],
+        bytes: &'de [u8],
     ) -> Result<&'de T::Archived, CheckTypeError<T::Archived, DefaultValidator<'de>>>
     where
         T: Archive,
         T::Archived: CheckBytes<DefaultValidator<'de>>,
     {
-        rkyv::check_archived_root::<T>(data)
+        rkyv::check_archived_root::<T>(bytes)
+    }
+
+    impl<'de> DecodeState<'de> {
+        #[inline(always)]
+        pub fn len(&self) -> usize {
+            self.bytes.len()
+        }
+
+        #[inline(always)]
+        pub fn decode<T>(
+            &self,
+        ) -> Result<&'de T::Archived, CheckTypeError<T::Archived, DefaultValidator<'de>>>
+        where
+            T: Archive,
+            T::Archived: CheckBytes<DefaultValidator<'de>>,
+        {
+            self::decode::<T>(self.bytes)
+        }
+    }
+
+    impl<'buf, 'scratch> State<'buf, 'scratch> {
+        pub fn reset<T>(&mut self, _: usize, _: &T) {
+            self.serialize_buffer.clear();
+        }
+
+        #[inline(always)]
+        pub fn encode<T>(
+            &mut self,
+            value: &T,
+        ) -> Result<DecodeState<'_>, <S<'buf> as Fallible>::Error>
+        where
+            T: for<'value> Serialize<S<'value>>,
+        {
+            let mut serializer = CompositeSerializer::new(
+                AlignedSerializer::new(&mut *self.serialize_buffer),
+                BufferScratch::new(&mut *self.serialize_scratch),
+                Infallible,
+            );
+
+            serializer.serialize_value(value)?;
+            let bytes = serializer.into_serializer().into_inner();
+            Ok(DecodeState { bytes })
+        }
     }
 }
 
@@ -119,32 +163,31 @@ pub mod serde_rmp {
 
     use serde::{Deserialize, Serialize};
 
-    pub fn buffer() -> Vec<u8> {
-        Vec::with_capacity(4096)
-    }
+    benchmarker! {
+        'buf
 
-    pub fn reset<T>(buf: &mut Vec<u8>, _: usize, _: &T) {
-        buf.clear();
-    }
+        pub fn buffer() -> Vec<u8> {
+            Vec::with_capacity(4096)
+        }
 
-    #[inline(always)]
-    pub fn encode<T>(
-        buf: &'buf mut Vec<u8>,
-        value: &T,
-    ) -> Result<&'buf [u8], rmp_serde::encode::Error>
-    where
-        T: Serialize,
-    {
-        rmp_serde::encode::write(&mut *buf, value)?;
-        Ok(buf.as_slice())
-    }
+        pub fn reset<T>(&mut self, _: usize, _: &T) {
+            self.buffer.clear();
+        }
 
-    #[inline(always)]
-    pub fn decode<'de, T>(data: &'de [u8]) -> Result<T, rmp_serde::decode::Error>
-    where
-        T: Deserialize<'de>,
-    {
-        rmp_serde::from_slice(data)
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], rmp_serde::encode::Error>
+        where
+            T: Serialize,
+        {
+            rmp_serde::encode::write(&mut *self.buffer, value)?;
+            Ok(self.buffer.as_slice())
+        }
+
+        pub fn decode<T>(&self) -> Result<T, rmp_serde::decode::Error>
+        where
+            T: Deserialize<'buf>,
+        {
+            rmp_serde::from_slice(self.buffer)
+        }
     }
 }
 
@@ -157,26 +200,28 @@ pub mod serde_bitcode {
     use bitcode::Buffer;
     use serde::{Deserialize, Serialize};
 
-    pub fn buffer() -> Buffer {
-        Buffer::with_capacity(4096)
-    }
+    benchmarker! {
+        'buf
 
-    pub fn reset<T>(_: &mut Buffer, _: usize, _: &T) {}
+        pub fn buffer() -> Buffer {
+            Buffer::with_capacity(4096)
+        }
 
-    #[inline(always)]
-    pub fn encode<T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
-    where
-        T: Serialize,
-    {
-        buf.serialize(value)
-    }
+        pub fn reset<T>(&mut self, _: usize, _: &T) {}
 
-    #[inline(always)]
-    pub fn decode<T>(data: &[u8]) -> Result<T, bitcode::Error>
-    where
-        T: for<'de> Deserialize<'de>,
-    {
-        bitcode::deserialize(data)
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], bitcode::Error>
+        where
+            T: Serialize,
+        {
+            self.buffer.serialize(value)
+        }
+
+        pub fn decode<T>(&self) -> Result<T, bitcode::Error>
+        where
+            for<'de> T: Deserialize<'de>,
+        {
+            bitcode::deserialize(self.buffer)
+        }
     }
 }
 
@@ -189,25 +234,27 @@ pub mod derive_bitcode {
     use bitcode::Buffer;
     use bitcode::{Decode, Encode};
 
-    pub fn buffer() -> Buffer {
-        Buffer::with_capacity(4096)
-    }
+    benchmarker! {
+        'buf
 
-    pub fn reset<T>(_: &mut Buffer, _: usize, _: &T) {}
+        pub fn buffer() -> Buffer {
+            Buffer::with_capacity(4096)
+        }
 
-    #[inline(always)]
-    pub fn encode<T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
-    where
-        T: Encode,
-    {
-        buf.encode(value)
-    }
+        pub fn reset<T>(&mut self, _: usize, _: &T) {}
 
-    #[inline(always)]
-    pub fn decode<T>(data: &[u8]) -> Result<T, bitcode::Error>
-    where
-        T: Decode,
-    {
-        bitcode::decode(data)
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], bitcode::Error>
+        where
+            T: Encode,
+        {
+            self.buffer.encode(value)
+        }
+
+        pub fn decode<T>(&self) -> Result<T, bitcode::Error>
+        where
+            T: Decode,
+        {
+            bitcode::decode(self.buffer)
+        }
     }
 }

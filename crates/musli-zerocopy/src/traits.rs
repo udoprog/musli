@@ -19,7 +19,7 @@ use core::marker::PhantomData;
 use core::mem::align_of;
 use core::str;
 
-use crate::buf::{Buf, BufMut, Visit};
+use crate::buf::{Buf, BufMut, Cursor, Visit};
 use crate::error::{Error, ErrorKind};
 
 mod sealed {
@@ -194,8 +194,8 @@ where
     }
 
     #[inline]
-    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
-        T::validate(buf)
+    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
+        T::validate(cursor)
     }
 }
 
@@ -317,16 +317,17 @@ pub unsafe trait ZeroCopy {
     /// ```no_run
     /// use core::mem::align_of;
     ///
-    /// use musli_zerocopy::{AlignedBuf, Buf, Error, ZeroCopy};
+    /// use musli_zerocopy::{AlignedBuf, Error, ZeroCopy};
     /// use musli_zerocopy::pointer::Ref;
+    /// use musli_zerocopy::buf::Cursor;
     ///
-    /// unsafe fn unsafe_coerce<T>(buf: &Buf) -> Result<&T, Error>
+    /// unsafe fn unsafe_coerce<T>(cursor: Cursor<'_>) -> Result<&T, Error>
     /// where
     ///     T: ZeroCopy
     /// {
-    ///     // SAFETY: We've checked that the buffer is compatible.
-    ///     T::validate(buf)?;
-    ///     Ok(buf.cast())
+    ///     // SAFETY: We've checked that the cursor is compatible.
+    ///     T::validate(cursor)?;
+    ///     Ok(cursor.cast())
     /// }
     ///
     /// let mut buf = AlignedBuf::with_alignment(align_of::<u32>());
@@ -340,11 +341,11 @@ pub unsafe trait ZeroCopy {
     /// // Achieves the same as above, but we take on the responsibility
     /// // of never using it with improperly aligned or sized buffers.
     /// unsafe {
-    ///     assert_eq!(unsafe_coerce::<u32>(buf)?, &42);
+    ///     assert_eq!(unsafe_coerce::<u32>(buf.cursor())?, &42);
     /// }
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    unsafe fn validate(buf: &Buf) -> Result<(), Error>;
+    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error>;
 }
 
 unsafe impl UnsizedZeroCopy for str {
@@ -452,7 +453,7 @@ macro_rules! impl_number {
 
             #[allow(clippy::missing_safety_doc)]
             #[inline]
-            unsafe fn validate(_: &Buf) -> Result<(), Error> {
+            unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
                 Ok(())
             }
         }
@@ -500,7 +501,7 @@ macro_rules! impl_float {
 
             #[allow(clippy::missing_safety_doc)]
             #[inline]
-            unsafe fn validate(_: &Buf) -> Result<(), Error> {
+            unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
                 Ok(())
             }
         }
@@ -537,8 +538,8 @@ unsafe impl ZeroCopy for char {
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
-    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
-        let repr = unsafe { *buf.cast::<u32>() };
+    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
+        let repr = unsafe { *cursor.cast::<u32>() };
 
         if char::try_from(repr).is_err() {
             return Err(Error::new(ErrorKind::IllegalChar { repr }));
@@ -574,8 +575,8 @@ unsafe impl ZeroCopy for bool {
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
-    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
-        match *buf.cast::<u8>() {
+    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
+        match *cursor.cast::<u8>() {
             0 | 1 => (),
             repr => return Err(Error::new(ErrorKind::IllegalBool { repr })),
         }
@@ -598,7 +599,7 @@ impl Visit for bool {
 }
 
 macro_rules! impl_nonzero_number {
-    ($ty:ident, $example:ty) => {
+    ($ty:ident, $inner:ty) => {
         #[doc = concat!(" [`ZeroCopy`] implementation for `", stringify!($ty), "`")]
         ///
         /// # Examples
@@ -616,10 +617,10 @@ macro_rules! impl_nonzero_number {
         #[doc = concat!("    field: ", stringify!($ty), ",")]
         /// }
         ///
-        #[doc = concat!("let size = size_of::<", stringify!($example) ,">();")]
+        #[doc = concat!("let size = size_of::<", stringify!($inner) ,">();")]
         ///
-        #[doc = concat!("let zero: ", stringify!($example), " = 0;")]
-        #[doc = concat!("let one: ", stringify!($example), " = 1;")]
+        #[doc = concat!("let zero: ", stringify!($inner), " = 0;")]
+        #[doc = concat!("let one: ", stringify!($inner), " = 1;")]
         ///
         /// let zero = unsafe {
         ///     let bytes = slice::from_raw_parts(&zero as *const _ as *const u8, size);
@@ -651,9 +652,11 @@ macro_rules! impl_nonzero_number {
 
             #[allow(clippy::missing_safety_doc)]
             #[inline]
-            unsafe fn validate(buf: &Buf) -> Result<(), Error> {
-                if buf.is_zeroed() {
-                    return Err(Error::new(ErrorKind::NonZeroZeroed { range: buf.range() }));
+            unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
+                if *cursor.cast::<$inner>() == 0 {
+                    return Err(Error::new(ErrorKind::NonZeroZeroed {
+                        range: cursor.range::<::core::num::$ty>(),
+                    }));
                 }
 
                 Ok(())
@@ -728,7 +731,7 @@ macro_rules! impl_zst {
 
             #[allow(clippy::missing_safety_doc)]
             #[inline]
-            unsafe fn validate(_: &Buf) -> Result<(), Error> {
+            unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
                 Ok(())
             }
         }
@@ -794,8 +797,8 @@ where
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
-    unsafe fn validate(buf: &Buf) -> Result<(), Error> {
-        crate::buf::validate_array::<T>(buf)?;
+    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
+        crate::buf::validate_array::<T>(cursor, N)?;
         Ok(())
     }
 }
