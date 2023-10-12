@@ -28,7 +28,7 @@ pub mod musli_json {
             self.buffer.clear();
         }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<[u8], Error>
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
         where
             T: Encode,
         {
@@ -189,8 +189,7 @@ pub mod musli_descriptive {
             self.buffer.clear();
         }
 
-        #[inline(always)]
-        pub fn encode<T>(&mut self, value: &T) -> Result<[u8], Error>
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
         where
             T: Encode,
         {
@@ -198,7 +197,6 @@ pub mod musli_descriptive {
             Ok(self.buffer.as_slice())
         }
 
-        #[inline(always)]
         pub fn decode<T>(&self) -> Result<T, Error>
         where
             T: Decode<'buf>,

@@ -469,7 +469,7 @@ impl<O: Size> AlignedBuf<O> {
     /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub unsafe fn store_struct<T>(&mut self, value: &T) -> AlignedBufStoreStruct<'_, T>
+    pub unsafe fn store_struct<T>(&mut self, value: &T) -> StoreStruct<'_, T>
     where
         T: ZeroCopy,
     {
@@ -486,7 +486,7 @@ impl<O: Size> AlignedBuf<O> {
         self.len = end;
         let start = self.data.as_ptr();
         let end = start.wrapping_add(size_of::<T>());
-        AlignedBufStoreStruct::new(start, end)
+        StoreStruct::new(start, end)
     }
 
     /// Write a [`ZeroCopy`] value directly into the buffer.
@@ -1277,7 +1277,6 @@ impl<O: Size> Drop for AlignedBuf<O> {
 
 impl<O: Size> BufMut for AlignedBuf<O> {
     type Size = O;
-    type StoreStruct<'a, T> = AlignedBufStoreStruct<'a, T> where Self: 'a, T: 'a + ZeroCopy;
 
     #[inline]
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
@@ -1293,7 +1292,7 @@ impl<O: Size> BufMut for AlignedBuf<O> {
     }
 
     #[inline]
-    unsafe fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: &T) -> StoreStruct<'_, T>
     where
         T: ZeroCopy,
     {
@@ -1317,74 +1316,6 @@ impl<O: Size> BufMut for AlignedBuf<O> {
             }
 
             s.finish()?;
-        }
-
-        Ok(())
-    }
-}
-
-/// A writer as returned from [AlignedBuf::writer].
-#[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StoreStruct::finish`"]
-pub struct AlignedBufStoreStruct<'a, T> {
-    start: *mut u8,
-    end: *mut u8,
-    _marker: PhantomData<&'a mut T>,
-}
-
-impl<'a, T> AlignedBufStoreStruct<'a, T>
-where
-    T: ZeroCopy,
-{
-    pub(crate) fn new(start: *mut u8, end: *mut u8) -> Self {
-        Self {
-            start,
-            end,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'a, T> StoreStruct<T> for AlignedBufStoreStruct<'a, T>
-where
-    T: ZeroCopy,
-{
-    /// Pad around the given field with zeros.
-    ///
-    /// Note that this is necessary to do correctly in order to satisfy the
-    /// requirements imposed by [`finish()`].
-    ///
-    /// [`finish()`]: Self::finish
-    fn pad<F>(&mut self)
-    where
-        F: ZeroCopy,
-    {
-        unsafe {
-            let offset = self.start.align_offset(align_of::<F>());
-
-            // zero out padding.
-            if offset > 0 {
-                ptr::write_bytes(self.start, 0, offset);
-            }
-
-            self.start = self.start.wrapping_add(offset).wrapping_add(size_of::<F>());
-        }
-    }
-
-    /// Finish writing the current buffer.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that they've called [`pad`] in order for every
-    /// field in a struct being serialized. Otherwise we might not have written
-    /// the necessary padding, and the [`AlignedBuf`] we're writing to might
-    /// contain uninitialized data in the form of uninitialized padding.
-    ///
-    /// [`pad`]: Self::pad
-    unsafe fn finish(self) -> Result<(), Error> {
-        let distance = self.start.offset_from(self.end);
-
-        if distance > 0 {
-            ptr::write_bytes(self.start, 0, distance as usize);
         }
 
         Ok(())

@@ -23,12 +23,6 @@ pub trait BufMut: self::sealed::Sealed {
     /// Target size buffer is configured to use.
     type Size: Size;
 
-    /// Interior mutable buffer.
-    type StoreStruct<'a, T>: StoreStruct<T>
-    where
-        Self: 'a,
-        T: 'a + ZeroCopy;
-
     /// Extend the current buffer from the given slice.
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error>;
 
@@ -93,7 +87,7 @@ pub trait BufMut: self::sealed::Sealed {
     /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    unsafe fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: &T) -> StoreStruct<'_, T>
     where
         T: ZeroCopy;
 
@@ -108,7 +102,6 @@ where
     B: BufMut,
 {
     type Size = B::Size;
-    type StoreStruct<'a, T> = B::StoreStruct<'a, T> where Self: 'a, T: 'a + ZeroCopy;
 
     #[inline]
     fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), Error> {
@@ -124,7 +117,7 @@ where
     }
 
     #[inline]
-    unsafe fn store_struct<T>(&mut self, value: &T) -> Self::StoreStruct<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: &T) -> StoreStruct<'_, T>
     where
         T: ZeroCopy,
     {
