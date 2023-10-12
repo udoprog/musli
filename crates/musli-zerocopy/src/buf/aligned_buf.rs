@@ -1036,18 +1036,28 @@ impl<O: Size> AlignedBuf<O> {
         unsafe { self.next_offset_with(align_of::<T>()) }
     }
 
+    // Return the max capacity of this vector. This depends on the requested
+    // alignment.
+    //
+    // This is defined by `max_size_for_align` in [`Layout`].
+    #[inline]
+    fn max_capacity_for_align(&self) -> usize {
+        isize::MAX as usize - (self.requested - 1)
+    }
+
     #[inline]
     fn ensure_capacity(&mut self, new_capacity: usize) {
+        let new_capacity = new_capacity.max(self.requested);
+
         if self.capacity >= new_capacity {
             return;
         }
 
         assert!(
-            new_capacity < isize::MAX as usize - (self.align - 1),
+            new_capacity < self.max_capacity_for_align(),
             "Capacity overflow"
         );
-
-        let (old_layout, new_layout) = self.layouts(new_capacity.max(self.requested));
+        let (old_layout, new_layout) = self.layouts(new_capacity);
 
         if old_layout.size() == 0 {
             self.alloc_init(new_layout);
