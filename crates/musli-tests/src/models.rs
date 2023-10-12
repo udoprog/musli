@@ -122,12 +122,6 @@ impl PartialEq<Allocated> for &Allocated {
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
-#[cfg_attr(
-    feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
-    archive(compare(PartialEq), check_bytes),
-    archive_attr(derive(Debug))
-)]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct Tuples {
     u0: (),
@@ -148,14 +142,6 @@ pub struct Tuples {
     i5: (bool, i8, i32, i64, f32),
     #[cfg(feature = "model_float")]
     i6: (bool, i8, i32, i64, f32, f64),
-}
-
-#[cfg(feature = "rkyv")]
-impl PartialEq<Tuples> for &ArchivedTuples {
-    #[inline]
-    fn eq(&self, other: &Tuples) -> bool {
-        *other == **self
-    }
 }
 
 impl PartialEq<Tuples> for &Tuples {
@@ -230,8 +216,9 @@ pub struct LargeStruct {
     medium_map: HashMap<String, MediumEnum>,
     #[cfg(feature = "model_map_string_key")]
     string_keys: HashMap<String, u64>,
-    #[cfg(feature = "model_map")]
+    #[cfg(all(feature = "model_map", feature = "model_tuple"))]
     number_keys: HashMap<u32, u64>,
+    #[cfg(feature = "model_tuple")]
     number_vec: Vec<(u32, u64)>,
 }
 
