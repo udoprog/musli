@@ -117,3 +117,53 @@ fn test_unaligned_write() -> Result<(), Error> {
     assert_eq!(buf.load(custom.string)?, "Hello World!");
     Ok(())
 }
+
+#[test]
+fn inner_padding() -> Result<(), Error> {
+    #[derive(Debug, PartialEq, Clone, Copy, ZeroCopy)]
+    #[repr(C, align(8))]
+    #[zero_copy(crate)]
+    struct Inner {
+        field: u8,
+    }
+
+    #[derive(Debug, PartialEq, Clone, Copy, ZeroCopy)]
+    #[repr(C, align(16))]
+    #[zero_copy(crate)]
+    struct Inner2 {
+        field: u32,
+    }
+
+    #[derive(ZeroCopy)]
+    #[repr(C)]
+    #[zero_copy(crate)]
+    struct Custom {
+        inner: Inner,
+        inner2: Inner2,
+    }
+
+    assert!(Custom::PADDED);
+    assert!(Inner::PADDED);
+    assert!(Inner2::PADDED);
+
+    let inner = Inner { field: 10 };
+    let inner2 = Inner2 { field: 20 };
+    let custom = Custom { inner, inner2 };
+
+    let mut buf = AlignedBuf::with_capacity_and_alignment::<u8>(128);
+    buf.extend_from_slice(&[1]);
+
+    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+
+    buf.load_uninit_mut(reference).write(&custom);
+
+    let buf = buf.as_aligned();
+    let reference = reference.assume_init();
+
+    assert_eq!(reference.offset(), 16);
+
+    let custom = buf.load(reference)?;
+    assert_eq!(&custom.inner, &inner);
+    assert_eq!(&custom.inner2, &inner2);
+    Ok(())
+}
