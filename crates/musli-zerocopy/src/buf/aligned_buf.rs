@@ -1,14 +1,14 @@
 use core::alloc::Layout;
 use core::hash::Hash;
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, ManuallyDrop};
+use core::mem::{align_of, size_of, size_of_val, ManuallyDrop};
 use core::ptr::{self, NonNull};
 use core::slice;
 
 use ::alloc::alloc;
 use ::alloc::vec::Vec;
 
-use crate::buf::{Buf, BufMut, DefaultAlignment, StructPadder, Visit};
+use crate::buf::{Buf, BufMut, DefaultAlignment, MaybeUninit, StructPadder, Visit};
 use crate::error::Error;
 use crate::map::{Entry, MapRef};
 use crate::pointer::{DefaultSize, Ref, Size, Slice, Unsized};
@@ -173,13 +173,14 @@ impl<O: Size> AlignedBuf<O> {
         T: ZeroCopy,
     {
         // SAFETY: Alignment of `T` is always a power of two.
-        unsafe { Self::new_inner(capacity, align_of::<T>()) }
+        unsafe { Self::with_capacity_and_custom_alignment(capacity, align_of::<T>()) }
     }
 
     // # Safety
     //
     // The specified alignment must be a power of two.
-    unsafe fn new_inner(capacity: usize, align: usize) -> Self where {
+    pub(crate) unsafe fn with_capacity_and_custom_alignment(capacity: usize, align: usize) -> Self where
+    {
         if capacity == 0 {
             return Self {
                 // SAFETY: Alignment is asserted through `T`.
@@ -378,6 +379,130 @@ impl<O: Size> AlignedBuf<O> {
         unsafe { slice::from_raw_parts_mut(self.as_ptr_mut(), self.len()) }
     }
 
+    /// Store an uninitialized value.
+    ///
+    /// This allows values to be inserted before they can be initialized, which
+    /// can be useful if you need them to be in a certain location in the buffer
+    /// but don't have access to their fields yet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::buf::MaybeUninit;
+    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::pointer::{Ref, Unsized};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Custom {
+    ///     field: u32,
+    ///     string: Unsized<str>
+    /// }
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+    ///
+    /// let string = buf.store_unsized("Hello World!");
+    ///
+    /// buf.load_uninit_mut(reference).write(&Custom {
+    ///     field: 42,
+    ///     string,
+    /// });
+    ///
+    /// let reference = reference.assume_init();
+    /// assert_eq!(reference.offset(), 0);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn store_uninit<T>(&mut self) -> Ref<MaybeUninit<T>, O>
+    where
+        T: ZeroCopy,
+    {
+        // SAFETY: We've just reserved capacity for this write.
+        unsafe {
+            let len = self.next_offset_with(align_of::<T>(), size_of::<T>());
+
+            self.data.as_ptr().add(len).write_bytes(0, size_of::<T>());
+
+            self.len = self.len.wrapping_add(size_of::<T>());
+            Ref::new_raw(len)
+        }
+    }
+
+    /// Write a reference that might not have been initialized.
+    ///
+    /// This does not prevent [`Ref`] from different instances of [`AlignedBuf`]
+    /// from being written. It would only result in potentially garbled data,
+    /// but wouldn't be a safety issue.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the reference [`Ref::offset()`] and size of `T` does not fit
+    /// within the [`len()`] of the current structure. This might happen if you
+    /// try and use a reference constructed from a different [`AlignedBuf`]
+    /// instance.
+    ///
+    /// [`len()`]: Self::len()
+    ///
+    /// ```should_panic
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf1 = AlignedBuf::new();
+    /// buf1.store(&1u32);
+    ///
+    /// let mut buf2 = AlignedBuf::new();
+    /// buf2.store(&10u32);
+    ///
+    /// let number = buf2.store_uninit::<u32>();
+    ///
+    /// buf1.load_uninit_mut(number);
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::pointer::{Ref, Unsized};
+    /// use musli_zerocopy::buf::MaybeUninit;
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Custom {
+    ///     field: u32,
+    ///     string: Unsized<str>
+    /// }
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+    ///
+    /// let string = buf.store_unsized("Hello World!");
+    ///
+    /// buf.load_uninit_mut(reference).write(&Custom {
+    ///     field: 42,
+    ///     string,
+    /// });
+    ///
+    /// let reference = reference.assume_init();
+    /// assert_eq!(reference.offset(), 0);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn load_uninit_mut<T>(&mut self, reference: Ref<MaybeUninit<T>>) -> &mut MaybeUninit<T>
+    where
+        T: ZeroCopy,
+    {
+        let at = reference.offset();
+
+        // Note: We only need this as debug assertion, because `MaybeUninit<T>`
+        // does not implement `ZeroCopy`, so there is no way to construct.
+        assert!(
+            at.wrapping_add(size_of::<T>()) <= self.len,
+            "Capacity overflow"
+        );
+
+        unsafe { &mut *(self.data.as_ptr().add(at) as *mut MaybeUninit<T>) }
+    }
+
     /// Insert a value with the given size.
     ///
     /// To get the pointer where the value will be written, call
@@ -400,9 +525,9 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let string = buf.store_unsized("string")?;
-    /// let custom = buf.store(&Custom { field: 1, string })?;
-    /// let custom2 = buf.store(&Custom { field: 2, string })?;
+    /// let string = buf.store_unsized("string");
+    /// let custom = buf.store(&Custom { field: 1, string });
+    /// let custom2 = buf.store(&Custom { field: 2, string });
     ///
     /// let buf = buf.as_aligned();
     ///
@@ -415,14 +540,44 @@ impl<O: Size> AlignedBuf<O> {
     /// assert_eq!(buf.load(custom2.string)?, "string");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    ///
+    /// Storing an array:
+    ///
+    ///
+    /// ```
+    /// use musli_zerocopy::{ZeroCopy, AlignedBuf};
+    ///
+    /// // Element with padding.
+    /// #[derive(Debug, PartialEq, ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Element {
+    ///     first: u8,
+    ///     second: u32,
+    /// }
+    ///
+    /// let values = [
+    ///     Element { first: 0x01, second: 0x01020304u32 },
+    ///     Element { first: 0x02, second: 0x01020304u32 }
+    /// ];
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let array = buf.store(&values);
+    /// let buf = buf.as_aligned();
+    /// assert_eq!(buf.load(array)?, &values);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     #[inline]
-    pub fn store<T>(&mut self, value: &T) -> Result<Ref<T, O>, Error>
+    pub fn store<T>(&mut self, value: &T) -> Ref<T, O>
     where
         T: ZeroCopy,
     {
-        let ptr = self.next_offset::<T>();
-        value.store_to(self)?;
-        Ok(Ref::new(ptr))
+        // SAFETY: We're ensuring that these elements are interacted with
+        // correctly.
+        unsafe {
+            let ptr = self.next_offset_with(align_of::<T>(), size_of::<T>());
+            value.store_to(self);
+            Ref::new(ptr)
+        }
     }
 
     /// Write a value to the buffer.
@@ -432,8 +587,8 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let first = buf.store_unsized("first")?;
-    /// let second = buf.store_unsized("second")?;
+    /// let first = buf.store_unsized("first");
+    /// let second = buf.store_unsized("second");
     ///
     /// let buf = buf.as_aligned();
     ///
@@ -442,15 +597,15 @@ impl<O: Size> AlignedBuf<O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_unsized<T>(&mut self, value: &T) -> Result<Unsized<T, O>, Error>
+    pub fn store_unsized<T>(&mut self, value: &T) -> Unsized<T, O>
     where
         T: ?Sized + UnsizedZeroCopy,
     {
-        // SAFETY: The alignment specified in `T::ALIGN` is required to be a
-        // power of two.
-        let ptr = unsafe { self.next_offset_with(T::ALIGN) };
-        value.store_to(self)?;
-        Ok(Unsized::new(ptr, value.size()))
+        unsafe {
+            let ptr = self.next_offset_with(T::ALIGN, value.size());
+            value.store_to(self);
+            Unsized::new(ptr, value.size())
+        }
     }
 
     /// Insert a slice into the buffer.
@@ -464,10 +619,10 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// let mut values = Vec::new();
     ///
-    /// values.push(buf.store_unsized("first")?);
-    /// values.push(buf.store_unsized("second")?);
+    /// values.push(buf.store_unsized("first"));
+    /// values.push(buf.store_unsized("second"));
     ///
-    /// let slice_ref = buf.store_slice(&values)?;
+    /// let slice_ref = buf.store_slice(&values);
     ///
     /// let buf = buf.as_aligned();
     ///
@@ -483,17 +638,12 @@ impl<O: Size> AlignedBuf<O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_slice<T>(&mut self, values: &[T]) -> Result<Slice<T, O>, Error>
+    pub fn store_slice<T>(&mut self, values: &[T]) -> Slice<T, O>
     where
         T: ZeroCopy,
     {
-        let ptr = self.next_offset::<T>();
-
-        for value in values {
-            value.store_to(self)?;
-        }
-
-        Ok(Slice::new(ptr, values.len()))
+        let ptr = self.store_array(values);
+        Slice::new(ptr, values.len())
     }
 
     /// Insert a map into the buffer.
@@ -516,11 +666,11 @@ impl<O: Size> AlignedBuf<O> {
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut values = [
-    ///     buf.store_unsized("first")?,
-    ///     buf.store_unsized("second")?,
+    ///     buf.store_unsized("first"),
+    ///     buf.store_unsized("second"),
     /// ];
     ///
-    /// let set = buf.insert_set(&mut values)?;
+    /// let set = buf.store_set(&mut values)?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///
@@ -539,7 +689,7 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// let mut values = [10u64, 20u64];
     ///
-    /// let set = buf.insert_set(&mut values)?;
+    /// let set = buf.store_set(&mut values)?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///
@@ -548,7 +698,7 @@ impl<O: Size> AlignedBuf<O> {
     /// assert!(!set.contains(&30u64)?);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert_set<T>(&mut self, entries: &mut [T]) -> Result<SetRef<T, O>, Error>
+    pub fn store_set<T>(&mut self, entries: &mut [T]) -> Result<SetRef<T, O>, Error>
     where
         T: Visit + ZeroCopy,
         T::Target: Hash,
@@ -572,7 +722,7 @@ impl<O: Size> AlignedBuf<O> {
             }
         }
 
-        let entries = self.store_slice(entries)?;
+        let entries = self.store_slice(entries);
 
         let mut displacements = Vec::new();
 
@@ -580,7 +730,7 @@ impl<O: Size> AlignedBuf<O> {
             displacements.push(Entry { key: a, value: b });
         }
 
-        let displacements = self.store_slice(&displacements)?;
+        let displacements = self.store_slice(&displacements);
         Ok(SetRef::new(hash_state.key, entries, displacements))
     }
 
@@ -606,10 +756,10 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// let mut pairs = Vec::new();
     ///
-    /// pairs.push(Entry::new(buf.store_unsized("first")?, 1u32));
-    /// pairs.push(Entry::new(buf.store_unsized("second")?, 2u32));
+    /// pairs.push(Entry::new(buf.store_unsized("first"), 1u32));
+    /// pairs.push(Entry::new(buf.store_unsized("second"), 2u32));
     ///
-    /// let map = buf.insert_map(&mut pairs)?;
+    /// let map = buf.store_map(&mut pairs)?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -632,7 +782,7 @@ impl<O: Size> AlignedBuf<O> {
     /// pairs.push(Entry::new(10u64, 1u32));
     /// pairs.push(Entry::new(20u64, 2u32));
     ///
-    /// let map = buf.insert_map(&mut pairs)?;
+    /// let map = buf.store_map(&mut pairs)?;
     /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(map.get(buf, &10u64)?, Some(&1));
@@ -640,10 +790,7 @@ impl<O: Size> AlignedBuf<O> {
     /// assert_eq!(map.get(buf, &30u64)?, None);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert_map<K, V>(
-        &mut self,
-        entries: &mut [Entry<K, V>],
-    ) -> Result<MapRef<K, V, O>, Error>
+    pub fn store_map<K, V>(&mut self, entries: &mut [Entry<K, V>]) -> Result<MapRef<K, V, O>, Error>
     where
         K: Visit + ZeroCopy,
         V: ZeroCopy,
@@ -668,7 +815,7 @@ impl<O: Size> AlignedBuf<O> {
             }
         }
 
-        let entries = self.store_slice(entries)?;
+        let entries = self.store_slice(entries);
 
         let mut displacements = Vec::new();
 
@@ -676,7 +823,7 @@ impl<O: Size> AlignedBuf<O> {
             displacements.push(Entry { key: a, value: b });
         }
 
-        let displacements = self.store_slice(&displacements)?;
+        let displacements = self.store_slice(&displacements);
         Ok(MapRef::new(hash_state.key, entries, displacements))
     }
 
@@ -737,16 +884,27 @@ impl<O: Size> AlignedBuf<O> {
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    #[inline]
     pub fn extend_from_slice(&mut self, bytes: &[u8]) {
         let new_capacity = self.capacity + bytes.len();
         self.ensure_capacity(new_capacity);
 
+        // SAFETY: We just allocated space for the slice.
         unsafe {
-            let dst = self.as_ptr_mut().wrapping_add(self.len);
-            dst.copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
-            self.len = self.len.wrapping_add(bytes.len());
+            self.store_bytes(bytes);
         }
+    }
+
+    /// Store the slice without allocating.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer has the capacity for
+    /// `bytes.len()`.
+    #[inline]
+    pub unsafe fn store_bytes(&mut self, bytes: &[u8]) {
+        let dst = self.as_ptr_mut().wrapping_add(self.len);
+        dst.copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
+        self.len = self.len.wrapping_add(bytes.len());
     }
 
     /// Return a cloned variant of this buffer that is aligned per its
@@ -765,7 +923,7 @@ impl<O: Size> AlignedBuf<O> {
     #[inline]
     pub fn as_aligned_owned_buf(&self) -> Self {
         // SAFETY: Alignment of `requested` is always a power of two.
-        let mut new = unsafe { Self::new_inner(self.len, self.requested) };
+        let mut new = unsafe { Self::with_capacity_and_custom_alignment(self.len, self.requested) };
 
         unsafe {
             new.as_ptr_mut()
@@ -792,7 +950,7 @@ impl<O: Size> AlignedBuf<O> {
     /// use musli_zerocopy::AlignedBuf;
     ///
     /// let mut buf = AlignedBuf::with_alignment::<()>();
-    /// let number = buf.store(&1u32)?;
+    /// let number = buf.store(&1u32);
     /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(buf.load(number)?, &1u32);
@@ -824,7 +982,7 @@ impl<O: Size> AlignedBuf<O> {
     /// use musli_zerocopy::AlignedBuf;
     ///
     /// let mut buf = AlignedBuf::with_alignment::<()>();
-    /// let number = buf.store(&1u32)?;
+    /// let number = buf.store(&1u32);
     /// let buf = buf.as_mut_aligned();
     ///
     /// *buf.load_mut(number)? += 1;
@@ -877,7 +1035,7 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(4);
+    /// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(8);
     ///
     /// buf.extend_from_slice(&[1, 2]);
     /// assert_eq!(buf.align(), 2);
@@ -916,7 +1074,7 @@ impl<O: Size> AlignedBuf<O> {
         T: ZeroCopy,
     {
         self.requested = self.requested.max(align_of::<T>());
-        self.ensure_aligned(align_of::<T>());
+        self.ensure_aligned(align_of::<T>(), size_of::<T>());
     }
 
     #[inline]
@@ -946,7 +1104,6 @@ impl<O: Size> AlignedBuf<O> {
         self.ensure_capacity(len);
 
         let start = self.as_ptr_mut().wrapping_add(self.len);
-        let end = start.wrapping_add(size_of::<T>());
 
         // This is what makes calling `store_struct` unsafe, we're preemptively
         // pretending that the buffer has been initialized, while in reality
@@ -957,7 +1114,7 @@ impl<O: Size> AlignedBuf<O> {
             start.copy_from_nonoverlapping((value as *const T).cast::<u8>(), size_of::<T>());
         }
 
-        StructPadder::new(start, end)
+        StructPadder::new(start)
     }
 
     /// Write a [`ZeroCopy`] value directly into the buffer.
@@ -965,30 +1122,23 @@ impl<O: Size> AlignedBuf<O> {
     /// If you want to know the pointer where this value will be written, use
     /// `next_offset::<T>()` before calling this function.
     #[inline]
-    fn store_inner<T>(&mut self, value: &T) -> Result<(), Error>
+    unsafe fn store_inner<T>(&mut self, value: &T)
     where
         T: ZeroCopy,
     {
         self.request_align::<T>();
-        value.store_to(self)?;
-        Ok(())
+        value.store_to(self);
     }
 
     #[inline]
-    fn ensure_aligned(&mut self, align: usize) {
-        const PAD: [u8; 128] = [0; 128];
+    fn ensure_aligned(&mut self, align: usize, reserve: usize) {
+        let extra = crate::buf::padding_to(self.len, align);
 
-        let mask = align - 1;
-        let extra = (align - (self.len & mask)) & mask;
-        self.reserve(extra);
+        self.reserve(extra.wrapping_add(reserve));
 
         // SAFETY: The length is ensures to be within the address space.
         unsafe {
-            assert!(extra < PAD.len());
-            self.data
-                .as_ptr()
-                .add(self.len)
-                .copy_from_nonoverlapping(PAD.as_ptr(), extra);
+            self.data.as_ptr().add(self.len).write_bytes(0, extra);
             self.len = self.len.wrapping_add(extra);
         }
     }
@@ -996,9 +1146,9 @@ impl<O: Size> AlignedBuf<O> {
     /// Construct a pointer aligned for `align` into the current buffer which
     /// points to the next location that will be written.
     #[inline]
-    unsafe fn next_offset_with(&mut self, align: usize) -> usize {
+    unsafe fn next_offset_with(&mut self, align: usize, reserve: usize) -> usize {
         self.requested = self.requested.max(align);
-        self.ensure_aligned(align);
+        self.ensure_aligned(align, reserve);
         self.len
     }
 
@@ -1033,16 +1183,7 @@ impl<O: Size> AlignedBuf<O> {
         T: ZeroCopy,
     {
         // SAFETY: The alignment of `T` is guaranteed to be a power of two.
-        unsafe { self.next_offset_with(align_of::<T>()) }
-    }
-
-    // Return the max capacity of this vector. This depends on the requested
-    // alignment.
-    //
-    // This is defined by `max_size_for_align` in [`Layout`].
-    #[inline]
-    fn max_capacity_for_align(&self) -> usize {
-        isize::MAX as usize - (self.requested - 1)
+        unsafe { self.next_offset_with(align_of::<T>(), 0) }
     }
 
     #[inline]
@@ -1053,10 +1194,6 @@ impl<O: Size> AlignedBuf<O> {
             return;
         }
 
-        assert!(
-            new_capacity < self.max_capacity_for_align(),
-            "Capacity overflow"
-        );
         let (old_layout, new_layout) = self.layouts(new_capacity);
 
         if old_layout.size() == 0 {
@@ -1133,7 +1270,39 @@ impl<O: Size> AlignedBuf<O> {
             self.align = self.requested;
         }
     }
+
+    fn store_array<T>(&mut self, values: &[T]) -> usize
+    where
+        T: ZeroCopy,
+    {
+        // SAFETY: We're interacting with all elements correctly.
+        unsafe {
+            let size = size_of_val(values);
+            let offset = self.next_offset_with(align_of::<T>(), size);
+
+            if T::PADDED {
+                for value in values {
+                    value.store_to(self);
+                }
+            } else {
+                self.data
+                    .as_ptr()
+                    .add(self.len)
+                    .copy_from_nonoverlapping(values.as_ptr().cast::<u8>(), size);
+
+                self.len = self.len.wrapping_add(size);
+            }
+
+            offset
+        }
+    }
 }
+
+/// `AlignedBuf` are `Send` because the data they reference is unaliased.
+unsafe impl Send for AlignedBuf {}
+/// `AlignedBuf` are `Sync` since they are `Send` and the data they reference is
+/// unaliased.
+unsafe impl Sync for AlignedBuf {}
 
 impl<O: Size> AsRef<Buf> for AlignedBuf<O> {
     /// Access the current buffer immutably while checking that the buffer is
@@ -1152,7 +1321,7 @@ impl<O: Size> AsRef<Buf> for AlignedBuf<O> {
     /// use musli_zerocopy::AlignedBuf;
     ///
     /// let mut buf = AlignedBuf::new();
-    /// let slice = buf.store_unsized("hello world")?;
+    /// let slice = buf.store_unsized("hello world");
     /// let buf = buf.as_ref();
     ///
     /// assert_eq!(buf.load(slice)?, "hello world");
@@ -1181,7 +1350,7 @@ impl<O: Size> AsMut<Buf> for AlignedBuf<O> {
     /// use musli_zerocopy::AlignedBuf;
     ///
     /// let mut buf = AlignedBuf::new();
-    /// let slice = buf.store_unsized("hello world")?;
+    /// let slice = buf.store_unsized("hello world");
     /// let buf = buf.as_mut();
     ///
     /// buf.load_mut(slice)?.make_ascii_uppercase();
@@ -1224,7 +1393,9 @@ impl<O: Size> AsMut<Buf> for AlignedBuf<O> {
 impl<O: Size> Clone for AlignedBuf<O> {
     fn clone(&self) -> Self {
         unsafe {
-            let mut new = ManuallyDrop::new(Self::new_inner(self.len, self.align));
+            let mut new = ManuallyDrop::new(Self::with_capacity_and_custom_alignment(
+                self.len, self.align,
+            ));
             new.as_ptr_mut()
                 .copy_from_nonoverlapping(self.as_ptr(), self.len);
             // Set requested to the same as original.
@@ -1250,12 +1421,12 @@ impl<O: Size> Drop for AlignedBuf<O> {
 
 impl<O: Size> BufMut for AlignedBuf<O> {
     #[inline]
-    fn extend_from_slice(&mut self, bytes: &[u8]) {
-        AlignedBuf::extend_from_slice(self, bytes)
+    unsafe fn store_bytes(&mut self, bytes: &[u8]) {
+        AlignedBuf::store_bytes(self, bytes)
     }
 
     #[inline]
-    fn store_bits<T>(&mut self, value: T)
+    unsafe fn store_bits<T>(&mut self, value: T)
     where
         T: ZeroCopy,
     {
@@ -1263,7 +1434,7 @@ impl<O: Size> BufMut for AlignedBuf<O> {
     }
 
     #[inline]
-    fn store<T>(&mut self, value: &T) -> Result<(), Error>
+    unsafe fn store<T>(&mut self, value: &T)
     where
         T: ZeroCopy,
     {
@@ -1276,6 +1447,14 @@ impl<O: Size> BufMut for AlignedBuf<O> {
         T: ZeroCopy,
     {
         AlignedBuf::store_struct::<T>(self, value)
+    }
+
+    #[inline]
+    unsafe fn store_array<T>(&mut self, values: &[T])
+    where
+        T: ZeroCopy,
+    {
+        self.store_array(values);
     }
 }
 

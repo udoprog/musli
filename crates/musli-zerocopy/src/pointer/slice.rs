@@ -18,7 +18,7 @@ use crate::ZeroCopy;
 /// use musli_zerocopy::AlignedBuf;
 ///
 /// let mut buf = AlignedBuf::new();
-/// let slice = buf.store_slice(&[1, 2, 3, 4])?;
+/// let slice = buf.store_slice(&[1, 2, 3, 4]);
 ///
 /// let buf = buf.as_aligned();
 ///
@@ -112,6 +112,19 @@ where
         }
     }
 
+    /// Coerce an offset and a length directly into a slice.
+    pub(crate) fn new_with_offset(offset: O, len: usize) -> Self {
+        let Some(len) = O::from_usize(len) else {
+            panic!("Slice length {len} not in the legal range of 0-{}", O::MAX);
+        };
+
+        Self {
+            offset,
+            len,
+            _marker: PhantomData,
+        }
+    }
+
     /// The pointer part of the slice reference.
     ///
     /// # Examples
@@ -170,7 +183,7 @@ where
     /// use musli_zerocopy::AlignedBuf;
     ///
     /// let mut buf = AlignedBuf::new();
-    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
+    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
     ///
     /// let buf = buf.as_aligned();
     ///

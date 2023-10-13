@@ -13,14 +13,14 @@ struct Custom {
 fn main() -> Result<()> {
     let mut buf = AlignedBuf::new();
 
-    let string = buf.store_unsized("string")?;
+    let string = buf.store_unsized("string");
 
-    let c1 = buf.store(&Custom { field: 1, string })?;
-    let c2 = buf.store(&Custom { field: 2, string })?;
+    let c1 = buf.store(&Custom { field: 1, string });
+    let c2 = buf.store(&Custom { field: 2, string });
 
     let mut map = vec![Entry::new(1, c1), Entry::new(2, c2)];
 
-    let map = buf.insert_map(&mut map)?;
+    let map = buf.store_map(&mut map)?;
     let buf = buf.as_aligned();
     let map = buf.bind(map)?;
 

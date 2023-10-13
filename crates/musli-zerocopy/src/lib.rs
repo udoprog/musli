@@ -25,8 +25,8 @@
 //! use musli_zerocopy::AlignedBuf;
 //!
 //! let mut buf = AlignedBuf::new();
-//! let string = buf.store_unsized("Hello World!")?;
-//! let reference = buf.store(&string)?;
+//! let string = buf.store_unsized("Hello World!");
+//! let reference = buf.store(&string);
 //!
 //! assert_eq!(reference.offset(), 12);
 //! # Ok::<_, musli_zerocopy::Error>(())
@@ -51,8 +51,8 @@
 //! use musli_zerocopy::AlignedBuf;
 //!
 //! let mut buf = AlignedBuf::new();
-//! let slice = buf.store_slice(&[1u32, 2, 3, 4])?;
-//! let reference = buf.store(&slice)?;
+//! let slice = buf.store_slice(&[1u32, 2, 3, 4]);
+//! let reference = buf.store(&slice);
 //!
 //! assert_eq!(reference.offset(), 16);
 //! # Ok::<_, musli_zerocopy::Error>(())
@@ -88,8 +88,8 @@
 //!
 //! let mut buf = AlignedBuf::new();
 //!
-//! let string = buf.store_unsized("Hello World!")?;
-//! let custom = buf.store(&Custom { field: 42, string })?;
+//! let string = buf.store_unsized("Hello World!");
+//! let custom = buf.store(&Custom { field: 42, string });
 //!
 //! // The buffer stores both the unsized string and the Custom element.
 //! assert!(buf.len() >= 24);
@@ -123,11 +123,10 @@
 //! * The *alignment* of the buffer. Which you can read through the
 //!   [`requested()`]. On the receiving end we need to ensure that the buffer
 //!   follow this alignment. Dynamically this can be achieved by loading the
-//!   buffer back into an appropriately constructed [`AlignedBuf`] instance.
-//!   Other tricks include embedding a static buffer inside of an aligned
-//!   newtype which we'll showcase below. Networked applications might simply
-//!   agree to use a particular alignment up front. This alignment has to be
-//!   compatible with the types being coerced.
+//!   buffer using [`aligned_buf(bytes, align)`]. Other tricks include embedding
+//!   a static buffer inside of an aligned newtype which we'll showcase below.
+//!   Networked applications might simply agree to use a particular alignment up
+//!   front. This alignment has to be compatible with the types being coerced.
 //! * The *endianness* of the machine which produced the buffer. Any numerical
 //!   elements will in native endian ordering, so they would have to be adjusted
 //!   on the read side if it differ.
@@ -188,6 +187,42 @@
 //! let custom: &Custom = buf.load(custom)?;
 //! assert_eq!(custom.field, 42);
 //! assert_eq!(buf.load(custom.string)?, "Hello World!");
+//! # Ok::<_, musli_zerocopy::Error>(())
+//! ```
+//!
+//! <br>
+//!
+//! ## Writing data at offset zero
+//!
+//! Most of the time you want to write data where the first element in the
+//! buffer is the element currently being written.
+//!
+//! This is useful because it satisfies the last requirement above, *the offset*
+//! at where the struct can be read will then simply be zero, and all the data
+//! it depends on are stored at larger offsets.
+//!
+//! ```
+//! # use musli_zerocopy::ZeroCopy;
+//! # use musli_zerocopy::pointer::Unsized;
+//! # #[derive(ZeroCopy)]
+//! # #[repr(C)]
+//! # struct Custom { field: u32, string: Unsized<str> }
+//! use musli_zerocopy::AlignedBuf;
+//! use musli_zerocopy::pointer::Ref;
+//! use musli_zerocopy::buf::MaybeUninit;
+//!
+//! let mut buf = AlignedBuf::new();
+//! let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+//!
+//! let string = buf.store_unsized("Hello World!");
+//!
+//! buf.load_uninit_mut(reference).write(&Custom {
+//!     field: 42,
+//!     string,
+//! });
+//!
+//! let reference = reference.assume_init();
+//! assert_eq!(reference.offset(), 0);
 //! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 //!
@@ -283,11 +318,11 @@
 //!
 //! let mut buf = AlignedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
 //!
-//! let reference = buf.store(&42u32)?;
-//! let slice = buf.store_slice(&[1, 2, 3, 4])?;
-//! let unsize = buf.store_unsized("Hello World")?;
+//! let reference = buf.store(&42u32);
+//! let slice = buf.store_slice(&[1, 2, 3, 4]);
+//! let unsize = buf.store_unsized("Hello World");
 //!
-//! buf.store(&Custom { reference, slice, unsize })?;
+//! buf.store(&Custom { reference, slice, unsize });
 //! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 //!
@@ -308,6 +343,8 @@
 //! [`AlignedBuf`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.AlignedBuf.html
 //! [`Size`]:
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+//! [`aligned_buf(bytes, align)`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 
 #![no_std]
@@ -368,7 +405,7 @@ pub mod pointer;
 /// }
 ///
 /// let mut buf = AlignedBuf::new();
-/// let ptr = buf.store(&Custom { field: 10 })?;
+/// let ptr = buf.store(&Custom { field: 10 });
 /// let buf = buf.as_aligned();
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 10 });
 /// # Ok::<_, musli_zerocopy::Error>(())
@@ -395,13 +432,84 @@ pub mod pointer;
 /// }
 ///
 /// let mut buf = AlignedBuf::new();
-/// let ptr = buf.store(&Flags::First)?;
+/// let ptr = buf.store(&Flags::First);
 /// let buf = buf.as_aligned();
 /// assert_eq!(buf.load(ptr)?, &Flags::First);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///
-/// # Attributes
+/// # Padding
+///
+/// The constant [`ZeroCopy::PADDING`] determines whether the derives struct
+/// uses padding or not. This derive currently uses a fairly conservative
+/// algorithm:
+///
+/// The constant [`ZeroCopy::PADDING`] will be set to `true` if:
+/// * The size of the type is 0, and the alignment is larger than 1. This
+///   indicates a zero-sized type with an explicit `#[repr(align(N))]` that is
+///   not set to 1.
+/// * The sum of the size of all the fields is not the same as the size of the
+///   type.
+/// * Any of the fields has its [`ZeroCopy::PADDING`] set to `true`.
+/// * For enums, we test every variant with the same rules, except each variant
+///   is treated as a struct where the discriminant (`u32` in `#[repr(u32)]`) is
+///   treated like [a leading hidden field].
+///
+/// [`ZeroCopy::PADDING`]: crate::traits::ZeroCopy::PADDING
+/// [a first hidden field]: https://doc.rust-lang.org/beta/reference/type-layout.html#primitive-representation-of-enums-with-fields
+///
+/// ```
+/// use musli_zerocopy::ZeroCopy;
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C)]
+/// struct Zst;
+/// const _: () = assert!(!Zst::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C, align(1))]
+/// struct ZstAlign1;
+/// const _: () = assert!(!ZstAlign1::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C, align(128))]
+/// struct ZstPadded;
+/// const _: () = assert!(ZstPadded::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(u8)]
+/// enum ZstEnum {
+///     EmptyField
+/// }
+/// const _: () = assert!(!ZstEnum::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(u8)]
+/// enum SameEnum {
+///     Variant1(u8),
+///     Variant2(u8),
+/// }
+/// const _: () = assert!(!SameEnum::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(u16)]
+/// enum PaddedU16 {
+///     Variant1(u8),
+///     Variant2(u8),
+/// }
+/// const _: () = assert!(PaddedU16::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(u16)]
+/// enum NotPaddedU16 {
+///     Variant1(u8, u8),
+///     Variant2([u8; 2]),
+///     Variant3(u16),
+/// }
+/// const _: () = assert!(!NotPaddedU16::PADDED);
+/// ```
+///
+/// # Supported attributes
 ///
 /// ## Type attributes
 ///

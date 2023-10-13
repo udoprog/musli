@@ -57,7 +57,7 @@ impl<'a> Cursor<'a> {
     /// let custom = buf.store(&Custom {
     ///     field: 42,
     ///     field2: 85,
-    /// })?;
+    /// });
     ///
     /// let buf = buf.as_aligned();
     ///

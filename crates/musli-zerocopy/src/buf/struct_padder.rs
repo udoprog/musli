@@ -2,7 +2,6 @@ use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 use core::ptr;
 
-use crate::error::Error;
 use crate::traits::ZeroCopy;
 
 /// A struct padder as returned from [`BufMut::store_struct`].
@@ -13,8 +12,8 @@ use crate::traits::ZeroCopy;
 /// [`BufMut::store_struct`]: crate::buf::BufMut::store_struct
 #[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StructPadder::finish`"]
 pub struct StructPadder<'a, T> {
-    start: *mut u8,
-    end: *mut u8,
+    ptr: *mut u8,
+    offset: usize,
     _marker: PhantomData<&'a mut T>,
 }
 
@@ -23,10 +22,10 @@ where
     T: ZeroCopy,
 {
     #[inline]
-    pub(crate) fn new(start: *mut u8, end: *mut u8) -> Self {
+    pub(crate) fn new(ptr: *mut u8) -> Self {
         Self {
-            start,
-            end,
+            ptr,
+            offset: 0,
             _marker: PhantomData,
         }
     }
@@ -34,12 +33,12 @@ where
     /// Pad around the given field with zeros.
     ///
     /// Note that this is necessary to do correctly in order to satisfy the
-    /// safety requirements by [`finish()`].
+    /// safety requirements by [`end()`].
     ///
     /// This is typically not called directly, but rather is implemented by the
     /// [`ZeroCopy`] derive.
     ///
-    /// [`finish()`]: Self::finish
+    /// [`end()`]: Self::end
     /// [`ZeroCopy`]: derive@crate::ZeroCopy
     ///
     /// # Safety
@@ -65,8 +64,8 @@ where
     /// // making sure to initialize all of the buffer.
     /// unsafe {
     ///     let mut w = buf.store_struct(&padded);
-    ///     w.pad::<u8>();
-    ///     w.pad::<u16>();
+    ///     w.pad::<u8>(&padded.0);
+    ///     w.pad::<u16>(&padded.1);
     ///     w.end();
     /// }
     ///
@@ -75,14 +74,40 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn pad<F>(&mut self)
+    pub unsafe fn pad<F>(&mut self, field: &F)
     where
         F: ZeroCopy,
     {
-        let offset = self.start.align_offset(align_of::<F>());
+        let count = crate::buf::padding_to(self.offset, align_of::<F>());
         // zero out padding.
-        ptr::write_bytes(self.start, 0, offset);
-        self.start = self.start.wrapping_add(offset.wrapping_add(size_of::<F>()));
+        ptr::write_bytes(self.ptr.add(self.offset), 0, count);
+        self.offset = self.offset.wrapping_add(count);
+
+        if F::PADDED {
+            let mut padder = StructPadder::new(self.ptr.wrapping_add(self.offset));
+            field.pad(&mut padder);
+            padder.end();
+        }
+
+        self.offset = self.offset.wrapping_add(size_of::<F>());
+    }
+
+    /// Only pad a field where the value of the field doesn't matter.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the field type `F` is an actual field in
+    /// order in the struct being padded and that `F` is a primitive that does
+    /// not contain any interior padding.
+    #[inline]
+    pub unsafe fn pad_primitive<F>(&mut self)
+    where
+        F: ZeroCopy,
+    {
+        let count = crate::buf::padding_to(self.offset, align_of::<F>());
+        // zero out padding.
+        ptr::write_bytes(self.ptr.add(self.offset), 0, count);
+        self.offset = self.offset.wrapping_add(count.wrapping_add(size_of::<F>()));
     }
 
     /// Finish writing the current buffer.
@@ -94,7 +119,7 @@ where
     ///
     /// # Safety
     ///
-    /// Before calling `finish()`, the caller must ensure that they've called
+    /// Before calling `end()`, the caller must ensure that they've called
     /// [`pad::<F>()`] *in order* for every field in a struct being serialized
     /// where `F` is the type of the field. Otherwise we might not have written
     /// the necessary padding to ensure that all bytes related to the struct are
@@ -126,8 +151,8 @@ where
     /// // making sure to initialize all of the buffer.
     /// unsafe {
     ///     let mut w = buf.store_struct(&padded);
-    ///     w.pad::<u8>();
-    ///     w.pad::<u16>();
+    ///     w.pad(&padded.0);
+    ///     w.pad(&padded.1);
     ///     w.end();
     /// }
     ///
@@ -140,13 +165,8 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn end(self) -> Result<(), Error> {
-        let distance = self.start.offset_from(self.end);
-        ptr::write_bytes(
-            self.start,
-            0,
-            usize::from(distance > 0) * (distance as usize),
-        );
-        Ok(())
+    pub unsafe fn end(self) {
+        let count = size_of::<T>() - self.offset;
+        ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
     }
 }
