@@ -2,6 +2,7 @@ use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 use core::ptr;
 
+use crate::buf::Cursor;
 use crate::traits::ZeroCopy;
 
 /// A struct padder as returned from [`BufMut::store_struct`].
@@ -83,7 +84,14 @@ where
         let count = (align - (self.offset & mask)) & mask;
         // zero out padding.
         ptr::write_bytes(self.ptr.add(self.offset), 0, count);
-        self.offset = self.offset.wrapping_add(count).wrapping_add(size_of::<F>());
+        self.offset = self.offset.wrapping_add(count);
+
+        if F::PADDED {
+            let ptr = Cursor::new_unchecked(self.ptr.add(self.offset));
+            T::store_to();
+        }
+
+        self.offset = self.offset.wrapping_add(size_of::<F>());
     }
 
     /// Finish writing the current buffer.

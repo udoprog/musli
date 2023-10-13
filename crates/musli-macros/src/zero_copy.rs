@@ -364,9 +364,9 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     // SAFETY: We've systematically ensured to pad all fields on the
                     // struct.
                     unsafe {
-                        let mut writer = #buf_mut::store_struct(buf, self);
-                        #(#struct_padder::pad::<#types>(&mut writer);)*
-                        #struct_padder::end(writer);
+                        let mut padder = #buf_mut::store_struct(buf, self);
+                        #(#struct_padder::pad::<#types>(&mut padder);)*
+                        #struct_padder::end(padder);
                     }
                 };
 

@@ -15,6 +15,14 @@ pub struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
+    /// Construct a new unchecked cursor.
+    pub(crate) unsafe fn new_unchecked(ptr: *mut u8) -> Cursor<'a> {
+        Self {
+            pointer: NonNull::new_unchecked(ptr),
+            _marker: PhantomData,
+        }
+    }
+
     /// Construct a new cursor from a checked slice.
     pub(crate) fn new(data: &'a [u8]) -> Cursor<'a> {
         // SAFETY: The pointer is guaranteed to be non-null.
