@@ -137,3 +137,9 @@ where
 
     Ok(())
 }
+
+/// Calculate padding with the assumption that alignment is a power of two.
+pub(crate) fn padding_to(len: usize, align: usize) -> usize {
+    let mask = align - 1;
+    (align - (len & mask)) & mask
+}

@@ -329,6 +329,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let align_of: syn::Path = syn::parse_quote!(core::mem::align_of);
 
     let store_to;
+    let pad;
     let validate;
     let impl_zero_sized;
     let any_bits;
@@ -347,17 +348,24 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                         <#ty as #zero_copy>::store_to(&self.#member, buf);
                     };
 
+                    pad = quote! {
+                        #struct_padder::pad(padder, &self.#member);
+                    };
+
                     validate = quote! {
                         <#ty as #zero_copy>::validate(cursor)
                     };
                 } else {
                     store_to = quote! {};
 
+                    pad = quote!();
+
                     validate = quote! {
                         #result::Ok(())
                     };
                 }
             } else {
+                let members = &output.members;
                 let types = &output.types;
 
                 store_to = quote! {
@@ -365,9 +373,13 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     // struct.
                     unsafe {
                         let mut padder = #buf_mut::store_struct(buf, self);
-                        #(#struct_padder::pad::<#types>(&mut padder);)*
+                        #(#struct_padder::pad::<#types>(&mut padder, &self.#members);)*
                         #struct_padder::end(padder);
                     }
+                };
+
+                pad = quote! {
+                    #(#struct_padder::pad(padder, &self.#members);)*
                 };
 
                 validate = quote! {
@@ -384,7 +396,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             let mut field_sizes = Vec::new();
             let mut field_padded = Vec::new();
 
-            for ty in output.types.iter().copied() {
+            for ty in output.types.iter() {
                 field_sizes.push(quote!(#size_of::<#ty>()));
                 field_padded.push(quote!(<#ty as #zero_copy>::PADDED));
             }
@@ -421,6 +433,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
             let mut variants = Vec::new();
             let mut store_to_variants = Vec::new();
+            let mut pad_variants = Vec::new();
             let mut padded_variants = Vec::new();
 
             let mut current = (
@@ -490,6 +503,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
                 let ident = &variant.ident;
                 let types = &output.types;
+                let variables = &output.variables;
+                let assigns = &output.assigns;
 
                 variants.push(quote! {
                     #discriminator => {
@@ -498,15 +513,21 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 });
 
                 store_to_variants.push(quote! {
-                    Self::#ident { .. } => {
-                        #(#struct_padder::pad::<#types>(&mut writer);)*
+                    Self::#ident { #(#assigns,)* .. } => {
+                        #(#struct_padder::pad(&mut padder, #variables);)*
+                    }
+                });
+
+                pad_variants.push(quote! {
+                    Self::#ident { #(#assigns,)* .. } => {
+                        #(#struct_padder::pad(padder, #variables);)*
                     }
                 });
 
                 let mut field_sizes = Vec::new();
                 let mut field_padded = Vec::new();
 
-                for ty in output.types.iter().copied() {
+                for ty in output.types.iter() {
                     field_sizes.push(quote!(#size_of::<#ty>()));
                     field_padded.push(quote!(<#ty as #zero_copy>::PADDED));
                 }
@@ -522,14 +543,22 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 // SAFETY: We've systematically ensured to pad all fields on the
                 // struct.
                 unsafe {
-                    let mut writer = #buf_mut::store_struct(buf, self);
-                    #struct_padder::pad::<#ty>(&mut writer);
+                    let mut padder = #buf_mut::store_struct(buf, self);
+                    #struct_padder::pad_primitive::<#ty>(&mut padder);
 
                     match self {
                         #(#store_to_variants,)*
                     }
 
-                    #struct_padder::end(writer);
+                    #struct_padder::end(padder);
+                }
+            };
+
+            pad = quote! {
+                #struct_padder::pad_primitive::<#ty>(padder);
+
+                match self {
+                    #(#pad_variants,)*
                 }
             };
 
@@ -597,6 +626,10 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 #store_to
             }
 
+            unsafe fn pad(&self, padder: &mut #struct_padder<'_, Self>) {
+                #pad
+            }
+
             unsafe fn validate(cursor: #cursor<'_>) -> #result<(), #error> {
                 #validate
             }
@@ -607,6 +640,9 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 #[derive(Default)]
 struct Fields<'a> {
     types: Vec<&'a syn::Type>,
+    members: Vec<syn::Member>,
+    variables: Vec<syn::Ident>,
+    assigns: Vec<syn::FieldValue>,
     first_field: Option<(&'a syn::Type, syn::Member)>,
     check_zero_sized: Vec<&'a syn::Type>,
 }
@@ -647,6 +683,20 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
         }
 
         output.types.push(ty);
+        output.members.push(member.clone());
+
+        let variable = match &field.ident {
+            Some(ident) => ident.clone(),
+            None => quote::format_ident!("_{}", index),
+        };
+
+        if matches!(&member, syn::Member::Named(..)) {
+            output.assigns.push(syn::parse_quote!(#member));
+        } else {
+            output.assigns.push(syn::parse_quote!(#member: #variable));
+        }
+
+        output.variables.push(variable);
 
         if output.first_field.is_none() {
             output.first_field = Some((ty, member));

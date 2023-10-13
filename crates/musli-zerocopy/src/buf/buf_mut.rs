@@ -17,24 +17,32 @@ mod sealed {
 ///
 /// This is implemented by [`AlignedBuf`].
 ///
+/// # Safety
+///
+/// Every store function is unsafe, because every buffer pre-allocates space for
+/// the type being stored and calling `store*` incorrectly would result in
+/// writing out-of-bound.
+///
 /// [`AlignedBuf`]: crate::AlignedBuf
 pub trait BufMut: self::sealed::Sealed {
     /// Extend the current buffer from the given slice.
     ///
     /// # Safety
     ///
-    /// Must only be called inside of an implementation of
-    /// [`ZeroCopy::store_to`] since that asserts that the underlying buffer has
-    /// been appropriately sized.
+    /// The caller must ensure that any store call only includes data up-to the
+    /// size of `Self`.
+    ///
+    /// Also see the [type level safety documentation][Self:#safety]
     unsafe fn store_bytes(&mut self, bytes: &[u8]);
 
     /// Store the exact bits of the given ZeroCopy type.
     ///
     /// # Safety
     ///
-    /// Must only be called inside of an implementation of
-    /// [`ZeroCopy::store_to`] since that asserts that the underlying buffer has
-    /// been appropriately sized.
+    /// The caller must ensure that any store call only includes data up-to the
+    /// size of `Self`.
+    ///
+    /// Also see the [type level safety documentation][Self:#safety]
     unsafe fn store_bits<T>(&mut self, value: T)
     where
         T: ZeroCopy;
@@ -43,9 +51,10 @@ pub trait BufMut: self::sealed::Sealed {
     ///
     /// # Safety
     ///
-    /// Must only be called inside of an implementation of
-    /// [`ZeroCopy::store_to`] since that asserts that the underlying buffer has
-    /// been appropriately sized.
+    /// The caller must ensure that any store call only includes data up-to the
+    /// size of `Self`.
+    ///
+    /// Also see the [type level safety documentation][Self:#safety]
     unsafe fn store<T>(&mut self, value: &T)
     where
         T: ZeroCopy;
@@ -55,9 +64,14 @@ pub trait BufMut: self::sealed::Sealed {
     ///
     /// # Safety
     ///
-    /// The caller must ensure to [`pad()`] the output correctly according to
-    /// the type being encoded, or else the aligned buffer will end up with
+    /// The caller must ensure that any store call only includes data up-to the
+    /// size of `Self`.
+    ///
+    /// The caller must also ensure to [`pad()`] the output correctly according
+    /// to the type being encoded, or else the aligned buffer will end up with
     /// uninitialized bytes.
+    ///
+    /// Also see the [type level safety documentation][Self:#safety]
     ///
     /// [`pad()`]: StructPadder::pad
     ///
@@ -95,10 +109,10 @@ pub trait BufMut: self::sealed::Sealed {
     ///     // making sure to initialize all of the buffer.
     ///     unsafe {
     ///         let mut w = buf.store_struct(&padded);
-    ///         w.pad::<u8>();
-    ///         w.pad::<u64>();
-    ///         w.pad::<u16>();
-    ///         w.pad::<u32>();
+    ///         w.pad(&padded.a);
+    ///         w.pad(&padded.b);
+    ///         w.pad(&padded.c);
+    ///         w.pad(&padded.d);
     ///         w.end();
     ///     };
     ///
@@ -121,6 +135,13 @@ pub trait BufMut: self::sealed::Sealed {
         T: ZeroCopy;
 
     /// Store an array immediately in the buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that any store call only includes data up-to the
+    /// size of `Self`.
+    ///
+    /// Also see the [type level safety documentation][Self:#safety]
     unsafe fn store_array<T>(&mut self, values: &[T])
     where
         T: ZeroCopy;

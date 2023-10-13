@@ -1,3 +1,5 @@
+#![allow(clippy::assertions_on_constants)]
+
 use core::array;
 
 use crate::buf::MaybeUninit;

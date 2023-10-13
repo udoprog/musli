@@ -1132,8 +1132,7 @@ impl<O: Size> AlignedBuf<O> {
 
     #[inline]
     fn ensure_aligned(&mut self, align: usize, reserve: usize) {
-        let mask = align - 1;
-        let extra = (align - (self.len & mask)) & mask;
+        let extra = crate::buf::padding_to(self.len, align);
 
         self.reserve(extra.wrapping_add(reserve));
 

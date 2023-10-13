@@ -14,12 +14,14 @@
 //!
 //! [`Unsized<T>`]: crate::pointer::Unsized
 
+#![allow(clippy::missing_safety_doc)]
+
 use core::cell::Cell;
 use core::marker::PhantomData;
 use core::mem::align_of;
 use core::str;
 
-use crate::buf::{Buf, BufMut, Cursor, Visit};
+use crate::buf::{Buf, BufMut, Cursor, StructPadder, Visit};
 use crate::error::{Error, ErrorKind};
 
 mod sealed {
@@ -192,8 +194,12 @@ where
     where
         B: BufMut,
     {
-        let value = self.get();
-        T::store_to(&value, buf);
+        self.get().store_to(buf);
+    }
+
+    #[inline]
+    unsafe fn pad(&self, padder: &mut StructPadder<'_, Self>) {
+        padder.pad(&self.get());
     }
 
     #[inline]
@@ -291,7 +297,7 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 42, ignore: () });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub unsafe trait ZeroCopy {
+pub unsafe trait ZeroCopy: Sized {
     /// Indicates if the type can inhabit all possible bit patterns within its
     /// `size_of::<Self>()` bytes.
     const ANY_BITS: bool;
@@ -306,9 +312,24 @@ pub unsafe trait ZeroCopy {
     /// [`AlignedBuf::store`].
     ///
     /// [`AlignedBuf::store`]: crate::buf::AlignedBuf::store
+    ///
+    /// # Safety
+    ///
+    /// The implementor is responsible for ensuring that the struct has a
+    /// well-defined layout, and that the struct is stored in the passed in
+    /// `buf` correctly, which includes enumerating every field including hidden
+    /// ones.
     unsafe fn store_to<B: ?Sized>(&self, buf: &mut B)
     where
         B: BufMut;
+
+    /// Write padding to the given padder.
+    ///
+    /// # Safety
+    ///
+    /// The implementor is responsible for ensuring that every field is provided
+    /// to `padder`, including potentially hidden ones.
+    unsafe fn pad(&self, padder: &mut StructPadder<'_, Self>);
 
     /// Only validate the provided buffer.
     ///
@@ -455,7 +476,9 @@ macro_rules! impl_number {
                 buf.store_bits(*self);
             }
 
-            #[allow(clippy::missing_safety_doc)]
+            #[inline]
+            unsafe fn pad(&self, _: &mut StructPadder<'_, Self>) {}
+
             #[inline]
             unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
                 Ok(())
@@ -505,7 +528,9 @@ macro_rules! impl_float {
                 buf.store_bits(*self);
             }
 
-            #[allow(clippy::missing_safety_doc)]
+            #[inline]
+            unsafe fn pad(&self, _: &mut StructPadder<'_, Self>) {}
+
             #[inline]
             unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
                 Ok(())
@@ -542,6 +567,9 @@ unsafe impl ZeroCopy for char {
     {
         buf.store_bits(*self as u32);
     }
+
+    #[inline]
+    unsafe fn pad(&self, _: &mut StructPadder<'_, Self>) {}
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
@@ -581,6 +609,9 @@ unsafe impl ZeroCopy for bool {
     {
         buf.store_bits(*self as u8);
     }
+
+    #[inline]
+    unsafe fn pad(&self, _: &mut StructPadder<'_, Self>) {}
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
@@ -661,7 +692,9 @@ macro_rules! impl_nonzero_number {
                 buf.store_bits(self.get());
             }
 
-            #[allow(clippy::missing_safety_doc)]
+            #[inline]
+            unsafe fn pad(&self, _: &mut StructPadder<'_, Self>) {}
+
             #[inline]
             unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
                 if *cursor.cast::<$inner>() == 0 {
@@ -739,7 +772,10 @@ macro_rules! impl_zst {
             {
             }
 
-            #[allow(clippy::missing_safety_doc)]
+            #[inline]
+            unsafe fn pad(&self, _: &mut StructPadder<'_, Self>) {
+            }
+
             #[inline]
             unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
                 Ok(())
@@ -807,14 +843,16 @@ where
         // SAFETY: The buffer where we store the struct has been allocated for
         // the `[T; N]`.
         unsafe {
-            let mut s = buf.store_struct(self);
+            let mut padder = buf.store_struct(self);
+            self.pad(&mut padder);
+        }
+    }
 
-            if T::PADDED {
-                for _ in 0..self.len() {
-                    s.pad::<T>();
-                }
-
-                s.end();
+    #[inline]
+    unsafe fn pad(&self, padder: &mut StructPadder<'_, Self>) {
+        if T::PADDED {
+            for value in self {
+                padder.pad::<T>(value);
             }
         }
     }

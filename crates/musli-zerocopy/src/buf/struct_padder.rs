@@ -2,7 +2,6 @@ use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 use core::ptr;
 
-use crate::buf::Cursor;
 use crate::traits::ZeroCopy;
 
 /// A struct padder as returned from [`BufMut::store_struct`].
@@ -65,8 +64,8 @@ where
     /// // making sure to initialize all of the buffer.
     /// unsafe {
     ///     let mut w = buf.store_struct(&padded);
-    ///     w.pad::<u8>();
-    ///     w.pad::<u16>();
+    ///     w.pad::<u8>(&padded.0);
+    ///     w.pad::<u16>(&padded.1);
     ///     w.end();
     /// }
     ///
@@ -75,23 +74,40 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn pad<F>(&mut self)
+    pub unsafe fn pad<F>(&mut self, field: &F)
     where
         F: ZeroCopy,
     {
-        let align = align_of::<F>();
-        let mask = align - 1;
-        let count = (align - (self.offset & mask)) & mask;
+        let count = crate::buf::padding_to(self.offset, align_of::<F>());
         // zero out padding.
         ptr::write_bytes(self.ptr.add(self.offset), 0, count);
         self.offset = self.offset.wrapping_add(count);
 
         if F::PADDED {
-            let ptr = Cursor::new_unchecked(self.ptr.add(self.offset));
-            T::store_to();
+            let mut padder = StructPadder::new(self.ptr.wrapping_add(self.offset));
+            field.pad(&mut padder);
+            padder.end();
         }
 
         self.offset = self.offset.wrapping_add(size_of::<F>());
+    }
+
+    /// Only pad a field where the value of the field doesn't matter.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the field type `F` is an actual field in
+    /// order in the struct being padded and that `F` is a primitive that does
+    /// not contain any interior padding.
+    #[inline]
+    pub unsafe fn pad_primitive<F>(&mut self)
+    where
+        F: ZeroCopy,
+    {
+        let count = crate::buf::padding_to(self.offset, align_of::<F>());
+        // zero out padding.
+        ptr::write_bytes(self.ptr.add(self.offset), 0, count);
+        self.offset = self.offset.wrapping_add(count.wrapping_add(size_of::<F>()));
     }
 
     /// Finish writing the current buffer.
@@ -135,8 +151,8 @@ where
     /// // making sure to initialize all of the buffer.
     /// unsafe {
     ///     let mut w = buf.store_struct(&padded);
-    ///     w.pad::<u8>();
-    ///     w.pad::<u16>();
+    ///     w.pad(&padded.0);
+    ///     w.pad(&padded.1);
     ///     w.end();
     /// }
     ///
