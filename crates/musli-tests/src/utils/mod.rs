@@ -296,7 +296,7 @@ pub mod musli_zerocopy {
         where
             T: ZeroCopy,
         {
-            let offset = self.buf.store(value)?.offset();
+            let offset = self.buf.store(value).offset();
 
             Ok(DecodeState {
                 buf: self.buf.as_ref(),

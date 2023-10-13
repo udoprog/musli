@@ -2,7 +2,6 @@ use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 use core::ptr;
 
-use crate::error::Error;
 use crate::traits::ZeroCopy;
 
 /// A struct padder as returned from [`BufMut::store_struct`].
@@ -13,8 +12,8 @@ use crate::traits::ZeroCopy;
 /// [`BufMut::store_struct`]: crate::buf::BufMut::store_struct
 #[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StructPadder::finish`"]
 pub struct StructPadder<'a, T> {
-    start: *mut u8,
-    end: *mut u8,
+    ptr: *mut u8,
+    offset: usize,
     _marker: PhantomData<&'a mut T>,
 }
 
@@ -23,10 +22,10 @@ where
     T: ZeroCopy,
 {
     #[inline]
-    pub(crate) fn new(start: *mut u8, end: *mut u8) -> Self {
+    pub(crate) fn new(ptr: *mut u8) -> Self {
         Self {
-            start,
-            end,
+            ptr,
+            offset: 0,
             _marker: PhantomData,
         }
     }
@@ -79,10 +78,12 @@ where
     where
         F: ZeroCopy,
     {
-        let offset = self.start.align_offset(align_of::<F>());
+        let align = align_of::<F>();
+        let mask = align - 1;
+        let count = (align - (self.offset & mask)) & mask;
         // zero out padding.
-        ptr::write_bytes(self.start, 0, offset);
-        self.start = self.start.wrapping_add(offset.wrapping_add(size_of::<F>()));
+        ptr::write_bytes(self.ptr.add(self.offset), 0, count);
+        self.offset = self.offset.wrapping_add(count).wrapping_add(size_of::<F>());
     }
 
     /// Finish writing the current buffer.
@@ -140,13 +141,8 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn end(self) -> Result<(), Error> {
-        let distance = self.start.offset_from(self.end);
-        ptr::write_bytes(
-            self.start,
-            0,
-            usize::from(distance > 0) * (distance as usize),
-        );
-        Ok(())
+    pub unsafe fn end(self) {
+        let count = size_of::<T>() - self.offset;
+        ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
     }
 }

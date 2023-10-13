@@ -1,5 +1,4 @@
 use crate::buf::StructPadder;
-use crate::error::Error;
 use crate::traits::ZeroCopy;
 
 mod sealed {
@@ -11,6 +10,7 @@ mod sealed {
     #[cfg(feature = "alloc")]
     impl<O: Size> Sealed for crate::buf::AlignedBuf<O> {}
     impl<B: ?Sized> Sealed for &mut B where B: Sealed {}
+    impl Sealed for crate::buf::RawBufMut {}
 }
 
 /// A mutable buffer to store zero copy types to.
@@ -20,15 +20,33 @@ mod sealed {
 /// [`AlignedBuf`]: crate::AlignedBuf
 pub trait BufMut: self::sealed::Sealed {
     /// Extend the current buffer from the given slice.
-    fn extend_from_slice(&mut self, bytes: &[u8]);
+    ///
+    /// # Safety
+    ///
+    /// Must only be called inside of an implementation of
+    /// [`ZeroCopy::store_to`] since that asserts that the underlying buffer has
+    /// been appropriately sized.
+    unsafe fn store_bytes(&mut self, bytes: &[u8]);
 
     /// Store the exact bits of the given ZeroCopy type.
-    fn store_bits<T>(&mut self, value: T)
+    ///
+    /// # Safety
+    ///
+    /// Must only be called inside of an implementation of
+    /// [`ZeroCopy::store_to`] since that asserts that the underlying buffer has
+    /// been appropriately sized.
+    unsafe fn store_bits<T>(&mut self, value: T)
     where
         T: ZeroCopy;
 
     /// Write the given zero copy type to the buffer.
-    fn store<T>(&mut self, value: &T) -> Result<(), Error>
+    ///
+    /// # Safety
+    ///
+    /// Must only be called inside of an implementation of
+    /// [`ZeroCopy::store_to`] since that asserts that the underlying buffer has
+    /// been appropriately sized.
+    unsafe fn store<T>(&mut self, value: &T)
     where
         T: ZeroCopy;
 
@@ -99,6 +117,11 @@ pub trait BufMut: self::sealed::Sealed {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     unsafe fn store_struct<T>(&mut self, value: &T) -> StructPadder<'_, T>
+    where
+        T: ZeroCopy;
+
+    /// Store an array immediately in the buffer.
+    unsafe fn store_array<T>(&mut self, values: &[T])
     where
         T: ZeroCopy;
 }

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::mem::take;
 
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::meta::ParseNestedMeta;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -116,6 +116,22 @@ enum Repr {
     Num(Span, Num),
 }
 
+enum NumSize<'a> {
+    Fixed(usize),
+    Pointer(&'a syn::Path),
+}
+
+impl ToTokens for NumSize<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            NumSize::Fixed(size) => size.to_tokens(tokens),
+            NumSize::Pointer(path) => {
+                tokens.extend(quote!(#path::<usize>()));
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum Num {
     U8,
@@ -133,6 +149,23 @@ enum Num {
 }
 
 impl Num {
+    fn size(self, size_of: &syn::Path) -> NumSize<'_> {
+        match self {
+            Num::U8 => NumSize::Fixed(1),
+            Num::U16 => NumSize::Fixed(2),
+            Num::U32 => NumSize::Fixed(4),
+            Num::U64 => NumSize::Fixed(8),
+            Num::U128 => NumSize::Fixed(16),
+            Num::I8 => NumSize::Fixed(1),
+            Num::I16 => NumSize::Fixed(2),
+            Num::I32 => NumSize::Fixed(4),
+            Num::I64 => NumSize::Fixed(8),
+            Num::I128 => NumSize::Fixed(16),
+            Num::Isize => NumSize::Pointer(size_of),
+            Num::Usize => NumSize::Pointer(size_of),
+        }
+    }
+
     fn as_ty(self) -> &'static str {
         match self {
             Num::U8 => "u8",
@@ -292,12 +325,14 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let cursor: syn::Path = syn::parse_quote!(#krate::buf::Cursor);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
+    let size_of: syn::Path = syn::parse_quote!(core::mem::size_of);
+    let align_of: syn::Path = syn::parse_quote!(core::mem::align_of);
 
     let store_to;
     let validate;
     let impl_zero_sized;
     let any_bits;
-    let mut needs_padding = quote!(false);
+    let padded;
     let mut check_zero_sized = Vec::new();
 
     match &input.data {
@@ -309,30 +344,18 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             if matches!(repr, Repr::Transparent) || output.first_field.is_none() {
                 if let Some((ty, member)) = output.first_field {
                     store_to = quote! {
-                        <#ty as #zero_copy>::store_to(&self.#member, buf)
+                        <#ty as #zero_copy>::store_to(&self.#member, buf);
                     };
 
                     validate = quote! {
                         <#ty as #zero_copy>::validate(cursor)
                     };
-
-                    // We are either a `repr(C)` with a single field or
-                    // `repr(transparent)`, in which case we can inherit that
-                    // fields padding.
-                    needs_padding = quote! {
-                        <#ty as #zero_copy>::NEEDS_PADDING
-                    };
                 } else {
-                    store_to = quote! {
-                        #result::Ok(())
-                    };
+                    store_to = quote! {};
 
                     validate = quote! {
                         #result::Ok(())
                     };
-
-                    // This is a ZST. No padding needed.
-                    needs_padding = quote!(false);
                 }
             } else {
                 let types = &output.types;
@@ -343,10 +366,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     unsafe {
                         let mut writer = #buf_mut::store_struct(buf, self);
                         #(#struct_padder::pad::<#types>(&mut writer);)*
-                        #struct_padder::end(writer)?;
+                        #struct_padder::end(writer);
                     }
-
-                    #result::Ok(())
                 };
 
                 validate = quote! {
@@ -359,6 +380,18 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     #result::Ok(())
                 };
             }
+
+            let mut field_sizes = Vec::new();
+            let mut field_padded = Vec::new();
+
+            for ty in output.types.iter().copied() {
+                field_sizes.push(quote!(#size_of::<#ty>()));
+                field_padded.push(quote!(<#ty as #zero_copy>::PADDED));
+            }
+
+            // Struct does not need to be padded if all elements are the
+            // same size and alignment.
+            padded = quote!((#size_of::<Self>() == 0 && #align_of::<Self>() > 1) || #size_of::<Self>() != (0 #(+ #field_sizes)*) #(|| #field_padded)*);
 
             let name = &input.ident;
             let types = &output.types;
@@ -388,6 +421,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
             let mut variants = Vec::new();
             let mut store_to_variants = Vec::new();
+            let mut padded_variants = Vec::new();
 
             let mut current = (
                 false,
@@ -468,6 +502,20 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                         #(#struct_padder::pad::<#types>(&mut writer);)*
                     }
                 });
+
+                let mut field_sizes = Vec::new();
+                let mut field_padded = Vec::new();
+
+                for ty in output.types.iter().copied() {
+                    field_sizes.push(quote!(#size_of::<#ty>()));
+                    field_padded.push(quote!(<#ty as #zero_copy>::PADDED));
+                }
+
+                let base_size = num.size(&size_of);
+
+                // Struct does not need to be padded if all elements are the
+                // same size and alignment.
+                padded_variants.push(quote!((#size_of::<Self>() != (#base_size #(+ #field_sizes)*) #(|| #field_padded)*)));
             }
 
             store_to = quote! {
@@ -481,10 +529,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                         #(#store_to_variants,)*
                     }
 
-                    #struct_padder::end(writer)?;
+                    #struct_padder::end(writer);
                 }
-
-                #result::Ok(())
             };
 
             let illegal_enum = quote::format_ident!("__illegal_enum_{}", num.as_ty());
@@ -507,6 +553,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
             impl_zero_sized = None;
             any_bits = quote!(false);
+            padded = quote!(false #(|| #padded_variants)*);
         }
         syn::Data::Union(data) => {
             cx.error(syn::Error::new_spanned(
@@ -541,9 +588,9 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
             const ANY_BITS: bool = #any_bits;
-            const NEEDS_PADDING: bool = #needs_padding;
+            const PADDED: bool = #padded;
 
-            fn store_to<__B: ?Sized>(&self, buf: &mut __B) -> #result<(), #error>
+            unsafe fn store_to<__B: ?Sized>(&self, buf: &mut __B)
             where
                 __B: #buf_mut
             {

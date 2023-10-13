@@ -45,7 +45,7 @@ impl<'a, T> Validator<'a, T> {
     /// let custom = buf.store(&Custom {
     ///     field: 42,
     ///     field2: 85,
-    /// })?;
+    /// });
     /// let buf = buf.as_aligned();
     ///
     /// let mut v = buf.validate_struct::<Custom>()?;

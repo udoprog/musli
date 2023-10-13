@@ -2,16 +2,16 @@
 //! up by keys.
 //!
 //! This map are implemented using a perfect hash functions, and are inserted
-//! into a buffering using [`AlignedBuf::insert_map`].
+//! into a buffering using [`AlignedBuf::store_map`].
 //!
 //! There's two types provided by this module:
 //! * [`Map<K, V>`] which is a *bound* reference to a map, providing a
 //!   convenient map-like access.
 //! * [`MapRef<K, V>`] which is the *pointer* of the map. This is what you store
 //!   in [`ZeroCopy`] types and is what is returned by
-//!   [`AlignedBuf::insert_map`].
+//!   [`AlignedBuf::store_map`].
 //!
-//! [`AlignedBuf::insert_map`]: crate::buf::AlignedBuf::insert_map
+//! [`AlignedBuf::store_map`]: crate::buf::AlignedBuf::store_map
 
 pub use self::entry::Entry;
 mod entry;
@@ -40,7 +40,7 @@ use crate::ZeroCopy;
 /// map.push(Entry::new(1, 2));
 /// map.push(Entry::new(2, 3));
 ///
-/// let map = buf.insert_map(&mut map)?;
+/// let map = buf.store_map(&mut map)?;
 /// let buf = buf.as_aligned();
 /// let map = buf.bind(map)?;
 ///
@@ -79,7 +79,7 @@ where
     /// map.push(Entry::new(1, 2));
     /// map.push(Entry::new(2, 3));
     ///
-    /// let map = buf.insert_map(&mut map)?;
+    /// let map = buf.store_map(&mut map)?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -116,7 +116,7 @@ where
     /// map.push(Entry::new(1, 2));
     /// map.push(Entry::new(2, 3));
     ///
-    /// let map = buf.insert_map(&mut map)?;
+    /// let map = buf.store_map(&mut map)?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -149,7 +149,7 @@ where
     /// map.push(Entry::new(1, 2));
     /// map.push(Entry::new(2, 3));
     ///
-    /// let map = buf.insert_map(&mut map)?;
+    /// let map = buf.store_map(&mut map)?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -209,9 +209,9 @@ where
 /// [`bind()`] is used and might result in better performance if the data is
 /// infrequently accessed.
 ///
-/// Constructed through [`AlignedBuf::insert_map`].
+/// Constructed through [`AlignedBuf::store_map`].
 ///
-/// [`AlignedBuf::insert_map`]: crate::buf::AlignedBuf::insert_map
+/// [`AlignedBuf::store_map`]: crate::buf::AlignedBuf::store_map
 /// [`bind()`]: crate::buf::Buf::bind
 ///
 /// ## Examples
@@ -227,7 +227,7 @@ where
 /// map.push(Entry::new(1, 2));
 /// map.push(Entry::new(2, 3));
 ///
-/// let map = buf.insert_map(&mut map)?;
+/// let map = buf.store_map(&mut map)?;
 /// let buf = buf.as_aligned();
 ///
 /// assert_eq!(map.get(buf, &1)?, Some(&2));
@@ -290,7 +290,7 @@ where
     /// map.push(Entry::new(1, 2));
     /// map.push(Entry::new(2, 3));
     ///
-    /// let map = buf.insert_map(&mut map)?;
+    /// let map = buf.store_map(&mut map)?;
     /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(map.get(buf, &1)?, Some(&2));
@@ -326,7 +326,7 @@ where
     /// map.push(Entry::new(1, 2));
     /// map.push(Entry::new(2, 3));
     ///
-    /// let map = buf.insert_map(&mut map)?;
+    /// let map = buf.store_map(&mut map)?;
     /// let buf = buf.as_aligned();
     ///
     /// assert!(map.contains_key(buf, &1)?);
@@ -358,7 +358,7 @@ where
     /// map.push(Entry::new(1, 2));
     /// map.push(Entry::new(2, 3));
     ///
-    /// let map = buf.insert_map(&mut map)?;
+    /// let map = buf.store_map(&mut map)?;
     /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(map.get_entry(buf, &1)?, Some((&1, &2)));

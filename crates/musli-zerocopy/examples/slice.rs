@@ -3,9 +3,9 @@ use musli_zerocopy::{AlignedBuf, Error};
 fn main() -> Result<(), Error> {
     let mut buf = AlignedBuf::new();
 
-    let values = vec![buf.store_unsized("first")?, buf.store_unsized("second")?];
+    let values = vec![buf.store_unsized("first"), buf.store_unsized("second")];
 
-    let slice_ref = buf.store_slice(&values)?;
+    let slice_ref = buf.store_slice(&values);
 
     let buf = buf.as_aligned();
 

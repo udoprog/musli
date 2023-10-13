@@ -7,7 +7,103 @@ use crate::pointer::Ref;
 use crate::{AlignedBuf, Error, ZeroCopy};
 
 #[test]
-fn test_weird_alignment() -> Result<(), Error> {
+fn test_zero_padded() {
+    #[derive(ZeroCopy)]
+    #[zero_copy(crate)]
+    #[repr(C, align(128))]
+    struct EmptyPadded;
+
+    assert!(EmptyPadded::PADDED);
+
+    #[derive(ZeroCopy)]
+    #[zero_copy(crate)]
+    #[repr(C)]
+    struct EmptyDefaultAlign;
+
+    assert!(!EmptyDefaultAlign::PADDED);
+}
+
+#[test]
+fn test_inner_padded() -> Result<(), Error> {
+    #[derive(Debug, PartialEq, ZeroCopy)]
+    #[zero_copy(crate)]
+    #[repr(C)]
+    struct Inner {
+        first: u8,
+        second: u32,
+    }
+
+    assert!(Inner::PADDED);
+
+    #[derive(Debug, PartialEq, ZeroCopy)]
+    #[zero_copy(crate)]
+    #[repr(C)]
+    struct Element {
+        first: u32,
+        second: u32,
+        third: Inner,
+    }
+
+    assert!(Element::PADDED);
+    Ok(())
+}
+
+#[test]
+fn test_inner_not_padded() -> Result<(), Error> {
+    #[derive(Debug, PartialEq, ZeroCopy)]
+    #[zero_copy(crate)]
+    #[repr(C)]
+    struct Inner {
+        first: u8,
+        second: [u8; 1],
+        third: u8,
+        fourth: u8,
+    }
+
+    assert!(!Inner::PADDED);
+
+    #[derive(Debug, PartialEq, ZeroCopy)]
+    #[zero_copy(crate)]
+    #[repr(C)]
+    struct Element {
+        first: u32,
+        second: u32,
+        third: Inner,
+    }
+
+    assert!(!Element::PADDED);
+    Ok(())
+}
+
+#[test]
+fn test_inner_not_padded_by_align() -> Result<(), Error> {
+    #[derive(Debug, PartialEq, ZeroCopy)]
+    #[zero_copy(crate)]
+    #[repr(C, align(128))]
+    struct Inner {
+        first: u8,
+        second: [u8; 1],
+        third: u8,
+        fourth: u8,
+    }
+
+    assert!(Inner::PADDED);
+
+    #[derive(Debug, PartialEq, ZeroCopy)]
+    #[zero_copy(crate)]
+    #[repr(C)]
+    struct Element {
+        first: u32,
+        second: u32,
+        third: Inner,
+    }
+
+    assert!(Element::PADDED);
+    Ok(())
+}
+
+#[test]
+fn weird_alignment() -> Result<(), Error> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[repr(C, align(128))]
     #[zero_copy(crate)]
@@ -22,7 +118,7 @@ fn test_weird_alignment() -> Result<(), Error> {
     };
 
     let mut buf = AlignedBuf::with_alignment::<WeirdAlignment>();
-    let w = buf.store(&weird)?;
+    let w = buf.store(&weird);
     let buf = buf.as_aligned();
 
     assert_eq!(buf.len(), size_of::<WeirdAlignment>());
@@ -31,7 +127,7 @@ fn test_weird_alignment() -> Result<(), Error> {
 }
 
 #[test]
-fn test_enum_boundaries() -> Result<(), Error> {
+fn enum_boundaries() -> Result<(), Error> {
     macro_rules! test_case {
         ($name:ident, $repr:ident, $num:ty, $min:literal, $max:literal, $illegal_repr:ident $(,)?) => {{
             #[derive(Debug, PartialEq, ZeroCopy)]
@@ -54,13 +150,13 @@ fn test_enum_boundaries() -> Result<(), Error> {
             assert_eq!($name::AfterMin as $repr, $min + 1);
 
             let mut buf = AlignedBuf::with_alignment::<$name>();
-            let v1 = buf.store(&$name::Variant1)?;
-            let v2 = buf.store(&$name::Variant2)?;
-            let v3 = buf.store(&$name::Variant3)?;
-            let max = buf.store(&$name::Max)?;
-            let min = buf.store(&$name::Min)?;
-            let after_min = buf.store(&$name::AfterMin)?;
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX - 1))?.offset());
+            let v1 = buf.store(&$name::Variant1);
+            let v2 = buf.store(&$name::Variant2);
+            let v3 = buf.store(&$name::Variant3);
+            let max = buf.store(&$name::Max);
+            let min = buf.store(&$name::Min);
+            let after_min = buf.store(&$name::AfterMin);
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX - 1)).offset());
 
             let buf = buf.as_aligned();
 
@@ -147,10 +243,10 @@ fn test_signed_wraparound() -> Result<(), Error> {
             assert_eq!($name::One as $repr, 1);
 
             let mut buf = AlignedBuf::with_alignment::<$name>();
-            let minus_one = buf.store(&$name::MinusOne)?;
-            let zero = buf.store(&$name::Zero)?;
-            let one = buf.store(&$name::One)?;
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.offset());
+            let minus_one = buf.store(&$name::MinusOne);
+            let zero = buf.store(&$name::Zero);
+            let one = buf.store(&$name::One);
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX)).offset());
 
             let buf = buf.as_aligned();
 
@@ -192,10 +288,10 @@ fn test_neg0() -> Result<(), Error> {
             assert_eq!($name::One as $repr, 1);
 
             let mut buf = AlignedBuf::with_alignment::<$name>();
-            let minus_one = buf.store(&$name::MinusOne)?;
-            let neg0 = buf.store(&$name::Neg0)?;
-            let one = buf.store(&$name::One)?;
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.offset());
+            let minus_one = buf.store(&$name::MinusOne);
+            let neg0 = buf.store(&$name::Neg0);
+            let one = buf.store(&$name::One);
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX)).offset());
 
             let buf = buf.as_aligned();
 
@@ -226,7 +322,7 @@ fn test_needs_padding() -> Result<(), Error> {
     #[zero_copy(crate)]
     struct Zst {}
 
-    const _: () = assert!(!Zst::NEEDS_PADDING);
+    assert!(!Zst::PADDED);
 
     #[derive(ZeroCopy)]
     #[repr(transparent)]
@@ -235,7 +331,7 @@ fn test_needs_padding() -> Result<(), Error> {
         not_padded: u32,
     }
 
-    const _: () = assert!(!SingleField::NEEDS_PADDING);
+    assert!(!SingleField::PADDED);
 
     #[derive(ZeroCopy)]
     #[repr(transparent)]
@@ -244,7 +340,7 @@ fn test_needs_padding() -> Result<(), Error> {
         might_pad: [u32; 4],
     }
 
-    const _: () = assert!(!MightPad::NEEDS_PADDING);
+    assert!(!MightPad::PADDED);
     Ok(())
 }
 
@@ -270,10 +366,10 @@ fn test_enum_with_fields() -> Result<(), Error> {
     let variant = buf.store(&Types::Variant {
         field: 10,
         field2: 20,
-    })?;
-    let variant2 = buf.store(&Types::Variant2(40))?;
-    let variant3 = buf.store(&Types::Variant3)?;
-    let empty = buf.store(&Types::Empty { empty: PhantomData })?;
+    });
+    let variant2 = buf.store(&Types::Variant2(40));
+    let variant3 = buf.store(&Types::Variant3);
+    let empty = buf.store(&Types::Empty { empty: PhantomData });
 
     let buf = buf.as_aligned();
 

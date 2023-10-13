@@ -2,15 +2,15 @@
 //! up by keys.
 //!
 //! This set are implemented using a perfect hash functions, and are inserted
-//! into a buffering using [`AlignedBuf::insert_set`].
+//! into a buffering using [`AlignedBuf::store_set`].
 //!
 //! There's two types provided by this module:
 //! * [`Set<T>`] which is a *bound* reference to a set, providing a convenient
 //!   set-like access.
 //! * [`SetRef<T>`] which is the *pointer* of the set. This is what you store in
-//!   [`ZeroCopy`] types and is what is returned by [`AlignedBuf::insert_set`].
+//!   [`ZeroCopy`] types and is what is returned by [`AlignedBuf::store_set`].
 //!
-//! [`AlignedBuf::insert_set`]: crate::buf::AlignedBuf::insert_set
+//! [`AlignedBuf::store_set`]: crate::buf::AlignedBuf::store_set
 
 use core::borrow::Borrow;
 use core::hash::Hash;
@@ -34,7 +34,7 @@ use crate::ZeroCopy;
 ///
 /// let mut set = [1, 2];
 ///
-/// let set = buf.insert_set(&mut set)?;
+/// let set = buf.store_set(&mut set)?;
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
@@ -65,7 +65,7 @@ where
     ///
     /// let mut set = [1, 2];
     ///
-    /// let set = buf.insert_set(&mut set)?;
+    /// let set = buf.store_set(&mut set)?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///
@@ -120,9 +120,9 @@ where
 /// [`bind()`] is used and might result in better performance if the data is
 /// infrequently accessed.
 ///
-/// Constructed through [`AlignedBuf::insert_set`].
+/// Constructed through [`AlignedBuf::store_set`].
 ///
-/// [`AlignedBuf::insert_set`]: crate::buf::AlignedBuf::insert_set
+/// [`AlignedBuf::store_set`]: crate::buf::AlignedBuf::store_set
 /// [`bind()`]: crate::buf::Buf::bind
 ///
 /// ## Examples
@@ -134,7 +134,7 @@ where
 ///
 /// let mut set = [1, 2];
 ///
-/// let set = buf.insert_set(&mut set)?;
+/// let set = buf.store_set(&mut set)?;
 /// let buf = buf.as_aligned();
 ///
 /// assert!(set.contains(buf, &1)?);
@@ -187,7 +187,7 @@ where
     ///
     /// let mut set = [1, 2];
     ///
-    /// let set = buf.insert_set(&mut set)?;
+    /// let set = buf.store_set(&mut set)?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///

@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
-use crate::pointer::{DefaultSize, Size};
+use crate::buf::MaybeUninit;
+use crate::pointer::{DefaultSize, Size, Slice};
 use crate::ZeroCopy;
 
 /// A sized reference.
@@ -32,10 +33,79 @@ use crate::ZeroCopy;
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct Ref<T: ZeroCopy, O: Size = DefaultSize> {
+pub struct Ref<T, O: Size = DefaultSize> {
     offset: O,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
+}
+
+impl<T, O: Size> Ref<T, O> {
+    // Construct a reference that does not require `T` to be `ZeroCopy`.
+    pub(crate) fn new_raw(offset: usize) -> Self {
+        let Some(offset) = O::from_usize(offset) else {
+            panic!("Ref offset {offset} not in the legal range of 0-{}", O::MAX);
+        };
+
+        Self {
+            offset,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Get the offset the reference points to.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let reference = Ref::<u64>::new(42);
+    /// assert_eq!(reference.offset(), 42);
+    /// ```
+    #[inline]
+    pub fn offset(&self) -> usize {
+        self.offset.as_usize()
+    }
+}
+
+impl<T, const N: usize, O: Size> Ref<[T; N], O>
+where
+    T: ZeroCopy,
+{
+    /// Coerce a reference to an array into a slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// let values = buf.store(&[1, 2, 3, 4]);
+    /// let slice = values.into_slice();
+    ///
+    /// let buf = buf.as_aligned();
+    ///
+    /// assert_eq!(buf.load(slice)?, &[1, 2, 3, 4]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn into_slice(self) -> Slice<T, O> {
+        Slice::new_with_offset(self.offset, N)
+    }
+}
+
+impl<T, O: Size> Ref<MaybeUninit<T>, O> {
+    /// Assume that the reference is initialized.
+    ///
+    /// Unlike the counterpart in Rust, this isn't actually unsafe. Because in
+    /// order to load the reference again we'd have to validate it anyways.
+    #[inline]
+    pub const fn assume_init(self) -> Ref<T, O> {
+        Ref {
+            offset: self.offset,
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<T, O: Size> Ref<T, O>
@@ -70,37 +140,15 @@ where
     /// assert_eq!(reference.offset(), 42);
     /// ```
     pub fn new(offset: usize) -> Self {
-        let Some(offset) = O::from_usize(offset) else {
-            panic!("Ref offset {offset} not in the legal range of 0-{}", O::MAX);
-        };
-
-        Self {
-            offset,
-            _marker: PhantomData,
-        }
-    }
-
-    /// Get the offset the reference points to.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::pointer::Ref;
-    ///
-    /// let reference = Ref::<u64>::new(42);
-    /// assert_eq!(reference.offset(), 42);
-    /// ```
-    #[inline]
-    pub fn offset(&self) -> usize {
-        self.offset.as_usize()
+        Self::new_raw(offset)
     }
 }
 
-impl<T: ZeroCopy, O: Size> Clone for Ref<T, O> {
+impl<T, O: Size> Clone for Ref<T, O> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T: ZeroCopy, O: Size> Copy for Ref<T, O> {}
+impl<T, O: Size> Copy for Ref<T, O> {}
