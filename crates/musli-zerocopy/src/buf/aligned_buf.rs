@@ -173,13 +173,14 @@ impl<O: Size> AlignedBuf<O> {
         T: ZeroCopy,
     {
         // SAFETY: Alignment of `T` is always a power of two.
-        unsafe { Self::new_inner(capacity, align_of::<T>()) }
+        unsafe { Self::with_capacity_and_custom_alignment(capacity, align_of::<T>()) }
     }
 
     // # Safety
     //
     // The specified alignment must be a power of two.
-    unsafe fn new_inner(capacity: usize, align: usize) -> Self where {
+    pub(crate) unsafe fn with_capacity_and_custom_alignment(capacity: usize, align: usize) -> Self where
+    {
         if capacity == 0 {
             return Self {
                 // SAFETY: Alignment is asserted through `T`.
@@ -765,7 +766,7 @@ impl<O: Size> AlignedBuf<O> {
     #[inline]
     pub fn as_aligned_owned_buf(&self) -> Self {
         // SAFETY: Alignment of `requested` is always a power of two.
-        let mut new = unsafe { Self::new_inner(self.len, self.requested) };
+        let mut new = unsafe { Self::with_capacity_and_custom_alignment(self.len, self.requested) };
 
         unsafe {
             new.as_ptr_mut()
@@ -1036,15 +1037,6 @@ impl<O: Size> AlignedBuf<O> {
         unsafe { self.next_offset_with(align_of::<T>()) }
     }
 
-    // Return the max capacity of this vector. This depends on the requested
-    // alignment.
-    //
-    // This is defined by `max_size_for_align` in [`Layout`].
-    #[inline]
-    fn max_capacity_for_align(&self) -> usize {
-        isize::MAX as usize - (self.requested - 1)
-    }
-
     #[inline]
     fn ensure_capacity(&mut self, new_capacity: usize) {
         let new_capacity = new_capacity.max(self.requested);
@@ -1053,10 +1045,6 @@ impl<O: Size> AlignedBuf<O> {
             return;
         }
 
-        assert!(
-            new_capacity < self.max_capacity_for_align(),
-            "Capacity overflow"
-        );
         let (old_layout, new_layout) = self.layouts(new_capacity);
 
         if old_layout.size() == 0 {
@@ -1134,6 +1122,12 @@ impl<O: Size> AlignedBuf<O> {
         }
     }
 }
+
+/// `AlignedBuf` are `Send` because the data they reference is unaliased.
+unsafe impl Send for AlignedBuf {}
+/// `AlignedBuf` are `Sync` since they are `Send` and the data they reference is
+/// unaliased.
+unsafe impl Sync for AlignedBuf {}
 
 impl<O: Size> AsRef<Buf> for AlignedBuf<O> {
     /// Access the current buffer immutably while checking that the buffer is
@@ -1224,7 +1218,9 @@ impl<O: Size> AsMut<Buf> for AlignedBuf<O> {
 impl<O: Size> Clone for AlignedBuf<O> {
     fn clone(&self) -> Self {
         unsafe {
-            let mut new = ManuallyDrop::new(Self::new_inner(self.len, self.align));
+            let mut new = ManuallyDrop::new(Self::with_capacity_and_custom_alignment(
+                self.len, self.align,
+            ));
             new.as_ptr_mut()
                 .copy_from_nonoverlapping(self.as_ptr(), self.len);
             // Set requested to the same as original.

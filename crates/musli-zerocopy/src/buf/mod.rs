@@ -30,6 +30,64 @@ pub use self::aligned_buf::AlignedBuf;
 #[cfg(feature = "alloc")]
 mod aligned_buf;
 
+/// Return the max capacity of this vector. This depends on the requested
+/// alignment.
+///
+/// This follows how it's defined by `max_size_for_align` in [`Layout`].
+#[inline]
+pub fn max_capacity_for_align(align: usize) -> usize {
+    isize::MAX as usize - (align - 1)
+}
+
+/// Construct a buffer with a specific alignment which is either wrapped in a
+/// [`Buf`] if it is already correctly aligned, or inside of an allocated
+/// [`AlignedBuf`].
+///
+/// # Panics
+///
+/// Panics if `align` is not a power of two or if the size of the buffer is
+/// larger than [`max_capacity_for_align(align)`].
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::fs::read;
+/// use musli_zerocopy::ZeroCopy;
+/// use musli_zerocopy::buf::aligned_buf;
+/// use musli_zerocopy::pointer::{Ref, Unsized};
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C)]
+/// struct Person {
+///     name: Unsized<str>,
+///     age: u32,
+/// }
+///
+/// let bytes = read("person.bin")?;
+/// let buf = aligned_buf(&bytes, 16);
+///
+/// let buf = match &buf {
+///     Ok(buf) => *buf,
+///     Err(buf) => buf.as_ref(),
+/// };
+///
+/// let s = buf.load(Ref::<Person>::zero())?;
+/// # Ok::<_, anyhow::Error>(())
+/// ```
+pub fn aligned_buf(bytes: &[u8], align: usize) -> Result<&Buf, AlignedBuf> {
+    assert!(align.is_power_of_two(), "Alignment must be power of two");
+
+    let buf = Buf::new(bytes);
+
+    if buf.is_aligned_to(align) {
+        Ok(buf)
+    } else {
+        let mut buf = unsafe { AlignedBuf::with_capacity_and_custom_alignment(bytes.len(), align) };
+        buf.extend_from_slice(bytes);
+        Err(buf)
+    }
+}
+
 /// The type used to calculate default alignment for [`AlignedBuf`].
 pub type DefaultAlignment = usize;
 

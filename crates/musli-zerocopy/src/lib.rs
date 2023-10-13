@@ -123,11 +123,10 @@
 //! * The *alignment* of the buffer. Which you can read through the
 //!   [`requested()`]. On the receiving end we need to ensure that the buffer
 //!   follow this alignment. Dynamically this can be achieved by loading the
-//!   buffer back into an appropriately constructed [`AlignedBuf`] instance.
-//!   Other tricks include embedding a static buffer inside of an aligned
-//!   newtype which we'll showcase below. Networked applications might simply
-//!   agree to use a particular alignment up front. This alignment has to be
-//!   compatible with the types being coerced.
+//!   buffer using [`aligned_buf(bytes, align)`]. Other tricks include embedding
+//!   a static buffer inside of an aligned newtype which we'll showcase below.
+//!   Networked applications might simply agree to use a particular alignment up
+//!   front. This alignment has to be compatible with the types being coerced.
 //! * The *endianness* of the machine which produced the buffer. Any numerical
 //!   elements will in native endian ordering, so they would have to be adjusted
 //!   on the read side if it differ.
@@ -308,6 +307,8 @@
 //! [`AlignedBuf`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.AlignedBuf.html
 //! [`Size`]:
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+//! [`aligned_buf(bytes, align)`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 
 #![no_std]

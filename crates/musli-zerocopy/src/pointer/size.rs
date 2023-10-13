@@ -14,6 +14,7 @@ compile_error!("musli-zerocopy is only supported on 32, 64, or 128-bit platforms
 
 mod sealed {
     pub trait Sealed {}
+    impl Sealed for u16 {}
     impl Sealed for u32 {}
     impl Sealed for usize {}
 }
@@ -42,6 +43,27 @@ pub trait Size: self::sealed::Sealed + 'static + Sized + ZeroCopy + fmt::Display
     /// Test if the value is zero.
     #[doc(hidden)]
     fn is_zero(self) -> bool;
+}
+
+impl Size for u16 {
+    const ZERO: Self = 0;
+    const MAX: Self = u16::MAX;
+
+    fn from_usize(offset: usize) -> Option<Self> {
+        if offset > u16::MAX as usize {
+            None
+        } else {
+            Some(offset as u16)
+        }
+    }
+
+    fn as_usize(self) -> usize {
+        self as usize
+    }
+
+    fn is_zero(self) -> bool {
+        self == 0
+    }
 }
 
 impl Size for u32 {

@@ -4,7 +4,10 @@ use crate::buf::Cursor;
 use crate::error::Error;
 use crate::traits::ZeroCopy;
 
-/// Validator over a [`Buf`] constructed using [`Buf::validate`].
+/// Validator over a [`Buf`] constructed using [`Buf::validate_struct`].
+///
+/// [`Buf`]: crate::buf::Buf
+/// [`Buf::validate_struct`]: crate::buf::Buf::validate_struct
 #[must_use = "Must call `Validator::end` when validation is completed"]
 pub struct Validator<'a, T> {
     cursor: Cursor<'a>,

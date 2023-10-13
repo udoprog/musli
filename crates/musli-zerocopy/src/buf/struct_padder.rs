@@ -34,12 +34,12 @@ where
     /// Pad around the given field with zeros.
     ///
     /// Note that this is necessary to do correctly in order to satisfy the
-    /// safety requirements by [`finish()`].
+    /// safety requirements by [`end()`].
     ///
     /// This is typically not called directly, but rather is implemented by the
     /// [`ZeroCopy`] derive.
     ///
-    /// [`finish()`]: Self::finish
+    /// [`end()`]: Self::end
     /// [`ZeroCopy`]: derive@crate::ZeroCopy
     ///
     /// # Safety
@@ -94,7 +94,7 @@ where
     ///
     /// # Safety
     ///
-    /// Before calling `finish()`, the caller must ensure that they've called
+    /// Before calling `end()`, the caller must ensure that they've called
     /// [`pad::<F>()`] *in order* for every field in a struct being serialized
     /// where `F` is the type of the field. Otherwise we might not have written
     /// the necessary padding to ensure that all bytes related to the struct are
