@@ -28,8 +28,8 @@ Say you want to store the string `"Hello World!"`.
 use musli_zerocopy::AlignedBuf;
 
 let mut buf = AlignedBuf::new();
-let string = buf.store_unsized("Hello World!")?;
-let reference = buf.store(&string)?;
+let string = buf.store_unsized("Hello World!");
+let reference = buf.store(&string);
 
 assert_eq!(reference.offset(), 12);
 ```
@@ -53,8 +53,8 @@ Let's have a look at a [`Slice<u32>`] next:
 use musli_zerocopy::AlignedBuf;
 
 let mut buf = AlignedBuf::new();
-let slice = buf.store_slice(&[1u32, 2, 3, 4])?;
-let reference = buf.store(&slice)?;
+let slice = buf.store_slice(&[1u32, 2, 3, 4]);
+let reference = buf.store(&slice);
 
 assert_eq!(reference.offset(), 16);
 ```
@@ -88,8 +88,8 @@ struct Custom {
 
 let mut buf = AlignedBuf::new();
 
-let string = buf.store_unsized("Hello World!")?;
-let custom = buf.store(&Custom { field: 42, string })?;
+let string = buf.store_unsized("Hello World!");
+let custom = buf.store(&Custom { field: 42, string });
 
 // The buffer stores both the unsized string and the Custom element.
 assert!(buf.len() >= 24);
@@ -122,11 +122,10 @@ type back from a raw buffer:
 * The *alignment* of the buffer. Which you can read through the
   [`requested()`]. On the receiving end we need to ensure that the buffer
   follow this alignment. Dynamically this can be achieved by loading the
-  buffer back into an appropriately constructed [`AlignedBuf`] instance.
-  Other tricks include embedding a static buffer inside of an aligned
-  newtype which we'll showcase below. Networked applications might simply
-  agree to use a particular alignment up front. This alignment has to be
-  compatible with the types being coerced.
+  buffer using [`aligned_buf(bytes, align)`]. Other tricks include embedding
+  a static buffer inside of an aligned newtype which we'll showcase below.
+  Networked applications might simply agree to use a particular alignment up
+  front. This alignment has to be compatible with the types being coerced.
 * The *endianness* of the machine which produced the buffer. Any numerical
   elements will in native endian ordering, so they would have to be adjusted
   on the read side if it differ.
@@ -176,6 +175,36 @@ let custom = Ref::<Custom>::new(BYTES.1.len() - size_of::<Custom>());
 let custom: &Custom = buf.load(custom)?;
 assert_eq!(custom.field, 42);
 assert_eq!(buf.load(custom.string)?, "Hello World!");
+```
+
+<br>
+
+## Writing data at offset zero
+
+Most of the time you want to write data where the first element in the
+buffer is the element currently being written.
+
+This is useful because it satisfies the last requirement above, *the offset*
+at where the struct can be read will then simply be zero, and all the data
+it depends on are stored at larger offsets.
+
+```rust
+use musli_zerocopy::AlignedBuf;
+use musli_zerocopy::pointer::Ref;
+use musli_zerocopy::buf::MaybeUninit;
+
+let mut buf = AlignedBuf::new();
+let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+
+let string = buf.store_unsized("Hello World!");
+
+buf.load_uninit_mut(reference).write(&Custom {
+    field: 42,
+    string,
+});
+
+let reference = reference.assume_init();
+assert_eq!(reference.offset(), 0);
 ```
 
 <br>
@@ -233,7 +262,7 @@ constructor while specifying one of the above parameters:
 use musli_zerocopy::AlignedBuf;
 use musli_zerocopy::buf::DefaultAlignment;
 
-let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment(0, DefaultAlignment);
+let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment::<DefaultAlignment>(0);
 ```
 
 And to use a custom target size in a struct using the [`ZeroCopy`], you
@@ -252,13 +281,13 @@ struct Custom {
     unsize: Unsized::<str, usize>,
 }
 
-let mut buf = AlignedBuf::with_capacity_and_alignment(0, DefaultAlignment);
+let mut buf = AlignedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
 
-let reference = buf.store(&42u32)?;
-let slice = buf.store_slice(&[1, 2, 3, 4])?;
-let unsize = buf.store_unsized("Hello World")?;
+let reference = buf.store(&42u32);
+let slice = buf.store_slice(&[1, 2, 3, 4]);
+let unsize = buf.store_unsized("Hello World");
 
-buf.store(&Custom { reference, slice, unsize })?;
+buf.store(&Custom { reference, slice, unsize });
 ```
 
 [`requested()`]:
@@ -278,4 +307,6 @@ buf.store(&Custom { reference, slice, unsize })?;
 [`AlignedBuf`]:
     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.AlignedBuf.html
 [`Size`]:
+    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+[`aligned_buf(bytes, align)`]:
     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
