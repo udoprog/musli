@@ -584,7 +584,7 @@ impl<O: Size> AlignedBuf<O> {
         T: ?Sized + UnsizedZeroCopy,
     {
         unsafe {
-            let ptr = self.next_offset_with(T::ALIGN, value.size());
+            let ptr = self.next_offset_with(T::ALIGN, value.bytes());
             value.store_to(self);
             Unsized::new(ptr, value.size())
         }
@@ -881,12 +881,16 @@ impl<O: Size> AlignedBuf<O> {
     /// # Safety
     ///
     /// The caller must ensure that the buffer has the capacity for
-    /// `bytes.len()`.
+    /// `bytes.len()` and that the value being stored is not padded as per
+    /// `ZeroCopy::PADDED`.
     #[inline]
-    pub unsafe fn store_bytes(&mut self, bytes: &[u8]) {
+    pub unsafe fn store_bytes<T>(&mut self, values: &[T])
+    where
+        T: ZeroCopy,
+    {
         let dst = self.as_ptr_mut().wrapping_add(self.len);
-        dst.copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
-        self.len = self.len.wrapping_add(bytes.len());
+        dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
+        self.len = self.len.wrapping_add(size_of_val(values));
     }
 
     /// Return a cloned variant of this buffer that is aligned per its
@@ -1403,8 +1407,11 @@ impl<O: Size> Drop for AlignedBuf<O> {
 
 impl<O: Size> BufMut for AlignedBuf<O> {
     #[inline]
-    unsafe fn store_bytes(&mut self, bytes: &[u8]) {
-        AlignedBuf::store_bytes(self, bytes)
+    unsafe fn store_bytes<T>(&mut self, values: &[T])
+    where
+        T: ZeroCopy,
+    {
+        AlignedBuf::store_bytes(self, values)
     }
 
     #[inline]

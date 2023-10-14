@@ -379,7 +379,7 @@ impl Buf {
     /// Get the given range while checking its required alignment.
     #[inline]
     pub(crate) fn get(&self, start: usize, end: usize, align: usize) -> Result<&Buf, Error> {
-        let buf = self.get_unaligned(start, end)?;
+        let buf = Buf::new(self.get_unaligned(start, end)?);
 
         if !buf.is_aligned_to(align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
@@ -399,7 +399,7 @@ impl Buf {
         end: usize,
         align: usize,
     ) -> Result<&mut Buf, Error> {
-        let buf = self.get_mut_unaligned(start, end)?;
+        let buf = Buf::new_mut(self.get_mut_unaligned(start, end)?);
 
         if !buf.is_aligned_to(align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
@@ -414,7 +414,7 @@ impl Buf {
     /// Get the given range without checking that it corresponds to any given
     /// alignment.
     #[inline]
-    pub(crate) fn get_unaligned(&self, start: usize, end: usize) -> Result<&Buf, Error> {
+    pub(crate) fn get_unaligned(&self, start: usize, end: usize) -> Result<&[u8], Error> {
         let Some(data) = self.data.get(start..end) else {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
                 range: start..end,
@@ -422,7 +422,7 @@ impl Buf {
             }));
         };
 
-        Ok(Buf::new(data))
+        Ok(data)
     }
 
     /// Get the given range mutably without checking that it corresponds to any given alignment.
@@ -431,7 +431,7 @@ impl Buf {
         &mut self,
         start: usize,
         end: usize,
-    ) -> Result<&mut Buf, Error> {
+    ) -> Result<&mut [u8], Error> {
         let len = self.data.len();
 
         let Some(data) = self.data.get_mut(start..end) else {
@@ -441,7 +441,7 @@ impl Buf {
             }));
         };
 
-        Ok(Buf::new_mut(data))
+        Ok(data)
     }
 
     /// Load an unsized reference.
@@ -454,12 +454,12 @@ impl Buf {
         T: UnsizedZeroCopy,
     {
         let start = unsize.offset();
-        let end = start.wrapping_add(unsize.size());
+        let end = start.wrapping_add(unsize.size().wrapping_mul(T::SIZE));
         let buf = self.get(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
-        unsafe { T::coerce(buf) }
+        unsafe { Ok(&*T::coerce(buf.as_ptr(), unsize.size())?) }
     }
 
     /// Load an unsized mutable reference.
@@ -472,12 +472,12 @@ impl Buf {
         T: UnsizedZeroCopy,
     {
         let start = unsize.offset();
-        let end = start.wrapping_add(unsize.size());
+        let end = start.wrapping_add(unsize.size().wrapping_mul(T::SIZE));
         let buf = self.get_mut(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
-        unsafe { T::coerce_mut(buf) }
+        unsafe { Ok(&mut *T::coerce_mut(buf.as_mut_ptr(), unsize.size())?) }
     }
 
     /// Load the given sized value as a reference.
@@ -550,9 +550,9 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
-        let buf: &mut Buf = self.get_mut_unaligned(start, end)?;
+        let buf = self.get_mut_unaligned(start, end)?;
         let len = buf.len();
-        crate::buf::validate_array::<T>(buf.cursor(), len)?;
+        crate::buf::validate_array::<T>(Cursor::new(buf), len)?;
         Ok(unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), ptr.len()) })
     }
 

@@ -1,4 +1,5 @@
-use musli_zerocopy::buf::{AlignedBuf, MaybeUninit};
+use musli_zerocopy::buf::AlignedBuf;
+use musli_zerocopy::mem::MaybeUninit;
 use musli_zerocopy::pointer::{Ref, Unsized};
 use musli_zerocopy::{Error, ZeroCopy};
 

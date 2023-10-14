@@ -15,11 +15,14 @@ impl RawBufMut {
 }
 
 impl BufMut for RawBufMut {
-    unsafe fn store_bytes(&mut self, bytes: &[u8]) {
+    unsafe fn store_bytes<T>(&mut self, values: &[T])
+    where
+        T: ZeroCopy,
+    {
         unsafe {
             self.start
-                .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
-            self.start = self.start.wrapping_add(bytes.len());
+                .copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
+            self.start = self.start.wrapping_add(size_of_val(values));
         }
     }
 

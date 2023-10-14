@@ -29,11 +29,14 @@ pub trait BufMut: self::sealed::Sealed {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that any store call only includes data up-to the
-    /// size of `Self`.
+    /// The caller must ensure that the buffer has the capacity for
+    /// `bytes.len()` and that the value being stored is not padded as per
+    /// `ZeroCopy::PADDED`.
     ///
     /// Also see the [type level safety documentation][Self:#safety]
-    unsafe fn store_bytes(&mut self, bytes: &[u8]);
+    unsafe fn store_bytes<T>(&mut self, bytes: &[T])
+    where
+        T: ZeroCopy;
 
     /// Store the exact bits of the given ZeroCopy type.
     ///
