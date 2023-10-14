@@ -27,3 +27,25 @@ where
         Ok(visitor(value))
     }
 }
+
+impl Visit for str {
+    type Target = str;
+
+    fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
+    where
+        V: FnOnce(&Self::Target) -> O,
+    {
+        Ok(visitor(self))
+    }
+}
+
+impl<T> Visit for [T] {
+    type Target = [T];
+
+    fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
+    where
+        V: FnOnce(&Self::Target) -> O,
+    {
+        Ok(visitor(self))
+    }
+}

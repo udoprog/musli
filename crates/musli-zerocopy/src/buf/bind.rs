@@ -14,6 +14,13 @@ mod sealed {
     {
     }
 
+    impl<K, V, O: Size> Sealed for crate::swiss::map::MapRef<K, V, O>
+    where
+        K: ZeroCopy,
+        V: ZeroCopy,
+    {
+    }
+
     impl<T, O: Size> Sealed for crate::phf::set::SetRef<T, O> where T: ZeroCopy {}
 }
 

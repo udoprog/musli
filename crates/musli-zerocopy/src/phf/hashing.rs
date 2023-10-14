@@ -1,8 +1,9 @@
 use core::hash::Hash;
 
+use crate::buf::{Buf, Visit};
 use crate::error::{Error, ErrorKind};
-use crate::phf::sip::{Hash128, Hasher128, SipHasher13};
 use crate::phf::Entry;
+use crate::sip::{Hash128, Hasher128, SipHasher13};
 
 #[non_exhaustive]
 pub(crate) struct Hashes {
@@ -19,20 +20,21 @@ pub(crate) fn displace(f1: u32, f2: u32, d1: u32, d2: u32) -> u32 {
 }
 
 #[inline]
-pub(crate) fn hash<T>(value: &T, key: &HashKey) -> Hashes
+pub(crate) fn hash<T>(buf: &Buf, value: &T, key: &HashKey) -> Result<Hashes, Error>
 where
-    T: ?Sized + Hash,
+    T: ?Sized + Visit,
+    T::Target: Hash,
 {
     let mut hasher = SipHasher13::new_with_keys(0, *key);
-    value.hash(&mut hasher);
+    value.visit(buf, |value| value.hash(&mut hasher))?;
 
     let Hash128 { h1, h2 } = hasher.finish128();
 
-    Hashes {
+    Ok(Hashes {
         g: (h1 >> 32) as usize,
         f1: h1 as u32,
         f2: h2 as u32,
-    }
+    })
 }
 
 #[inline]

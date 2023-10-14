@@ -64,7 +64,7 @@ where
 
         let entry = access(entry);
 
-        let h = entry.visit(buf, |entry| hash(entry, &key))?;
+        let h = hash(buf, entry, &key)?;
         hashes.push(h);
     }
 

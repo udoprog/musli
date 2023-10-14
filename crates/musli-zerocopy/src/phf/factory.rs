@@ -11,36 +11,36 @@ use crate::ZeroCopy;
 
 /// Store a map based on a perfect hash function into the [`AlignedBuf`].
 ///
-/// This will utilize a perfect hash functions derived from the [`phf`
-/// crate] to construct a persistent hash set.
+/// This will utilize a perfect hash functions derived from the [`phf` crate] to
+/// construct a persistent hash set.
 ///
-/// This returns a [`SetRef`] which can be bound into a [`Set`] through the
+/// This returns a [`MapRef`] which can be bound into a [`Map`] through the
 /// [`bind()`] method for convenience.
 ///
 /// [`phf` crate]: https://crates.io/crates/phf
-/// [`Set`]: crate::set::Set
-/// [`bind()`]: Buf::bind
+/// [`Map`]: crate::phf::Map
+/// [`bind()`]: crate::buf::Buf::bind
 ///
 /// # Examples
 ///
 /// ```
 /// use musli_zerocopy::AlignedBuf;
-/// use musli_zerocopy::phf::{self, Entry};
+/// use musli_zerocopy::phf;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let mut pairs = Vec::new();
+/// let first = buf.store_unsized("first");
+/// let second = buf.store_unsized("second");
 ///
-/// pairs.push(Entry::new(buf.store_unsized("first"), 1u32));
-/// pairs.push(Entry::new(buf.store_unsized("second"), 2u32));
-///
-/// let map = phf::store_map(&mut buf, &mut pairs)?;
+/// let map = phf::store_map(&mut buf, [(first, 1u32), (second, 2u32)])?;
 /// let buf = buf.as_aligned();
 /// let map = buf.bind(map)?;
 ///
-/// assert_eq!(map.get(&"first")?, Some(&1));
-/// assert_eq!(map.get(&"second")?, Some(&2));
-/// assert_eq!(map.get(&"third")?, None);
+/// assert_eq!(map.get("first")?, Some(&1));
+/// assert_eq!(map.get(&first)?, Some(&1));
+/// assert_eq!(map.get("second")?, Some(&2));
+/// assert_eq!(map.get(&second)?, Some(&2));
+/// assert_eq!(map.get("third")?, None);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///
@@ -48,16 +48,11 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use musli_zerocopy::AlignedBuf;
-/// use musli_zerocopy::phf::{self, Entry};
+/// use musli_zerocopy::phf;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let mut pairs = Vec::new();
-///
-/// pairs.push(Entry::new(10u64, 1u32));
-/// pairs.push(Entry::new(20u64, 2u32));
-///
-/// let map = phf::store_map(&mut buf, &mut pairs)?;
+/// let map = phf::store_map(&mut buf, [(10u64, 1), (20u64, 2)])?;
 /// let buf = buf.as_aligned();
 ///
 /// assert_eq!(map.get(buf, &10u64)?, Some(&1));
@@ -65,18 +60,28 @@ use crate::ZeroCopy;
 /// assert_eq!(map.get(buf, &30u64)?, None);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_map<K, V, O: Size>(
+pub fn store_map<K, V, I, O: Size>(
     buf: &mut AlignedBuf<O>,
-    entries: &mut [Entry<K, V>],
+    entries: I,
 ) -> Result<MapRef<K, V, O>, Error>
 where
     K: Visit + ZeroCopy,
     V: ZeroCopy,
     K::Target: Hash,
+    I: IntoIterator<Item = (K, V)>,
+    I::IntoIter: ExactSizeIterator,
 {
+    let iter = entries.into_iter();
+
+    let mut entries = Vec::with_capacity(iter.len());
+
+    for (k, v) in iter {
+        entries.push(Entry::new(k, v));
+    }
+
     let mut hash_state = {
         let buf = buf.as_aligned();
-        crate::phf::generator::generate_hash(buf, entries, |entry| &entry.key)?
+        crate::phf::generator::generate_hash(buf, &mut entries, |entry| &entry.key)?
     };
 
     for a in 0..hash_state.map.len() {
@@ -93,7 +98,7 @@ where
         }
     }
 
-    let entries = buf.store_slice(entries);
+    let entries = buf.store_slice(&entries);
 
     let mut displacements = Vec::new();
 
@@ -107,15 +112,15 @@ where
 
 /// Store a set based on a perfect hash function into the [`AlignedBuf`].
 ///
-/// This will utilize a perfect hash functions derived from the [`phf`
-/// crate] to construct a persistent hash map.
+/// This will utilize a perfect hash functions derived from the [`phf` crate] to
+/// construct a persistent hash map.
 ///
-/// This returns a [`MapRef`] which can be bound into a [`Map`] through the
+/// This returns a [`SetRef`] which can be bound into a [`Set`] through the
 /// [`bind()`] method for convenience.
 ///
 /// [`phf` crate]: https://crates.io/crates/phf
-/// [`Map`]: crate::map::Map
-/// [`bind()`]: Buf::bind
+/// [`Set`]: crate::phf::Set
+/// [`bind()`]: crate::buf::Buf::bind
 ///
 /// # Examples
 ///
@@ -134,9 +139,9 @@ where
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
-/// assert!(set.contains(&"first")?);
-/// assert!(set.contains(&"second")?);
-/// assert!(!set.contains(&"third")?);
+/// assert!(set.contains("first")?);
+/// assert!(set.contains("second")?);
+/// assert!(!set.contains("third")?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///

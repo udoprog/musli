@@ -77,15 +77,16 @@ where
     /// ```
     pub fn contains<Q>(&self, key: &Q) -> Result<bool, Error>
     where
-        Q: ?Sized + Eq + Hash,
+        Q: ?Sized + Visit,
+        Q::Target: Eq + Hash,
         T: Visit,
-        T::Target: Borrow<Q>,
+        T::Target: Borrow<Q::Target>,
     {
         if self.displacements.is_empty() {
             return Ok(false);
         }
 
-        let hashes = crate::phf::hashing::hash(key, &self.key);
+        let hashes = crate::phf::hashing::hash(self.buf, key, &self.key)?;
         let index =
             crate::phf::hashing::get_index(&hashes, self.displacements, self.entries.len())?;
 
@@ -93,7 +94,7 @@ where
             return Ok(false);
         };
 
-        e.visit(self.buf, |v| v.borrow() == key)
+        key.visit(self.buf, |b| e.visit(self.buf, |a| a.borrow() == b))?
     }
 }
 
@@ -199,17 +200,18 @@ where
     /// assert!(!set.contains(&3)?);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn contains<'a, Q>(&self, buf: &'a Buf, key: &Q) -> Result<bool, Error>
+    pub fn contains<Q>(&self, buf: &Buf, key: &Q) -> Result<bool, Error>
     where
-        Q: ?Sized + Eq + Hash,
-        T: 'a + Visit,
-        T::Target: Borrow<Q>,
+        Q: ?Sized + Visit,
+        Q::Target: Eq + Hash,
+        T: Visit,
+        T::Target: Borrow<Q::Target>,
     {
         if self.displacements.is_empty() {
             return Ok(false);
         }
 
-        let hashes = crate::phf::hashing::hash(key, &self.key);
+        let hashes = crate::phf::hashing::hash(buf, key, &self.key)?;
 
         let displacements = |index| match self.displacements.get(index) {
             Some(entry) => Ok(Some(buf.load(entry)?)),
@@ -227,6 +229,7 @@ where
             return Ok(false);
         };
 
-        buf.load(e)?.visit(buf, |v| v.borrow() == key)
+        let e = buf.load(e)?;
+        key.visit(buf, |b| e.visit(buf, |a| a.borrow() == b))?
     }
 }

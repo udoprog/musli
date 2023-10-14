@@ -432,7 +432,7 @@ macro_rules! impl_unsized_primitive {
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
-        #[doc = concat!("struct Custom", stringify!($(<$param>)*) ," { field: Unsized<[", stringify!($ty) ,"]> }")]
+        #[doc = concat!("struct ", stringify!($(<$param>)*) ," { field: Unsized<[", stringify!($ty) ,"]> }")]
         ///
         /// let mut buf = AlignedBuf::new();
         #[doc = concat!("let unsize: Unsized<[", stringify!($example_ty), "]> = buf.store_unsized(&", stringify!($example), ");")]
@@ -440,6 +440,7 @@ macro_rules! impl_unsized_primitive {
         #[doc = concat!("assert_eq!(buf.load(unsize)?, &", stringify!($example), ");")]
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
+        #[allow(rustdoc::invalid_html_tags)]
         unsafe impl $(<$param>)* UnsizedZeroCopy for [$ty] {
             const ALIGN: usize = align_of::<$ty>();
             const SIZE: usize = size_of::<$ty>();

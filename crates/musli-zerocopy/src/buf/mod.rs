@@ -51,6 +51,8 @@ pub type DefaultAlignment = usize;
 /// alignment.
 ///
 /// This follows how it's defined by `max_size_for_align` in [`Layout`].
+///
+/// [`Layout`]: core::alloc::Layout
 #[inline]
 pub fn max_capacity_for_align(align: usize) -> usize {
     isize::MAX as usize - (align - 1)

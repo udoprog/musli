@@ -1,3 +1,4 @@
+use core::fmt;
 use core::hash::Hash;
 use core::marker::PhantomData;
 
@@ -31,7 +32,7 @@ use crate::ZeroCopy;
 /// assert_eq!(*buf.load(number)?, u32::from_ne_bytes([1, 2, 3, 4]));
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(Debug, ZeroCopy)]
+#[derive(ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate, skip_visit)]
 pub struct Ref<T, O: Size = DefaultSize> {
@@ -142,6 +143,14 @@ where
     /// ```
     pub fn new(offset: usize) -> Self {
         Self::new_raw(offset)
+    }
+}
+
+impl<T, O: Size> fmt::Debug for Ref<T, O> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Ref")
+            .field("offset", &self.offset.as_usize())
+            .finish()
     }
 }
 

@@ -28,16 +28,11 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use musli_zerocopy::AlignedBuf;
-/// use musli_zerocopy::phf::{self, Entry};
+/// use musli_zerocopy::phf;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let mut map = Vec::new();
-///
-/// map.push(Entry::new(1, 2));
-/// map.push(Entry::new(2, 3));
-///
-/// let map = phf::store_map(&mut buf, &mut map)?;
+/// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
 /// let buf = buf.as_aligned();
 /// let map = buf.bind(map)?;
 ///
@@ -67,16 +62,11 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// use musli_zerocopy::phf::{self, Entry};
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut map = Vec::new();
-    ///
-    /// map.push(Entry::new(1, 2));
-    /// map.push(Entry::new(2, 3));
-    ///
-    /// let map = phf::store_map(&mut buf, &mut map)?;
+    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -87,9 +77,10 @@ where
     /// ```
     pub fn get<T>(&self, key: &T) -> Result<Option<&V>, Error>
     where
-        T: ?Sized + Eq + Hash,
+        T: ?Sized + Visit,
+        T::Target: Eq + Hash,
         K: Visit,
-        K::Target: Borrow<T>,
+        K::Target: Borrow<T::Target>,
     {
         let Some(entry) = self.get_entry(key)? else {
             return Ok(None);
@@ -104,16 +95,11 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// use musli_zerocopy::phf::{self, Entry};
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut map = Vec::new();
-    ///
-    /// map.push(Entry::new(1, 2));
-    /// map.push(Entry::new(2, 3));
-    ///
-    /// let map = phf::store_map(&mut buf, &mut map)?;
+    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -124,9 +110,10 @@ where
     /// ```
     pub fn contains_key<T>(&self, key: &T) -> Result<bool, Error>
     where
-        T: ?Sized + Eq + Hash,
+        T: ?Sized + Visit,
+        T::Target: Eq + Hash,
         K: Visit,
-        K::Target: Borrow<T>,
+        K::Target: Borrow<T::Target>,
     {
         Ok(self.get_entry(key)?.is_some())
     }
@@ -137,16 +124,11 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// use musli_zerocopy::phf::{self, Entry};
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut map = Vec::new();
-    ///
-    /// map.push(Entry::new(1, 2));
-    /// map.push(Entry::new(2, 3));
-    ///
-    /// let map = phf::store_map(&mut buf, &mut map)?;
+    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -157,15 +139,16 @@ where
     /// ```
     pub fn get_entry<T>(&self, key: &T) -> Result<Option<(&K, &V)>, Error>
     where
-        T: ?Sized + Eq + Hash,
+        T: ?Sized + Visit,
+        T::Target: Eq + Hash,
         K: Visit,
-        K::Target: Borrow<T>,
+        K::Target: Borrow<T::Target>,
     {
         if self.displacements.is_empty() {
             return Ok(None);
         }
 
-        let hashes = crate::phf::hashing::hash(key, &self.key);
+        let hashes = crate::phf::hashing::hash(self.buf, key, &self.key)?;
         let index =
             crate::phf::hashing::get_index(&hashes, self.displacements, self.entries.len())?;
 
@@ -173,7 +156,7 @@ where
             return Ok(None);
         };
 
-        if e.key.visit(self.buf, |v| v.borrow() == key)? {
+        if key.visit(self.buf, |b| e.key.visit(self.buf, |a| a.borrow() == b))?? {
             Ok(Some((&e.key, &e.value)))
         } else {
             Ok(None)
@@ -215,16 +198,11 @@ where
 ///
 /// ```
 /// use musli_zerocopy::AlignedBuf;
-/// use musli_zerocopy::phf::{self, Entry};
+/// use musli_zerocopy::phf;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let mut map = Vec::new();
-///
-/// map.push(Entry::new(1, 2));
-/// map.push(Entry::new(2, 3));
-///
-/// let map = phf::store_map(&mut buf, &mut map)?;
+/// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
 /// let buf = buf.as_aligned();
 ///
 /// assert_eq!(map.get(buf, &1)?, Some(&2));
@@ -278,16 +256,11 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// use musli_zerocopy::phf::{self, Entry};
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut map = Vec::new();
-    ///
-    /// map.push(Entry::new(1, 2));
-    /// map.push(Entry::new(2, 3));
-    ///
-    /// let map = phf::store_map(&mut buf, &mut map)?;
+    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(map.get(buf, &1)?, Some(&2));
@@ -297,9 +270,10 @@ where
     /// ```
     pub fn get<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<&'a V>, Error>
     where
-        T: ?Sized + Eq + Hash,
+        T: ?Sized + Visit,
+        T::Target: Eq + Hash,
         K: 'a + Visit,
-        K::Target: Borrow<T>,
+        K::Target: Borrow<T::Target>,
     {
         let Some(entry) = self.get_entry(buf, key)? else {
             return Ok(None);
@@ -314,16 +288,11 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// use musli_zerocopy::phf::{self, Entry};
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut map = Vec::new();
-    ///
-    /// map.push(Entry::new(1, 2));
-    /// map.push(Entry::new(2, 3));
-    ///
-    /// let map = phf::store_map(&mut buf, &mut map)?;
+    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.as_aligned();
     ///
     /// assert!(map.contains_key(buf, &1)?);
@@ -333,9 +302,10 @@ where
     /// ```
     pub fn contains_key<T>(&self, buf: &Buf, key: &T) -> Result<bool, Error>
     where
-        T: ?Sized + Eq + Hash,
+        T: ?Sized + Visit,
+        T::Target: Eq + Hash,
         K: Visit,
-        K::Target: Borrow<T>,
+        K::Target: Borrow<T::Target>,
     {
         Ok(self.get_entry(buf, key)?.is_some())
     }
@@ -346,16 +316,11 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// use musli_zerocopy::phf::{self, Entry};
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut map = Vec::new();
-    ///
-    /// map.push(Entry::new(1, 2));
-    /// map.push(Entry::new(2, 3));
-    ///
-    /// let map = phf::store_map(&mut buf, &mut map)?;
+    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.as_aligned();
     ///
     /// assert_eq!(map.get_entry(buf, &1)?, Some((&1, &2)));
@@ -365,15 +330,16 @@ where
     /// ```
     pub fn get_entry<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<(&'a K, &'a V)>, Error>
     where
-        T: ?Sized + Eq + Hash,
-        K: Visit,
-        K::Target: Borrow<T>,
+        T: ?Sized + Visit,
+        T::Target: Eq + Hash,
+        K: 'a + Visit,
+        K::Target: Borrow<T::Target>,
     {
         if self.displacements.is_empty() {
             return Ok(None);
         }
 
-        let hashes = crate::phf::hashing::hash(key, &self.key);
+        let hashes = crate::phf::hashing::hash(buf, key, &self.key)?;
 
         let displacements = |index| match self.displacements.get(index) {
             Some(entry) => Ok(Some(buf.load(entry)?)),
@@ -393,7 +359,7 @@ where
 
         let e = buf.load(e)?;
 
-        if e.key.visit(buf, |v| v.borrow() == key)? {
+        if key.visit(buf, |b| e.key.visit(buf, |a| a.borrow() == b))?? {
             Ok(Some((&e.key, &e.value)))
         } else {
             Ok(None)

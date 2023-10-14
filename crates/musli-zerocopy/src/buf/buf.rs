@@ -219,6 +219,30 @@ impl Buf {
         ptr.load(self)
     }
 
+    /// Get raw underlying bytes matching the size of `len` at the given offset
+    /// `O`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// let first = buf.store_unsized("first");
+    /// let second = buf.store_unsized("second");
+    ///
+    /// let buf = buf.as_ref();
+    ///
+    /// assert_eq!(buf.get(first.offset(), 5)?, b"first");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn get(&self, start: usize, len: usize) -> Result<&[u8], Error> {
+        let end = start.wrapping_add(len);
+        self.inner_get_unaligned(start, end)
+    }
+
     /// Load the given value as a mutable reference.
     ///
     /// # Examples
@@ -249,34 +273,29 @@ impl Buf {
 
     /// Bind the current buffer to a value.
     ///
-    /// This provides a more convenient API for complex types like [`MapRef`]
-    /// and [`SetRef`], and makes sure that all the internals related to the
-    /// type being bound have been validated.
+    /// This provides a more convenient API for complex types like
+    /// [`phf::MapRef`] and [`phf::SetRef`], and makes sure that all the
+    /// internals related to the type being bound have been validated.
     ///
     /// Binding a type can be be faster in cases where you interact with the
     /// bound type a lot since accesses do not require validation, but might be
     /// slower if the access is a "one of", or infrequent.
     ///
-    /// [`MapRef`]: crate::map::MapRef
-    /// [`SetRef`]: crate::set::SetRef
+    /// [`phf::MapRef`]: crate::phf::MapRef
+    /// [`phf::SetRef`]: crate::phf::SetRef
     ///
     /// ## Examples
     ///
-    /// Binding a [`Map`] ensures that all the internals of the map have been
-    /// validated:
+    /// Binding a [`phf::Map`] ensures that all the internals of the map have
+    /// been validated:
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// use musli_zerocopy::phf::{self, Entry};
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut map = Vec::new();
-    ///
-    /// map.push(Entry::new(1, 2));
-    /// map.push(Entry::new(2, 3));
-    ///
-    /// let map = phf::store_map(&mut buf, &mut map)?;
+    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -289,7 +308,7 @@ impl Buf {
     /// Ok::<_, musli_zerocopy::Error>(())
     /// ```
     ///
-    /// [`Map`]: crate::map::Map
+    /// [`phf::Map`]: crate::phf::Map
     #[inline]
     pub fn bind<T>(&self, ptr: T) -> Result<T::Bound<'_>, Error>
     where
@@ -378,8 +397,8 @@ impl Buf {
 
     /// Get the given range while checking its required alignment.
     #[inline]
-    pub(crate) fn get(&self, start: usize, end: usize, align: usize) -> Result<&Buf, Error> {
-        let buf = Buf::new(self.get_unaligned(start, end)?);
+    pub(crate) fn inner_get(&self, start: usize, end: usize, align: usize) -> Result<&Buf, Error> {
+        let buf = Buf::new(self.inner_get_unaligned(start, end)?);
 
         if !buf.is_aligned_to(align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
@@ -393,13 +412,13 @@ impl Buf {
 
     /// Get the given range mutably while checking its required alignment.
     #[inline]
-    pub(crate) fn get_mut(
+    pub(crate) fn inner_get_mut(
         &mut self,
         start: usize,
         end: usize,
         align: usize,
     ) -> Result<&mut Buf, Error> {
-        let buf = Buf::new_mut(self.get_mut_unaligned(start, end)?);
+        let buf = Buf::new_mut(self.inner_get_mut_unaligned(start, end)?);
 
         if !buf.is_aligned_to(align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
@@ -414,7 +433,7 @@ impl Buf {
     /// Get the given range without checking that it corresponds to any given
     /// alignment.
     #[inline]
-    pub(crate) fn get_unaligned(&self, start: usize, end: usize) -> Result<&[u8], Error> {
+    pub(crate) fn inner_get_unaligned(&self, start: usize, end: usize) -> Result<&[u8], Error> {
         let Some(data) = self.data.get(start..end) else {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
                 range: start..end,
@@ -427,7 +446,7 @@ impl Buf {
 
     /// Get the given range mutably without checking that it corresponds to any given alignment.
     #[inline]
-    pub(crate) fn get_mut_unaligned(
+    pub(crate) fn inner_get_mut_unaligned(
         &mut self,
         start: usize,
         end: usize,
@@ -456,7 +475,7 @@ impl Buf {
         let start = unsize.offset();
         let size = unsize.size();
         let end = start.wrapping_add(size.wrapping_mul(T::SIZE));
-        let buf = self.get(start, end, T::ALIGN)?;
+        let buf = self.inner_get(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
@@ -475,7 +494,7 @@ impl Buf {
         let start = unsize.offset();
         let size = unsize.size();
         let end = start.wrapping_add(size.wrapping_mul(T::SIZE));
-        let buf = self.get_mut(start, end, T::ALIGN)?;
+        let buf = self.inner_get_mut(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
@@ -490,7 +509,7 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(size_of::<T>());
-        let buf = self.get(start, end, align_of::<T>())?;
+        let buf = self.inner_get(start, end, align_of::<T>())?;
 
         if !T::ANY_BITS {
             // SAFETY: We've checked the size and alignment of the buffer above.
@@ -514,7 +533,7 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(size_of::<T>());
-        let buf = self.get_mut(start, end, align_of::<T>())?;
+        let buf = self.inner_get_mut(start, end, align_of::<T>())?;
 
         if !T::ANY_BITS {
             // SAFETY: We've checked the size and alignment of the buffer above.
@@ -538,7 +557,7 @@ impl Buf {
     {
         let start = slice.offset();
         let end = start.wrapping_add(slice.len().wrapping_mul(size_of::<T>()));
-        let buf = self.get(start, end, align_of::<T>())?;
+        let buf = self.inner_get(start, end, align_of::<T>())?;
         let len = buf.len();
         crate::buf::validate_array::<T>(buf.cursor(), len)?;
         Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), slice.len()) })
@@ -552,7 +571,7 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
-        let buf = self.get_mut_unaligned(start, end)?;
+        let buf = self.inner_get_mut_unaligned(start, end)?;
         let len = buf.len();
         crate::buf::validate_array::<T>(Cursor::new(buf), len)?;
         Ok(unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), ptr.len()) })

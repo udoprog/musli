@@ -1,4 +1,8 @@
 //! A ZeroCopy [`Map`] and [`Set`] based on a perfect hash functions.
+//!
+//! > **Warning** While these maps can be incredibly performant, they can be
+//! > incredibly expensive to build. So avoid these if you're storing many
+//! > elements.
 
 // Map internals copied from rust-phf under the MIT license.
 //
@@ -10,9 +14,7 @@ pub(crate) mod generator;
 
 pub(crate) mod hashing;
 
-mod sip;
-
-pub use self::entry::Entry;
+pub(crate) use self::entry::Entry;
 mod entry;
 
 #[doc(inline)]
