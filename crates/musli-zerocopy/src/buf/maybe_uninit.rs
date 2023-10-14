@@ -8,7 +8,7 @@ use crate::traits::ZeroCopy;
 /// A value which might or might not have been initialized.
 ///
 /// This differs from the standard library
-/// [`MaybeUninit`][core::mem::MaybeUninit] in that it's methods does not assume
+/// [`MaybeUninit`][core::mem::MaybeUninit] in that its methods does not assume
 /// that the value is aligned.
 #[repr(C, packed(1))]
 pub union MaybeUninit<T> {

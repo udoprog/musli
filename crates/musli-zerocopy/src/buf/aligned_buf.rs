@@ -1310,7 +1310,7 @@ impl<O: Size> AsRef<Buf> for AlignedBuf<O> {
     ///
     /// # Errors
     ///
-    /// This will fail if the buffer isn't aligned per it's [`requested()`]
+    /// This will fail if the buffer isn't aligned per its [`requested()`]
     /// alignment.
     ///
     /// [`requested()`]: Self::requested
@@ -1339,7 +1339,7 @@ impl<O: Size> AsMut<Buf> for AlignedBuf<O> {
     ///
     /// # Errors
     ///
-    /// This will fail if the buffer isn't aligned per it's [`requested()`]
+    /// This will fail if the buffer isn't aligned per its [`requested()`]
     /// alignment.
     ///
     /// [`requested()`]: Self::requested
