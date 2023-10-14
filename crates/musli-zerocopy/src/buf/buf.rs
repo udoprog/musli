@@ -454,12 +454,13 @@ impl Buf {
         T: UnsizedZeroCopy,
     {
         let start = unsize.offset();
-        let end = start.wrapping_add(unsize.size().wrapping_mul(T::SIZE));
+        let size = unsize.size();
+        let end = start.wrapping_add(size.wrapping_mul(T::SIZE));
         let buf = self.get(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
-        unsafe { Ok(&*T::coerce(buf.as_ptr(), unsize.size())?) }
+        unsafe { Ok(&*T::coerce(buf.as_ptr(), size)?) }
     }
 
     /// Load an unsized mutable reference.
@@ -472,12 +473,13 @@ impl Buf {
         T: UnsizedZeroCopy,
     {
         let start = unsize.offset();
-        let end = start.wrapping_add(unsize.size().wrapping_mul(T::SIZE));
+        let size = unsize.size();
+        let end = start.wrapping_add(size.wrapping_mul(T::SIZE));
         let buf = self.get_mut(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
-        unsafe { Ok(&mut *T::coerce_mut(buf.as_mut_ptr(), unsize.size())?) }
+        unsafe { Ok(&mut *T::coerce_mut(buf.as_mut_ptr(), size)?) }
     }
 
     /// Load the given sized value as a reference.

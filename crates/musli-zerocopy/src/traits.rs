@@ -74,10 +74,10 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// The size of the base type.
     const SIZE: usize;
 
-    /// The length of the unsized value.
+    /// The size of the unsized value.
     fn size(&self) -> usize;
 
-    /// The size in bytes of the pointed to value.
+    /// The size in bytes of the unsized value.
     fn bytes(&self) -> usize;
 
     /// Write to the owned buffer.
@@ -94,20 +94,18 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     ///
     /// # Safety
     ///
-    /// The caller is responsible for ensuring that the buffer is aligned
-    /// according to [`ALIGN`].
-    ///
-    /// [`ALIGN`]: UnsizedZeroCopy::ALIGN
+    /// The caller is responsible for ensuring that the pointer is valid up to
+    /// the reported size of `Self`. If `Self` is `[T]` then `size` is the
+    /// length of the `T`-containing slice.
     unsafe fn coerce(buf: *const u8, size: usize) -> Result<*const Self, Error>;
 
     /// Validate and coerce the buffer as this type mutably.
     ///
     /// # Safety
     ///
-    /// The caller is responsible for ensuring that the buffer is aligned
-    /// according to [`ALIGN`].
-    ///
-    /// [`ALIGN`]: UnsizedZeroCopy::ALIGN
+    /// The caller is responsible for ensuring that the pointer is valid up to
+    /// the reported size of `Self`. If `Self` is `[T]` then `size` is the
+    /// length of the `T`-containing slice.
     unsafe fn coerce_mut(buf: *mut u8, size: usize) -> Result<*mut Self, Error>;
 }
 
