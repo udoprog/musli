@@ -54,10 +54,11 @@ use crate::ZeroCopy;
 ///
 /// let map = phf::store_map(&mut buf, [(10u64, 1), (20u64, 2)])?;
 /// let buf = buf.as_aligned();
+/// let map = buf.bind(map)?;
 ///
-/// assert_eq!(map.get(buf, &10u64)?, Some(&1));
-/// assert_eq!(map.get(buf, &20u64)?, Some(&2));
-/// assert_eq!(map.get(buf, &30u64)?, None);
+/// assert_eq!(map.get(&10u64)?, Some(&1));
+/// assert_eq!(map.get(&20u64)?, Some(&2));
+/// assert_eq!(map.get(&30u64)?, None);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 pub fn store_map<K, V, I, O: Size>(
@@ -81,7 +82,7 @@ where
 
     let mut hash_state = {
         let buf = buf.as_aligned();
-        crate::phf::generator::generate_hash(buf, &mut entries, |entry| &entry.key)?
+        crate::phf::generator::generate_hash(buf, &entries, |entry| &entry.key)?
     };
 
     for a in 0..hash_state.map.len() {

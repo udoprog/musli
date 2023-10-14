@@ -1,8 +1,11 @@
 //! A ZeroCopy [`Map`] and [`Set`] based on a perfect hash functions.
 //!
-//! > **Warning** While these maps can be incredibly performant, they can be
-//! > incredibly expensive to build. So avoid these if you're storing many
-//! > elements.
+//! While these maps can be incredibly performant, they can be incredibly
+//! expensive to build. So avoid these if you're storing many elements.
+//!
+//! For very large maps and sets, prefer to use [`swiss`] instead.
+//!
+//! [`swiss`]: crate::swiss
 
 // Map internals copied from rust-phf under the MIT license.
 //

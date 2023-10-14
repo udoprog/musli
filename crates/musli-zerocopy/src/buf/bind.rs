@@ -22,6 +22,8 @@ mod sealed {
     }
 
     impl<T, O: Size> Sealed for crate::phf::set::SetRef<T, O> where T: ZeroCopy {}
+
+    impl<T, O: Size> Sealed for crate::swiss::set::SetRef<T, O> where T: ZeroCopy {}
 }
 
 /// Trait used for binding a reference to a [`Buf`] through [`Buf::bind()`].

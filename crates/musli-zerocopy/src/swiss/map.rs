@@ -22,10 +22,8 @@ use crate::error::{Error, ErrorKind};
 use crate::pointer::{DefaultSize, Size, Slice, Unsized};
 use crate::sip::SipHasher13;
 use crate::swiss::raw::{h2, probe_seq, Group};
-use crate::swiss::RawOption;
+use crate::swiss::{Entry, RawOption};
 use crate::ZeroCopy;
-
-use super::Entry;
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///
@@ -79,12 +77,12 @@ where
     /// assert_eq!(map.get(&3)?, None);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn get<T>(&self, key: &T) -> Result<Option<&V>, Error>
+    pub fn get<Q>(&self, key: &Q) -> Result<Option<&V>, Error>
     where
-        T: ?Sized + Visit,
-        T::Target: Eq + Hash,
+        Q: ?Sized + Visit,
+        Q::Target: Eq + Hash,
         K: Visit,
-        K::Target: Borrow<T::Target>,
+        K::Target: Borrow<Q::Target>,
     {
         let hash = key.visit(self.buf, |k| self.hash(k))?;
 
@@ -118,12 +116,12 @@ where
     /// assert!(!map.contains_key(&3)?);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn contains_key<T>(&self, key: &T) -> Result<bool, Error>
+    pub fn contains_key<Q>(&self, key: &Q) -> Result<bool, Error>
     where
-        T: ?Sized + Visit,
-        T::Target: Eq + Hash,
+        Q: ?Sized + Visit,
+        Q::Target: Eq + Hash,
         K: Visit,
-        K::Target: Borrow<T::Target>,
+        K::Target: Borrow<Q::Target>,
     {
         let hash = key.visit(self.buf, |k| self.hash(k))?;
 
@@ -134,9 +132,9 @@ where
         Ok(entry.is_some())
     }
 
-    fn hash<T: ?Sized>(&self, value: &T) -> u64
+    fn hash<H: ?Sized>(&self, value: &H) -> u64
     where
-        T: Hash,
+        H: Hash,
     {
         let mut hasher = SipHasher13::new_with_keys(0, self.key);
         value.hash(&mut hasher);
@@ -155,11 +153,7 @@ where
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {
         Ok(Map {
             key: self.key,
-            table: RawTable {
-                ctrl: buf.load(self.table.ctrl)?,
-                entries: buf.load(self.table.entries)?,
-                bucket_mask: self.table.bucket_mask,
-            },
+            table: self.table.bind(buf)?,
             buf,
         })
     }
@@ -235,12 +229,12 @@ where
     /// assert_eq!(map.get(buf, &3)?, None);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn get<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<&'a V>, Error>
+    pub fn get<'a, Q>(&self, buf: &'a Buf, key: &Q) -> Result<Option<&'a V>, Error>
     where
-        T: ?Sized + Visit,
-        T::Target: Eq + Hash,
+        Q: ?Sized + Visit,
+        Q::Target: Eq + Hash,
         K: 'a + Visit,
-        K::Target: Borrow<T::Target>,
+        K::Target: Borrow<Q::Target>,
     {
         let hash = key.visit(buf, |k| self.hash(k))?;
 
@@ -273,12 +267,12 @@ where
     /// assert!(!map.contains_key(buf, &3)?);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn contains_key<T>(&self, buf: &Buf, key: &T) -> Result<bool, Error>
+    pub fn contains_key<Q>(&self, buf: &Buf, key: &Q) -> Result<bool, Error>
     where
-        T: ?Sized + Visit,
-        T::Target: Eq + Hash,
+        Q: ?Sized + Visit,
+        Q::Target: Eq + Hash,
         K: Visit,
-        K::Target: Borrow<T::Target>,
+        K::Target: Borrow<Q::Target>,
     {
         let hash = key.visit(buf, |key| self.hash(key))?;
 
@@ -289,9 +283,9 @@ where
         Ok(entry.is_some())
     }
 
-    fn hash<T: ?Sized>(&self, value: &T) -> u64
+    fn hash<H: ?Sized>(&self, value: &H) -> u64
     where
-        T: Hash,
+        H: Hash,
     {
         let mut hasher = SipHasher13::new_with_keys(0, self.key);
         value.hash(&mut hasher);
@@ -308,7 +302,7 @@ pub(crate) struct RawTable<'a, T> {
 impl<'a, T> RawTable<'a, T> {
     /// Searches for an element in the table.
     #[inline]
-    fn find(
+    pub(crate) fn find(
         &self,
         hash: u64,
         mut eq: impl FnMut(&T) -> Result<bool, Error>,
@@ -414,6 +408,14 @@ where
             bucket_mask,
         }
     }
+
+    pub(crate) fn bind<'buf>(&self, buf: &'buf Buf) -> Result<RawTable<'buf, T>, Error> {
+        Ok(RawTable {
+            ctrl: buf.load(self.ctrl)?,
+            entries: buf.load(self.entries)?,
+            bucket_mask: self.bucket_mask,
+        })
+    }
 }
 
 impl<T, O: Size> RawTableRef<T, O>
@@ -422,7 +424,7 @@ where
 {
     /// Searches for an element in the table.
     #[inline]
-    fn find<'buf>(
+    pub(crate) fn find<'buf>(
         &self,
         buf: &'buf Buf,
         hash: u64,

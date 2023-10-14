@@ -432,7 +432,7 @@ macro_rules! impl_unsized_primitive {
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
-        #[doc = concat!("struct ", stringify!($(<$param>)*) ," { field: Unsized<[", stringify!($ty) ,"]> }")]
+        #[doc = concat!("struct Custom", stringify!($(<$param>)*) ," { field: Unsized<[", stringify!($ty) ,"]> }")]
         ///
         /// let mut buf = AlignedBuf::new();
         #[doc = concat!("let unsize: Unsized<[", stringify!($example_ty), "]> = buf.store_unsized(&", stringify!($example), ");")]
