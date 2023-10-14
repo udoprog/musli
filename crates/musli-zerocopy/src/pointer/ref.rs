@@ -1,3 +1,4 @@
+use core::hash::Hash;
 use core::marker::PhantomData;
 
 use crate::mem::MaybeUninit;
@@ -32,7 +33,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate)]
+#[zero_copy(crate, skip_visit)]
 pub struct Ref<T, O: Size = DefaultSize> {
     offset: O,
     #[zero_copy(ignore)]
@@ -152,3 +153,45 @@ impl<T, O: Size> Clone for Ref<T, O> {
 }
 
 impl<T, O: Size> Copy for Ref<T, O> {}
+
+impl<T, O: Size> PartialEq for Ref<T, O>
+where
+    O: PartialEq,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.offset == other.offset
+    }
+}
+
+impl<T, O: Size> Eq for Ref<T, O> where O: Eq {}
+
+impl<T, O: Size> PartialOrd for Ref<T, O>
+where
+    O: PartialOrd,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.offset.partial_cmp(&other.offset)
+    }
+}
+
+impl<T, O: Size> Ord for Ref<T, O>
+where
+    O: Ord,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.offset.cmp(&other.offset)
+    }
+}
+
+impl<T, O: Size> Hash for Ref<T, O>
+where
+    O: Hash,
+{
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.offset.hash(state);
+    }
+}

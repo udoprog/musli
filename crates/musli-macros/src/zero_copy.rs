@@ -283,6 +283,7 @@ impl Repr {
 fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let mut generics = input.generics.clone();
 
+    let mut skip_visit = false;
     let mut r = ReprAttr::default();
     let mut krate: syn::Path = syn::parse_quote!(musli_zerocopy);
 
@@ -302,6 +303,11 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                         Punctuated::<syn::WherePredicate, Token![,]>::parse_terminated(&content)?;
 
                     generics.make_where_clause().predicates.extend(predicates);
+                    return Ok(());
+                }
+
+                if meta.path.is_ident("skip_visit") {
+                    skip_visit = true;
                     return Ok(());
                 }
 
@@ -336,10 +342,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
     let struct_padder: syn::Path = syn::parse_quote!(#krate::buf::StructPadder);
+    let buf: syn::Path = syn::parse_quote!(#krate::buf::Buf);
     let validator: syn::Path = syn::parse_quote!(#krate::buf::Validator);
     let cursor: syn::Path = syn::parse_quote!(#krate::buf::Cursor);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
+    let visit: syn::Path = syn::parse_quote!(#krate::buf::Visit);
     let size_of: syn::Path = syn::parse_quote!(core::mem::size_of);
     let align_of: syn::Path = syn::parse_quote!(core::mem::align_of);
     let ptr: syn::Path = syn::parse_quote!(core::ptr);
@@ -639,6 +647,22 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
+    let visit_impl = (!skip_visit).then(|| {
+        quote! {
+            impl #impl_generics #visit for #name #ty_generics #where_clause {
+                type Target = Self;
+
+                #[inline]
+                fn visit<__V, __O>(&self, _: &#buf, visitor: __V) -> #result<__O, #error>
+                where
+                    __V: FnOnce(&Self::Target) -> __O,
+                {
+                    Ok(visitor(self))
+                }
+            }
+        }
+    });
+
     Ok(quote::quote! {
         #check_zero_sized
 
@@ -663,6 +687,8 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 #validate
             }
         }
+
+        #visit_impl
     })
 }
 

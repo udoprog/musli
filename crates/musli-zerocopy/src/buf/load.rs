@@ -22,7 +22,7 @@ mod sealed {
 ///
 /// This can only be implemented correctly by types under certain conditions:
 /// * The type has a strict, well-defined layout or is `repr(C)`.
-pub unsafe trait Load: self::sealed::Sealed {
+pub unsafe trait Load {
     /// The target being read.
     type Target: ?Sized;
 

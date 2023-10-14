@@ -552,8 +552,6 @@ macro_rules! impl_number {
             }
         }
 
-        impl crate::buf::visit::sealed::Sealed for $ty {}
-
         impl Visit for $ty {
             type Target = $ty;
 
@@ -604,8 +602,6 @@ macro_rules! impl_float {
             }
         }
 
-        impl crate::buf::visit::sealed::Sealed for $ty {}
-
         impl Visit for $ty {
             type Target = $ty;
 
@@ -651,8 +647,6 @@ unsafe impl ZeroCopy for char {
     }
 }
 
-impl crate::buf::visit::sealed::Sealed for char {}
-
 impl Visit for char {
     type Target = char;
 
@@ -691,8 +685,6 @@ unsafe impl ZeroCopy for bool {
         Ok(())
     }
 }
-
-impl crate::buf::visit::sealed::Sealed for bool {}
 
 impl Visit for bool {
     type Target = bool;
@@ -774,8 +766,6 @@ macro_rules! impl_nonzero_number {
             }
         }
 
-        impl crate::buf::visit::sealed::Sealed for ::core::num::$ty {}
-
         impl Visit for ::core::num::$ty {
             type Target = ::core::num::$ty;
 
@@ -847,9 +837,6 @@ macro_rules! impl_zst {
             unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
                 Ok(())
             }
-        }
-
-        impl $(<$($bounds)*>)* crate::buf::visit::sealed::Sealed for $ty {
         }
 
         impl $(<$($bounds)*>)* Visit for $ty {
@@ -935,8 +922,6 @@ where
         Ok(())
     }
 }
-
-impl<T> crate::buf::visit::sealed::Sealed for [T; 0] {}
 
 impl<T> Visit for [T; 0] {
     type Target = [T; 0];

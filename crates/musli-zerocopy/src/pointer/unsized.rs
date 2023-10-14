@@ -36,7 +36,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate)]
+#[zero_copy(crate, skip_visit)]
 pub struct Unsized<T: ?Sized + UnsizedZeroCopy, O: Size = DefaultSize> {
     offset: O,
     size: O,

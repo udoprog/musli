@@ -1180,6 +1180,7 @@ impl<O: Size> AlignedBuf<O> {
             return;
         }
 
+        let new_capacity = new_capacity.max((self.capacity as f32 * 1.5) as usize);
         let (old_layout, new_layout) = self.layouts(new_capacity);
 
         if old_layout.size() == 0 {
