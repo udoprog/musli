@@ -14,7 +14,7 @@ use crate::ZeroCopy;
 #[derive(Debug, ZeroCopy)]
 #[zero_copy(crate, bounds = {K: ZeroCopy, V: ZeroCopy})]
 #[repr(C)]
-pub struct Entry<K, V> {
+pub(crate) struct Entry<K, V> {
     /// The first element in the pair.
     pub key: K,
     /// The second element in the pair.
@@ -23,7 +23,15 @@ pub struct Entry<K, V> {
 
 impl<K, V> Entry<K, V> {
     /// Construct a new pair.
-    pub fn new(key: K, value: V) -> Self {
+    pub(crate) fn new(key: K, value: V) -> Self {
         Self { key, value }
     }
+}
+
+#[derive(Debug, ZeroCopy)]
+#[zero_copy(crate, bounds = {T: ZeroCopy})]
+#[repr(u8)]
+pub(crate) enum RawOption<T> {
+    Some(T),
+    None,
 }

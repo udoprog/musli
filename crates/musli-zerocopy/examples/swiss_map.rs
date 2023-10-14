@@ -1,15 +1,10 @@
-use musli_zerocopy::map::Entry;
+use musli_zerocopy::swiss;
 use musli_zerocopy::{AlignedBuf, Error};
 
 fn main() -> Result<(), Error> {
     let mut buf = AlignedBuf::new();
 
-    let mut values = Vec::new();
-
-    values.push(Entry::new(10u32, 1u32));
-    values.push(Entry::new(20u32, 2u32));
-
-    let values = buf.store_map(&mut values)?;
+    let values = swiss::store_map(&mut buf, [(10u32, 1u32), (20u32, 2u32)])?;
 
     let buf = buf.as_aligned();
     let values = buf.bind(values)?;

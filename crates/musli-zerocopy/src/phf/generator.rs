@@ -34,6 +34,8 @@ where
         if let Some(hash) = try_generate_hash(buf, entries, key, &access)? {
             return Ok(hash);
         }
+
+        std::println!("failed to generate hash");
     }
 
     Err(Error::new(ErrorKind::FailedPhf))
@@ -62,7 +64,7 @@ where
 
         let entry = access(entry);
 
-        let h = entry.visit(buf, |entry| hash(entry, &key))?;
+        let h = hash(buf, entry, &key)?;
         hashes.push(h);
     }
 

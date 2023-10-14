@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::pointer::{DefaultSize, Size};
+use crate::pointer::{DefaultSize, Ref, Size};
 use crate::traits::UnsizedZeroCopy;
 use crate::ZeroCopy;
 
@@ -36,7 +36,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate)]
+#[zero_copy(crate, skip_visit)]
 pub struct Unsized<T: ?Sized + UnsizedZeroCopy, O: Size = DefaultSize> {
     offset: O,
     size: O,
@@ -104,6 +104,84 @@ where
     #[inline]
     pub fn size(&self) -> usize {
         self.size.as_usize()
+    }
+}
+
+impl<T, O: Size> Unsized<[T], O>
+where
+    [T]: UnsizedZeroCopy,
+    T: ZeroCopy,
+{
+    /// Get the length of the unsized slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let unsize = buf.store_unsized(&b"abcd"[..]);
+    ///
+    /// let buf = buf.as_aligned();
+    ///
+    /// assert_eq!(unsize.len(), 4);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn len(&self) -> usize {
+        self.size.as_usize()
+    }
+
+    /// Test if the slice is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let unsize = buf.store_unsized(&b""[..]);
+    /// assert!(unsize.is_empty());
+    ///
+    /// let unsize = buf.store_unsized(&b"abcd"[..]);
+    ///
+    /// let buf = buf.as_aligned();
+    ///
+    /// assert!(!unsize.is_empty());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.size.is_zero()
+    }
+
+    /// Try to get a reference directly out of the slice without validation.
+    ///
+    /// This avoids having to validate every element in a slice in order to
+    /// address them.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::AlignedBuf;
+    ///
+    /// let mut buf = AlignedBuf::new();
+    /// let unsize = buf.store_unsized(&b"abcd"[..]);
+    ///
+    /// let buf = buf.as_aligned();
+    ///
+    /// let two = unsize.get(2).expect("missing element 2");
+    /// assert_eq!(buf.load(two)?, &b'c');
+    ///
+    /// assert!(unsize.get(4).is_none());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    ///
+    pub fn get(&self, index: usize) -> Option<Ref<T, O>> {
+        if index >= self.len() {
+            return None;
+        }
+
+        let ptr = self.offset().wrapping_add(index.wrapping_mul(<[T]>::SIZE));
+        Some(Ref::new(ptr))
     }
 }
 

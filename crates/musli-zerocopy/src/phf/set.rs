@@ -2,23 +2,23 @@
 //! up by keys.
 //!
 //! This set are implemented using a perfect hash functions, and are inserted
-//! into a buffering using [`AlignedBuf::store_set`].
+//! into a buffering using [`phf::store_set`].
 //!
 //! There's two types provided by this module:
 //! * [`Set<T>`] which is a *bound* reference to a set, providing a convenient
 //!   set-like access.
 //! * [`SetRef<T>`] which is the *pointer* of the set. This is what you store in
-//!   [`ZeroCopy`] types and is what is returned by [`AlignedBuf::store_set`].
+//!   [`ZeroCopy`] types and is what is returned by [`phf::store_set`].
 //!
-//! [`AlignedBuf::store_set`]: crate::buf::AlignedBuf::store_set
+//! [`phf::store_set`]: crate::phf::store_set
 
 use core::borrow::Borrow;
 use core::hash::Hash;
 
 use crate::buf::{Bindable, Buf, Visit};
 use crate::error::Error;
-use crate::map::Entry;
 use crate::phf::hashing::HashKey;
+use crate::phf::Entry;
 use crate::pointer::{DefaultSize, Size, Slice};
 use crate::ZeroCopy;
 
@@ -28,13 +28,13 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use musli_zerocopy::AlignedBuf;
-/// use musli_zerocopy::map::Entry;
+/// use musli_zerocopy::phf;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
 /// let mut set = [1, 2];
 ///
-/// let set = buf.store_set(&mut set)?;
+/// let set = phf::store_set(&mut buf, &mut set)?;
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
@@ -60,12 +60,13 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut set = [1, 2];
     ///
-    /// let set = buf.store_set(&mut set)?;
+    /// let set = phf::store_set(&mut buf, &mut set)?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///
@@ -76,15 +77,16 @@ where
     /// ```
     pub fn contains<Q>(&self, key: &Q) -> Result<bool, Error>
     where
-        Q: ?Sized + Eq + Hash,
+        Q: ?Sized + Visit,
+        Q::Target: Eq + Hash,
         T: Visit,
-        T::Target: Borrow<Q>,
+        T::Target: Borrow<Q::Target>,
     {
         if self.displacements.is_empty() {
             return Ok(false);
         }
 
-        let hashes = crate::phf::hashing::hash(key, &self.key);
+        let hashes = crate::phf::hashing::hash(self.buf, key, &self.key)?;
         let index =
             crate::phf::hashing::get_index(&hashes, self.displacements, self.entries.len())?;
 
@@ -92,7 +94,7 @@ where
             return Ok(false);
         };
 
-        e.visit(self.buf, |v| v.borrow() == key)
+        key.visit(self.buf, |b| e.visit(self.buf, |a| a.borrow() == b))?
     }
 }
 
@@ -120,21 +122,22 @@ where
 /// [`bind()`] is used and might result in better performance if the data is
 /// infrequently accessed.
 ///
-/// Constructed through [`AlignedBuf::store_set`].
+/// Constructed through [`phf::store_set`].
 ///
-/// [`AlignedBuf::store_set`]: crate::buf::AlignedBuf::store_set
+/// [`phf::store_set`]: crate::phf::store_set
 /// [`bind()`]: crate::buf::Buf::bind
 ///
 /// ## Examples
 ///
 /// ```
 /// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::phf;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
 /// let mut set = [1, 2];
 ///
-/// let set = buf.store_set(&mut set)?;
+/// let set = phf::store_set(&mut buf, &mut set)?;
 /// let buf = buf.as_aligned();
 ///
 /// assert!(set.contains(buf, &1)?);
@@ -182,12 +185,13 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut set = [1, 2];
     ///
-    /// let set = buf.store_set(&mut set)?;
+    /// let set = phf::store_set(&mut buf, &mut set)?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///
@@ -196,17 +200,18 @@ where
     /// assert!(!set.contains(&3)?);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn contains<'a, Q>(&self, buf: &'a Buf, key: &Q) -> Result<bool, Error>
+    pub fn contains<Q>(&self, buf: &Buf, key: &Q) -> Result<bool, Error>
     where
-        Q: ?Sized + Eq + Hash,
-        T: 'a + Visit,
-        T::Target: Borrow<Q>,
+        Q: ?Sized + Visit,
+        Q::Target: Eq + Hash,
+        T: Visit,
+        T::Target: Borrow<Q::Target>,
     {
         if self.displacements.is_empty() {
             return Ok(false);
         }
 
-        let hashes = crate::phf::hashing::hash(key, &self.key);
+        let hashes = crate::phf::hashing::hash(buf, key, &self.key)?;
 
         let displacements = |index| match self.displacements.get(index) {
             Some(entry) => Ok(Some(buf.load(entry)?)),
@@ -224,6 +229,7 @@ where
             return Ok(false);
         };
 
-        buf.load(e)?.visit(buf, |v| v.borrow() == key)
+        let e = buf.load(e)?;
+        key.visit(buf, |b| e.visit(buf, |a| a.borrow() == b))?
     }
 }

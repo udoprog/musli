@@ -123,6 +123,14 @@ pub(crate) enum ErrorKind {
         index: usize,
         len: usize,
     },
+    ControlIndexOutOfBounds {
+        index: usize,
+        len: usize,
+    },
+    AbsentEntry {
+        index: usize,
+        len: usize,
+    },
     IllegalEnumRepr {
         name: &'static str,
         repr: EnumRepr,
@@ -163,6 +171,12 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::IndexOutOfBounds { index, len } => {
                 write!(f, "Index {index} out of bound 0-{len}")
+            }
+            ErrorKind::ControlIndexOutOfBounds { index, len } => {
+                write!(f, "Control index {index} out of bound 0-{len}")
+            }
+            ErrorKind::AbsentEntry { index, len } => {
+                write!(f, "Entry absent at index {index} in bound 0-{len}")
             }
             ErrorKind::IllegalEnumRepr { name, repr } => {
                 write!(f, "Illegal enum representation {repr} for enum {name}")
