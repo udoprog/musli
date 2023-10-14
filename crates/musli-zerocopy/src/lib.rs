@@ -366,10 +366,7 @@ mod error;
 pub use self::traits::ZeroCopy;
 pub mod traits;
 
-mod phf;
-
-pub mod map;
-pub mod set;
+pub mod phf;
 
 pub mod pointer;
 

@@ -2,23 +2,23 @@
 //! up by keys.
 //!
 //! This set are implemented using a perfect hash functions, and are inserted
-//! into a buffering using [`AlignedBuf::store_set`].
+//! into a buffering using [`phf::store_set`].
 //!
 //! There's two types provided by this module:
 //! * [`Set<T>`] which is a *bound* reference to a set, providing a convenient
 //!   set-like access.
 //! * [`SetRef<T>`] which is the *pointer* of the set. This is what you store in
-//!   [`ZeroCopy`] types and is what is returned by [`AlignedBuf::store_set`].
+//!   [`ZeroCopy`] types and is what is returned by [`phf::store_set`].
 //!
-//! [`AlignedBuf::store_set`]: crate::buf::AlignedBuf::store_set
+//! [`phf::store_set`]: crate::phf::store_set
 
 use core::borrow::Borrow;
 use core::hash::Hash;
 
 use crate::buf::{Bindable, Buf, Visit};
 use crate::error::Error;
-use crate::map::Entry;
 use crate::phf::hashing::HashKey;
+use crate::phf::Entry;
 use crate::pointer::{DefaultSize, Size, Slice};
 use crate::ZeroCopy;
 
@@ -28,13 +28,13 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use musli_zerocopy::AlignedBuf;
-/// use musli_zerocopy::map::Entry;
+/// use musli_zerocopy::phf;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
 /// let mut set = [1, 2];
 ///
-/// let set = buf.store_set(&mut set)?;
+/// let set = phf::store_set(&mut buf, &mut set)?;
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
@@ -60,12 +60,13 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut set = [1, 2];
     ///
-    /// let set = buf.store_set(&mut set)?;
+    /// let set = phf::store_set(&mut buf, &mut set)?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///
@@ -120,21 +121,22 @@ where
 /// [`bind()`] is used and might result in better performance if the data is
 /// infrequently accessed.
 ///
-/// Constructed through [`AlignedBuf::store_set`].
+/// Constructed through [`phf::store_set`].
 ///
-/// [`AlignedBuf::store_set`]: crate::buf::AlignedBuf::store_set
+/// [`phf::store_set`]: crate::phf::store_set
 /// [`bind()`]: crate::buf::Buf::bind
 ///
 /// ## Examples
 ///
 /// ```
 /// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::phf;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
 /// let mut set = [1, 2];
 ///
-/// let set = buf.store_set(&mut set)?;
+/// let set = phf::store_set(&mut buf, &mut set)?;
 /// let buf = buf.as_aligned();
 ///
 /// assert!(set.contains(buf, &1)?);
@@ -182,12 +184,13 @@ where
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::phf;
     ///
     /// let mut buf = AlignedBuf::new();
     ///
     /// let mut set = [1, 2];
     ///
-    /// let set = buf.store_set(&mut set)?;
+    /// let set = phf::store_set(&mut buf, &mut set)?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///

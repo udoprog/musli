@@ -7,14 +7,14 @@ mod sealed {
 
     pub trait Sealed {}
 
-    impl<K, V, O: Size> Sealed for crate::map::MapRef<K, V, O>
+    impl<K, V, O: Size> Sealed for crate::phf::map::MapRef<K, V, O>
     where
         K: ZeroCopy,
         V: ZeroCopy,
     {
     }
 
-    impl<T, O: Size> Sealed for crate::set::SetRef<T, O> where T: ZeroCopy {}
+    impl<T, O: Size> Sealed for crate::phf::set::SetRef<T, O> where T: ZeroCopy {}
 }
 
 /// Trait used for binding a reference to a [`Buf`] through [`Buf::bind()`].

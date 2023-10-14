@@ -1,8 +1,8 @@
 use core::hash::Hash;
 
 use crate::error::{Error, ErrorKind};
-use crate::map::Entry;
 use crate::phf::sip::{Hash128, Hasher128, SipHasher13};
+use crate::phf::Entry;
 
 #[non_exhaustive]
 pub(crate) struct Hashes {

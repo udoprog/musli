@@ -267,7 +267,7 @@ impl Buf {
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// use musli_zerocopy::map::Entry;
+    /// use musli_zerocopy::phf::{self, Entry};
     ///
     /// let mut buf = AlignedBuf::new();
     ///
@@ -276,7 +276,7 @@ impl Buf {
     /// map.push(Entry::new(1, 2));
     /// map.push(Entry::new(2, 3));
     ///
-    /// let map = buf.store_map(&mut map)?;
+    /// let map = phf::store_map(&mut buf, &mut map)?;
     /// let buf = buf.as_aligned();
     /// let map = buf.bind(map)?;
     ///
