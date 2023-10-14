@@ -186,22 +186,19 @@ buffer is the element currently being written.
 
 This is useful because it satisfies the last requirement above, *the offset*
 at where the struct can be read will then simply be zero, and all the data
-it depends on are stored at larger offsets.
+it depends on are stored at subsequent offsets.
 
 ```rust
 use musli_zerocopy::AlignedBuf;
 use musli_zerocopy::pointer::Ref;
-use musli_zerocopy::buf::MaybeUninit;
+use musli_zerocopy::mem::MaybeUninit;
 
 let mut buf = AlignedBuf::new();
 let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
 
 let string = buf.store_unsized("Hello World!");
 
-buf.load_uninit_mut(reference).write(&Custom {
-    field: 42,
-    string,
-});
+buf.load_uninit_mut(reference).write(&Custom { field: 42, string });
 
 let reference = reference.assume_init();
 assert_eq!(reference.offset(), 0);
@@ -275,11 +272,7 @@ use musli_zerocopy::pointer::{Ref, Slice, Unsized};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
-struct Custom {
-    reference: Ref<u32, usize>,
-    slice: Slice::<u32, usize>,
-    unsize: Unsized::<str, usize>,
-}
+struct Custom { reference: Ref<u32, usize>, slice: Slice::<u32, usize>, unsize: Unsized::<str, usize> }
 
 let mut buf = AlignedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
 

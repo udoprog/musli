@@ -1,0 +1,37 @@
+error: ZeroCopy: repr(packed) is only supported on structs
+ --> tests/ui/repr_enum_error.rs:4:17
+  |
+4 | #[repr(C, packed)]
+  |                 ^
+
+error: ZeroCopy: repr(packed) is only supported on structs
+  --> tests/ui/repr_enum_error.rs:10:18
+   |
+10 | #[repr(u8, packed)]
+   |                  ^
+
+error: ZeroCopy: only supported for repr(i*) or repr(u*) enums
+  --> tests/ui/repr_enum_error.rs:16:8
+   |
+16 | #[repr(C)]
+   |        ^
+
+error[E0517]: attribute should be applied to a struct or union
+ --> tests/ui/repr_enum_error.rs:4:11
+  |
+4 |   #[repr(C, packed)]
+  |             ^^^^^^
+5 | / enum ReprPackedC {
+6 | |     Variant(u32),
+7 | | }
+  | |_- not a struct or union
+
+error[E0517]: attribute should be applied to a struct or union
+  --> tests/ui/repr_enum_error.rs:10:12
+   |
+10 |   #[repr(u8, packed)]
+   |              ^^^^^^
+11 | / enum ReprPackedU8 {
+12 | |     Variant(u32),
+13 | | }
+   | |_- not a struct or union

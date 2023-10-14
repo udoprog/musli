@@ -2,15 +2,16 @@ use core::alloc::Layout;
 use core::hash::Hash;
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of, size_of_val, ManuallyDrop};
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 use core::slice;
 
 use ::alloc::alloc;
 use ::alloc::vec::Vec;
 
-use crate::buf::{Buf, BufMut, DefaultAlignment, MaybeUninit, StructPadder, Visit};
+use crate::buf::{Buf, BufMut, DefaultAlignment, StructPadder, Visit};
 use crate::error::Error;
 use crate::map::{Entry, MapRef};
+use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Ref, Size, Slice, Unsized};
 use crate::set::SetRef;
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -28,9 +29,7 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C, align(128))]
-/// struct Custom {
-///     field: u32,
-/// }
+/// struct Custom { field: u32 }
 ///
 /// let mut buf = AlignedBuf::new();
 /// buf.store(&Custom { field: 10 });
@@ -388,26 +387,20 @@ impl<O: Size> AlignedBuf<O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::buf::MaybeUninit;
+    /// use musli_zerocopy::mem::MaybeUninit;
     /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
     /// use musli_zerocopy::pointer::{Ref, Unsized};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
-    /// struct Custom {
-    ///     field: u32,
-    ///     string: Unsized<str>
-    /// }
+    /// struct Custom { field: u32, string: Unsized<str> }
     ///
     /// let mut buf = AlignedBuf::new();
     /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
     ///
     /// let string = buf.store_unsized("Hello World!");
     ///
-    /// buf.load_uninit_mut(reference).write(&Custom {
-    ///     field: 42,
-    ///     string,
-    /// });
+    /// buf.load_uninit_mut(reference).write(&Custom { field: 42, string });
     ///
     /// let reference = reference.assume_init();
     /// assert_eq!(reference.offset(), 0);
@@ -421,9 +414,7 @@ impl<O: Size> AlignedBuf<O> {
         // SAFETY: We've just reserved capacity for this write.
         unsafe {
             let len = self.next_offset_with(align_of::<T>(), size_of::<T>());
-
             self.data.as_ptr().add(len).write_bytes(0, size_of::<T>());
-
             self.len = self.len.wrapping_add(size_of::<T>());
             Ref::new_raw(len)
         }
@@ -463,24 +454,18 @@ impl<O: Size> AlignedBuf<O> {
     /// ```
     /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
     /// use musli_zerocopy::pointer::{Ref, Unsized};
-    /// use musli_zerocopy::buf::MaybeUninit;
+    /// use musli_zerocopy::mem::MaybeUninit;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
-    /// struct Custom {
-    ///     field: u32,
-    ///     string: Unsized<str>
-    /// }
+    /// struct Custom { field: u32, string: Unsized<str> }
     ///
     /// let mut buf = AlignedBuf::new();
     /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
     ///
     /// let string = buf.store_unsized("Hello World!");
     ///
-    /// buf.load_uninit_mut(reference).write(&Custom {
-    ///     field: 42,
-    ///     string,
-    /// });
+    /// buf.load_uninit_mut(reference).write(&Custom { field: 42, string });
     ///
     /// let reference = reference.assume_init();
     /// assert_eq!(reference.offset(), 0);
@@ -518,10 +503,7 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
-    /// struct Custom {
-    ///     field: u32,
-    ///     string: Unsized<str>,
-    /// }
+    /// struct Custom { field: u32, string: Unsized<str> }
     ///
     /// let mut buf = AlignedBuf::new();
     ///
@@ -575,7 +557,7 @@ impl<O: Size> AlignedBuf<O> {
         // correctly.
         unsafe {
             let ptr = self.next_offset_with(align_of::<T>(), size_of::<T>());
-            value.store_to(self);
+            T::store_to(value, self);
             Ref::new(ptr)
         }
     }
@@ -1078,7 +1060,7 @@ impl<O: Size> AlignedBuf<O> {
     }
 
     #[inline]
-    fn store_bits<T>(&mut self, value: T)
+    fn store_bits<T>(&mut self, value: *const T)
     where
         T: ZeroCopy,
     {
@@ -1088,14 +1070,14 @@ impl<O: Size> AlignedBuf<O> {
         let start = self.as_ptr_mut().wrapping_add(self.len);
 
         unsafe {
-            ptr::write_unaligned(start.cast::<T>(), value);
+            start.copy_from_nonoverlapping(value.cast(), size_of::<T>());
         }
 
         self.len = len;
     }
 
     #[inline]
-    unsafe fn store_struct<T>(&mut self, value: &T) -> StructPadder<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: *const T) -> StructPadder<'_, T>
     where
         T: ZeroCopy,
     {
@@ -1111,7 +1093,7 @@ impl<O: Size> AlignedBuf<O> {
         self.len = len;
 
         unsafe {
-            start.copy_from_nonoverlapping((value as *const T).cast::<u8>(), size_of::<T>());
+            start.copy_from_nonoverlapping(value.cast(), size_of::<T>());
         }
 
         StructPadder::new(start)
@@ -1127,7 +1109,7 @@ impl<O: Size> AlignedBuf<O> {
         T: ZeroCopy,
     {
         self.request_align::<T>();
-        value.store_to(self);
+        T::store_to(value, self);
     }
 
     #[inline]
@@ -1282,7 +1264,7 @@ impl<O: Size> AlignedBuf<O> {
 
             if T::PADDED {
                 for value in values {
-                    value.store_to(self);
+                    T::store_to(value, self);
                 }
             } else {
                 self.data
@@ -1426,7 +1408,7 @@ impl<O: Size> BufMut for AlignedBuf<O> {
     }
 
     #[inline]
-    unsafe fn store_bits<T>(&mut self, value: T)
+    unsafe fn store_bits<T>(&mut self, value: *const T)
     where
         T: ZeroCopy,
     {
@@ -1442,7 +1424,7 @@ impl<O: Size> BufMut for AlignedBuf<O> {
     }
 
     #[inline]
-    unsafe fn store_struct<T>(&mut self, value: &T) -> StructPadder<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: *const T) -> StructPadder<'_, T>
     where
         T: ZeroCopy,
     {

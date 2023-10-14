@@ -2,8 +2,8 @@
 
 use core::array;
 
-use crate::buf::MaybeUninit;
 use crate::error::Error;
+use crate::mem::MaybeUninit;
 use crate::pointer::{Ref, Unsized};
 use crate::ZeroCopy;
 
@@ -166,4 +166,27 @@ fn inner_padding() -> Result<(), Error> {
     assert_eq!(&custom.inner, &inner);
     assert_eq!(&custom.inner2, &inner2);
     Ok(())
+}
+
+#[test]
+fn test_packing() {
+    #[derive(ZeroCopy)]
+    #[repr(C, packed)]
+    #[zero_copy(crate)]
+    struct Packed {
+        inner: u8,
+        inner2: u32,
+    }
+
+    const _: () = assert!(!Packed::PADDED);
+
+    #[derive(ZeroCopy)]
+    #[repr(C, packed(1))]
+    #[zero_copy(crate)]
+    struct Packed1 {
+        inner: u8,
+        inner2: u32,
+    }
+
+    const _: () = assert!(!Packed1::PADDED);
 }

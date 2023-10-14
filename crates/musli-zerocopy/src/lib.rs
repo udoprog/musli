@@ -199,7 +199,7 @@
 //!
 //! This is useful because it satisfies the last requirement above, *the offset*
 //! at where the struct can be read will then simply be zero, and all the data
-//! it depends on are stored at larger offsets.
+//! it depends on are stored at subsequent offsets.
 //!
 //! ```
 //! # use musli_zerocopy::ZeroCopy;
@@ -209,17 +209,14 @@
 //! # struct Custom { field: u32, string: Unsized<str> }
 //! use musli_zerocopy::AlignedBuf;
 //! use musli_zerocopy::pointer::Ref;
-//! use musli_zerocopy::buf::MaybeUninit;
+//! use musli_zerocopy::mem::MaybeUninit;
 //!
 //! let mut buf = AlignedBuf::new();
 //! let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
 //!
 //! let string = buf.store_unsized("Hello World!");
 //!
-//! buf.load_uninit_mut(reference).write(&Custom {
-//!     field: 42,
-//!     string,
-//! });
+//! buf.load_uninit_mut(reference).write(&Custom { field: 42, string });
 //!
 //! let reference = reference.assume_init();
 //! assert_eq!(reference.offset(), 0);
@@ -310,11 +307,7 @@
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
-//! struct Custom {
-//!     reference: Ref<u32, usize>,
-//!     slice: Slice::<u32, usize>,
-//!     unsize: Unsized::<str, usize>,
-//! }
+//! struct Custom { reference: Ref<u32, usize>, slice: Slice::<u32, usize>, unsize: Unsized::<str, usize> }
 //!
 //! let mut buf = AlignedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
 //!
@@ -363,6 +356,8 @@ extern crate std;
 pub use self::buf::{AlignedBuf, Buf};
 pub mod buf;
 
+pub mod mem;
+
 #[doc(inline)]
 pub use self::error::Error;
 mod error;
@@ -400,9 +395,7 @@ pub mod pointer;
 ///
 /// #[derive(Debug, PartialEq, ZeroCopy)]
 /// #[repr(C, align(128))]
-/// struct Custom {
-///     field: u32,
-/// }
+/// struct Custom { field: u32 }
 ///
 /// let mut buf = AlignedBuf::new();
 /// let ptr = buf.store(&Custom { field: 10 });
@@ -478,35 +471,43 @@ pub mod pointer;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(u8)]
-/// enum ZstEnum {
-///     EmptyField
-/// }
+/// enum ZstEnum { EmptyField }
 /// const _: () = assert!(!ZstEnum::PADDED);
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(u8)]
-/// enum SameEnum {
-///     Variant1(u8),
-///     Variant2(u8),
-/// }
+/// enum SameEnum { Variant1(u8), Variant2(u8) }
 /// const _: () = assert!(!SameEnum::PADDED);
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(u16)]
-/// enum PaddedU16 {
-///     Variant1(u8),
-///     Variant2(u8),
-/// }
+/// enum PaddedU16 { Variant1(u8), Variant2(u8) }
 /// const _: () = assert!(PaddedU16::PADDED);
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(u16)]
-/// enum NotPaddedU16 {
-///     Variant1(u8, u8),
-///     Variant2([u8; 2]),
-///     Variant3(u16),
-/// }
+/// enum NotPaddedU16 { Variant1(u8, u8), Variant2([u8; 2]), Variant3(u16) }
 /// const _: () = assert!(!NotPaddedU16::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C, packed)]
+/// struct Packed { inner: u8, inner2: u32 }
+/// const _: () = assert!(!Packed::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C, packed(2))]
+/// struct Packed1 { inner: u8, inner2: u32 }
+/// const _: () = assert!(Packed1::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C)]
+/// struct Inner { inner: u8, inner2: u32 }
+/// const _: () = assert!(Inner::PADDED);
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C)]
+/// struct Outer { first: u8, inner: Inner }
+/// const _: () = assert!(Outer::PADDED);
 /// ```
 ///
 /// # Supported attributes
@@ -514,10 +515,12 @@ pub mod pointer;
 /// ## Type attributes
 ///
 /// The following `repr` attributes are supported:
-/// * repr(C) - Ensures that the type has the mandatory represention.
-/// * repr(transparent) - If there is a single field inside of the marked struct
-///   which implements `ZeroCopy`.
-/// * repr(align(..)) - Allows for control over the struct alignment.
+/// * `#[repr(C)]` - Ensures that the type has the mandatory represention.
+/// * `#[repr(transparent)]` - If there is a single field inside of the marked
+///   struct which implements `ZeroCopy`.
+/// * `#[repr(align(N))]` - Allows for control over the type's alignment.
+/// * `#[repr(packed)]` or `#[repr(packed(N))]` - Allows for control over the
+///   struct alignment. Namely to lower it. This is not supported for enums.
 ///
 /// The following `zero_copy(..)` attribute are supported:
 ///
@@ -544,16 +547,13 @@ pub mod pointer;
 /// (default).
 ///
 /// ```
-/// use musli_zerocopy as zerocopy;
-///
+/// # use musli_zerocopy as zerocopy;
 /// use zerocopy::ZeroCopy;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]
 /// #[zero_copy(crate = zerocopy)]
-/// struct Custom {
-///     field: u32,
-/// }
+/// struct Custom { field: u32 }
 /// ```
 #[doc(inline)]
 pub use musli_macros::ZeroCopy;

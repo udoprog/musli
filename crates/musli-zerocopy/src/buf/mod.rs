@@ -39,9 +39,6 @@ pub use self::aligned_buf::AlignedBuf;
 #[cfg(feature = "alloc")]
 mod aligned_buf;
 
-pub use self::maybe_uninit::MaybeUninit;
-mod maybe_uninit;
-
 use core::mem::size_of;
 
 use crate::error::Error;

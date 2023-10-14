@@ -343,17 +343,11 @@ impl Buf {
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
-    /// struct Custom {
-    ///     field: u32,
-    ///     field2: u64,
-    /// }
+    /// struct Custom { field: u32, field2: u64 }
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let custom = buf.store(&Custom {
-    ///     field: 42,
-    ///     field2: 85,
-    /// });
+    /// let custom = buf.store(&Custom { field: 42, field2: 85 });
     /// let buf = buf.as_aligned();
     ///
     /// let mut v = buf.validate_struct::<Custom>()?;

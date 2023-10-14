@@ -74,7 +74,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn pad<F>(&mut self, field: &F)
+    pub unsafe fn pad<F>(&mut self, field: *const F)
     where
         F: ZeroCopy,
     {
@@ -85,7 +85,7 @@ where
 
         if F::PADDED {
             let mut padder = StructPadder::new(self.ptr.wrapping_add(self.offset));
-            field.pad(&mut padder);
+            F::pad(field, &mut padder);
             padder.end();
         }
 

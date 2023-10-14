@@ -43,7 +43,7 @@ pub trait BufMut: self::sealed::Sealed {
     /// size of `Self`.
     ///
     /// Also see the [type level safety documentation][Self:#safety]
-    unsafe fn store_bits<T>(&mut self, value: T)
+    unsafe fn store_bits<T>(&mut self, value: *const T)
     where
         T: ZeroCopy;
 
@@ -130,7 +130,7 @@ pub trait BufMut: self::sealed::Sealed {
     /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    unsafe fn store_struct<T>(&mut self, value: &T) -> StructPadder<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: *const T) -> StructPadder<'_, T>
     where
         T: ZeroCopy;
 

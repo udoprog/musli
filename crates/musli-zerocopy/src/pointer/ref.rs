@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::buf::MaybeUninit;
+use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Size, Slice};
 use crate::ZeroCopy;
 

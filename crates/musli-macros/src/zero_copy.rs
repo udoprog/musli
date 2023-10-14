@@ -49,8 +49,9 @@ impl<'a> Expander<'a> {
 
 #[derive(Default)]
 struct ReprAttr {
-    repr: Option<Repr>,
+    repr: Option<(Span, Repr)>,
     repr_align: Option<usize>,
+    repr_packed: Option<(Span, usize)>,
 }
 
 impl ReprAttr {
@@ -66,7 +67,7 @@ impl ReprAttr {
                             ));
                         }
 
-                        self.repr = Some($variant);
+                        self.repr = Some((meta.path.span(), $variant));
                         return Ok(());
                     }
                 };
@@ -97,9 +98,23 @@ impl ReprAttr {
                 return Ok(());
             }
 
+            // #[repr(packed)] or #[repr(packed(N))], omitted N means 1
+            if meta.path.is_ident("packed") {
+                if meta.input.peek(syn::token::Paren) {
+                    let content;
+                    parenthesized!(content in meta.input);
+                    let lit: syn::LitInt = content.parse()?;
+                    let n: usize = lit.base10_parse()?;
+                    self.repr_packed = Some((meta.input.span(), n));
+                } else {
+                    self.repr_packed = Some((meta.input.span(), 1));
+                }
+                return Ok(());
+            }
+
             Err(syn::Error::new_spanned(
                 meta.path,
-                "ZeroCopy: not a support representation",
+                "ZeroCopy: unsupported #[repr(..)]",
             ))
         });
 
@@ -268,12 +283,12 @@ impl Repr {
 fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let mut generics = input.generics.clone();
 
-    let mut repr = ReprAttr::default();
+    let mut r = ReprAttr::default();
     let mut krate: syn::Path = syn::parse_quote!(musli_zerocopy);
 
     for attr in &input.attrs {
         if attr.path().is_ident("repr") {
-            repr.parse_attr(cx, attr);
+            r.parse_attr(cx, attr);
         }
 
         if attr.path().is_ident("zero_copy") {
@@ -309,7 +324,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
         }
     }
 
-    let Some(repr) = repr.repr else {
+    let Some((repr_span, repr)) = r.repr else {
         cx.error(syn::Error::new_spanned(
             input,
             "ZeroCopy: struct must be marked with repr(C), repr(transparent), repr(u*), or repr(i*)",
@@ -327,6 +342,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
     let size_of: syn::Path = syn::parse_quote!(core::mem::size_of);
     let align_of: syn::Path = syn::parse_quote!(core::mem::align_of);
+    let ptr: syn::Path = syn::parse_quote!(core::ptr);
 
     let store_to;
     let pad;
@@ -345,11 +361,11 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             if matches!(repr, Repr::Transparent) || output.first_field.is_none() {
                 if let Some((ty, member)) = output.first_field {
                     store_to = quote! {
-                        <#ty as #zero_copy>::store_to(&self.#member, buf);
+                        <#ty as #zero_copy>::store_to(#ptr::addr_of!((*this).#member), buf);
                     };
 
                     pad = quote! {
-                        #struct_padder::pad(padder, &self.#member);
+                        #struct_padder::pad(padder, #ptr::addr_of!((*this).#member));
                     };
 
                     validate = quote! {
@@ -372,14 +388,14 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     // SAFETY: We've systematically ensured to pad all fields on the
                     // struct.
                     unsafe {
-                        let mut padder = #buf_mut::store_struct(buf, self);
-                        #(#struct_padder::pad::<#types>(&mut padder, &self.#members);)*
+                        let mut padder = #buf_mut::store_struct(buf, this);
+                        #(#struct_padder::pad::<#types>(&mut padder, #ptr::addr_of!((*this).#members));)*
                         #struct_padder::end(padder);
                     }
                 };
 
                 pad = quote! {
-                    #(#struct_padder::pad(padder, &self.#members);)*
+                    #(#struct_padder::pad(padder, #ptr::addr_of!((*this).#members));)*
                 };
 
                 validate = quote! {
@@ -420,9 +436,18 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             any_bits = quote!(true #(&& <#types as #zero_copy>::ANY_BITS)*);
         }
         syn::Data::Enum(en) => {
+            if let Some((span, _)) = r.repr_packed {
+                cx.error(syn::Error::new(
+                    span,
+                    "ZeroCopy: repr(packed) is only supported on structs",
+                ));
+
+                return Err(());
+            }
+
             let Some((span, num)) = repr.as_numerical_repr() else {
-                cx.error(syn::Error::new_spanned(
-                    en.enum_token,
+                cx.error(syn::Error::new(
+                    repr_span,
                     "ZeroCopy: only supported for repr(i*) or repr(u*) enums",
                 ));
 
@@ -543,10 +568,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 // SAFETY: We've systematically ensured to pad all fields on the
                 // struct.
                 unsafe {
-                    let mut padder = #buf_mut::store_struct(buf, self);
+                    let mut padder = #buf_mut::store_struct(buf, this);
                     #struct_padder::pad_primitive::<#ty>(&mut padder);
 
-                    match self {
+                    // NOTE: this is assumed to be properly, since enums cannot
+                    // be packed.
+                    match &*this {
                         #(#store_to_variants,)*
                     }
 
@@ -557,7 +584,9 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             pad = quote! {
                 #struct_padder::pad_primitive::<#ty>(padder);
 
-                match self {
+                // NOTE: this is assumed to be properly, since enums cannot be
+                // packed.
+                match &*this {
                     #(#pad_variants,)*
                 }
             };
@@ -619,14 +648,14 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             const ANY_BITS: bool = #any_bits;
             const PADDED: bool = #padded;
 
-            unsafe fn store_to<__B: ?Sized>(&self, buf: &mut __B)
+            unsafe fn store_to<__B: ?Sized>(this: *const Self, buf: &mut __B)
             where
                 __B: #buf_mut
             {
                 #store_to
             }
 
-            unsafe fn pad(&self, padder: &mut #struct_padder<'_, Self>) {
+            unsafe fn pad(this: *const Self, padder: &mut #struct_padder<'_, Self>) {
                 #pad
             }
 

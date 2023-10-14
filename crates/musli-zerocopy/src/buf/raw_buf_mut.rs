@@ -1,5 +1,4 @@
 use core::mem::{replace, size_of, size_of_val};
-use core::ptr;
 
 use crate::buf::BufMut;
 use crate::buf::StructPadder;
@@ -24,12 +23,13 @@ impl BufMut for RawBufMut {
         }
     }
 
-    unsafe fn store_bits<T>(&mut self, value: T)
+    unsafe fn store_bits<T>(&mut self, value: *const T)
     where
         T: ZeroCopy,
     {
         unsafe {
-            ptr::write_unaligned(self.start.cast::<T>(), value);
+            self.start
+                .copy_from_nonoverlapping(value.cast(), size_of::<T>());
             self.start = self.start.wrapping_add(size_of::<T>());
         }
     }
@@ -38,19 +38,17 @@ impl BufMut for RawBufMut {
     where
         T: ZeroCopy,
     {
-        value.store_to(self);
+        T::store_to(value, self);
     }
 
-    unsafe fn store_struct<T>(&mut self, value: &T) -> StructPadder<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: *const T) -> StructPadder<'_, T>
     where
         T: ZeroCopy,
     {
         let end = self.start.wrapping_add(size_of::<T>());
 
-        unsafe {
-            self.start
-                .copy_from_nonoverlapping((value as *const T).cast::<u8>(), size_of::<T>());
-        }
+        self.start
+            .copy_from_nonoverlapping(value.cast(), size_of::<T>());
 
         let start = replace(&mut self.start, end);
         StructPadder::new(start)
@@ -62,7 +60,7 @@ impl BufMut for RawBufMut {
     {
         if T::PADDED {
             for value in values {
-                value.store_to(self);
+                T::store_to(value, self);
             }
         } else {
             let size = size_of_val(values);

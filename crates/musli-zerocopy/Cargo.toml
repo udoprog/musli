@@ -27,3 +27,4 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 
 [dev-dependencies]
 anyhow = "1.0.75"
+trybuild = "1.0.85"
