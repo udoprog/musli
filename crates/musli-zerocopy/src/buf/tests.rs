@@ -52,7 +52,7 @@ fn allocate_array_needing_padding() -> Result<(), Error> {
     buf.load_uninit_mut(array).write(&values);
     let array = array.assume_init();
 
-    let buf = buf.as_aligned();
+    let buf = buf.into_aligned();
 
     assert_eq!(buf.load(array)?, &values);
     Ok(())
@@ -84,7 +84,7 @@ fn allocate_array_not_needing_padding() -> Result<(), Error> {
     buf.load_uninit_mut(array).write(&values);
     let array = array.assume_init();
 
-    let buf = buf.as_aligned();
+    let buf = buf.into_aligned();
 
     assert_eq!(buf.load(array)?, &values);
     Ok(())
@@ -108,7 +108,7 @@ fn test_unaligned_write() -> Result<(), Error> {
 
     buf.load_uninit_mut(reference).write(&Custom { string });
 
-    let buf = buf.as_aligned();
+    let buf = buf.into_aligned();
     let reference = reference.assume_init();
 
     assert_eq!(reference.offset(), 4);
@@ -157,7 +157,7 @@ fn inner_padding() -> Result<(), Error> {
 
     buf.load_uninit_mut(reference).write(&custom);
 
-    let buf = buf.as_aligned();
+    let buf = buf.into_aligned();
     let reference = reference.assume_init();
 
     assert_eq!(reference.offset(), 16);

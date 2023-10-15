@@ -34,7 +34,7 @@ use crate::traits::ZeroCopy;
 ///
 /// buf.load_uninit_mut(reference).write(&Custom { string });
 ///
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// let reference = reference.assume_init();
 ///
 /// assert_eq!(reference.offset(), 0);

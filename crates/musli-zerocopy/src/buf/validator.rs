@@ -56,7 +56,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// let mut buf = AlignedBuf::new();
     ///
     /// let custom = buf.store(&Custom { field: 42, field2: 85 });
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// let mut v = buf.validate_struct::<Custom>()?;
     ///
@@ -150,7 +150,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// let mut buf = AlignedBuf::new();
     ///
     /// buf.store(&Packed { field: 42, field2: NonZeroU64::new(84).unwrap() });
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// let mut v = buf.validate_struct::<Packed>()?;
     ///
@@ -200,7 +200,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// let mut buf = AlignedBuf::new();
     ///
     /// buf.store(&Packed { field: 42, field2: NonZeroU64::new(84).unwrap() });
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// let mut v = buf.validate_struct::<Packed>()?;
     ///

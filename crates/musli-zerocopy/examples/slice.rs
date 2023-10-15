@@ -7,7 +7,7 @@ fn main() -> Result<(), Error> {
 
     let slice_ref = buf.store_slice(&values);
 
-    let buf = buf.as_aligned();
+    let buf = buf.into_aligned();
 
     let slice = buf.load(slice_ref)?;
 

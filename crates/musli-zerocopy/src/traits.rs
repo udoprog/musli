@@ -324,7 +324,7 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 ///
 /// let mut buf = AlignedBuf::new();
 /// let ptr = buf.store(&Custom { field: 42, ignore: () });
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 42, ignore: () });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -435,7 +435,7 @@ macro_rules! impl_unsized_primitive {
         ///
         /// let mut buf = AlignedBuf::new();
         #[doc = concat!("let unsize: Unsized<[", stringify!($example_ty), "]> = buf.store_unsized(&", stringify!($example), ");")]
-        /// let buf = buf.as_aligned();
+        /// let buf = buf.into_aligned();
         #[doc = concat!("assert_eq!(buf.load(unsize)?, &", stringify!($example), ");")]
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
@@ -861,7 +861,7 @@ macro_rules! impl_zst {
         /// let mut empty = AlignedBuf::new();
         /// let values = [Struct::default(); 100];
         /// let slice = empty.store_slice(&values[..]);
-        /// let buf = empty.as_aligned();
+        /// let buf = empty.into_aligned();
         /// assert_eq!(buf.len(), 0);
         ///
         /// let slice = buf.load(slice)?;
@@ -925,7 +925,7 @@ impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::Phan
 /// let mut empty = AlignedBuf::with_alignment::<u128>();
 /// let values = [Struct::<u128>::default(); 100];
 /// let slice = empty.store_slice(&values[..]);
-/// let buf = empty.as_aligned();
+/// let buf = empty.into_aligned();
 /// assert_eq!(buf.len(), 0);
 ///
 /// let slice = buf.load(slice)?;

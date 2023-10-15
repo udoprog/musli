@@ -222,7 +222,7 @@ where
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
     /// assert_eq!(buf.as_slice(), &[1, 0, 2, 3]);
     ///
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())

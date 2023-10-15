@@ -86,7 +86,7 @@ where
     /// let values = buf.store(&[1, 2, 3, 4]);
     /// let slice = values.into_slice();
     ///
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// assert_eq!(buf.load(slice)?, &[1, 2, 3, 4]);
     /// # Ok::<_, musli_zerocopy::Error>(())

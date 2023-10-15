@@ -78,7 +78,7 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
 
     /// Access the underlying buffer.
     pub(crate) fn buf(&mut self) -> &Buf {
-        self.buf.as_aligned()
+        self.buf
     }
 
     /// Export bucket mask.

@@ -33,7 +33,7 @@ use crate::ZeroCopy;
 /// let mut buf = AlignedBuf::new();
 ///
 /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get(&1)?, Some(&2));
@@ -67,7 +67,7 @@ where
     /// let mut buf = AlignedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get(&1)?, Some(&2));
@@ -100,7 +100,7 @@ where
     /// let mut buf = AlignedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert!(map.contains_key(&1)?);
@@ -129,7 +129,7 @@ where
     /// let mut buf = AlignedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get_entry(&1)?, Some((&1, &2)));
@@ -203,14 +203,13 @@ where
 /// let mut buf = AlignedBuf::new();
 ///
 /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-/// let buf = buf.as_aligned();
 ///
-/// assert_eq!(map.get(buf, &1)?, Some(&2));
-/// assert_eq!(map.get(buf, &2)?, Some(&3));
-/// assert_eq!(map.get(buf, &3)?, None);
+/// assert_eq!(map.get(&buf, &1)?, Some(&2));
+/// assert_eq!(map.get(&buf, &2)?, Some(&3));
+/// assert_eq!(map.get(&buf, &3)?, None);
 ///
-/// assert!(map.contains_key(buf, &1)?);
-/// assert!(!map.contains_key(buf, &3)?);
+/// assert!(map.contains_key(&buf, &1)?);
+/// assert!(!map.contains_key(&buf, &3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[derive(Debug, ZeroCopy)]
@@ -261,11 +260,10 @@ where
     /// let mut buf = AlignedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.as_aligned();
     ///
-    /// assert_eq!(map.get(buf, &1)?, Some(&2));
-    /// assert_eq!(map.get(buf, &2)?, Some(&3));
-    /// assert_eq!(map.get(buf, &3)?, None);
+    /// assert_eq!(map.get(&buf, &1)?, Some(&2));
+    /// assert_eq!(map.get(&buf, &2)?, Some(&3));
+    /// assert_eq!(map.get(&buf, &3)?, None);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn get<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<&'a V>, Error>
@@ -293,11 +291,10 @@ where
     /// let mut buf = AlignedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.as_aligned();
     ///
-    /// assert!(map.contains_key(buf, &1)?);
-    /// assert!(map.contains_key(buf, &2)?);
-    /// assert!(!map.contains_key(buf, &3)?);
+    /// assert!(map.contains_key(&buf, &1)?);
+    /// assert!(map.contains_key(&buf, &2)?);
+    /// assert!(!map.contains_key(&buf, &3)?);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn contains_key<T>(&self, buf: &Buf, key: &T) -> Result<bool, Error>
@@ -321,11 +318,10 @@ where
     /// let mut buf = AlignedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.as_aligned();
     ///
-    /// assert_eq!(map.get_entry(buf, &1)?, Some((&1, &2)));
-    /// assert_eq!(map.get_entry(buf, &2)?, Some((&2, &3)));
-    /// assert_eq!(map.get_entry(buf, &3)?, None);
+    /// assert_eq!(map.get_entry(&buf, &1)?, Some((&1, &2)));
+    /// assert_eq!(map.get_entry(&buf, &2)?, Some((&2, &3)));
+    /// assert_eq!(map.get_entry(&buf, &3)?, None);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn get_entry<'a, T>(&self, buf: &'a Buf, key: &T) -> Result<Option<(&'a K, &'a V)>, Error>

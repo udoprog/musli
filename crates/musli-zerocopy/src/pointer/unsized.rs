@@ -125,7 +125,7 @@ where
     /// let mut buf = AlignedBuf::new();
     /// let unsize = buf.store_unsized(&b"abcd"[..]);
     ///
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// assert_eq!(unsize.len(), 4);
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -147,7 +147,7 @@ where
     ///
     /// let unsize = buf.store_unsized(&b"abcd"[..]);
     ///
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// assert!(!unsize.is_empty());
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -169,7 +169,7 @@ where
     /// let mut buf = AlignedBuf::new();
     /// let unsize = buf.store_unsized(&b"abcd"[..]);
     ///
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// let two = unsize.get(2).expect("missing element 2");
     /// assert_eq!(buf.load(two)?, &b'c');

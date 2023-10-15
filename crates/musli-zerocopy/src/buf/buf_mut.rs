@@ -127,7 +127,7 @@ pub trait BufMut: self::sealed::Sealed {
     ///     assert_eq!(chunk, &[index as u8, 0, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 12, 13, 14, 15]);
     /// }
     ///
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// padded.a = 0;
     /// assert_eq!(buf.load(reference)?, &padded);

@@ -1,11 +1,11 @@
 use core::alloc::Layout;
 use core::fmt;
 use core::mem::{align_of, size_of};
-use core::ops::Range;
-use core::slice;
+use core::ops::{Index, IndexMut, Range};
+use core::slice::{self, SliceIndex};
 
 #[cfg(feature = "alloc")]
-use alloc::borrow::ToOwned;
+use alloc::borrow::{Cow, ToOwned};
 
 #[cfg(feature = "alloc")]
 use crate::buf::AlignedBuf;
@@ -77,41 +77,92 @@ impl Buf {
         unsafe { &mut *(data as *mut [u8] as *mut Self) }
     }
 
-    /// Access the backing slice of the buffer.
+    /// Construct a buffer with an alignment matching that of `T` which is
+    /// either wrapped in a [`Buf`] if it is already correctly aligned, or
+    /// inside of an allocated [`AlignedBuf`].
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli_zerocopy::Buf;
+    /// ```no_run
+    /// use std::fs::read;
     ///
-    /// let buf = Buf::new(b"Hello World!");
+    /// use musli_zerocopy::{Buf, ZeroCopy};
+    /// use musli_zerocopy::pointer::{Ref, Unsized};
     ///
-    /// assert_eq!(buf.as_slice(), &b"Hello World!"[..]);
-    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Person {
+    ///     name: Unsized<str>,
+    ///     age: u32,
+    /// }
+    ///
+    /// let bytes = read("person.bin")?;
+    /// let buf = Buf::new(&bytes).to_aligned::<u128>();
+    ///
+    /// let s = buf.load(Ref::<Person>::zero())?;
+    /// # Ok::<_, anyhow::Error>(())
     /// ```
+    #[cfg(feature = "alloc")]
     #[inline]
-    pub fn as_slice(&self) -> &[u8] {
-        &self.data
+    pub fn to_aligned<T>(&self) -> Cow<'_, Buf> {
+        self.to_aligned_with(align_of::<T>())
     }
 
-    /// Access the backing slice of the buffer mutably.
+    /// Construct a buffer with a specific alignment which is either wrapped in
+    /// a [`Buf`] if it is already correctly aligned, or inside of an allocated
+    /// [`AlignedBuf`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `align` is not a power of two or if the size of the buffer is
+    /// larger than [`max_capacity_for_align(align)`].
     ///
     /// # Examples
     ///
+    /// ```no_run
+    /// use std::fs::read;
+    ///
+    /// use musli_zerocopy::{Buf, ZeroCopy};
+    /// use musli_zerocopy::pointer::{Ref, Unsized};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Person {
+    ///     name: Unsized<str>,
+    ///     age: u32,
+    /// }
+    ///
+    /// let bytes = read("person.bin")?;
+    /// let buf = Buf::new(&bytes).to_aligned_with(16);
+    ///
+    /// let s = buf.load(Ref::<Person>::zero())?;
+    /// # Ok::<_, anyhow::Error>(())
     /// ```
-    /// use musli_zerocopy::Buf;
-    ///
-    /// let mut bytes: [u8; 12] = *b"Hello World!";
-    ///
-    /// let buf = Buf::new_mut(&mut bytes[..]);
-    /// buf.as_mut_slice().make_ascii_uppercase();
-    ///
-    /// assert_eq!(buf.as_slice(), &b"HELLO WORLD!"[..]);
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
+    #[cfg(feature = "alloc")]
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        &mut self.data
+    pub fn to_aligned_with(&self, align: usize) -> Cow<'_, Buf> {
+        assert!(align.is_power_of_two(), "Alignment must be power of two");
+
+        // SAFETY: align is checked as a power of two just above.
+        if unsafe { self.is_aligned_to(align) } {
+            Cow::Borrowed(self)
+        } else {
+            let mut buf =
+                unsafe { AlignedBuf::with_capacity_and_custom_alignment(self.len(), align) };
+
+            // SAFETY: Space for the slice has been allocated.
+            unsafe {
+                buf.store_bytes(&self.data);
+            }
+
+            Cow::Owned(buf)
+        }
+    }
+
+    /// Get the alignment of the current buffer.
+    pub fn alignment(&self) -> usize {
+        // NB: Maximum alignment supported by Rust is 2^29.
+        1usize << (self.as_ptr() as usize).trailing_zeros().min(29)
     }
 
     /// Test if the current buffer is layout compatible with the given `T`.
@@ -123,7 +174,7 @@ impl Buf {
     ///
     /// let mut buf = AlignedBuf::with_alignment::<u32>();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// assert!(buf.is_compatible_with::<u32>());
     /// assert!(!buf.is_compatible_with::<u64>());
@@ -145,7 +196,7 @@ impl Buf {
     ///
     /// let mut buf = AlignedBuf::with_alignment::<u32>();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// assert!(buf.ensure_compatible_with::<u32>().is_ok());
     /// assert!(buf.ensure_compatible_with::<u64>().is_err());
@@ -198,7 +249,66 @@ impl Buf {
         self.data.is_empty()
     }
 
+    /// Returns a reference to an element or subslice depending on the type of
+    /// index.
+    ///
+    /// - If given a position, returns a reference to the element at that
+    ///   position or `None` if out of bounds.
+    /// - If given a range, returns the subslice corresponding to that range, or
+    ///   `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Buf;
+    ///
+    /// let buf = Buf::new(b"Hello World!");
+    ///
+    /// assert_eq!(buf.get(..5), Some(&b"Hello"[..]));
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn get<I>(&self, index: I) -> Option<&I::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        self.data.get(index)
+    }
+
+    /// Returns a mutable reference to an element or subslice depending on the
+    /// type of index (see [`get`]) or `None` if the index is out of bounds.
+    ///
+    /// [`get`]: slice::get
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Buf;
+    ///
+    /// let mut bytes: [u8; 12] = *b"Hello World!";
+    ///
+    /// let buf = Buf::new_mut(&mut bytes[..]);
+    ///
+    /// if let Some(bytes) = buf.get_mut(..) {
+    ///     bytes.make_ascii_uppercase();
+    /// }
+    ///
+    /// assert_eq!(&buf[..], &b"HELLO WORLD!"[..]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        self.data.get_mut(index)
+    }
+
     /// Load the given value as a reference.
+    ///
+    /// # Errors
+    ///
+    /// This will error if the current buffer is not aligned for the type `T`,
+    /// or for other reasons specific to what needs to be done to validate a
+    /// `&T` reference.
     ///
     /// # Examples
     ///
@@ -224,31 +334,13 @@ impl Buf {
         ptr.load(self)
     }
 
-    /// Get raw underlying bytes matching the size of `len` at the given offset
-    /// `O`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::AlignedBuf;
-    ///
-    /// let mut buf = AlignedBuf::new();
-    ///
-    /// let first = buf.store_unsized("first");
-    /// let second = buf.store_unsized("second");
-    ///
-    /// let buf = buf.as_ref();
-    ///
-    /// assert_eq!(buf.get(first.offset(), 5)?, b"first");
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    #[inline]
-    pub fn get(&self, start: usize, len: usize) -> Result<&[u8], Error> {
-        let end = start.wrapping_add(len);
-        self.inner_get_unaligned(start, end)
-    }
-
     /// Load the given value as a mutable reference.
+    ///
+    /// # Errors
+    ///
+    /// This will error if the current buffer is not aligned for the type `T`,
+    /// or for other reasons specific to what needs to be done to validate a
+    /// `&mut T` reference.
     ///
     /// # Examples
     ///
@@ -301,7 +393,7 @@ impl Buf {
     /// let mut buf = AlignedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get(&1)?, Some(&2));
@@ -372,7 +464,7 @@ impl Buf {
     /// let mut buf = AlignedBuf::new();
     ///
     /// let custom = buf.store(&Custom { field: 42, field2: 85 });
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     ///
     /// let mut v = buf.validate_struct::<Custom>()?;
     ///
@@ -394,8 +486,17 @@ impl Buf {
     }
 
     /// Get the given range while checking its required alignment.
+    ///
+    /// # Safety
+    ///
+    /// Specified `align` must be a power of two.
     #[inline]
-    pub(crate) fn inner_get(&self, start: usize, end: usize, align: usize) -> Result<&Buf, Error> {
+    pub(crate) unsafe fn inner_get(
+        &self,
+        start: usize,
+        end: usize,
+        align: usize,
+    ) -> Result<&Buf, Error> {
         let buf = Buf::new(self.inner_get_unaligned(start, end)?);
 
         if !buf.is_aligned_to(align) {
@@ -409,8 +510,12 @@ impl Buf {
     }
 
     /// Get the given range mutably while checking its required alignment.
+    ///
+    /// # Safety
+    ///
+    /// Specified `align` must be a power of two.
     #[inline]
-    pub(crate) fn inner_get_mut(
+    pub(crate) unsafe fn inner_get_mut(
         &mut self,
         start: usize,
         end: usize,
@@ -473,11 +578,13 @@ impl Buf {
         let start = unsize.offset();
         let size = unsize.size();
         let end = start.wrapping_add(size.wrapping_mul(T::SIZE));
-        let buf = self.inner_get(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
-        unsafe { Ok(&*T::coerce(buf.as_ptr(), size)?) }
+        unsafe {
+            let buf = self.inner_get(start, end, T::ALIGN)?;
+            Ok(&*T::coerce(buf.as_ptr(), size)?)
+        }
     }
 
     /// Load an unsized mutable reference.
@@ -492,11 +599,13 @@ impl Buf {
         let start = unsize.offset();
         let size = unsize.size();
         let end = start.wrapping_add(size.wrapping_mul(T::SIZE));
-        let buf = self.inner_get_mut(start, end, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
-        unsafe { Ok(&mut *T::coerce_mut(buf.as_mut_ptr(), size)?) }
+        unsafe {
+            let buf = self.inner_get_mut(start, end, T::ALIGN)?;
+            Ok(&mut *T::coerce_mut(buf.as_mut_ptr(), size)?)
+        }
     }
 
     /// Load the given sized value as a reference.
@@ -507,7 +616,8 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(size_of::<T>());
-        let buf = self.inner_get(start, end, align_of::<T>())?;
+        // SAFETY: align_of::<T>() is always a power of two.
+        let buf = unsafe { self.inner_get(start, end, align_of::<T>())? };
 
         if !T::ANY_BITS {
             // SAFETY: We've checked the size and alignment of the buffer above.
@@ -531,7 +641,8 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(size_of::<T>());
-        let buf = self.inner_get_mut(start, end, align_of::<T>())?;
+        // SAFETY: align_of::<T>() is always a power of two.
+        let buf = unsafe { self.inner_get_mut(start, end, align_of::<T>())? };
 
         if !T::ANY_BITS {
             // SAFETY: We've checked the size and alignment of the buffer above.
@@ -555,13 +666,14 @@ impl Buf {
     {
         let start = slice.offset();
         let end = start.wrapping_add(slice.len().wrapping_mul(size_of::<T>()));
-        let buf = self.inner_get(start, end, align_of::<T>())?;
-        let len = buf.len();
 
-        Ok(unsafe {
+        // SAFETY: align_of::<T>() is always a power of two.
+        unsafe {
+            let buf = self.inner_get(start, end, align_of::<T>())?;
+            let len = buf.len();
             crate::buf::validate_array::<[T], T>(&mut Validator::new(buf.as_ptr()), len)?;
-            slice::from_raw_parts(buf.as_ptr().cast(), slice.len())
-        })
+            Ok(slice::from_raw_parts(buf.as_ptr().cast(), slice.len()))
+        }
     }
 
     /// Load the given slice mutably.
@@ -572,13 +684,16 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
-        let buf = self.inner_get_mut_unaligned(start, end)?;
-        let len = buf.len();
 
-        Ok(unsafe {
+        unsafe {
+            let buf = self.inner_get_mut(start, end, align_of::<T>())?;
+            let len = buf.len();
             crate::buf::validate_array::<[T], T>(&mut Validator::new(buf.as_ptr()), len)?;
-            slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), ptr.len())
-        })
+            Ok(slice::from_raw_parts_mut(
+                buf.as_mut_ptr().cast(),
+                ptr.len(),
+            ))
+        }
     }
 
     /// Access the underlying slice as a pointer.
@@ -600,7 +715,8 @@ impl Buf {
     /// Test if the current buffer is compatible with the given layout.
     #[inline]
     pub(crate) fn is_compatible(&self, layout: Layout) -> bool {
-        self.is_aligned_to(layout.align()) && self.data.len() >= layout.size()
+        // SAFETY: Layout::align is a power of two.
+        unsafe { self.is_aligned_to(layout.align()) && self.data.len() >= layout.size() }
     }
 
     /// Test if the buffer is aligned with the given alignment.
@@ -609,7 +725,7 @@ impl Buf {
     ///
     /// Panics if `align` is not a power of two.
     #[inline]
-    pub(crate) fn is_aligned_to(&self, align: usize) -> bool {
+    pub(crate) unsafe fn is_aligned_to(&self, align: usize) -> bool {
         crate::buf::is_aligned_to(self.data.as_ptr(), align)
     }
 }
@@ -626,8 +742,63 @@ impl ToOwned for Buf {
 
     #[inline]
     fn to_owned(&self) -> Self::Owned {
-        let mut buf = AlignedBuf::with_capacity(self.len());
-        buf.extend_from_slice(self.as_slice());
+        let mut buf =
+            unsafe { AlignedBuf::with_capacity_and_custom_alignment(self.len(), self.alignment()) };
+
+        buf.extend_from_slice(&self.data);
         buf
+    }
+}
+
+/// Index implementation to get a slice or individual byte out of a [`Buf`].
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::Buf;
+///
+/// let buf = Buf::new(b"Hello World!");
+///
+/// assert_eq!(&buf[..], &b"Hello World!"[..]);
+/// assert_eq!(buf[0], b'H');
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
+impl<I> Index<I> for Buf
+where
+    I: SliceIndex<[u8]>,
+{
+    type Output = I::Output;
+
+    #[inline]
+    fn index(&self, index: I) -> &I::Output {
+        &self.data[index]
+    }
+}
+
+/// Index implementation to get a mutable slice or individual byte out of a
+/// [`Buf`].
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::Buf;
+///
+/// let mut bytes = *b"Hello World!";
+/// let mut buf = Buf::new_mut(&mut bytes[..]);
+///
+/// buf[..].make_ascii_uppercase();
+///
+/// assert_eq!(&buf[..], &b"HELLO WORLD!"[..]);
+/// buf[0] = b'B';
+/// assert_eq!(&buf[..], &b"BELLO WORLD!"[..]);
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
+impl<I> IndexMut<I> for Buf
+where
+    I: SliceIndex<[u8]>,
+{
+    #[inline]
+    fn index_mut(&mut self, index: I) -> &mut I::Output {
+        &mut self.data[index]
     }
 }

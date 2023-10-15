@@ -72,7 +72,7 @@
 //! let slice_ref: Ref<Slice<u8>> = buf1.store(&slice);
 //! assert_eq!(buf1.len(), 12);
 //!
-//! let buf1 = buf1.as_aligned();
+//! let buf1 = buf1.into_aligned();
 //! let slice = buf1.load(slice_ref)?;
 //! assert_eq!(slice.len(), 4);
 //! assert_eq!(buf1.load(slice)?, &[1, 2, 3, 4]);
@@ -83,7 +83,7 @@
 //! let slice_ref: Ref<CompactSlice> = buf2.store(&slice);
 //! assert_eq!(buf2.len(), 8);
 //!
-//! let buf2 = buf2.as_aligned();
+//! let buf2 = buf2.into_aligned();
 //! let slice = buf2.load(slice_ref)?;
 //! assert_eq!(slice.len(), 4);
 //! assert_eq!(buf2.load(slice)?, &[1, 2, 3, 4]);
@@ -153,6 +153,7 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 ///
 /// ```no_run
 /// use std::fs::read;
+///
 /// use musli_zerocopy::ZeroCopy;
 /// use musli_zerocopy::buf;
 /// use musli_zerocopy::pointer::{Ref, Unsized};
@@ -172,7 +173,7 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 /// ```
 #[cfg(feature = "alloc")]
 pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
-    aligned_buf_with(bytes, align_of::<T>())
+    Buf::new(bytes).to_aligned::<T>()
 }
 
 /// Construct a buffer with a specific alignment which is either wrapped in a
@@ -188,6 +189,7 @@ pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
 ///
 /// ```no_run
 /// use std::fs::read;
+///
 /// use musli_zerocopy::ZeroCopy;
 /// use musli_zerocopy::buf;
 /// use musli_zerocopy::pointer::{Ref, Unsized};
@@ -207,26 +209,14 @@ pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
 /// ```
 #[cfg(feature = "alloc")]
 pub fn aligned_buf_with(bytes: &[u8], align: usize) -> Cow<'_, Buf> {
-    assert!(align.is_power_of_two(), "Alignment must be power of two");
-
-    let buf = Buf::new(bytes);
-
-    if buf.is_aligned_to(align) {
-        Cow::Borrowed(buf)
-    } else {
-        let mut buf = unsafe { AlignedBuf::with_capacity_and_custom_alignment(bytes.len(), align) };
-
-        unsafe {
-            buf.store_bytes(bytes);
-        }
-
-        Cow::Owned(buf)
-    }
+    Buf::new(bytes).to_aligned_with(align)
 }
 
+/// # Safety
+///
+/// Must be called with an alignment that is a power of two.
 #[inline]
-pub(crate) fn is_aligned_to(ptr: *const u8, align: usize) -> bool {
-    assert!(align.is_power_of_two(), "alignment is not a power-of-two");
+pub(crate) unsafe fn is_aligned_to(ptr: *const u8, align: usize) -> bool {
     (ptr as usize) & (align - 1) == 0
 }
 

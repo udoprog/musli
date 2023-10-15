@@ -39,7 +39,7 @@ const FIXED_SEED: u64 = 1234567890;
 /// ];
 ///
 /// let map = swiss::store_map(&mut buf, pairs)?;
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get("first")?, Some(&1));
@@ -57,7 +57,7 @@ const FIXED_SEED: u64 = 1234567890;
 /// let mut buf = AlignedBuf::new();
 ///
 /// let map = swiss::store_map(&mut buf, [(10u64, 1u32), (20u64, 2u32)])?;
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get(&10u64)?, Some(&1));
@@ -112,7 +112,7 @@ where
 /// let third = buf.store_unsized("third");
 ///
 /// let set = swiss::store_set(&mut buf, [first, second])?;
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains("first")?);
@@ -133,7 +133,7 @@ where
 /// let mut buf = AlignedBuf::new();
 ///
 /// let set = swiss::store_set(&mut buf, [1, 2])?;
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains(&1)?);
@@ -195,7 +195,7 @@ where
     buf.fill(0, size_of::<T>().wrapping_mul(buckets));
 
     let (buckets, bucket_mask) = {
-        buf.as_aligned();
+        buf.align_in_place();
 
         let mut table = unsafe { Constructor::<U, O>::with_buf(buf, ctrl_ptr, base_ptr, buckets) };
 

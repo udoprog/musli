@@ -417,7 +417,7 @@ pub mod pointer;
 ///
 /// let mut buf = AlignedBuf::new();
 /// let ptr = buf.store(&Custom { field: 10 });
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 10 });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -446,7 +446,7 @@ pub mod pointer;
 ///
 /// let mut buf = AlignedBuf::new();
 /// let ptr = buf.store(&Flags::First);
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// assert_eq!(buf.load(ptr)?, &Flags::First);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```

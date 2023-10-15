@@ -33,7 +33,7 @@ use crate::ZeroCopy;
 /// let mut buf = AlignedBuf::new();
 ///
 /// let set = phf::store_set(&mut buf, [1, 2])?;
-/// let buf = buf.as_aligned();
+/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains(&1)?);
@@ -63,7 +63,7 @@ where
     /// let mut buf = AlignedBuf::new();
     ///
     /// let set = phf::store_set(&mut buf, [1, 2])?;
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     /// let set = buf.bind(set)?;
     ///
     /// assert!(set.contains(&1)?);
@@ -132,11 +132,10 @@ where
 /// let mut buf = AlignedBuf::new();
 ///
 /// let set = phf::store_set(&mut buf, [1, 2])?;
-/// let buf = buf.as_aligned();
 ///
-/// assert!(set.contains(buf, &1)?);
-/// assert!(set.contains(buf, &2)?);
-/// assert!(!set.contains(buf, &3)?);
+/// assert!(set.contains(&buf, &1)?);
+/// assert!(set.contains(&buf, &2)?);
+/// assert!(!set.contains(&buf, &3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[derive(Debug, ZeroCopy)]
@@ -184,7 +183,7 @@ where
     /// let mut buf = AlignedBuf::new();
     ///
     /// let set = phf::store_set(&mut buf, [1, 2])?;
-    /// let buf = buf.as_aligned();
+    /// let buf = buf.into_aligned();
     /// let set = buf.bind(set)?;
     ///
     /// assert!(set.contains(&1)?);
