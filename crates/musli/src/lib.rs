@@ -10,7 +10,8 @@
 //! It provides a set of [formats](#formats), each with its own well-documented
 //! set of features and tradeoffs. Every byte-oriented serialization method
 //! (including [`musli-json`]) has full `#[no_std]` support with or without
-//! `alloc`.
+//! `alloc`. And a particularly neat component providing low-level refreshingly
+//! simple [zero-copy serialization].
 //!
 //! [^1]: As in Müsli should be able to do everything you need and more.
 //!
@@ -417,20 +418,26 @@
 //!
 //! [`bincode`]: https://docs.rs/bincode
 //! [`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
-//! [`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
+//! [`DefaultMode`]:
+//!     https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
 //! [`derives`]: https://docs.rs/musli/latest/musli/derives/
 //! [`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
 //! [`musli-descriptive`]: https://docs.rs/musli-descriptive
 //! [`musli-json`]: https://docs.rs/musli-json
 //! [`musli-storage`]: https://docs.rs/musli-storage
-//! [`musli-tests`]: https://github.com/udoprog/musli/tree/main/crates/musli-tests
+//! [`musli-tests`]:
+//!     https://github.com/udoprog/musli/tree/main/crates/musli-tests
 //! [`musli-value`]: https://docs.rs/musli-value
 //! [`musli-wire`]: https://docs.rs/musli-wire
 //! [`protobuf`]: https://developers.google.com/protocol-buffers
 //! [`serde`]: https://serde.rs
 //! [`simdutf8`]: https://docs.rs/simdutf8
-//! [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
-//! [when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
+//! [bit packing]:
+//!     https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
+//! [when decoding collections]:
+//! https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
+//! [zero-copy serialization]:
+//!     https://docs.rs/musli-zerocopy
 
 #![deny(missing_docs)]
 #![no_std]
