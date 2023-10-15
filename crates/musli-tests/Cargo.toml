@@ -1,6 +1,6 @@
 [package]
 name = "musli-tests"
-version = "0.0.24"
+version = "0.0.25"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
@@ -58,14 +58,14 @@ rkyv = ["dep:rkyv", "std"]
 postcard = ["dep:postcard", "serde"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.70", default-features = false, optional = true, features = ["alloc"] }
-musli-wire = { path = "../musli-wire", version = "0.0.70", default-features = false, features = ["alloc", "test"], optional = true }
-musli-descriptive = { path = "../musli-descriptive", version = "0.0.70", default-features = false, features = ["alloc", "test"], optional = true }
-musli-storage = { path = "../musli-storage", version = "0.0.70", default-features = false, features = ["alloc", "test"], optional = true }
-musli-json = { path = "../musli-json", version = "0.0.70", default-features = false, features = ["alloc", "test",], optional = true }
-musli-value = { path = "../musli-value", version = "0.0.70", default-features = false, features = ["alloc", "test"], optional = true }
-musli-zerocopy = { path = "../musli-zerocopy", version = "0.0.70", default-features = false, features = ["alloc"], optional = true }
-musli-macros = { path = "../musli-macros", version = "0.0.70", features = ["test"] }
+musli = { path = "../musli", version = "0.0.71", default-features = false, optional = true, features = ["alloc"] }
+musli-wire = { path = "../musli-wire", version = "0.0.71", default-features = false, features = ["alloc", "test"], optional = true }
+musli-descriptive = { path = "../musli-descriptive", version = "0.0.71", default-features = false, features = ["alloc", "test"], optional = true }
+musli-storage = { path = "../musli-storage", version = "0.0.71", default-features = false, features = ["alloc", "test"], optional = true }
+musli-json = { path = "../musli-json", version = "0.0.71", default-features = false, features = ["alloc", "test",], optional = true }
+musli-value = { path = "../musli-value", version = "0.0.71", default-features = false, features = ["alloc", "test"], optional = true }
+musli-zerocopy = { path = "../musli-zerocopy", version = "0.0.71", default-features = false, features = ["alloc"], optional = true }
+musli-macros = { path = "../musli-macros", version = "0.0.71", features = ["test"] }
 
 anyhow = "1.0.75"
 serde = { version = "1.0.188", default-features = false, optional = true, features = ["derive"] }
@@ -80,7 +80,7 @@ rkyv = { version = "0.7.42", default-features = false, optional = true, features
 postcard = { version = "1.0.8",  default-features = false, optional = true }
 
 [dev-dependencies]
-musli = { path = "../musli", version = "0.0.70", default-features = false, features = ["alloc"] }
+musli = { path = "../musli", version = "0.0.71", default-features = false, features = ["alloc"] }
 criterion = { version = "0.4.0", features = ["html_reports"] }
 trybuild = "1.0.85"
 bstr = "1.7.0"

@@ -1,6 +1,6 @@
 [package]
 name = "musli-value"
-version = "0.0.70"
+version = "0.0.71"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
@@ -22,9 +22,9 @@ std = ["musli/std", "musli-storage/std", "musli-common/std", "alloc"]
 alloc = ["musli/alloc", "musli-storage/alloc", "musli-common/alloc"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.70", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.70", default-features = false }
-musli-storage = { path = "../musli-storage", version = "0.0.70", default-features = false }
+musli = { path = "../musli", version = "0.0.71", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.71", default-features = false }
+musli-storage = { path = "../musli-storage", version = "0.0.71", default-features = false }
 
 itoa = "1.0.9"
 ryu = "1.0.15"
