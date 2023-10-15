@@ -1,10 +1,20 @@
 use crate::buf::{Buf, Load};
 use crate::error::Error;
 
-/// Trait used for handling any kind of zero copy value, be they references or
-/// not.
+/// Trait used for accessing the value behind a reference when interacting with
+/// higher level containers such as [`phf`] or [`swiss`].
+///
+/// This is a high level trait which can be implemented safely, typically it's
+/// used to build facade types for when you want some type to behave like a
+/// different type, but have a different layout.
+///
+/// See the [module level documentation][crate::buf#extension-traits] for an
+/// example.
+///
+/// [`phf`]: crate::phf
+/// [`swiss`]: crate::swiss
 pub trait Visit {
-    /// The target being read.
+    /// The target type being visited.
     type Target: ?Sized;
 
     /// Validate the value.
@@ -19,6 +29,7 @@ where
 {
     type Target = T::Target;
 
+    #[inline]
     fn visit<V, O>(&self, buf: &Buf, visitor: V) -> Result<O, Error>
     where
         V: FnOnce(&Self::Target) -> O,
@@ -31,6 +42,7 @@ where
 impl Visit for str {
     type Target = str;
 
+    #[inline]
     fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
     where
         V: FnOnce(&Self::Target) -> O,
@@ -42,6 +54,7 @@ impl Visit for str {
 impl<T> Visit for [T] {
     type Target = [T];
 
+    #[inline]
     fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
     where
         V: FnOnce(&Self::Target) -> O,

@@ -15,28 +15,27 @@ impl RawBufMut {
 }
 
 impl BufMut for RawBufMut {
+    #[inline]
     unsafe fn store_bytes<T>(&mut self, values: &[T])
     where
         T: ZeroCopy,
     {
-        unsafe {
-            self.start
-                .copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
-            self.start = self.start.wrapping_add(size_of_val(values));
-        }
+        self.start
+            .copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
+        self.start = self.start.wrapping_add(size_of_val(values));
     }
 
+    #[inline]
     unsafe fn store_bits<T>(&mut self, value: *const T)
     where
         T: ZeroCopy,
     {
-        unsafe {
-            self.start
-                .copy_from_nonoverlapping(value.cast(), size_of::<T>());
-            self.start = self.start.wrapping_add(size_of::<T>());
-        }
+        self.start
+            .copy_from_nonoverlapping(value.cast(), size_of::<T>());
+        self.start = self.start.wrapping_add(size_of::<T>());
     }
 
+    #[inline]
     unsafe fn store<T>(&mut self, value: &T)
     where
         T: ZeroCopy,
@@ -44,6 +43,7 @@ impl BufMut for RawBufMut {
         T::store_to(value, self);
     }
 
+    #[inline]
     unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
     where
         T: ZeroCopy,
@@ -57,6 +57,7 @@ impl BufMut for RawBufMut {
         Padder::new(start)
     }
 
+    #[inline]
     unsafe fn store_array<T>(&mut self, values: &[T])
     where
         T: ZeroCopy,

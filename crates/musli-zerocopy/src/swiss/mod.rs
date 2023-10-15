@@ -15,12 +15,16 @@ mod raw;
 pub(crate) use self::entry::Entry;
 mod entry;
 
-pub(crate) use self::map::RawTableRef;
 pub use self::map::{Map, MapRef};
 pub mod map;
 
 pub use self::set::{Set, SetRef};
 pub mod set;
 
+#[cfg(feature = "alloc")]
+mod constructor;
+
+#[cfg(feature = "alloc")]
 pub use self::factory::*;
+#[cfg(feature = "alloc")]
 mod factory;

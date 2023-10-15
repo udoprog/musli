@@ -5,8 +5,10 @@ use crate::buf::{AlignedBuf, Buf, Visit};
 use crate::error::Error;
 use crate::pointer::{Size, Slice, Unsized};
 use crate::sip::SipHasher13;
-use crate::swiss::raw::{self, RawTable};
-use crate::swiss::{Entry, MapRef, RawTableRef, SetRef};
+use crate::swiss::constructor::Constructor;
+use crate::swiss::map::RawTableRef;
+use crate::swiss::raw::{self};
+use crate::swiss::{Entry, MapRef, SetRef};
 use crate::ZeroCopy;
 
 const FIXED_SEED: u64 = 1234567890;
@@ -190,7 +192,7 @@ where
     let (buckets, bucket_mask) = {
         buf.as_aligned();
 
-        let mut table = unsafe { RawTable::<U, O>::with_buf(buf, ctrl_ptr, base_ptr, buckets) };
+        let mut table = unsafe { Constructor::<U, O>::with_buf(buf, ctrl_ptr, base_ptr, buckets) };
 
         for v in entries {
             let mut hasher = SipHasher13::new_with_keys(0, key);

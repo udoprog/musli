@@ -144,6 +144,7 @@ pub(crate) enum ErrorKind {
     Utf8Error {
         error: Utf8Error,
     },
+    #[cfg(feature = "alloc")]
     CapacityError,
     #[cfg(feature = "alloc")]
     FailedPhf,
@@ -189,6 +190,7 @@ impl fmt::Display for ErrorKind {
                 write!(f, "Illegal bool representation {repr}")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
+            #[cfg(feature = "alloc")]
             ErrorKind::CapacityError => {
                 write!(f, "Out of capacity")
             }

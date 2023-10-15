@@ -740,6 +740,7 @@ macro_rules! impl_nonzero_number {
         impl Visit for ::core::num::$ty {
             type Target = ::core::num::$ty;
 
+            #[inline]
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
             where
                 V: FnOnce(&Self::Target) -> O,

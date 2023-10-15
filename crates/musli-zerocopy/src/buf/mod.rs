@@ -3,6 +3,92 @@
 //! Buffers are slices of bytes without any inherent alignment. They allow use
 //! to safely convert offset-like types to references for types which implements
 //! [`ZeroCopy`].
+//!
+//! # Extension traits
+//!
+//! This module provides a couple of extension traits which can be used to alter
+//! how types interact with buffers.
+//!
+//! The following is a more compact [`Slice<u8>`] which only occupies 4 bytes,
+//! but restricts the offset and length.
+//!
+//! [`Slice<u8>`]: crate::pointer::Slice
+//!
+//! ```
+//! use musli_zerocopy::{Error, ZeroCopy};
+//! use musli_zerocopy::buf::{AlignedBuf, Buf, Load, LoadMut, Visit};
+//! use musli_zerocopy::pointer::{Slice, Ref};
+//!
+//! #[derive(ZeroCopy)]
+//! #[repr(C, packed)]
+//! struct CompactSlice {
+//!     // 3 bytes of offset.
+//!     offset: [u8; 3],
+//!     // one byte of length.
+//!     len: u8,
+//! }
+//!
+//! impl CompactSlice {
+//!     /// Construct a new compact slice, panic if offset and length
+//!     /// overflow 3 and 1 byte integers respectively.
+//!     pub fn new(offset: usize, len: usize) -> Self {
+//!         assert!(offset <= 0xffffffusize && len <= 0xff);
+//!         let [a, b, c, ..] = offset.to_le_bytes();
+//!
+//!         Self {
+//!             offset: [a, b, c],
+//!             len: len as u8,
+//!         }
+//!     }
+//!
+//!     /// Get the length of the compact slice.
+//!     pub fn len(&self) -> usize {
+//!         self.len as usize
+//!     }
+//!
+//!     fn to_slice(&self) -> Slice<u8> {
+//!         let [a, b, c] = self.offset;
+//!         let offset = u32::from_le_bytes([a, b, c, 0]);
+//!         Slice::new(offset as usize, self.len as usize)
+//!     }
+//! }
+//!
+//! impl Load for CompactSlice {
+//!     type Target = [u8];
+//!
+//!     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+//!         buf.load(self.to_slice())
+//!     }
+//! }
+//!
+//! impl LoadMut for CompactSlice {
+//!     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
+//!         buf.load_mut(self.to_slice())
+//!     }
+//! }
+//!
+//! let mut buf1 = AlignedBuf::new();
+//! let slice = buf1.store_slice(&[1u8, 2, 3, 4]);
+//! let slice_ref: Ref<Slice<u8>> = buf1.store(&slice);
+//! assert_eq!(buf1.len(), 12);
+//!
+//! let buf1 = buf1.as_aligned();
+//! let slice = buf1.load(slice_ref)?;
+//! assert_eq!(slice.len(), 4);
+//! assert_eq!(buf1.load(slice)?, &[1, 2, 3, 4]);
+//!
+//! let mut buf2 = AlignedBuf::new();
+//! let slice = buf2.store_slice(&[1u8, 2, 3, 4]);
+//! let slice = CompactSlice::new(slice.offset(), slice.len());
+//! let slice_ref: Ref<CompactSlice> = buf2.store(&slice);
+//! assert_eq!(buf2.len(), 8);
+//!
+//! let buf2 = buf2.as_aligned();
+//! let slice = buf2.load(slice_ref)?;
+//! assert_eq!(slice.len(), 4);
+//! assert_eq!(buf2.load(slice)?, &[1, 2, 3, 4]);
+//! # Ok::<_, musli_zerocopy::Error>(())
+//! ```
 
 #[cfg(test)]
 mod tests;
@@ -17,6 +103,7 @@ pub use self::load::{Load, LoadMut};
 mod load;
 
 pub use self::visit::Visit;
+pub use musli_macros::Visit;
 pub(crate) mod visit;
 
 pub use self::validator::Validator;
@@ -90,6 +177,7 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 /// let s = buf.load(Ref::<Person>::zero())?;
 /// # Ok::<_, anyhow::Error>(())
 /// ```
+#[cfg(feature = "alloc")]
 pub fn aligned_buf(bytes: &[u8], align: usize) -> Result<&Buf, AlignedBuf> {
     assert!(align.is_power_of_two(), "Alignment must be power of two");
 

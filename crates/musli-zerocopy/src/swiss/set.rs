@@ -154,6 +154,7 @@ impl<T, O: Size> SetRef<T, O>
 where
     T: ZeroCopy,
 {
+    #[cfg(feature = "alloc")]
     pub(crate) fn new(key: u64, table: RawTableRef<T, O>) -> Self {
         Self { key, table }
     }

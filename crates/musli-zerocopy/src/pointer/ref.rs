@@ -34,7 +34,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, skip_visit)]
+#[zero_copy(crate)]
 pub struct Ref<T, O: Size = DefaultSize> {
     offset: O,
     #[zero_copy(ignore)]

@@ -71,7 +71,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, skip_visit)]
+#[zero_copy(crate)]
 pub struct Slice<T, O: Size = DefaultSize> {
     offset: O,
     len: O,

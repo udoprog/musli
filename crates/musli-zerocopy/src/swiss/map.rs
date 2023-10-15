@@ -207,6 +207,7 @@ where
     K: ZeroCopy,
     V: ZeroCopy,
 {
+    #[cfg(feature = "alloc")]
     pub(crate) fn new(key: u64, table: RawTableRef<Entry<K, V>, O>) -> Self {
         Self { key, table }
     }
@@ -389,6 +390,7 @@ impl<T, O: Size> RawTableRef<T, O>
 where
     T: ZeroCopy,
 {
+    #[cfg(feature = "alloc")]
     pub(crate) fn new(ctrl: Unsized<[u8], O>, entries: Slice<T, O>, bucket_mask: usize) -> Self {
         Self {
             ctrl,

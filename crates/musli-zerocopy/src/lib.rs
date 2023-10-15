@@ -7,12 +7,17 @@
 //! This provides a base set of tools to deal with types which do not require
 //! copying during deserialization.
 //!
-//! To implement zero-copy support for a Rust type, see the [`ZeroCopy`] derive.
+//! For a detailed overview of how this works, see the [`ZeroCopy`] derive.
+//! There's also a high level guide just below.
 //!
-//! This crate includes support for a couple of neat high level data structures:
-//! * [`phf`] - which are maps and sets based on [`phf` crate], or perfect hash
+//! Reading a zero-copy structure has full `#[no_std]` support. Constructing
+//! ones currently require the `alloc` feature to be enabled.
+//!
+//! This crate also includes a couple of neat and very efficient high level data
+//! structures:
+//! * [`phf`] provides maps and sets based on [`phf` crate], or perfect hash
 //!   functions.
-//! * [`swiss`] - which is a port of the [`hashbrown` crate] which is a Google
+//! * [`swiss`] is a port of the [`hashbrown` crate] which is a Google
 //!   SwissTable implementation.
 //!
 //! <br>
@@ -361,8 +366,10 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "alloc")]
+pub use self::buf::AlignedBuf;
 #[doc(inline)]
-pub use self::buf::{AlignedBuf, Buf};
+pub use self::buf::Buf;
 pub mod buf;
 
 pub mod mem;
