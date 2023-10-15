@@ -394,6 +394,8 @@ pub mod pointer;
 /// Implementing this trait ensures that the type can safely be coerced to and
 /// from initialized bytes.
 ///
+/// <br>
+///
 /// # Using with structs
 ///
 /// The following are the requirements for deriving structs:
@@ -422,6 +424,8 @@ pub mod pointer;
 ///
 /// [`ZeroCopy`]: trait@crate::zero_copy::ZeroCopy
 ///
+/// <br>
+///
 /// # Using with enums
 ///
 /// The following are the requirements for deriving for enums:
@@ -446,6 +450,8 @@ pub mod pointer;
 /// assert_eq!(buf.load(ptr)?, &Flags::First);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
+///
+/// <br>
 ///
 /// # Padding
 ///
@@ -526,7 +532,11 @@ pub mod pointer;
 /// const _: () = assert!(Outer::PADDED);
 /// ```
 ///
+/// <br>
+///
 /// # Supported attributes
+///
+/// <br>
 ///
 /// ## Type attributes
 ///
@@ -539,6 +549,8 @@ pub mod pointer;
 ///   struct alignment. Namely to lower it. This is not supported for enums.
 ///
 /// The following `zero_copy(..)` attribute are supported:
+///
+/// <br>
 ///
 /// ### `zero_copy(bounds = {<bound>,*})`
 ///
@@ -556,6 +568,8 @@ pub mod pointer;
 ///     right: B,
 /// }
 /// ```
+///
+/// <br>
 ///
 /// ### `zero_copy(crate = <path>)`
 ///

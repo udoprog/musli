@@ -72,13 +72,10 @@ where
     I: IntoIterator<Item = (K, V)>,
     I::IntoIter: ExactSizeIterator,
 {
-    let iter = entries.into_iter();
-
-    let mut entries = Vec::with_capacity(iter.len());
-
-    for (k, v) in iter {
-        entries.push(Entry::new(k, v));
-    }
+    let mut entries = entries
+        .into_iter()
+        .map(|(k, v)| Entry::new(k, v))
+        .collect::<Vec<_>>();
 
     let mut hash_state = {
         let buf = buf.as_aligned();
@@ -131,18 +128,20 @@ where
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let mut values = [
-///     buf.store_unsized("first"),
-///     buf.store_unsized("second"),
-/// ];
+/// let first = buf.store_unsized("first");
+/// let second = buf.store_unsized("second");
+/// let third = buf.store_unsized("third");
 ///
-/// let set = phf::store_set(&mut buf, &mut values)?;
+/// let set = phf::store_set(&mut buf, [first, second])?;
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains("first")?);
+/// assert!(set.contains(&first)?);
 /// assert!(set.contains("second")?);
+/// assert!(set.contains(&second)?);
 /// assert!(!set.contains("third")?);
+/// assert!(!set.contains(&third)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///
@@ -154,28 +153,27 @@ where
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let mut values = [10u64, 20u64];
-///
-/// let set = phf::store_set(&mut buf, &mut values)?;
+/// let set = phf::store_set(&mut buf, [1, 2])?;
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
-/// assert!(set.contains(&10u64)?);
-/// assert!(set.contains(&20u64)?);
-/// assert!(!set.contains(&30u64)?);
+/// assert!(set.contains(&1)?);
+/// assert!(set.contains(&2)?);
+/// assert!(!set.contains(&3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_set<T, O: Size>(
-    buf: &mut AlignedBuf<O>,
-    entries: &mut [T],
-) -> Result<SetRef<T, O>, Error>
+pub fn store_set<T, I, O: Size>(buf: &mut AlignedBuf<O>, iter: I) -> Result<SetRef<T, O>, Error>
 where
     T: Visit + ZeroCopy,
     T::Target: Hash,
+    I: IntoIterator<Item = T>,
+    I::IntoIter: ExactSizeIterator,
 {
+    let mut entries = iter.into_iter().collect::<Vec<_>>();
+
     let mut hash_state = {
         let buf = buf.as_aligned();
-        crate::phf::generator::generate_hash(buf, entries, |value| value)?
+        crate::phf::generator::generate_hash(buf, &entries, |value| value)?
     };
 
     for a in 0..hash_state.map.len() {
@@ -192,7 +190,7 @@ where
         }
     }
 
-    let entries = buf.store_slice(entries);
+    let entries = buf.store_slice(&entries);
 
     let mut displacements = Vec::new();
 

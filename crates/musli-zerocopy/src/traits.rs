@@ -16,9 +16,9 @@
 
 #![allow(clippy::missing_safety_doc)]
 
-use core::cell::Cell;
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of, size_of_val};
+use core::num::Wrapping;
 use core::slice;
 use core::str;
 
@@ -139,8 +139,8 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
 /// zero-sized:
 ///
 /// ```
-/// use core::marker::PhantomData;
-/// use core::mem::size_of;
+/// use std::marker::PhantomData;
+/// use std::mem::size_of;
 /// use musli_zerocopy::ZeroCopy;
 /// use musli_zerocopy::traits::ZeroSized;
 ///
@@ -169,26 +169,38 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
 /// ```
 pub unsafe trait ZeroSized {}
 
-/// `Cell<T>` can be ignored as a zero-sized field.
+/// [`ZeroCopy`] implementation for `Wrapping<T>`.
 ///
 /// # Examples
 ///
 /// ```
-/// use core::cell::Cell;
+/// use std::num::Wrapping;
 ///
-/// use musli_zerocopy::ZeroCopy;
+/// use musli_zerocopy::{buf, ZeroCopy};
+/// use musli_zerocopy::pointer::Ref;
 ///
 /// #[derive(ZeroCopy)]
-/// #[repr(transparent)]
+/// #[repr(C)]
 /// struct Struct {
-///     #[zero_copy(ignore)]
-///     field: Cell<()>,
+///     field: Wrapping<u32>,
 /// }
+///
+/// let zero = u32::to_ne_bytes(0);
+/// let zero = buf::aligned_buf::<u32>(&zero);
+/// let one = u32::to_ne_bytes(1);
+/// let one = buf::aligned_buf::<u32>(&one);
+///
+/// let st = zero.load(Ref::<Struct>::zero())?;
+/// assert_eq!(st.field.0, 0);
+///
+/// let st = one.load(Ref::<Struct>::zero())?;
+/// assert_eq!(st.field.0, 1);
+/// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-// SAFETY: `Cell<T>` is repr-transparent.
-unsafe impl<T> ZeroSized for Cell<T> where T: ZeroSized {}
+// SAFETY: `Wrapping<T>` is repr-transparent.
+unsafe impl<T> ZeroSized for Wrapping<T> where T: ZeroSized {}
 
-unsafe impl<T> ZeroCopy for Cell<T>
+unsafe impl<T> ZeroCopy for Wrapping<T>
 where
     T: Copy + ZeroCopy,
 {
@@ -253,7 +265,7 @@ unsafe impl<T> ZeroSized for [T; 0] {}
 /// # Examples
 ///
 /// ```
-/// use core::marker::PhantomData;
+/// use std::marker::PhantomData;
 /// use musli_zerocopy::ZeroCopy;
 ///
 /// #[derive(ZeroCopy)]
@@ -283,6 +295,23 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 ///   example their alignment depends on the range of values they can represent.
 ///
 /// [`size_of`]: core::mem::size_of
+///
+/// # Notable types which cannot be `ZeroCopy`
+///
+/// Any type which does not have an explicit representation cannot implement
+/// `ZeroCopy`. Most Rust types use the Rust. Or `#[repr(Rust)]`. The Rust as a
+/// language is allowed to make arbitrary layout decisions for `#[repr(Rust)]`
+/// types.
+///
+/// The following is a list of common Rust types which *cannot* implements
+/// `ZeroCopy`, and the rationale for why:
+///
+/// * Non-zero sized tuples. Since tuples do not have a stable layout.
+/// * `Option<T>` since that is a `#[repr(Rust)]` type, except where [specific
+///   representation guarantees] are made such as with `Option<NonZero*>` types.
+///
+/// [specific representation guarantees]:
+///     https://doc.rust-lang.org/std/option/index.html#representation
 ///
 /// # Examples
 ///
@@ -462,7 +491,7 @@ impl_unsized_primitive!(
     PhantomData<T>,
     PhantomData<u32>,
     [PhantomData, PhantomData],
-    core::marker::PhantomData
+    std::marker::PhantomData
 );
 
 macro_rules! impl_number {
@@ -474,7 +503,7 @@ macro_rules! impl_number {
         /// ```
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{ZeroCopy, Buf};
+        /// use musli_zerocopy::{buf, ZeroCopy};
         /// use musli_zerocopy::pointer::Ref;
         ///
         /// #[derive(ZeroCopy)]
@@ -483,23 +512,19 @@ macro_rules! impl_number {
         #[doc = concat!("    field: ", stringify!($ty), ",")]
         /// }
         ///
-        #[doc = concat!("let size = size_of::<", stringify!($ty) ,">();")]
-        ///
         #[doc = concat!("let zero: ", stringify!($ty), " = 0;")]
         #[doc = concat!("let one: ", stringify!($ty), " = 1;")]
         ///
-        /// let zero = unsafe {
-        ///     let bytes = slice::from_raw_parts(&zero as *const _ as *const u8, size);
-        ///     Buf::new(bytes)
-        /// };
+        #[doc = concat!("let zero = ", stringify!($ty), "::to_ne_bytes(0);")]
+        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero);")]
+        #[doc = concat!("let one = ", stringify!($ty), "::to_ne_bytes(1);")]
+        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one);")]
         ///
-        /// let one = unsafe {
-        ///     let bytes = slice::from_raw_parts(&one as *const _ as *const u8, size);
-        ///     Buf::new(bytes)
-        /// };
+        /// let st = zero.load(Ref::<Struct>::new(0))?;
+        /// assert_eq!(st.field, 0);
         ///
-        /// assert_eq!(zero.load(Ref::<Struct>::new(0))?.field, 0);
-        /// assert_eq!(one.load(Ref::<Struct>::new(0))?.field, 1);
+        /// let st = one.load(Ref::<Struct>::new(0))?;
+        /// assert_eq!(st.field, 1);
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
         unsafe impl ZeroCopy for $ty {
@@ -679,7 +704,7 @@ macro_rules! impl_nonzero_number {
         #[doc = concat!("use std::num::", stringify!($ty), ";")]
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{ZeroCopy, Buf};
+        /// use musli_zerocopy::{buf, ZeroCopy};
         /// use musli_zerocopy::pointer::Ref;
         ///
         /// #[derive(ZeroCopy)]
@@ -688,26 +713,17 @@ macro_rules! impl_nonzero_number {
         #[doc = concat!("    field: ", stringify!($ty), ",")]
         /// }
         ///
-        #[doc = concat!("let size = size_of::<", stringify!($inner) ,">();")]
-        ///
-        #[doc = concat!("let zero: ", stringify!($inner), " = 0;")]
-        #[doc = concat!("let one: ", stringify!($inner), " = 1;")]
-        ///
-        /// let zero = unsafe {
-        ///     let bytes = slice::from_raw_parts(&zero as *const _ as *const u8, size);
-        ///     Buf::new(bytes)
-        /// };
-        ///
-        /// let one = unsafe {
-        ///     let bytes = slice::from_raw_parts(&one as *const _ as *const u8, size);
-        ///     Buf::new(bytes)
-        /// };
+        #[doc = concat!("let zero = ", stringify!($inner), "::to_ne_bytes(0);")]
+        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero);")]
+        #[doc = concat!("let one = ", stringify!($inner), "::to_ne_bytes(1);")]
+        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one);")]
         ///
         /// // Non-zero buffer works as expected.
-        /// assert_eq!(one.load(Ref::<Struct>::new(0))?.field.get(), 1);
+        /// let st = one.load(Ref::<Struct>::zero())?;
+        /// assert_eq!(st.field.get(), 1);
         ///
         /// // Trying to use a zeroed buffer with a non-zero type.
-        /// assert!(zero.load(Ref::<Struct>::new(0)).is_err());
+        /// assert!(zero.load(Ref::<Struct>::zero()).is_err());
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
         unsafe impl ZeroCopy for ::core::num::$ty {
@@ -739,6 +755,68 @@ macro_rules! impl_nonzero_number {
 
         impl Visit for ::core::num::$ty {
             type Target = ::core::num::$ty;
+
+            #[inline]
+            fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
+            where
+                V: FnOnce(&Self::Target) -> O,
+            {
+                Ok(visitor(self))
+            }
+        }
+
+        #[doc = concat!(" [`ZeroCopy`] implementation for `Option<", stringify!($ty), ">`")]
+        ///
+        /// # Examples
+        ///
+        /// ```
+        #[doc = concat!("use std::num::", stringify!($ty), ";")]
+        /// use std::slice;
+        /// use std::mem::size_of;
+        /// use musli_zerocopy::{buf, ZeroCopy};
+        /// use musli_zerocopy::pointer::Ref;
+        ///
+        /// #[derive(ZeroCopy)]
+        /// #[repr(C)]
+        /// struct Struct {
+        #[doc = concat!("    field: Option<", stringify!($ty), ">,")]
+        /// }
+        ///
+        #[doc = concat!("let zero = ", stringify!($inner), "::to_ne_bytes(0);")]
+        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero);")]
+        #[doc = concat!("let one = ", stringify!($inner), "::to_ne_bytes(1);")]
+        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one);")]
+        ///
+        /// let st = zero.load(Ref::<Struct>::new(0))?;
+        /// assert_eq!(st.field, None);
+        ///
+        /// let st = one.load(Ref::<Struct>::new(0))?;
+        #[doc = concat!("assert_eq!(st.field, ", stringify!($ty), "::new(1));")]
+        /// # Ok::<_, musli_zerocopy::Error>(())
+        /// ```
+        unsafe impl ZeroCopy for Option<::core::num::$ty> {
+            const ANY_BITS: bool = true;
+            const PADDED: bool = false;
+
+            #[inline]
+            unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
+            where
+                B: BufMut,
+            {
+                buf.store_bits(this.cast::<$inner>());
+            }
+
+            #[inline]
+            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
+
+            #[inline]
+            unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
+                Ok(())
+            }
+        }
+
+        impl Visit for Option<::core::num::$ty> {
+            type Target = Option<::core::num::$ty>;
 
             #[inline]
             fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
@@ -833,7 +911,7 @@ impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::Phan
 /// # Examples
 ///
 /// ```
-/// use core::mem::align_of;
+/// use std::mem::align_of;
 ///
 /// use musli_zerocopy::{ZeroCopy, AlignedBuf};
 ///

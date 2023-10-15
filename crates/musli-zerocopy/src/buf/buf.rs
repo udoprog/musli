@@ -4,6 +4,11 @@ use core::mem::{align_of, size_of};
 use core::ops::Range;
 use core::slice;
 
+#[cfg(feature = "alloc")]
+use alloc::borrow::ToOwned;
+
+#[cfg(feature = "alloc")]
+use crate::buf::AlignedBuf;
 use crate::buf::{Bindable, Load, LoadMut, Validator};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Ref, Size, Slice, Unsized};
@@ -612,5 +617,17 @@ impl Buf {
 impl fmt::Debug for Buf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Buf").field(&self.data.len()).finish()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl ToOwned for Buf {
+    type Owned = AlignedBuf;
+
+    #[inline]
+    fn to_owned(&self) -> Self::Owned {
+        let mut buf = AlignedBuf::with_capacity(self.len());
+        buf.extend_from_slice(self.as_slice());
+        buf
     }
 }

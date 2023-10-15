@@ -32,9 +32,7 @@ use crate::ZeroCopy;
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let mut set = [1, 2];
-///
-/// let set = phf::store_set(&mut buf, &mut set)?;
+/// let set = phf::store_set(&mut buf, [1, 2])?;
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
@@ -64,9 +62,7 @@ where
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut set = [1, 2];
-    ///
-    /// let set = phf::store_set(&mut buf, &mut set)?;
+    /// let set = phf::store_set(&mut buf, [1, 2])?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///
@@ -135,9 +131,7 @@ where
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let mut set = [1, 2];
-///
-/// let set = phf::store_set(&mut buf, &mut set)?;
+/// let set = phf::store_set(&mut buf, [1, 2])?;
 /// let buf = buf.as_aligned();
 ///
 /// assert!(set.contains(buf, &1)?);
@@ -189,9 +183,7 @@ where
     ///
     /// let mut buf = AlignedBuf::new();
     ///
-    /// let mut set = [1, 2];
-    ///
-    /// let set = phf::store_set(&mut buf, &mut set)?;
+    /// let set = phf::store_set(&mut buf, [1, 2])?;
     /// let buf = buf.as_aligned();
     /// let set = buf.bind(set)?;
     ///

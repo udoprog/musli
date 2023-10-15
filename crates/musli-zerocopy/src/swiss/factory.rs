@@ -107,15 +107,20 @@ where
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let pairs = [buf.store_unsized("first"), buf.store_unsized("second")];
+/// let first = buf.store_unsized("first");
+/// let second = buf.store_unsized("second");
+/// let third = buf.store_unsized("third");
 ///
-/// let set = swiss::store_set(&mut buf, pairs)?;
+/// let set = swiss::store_set(&mut buf, [first, second])?;
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains("first")?);
+/// assert!(set.contains(&first)?);
 /// assert!(set.contains("second")?);
+/// assert!(set.contains(&second)?);
 /// assert!(!set.contains("third")?);
+/// assert!(!set.contains(&third)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///
@@ -127,13 +132,13 @@ where
 ///
 /// let mut buf = AlignedBuf::new();
 ///
-/// let set = swiss::store_set(&mut buf, [10u64, 20u64])?;
+/// let set = swiss::store_set(&mut buf, [1, 2])?;
 /// let buf = buf.as_aligned();
 /// let set = buf.bind(set)?;
 ///
-/// assert!(set.contains(&10u64)?);
-/// assert!(set.contains(&20u64)?);
-/// assert!(!set.contains(&30u64)?);
+/// assert!(set.contains(&1)?);
+/// assert!(set.contains(&2)?);
+/// assert!(!set.contains(&3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 pub fn store_set<T, I, O: Size>(buf: &mut AlignedBuf<O>, entries: I) -> Result<SetRef<T, O>, Error>

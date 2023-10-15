@@ -1,10 +1,11 @@
 use core::alloc::Layout;
+use core::borrow::Borrow;
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of, size_of_val, ManuallyDrop};
 use core::ptr::NonNull;
 use core::slice;
 
-use ::alloc::alloc;
+use alloc::alloc;
 
 use crate::buf::{Buf, BufMut, DefaultAlignment, Padder};
 use crate::mem::MaybeUninit;
@@ -1170,6 +1171,13 @@ impl<O: Size> AsMut<Buf> for AlignedBuf<O> {
     #[inline]
     fn as_mut(&mut self) -> &mut Buf {
         Buf::new_mut(self.as_mut_slice())
+    }
+}
+
+impl Borrow<Buf> for AlignedBuf {
+    #[inline]
+    fn borrow(&self) -> &Buf {
+        self.as_ref()
     }
 }
 

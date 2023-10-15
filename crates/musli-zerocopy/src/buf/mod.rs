@@ -125,6 +125,9 @@ mod aligned_buf;
 
 use core::mem::{align_of, size_of};
 
+#[cfg(feature = "alloc")]
+use alloc::borrow::Cow;
+
 use crate::error::Error;
 use crate::traits::ZeroCopy;
 
@@ -142,6 +145,36 @@ pub fn max_capacity_for_align(align: usize) -> usize {
     isize::MAX as usize - (align - 1)
 }
 
+/// Construct a buffer with an alignment matching that of `T` which is either
+/// wrapped in a [`Buf`] if it is already correctly aligned, or inside of an
+/// allocated [`AlignedBuf`].
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::fs::read;
+/// use musli_zerocopy::ZeroCopy;
+/// use musli_zerocopy::buf;
+/// use musli_zerocopy::pointer::{Ref, Unsized};
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(C)]
+/// struct Person {
+///     name: Unsized<str>,
+///     age: u32,
+/// }
+///
+/// let bytes = read("person.bin")?;
+/// let buf = buf::aligned_buf::<u128>(&bytes);
+///
+/// let s = buf.load(Ref::<Person>::zero())?;
+/// # Ok::<_, anyhow::Error>(())
+/// ```
+#[cfg(feature = "alloc")]
+pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
+    aligned_buf_with(bytes, align_of::<T>())
+}
+
 /// Construct a buffer with a specific alignment which is either wrapped in a
 /// [`Buf`] if it is already correctly aligned, or inside of an allocated
 /// [`AlignedBuf`].
@@ -156,7 +189,7 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 /// ```no_run
 /// use std::fs::read;
 /// use musli_zerocopy::ZeroCopy;
-/// use musli_zerocopy::buf::aligned_buf;
+/// use musli_zerocopy::buf;
 /// use musli_zerocopy::pointer::{Ref, Unsized};
 ///
 /// #[derive(ZeroCopy)]
@@ -167,24 +200,19 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 /// }
 ///
 /// let bytes = read("person.bin")?;
-/// let buf = aligned_buf(&bytes, 16);
-///
-/// let buf = match &buf {
-///     Ok(buf) => *buf,
-///     Err(buf) => buf.as_ref(),
-/// };
+/// let buf = buf::aligned_buf_with(&bytes, 16);
 ///
 /// let s = buf.load(Ref::<Person>::zero())?;
 /// # Ok::<_, anyhow::Error>(())
 /// ```
 #[cfg(feature = "alloc")]
-pub fn aligned_buf(bytes: &[u8], align: usize) -> Result<&Buf, AlignedBuf> {
+pub fn aligned_buf_with(bytes: &[u8], align: usize) -> Cow<'_, Buf> {
     assert!(align.is_power_of_two(), "Alignment must be power of two");
 
     let buf = Buf::new(bytes);
 
     if buf.is_aligned_to(align) {
-        Ok(buf)
+        Cow::Borrowed(buf)
     } else {
         let mut buf = unsafe { AlignedBuf::with_capacity_and_custom_alignment(bytes.len(), align) };
 
@@ -192,7 +220,7 @@ pub fn aligned_buf(bytes: &[u8], align: usize) -> Result<&Buf, AlignedBuf> {
             buf.store_bytes(bytes);
         }
 
-        Err(buf)
+        Cow::Owned(buf)
     }
 }
 
