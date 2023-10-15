@@ -747,7 +747,8 @@ impl<O: Size> OwnedBuf<O> {
     /// ```
     #[inline]
     pub fn align_in_place(&mut self) {
-        if !self.is_aligned_to(self.requested) {
+        // SAFETY: self.requested is guaranteed to be a power of two.
+        if !unsafe { crate::buf::is_aligned_with(self.as_ptr(), self.requested) } {
             let (old_layout, new_layout) = self.layouts(self.capacity);
             self.alloc_new(old_layout, new_layout);
         }
@@ -779,26 +780,6 @@ impl<O: Size> OwnedBuf<O> {
     pub fn into_aligned(mut self) -> Self {
         self.align_in_place();
         self
-    }
-
-    /// Test if the current allocation uses the specified allocation.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the specified alignment is not a power of two.
-    ///
-    /// ```should_panic
-    /// use musli_zerocopy::OwnedBuf;
-    ///
-    /// let buf = OwnedBuf::new();
-    /// buf.is_aligned_to(0);
-    /// ```
-    #[inline]
-    pub fn is_aligned_to(&self, align: usize) -> bool {
-        assert!(align.is_power_of_two(), "Align is not a power of two");
-
-        // SAFETY: align is a power of two.
-        unsafe { crate::buf::is_aligned_to(self.as_ptr(), align) }
     }
 
     /// Request that the current buffer should have at least the specified

@@ -28,7 +28,7 @@ fn allocate_array_needing_padding() -> Result<(), Error> {
         third: [Inner; 2],
     }
 
-    assert!(Element::PADDED);
+    const _: () = assert!(Element::PADDED);
 
     let mut buf = OwnedBuf::new();
 
@@ -69,7 +69,7 @@ fn allocate_array_not_needing_padding() -> Result<(), Error> {
         third: u32,
     }
 
-    assert!(!Element::PADDED);
+    const _: () = assert!(!Element::PADDED);
 
     let mut buf = OwnedBuf::new();
 
@@ -142,9 +142,9 @@ fn inner_padding() -> Result<(), Error> {
         inner2: Inner2,
     }
 
-    assert!(Custom::PADDED);
-    assert!(Inner::PADDED);
-    assert!(Inner2::PADDED);
+    const _: () = assert!(Custom::PADDED);
+    const _: () = assert!(Inner::PADDED);
+    const _: () = assert!(Inner2::PADDED);
 
     let inner = Inner { field: 10 };
     let inner2 = Inner2 { field: 20 };

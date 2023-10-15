@@ -216,7 +216,7 @@ pub fn aligned_buf_with(bytes: &[u8], align: usize) -> Cow<'_, Buf> {
 ///
 /// Must be called with an alignment that is a power of two.
 #[inline]
-pub(crate) unsafe fn is_aligned_to(ptr: *const u8, align: usize) -> bool {
+pub(crate) unsafe fn is_aligned_with(ptr: *const u8, align: usize) -> bool {
     (ptr as usize) & (align - 1) == 0
 }
 

@@ -144,7 +144,7 @@ impl Buf {
         assert!(align.is_power_of_two(), "Alignment must be power of two");
 
         // SAFETY: align is checked as a power of two just above.
-        if unsafe { self.is_aligned_to(align) } {
+        if unsafe { self.is_aligned_with_unchecked(align) } {
             Cow::Borrowed(self)
         } else {
             let mut buf =
@@ -499,7 +499,7 @@ impl Buf {
     ) -> Result<&Buf, Error> {
         let buf = Buf::new(self.inner_get_unaligned(start, end)?);
 
-        if !buf.is_aligned_to(align) {
+        if !buf.is_aligned_with_unchecked(align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
                 range: start..end,
                 align,
@@ -523,7 +523,7 @@ impl Buf {
     ) -> Result<&mut Buf, Error> {
         let buf = Buf::new_mut(self.inner_get_mut_unaligned(start, end)?);
 
-        if !buf.is_aligned_to(align) {
+        if !buf.is_aligned_with_unchecked(align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
                 range: start..end,
                 align,
@@ -716,17 +716,62 @@ impl Buf {
     #[inline]
     pub(crate) fn is_compatible(&self, layout: Layout) -> bool {
         // SAFETY: Layout::align is a power of two.
-        unsafe { self.is_aligned_to(layout.align()) && self.data.len() >= layout.size() }
+        unsafe {
+            self.is_aligned_with_unchecked(layout.align()) && self.data.len() >= layout.size()
+        }
     }
 
-    /// Test if the buffer is aligned with the given alignment.
+    /// Test if the current allocation uses the alignment of `T`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// #[repr(align(4096))]
+    /// struct Align4096;
+    ///
+    /// let buf = OwnedBuf::new();
+    /// assert!(buf.is_aligned::<u32>());
+    /// // NB: We might have gotten lucky and hit a wide alignment by chance.
+    /// assert!(buf.is_aligned::<Align4096>() || !buf.is_aligned::<Align4096>());
+    /// ```
+    #[inline]
+    pub fn is_aligned<T>(&self) -> bool {
+        unsafe { crate::buf::is_aligned_with(self.as_ptr(), align_of::<T>()) }
+    }
+
+    /// Test if the current allocation uses the specified alignment.
     ///
     /// # Panics
     ///
-    /// Panics if `align` is not a power of two.
+    /// Panics if the specified alignment is not a power of two.
+    ///
+    /// ```should_panic
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let buf = OwnedBuf::new();
+    /// buf.is_aligned_with(0);
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let buf = OwnedBuf::new();
+    /// assert!(buf.is_aligned_with(8));
+    /// ```
     #[inline]
-    pub(crate) unsafe fn is_aligned_to(&self, align: usize) -> bool {
-        crate::buf::is_aligned_to(self.data.as_ptr(), align)
+    pub fn is_aligned_with(&self, align: usize) -> bool {
+        assert!(align.is_power_of_two(), "Alignment is not a power of two");
+        // SAFETY: align is a power of two.
+        unsafe { crate::buf::is_aligned_with(self.as_ptr(), align) }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn is_aligned_with_unchecked(&self, align: usize) -> bool {
+        crate::buf::is_aligned_with(self.as_ptr(), align)
     }
 }
 

@@ -56,14 +56,14 @@ fn test_zero_padded() {
     #[repr(C, align(128))]
     struct EmptyPadded;
 
-    assert!(EmptyPadded::PADDED);
+    const _: () = assert!(EmptyPadded::PADDED);
 
     #[derive(ZeroCopy)]
     #[zero_copy(crate)]
     #[repr(C)]
     struct EmptyDefaultAlign;
 
-    assert!(!EmptyDefaultAlign::PADDED);
+    const _: () = assert!(!EmptyDefaultAlign::PADDED);
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn test_inner_padded() -> Result<(), Error> {
         second: u32,
     }
 
-    assert!(Inner::PADDED);
+    const _: () = assert!(Inner::PADDED);
 
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[zero_copy(crate)]
@@ -87,7 +87,7 @@ fn test_inner_padded() -> Result<(), Error> {
         third: Inner,
     }
 
-    assert!(Element::PADDED);
+    const _: () = assert!(Element::PADDED);
     Ok(())
 }
 
@@ -103,7 +103,7 @@ fn test_inner_not_padded() -> Result<(), Error> {
         fourth: u8,
     }
 
-    assert!(!Inner::PADDED);
+    const _: () = assert!(!Inner::PADDED);
 
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[zero_copy(crate)]
@@ -114,7 +114,7 @@ fn test_inner_not_padded() -> Result<(), Error> {
         third: Inner,
     }
 
-    assert!(!Element::PADDED);
+    const _: () = assert!(!Element::PADDED);
     Ok(())
 }
 
@@ -130,7 +130,7 @@ fn test_inner_not_padded_by_align() -> Result<(), Error> {
         fourth: u8,
     }
 
-    assert!(Inner::PADDED);
+    const _: () = assert!(Inner::PADDED);
 
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[zero_copy(crate)]
@@ -141,7 +141,7 @@ fn test_inner_not_padded_by_align() -> Result<(), Error> {
         third: Inner,
     }
 
-    assert!(Element::PADDED);
+    const _: () = assert!(Element::PADDED);
     Ok(())
 }
 
@@ -365,7 +365,7 @@ fn test_needs_padding() -> Result<(), Error> {
     #[zero_copy(crate)]
     struct Zst {}
 
-    assert!(!Zst::PADDED);
+    const _: () = assert!(!Zst::PADDED);
 
     #[derive(ZeroCopy)]
     #[repr(transparent)]
@@ -374,7 +374,7 @@ fn test_needs_padding() -> Result<(), Error> {
         not_padded: u32,
     }
 
-    assert!(!SingleField::PADDED);
+    const _: () = assert!(!SingleField::PADDED);
 
     #[derive(ZeroCopy)]
     #[repr(transparent)]
@@ -383,7 +383,7 @@ fn test_needs_padding() -> Result<(), Error> {
         might_pad: [u32; 4],
     }
 
-    assert!(!MightPad::PADDED);
+    const _: () = assert!(!MightPad::PADDED);
     Ok(())
 }
 
