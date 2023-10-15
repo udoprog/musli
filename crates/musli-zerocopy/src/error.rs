@@ -127,6 +127,10 @@ pub(crate) enum ErrorKind {
         range: Range<usize>,
         len: usize,
     },
+    StrideOutOfBounds {
+        index: usize,
+        len: usize,
+    },
     IllegalEnumRepr {
         name: &'static str,
         repr: EnumRepr,
@@ -140,6 +144,7 @@ pub(crate) enum ErrorKind {
     Utf8Error {
         error: Utf8Error,
     },
+    CapacityError,
     #[cfg(feature = "alloc")]
     FailedPhf,
 }
@@ -171,6 +176,9 @@ impl fmt::Display for ErrorKind {
             ErrorKind::ControlRangeOutOfBounds { range, len } => {
                 write!(f, "Control range {range:?} out of bound 0-{len}")
             }
+            ErrorKind::StrideOutOfBounds { index, len } => {
+                write!(f, "Stride at index {index} out of bound 0-{len}")
+            }
             ErrorKind::IllegalEnumRepr { name, repr } => {
                 write!(f, "Illegal enum representation {repr} for enum {name}")
             }
@@ -181,6 +189,9 @@ impl fmt::Display for ErrorKind {
                 write!(f, "Illegal bool representation {repr}")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
+            ErrorKind::CapacityError => {
+                write!(f, "Out of capacity")
+            }
             #[cfg(feature = "alloc")]
             ErrorKind::FailedPhf => {
                 write!(f, "Failed to construct perfect hash for map")

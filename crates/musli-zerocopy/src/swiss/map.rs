@@ -368,7 +368,7 @@ impl<'a, T> RawTable<'a, T> {
                 return Ok(None);
             }
 
-            probe_seq.move_next(self.bucket_mask);
+            probe_seq.move_next(self.bucket_mask)?;
         }
     }
 }
@@ -477,7 +477,7 @@ where
                 return Ok(None);
             }
 
-            probe_seq.move_next(self.bucket_mask);
+            probe_seq.move_next(self.bucket_mask)?;
         }
     }
 }

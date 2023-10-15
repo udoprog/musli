@@ -31,8 +31,10 @@ cfg_if! {
 mod bitmask;
 
 use crate::buf::{AlignedBuf, Buf, RawBufMut};
+use crate::error::Error;
+use crate::error::ErrorKind;
 use crate::pointer::Size;
-use crate::ZeroCopy;
+use crate::traits::ZeroCopy;
 
 pub(crate) use self::imp::Group;
 
@@ -86,7 +88,7 @@ impl<'a, T, O: Size> RawTable<'a, T, O> {
     }
 
     /// Insert the given zero copy value into the table.
-    pub(crate) fn insert(&mut self, hash: u64, value: T) -> Bucket<T>
+    pub(crate) fn insert(&mut self, hash: u64, value: T) -> Result<Bucket<'_, T>, Error>
     where
         T: ZeroCopy,
     {
@@ -94,7 +96,7 @@ impl<'a, T, O: Size> RawTable<'a, T, O> {
             // SAFETY:
             // 1. The [`RawTableInner`] must already have properly initialized control bytes since
             //    we will never expose `RawTable::new_uninitialized` in a public API.
-            let slot = self.table.find_insert_slot(hash);
+            let slot = self.table.find_insert_slot(hash)?;
 
             // We can avoid growing the table once we have reached our load factor if we are replacing
             // a tombstone. This works since the number of EMPTY slots does not change in this case.
@@ -104,10 +106,10 @@ impl<'a, T, O: Size> RawTable<'a, T, O> {
             let old_ctrl = *self.table.ctrl(slot.index);
 
             if unlikely(self.table.growth_left == 0 && special_is_empty(old_ctrl)) {
-                panic!("Table out of allocated capacity");
+                return Err(Error::new(ErrorKind::CapacityError));
             }
 
-            self.insert_in_slot(hash, slot, value)
+            Ok(self.insert_in_slot(hash, slot, value))
         }
     }
 
@@ -315,7 +317,14 @@ pub(crate) struct ProbeSeq {
 
 impl ProbeSeq {
     #[inline]
-    pub(crate) fn move_next(&mut self, bucket_mask: usize) {
+    pub(crate) fn move_next(&mut self, bucket_mask: usize) -> Result<(), Error> {
+        if self.stride > bucket_mask {
+            return Err(Error::new(ErrorKind::StrideOutOfBounds {
+                index: self.stride,
+                len: bucket_mask,
+            }));
+        }
+
         // We should have found an empty bucket by now and ended the probe.
         debug_assert!(
             self.stride <= bucket_mask,
@@ -325,6 +334,7 @@ impl ProbeSeq {
         self.stride += Group::WIDTH;
         self.pos += self.stride;
         self.pos &= bucket_mask;
+        Ok(())
     }
 }
 
@@ -458,7 +468,7 @@ impl<'a, O: Size> RawTableInner<'a, O> {
     /// [`undefined behavior`]:
     ///     https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
-    unsafe fn find_insert_slot(&mut self, hash: u64) -> InsertSlot {
+    unsafe fn find_insert_slot(&mut self, hash: u64) -> Result<InsertSlot, Error> {
         let mut probe_seq = probe_seq(self.bucket_mask, hash);
 
         loop {
@@ -491,11 +501,11 @@ impl<'a, O: Size> RawTableInner<'a, O> {
                 //
                 // * We use this function with the slot / index found by `self.find_insert_slot_in_group`
                 unsafe {
-                    return self.fix_insert_slot(index.unwrap_unchecked());
+                    return Ok(self.fix_insert_slot(index.unwrap_unchecked()));
                 }
             }
 
-            probe_seq.move_next(self.bucket_mask);
+            probe_seq.move_next(self.bucket_mask)?;
         }
     }
 
