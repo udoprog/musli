@@ -23,7 +23,9 @@ mod sealed {
 ///
 /// This trait is sealed, and its internals hidden. It's only public use must be
 /// as a marker trait.
-pub trait Size: self::sealed::Sealed + 'static + Sized + ZeroCopy + Copy + fmt::Display {
+pub trait Size:
+    self::sealed::Sealed + 'static + Sized + ZeroCopy + Copy + fmt::Display + fmt::Debug
+{
     /// The default zero pointer.
     #[doc(hidden)]
     const ZERO: Self;

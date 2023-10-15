@@ -1,15 +1,12 @@
 use core::hash::{Hash, Hasher};
-use core::ptr;
+use core::mem::size_of;
 
-use alloc::vec::Vec;
-
-use crate::buf::Visit;
+use crate::buf::{AlignedBuf, Buf, Visit};
 use crate::error::Error;
-use crate::pointer::Size;
+use crate::pointer::{Size, Slice, Unsized};
 use crate::sip::SipHasher13;
-use crate::swiss::raw::RawTable;
-use crate::swiss::{Entry, MapRef, RawOption, RawTableRef, SetRef};
-use crate::AlignedBuf;
+use crate::swiss::raw::{self, RawTable};
+use crate::swiss::{Entry, MapRef, RawTableRef, SetRef};
 use crate::ZeroCopy;
 
 const FIXED_SEED: u64 = 1234567890;
@@ -77,41 +74,10 @@ where
     I: IntoIterator<Item = (K, V)>,
     I::IntoIter: ExactSizeIterator,
 {
-    let entries = entries.into_iter();
-    let mut table = RawTable::with_capacity(entries.len() + 64);
-
-    let key = FIXED_SEED;
-
-    {
-        let buf = buf.as_aligned();
-
-        for (k, v) in entries {
-            let mut hasher = SipHasher13::new_with_keys(0, key);
-            k.visit(buf, |key| key.hash(&mut hasher))?;
-            let hash = hasher.finish();
-            table.insert(hash, Entry::new(k, v));
-        }
-    }
-
-    let bucket_mask = table.bucket_mask();
-    let ctrl = table.control_bytes();
-
-    let ctrl = buf.store_unsized(ctrl);
-
-    let mut buckets = Vec::with_capacity(table.buckets());
-
-    for _ in 0..table.buckets() {
-        buckets.push(RawOption::None);
-    }
-
-    unsafe {
-        for bucket in table.iter() {
-            // SAFETY: ZeroType types can be bitwise copied.
-            buckets[bucket.index()] = RawOption::Some(ptr::read_unaligned(bucket.as_ptr()));
-        }
-    }
-
-    let buckets = buf.store_slice(&buckets);
+    let (key, ctrl, buckets, bucket_mask) = store_raw(entries, buf, |buf, (k, v), hasher| {
+        k.visit(buf, |key| key.hash(hasher))?;
+        Ok(Entry::new(k, v))
+    })?;
 
     Ok(MapRef::new(
         key,
@@ -175,44 +141,63 @@ where
     I: IntoIterator<Item = T>,
     I::IntoIter: ExactSizeIterator,
 {
-    let entries = entries.into_iter();
-    let mut table = RawTable::with_capacity(entries.len() + 64);
-
-    let key = FIXED_SEED;
-
-    {
-        let buf = buf.as_aligned();
-
-        for entry in entries {
-            let mut hasher = SipHasher13::new_with_keys(0, key);
-            entry.visit(buf, |key| key.hash(&mut hasher))?;
-            let hash = hasher.finish();
-            table.insert(hash, entry);
-        }
-    }
-
-    let bucket_mask = table.bucket_mask();
-    let ctrl = table.control_bytes();
-
-    let ctrl = buf.store_unsized(ctrl);
-
-    let mut buckets = Vec::with_capacity(table.buckets());
-
-    for _ in 0..table.buckets() {
-        buckets.push(RawOption::None);
-    }
-
-    unsafe {
-        for bucket in table.iter() {
-            // SAFETY: ZeroType types can be bitwise copied.
-            buckets[bucket.index()] = RawOption::Some(ptr::read_unaligned(bucket.as_ptr()));
-        }
-    }
-
-    let buckets = buf.store_slice(&buckets);
+    let (key, ctrl, buckets, bucket_mask) = store_raw(entries, buf, |buf, v, hasher| {
+        v.visit(buf, |key| key.hash(hasher))?;
+        Ok(v)
+    })?;
 
     Ok(SetRef::new(
         key,
         RawTableRef::new(ctrl, buckets, bucket_mask),
     ))
+}
+
+// Output from storing raw values.
+type Raw<U, O> = (u64, Unsized<[u8], O>, Slice<U, O>, usize);
+
+// Raw store function which is capable of storing any value using a hashing
+// adapter.
+fn store_raw<T, U, I, O: Size>(
+    entries: I,
+    buf: &mut AlignedBuf<O>,
+    hash: fn(&Buf, T, &mut SipHasher13) -> Result<U, Error>,
+) -> Result<Raw<U, O>, Error>
+where
+    U: ZeroCopy,
+    I: IntoIterator<Item = T>,
+    I::IntoIter: ExactSizeIterator,
+{
+    let entries = entries.into_iter();
+    let key = FIXED_SEED;
+
+    let (ctrl_len, ctrl_align, buckets) =
+        RawTable::<'_, U, O>::layout_and_offset_for(entries.len());
+
+    debug_assert!(ctrl_align.is_power_of_two());
+
+    let ctrl_ptr = unsafe { buf.next_offset_with(ctrl_align, ctrl_len) };
+    // All ones indicates that the table is empty, since the ctrl byte for empty
+    // buckets is 1111_1111.
+    buf.fill(raw::EMPTY, ctrl_len);
+    let base_ptr = buf.next_offset::<U>();
+    buf.fill(0, size_of::<T>().wrapping_mul(buckets));
+
+    let (buckets, bucket_mask) = {
+        buf.as_aligned();
+
+        let mut table = unsafe { RawTable::<U, O>::with_buf(buf, ctrl_ptr, base_ptr, buckets) };
+
+        for v in entries {
+            let mut hasher = SipHasher13::new_with_keys(0, key);
+            let v = hash(table.buf(), v, &mut hasher)?;
+            let hash = hasher.finish();
+            table.insert(hash, v);
+        }
+
+        (table.buckets(), table.bucket_mask())
+    };
+
+    let ctrl = Unsized::new(ctrl_ptr, ctrl_len);
+    let buckets = Slice::new(base_ptr, buckets);
+    Ok((key, ctrl, buckets, bucket_mask))
 }

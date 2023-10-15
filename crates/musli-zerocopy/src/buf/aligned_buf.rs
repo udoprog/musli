@@ -689,6 +689,18 @@ impl<O: Size> AlignedBuf<O> {
         }
     }
 
+    /// Fill and initialize the buffer with `byte` up to `len`.
+    pub(crate) fn fill(&mut self, byte: u8, len: usize) {
+        self.reserve(len);
+
+        let base = self.data.as_ptr().wrapping_add(self.len);
+
+        unsafe {
+            base.write_bytes(byte, len);
+            self.len += len;
+        }
+    }
+
     /// Store the slice without allocating.
     ///
     /// # Safety
@@ -943,7 +955,7 @@ impl<O: Size> AlignedBuf<O> {
     /// Construct a pointer aligned for `align` into the current buffer which
     /// points to the next location that will be written.
     #[inline]
-    unsafe fn next_offset_with(&mut self, align: usize, reserve: usize) -> usize {
+    pub(crate) unsafe fn next_offset_with(&mut self, align: usize, reserve: usize) -> usize {
         self.requested = self.requested.max(align);
         self.ensure_aligned(align, reserve);
         self.len

@@ -27,11 +27,3 @@ impl<K, V> Entry<K, V> {
         Self { key, value }
     }
 }
-
-#[derive(Debug, ZeroCopy)]
-#[zero_copy(crate, bounds = {T: ZeroCopy})]
-#[repr(u8)]
-pub(crate) enum RawOption<T> {
-    Some(T),
-    None,
-}

@@ -22,7 +22,7 @@ use crate::error::{Error, ErrorKind};
 use crate::pointer::{DefaultSize, Size, Slice, Unsized};
 use crate::sip::SipHasher13;
 use crate::swiss::raw::{h2, probe_seq, Group};
-use crate::swiss::{Entry, RawOption};
+use crate::swiss::Entry;
 use crate::ZeroCopy;
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
@@ -295,7 +295,7 @@ where
 
 pub(crate) struct RawTable<'a, T> {
     ctrl: &'a [u8],
-    entries: &'a [RawOption<T>],
+    entries: &'a [T],
     bucket_mask: usize,
 }
 
@@ -321,13 +321,6 @@ impl<'a, T> RawTable<'a, T> {
     fn entry(&self, index: usize) -> Result<&'a T, Error> {
         let Some(entry) = self.entries.get(index) else {
             return Err(Error::new(ErrorKind::IndexOutOfBounds {
-                index,
-                len: self.entries.len(),
-            }));
-        };
-
-        let RawOption::Some(entry) = entry else {
-            return Err(Error::new(ErrorKind::AbsentEntry {
                 index,
                 len: self.entries.len(),
             }));
@@ -389,7 +382,7 @@ where
     T: ZeroCopy,
 {
     ctrl: Unsized<[u8], O>,
-    entries: Slice<RawOption<T>, O>,
+    entries: Slice<T, O>,
     bucket_mask: usize,
 }
 
@@ -397,11 +390,7 @@ impl<T, O: Size> RawTableRef<T, O>
 where
     T: ZeroCopy,
 {
-    pub(crate) fn new(
-        ctrl: Unsized<[u8], O>,
-        entries: Slice<RawOption<T>, O>,
-        bucket_mask: usize,
-    ) -> Self {
+    pub(crate) fn new(ctrl: Unsized<[u8], O>, entries: Slice<T, O>, bucket_mask: usize) -> Self {
         Self {
             ctrl,
             entries,
@@ -446,14 +435,7 @@ where
             }));
         };
 
-        let RawOption::Some(entry) = buf.load(entry)? else {
-            return Err(Error::new(ErrorKind::AbsentEntry {
-                index,
-                len: self.entries.len(),
-            }));
-        };
-
-        Ok(entry)
+        buf.load(entry)
     }
 
     /// Searches for an element in a table, returning the `index` of the found

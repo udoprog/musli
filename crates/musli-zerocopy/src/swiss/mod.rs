@@ -12,7 +12,7 @@
 
 mod raw;
 
-pub(crate) use self::entry::{Entry, RawOption};
+pub(crate) use self::entry::Entry;
 mod entry;
 
 pub(crate) use self::map::RawTableRef;

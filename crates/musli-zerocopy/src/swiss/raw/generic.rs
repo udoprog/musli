@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::bitmask::BitMask;
 use super::EMPTY;
 use core::{mem, ptr};
