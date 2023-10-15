@@ -3,8 +3,51 @@
 use core::marker::PhantomData;
 use core::mem::size_of;
 
-use crate::pointer::Ref;
+use crate::pointer::{Ref, Slice};
 use crate::{AlignedBuf, Error, ZeroCopy};
+
+#[test]
+fn test_ref_to_slice() -> Result<(), Error> {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ZeroCopy)]
+    #[repr(u32)]
+    #[zero_copy(crate)]
+    enum InnerEnum {
+        None = 0xfffffffe,
+        Some(u32),
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ZeroCopy)]
+    #[repr(C)]
+    #[zero_copy(crate)]
+    pub struct RefToSlice {
+        index: Ref<Slice<u8>>,
+        extra: InnerEnum,
+    }
+
+    let mut buf = AlignedBuf::new();
+
+    let index = buf.store_slice(&[1, 2, 3, 4]);
+    let index = buf.store(&index);
+
+    let to_slice1 = RefToSlice {
+        index,
+        extra: InnerEnum::Some(4040),
+    };
+
+    let to_slice2 = RefToSlice {
+        index,
+        extra: InnerEnum::None,
+    };
+
+    let to_slice1_ref = buf.store(&to_slice1);
+    let to_slice2_ref = buf.store(&to_slice2);
+
+    let buf = buf.as_aligned();
+
+    assert_eq!(buf.load(&to_slice1_ref)?, &to_slice1);
+    assert_eq!(buf.load(&to_slice2_ref)?, &to_slice2);
+    Ok(())
+}
 
 #[test]
 fn test_zero_padded() {

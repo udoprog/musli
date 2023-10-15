@@ -681,8 +681,7 @@ impl<O: Size> AlignedBuf<O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn extend_from_slice(&mut self, bytes: &[u8]) {
-        let new_capacity = self.capacity + bytes.len();
-        self.ensure_capacity(new_capacity);
+        self.reserve(bytes.len());
 
         // SAFETY: We just allocated space for the slice.
         unsafe {
@@ -835,7 +834,7 @@ impl<O: Size> AlignedBuf<O> {
     ///
     /// ```
     /// use musli_zerocopy::AlignedBuf;
-    /// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(8);
+    /// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(32);
     ///
     /// buf.extend_from_slice(&[1, 2]);
     /// assert_eq!(buf.align(), 2);
@@ -844,7 +843,7 @@ impl<O: Size> AlignedBuf<O> {
     /// assert_eq!(buf.requested(), 4);
     /// assert_eq!(buf.align(), 2);
     ///
-    /// buf.extend_from_slice(&[1, 2, 3]);
+    /// buf.extend_from_slice(&[0; 32]);
     /// assert_eq!(buf.requested(), 4);
     /// assert_eq!(buf.align(), 4);
     /// ```
@@ -900,7 +899,6 @@ impl<O: Size> AlignedBuf<O> {
         T: ZeroCopy,
     {
         let len = self.len.wrapping_add(size_of::<T>());
-
         self.ensure_capacity(len);
 
         let start = self.as_ptr_mut().wrapping_add(self.len);
@@ -933,7 +931,6 @@ impl<O: Size> AlignedBuf<O> {
     #[inline]
     fn ensure_aligned(&mut self, align: usize, reserve: usize) {
         let extra = crate::buf::padding_to(self.len, align);
-
         self.reserve(extra.wrapping_add(reserve));
 
         // SAFETY: The length is ensures to be within the address space.
@@ -1181,7 +1178,7 @@ impl<O: Size> AsMut<Buf> for AlignedBuf<O> {
 ///
 /// assert_ne!(align_of::<u16>(), align_of::<u32>());
 ///
-/// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(4);
+/// let mut buf = AlignedBuf::<u32>::with_capacity_and_alignment::<u16>(32);
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 /// buf.request_align::<u32>();
 ///

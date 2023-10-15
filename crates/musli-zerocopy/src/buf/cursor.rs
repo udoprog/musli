@@ -84,7 +84,7 @@ impl<'a> Cursor<'a> {
     /// Caller must ensure that advancing the pointer by size of `T` doesn't
     /// wrap around the address space.
     #[inline]
-    pub unsafe fn advance<T>(&mut self) {
+    pub(crate) unsafe fn advance<T>(&mut self) {
         self.advance_raw(size_of::<T>());
     }
 
@@ -100,7 +100,7 @@ impl<'a> Cursor<'a> {
     /// Caller must ensure that advancing the pointer to the alignment of `T`
     /// doesn't wrap around the address space.
     #[inline]
-    pub unsafe fn align<T>(&mut self) -> usize {
+    pub(crate) unsafe fn align<T>(&mut self) -> usize {
         let offset = self.align_offset::<T>();
 
         if offset > 0 {

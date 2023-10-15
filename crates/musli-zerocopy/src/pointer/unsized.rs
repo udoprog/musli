@@ -1,3 +1,6 @@
+use core::cmp::Ordering;
+use core::fmt;
+use core::hash::Hash;
 use core::marker::PhantomData;
 
 use crate::pointer::{DefaultSize, Ref, Size};
@@ -34,10 +37,10 @@ use crate::ZeroCopy;
 /// assert_eq!(buf.load(bytes)?, "Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(Debug, ZeroCopy)]
+#[derive(ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate, skip_visit)]
-pub struct Unsized<T: ?Sized + UnsizedZeroCopy, O: Size = DefaultSize> {
+pub struct Unsized<T: ?Sized, O: Size = DefaultSize> {
     offset: O,
     size: O,
     #[zero_copy(ignore)]
@@ -185,6 +188,21 @@ where
     }
 }
 
+impl<T: ?Sized, O: Size> fmt::Debug for Unsized<T, O>
+where
+    O: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Unsized<{}> {{ offset: {:?}, size: {:?} }}",
+            core::any::type_name::<T>(),
+            self.offset,
+            self.size
+        )
+    }
+}
+
 impl<T: ?Sized + UnsizedZeroCopy, O: Size> Clone for Unsized<T, O> {
     fn clone(&self) -> Self {
         *self
@@ -192,3 +210,55 @@ impl<T: ?Sized + UnsizedZeroCopy, O: Size> Clone for Unsized<T, O> {
 }
 
 impl<T: ?Sized + UnsizedZeroCopy, O: Size> Copy for Unsized<T, O> {}
+
+impl<T: ?Sized, O: Size> PartialEq for Unsized<T, O>
+where
+    O: PartialEq,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.offset == other.offset && self.size == other.size
+    }
+}
+
+impl<T: ?Sized, O: Size> Eq for Unsized<T, O> where O: Eq {}
+
+impl<T: ?Sized, O: Size> PartialOrd for Unsized<T, O>
+where
+    O: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.offset.partial_cmp(&other.offset) {
+            Some(Ordering::Equal) => {}
+            ord => return ord,
+        }
+
+        self.size.partial_cmp(&other.size)
+    }
+}
+
+impl<T: ?Sized, O: Size> Ord for Unsized<T, O>
+where
+    O: Ord,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.offset.cmp(&other.offset) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        self.size.cmp(&other.size)
+    }
+}
+
+impl<T: ?Sized, O: Size> Hash for Unsized<T, O>
+where
+    O: Hash,
+{
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.offset.hash(state);
+        self.size.hash(state);
+    }
+}

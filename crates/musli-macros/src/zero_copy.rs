@@ -464,7 +464,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
             let ty = syn::Ident::new(num.as_ty(), span);
 
-            let mut variants = Vec::new();
+            let mut validate_variants = Vec::new();
             let mut store_to_variants = Vec::new();
             let mut pad_variants = Vec::new();
             let mut padded_variants = Vec::new();
@@ -539,7 +539,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 let variables = &output.variables;
                 let assigns = &output.assigns;
 
-                variants.push(quote! {
+                validate_variants.push(quote! {
                     #discriminator => {
                         #(#validator::field::<#types>(&mut validator)?;)*
                     }
@@ -609,7 +609,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                     let discriminator = #validator::field::<#ty>(&mut validator)?;
 
                     match *discriminator {
-                        #(#variants,)*
+                        #(#validate_variants,)*
                         value => return #result::Err(#error::#illegal_enum::<Self>(value)),
                     }
                 }

@@ -1,3 +1,6 @@
+use core::cmp::Ordering;
+use core::fmt;
+use core::hash::Hash;
 use core::marker::PhantomData;
 use core::mem::size_of;
 
@@ -66,13 +69,10 @@ use crate::ZeroCopy;
 /// assert_eq!(buf.load(slice)?, &expected[..]);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(Debug, ZeroCopy)]
+#[derive(ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate, skip_visit)]
-pub struct Slice<T, O: Size = DefaultSize>
-where
-    T: ZeroCopy,
-{
+pub struct Slice<T, O: Size = DefaultSize> {
     offset: O,
     len: O,
     #[zero_copy(ignore)]
@@ -207,6 +207,21 @@ where
     }
 }
 
+impl<T, O: Size> fmt::Debug for Slice<T, O>
+where
+    O: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Slice<{}> {{ offset: {:?}, len: {:?} }}",
+            core::any::type_name::<T>(),
+            self.offset,
+            self.len
+        )
+    }
+}
+
 impl<T, O: Size> Clone for Slice<T, O>
 where
     T: ZeroCopy,
@@ -217,3 +232,55 @@ where
 }
 
 impl<T, O: Size> Copy for Slice<T, O> where T: ZeroCopy {}
+
+impl<T, O: Size> PartialEq for Slice<T, O>
+where
+    O: PartialEq,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.offset == other.offset && self.len == other.len
+    }
+}
+
+impl<T, O: Size> Eq for Slice<T, O> where O: Eq {}
+
+impl<T, O: Size> PartialOrd for Slice<T, O>
+where
+    O: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.offset.partial_cmp(&other.offset) {
+            Some(Ordering::Equal) => {}
+            ord => return ord,
+        }
+
+        self.len.partial_cmp(&other.len)
+    }
+}
+
+impl<T, O: Size> Ord for Slice<T, O>
+where
+    O: Ord,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.offset.cmp(&other.offset) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        self.len.cmp(&other.len)
+    }
+}
+
+impl<T, O: Size> Hash for Slice<T, O>
+where
+    O: Hash,
+{
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.offset.hash(state);
+        self.len.hash(state);
+    }
+}

@@ -63,8 +63,9 @@ impl<'a, T> Validator<'a, T> {
         unsafe {
             self.cursor.align::<F>();
             F::validate(self.cursor)?;
-        };
-
-        Ok(unsafe { self.cursor.cast() })
+            let output = self.cursor.cast();
+            self.cursor.advance::<F>();
+            Ok(output)
+        }
     }
 }

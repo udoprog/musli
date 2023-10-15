@@ -146,11 +146,17 @@ where
     }
 }
 
-impl<T, O: Size> fmt::Debug for Ref<T, O> {
+impl<T, O: Size> fmt::Debug for Ref<T, O>
+where
+    O: fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Ref")
-            .field("offset", &self.offset.as_usize())
-            .finish()
+        write!(
+            f,
+            "Ref<{}> {{ offset: {:?} }}",
+            core::any::type_name::<T>(),
+            self.offset
+        )
     }
 }
 
