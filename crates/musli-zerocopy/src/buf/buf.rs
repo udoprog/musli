@@ -750,6 +750,50 @@ impl ToOwned for Buf {
     }
 }
 
+impl AsRef<Buf> for Buf {
+    /// Trivial `AsRef<Buf>` implementation for `Buf`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Buf;
+    ///
+    /// let buf = Buf::new(&b"Hello World!"[..]);
+    /// let buf = buf.as_ref();
+    ///
+    /// assert_eq!(&buf[..], b"Hello World!");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    fn as_ref(&self) -> &Buf {
+        self
+    }
+}
+
+impl AsMut<Buf> for Buf {
+    /// Trivial `AsMut<Buf>` implementation for `Buf`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Buf;
+    ///
+    /// let mut bytes = *b"Hello World!";
+    /// let buf = Buf::new_mut(&mut bytes[..]);
+    /// let buf = buf.as_mut();
+    ///
+    /// buf[..5].make_ascii_uppercase();
+    /// assert_eq!(&buf[..], b"HELLO World!");
+    /// buf[11] = b'?';
+    /// assert_eq!(&buf[..], b"HELLO World?");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    fn as_mut(&mut self) -> &mut Buf {
+        self
+    }
+}
+
 /// Index implementation to get a slice or individual byte out of a [`Buf`].
 ///
 /// # Examples
@@ -786,11 +830,11 @@ where
 /// let mut bytes = *b"Hello World!";
 /// let mut buf = Buf::new_mut(&mut bytes[..]);
 ///
-/// buf[..].make_ascii_uppercase();
+/// buf[..5].make_ascii_uppercase();
 ///
-/// assert_eq!(&buf[..], &b"HELLO WORLD!"[..]);
-/// buf[0] = b'B';
-/// assert_eq!(&buf[..], &b"BELLO WORLD!"[..]);
+/// assert_eq!(&buf[..], &b"HELLO World!"[..]);
+/// buf[11] = b'?';
+/// assert_eq!(&buf[..], &b"HELLO World?"[..]);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 impl<I> IndexMut<I> for Buf

@@ -1105,15 +1105,7 @@ impl<O: Size> DerefMut for OwnedBuf<O> {
 }
 
 impl<O: Size> AsRef<Buf> for OwnedBuf<O> {
-    /// Access the current buffer immutably while checking that the buffer is
-    /// aligned.
-    ///
-    /// # Errors
-    ///
-    /// This will fail if the buffer isn't aligned per its [`requested()`]
-    /// alignment.
-    ///
-    /// [`requested()`]: Self::requested
+    /// Trivial `AsRef<Buf>` implementation for `OwnedBuf<O>`.
     ///
     /// # Examples
     ///
@@ -1129,20 +1121,12 @@ impl<O: Size> AsRef<Buf> for OwnedBuf<O> {
     /// ```
     #[inline]
     fn as_ref(&self) -> &Buf {
-        Buf::new(self.as_slice())
+        self
     }
 }
 
 impl<O: Size> AsMut<Buf> for OwnedBuf<O> {
-    /// Access the current buffer mutably while checking that the buffer is
-    /// aligned.
-    ///
-    /// # Errors
-    ///
-    /// This will fail if the buffer isn't aligned per its [`requested()`]
-    /// alignment.
-    ///
-    /// [`requested()`]: Self::requested
+    /// Trivial `AsMut<Buf>` implementation for `OwnedBuf<O>`.
     ///
     /// # Examples
     ///
@@ -1159,7 +1143,7 @@ impl<O: Size> AsMut<Buf> for OwnedBuf<O> {
     /// ```
     #[inline]
     fn as_mut(&mut self) -> &mut Buf {
-        Buf::new_mut(self.as_mut_slice())
+        self
     }
 }
 
