@@ -1,7 +1,7 @@
-use musli_zerocopy::{AlignedBuf, Error};
+use musli_zerocopy::{Error, OwnedBuf};
 
 fn main() -> Result<(), Error> {
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
 
     let first = buf.store_unsized("first");
     let second = buf.store_unsized("second");

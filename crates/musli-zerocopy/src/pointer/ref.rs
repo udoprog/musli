@@ -20,10 +20,10 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::pointer::Ref;
 ///
-/// let mut buf = AlignedBuf::with_alignment::<u32>();
+/// let mut buf = OwnedBuf::with_alignment::<u32>();
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 ///
 /// let buf = buf.as_ref();
@@ -79,9 +79,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let values = buf.store(&[1, 2, 3, 4]);
     /// let slice = values.into_slice();

@@ -16,7 +16,7 @@
 //!
 //! ```
 //! use musli_zerocopy::{Error, ZeroCopy};
-//! use musli_zerocopy::buf::{AlignedBuf, Buf, Load, LoadMut, Visit};
+//! use musli_zerocopy::buf::{OwnedBuf, Buf, Load, LoadMut, Visit};
 //! use musli_zerocopy::pointer::{Slice, Ref};
 //!
 //! #[derive(ZeroCopy)]
@@ -67,7 +67,7 @@
 //!     }
 //! }
 //!
-//! let mut buf1 = AlignedBuf::new();
+//! let mut buf1 = OwnedBuf::new();
 //! let slice = buf1.store_slice(&[1u8, 2, 3, 4]);
 //! let slice_ref: Ref<Slice<u8>> = buf1.store(&slice);
 //! assert_eq!(buf1.len(), 12);
@@ -77,7 +77,7 @@
 //! assert_eq!(slice.len(), 4);
 //! assert_eq!(buf1.load(slice)?, &[1, 2, 3, 4]);
 //!
-//! let mut buf2 = AlignedBuf::new();
+//! let mut buf2 = OwnedBuf::new();
 //! let slice = buf2.store_slice(&[1u8, 2, 3, 4]);
 //! let slice = CompactSlice::new(slice.offset(), slice.len());
 //! let slice_ref: Ref<CompactSlice> = buf2.store(&slice);
@@ -119,9 +119,9 @@ pub(crate) use self::raw_buf_mut::RawBufMut;
 mod raw_buf_mut;
 
 #[cfg(feature = "alloc")]
-pub use self::aligned_buf::AlignedBuf;
+pub use self::owned_buf::OwnedBuf;
 #[cfg(feature = "alloc")]
-mod aligned_buf;
+mod owned_buf;
 
 use core::mem::{align_of, size_of};
 
@@ -131,7 +131,7 @@ use alloc::borrow::Cow;
 use crate::error::Error;
 use crate::traits::ZeroCopy;
 
-/// The type used to calculate default alignment for [`AlignedBuf`].
+/// The type used to calculate default alignment for [`OwnedBuf`].
 pub type DefaultAlignment = usize;
 
 /// Return the max capacity of this vector. This depends on the requested
@@ -147,7 +147,7 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 
 /// Construct a buffer with an alignment matching that of `T` which is either
 /// wrapped in a [`Buf`] if it is already correctly aligned, or inside of an
-/// allocated [`AlignedBuf`].
+/// allocated [`OwnedBuf`].
 ///
 /// # Examples
 ///
@@ -178,7 +178,7 @@ pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
 
 /// Construct a buffer with a specific alignment which is either wrapped in a
 /// [`Buf`] if it is already correctly aligned, or inside of an allocated
-/// [`AlignedBuf`].
+/// [`OwnedBuf`].
 ///
 /// # Panics
 ///

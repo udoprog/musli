@@ -237,16 +237,16 @@ pub mod musli_value {
 #[cfg(feature = "musli-zerocopy")]
 pub mod musli_zerocopy {
     use musli_zerocopy::pointer::{DefaultSize, Ref};
-    use musli_zerocopy::{AlignedBuf, Buf, Error, ZeroCopy};
+    use musli_zerocopy::{Buf, Error, OwnedBuf, ZeroCopy};
 
     pub struct Benchmarker {
-        buf: AlignedBuf,
+        buf: OwnedBuf,
     }
 
     #[inline(always)]
     pub fn new() -> Benchmarker {
         Benchmarker {
-            buf: AlignedBuf::with_capacity(4096),
+            buf: OwnedBuf::with_capacity(4096),
         }
     }
 
@@ -261,7 +261,7 @@ pub mod musli_zerocopy {
     }
 
     pub struct State<'buf> {
-        buf: &'buf mut AlignedBuf,
+        buf: &'buf mut OwnedBuf,
     }
 
     pub struct DecodeState<'buf> {

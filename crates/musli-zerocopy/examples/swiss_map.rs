@@ -1,8 +1,8 @@
 use musli_zerocopy::swiss;
-use musli_zerocopy::{AlignedBuf, Error};
+use musli_zerocopy::{Error, OwnedBuf};
 
 fn main() -> Result<(), Error> {
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
 
     let values = swiss::store_map(&mut buf, [(10u32, 1u32), (20u32, 2u32)])?;
 

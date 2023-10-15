@@ -8,7 +8,7 @@ use core::slice::{self, SliceIndex};
 use alloc::borrow::{Cow, ToOwned};
 
 #[cfg(feature = "alloc")]
-use crate::buf::AlignedBuf;
+use crate::buf::OwnedBuf;
 use crate::buf::{Bindable, Load, LoadMut, Validator};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Ref, Size, Slice, Unsized};
@@ -79,7 +79,7 @@ impl Buf {
 
     /// Construct a buffer with an alignment matching that of `T` which is
     /// either wrapped in a [`Buf`] if it is already correctly aligned, or
-    /// inside of an allocated [`AlignedBuf`].
+    /// inside of an allocated [`OwnedBuf`].
     ///
     /// # Examples
     ///
@@ -110,7 +110,7 @@ impl Buf {
 
     /// Construct a buffer with a specific alignment which is either wrapped in
     /// a [`Buf`] if it is already correctly aligned, or inside of an allocated
-    /// [`AlignedBuf`].
+    /// [`OwnedBuf`].
     ///
     /// # Panics
     ///
@@ -148,7 +148,7 @@ impl Buf {
             Cow::Borrowed(self)
         } else {
             let mut buf =
-                unsafe { AlignedBuf::with_capacity_and_custom_alignment(self.len(), align) };
+                unsafe { OwnedBuf::with_capacity_and_custom_alignment(self.len(), align) };
 
             // SAFETY: Space for the slice has been allocated.
             unsafe {
@@ -162,7 +162,7 @@ impl Buf {
     /// Get the alignment of the current buffer.
     pub fn alignment(&self) -> usize {
         // NB: Maximum alignment supported by Rust is 2^29.
-        1usize << (self.as_ptr() as usize).trailing_zeros().min(29)
+        1usize << (self.data.as_ptr() as usize).trailing_zeros().min(29)
     }
 
     /// Test if the current buffer is layout compatible with the given `T`.
@@ -170,9 +170,9 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::with_alignment::<u32>();
+    /// let mut buf = OwnedBuf::with_alignment::<u32>();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     /// let buf = buf.into_aligned();
     ///
@@ -192,9 +192,9 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::with_alignment::<u32>();
+    /// let mut buf = OwnedBuf::with_alignment::<u32>();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
     /// let buf = buf.into_aligned();
     ///
@@ -313,9 +313,9 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let first = buf.store_unsized("first");
     /// let second = buf.store_unsized("second");
@@ -345,9 +345,9 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let first = buf.store_unsized("first");
     /// let second = buf.store_unsized("second");
@@ -387,10 +387,10 @@ impl Buf {
     /// been validated:
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::phf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.into_aligned();
@@ -455,13 +455,13 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
     /// struct Custom { field: u32, field2: u64 }
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let custom = buf.store(&Custom { field: 42, field2: 85 });
     /// let buf = buf.into_aligned();
@@ -738,12 +738,12 @@ impl fmt::Debug for Buf {
 
 #[cfg(feature = "alloc")]
 impl ToOwned for Buf {
-    type Owned = AlignedBuf;
+    type Owned = OwnedBuf;
 
     #[inline]
     fn to_owned(&self) -> Self::Owned {
         let mut buf =
-            unsafe { AlignedBuf::with_capacity_and_custom_alignment(self.len(), self.alignment()) };
+            unsafe { OwnedBuf::with_capacity_and_custom_alignment(self.len(), self.alignment()) };
 
         buf.extend_from_slice(&self.data);
         buf

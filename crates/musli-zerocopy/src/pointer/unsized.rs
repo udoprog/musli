@@ -10,23 +10,23 @@ use crate::ZeroCopy;
 /// A reference to an unsized value packed as a wide pointer.
 ///
 /// The `T` that can be stored in here is determined by [`UnsizedZeroCopy`], is
-/// inserted through [`AlignedBuf::store_unsized`], and is represented by this
+/// inserted through [`OwnedBuf::store_unsized`], and is represented by this
 /// type.
 ///
 /// This contains a pointer to the unsized element and the length of the
 /// element.
 ///
 /// [`UnsizedZeroCopy`]: crate::traits::UnsizedZeroCopy
-/// [`AlignedBuf::store_unsized`]: crate::buf::AlignedBuf::store_unsized
+/// [`OwnedBuf::store_unsized`]: crate::buf::OwnedBuf::store_unsized
 ///
 /// # Examples
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::pointer::Unsized;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 /// let ptr = buf.next_offset::<u8>();
 /// buf.extend_from_slice(b"Hello World!");
 ///
@@ -120,9 +120,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     /// let unsize = buf.store_unsized(&b"abcd"[..]);
     ///
     /// let buf = buf.into_aligned();
@@ -139,9 +139,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     /// let unsize = buf.store_unsized(&b""[..]);
     /// assert!(unsize.is_empty());
     ///
@@ -164,9 +164,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     /// let unsize = buf.store_unsized(&b"abcd"[..]);
     ///
     /// let buf = buf.into_aligned();

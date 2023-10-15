@@ -2,7 +2,7 @@ use crate::ZeroCopy;
 
 /// An entry which is used when constructing a [`Map<K, V>`].
 ///
-/// To construct a map, this type is used to provide [`AlignedBuf`] with a pair
+/// To construct a map, this type is used to provide [`OwnedBuf`] with a pair
 /// of values.
 ///
 /// Note that this primarily exists because tuples are not support. The layout
@@ -10,7 +10,7 @@ use crate::ZeroCopy;
 /// to them.
 ///
 /// [`Map<K, V>`]: crate::map::Map
-/// [`AlignedBuf`]: crate::buf::AlignedBuf
+/// [`OwnedBuf`]: crate::buf::OwnedBuf
 #[derive(Debug, ZeroCopy)]
 #[zero_copy(crate, bounds = {K: ZeroCopy, V: ZeroCopy})]
 #[repr(C)]

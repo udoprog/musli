@@ -8,14 +8,14 @@ mod sealed {
     pub trait Sealed {}
 
     #[cfg(feature = "alloc")]
-    impl<O: Size> Sealed for crate::buf::AlignedBuf<O> {}
+    impl<O: Size> Sealed for crate::buf::OwnedBuf<O> {}
     impl<B: ?Sized> Sealed for &mut B where B: Sealed {}
     impl Sealed for crate::buf::RawBufMut {}
 }
 
 /// A mutable buffer to store zero copy types to.
 ///
-/// This is implemented by [`AlignedBuf`].
+/// This is implemented by [`OwnedBuf`].
 ///
 /// # Safety
 ///
@@ -23,7 +23,7 @@ mod sealed {
 /// the type being stored and calling `store*` incorrectly would result in
 /// writing out-of-bound.
 ///
-/// [`AlignedBuf`]: crate::AlignedBuf
+/// [`OwnedBuf`]: crate::OwnedBuf
 pub trait BufMut: self::sealed::Sealed {
     /// Extend the current buffer from the given slice.
     ///
@@ -83,7 +83,7 @@ pub trait BufMut: self::sealed::Sealed {
     /// ```
     /// use core::mem::size_of;
     ///
-    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
     /// use musli_zerocopy::pointer::Ref;
     ///
@@ -96,7 +96,7 @@ pub trait BufMut: self::sealed::Sealed {
     ///     d: u32,
     /// }
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let mut padded = ZeroPadded {
     ///     a: 0,

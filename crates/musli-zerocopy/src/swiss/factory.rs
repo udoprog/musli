@@ -1,7 +1,7 @@
 use core::hash::{Hash, Hasher};
 use core::mem::size_of;
 
-use crate::buf::{AlignedBuf, Buf, Visit};
+use crate::buf::{Buf, OwnedBuf, Visit};
 use crate::error::Error;
 use crate::pointer::{Size, Slice, Unsized};
 use crate::sip::SipHasher13;
@@ -13,7 +13,7 @@ use crate::ZeroCopy;
 
 const FIXED_SEED: u64 = 1234567890;
 
-/// Store a map based on a perfect hash function into the [`AlignedBuf`].
+/// Store a map based on a perfect hash function into the [`OwnedBuf`].
 ///
 /// This will utilize a perfect hash functions derived from the [`hashbrown`
 /// crate] to construct a persistent hash Map.
@@ -28,10 +28,10 @@ const FIXED_SEED: u64 = 1234567890;
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::swiss;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let pairs = [
 ///     (buf.store_unsized("first"), 1u32),
@@ -51,10 +51,10 @@ const FIXED_SEED: u64 = 1234567890;
 /// Using non-references as keys:
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::swiss;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let map = swiss::store_map(&mut buf, [(10u64, 1u32), (20u64, 2u32)])?;
 /// let buf = buf.into_aligned();
@@ -66,7 +66,7 @@ const FIXED_SEED: u64 = 1234567890;
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 pub fn store_map<K, V, I, O: Size>(
-    buf: &mut AlignedBuf<O>,
+    buf: &mut OwnedBuf<O>,
     entries: I,
 ) -> Result<MapRef<K, V, O>, Error>
 where
@@ -87,7 +87,7 @@ where
     ))
 }
 
-/// Store a set based on a perfect hash function into the [`AlignedBuf`].
+/// Store a set based on a perfect hash function into the [`OwnedBuf`].
 ///
 /// This will utilize a perfect hash functions derived from the [`hashbrown`
 /// crate] to construct a persistent hash Map.
@@ -102,10 +102,10 @@ where
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::swiss;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let first = buf.store_unsized("first");
 /// let second = buf.store_unsized("second");
@@ -127,10 +127,10 @@ where
 /// Using non-references as keys:
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::swiss;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let set = swiss::store_set(&mut buf, [1, 2])?;
 /// let buf = buf.into_aligned();
@@ -141,7 +141,7 @@ where
 /// assert!(!set.contains(&3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_set<T, I, O: Size>(buf: &mut AlignedBuf<O>, entries: I) -> Result<SetRef<T, O>, Error>
+pub fn store_set<T, I, O: Size>(buf: &mut OwnedBuf<O>, entries: I) -> Result<SetRef<T, O>, Error>
 where
     T: Visit + ZeroCopy,
     T::Target: Hash,
@@ -166,7 +166,7 @@ type Raw<U, O> = (u64, Unsized<[u8], O>, Slice<U, O>, usize);
 // adapter.
 fn store_raw<T, U, I, O: Size>(
     entries: I,
-    buf: &mut AlignedBuf<O>,
+    buf: &mut OwnedBuf<O>,
     hash: fn(&Buf, T, &mut SipHasher13) -> Result<U, Error>,
 ) -> Result<Raw<U, O>, Error>
 where

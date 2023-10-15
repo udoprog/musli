@@ -7,7 +7,7 @@ use crate::mem::MaybeUninit;
 use crate::pointer::{Ref, Unsized};
 use crate::ZeroCopy;
 
-use super::AlignedBuf;
+use super::OwnedBuf;
 
 #[derive(Debug, PartialEq, ZeroCopy)]
 #[zero_copy(crate)]
@@ -30,7 +30,7 @@ fn allocate_array_needing_padding() -> Result<(), Error> {
 
     assert!(Element::PADDED);
 
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
 
     let array = buf.store_uninit::<[Element; 10]>();
 
@@ -71,7 +71,7 @@ fn allocate_array_not_needing_padding() -> Result<(), Error> {
 
     assert!(!Element::PADDED);
 
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
 
     let array = buf.store_uninit::<[Element; 10]>();
 
@@ -99,7 +99,7 @@ fn test_unaligned_write() -> Result<(), Error> {
         string: Unsized<str>,
     }
 
-    let mut buf = AlignedBuf::with_capacity_and_alignment::<u8>(128);
+    let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128);
     buf.extend_from_slice(&[1]);
 
     let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
@@ -150,7 +150,7 @@ fn inner_padding() -> Result<(), Error> {
     let inner2 = Inner2 { field: 20 };
     let custom = Custom { inner, inner2 };
 
-    let mut buf = AlignedBuf::with_capacity_and_alignment::<u8>(128);
+    let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128);
     buf.extend_from_slice(&[1]);
 
     let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();

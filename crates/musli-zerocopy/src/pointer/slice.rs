@@ -9,18 +9,18 @@ use crate::ZeroCopy;
 
 /// A reference to a slice packed as a wide pointer.
 ///
-/// Slices are stored in buffers through [`AlignedBuf::store_slice`].
+/// Slices are stored in buffers through [`OwnedBuf::store_slice`].
 ///
 /// This contains a pointer to the first element and the length of the slice.
 ///
-/// [`AlignedBuf::store_slice`]: crate::buf::AlignedBuf::store_slice
+/// [`OwnedBuf::store_slice`]: crate::buf::OwnedBuf::store_slice
 ///
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 /// let slice = buf.store_slice(&[1, 2, 3, 4]);
 ///
 /// let buf = buf.into_aligned();
@@ -33,10 +33,10 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::pointer::Slice;
 ///
-/// let mut buf = AlignedBuf::with_alignment::<u32>();
+/// let mut buf = OwnedBuf::with_alignment::<u32>();
 /// buf.extend_from_slice(&[0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8]);
 ///
 /// let buf = buf.as_ref();
@@ -56,10 +56,10 @@ use crate::ZeroCopy;
 ///
 /// ```
 /// use core::mem::align_of;
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::pointer::Slice;
 ///
-/// let buf = AlignedBuf::with_alignment::<()>();
+/// let buf = OwnedBuf::with_alignment::<()>();
 /// let buf = buf.as_ref();
 ///
 /// let slice = Slice::<()>::new(0, 2);
@@ -180,9 +180,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     /// let slice = buf.store_slice(&[1, 2, 3, 4]);
     ///
     /// let buf = buf.into_aligned();

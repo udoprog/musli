@@ -47,13 +47,13 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
     /// struct Custom { field: u32, field2: u64 }
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let custom = buf.store(&Custom { field: 42, field2: 85 });
     /// let buf = buf.into_aligned();
@@ -141,13 +141,13 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     ///
     /// ```
     /// use core::num::NonZeroU64;
-    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
     /// struct Packed { field: u32, field2: NonZeroU64 }
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// buf.store(&Packed { field: 42, field2: NonZeroU64::new(84).unwrap() });
     /// let buf = buf.into_aligned();
@@ -191,13 +191,13 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     ///
     /// ```
     /// use core::num::NonZeroU64;
-    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C, packed(2))]
     /// struct Packed { field: u32, field2: NonZeroU64 }
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// buf.store(&Packed { field: 42, field2: NonZeroU64::new(84).unwrap() });
     /// let buf = buf.into_aligned();

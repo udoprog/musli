@@ -6,10 +6,10 @@ use crate::buf::Visit;
 use crate::error::Error;
 use crate::phf::{Entry, MapRef, SetRef};
 use crate::pointer::Size;
-use crate::AlignedBuf;
+use crate::OwnedBuf;
 use crate::ZeroCopy;
 
-/// Store a map based on a perfect hash function into the [`AlignedBuf`].
+/// Store a map based on a perfect hash function into the [`OwnedBuf`].
 ///
 /// This will utilize a perfect hash functions derived from the [`phf` crate] to
 /// construct a persistent hash set.
@@ -24,10 +24,10 @@ use crate::ZeroCopy;
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::phf;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let first = buf.store_unsized("first");
 /// let second = buf.store_unsized("second");
@@ -47,10 +47,10 @@ use crate::ZeroCopy;
 /// Using non-references as keys:
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::phf;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let map = phf::store_map(&mut buf, [(10u64, 1), (20u64, 2)])?;
 /// let buf = buf.into_aligned();
@@ -62,7 +62,7 @@ use crate::ZeroCopy;
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 pub fn store_map<K, V, I, O: Size>(
-    buf: &mut AlignedBuf<O>,
+    buf: &mut OwnedBuf<O>,
     entries: I,
 ) -> Result<MapRef<K, V, O>, Error>
 where
@@ -108,7 +108,7 @@ where
     Ok(MapRef::new(hash_state.key, entries, displacements))
 }
 
-/// Store a set based on a perfect hash function into the [`AlignedBuf`].
+/// Store a set based on a perfect hash function into the [`OwnedBuf`].
 ///
 /// This will utilize a perfect hash functions derived from the [`phf` crate] to
 /// construct a persistent hash map.
@@ -123,10 +123,10 @@ where
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::phf;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let first = buf.store_unsized("first");
 /// let second = buf.store_unsized("second");
@@ -148,10 +148,10 @@ where
 /// Using non-references as keys:
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::phf;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let set = phf::store_set(&mut buf, [1, 2])?;
 /// let buf = buf.into_aligned();
@@ -162,7 +162,7 @@ where
 /// assert!(!set.contains(&3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_set<T, I, O: Size>(buf: &mut AlignedBuf<O>, iter: I) -> Result<SetRef<T, O>, Error>
+pub fn store_set<T, I, O: Size>(buf: &mut OwnedBuf<O>, iter: I) -> Result<SetRef<T, O>, Error>
 where
     T: Visit + ZeroCopy,
     T::Target: Hash,
@@ -173,7 +173,7 @@ where
 
     let mut hash_state = {
         buf.align_in_place();
-        crate::phf::generator::generate_hash(&buf, &entries, |value| value)?
+        crate::phf::generator::generate_hash(buf, &entries, |value| value)?
     };
 
     for a in 0..hash_state.map.len() {

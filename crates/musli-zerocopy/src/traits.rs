@@ -53,9 +53,9 @@ mod sealed {
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 ///
-/// let mut buf = AlignedBuf::with_alignment::<u8>();
+/// let mut buf = OwnedBuf::with_alignment::<u8>();
 ///
 /// let bytes = buf.store_unsized(&b"Hello World!"[..]);
 /// let buf = buf.as_ref();
@@ -83,9 +83,9 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// Write to the owned buffer.
     ///
     /// This is usually called indirectly through methods such as
-    /// [`AlignedBuf::store_unsized`].
+    /// [`OwnedBuf::store_unsized`].
     ///
-    /// [`AlignedBuf::store_unsized`]: crate::buf::AlignedBuf::store_unsized
+    /// [`OwnedBuf::store_unsized`]: crate::buf::OwnedBuf::store_unsized
     unsafe fn store_to<B: ?Sized>(&self, buf: &mut B)
     where
         B: BufMut;
@@ -316,13 +316,13 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+/// use musli_zerocopy::{OwnedBuf, ZeroCopy};
 ///
 /// #[derive(Debug, PartialEq, ZeroCopy)]
 /// #[repr(C)]
 /// struct Custom { field: u32, #[zero_copy(ignore)] ignore: () }
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 /// let ptr = buf.store(&Custom { field: 42, ignore: () });
 /// let buf = buf.into_aligned();
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 42, ignore: () });
@@ -340,9 +340,9 @@ pub unsafe trait ZeroCopy: Sized {
     /// Store the current value to the mutable buffer.
     ///
     /// This is usually called indirectly through methods such as
-    /// [`AlignedBuf::store`].
+    /// [`OwnedBuf::store`].
     ///
-    /// [`AlignedBuf::store`]: crate::buf::AlignedBuf::store
+    /// [`OwnedBuf::store`]: crate::buf::OwnedBuf::store
     ///
     /// # Safety
     ///
@@ -426,14 +426,14 @@ macro_rules! impl_unsized_primitive {
         ///
         /// ```
         $(#[doc = concat!("use ", stringify!($import), ";")])*
-        /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+        /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
         /// use musli_zerocopy::pointer::Unsized;
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
         #[doc = concat!("struct Custom", stringify!($(<$param>)*) ," { field: Unsized<[", stringify!($ty) ,"]> }")]
         ///
-        /// let mut buf = AlignedBuf::new();
+        /// let mut buf = OwnedBuf::new();
         #[doc = concat!("let unsize: Unsized<[", stringify!($example_ty), "]> = buf.store_unsized(&", stringify!($example), ");")]
         /// let buf = buf.into_aligned();
         #[doc = concat!("assert_eq!(buf.load(unsize)?, &", stringify!($example), ");")]
@@ -850,7 +850,7 @@ macro_rules! impl_zst {
         ///
         /// ```
         $(#[doc = concat!("use ", stringify!($import), ";")])*
-        /// use musli_zerocopy::{ZeroCopy, AlignedBuf};
+        /// use musli_zerocopy::{ZeroCopy, OwnedBuf};
         ///
         /// #[derive(Default, Clone, Copy, ZeroCopy)]
         /// #[repr(C)]
@@ -858,7 +858,7 @@ macro_rules! impl_zst {
         #[doc = concat!("    field: ", stringify!($example), ",")]
         /// }
         ///
-        /// let mut empty = AlignedBuf::new();
+        /// let mut empty = OwnedBuf::new();
         /// let values = [Struct::default(); 100];
         /// let slice = empty.store_slice(&values[..]);
         /// let buf = empty.into_aligned();
@@ -913,7 +913,7 @@ impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::Phan
 /// ```
 /// use std::mem::align_of;
 ///
-/// use musli_zerocopy::{ZeroCopy, AlignedBuf};
+/// use musli_zerocopy::{ZeroCopy, OwnedBuf};
 ///
 /// #[derive(Default, Clone, Copy, ZeroCopy)]
 /// #[repr(C)]
@@ -922,7 +922,7 @@ impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::Phan
 ///     field: [T; 0],
 /// }
 ///
-/// let mut empty = AlignedBuf::with_alignment::<u128>();
+/// let mut empty = OwnedBuf::with_alignment::<u128>();
 /// let values = [Struct::<u128>::default(); 100];
 /// let slice = empty.store_slice(&values[..]);
 /// let buf = empty.into_aligned();

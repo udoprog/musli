@@ -1,8 +1,8 @@
 use musli_zerocopy::phf;
-use musli_zerocopy::{AlignedBuf, Error};
+use musli_zerocopy::{Error, OwnedBuf};
 
 fn main() -> Result<(), Error> {
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
 
     let string = buf.store_unsized("Hello World!");
 

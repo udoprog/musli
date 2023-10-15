@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use core::mem;
 use core::ptr::NonNull;
 
-use crate::buf::AlignedBuf;
+use crate::buf::OwnedBuf;
 use crate::buf::{Buf, RawBufMut};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::Size;
@@ -18,7 +18,7 @@ fn invalid_mut<T>(addr: usize) -> *mut T {
 
 /// A raw swizz table.
 pub struct Constructor<'a, T, O: Size> {
-    buf: &'a mut AlignedBuf<O>,
+    buf: &'a mut OwnedBuf<O>,
 
     // Mask to get an index from a hash value. The value is one less than the
     // number of buckets in the table.
@@ -44,7 +44,7 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     /// Allocates a new hash table using the given allocator, with at least enough capacity for
     /// inserting the given number of elements without reallocating.
     pub(crate) unsafe fn with_buf(
-        buf: &'a mut AlignedBuf<O>,
+        buf: &'a mut OwnedBuf<O>,
         ctrl_ptr: usize,
         base_ptr: usize,
         buckets: usize,

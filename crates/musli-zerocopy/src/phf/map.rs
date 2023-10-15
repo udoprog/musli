@@ -27,10 +27,10 @@ use crate::ZeroCopy;
 /// ## Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::phf;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
 /// let buf = buf.into_aligned();
@@ -61,10 +61,10 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::phf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.into_aligned();
@@ -94,10 +94,10 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::phf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.into_aligned();
@@ -123,10 +123,10 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::phf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.into_aligned();
@@ -197,10 +197,10 @@ where
 /// ## Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::phf;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
 ///
@@ -254,10 +254,10 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::phf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     ///
@@ -285,10 +285,10 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::phf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     ///
@@ -312,10 +312,10 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::phf;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
     ///

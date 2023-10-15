@@ -13,12 +13,12 @@ use crate::traits::ZeroCopy;
 ///
 /// # Examples
 ///
-/// Writing to a pre-allocation location in an [`AlignedBuf`].
+/// Writing to a pre-allocation location in an [`OwnedBuf`].
 ///
-/// [`AlignedBuf`]: crate::buf::AlignedBuf
+/// [`OwnedBuf`]: crate::buf::OwnedBuf
 ///
 /// ```
-/// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+/// use musli_zerocopy::{OwnedBuf, ZeroCopy};
 /// use musli_zerocopy::mem::MaybeUninit;
 /// use musli_zerocopy::pointer::{Ref, Unsized};
 ///
@@ -26,7 +26,7 @@ use crate::traits::ZeroCopy;
 /// #[repr(C)]
 /// struct Custom { string: Unsized<str> }
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
 ///

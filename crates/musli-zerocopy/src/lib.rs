@@ -33,9 +33,9 @@
 //! Say you want to store the string `"Hello World!"`.
 //!
 //! ```rust
-//! use musli_zerocopy::AlignedBuf;
+//! use musli_zerocopy::OwnedBuf;
 //!
-//! let mut buf = AlignedBuf::new();
+//! let mut buf = OwnedBuf::new();
 //! let string = buf.store_unsized("Hello World!");
 //! let reference = buf.store(&string);
 //!
@@ -59,9 +59,9 @@
 //! Let's have a look at a [`Slice<u32>`] next:
 //!
 //! ```rust
-//! use musli_zerocopy::AlignedBuf;
+//! use musli_zerocopy::OwnedBuf;
 //!
-//! let mut buf = AlignedBuf::new();
+//! let mut buf = OwnedBuf::new();
 //! let slice = buf.store_slice(&[1u32, 2, 3, 4]);
 //! let reference = buf.store(&slice);
 //!
@@ -87,7 +87,7 @@
 //! ```
 //! # use anyhow::Context;
 //! use core::mem::size_of;
-//! use musli_zerocopy::{AlignedBuf, ZeroCopy};
+//! use musli_zerocopy::{OwnedBuf, ZeroCopy};
 //! use musli_zerocopy::pointer::Unsized;
 //!
 //! #[derive(ZeroCopy)]
@@ -97,7 +97,7 @@
 //!     string: Unsized<str>,
 //! }
 //!
-//! let mut buf = AlignedBuf::new();
+//! let mut buf = OwnedBuf::new();
 //!
 //! let string = buf.store_unsized("Hello World!");
 //! let custom = buf.store(&Custom { field: 42, string });
@@ -158,8 +158,8 @@
 //! > the data structure. Both of these can be retrieved:
 //! >
 //! > ```no_run
-//! > use musli_zerocopy::AlignedBuf;
-//! > let buf: AlignedBuf = todo!();
+//! > use musli_zerocopy::OwnedBuf;
+//! > let buf: OwnedBuf = todo!();
 //! >
 //! > let is_little_endian = cfg!(target_endian = "little");
 //! > let alignment = buf.requested();
@@ -218,11 +218,11 @@
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom { field: u32, string: Unsized<str> }
-//! use musli_zerocopy::AlignedBuf;
+//! use musli_zerocopy::OwnedBuf;
 //! use musli_zerocopy::pointer::Ref;
 //! use musli_zerocopy::mem::MaybeUninit;
 //!
-//! let mut buf = AlignedBuf::new();
+//! let mut buf = OwnedBuf::new();
 //! let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
 //!
 //! let string = buf.store_unsized("Hello World!");
@@ -296,21 +296,21 @@
 //! let unsize = Unsized::<str, usize>::new(0, 1usize << 32);
 //! ```
 //!
-//! To initialize an [`AlignedBuf`] with a custom [`Size`] you use this
+//! To initialize an [`OwnedBuf`] with a custom [`Size`] you use this
 //! constructor with a custom parameter and :
 //!
 //! ```
-//! use musli_zerocopy::AlignedBuf;
+//! use musli_zerocopy::OwnedBuf;
 //! use musli_zerocopy::buf::DefaultAlignment;
 //!
-//! let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment::<DefaultAlignment>(0);
+//! let mut buf = OwnedBuf::<usize>::with_capacity_and_alignment::<DefaultAlignment>(0);
 //! ```
 //!
-//! The [`Size`] you've specified during construction of an [`AlignedBuf`] will
+//! The [`Size`] you've specified during construction of an [`OwnedBuf`] will
 //! then carry into any pointers it return:
 //!
 //! ```
-//! use musli_zerocopy::{ZeroCopy, AlignedBuf};
+//! use musli_zerocopy::{ZeroCopy, OwnedBuf};
 //! use musli_zerocopy::buf::DefaultAlignment;
 //! use musli_zerocopy::pointer::{Ref, Slice, Unsized};
 //!
@@ -318,7 +318,7 @@
 //! #[repr(C)]
 //! struct Custom { reference: Ref<u32, usize>, slice: Slice::<u32, usize>, unsize: Unsized::<str, usize> }
 //!
-//! let mut buf = AlignedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
+//! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
 //!
 //! let reference = buf.store(&42u32);
 //! let slice = buf.store_slice(&[1, 2, 3, 4]);
@@ -334,7 +334,7 @@
 //! [`phf` crate]: https://docs.rs/phf
 //! [`hashbrown` crate]: https://docs.rs/phf
 //! [`requested()`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.AlignedBuf.html#method.requested
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
 //! [`ZeroCopy`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
 //! [`Ref`]:
@@ -347,8 +347,8 @@
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Unsized.html
 //! [`Unsized<str>`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Unsized.html
-//! [`AlignedBuf`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.AlignedBuf.html
+//! [`OwnedBuf`]:
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
 //! [`Size`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 //! [`aligned_buf(bytes, align)`]:
@@ -366,10 +366,10 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "alloc")]
-pub use self::buf::AlignedBuf;
 #[doc(inline)]
 pub use self::buf::Buf;
+#[cfg(feature = "alloc")]
+pub use self::buf::OwnedBuf;
 pub mod buf;
 
 pub mod mem;
@@ -409,13 +409,13 @@ pub mod pointer;
 /// [`ZeroSized`]: crate::traits::ZeroSized
 ///
 /// ```
-/// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+/// use musli_zerocopy::{OwnedBuf, ZeroCopy};
 ///
 /// #[derive(Debug, PartialEq, ZeroCopy)]
 /// #[repr(C, align(128))]
 /// struct Custom { field: u32 }
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 /// let ptr = buf.store(&Custom { field: 10 });
 /// let buf = buf.into_aligned();
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 10 });
@@ -434,7 +434,7 @@ pub mod pointer;
 /// * If custom discriminators are used, only constant values can be used.
 ///
 /// ```
-/// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+/// use musli_zerocopy::{OwnedBuf, ZeroCopy};
 ///
 /// #[derive(Debug, PartialEq, ZeroCopy)]
 /// #[repr(u32)]
@@ -444,7 +444,7 @@ pub mod pointer;
 ///     Third = 5,
 /// }
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 /// let ptr = buf.store(&Flags::First);
 /// let buf = buf.into_aligned();
 /// assert_eq!(buf.load(ptr)?, &Flags::First);

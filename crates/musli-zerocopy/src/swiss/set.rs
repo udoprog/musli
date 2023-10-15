@@ -27,10 +27,10 @@ use crate::ZeroCopy;
 /// ## Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::swiss;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let set = swiss::store_set(&mut buf, [1, 2])?;
 /// let buf = buf.into_aligned();
@@ -56,10 +56,10 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::swiss;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let set = swiss::store_set(&mut buf, [1, 2])?;
     /// let buf = buf.into_aligned();
@@ -127,10 +127,10 @@ where
 /// ## Examples
 ///
 /// ```
-/// use musli_zerocopy::AlignedBuf;
+/// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::swiss;
 ///
-/// let mut buf = AlignedBuf::new();
+/// let mut buf = OwnedBuf::new();
 ///
 /// let set = swiss::store_set(&mut buf, [1, 2])?;
 ///
@@ -163,10 +163,10 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli_zerocopy::AlignedBuf;
+    /// use musli_zerocopy::OwnedBuf;
     /// use musli_zerocopy::swiss;
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let set = swiss::store_set(&mut buf, [1, 2])?;
     ///

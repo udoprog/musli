@@ -10,7 +10,7 @@ use crate::traits::ZeroCopy;
 /// and provides a builder-like API to doing so.
 ///
 /// [`BufMut::store_struct`]: crate::buf::BufMut::store_struct
-#[must_use = "For the writer to have an effect on `AlignedBuf` you must call `Padder::finish`"]
+#[must_use = "For the writer to have an effect on `OwnedBuf` you must call `Padder::finish`"]
 pub struct Padder<'a, T> {
     ptr: *mut u8,
     offset: usize,
@@ -59,7 +59,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
@@ -68,7 +68,7 @@ where
     ///
     /// let padded = ZeroPadded(0x01u8.to_be(), 0x0203u16.to_be());
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// // SAFETY: We do not pad beyond known fields and are
     /// // making sure to initialize all of the buffer.
@@ -112,7 +112,7 @@ where
     ///
     /// ```
     /// use core::ptr;
-    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
@@ -121,7 +121,7 @@ where
     ///
     /// let padded = ZeroPadded(0x01u8.to_be(), 0x02030405u32.to_be());
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// // SAFETY: We do not pad beyond known fields and are
     /// // making sure to initialize all of the buffer.
@@ -196,7 +196,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
     /// use musli_zerocopy::pointer::Ref;
     ///
@@ -206,7 +206,7 @@ where
     ///
     /// let padded = ZeroPadded(0x01u8.to_be(), 0x0203u16.to_be());
     ///
-    /// let mut buf = AlignedBuf::new();
+    /// let mut buf = OwnedBuf::new();
     ///
     /// let reference = Ref::<ZeroPadded>::new(buf.next_offset::<ZeroPadded>());
     ///

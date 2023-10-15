@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use musli_zerocopy::phf;
 use musli_zerocopy::pointer::Unsized;
-use musli_zerocopy::{AlignedBuf, ZeroCopy};
+use musli_zerocopy::{OwnedBuf, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
@@ -11,7 +11,7 @@ struct Custom {
 }
 
 fn main() -> Result<()> {
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
 
     let string = buf.store_unsized("string");
 

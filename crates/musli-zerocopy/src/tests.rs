@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 
 use crate::pointer::{Ref, Slice};
-use crate::{AlignedBuf, Error, ZeroCopy};
+use crate::{Error, OwnedBuf, ZeroCopy};
 
 #[test]
 fn test_ref_to_slice() -> Result<(), Error> {
@@ -24,7 +24,7 @@ fn test_ref_to_slice() -> Result<(), Error> {
         extra: InnerEnum,
     }
 
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
 
     let index = buf.store_slice(&[1, 2, 3, 4]);
     let index = buf.store(&index);
@@ -160,7 +160,7 @@ fn weird_alignment() -> Result<(), Error> {
         field: 0x0000ffff0000ffff0000ffff0000ffffu128,
     };
 
-    let mut buf = AlignedBuf::with_alignment::<WeirdAlignment>();
+    let mut buf = OwnedBuf::with_alignment::<WeirdAlignment>();
     let w = buf.store(&weird);
     let buf = buf.into_aligned();
 
@@ -192,7 +192,7 @@ fn enum_boundaries() -> Result<(), Error> {
             assert_eq!($name::Min as $repr, $min);
             assert_eq!($name::AfterMin as $repr, $min + 1);
 
-            let mut buf = AlignedBuf::with_alignment::<$name>();
+            let mut buf = OwnedBuf::with_alignment::<$name>();
             let v1 = buf.store(&$name::Variant1);
             let v2 = buf.store(&$name::Variant2);
             let v3 = buf.store(&$name::Variant3);
@@ -285,7 +285,7 @@ fn test_signed_wraparound() -> Result<(), Error> {
             assert_eq!($name::Zero as $repr, 0);
             assert_eq!($name::One as $repr, 1);
 
-            let mut buf = AlignedBuf::with_alignment::<$name>();
+            let mut buf = OwnedBuf::with_alignment::<$name>();
             let minus_one = buf.store(&$name::MinusOne);
             let zero = buf.store(&$name::Zero);
             let one = buf.store(&$name::One);
@@ -330,7 +330,7 @@ fn test_neg0() -> Result<(), Error> {
             assert_eq!($name::Neg0 as $repr, 0);
             assert_eq!($name::One as $repr, 1);
 
-            let mut buf = AlignedBuf::with_alignment::<$name>();
+            let mut buf = OwnedBuf::with_alignment::<$name>();
             let minus_one = buf.store(&$name::MinusOne);
             let neg0 = buf.store(&$name::Neg0);
             let one = buf.store(&$name::One);
@@ -405,7 +405,7 @@ fn test_enum_with_fields() -> Result<(), Error> {
         },
     }
 
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
     let variant = buf.store(&Types::Variant {
         field: 10,
         field2: 20,
@@ -445,7 +445,7 @@ fn validate_packed() -> Result<(), Error> {
     assert_eq!(size_of::<Packed>(), 12);
     assert_eq!(align_of::<Packed>(), 1);
 
-    let mut buf = AlignedBuf::new();
+    let mut buf = OwnedBuf::new();
 
     buf.store(&Packed {
         field: 42,
