@@ -34,8 +34,6 @@ where
         if let Some(hash) = try_generate_hash(buf, entries, key, &access)? {
             return Ok(hash);
         }
-
-        std::println!("failed to generate hash");
     }
 
     Err(Error::new(ErrorKind::FailedPhf))

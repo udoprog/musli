@@ -6,7 +6,7 @@ use core::slice;
 
 use ::alloc::alloc;
 
-use crate::buf::{Buf, BufMut, DefaultAlignment, StructPadder};
+use crate::buf::{Buf, BufMut, DefaultAlignment, Padder};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Ref, Size, Slice, Unsized};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -894,7 +894,7 @@ impl<O: Size> AlignedBuf<O> {
     }
 
     #[inline]
-    unsafe fn store_struct<T>(&mut self, value: *const T) -> StructPadder<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
     where
         T: ZeroCopy,
     {
@@ -912,7 +912,7 @@ impl<O: Size> AlignedBuf<O> {
             start.copy_from_nonoverlapping(value.cast(), size_of::<T>());
         }
 
-        StructPadder::new(start)
+        Padder::new(start)
     }
 
     /// Write a [`ZeroCopy`] value directly into the buffer.
@@ -1243,7 +1243,7 @@ impl<O: Size> BufMut for AlignedBuf<O> {
     }
 
     #[inline]
-    unsafe fn store_struct<T>(&mut self, value: *const T) -> StructPadder<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
     where
         T: ZeroCopy,
     {

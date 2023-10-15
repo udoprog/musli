@@ -1,7 +1,7 @@
 #![allow(clippy::assertions_on_constants)]
 
 use core::marker::PhantomData;
-use core::mem::size_of;
+use core::mem::{align_of, size_of};
 
 use crate::pointer::{Ref, Slice};
 use crate::{AlignedBuf, Error, ZeroCopy};
@@ -427,5 +427,43 @@ fn test_enum_with_fields() -> Result<(), Error> {
     assert_eq!(buf.load(variant2)?, &Types::Variant2(40));
     assert_eq!(buf.load(variant3)?, &Types::Variant3);
     assert_eq!(buf.load(empty)?, &Types::Empty { empty: PhantomData });
+    Ok(())
+}
+
+#[test]
+fn validate_packed() -> Result<(), Error> {
+    use core::num::NonZeroU64;
+
+    #[derive(ZeroCopy)]
+    #[repr(C, packed)]
+    #[zero_copy(crate)]
+    struct Packed {
+        field: u32,
+        field2: NonZeroU64,
+    }
+
+    assert_eq!(size_of::<Packed>(), 12);
+    assert_eq!(align_of::<Packed>(), 1);
+
+    let mut buf = AlignedBuf::new();
+
+    buf.store(&Packed {
+        field: 42,
+        field2: NonZeroU64::new(84).unwrap(),
+    });
+
+    let buf = buf.as_aligned();
+
+    let mut v = buf.validate_struct::<Packed>()?;
+
+    // SAFETY: We're only validating fields we know are
+    // part of the struct, and do not go beyond. We're
+    // also making sure not to construct reference to
+    // the fields which would be an error for a packed struct.
+    unsafe {
+        v.validate_with::<u32>(1)?;
+        v.validate_with::<NonZeroU64>(1)?;
+    }
+
     Ok(())
 }

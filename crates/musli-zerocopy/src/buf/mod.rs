@@ -22,14 +22,11 @@ pub(crate) mod visit;
 pub use self::validator::Validator;
 mod validator;
 
-pub use self::struct_padder::StructPadder;
-mod struct_padder;
+pub use self::padder::Padder;
+mod padder;
 
 pub use self::buf_mut::BufMut;
 mod buf_mut;
-
-pub use self::cursor::Cursor;
-mod cursor;
 
 pub(crate) use self::raw_buf_mut::RawBufMut;
 mod raw_buf_mut;
@@ -39,7 +36,7 @@ pub use self::aligned_buf::AlignedBuf;
 #[cfg(feature = "alloc")]
 mod aligned_buf;
 
-use core::mem::size_of;
+use core::mem::{align_of, size_of};
 
 use crate::error::Error;
 use crate::traits::ZeroCopy;
@@ -118,19 +115,22 @@ pub(crate) fn is_aligned_to(ptr: *const u8, align: usize) -> bool {
 }
 
 #[inline]
-pub(crate) fn validate_array<T>(mut cursor: Cursor<'_>, len: usize) -> Result<(), Error>
+pub(crate) unsafe fn validate_array<S, T>(
+    validator: &mut Validator<'_, S>,
+    len: usize,
+) -> Result<(), Error>
 where
+    S: ?Sized,
     T: ZeroCopy,
 {
+    validator.align_with(align_of::<T>());
+
     if !T::ANY_BITS && size_of::<T>() > 0 {
         for _ in 0..len / size_of::<T>() {
             // SAFETY: The passed in buffer is required to be aligned per the
-            // requirements of this trait, so any size_of::<T>() chunks are aligned
-            // too.
-            unsafe {
-                T::validate(cursor)?;
-                cursor.advance::<T>();
-            }
+            // requirements of this trait, so any size_of::<T>() chunks are
+            // aligned too.
+            validator.validate_only::<T>()?;
         }
     }
 

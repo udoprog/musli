@@ -1,4 +1,4 @@
-use crate::buf::StructPadder;
+use crate::buf::Padder;
 use crate::traits::ZeroCopy;
 
 mod sealed {
@@ -62,7 +62,7 @@ pub trait BufMut: self::sealed::Sealed {
     where
         T: ZeroCopy;
 
-    /// Store the given struct and return a [`StructPadder`] to initialize the
+    /// Store the given struct and return a [`Padder`] to initialize the
     /// any padding in the type written.
     ///
     /// # Safety
@@ -76,7 +76,7 @@ pub trait BufMut: self::sealed::Sealed {
     ///
     /// Also see the [type level safety documentation][#safety]
     ///
-    /// [`pad()`]: StructPadder::pad
+    /// [`pad()`]: Padder::pad
     ///
     /// # Examples
     ///
@@ -133,7 +133,7 @@ pub trait BufMut: self::sealed::Sealed {
     /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    unsafe fn store_struct<T>(&mut self, value: *const T) -> StructPadder<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
     where
         T: ZeroCopy;
 

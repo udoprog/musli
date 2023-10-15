@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of};
+use core::mem::{align_of, size_of, transmute};
 use core::ptr;
 
 use crate::traits::ZeroCopy;
@@ -10,14 +10,14 @@ use crate::traits::ZeroCopy;
 /// and provides a builder-like API to doing so.
 ///
 /// [`BufMut::store_struct`]: crate::buf::BufMut::store_struct
-#[must_use = "For the writer to have an effect on `AlignedBuf` you must call `StructPadder::finish`"]
-pub struct StructPadder<'a, T> {
+#[must_use = "For the writer to have an effect on `AlignedBuf` you must call `Padder::finish`"]
+pub struct Padder<'a, T> {
     ptr: *mut u8,
     offset: usize,
     _marker: PhantomData<&'a mut T>,
 }
 
-impl<'a, T> StructPadder<'a, T>
+impl<'a, T> Padder<'a, T>
 where
     T: ZeroCopy,
 {
@@ -28,6 +28,16 @@ where
             offset: 0,
             _marker: PhantomData,
         }
+    }
+
+    /// Indicate that this validate is transparent over `U`.
+    //
+    /// # Safety
+    ///
+    /// This is only allowed if `T` is `#[repr(transparent)]` over `U`.
+    #[inline]
+    pub unsafe fn transparent<U>(&mut self) -> &mut Padder<'a, U> {
+        transmute(self)
     }
 
     /// Pad around the given field with zeros.
@@ -78,13 +88,66 @@ where
     where
         F: ZeroCopy,
     {
-        let count = crate::buf::padding_to(self.offset, align_of::<F>());
+        self.pad_with(field, align_of::<F>());
+    }
+
+    /// Pad around the given field with zeros using a custom alignment `align`.
+    ///
+    /// Note that this is necessary to do correctly in order to satisfy the
+    /// safety requirements by [`end()`].
+    ///
+    /// This is typically not called directly, but rather is implemented by the
+    /// [`ZeroCopy`] derive.
+    ///
+    /// [`end()`]: Self::end
+    /// [`ZeroCopy`]: derive@crate::ZeroCopy
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the field type `F` is an actual field in
+    /// order in the struct being padded and that `align` matches the argument
+    /// provided to `#[repr(packed)]` (note that empty means 1).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::ptr;
+    /// use musli_zerocopy::{AlignedBuf, ZeroCopy};
+    /// use musli_zerocopy::buf::BufMut;
+    ///
+    /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
+    /// #[repr(C, packed(2))]
+    /// struct ZeroPadded(u8, u32);
+    ///
+    /// let padded = ZeroPadded(0x01u8.to_be(), 0x02030405u32.to_be());
+    ///
+    /// let mut buf = AlignedBuf::new();
+    ///
+    /// // SAFETY: We do not pad beyond known fields and are
+    /// // making sure to initialize all of the buffer.
+    /// unsafe {
+    ///     let mut w = buf.store_struct(&padded);
+    ///     w.pad_with::<u8>(ptr::addr_of!(padded.0), 2);
+    ///     w.pad_with::<u32>(ptr::addr_of!(padded.1), 2);
+    ///     w.end();
+    /// }
+    ///
+    /// // Note: The bytes are explicitly convert to big-endian encoding above.
+    /// assert_eq!(buf.as_slice(), &[1, 0, 2, 3, 4, 5]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub unsafe fn pad_with<F>(&mut self, field: *const F, align: usize)
+    where
+        F: ZeroCopy,
+    {
+        let count = crate::buf::padding_to(self.offset, align);
         // zero out padding.
         ptr::write_bytes(self.ptr.add(self.offset), 0, count);
         self.offset = self.offset.wrapping_add(count);
 
         if F::PADDED {
-            let mut padder = StructPadder::new(self.ptr.wrapping_add(self.offset));
+            let mut padder = Padder::new(self.ptr.wrapping_add(self.offset));
             F::pad(field, &mut padder);
             padder.end();
         }

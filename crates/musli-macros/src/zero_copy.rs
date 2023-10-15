@@ -341,10 +341,9 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
     let buf_mut: syn::Path = syn::parse_quote!(#krate::buf::BufMut);
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
-    let struct_padder: syn::Path = syn::parse_quote!(#krate::buf::StructPadder);
+    let padder: syn::Path = syn::parse_quote!(#krate::buf::Padder);
     let buf: syn::Path = syn::parse_quote!(#krate::buf::Buf);
     let validator: syn::Path = syn::parse_quote!(#krate::buf::Validator);
-    let cursor: syn::Path = syn::parse_quote!(#krate::buf::Cursor);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
     let visit: syn::Path = syn::parse_quote!(#krate::buf::Visit);
@@ -366,55 +365,67 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             let mut output = process_fields(cx, &st.fields);
             check_zero_sized.append(&mut output.check_zero_sized);
 
-            if matches!(repr, Repr::Transparent) || output.first_field.is_none() {
-                if let Some((ty, member)) = output.first_field {
+            match (repr, output.first_field) {
+                (Repr::Transparent, Some((ty, member))) => {
                     store_to = quote! {
                         <#ty as #zero_copy>::store_to(#ptr::addr_of!((*this).#member), buf);
                     };
 
                     pad = quote! {
-                        #struct_padder::pad(padder, #ptr::addr_of!((*this).#member));
+                        <#ty as #zero_copy>::pad(#ptr::addr_of!((*this).#member), #padder::transparent::<#ty>(padder));
                     };
 
                     validate = quote! {
-                        <#ty as #zero_copy>::validate(cursor)
-                    };
-                } else {
-                    store_to = quote! {};
-
-                    pad = quote!();
-
-                    validate = quote! {
-                        #result::Ok(())
+                        <#ty as #zero_copy>::validate(#validator::transparent::<#ty>(validator))?;
                     };
                 }
-            } else {
-                let members = &output.members;
-                let types = &output.types;
+                _ => {
+                    let members = &output.members;
+                    let types = &output.types;
 
-                store_to = quote! {
-                    // SAFETY: We've systematically ensured to pad all fields on the
-                    // struct.
-                    unsafe {
-                        let mut padder = #buf_mut::store_struct(buf, this);
-                        #(#struct_padder::pad::<#types>(&mut padder, #ptr::addr_of!((*this).#members));)*
-                        #struct_padder::end(padder);
+                    match r.repr_packed {
+                        Some((_, align)) => {
+                            pad = quote! {
+                                #(#padder::pad_with(padder, #ptr::addr_of!((*this).#members), #align);)*
+                            };
+
+                            store_to = quote! {
+                                // SAFETY: We've systematically ensured to pad all
+                                // fields on the struct.
+                                let mut padder = #buf_mut::store_struct(buf, this);
+                                #(#padder::pad_with::<#types>(&mut padder, #ptr::addr_of!((*this).#members), #align);)*
+                                #padder::end(padder);
+                            };
+
+                            validate = quote! {
+                                // SAFETY: We've systematically ensured that we're
+                                // only validating over fields within the size of
+                                // this type.
+                                #(#validator::validate_with::<#types>(validator, #align)?;)*
+                            };
+                        }
+                        _ => {
+                            store_to = quote! {
+                                // SAFETY: We've systematically ensured to pad all
+                                // fields on the struct.
+                                let mut padder = #buf_mut::store_struct(buf, this);
+                                #(#padder::pad::<#types>(&mut padder, #ptr::addr_of!((*this).#members));)*
+                                #padder::end(padder);
+                            };
+
+                            pad = quote! {
+                                #(#padder::pad(padder, #ptr::addr_of!((*this).#members));)*
+                            };
+
+                            validate = quote! {
+                                // SAFETY: We've systematically ensured that we're
+                                // only validating over fields within the size of
+                                // this type.
+                                #(#validator::validate::<#types>(validator)?;)*
+                            };
+                        }
                     }
-                };
-
-                pad = quote! {
-                    #(#struct_padder::pad(padder, #ptr::addr_of!((*this).#members));)*
-                };
-
-                validate = quote! {
-                    // SAFETY: We've systematically ensured that we're only
-                    // validating over fields within the size of this type.
-                    unsafe {
-                        let mut validator = #cursor::validate_struct::<Self>(cursor);
-                        #(#validator::field::<#types>(&mut validator)?;)*
-                    }
-                    #result::Ok(())
-                };
+                }
             }
 
             let mut field_sizes = Vec::new();
@@ -541,19 +552,19 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
 
                 validate_variants.push(quote! {
                     #discriminator => {
-                        #(#validator::field::<#types>(&mut validator)?;)*
+                        #(#validator::validate::<#types>(validator)?;)*
                     }
                 });
 
                 store_to_variants.push(quote! {
                     Self::#ident { #(#assigns,)* .. } => {
-                        #(#struct_padder::pad(&mut padder, #variables);)*
+                        #(#padder::pad(&mut padder, #variables);)*
                     }
                 });
 
                 pad_variants.push(quote! {
                     Self::#ident { #(#assigns,)* .. } => {
-                        #(#struct_padder::pad(padder, #variables);)*
+                        #(#padder::pad(padder, #variables);)*
                     }
                 });
 
@@ -575,22 +586,20 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             store_to = quote! {
                 // SAFETY: We've systematically ensured to pad all fields on the
                 // struct.
-                unsafe {
-                    let mut padder = #buf_mut::store_struct(buf, this);
-                    #struct_padder::pad_primitive::<#ty>(&mut padder);
+                let mut padder = #buf_mut::store_struct(buf, this);
+                #padder::pad_primitive::<#ty>(&mut padder);
 
-                    // NOTE: this is assumed to be properly, since enums cannot
-                    // be packed.
-                    match &*this {
-                        #(#store_to_variants,)*
-                    }
-
-                    #struct_padder::end(padder);
+                // NOTE: this is assumed to be properly, since enums cannot
+                // be packed.
+                match &*this {
+                    #(#store_to_variants,)*
                 }
+
+                #padder::end(padder);
             };
 
             pad = quote! {
-                #struct_padder::pad_primitive::<#ty>(padder);
+                #padder::pad_primitive::<#ty>(padder);
 
                 // NOTE: this is assumed to be properly, since enums cannot be
                 // packed.
@@ -604,17 +613,12 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             validate = quote! {
                 // SAFETY: We've systematically ensured that we're only
                 // validating over fields within the size of this type.
-                unsafe {
-                    let mut validator = #cursor::validate_struct::<Self>(cursor);
-                    let discriminator = #validator::field::<#ty>(&mut validator)?;
+                let discriminator = *#validator::field::<#ty>(validator)?;
 
-                    match *discriminator {
-                        #(#validate_variants,)*
-                        value => return #result::Err(#error::#illegal_enum::<Self>(value)),
-                    }
+                match discriminator {
+                    #(#validate_variants,)*
+                    value => return #result::Err(#error::#illegal_enum::<Self>(value)),
                 }
-
-                Ok(())
             };
 
             impl_zero_sized = None;
@@ -672,6 +676,7 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
             const ANY_BITS: bool = #any_bits;
             const PADDED: bool = #padded;
 
+            #[inline]
             unsafe fn store_to<__B: ?Sized>(this: *const Self, buf: &mut __B)
             where
                 __B: #buf_mut
@@ -679,12 +684,15 @@ fn expand(cx: &Ctxt, input: &DeriveInput) -> Result<TokenStream, ()> {
                 #store_to
             }
 
-            unsafe fn pad(this: *const Self, padder: &mut #struct_padder<'_, Self>) {
+            #[inline]
+            unsafe fn pad(this: *const Self, padder: &mut #padder<'_, Self>) {
                 #pad
             }
 
-            unsafe fn validate(cursor: #cursor<'_>) -> #result<(), #error> {
+            #[inline]
+            unsafe fn validate(validator: &mut #validator<'_, Self>) -> #result<(), #error> {
                 #validate
+                #result::Ok(())
             }
         }
 

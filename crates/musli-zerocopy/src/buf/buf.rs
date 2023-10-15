@@ -4,7 +4,7 @@ use core::mem::{align_of, size_of};
 use core::ops::Range;
 use core::slice;
 
-use crate::buf::{Bindable, Cursor, Load, LoadMut, Validator};
+use crate::buf::{Bindable, Load, LoadMut, Validator};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Ref, Size, Slice, Unsized};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -385,14 +385,7 @@ impl Buf {
         T: ZeroCopy,
     {
         self.ensure_compatible_with::<T>()?;
-        Ok(Validator::new(self.cursor()))
-    }
-
-    /// Construct a cursor over the current buffer.
-    ///
-    /// This is a raw, low-level API to access the underlying buffer. The safety of most cursor methods depend on not violating.
-    pub fn cursor(&self) -> Cursor {
-        Cursor::new(&self.data)
+        Ok(Validator::new(self.data.as_ptr()))
     }
 
     /// Get the given range while checking its required alignment.
@@ -516,7 +509,7 @@ impl Buf {
             // The remaining safety requirements depend on the implementation of
             // validate.
             unsafe {
-                T::validate(buf.cursor())?;
+                T::validate(&mut Validator::new(buf.as_ptr()))?;
             }
         }
 
@@ -540,7 +533,7 @@ impl Buf {
             // The remaining safety requirements depend on the implementation of
             // validate.
             unsafe {
-                T::validate(buf.cursor())?;
+                T::validate(&mut Validator::new(buf.as_ptr()))?;
             }
         }
 
@@ -559,8 +552,11 @@ impl Buf {
         let end = start.wrapping_add(slice.len().wrapping_mul(size_of::<T>()));
         let buf = self.inner_get(start, end, align_of::<T>())?;
         let len = buf.len();
-        crate::buf::validate_array::<T>(buf.cursor(), len)?;
-        Ok(unsafe { slice::from_raw_parts(buf.as_ptr().cast(), slice.len()) })
+
+        Ok(unsafe {
+            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf.as_ptr()), len)?;
+            slice::from_raw_parts(buf.as_ptr().cast(), slice.len())
+        })
     }
 
     /// Load the given slice mutably.
@@ -573,8 +569,11 @@ impl Buf {
         let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
         let buf = self.inner_get_mut_unaligned(start, end)?;
         let len = buf.len();
-        crate::buf::validate_array::<T>(Cursor::new(buf), len)?;
-        Ok(unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), ptr.len()) })
+
+        Ok(unsafe {
+            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf.as_ptr()), len)?;
+            slice::from_raw_parts_mut(buf.as_mut_ptr().cast(), ptr.len())
+        })
     }
 
     /// Access the underlying slice as a pointer.

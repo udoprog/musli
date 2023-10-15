@@ -22,7 +22,7 @@ use core::mem::{align_of, size_of, size_of_val};
 use core::slice;
 use core::str;
 
-use crate::buf::{Buf, BufMut, Cursor, StructPadder, Visit};
+use crate::buf::{Buf, BufMut, Padder, Validator, Visit};
 use crate::error::{Error, ErrorKind};
 
 mod sealed {
@@ -204,13 +204,13 @@ where
     }
 
     #[inline]
-    unsafe fn pad(this: *const Self, padder: &mut StructPadder<'_, Self>) {
+    unsafe fn pad(this: *const Self, padder: &mut Padder<'_, Self>) {
         padder.pad(this.cast::<T>());
     }
 
     #[inline]
-    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
-        T::validate(cursor)
+    unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+        validator.validate::<T>()
     }
 }
 
@@ -325,55 +325,25 @@ pub unsafe trait ZeroCopy: Sized {
     where
         B: BufMut;
 
-    /// Write padding to the given padder.
+    /// Mark padding for the current type.
     ///
-    /// This received a pointer, because the field might not be aligned.
+    /// The `this` receiver takes the current type as pointer instead of a
+    /// reference, because it might not be aligned in the case of packed
+    /// types.
     ///
     /// # Safety
     ///
     /// The implementor is responsible for ensuring that every field is provided
     /// to `padder`, including potentially hidden ones.
-    unsafe fn pad(this: *const Self, padder: &mut StructPadder<'_, Self>);
+    unsafe fn pad(this: *const Self, padder: &mut Padder<'_, Self>);
 
-    /// Only validate the provided buffer.
+    /// Validate the current type.
     ///
     /// # Safety
     ///
-    /// This assumes that the provided buffer is correctly sized and aligned,
-    /// something the caller is responsible for ensuring.
-    ///
-    /// ```no_run
-    /// use core::mem::align_of;
-    ///
-    /// use musli_zerocopy::{AlignedBuf, Error, ZeroCopy};
-    /// use musli_zerocopy::pointer::Ref;
-    /// use musli_zerocopy::buf::Cursor;
-    ///
-    /// unsafe fn unsafe_coerce<'a, T>(cursor: Cursor<'a>) -> Result<&'a T, Error>
-    /// where
-    ///     T: ZeroCopy
-    /// {
-    ///     // SAFETY: We've checked that the cursor is compatible.
-    ///     T::validate(cursor)?;
-    ///     Ok(cursor.cast())
-    /// }
-    ///
-    /// let mut buf = AlignedBuf::with_alignment::<u32>();
-    /// buf.store(&42u32);
-    ///
-    /// let buf = buf.as_ref();
-    ///
-    /// // Safe variant which performs layout checks for us.
-    /// assert_eq!(buf.load(Ref::<u32>::zero())?, &42);
-    ///
-    /// // Achieves the same as above, but we take on the responsibility
-    /// // of never using it with improperly aligned or sized buffers.
-    /// unsafe {
-    ///     assert_eq!(unsafe_coerce::<u32>(buf.cursor())?, &42);
-    /// }
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error>;
+    /// This assumes that the provided validator is wrapping a buffer that is
+    /// appropriately sized and aligned.
+    unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error>;
 }
 
 unsafe impl UnsizedZeroCopy for str {
@@ -545,10 +515,10 @@ macro_rules! impl_number {
             }
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut StructPadder<'_, Self>) {}
+            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
 
             #[inline]
-            unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
+            unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
                 Ok(())
             }
         }
@@ -595,10 +565,10 @@ macro_rules! impl_float {
             }
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut StructPadder<'_, Self>) {}
+            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
 
             #[inline]
-            unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
+            unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
                 Ok(())
             }
         }
@@ -633,12 +603,12 @@ unsafe impl ZeroCopy for char {
     }
 
     #[inline]
-    unsafe fn pad(_: *const Self, _: &mut StructPadder<'_, Self>) {}
+    unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
-    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
-        let repr = unsafe { *cursor.cast::<u32>() };
+    unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+        let repr = validator.load_unaligned::<u32>()?;
 
         if char::try_from(repr).is_err() {
             return Err(Error::new(ErrorKind::IllegalChar { repr }));
@@ -673,12 +643,12 @@ unsafe impl ZeroCopy for bool {
     }
 
     #[inline]
-    unsafe fn pad(_: *const Self, _: &mut StructPadder<'_, Self>) {}
+    unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
-    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
-        match *cursor.cast::<u8>() {
+    unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+        match validator.byte() {
             0 | 1 => (),
             repr => return Err(Error::new(ErrorKind::IllegalBool { repr })),
         }
@@ -753,13 +723,13 @@ macro_rules! impl_nonzero_number {
             }
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut StructPadder<'_, Self>) {}
+            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
 
             #[inline]
-            unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
-                if *cursor.cast::<$inner>() == 0 {
+            unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+                if validator.load_unaligned::<$inner>()? == 0 {
                     return Err(Error::new(ErrorKind::NonZeroZeroed {
-                        range: cursor.range::<::core::num::$ty>(),
+                        range: validator.range::<::core::num::$ty>(),
                     }));
                 }
 
@@ -831,11 +801,11 @@ macro_rules! impl_zst {
             }
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut StructPadder<'_, Self>) {
+            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {
             }
 
             #[inline]
-            unsafe fn validate(_: Cursor<'_>) -> Result<(), Error> {
+            unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
                 Ok(())
             }
         }
@@ -904,7 +874,7 @@ where
     }
 
     #[inline]
-    unsafe fn pad(this: *const Self, padder: &mut StructPadder<'_, Self>) {
+    unsafe fn pad(this: *const Self, padder: &mut Padder<'_, Self>) {
         if T::PADDED {
             // Cast the array to a pointer of the first element.
             let mut first = this.cast::<T>();
@@ -918,8 +888,8 @@ where
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
-    unsafe fn validate(cursor: Cursor<'_>) -> Result<(), Error> {
-        crate::buf::validate_array::<T>(cursor, N)?;
+    unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+        crate::buf::validate_array::<_, T>(validator, N)?;
         Ok(())
     }
 }

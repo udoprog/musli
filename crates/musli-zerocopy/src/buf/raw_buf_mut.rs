@@ -1,7 +1,7 @@
 use core::mem::{replace, size_of, size_of_val};
 
 use crate::buf::BufMut;
-use crate::buf::StructPadder;
+use crate::buf::Padder;
 use crate::traits::ZeroCopy;
 
 pub(crate) struct RawBufMut {
@@ -44,7 +44,7 @@ impl BufMut for RawBufMut {
         T::store_to(value, self);
     }
 
-    unsafe fn store_struct<T>(&mut self, value: *const T) -> StructPadder<'_, T>
+    unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
     where
         T: ZeroCopy,
     {
@@ -54,7 +54,7 @@ impl BufMut for RawBufMut {
             .copy_from_nonoverlapping(value.cast(), size_of::<T>());
 
         let start = replace(&mut self.start, end);
-        StructPadder::new(start)
+        Padder::new(start)
     }
 
     unsafe fn store_array<T>(&mut self, values: &[T])
