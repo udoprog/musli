@@ -9,6 +9,12 @@
 //!
 //! To implement zero-copy support for a Rust type, see the [`ZeroCopy`] derive.
 //!
+//! This crate includes support for a couple of neat high level data structures:
+//! * [`phf`] - which are maps and sets based on [`phf` crate], or perfect hash
+//!   functions.
+//! * [`swiss`] - which is a port of the [`hashbrown` crate] which is a Google
+//!   SwissTable implementation.
+//!
 //! <br>
 //!
 //! ## Guide
@@ -285,10 +291,8 @@
 //! let unsize = Unsized::<str, usize>::new(0, 1usize << 32);
 //! ```
 //!
-//! [`AlignedBuf`] can also be initialized with a custom [`Size`]:
-//!
-//! To initialize an [`AlignedBuf`] with a custom [`Size`] you simply use this
-//! constructor while specifying one of the above parameters:
+//! To initialize an [`AlignedBuf`] with a custom [`Size`] you use this
+//! constructor with a custom parameter and :
 //!
 //! ```
 //! use musli_zerocopy::AlignedBuf;
@@ -297,8 +301,8 @@
 //! let mut buf = AlignedBuf::<usize>::with_capacity_and_alignment::<DefaultAlignment>(0);
 //! ```
 //!
-//! And to use a custom target size in a struct using the [`ZeroCopy`], you
-//! simply specify the default parameter:
+//! The [`Size`] you've specified during construction of an [`AlignedBuf`] will
+//! then carry into any pointers it return:
 //!
 //! ```
 //! use musli_zerocopy::{ZeroCopy, AlignedBuf};
@@ -319,6 +323,11 @@
 //! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 //!
+//! [`swiss`]:
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
+//! [`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
+//! [`phf` crate]: https://docs.rs/phf
+//! [`hashbrown` crate]: https://docs.rs/phf
 //! [`requested()`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.AlignedBuf.html#method.requested
 //! [`ZeroCopy`]:
