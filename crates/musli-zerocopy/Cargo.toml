@@ -28,3 +28,4 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 [dev-dependencies]
 anyhow = "1.0.75"
 trybuild = "1.0.85"
+musli-macros = { version = "=0.0.71", path = "../musli-macros", features = ["sneaky-fields"] }

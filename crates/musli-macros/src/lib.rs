@@ -17,6 +17,8 @@ mod de;
 mod en;
 mod expander;
 mod internals;
+#[cfg(feature = "sneaky-fields")]
+mod sneaky_fields;
 #[cfg(feature = "test")]
 mod test;
 mod types;
@@ -138,7 +140,7 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_derive(ZeroCopy, attributes(zero_copy))]
 pub fn zero_copy(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
-    let expander = zero_copy::Expander::new(&input);
+    let expander = zero_copy::Expander::new(input);
 
     match expander.expand() {
         Ok(stream) => stream.into(),
@@ -155,6 +157,14 @@ pub fn visit(input: TokenStream) -> TokenStream {
         Ok(stream) => stream.into(),
         Err(errors) => to_compile_errors(errors).into(),
     }
+}
+
+// NB: Only used in UI tests.
+#[proc_macro_attribute]
+#[doc(hidden)]
+#[cfg(feature = "sneaky-fields")]
+pub fn sneaky_fields(attr: TokenStream, item: TokenStream) -> TokenStream {
+    sneaky_fields::expand(attr, item)
 }
 
 fn to_compile_errors(errors: Vec<syn::Error>) -> proc_macro2::TokenStream {

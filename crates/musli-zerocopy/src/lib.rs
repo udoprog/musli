@@ -593,5 +593,15 @@ mod tests;
 
 #[doc(hidden)]
 pub mod __private {
-    pub use ::core::result;
+    pub mod result {
+        pub use ::core::result::Result;
+    }
+
+    pub mod mem {
+        pub use ::core::mem::{align_of, size_of};
+    }
+
+    pub mod ptr {
+        pub use ::core::ptr::addr_of;
+    }
 }

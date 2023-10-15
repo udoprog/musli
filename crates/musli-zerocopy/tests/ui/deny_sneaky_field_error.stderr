@@ -1,0 +1,93 @@
+error[E0027]: pattern does not mention field `sneaky_field`
+  --> tests/ui/deny_sneaky_field_error.rs:14:8
+   |
+14 |   struct SneakyNamed {
+   |  ________^
+15 | |     field: u32,
+16 | | }
+   | |_^ missing field `sneaky_field`
+   |
+help: include the missing field in the pattern
+   |
+15 |     field, sneaky_field }
+   |          ~~~~~~~~~~~~~~~~
+help: if you don't care about this missing field, you can explicitly ignore it
+   |
+15 |     field, .. }
+   |          ~~~~~~
+
+error[E0023]: this pattern has 1 field, but the corresponding tuple struct has 2 fields
+  --> tests/ui/deny_sneaky_field_error.rs:25:10
+   |
+25 | #[derive(ZeroCopy)]
+   |          ^^^^^^^^ expected 2 fields, found 1
+26 | #[repr(C)]
+27 | #[sneaky_fields(Sneaky)]
+   |                 ------ tuple struct has 2 fields
+28 | struct SneakyUnnamed(u32);
+   |        ------------- ---
+   |        |
+   |        tuple struct defined here
+   |
+   = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: use `_` to explicitly ignore each field
+   |
+28 | struct SneakyUnnamed(u32, _);
+   |                         +++
+help: use `..` to ignore all fields
+   |
+25 | #[derive(..)]
+   |          ~~
+
+error[E0027]: pattern does not mention field `sneaky_field`
+  --> tests/ui/deny_sneaky_field_error.rs:38:6
+   |
+38 |   enum SneakyEnumNamed {
+   |  ______^
+39 | |     Named {
+40 | |         field: u32,
+41 | |     },
+   | |_____^ missing field `sneaky_field`
+   |
+help: include the missing field in the pattern
+   |
+40 |         field, sneaky_field },
+   |              ~~~~~~~~~~~~~~~~
+help: if you don't care about this missing field, you can explicitly ignore it
+   |
+40 |         field, .. },
+   |              ~~~~~~
+
+error[E0023]: this pattern has 1 field, but the corresponding tuple variant has 2 fields
+  --> tests/ui/deny_sneaky_field_error.rs:44:10
+   |
+44 |   #[derive(ZeroCopy)]
+   |            ^^^^^^^^ expected 2 fields, found 1
+45 |   #[repr(u8)]
+46 |   #[sneaky_fields(Sneaky)]
+   |                   ------ tuple variant has 2 fields
+47 |   enum SneakyEnumUnnamed {
+   |  ______-
+48 | |     Unnamed(u32)
+   | |     ------- ---
+   | |_____|_____|
+   |       |
+   |       tuple variant defined here
+   |
+   = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: use `_` to explicitly ignore each field
+   |
+48 |     Unnamed(u32, _)
+   |                +++
+help: use `..` to ignore all fields
+   |
+44 | #[derive(..)]
+   |          ~~
+
+error[E0533]: expected unit struct, unit variant or constant, found struct variant `SneakyEnumUnit::Unit`
+  --> tests/ui/deny_sneaky_field_error.rs:54:6
+   |
+54 |   enum SneakyEnumUnit {
+   |  ______^
+55 | |     Unit
+   | |________^ not a unit struct, unit variant or constant

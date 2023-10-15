@@ -21,6 +21,7 @@ path = "src/lib.rs"
 
 [features]
 test = []
+sneaky-fields = []
 
 [dependencies]
 proc-macro2 = "1.0.69"
