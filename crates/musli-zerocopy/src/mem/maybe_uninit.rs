@@ -8,8 +8,9 @@ use crate::traits::ZeroCopy;
 /// A value which might or might not have been initialized.
 ///
 /// This differs from the standard library
-/// [`MaybeUninit`][core::mem::MaybeUninit] in that its methods does not assume
-/// that the value is aligned.
+/// [`MaybeUninit`][core::mem::MaybeUninit] in that its methods does not inherit
+/// the alignment of the inner value so it can correctly refer to elements of
+/// `T` in unaligned memory. Which [`OwnedBuf`] might refer to.
 ///
 /// # Examples
 ///
@@ -43,7 +44,7 @@ use crate::traits::ZeroCopy;
 /// assert_eq!(buf.load(custom.string)?, "Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[repr(C, packed(1))]
+#[repr(C, packed)]
 pub union MaybeUninit<T> {
     uninit: (),
     value: ManuallyDrop<T>,

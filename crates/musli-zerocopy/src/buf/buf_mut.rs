@@ -81,7 +81,7 @@ pub trait BufMut: self::sealed::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use core::mem::size_of;
+    /// use std::mem::size_of;
     ///
     /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;

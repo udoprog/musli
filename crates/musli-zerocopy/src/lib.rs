@@ -369,6 +369,7 @@ extern crate std;
 #[doc(inline)]
 pub use self::buf::Buf;
 #[cfg(feature = "alloc")]
+#[doc(inline)]
 pub use self::buf::OwnedBuf;
 pub mod buf;
 

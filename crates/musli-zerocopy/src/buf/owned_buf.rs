@@ -69,6 +69,24 @@ impl OwnedBuf {
     /// The buffer must allocate for at least the given `capacity`, but might
     /// allocate more. If the capacity specified is `0` it will not allocate.
     ///
+    /// # Panics
+    ///
+    /// Panics if the specified capacity and memory layout are illegal, which
+    /// happens if:
+    /// * The alignment is not a power of two.
+    /// * The specified capacity causes the needed memory to overflow
+    ///   `isize::MAX`.
+    ///
+    /// ```should_panic
+    /// use std::mem::align_of;
+    ///
+    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::buf::DefaultAlignment;
+    ///
+    /// let max = isize::MAX as usize - (align_of::<DefaultAlignment>() - 1);
+    /// OwnedBuf::<u32>::with_capacity(max);
+    /// ```
+    ///
     /// # Examples
     ///
     /// ```
@@ -81,13 +99,7 @@ impl OwnedBuf {
         Self::with_capacity_and_alignment::<DefaultAlignment>(capacity)
     }
 
-    /// Construct a new empty buffer with the specified alignment.
-    ///
-    /// The alignment will be rounded up to the next power of two.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the specified alignment is not a power of two.
+    /// Construct a new empty buffer with the an alignment matching that of `T`.
     ///
     /// # Examples
     ///
@@ -363,7 +375,22 @@ impl<O: Size> OwnedBuf<O> {
     ///
     /// This allows values to be inserted before they can be initialized, which
     /// can be useful if you need them to be in a certain location in the buffer
-    /// but don't have access to their fields yet.
+    /// but don't have access to their value yet.
+    ///
+    /// The memory for `T` will be zero-initialized at [`next_offset<T>()`] and
+    /// the length and alignment requirement of `OwnedBuf` updated to reflect
+    /// that an instance of `T` has been stored. But that representation might
+    /// not match the representation of `T`[^non-zero].
+    ///
+    /// To get the offset where the value will be written, call
+    /// [`next_offset<T>()`] before storing the value.
+    ///
+    /// > **Note:** this does not return [`std::mem::MaybeUninit`], instead we
+    /// > use an internal [`MaybeUninit`] which is similar but has different
+    /// > properties. See [its documentation][MaybeUninit] for more.
+    ///
+    /// [`next_offset<T>()`]: Self::next_offset()
+    /// [^non-zero]: Like with [`NonZero*`][core::num] types.
     ///
     /// # Examples
     ///
@@ -404,8 +431,13 @@ impl<O: Size> OwnedBuf<O> {
     /// Write a reference that might not have been initialized.
     ///
     /// This does not prevent [`Ref`] from different instances of [`OwnedBuf`]
-    /// from being written. It would only result in potentially garbled data,
-    /// but wouldn't be a safety issue.
+    /// from being written. It would only result in garbled data, but wouldn't
+    /// be a safety concern.
+    ///
+    /// > **Note:** this does not return [`std::mem::MaybeUninit`], instead we
+    /// > use an internal [`MaybeUninit`] which is similar but has different
+    /// > properties. See [its documentation][MaybeUninit] for more.
+    ///
     ///
     /// # Panics
     ///
@@ -471,8 +503,13 @@ impl<O: Size> OwnedBuf<O> {
 
     /// Insert a value with the given size.
     ///
-    /// To get the pointer where the value will be written, call
-    /// [`next_offset<T>()`] before writing it.
+    /// The memory for `T` will be initialized at [`next_offset<T>()`] and the
+    /// length and alignment requirement of `OwnedBuf` updated to reflect that
+    /// an instance of `T` has been stored.
+    ///
+    /// To get the offset where the value will be written, call
+    /// [`next_offset<T>()`] before storing the value or access the offset
+    /// through the [`Ref::offset`] being returned.
     ///
     /// [`next_offset<T>()`]: Self::next_offset
     ///
@@ -706,11 +743,11 @@ impl<O: Size> OwnedBuf<O> {
 
     /// Align a buffer in place if necessary.
     ///
-    /// If [`requested()`] does not equal [`align()`] this will cause the buffer
+    /// If [`requested()`] does not equal [`alignment()`] this will cause the buffer
     /// to be reallocated before it is returned.
     ///
     /// [`requested()`]: Self::requested
-    /// [`align()`]: Self::align
+    /// [`alignment()`]: Buf::alignment
     /// [`as_ref`]: Self::as_ref
     ///
     /// # Examples
@@ -757,11 +794,11 @@ impl<O: Size> OwnedBuf<O> {
     /// Convert the current buffer into an aligned buffer if necessary and
     /// return the aligned buffer.
     ///
-    /// If [`requested()`] does not equal [`align()`] this will cause the buffer
+    /// If [`requested()`] does not equal [`alignment()`] this will cause the buffer
     /// to be reallocated before it is returned.
     ///
     /// [`requested()`]: Self::requested
-    /// [`align()`]: Self::align
+    /// [`alignment()`]: Buf::alignment
     /// [`as_ref`]: Self::as_ref
     ///
     /// # Examples
@@ -785,6 +822,9 @@ impl<O: Size> OwnedBuf<O> {
     /// Request that the current buffer should have at least the specified
     /// alignment and zero-initialize the buffer up to the next position which
     /// matches the given alignment.
+    ///
+    /// Note that this does not guarantee that the internal buffer is aligned
+    /// in-memory, to ensure this you can use [`align_in_place()`].
     ///
     /// ```
     /// use musli_zerocopy::OwnedBuf;
@@ -816,7 +856,7 @@ impl<O: Size> OwnedBuf<O> {
     /// ```
     ///
     /// [`capacity()`]: Self::capacity
-    /// [`into_aligned_owned_buf()`]: Self::into_aligned_owned_buf
+    /// [`align_in_place()`]: Self::align_in_place
     ///
     /// # Safety
     ///
@@ -1139,15 +1179,15 @@ impl Borrow<Buf> for OwnedBuf {
 ///
 /// While this causes another allocation, it doesn't ensure that the returned
 /// buffer has the [`requested()`] alignment. To achieve this prefer using
-/// [`into_aligned_owned_buf()`].
+/// [`into_aligned()`].
 ///
 /// [`requested()`]: Self::requested()
-/// [`into_aligned_owned_buf()`]: Self::into_aligned_owned_buf
+/// [`into_aligned()`]: Self::into_aligned
 ///
 /// # Examples
 ///
 /// ```
-/// use core::mem::align_of;
+/// use std::mem::align_of;
 /// use musli_zerocopy::OwnedBuf;
 ///
 /// assert_ne!(align_of::<u16>(), align_of::<u32>());

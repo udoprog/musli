@@ -1,3 +1,8 @@
+// Note: This was ported from `hashbrown`, and still contains some of the
+// comments assuming that it performs internal allocations. These are most
+// likely wrong and need to be rewritten to take into account the safety
+// requirements towards `OwnedBuf`.
+
 use core::convert::{identity as likely, identity as unlikely};
 use core::marker::PhantomData;
 use core::mem;
@@ -24,25 +29,35 @@ pub struct Constructor<'a, T, O: Size> {
     // number of buckets in the table.
     bucket_mask: usize,
 
-    // Offset to the first control byte.
+    // Control offset, where the control vectors are stored in `buf`.
     ctrl_ptr: usize,
 
-    // Base offset.
+    // Base offset where items are written in `buf`.
     base_ptr: usize,
 
-    // Number of elements in the table, only really used by len()
-    items: usize,
-
-    // Number of elements that can be inserted before we need to grow the table
+    // Number of elements that can be inserted before we need to grow the table.
+    // Since we can't grow the table, reaching this point results in an error.
     growth_left: usize,
 
-    // Tell dropck that we own instances of T.
+    // Hold onto T to make sure the API stays coherent with the types the
+    // constructor can write.
     _marker: PhantomData<T>,
 }
 
 impl<'a, T, O: Size> Constructor<'a, T, O> {
-    /// Allocates a new hash table using the given allocator, with at least enough capacity for
-    /// inserting the given number of elements without reallocating.
+    /// Wrap the given buffer for table construction.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that buffer contains allocated and correctly
+    /// initialized memory at `ctrl_ptr` and `base_ptr`.
+    ///
+    /// * `ctrl_ptr` must point to a memory region that is `buckets + 1` length
+    ///   sized for `Group` which has been bitwise initialized to [`EMPTY`].
+    /// * `base_ptr` must point to a memory region that is `buckets` length
+    ///   sized for `T`.
+    ///
+    /// [`EMPTY`]: crate::swiss::raw::EMPTY
     pub(crate) unsafe fn with_buf(
         buf: &'a mut OwnedBuf<O>,
         ctrl_ptr: usize,
@@ -51,24 +66,9 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     ) -> Self {
         debug_assert!(buckets.is_power_of_two());
 
-        /// Returns the maximum effective capacity for the given bucket mask, taking
-        /// the maximum load factor into account.
-        #[inline]
-        fn bucket_mask_to_capacity(bucket_mask: usize) -> usize {
-            if bucket_mask < 8 {
-                // For tables with 1/2/4/8 buckets, we always reserve one empty slot.
-                // Keep in mind that the bucket mask is one less than the bucket count.
-                bucket_mask
-            } else {
-                // For larger tables we reserve 12.5% of the slots as empty.
-                ((bucket_mask + 1) / 8) * 7
-            }
-        }
-
         Self {
             buf,
             bucket_mask: buckets - 1,
-            items: 0,
             ctrl_ptr,
             base_ptr,
             growth_left: bucket_mask_to_capacity(buckets - 1),
@@ -218,7 +218,6 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     unsafe fn record_item_insert_at(&mut self, index: usize, old_ctrl: u8, hash: u64) {
         self.growth_left -= usize::from(special_is_empty(old_ctrl));
         self.set_ctrl_h2(index, hash);
-        self.items += 1;
     }
 
     /// Searches for an empty or deleted bucket which is suitable for inserting
@@ -376,28 +375,9 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     ///
     /// # Safety
     ///
-    /// The safety rules are directly derived from the safety rules for [`RawTableInner::set_ctrl`]
-    /// method. Thus, in order to uphold the safety contracts for the method, you must observe the
-    /// following rules when calling this function:
-    ///
-    /// * The [`RawTableInner`] has already been allocated;
-    ///
-    /// * The `index` must not be greater than the `RawTableInner.bucket_mask`, i.e.
-    ///   `index <= RawTableInner.bucket_mask` or, in other words, `(index + 1)` must
-    ///   be no greater than the number returned by the function [`RawTableInner::buckets`].
-    ///
-    /// Calling this function on a table that has not been allocated results in [`undefined behavior`].
-    ///
-    /// See also [`Bucket::as_ptr`] method, for more information about of properly removing
-    /// or saving `data element` from / into the [`Constructor`] / [`RawTableInner`].
-    ///
-    /// [`RawTableInner::set_ctrl`]: RawTableInner::set_ctrl
-    /// [`RawTableInner::buckets`]: RawTableInner::buckets
-    /// [`Bucket::as_ptr`]: Bucket::as_ptr
-    /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    /// The caller must ensure that the `index` is not out of bounds of the control allocation.
     #[inline]
     unsafe fn set_ctrl_h2(&mut self, index: usize, hash: u64) {
-        // SAFETY: The caller must uphold the safety rules for the [`RawTableInner::set_ctrl_h2`]
         self.set_ctrl(index, h2(hash));
     }
 
@@ -409,22 +389,8 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     ///
     /// # Safety
     ///
-    /// You must observe the following safety rules when calling this function:
-    ///
-    /// * The [`RawTableInner`] has already been allocated;
-    ///
-    /// * The `index` must not be greater than the `RawTableInner.bucket_mask`, i.e.
-    ///   `index <= RawTableInner.bucket_mask` or, in other words, `(index + 1)` must
-    ///   be no greater than the number returned by the function [`RawTableInner::buckets`].
-    ///
-    /// Calling this function on a table that has not been allocated results in [`undefined behavior`].
-    ///
-    /// See also [`Bucket::as_ptr`] method, for more information about of properly removing
-    /// or saving `data element` from / into the [`Constructor`] / [`RawTableInner`].
-    ///
-    /// [`RawTableInner::buckets`]: RawTableInner::buckets
-    /// [`Bucket::as_ptr`]: Bucket::as_ptr
-    /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    /// The caller must ensure that `index` is not out of bounds of the control
+    /// allocation.
     #[inline]
     unsafe fn set_ctrl(&mut self, index: usize, ctrl: u8) {
         // Replicate the first Group::WIDTH control bytes at the end of
@@ -458,41 +424,13 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
         *self.ctrl(index2) = ctrl;
     }
 
-    /// Returns pointer to one past last `data` element in the the table as viewed from
-    /// the start point of the allocation (convenience for `self.ctrl.cast()`).
+    /// Returns pointer to the first `data` element in the the table in `buf`.
     ///
-    /// This function actually returns a pointer to the end of the `data element` at
-    /// index "0" (zero).
+    /// The caller must ensure that the `RawTableInner` outlives the returned
+    /// [`NonNull<T>`], otherwise using it may result in [`undefined behavior`].
     ///
-    /// The caller must ensure that the `RawTableInner` outlives the returned [`NonNull<T>`],
-    /// otherwise using it may result in [`undefined behavior`].
-    ///
-    /// # Note
-    ///
-    /// The type `T` must be the actual type of the elements stored in the table, otherwise
-    /// using the returned [`NonNull<T>`] may result in [`undefined behavior`].
-    ///
-    /// ```none
-    ///                        `table.data_end::<T>()` returns pointer that points here
-    ///                        (to the end of `T0`)
-    ///                          ∨
-    /// [Pad], T_n, ..., T1, T0, |CT0, CT1, ..., CT_n|, CTa_0, CTa_1, ..., CTa_m
-    ///                           \________  ________/
-    ///                                    \/
-    ///       `n = buckets - 1`, i.e. `RawTableInner::buckets() - 1`
-    ///
-    /// where: T0...T_n  - our stored data;
-    ///        CT0...CT_n - control bytes or metadata for `data`.
-    ///        CTa_0...CTa_m - additional control bytes, where `m = Group::WIDTH - 1` (so that the search
-    ///                        with loading `Group` bytes from the heap works properly, even if the result
-    ///                        of `h1(hash) & self.bucket_mask` is equal to `self.bucket_mask`). See also
-    ///                        `RawTableInner::set_ctrl` function.
-    ///
-    /// P.S. `h1(hash) & self.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
-    /// of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
-    /// ```
-    ///
-    /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    /// [`undefined behavior`]:
+    ///     https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
     fn data_start(&mut self) -> NonNull<T> {
         unsafe { NonNull::new_unchecked(self.buf.as_ptr_mut().wrapping_add(self.base_ptr)).cast() }
@@ -513,25 +451,29 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     ///
     /// # Safety
     ///
-    /// For the allocated [`RawTableInner`], the result is [`Undefined Behavior`],
-    /// if the `index` is greater than the `self.bucket_mask + 1 + Group::WIDTH`.
-    /// In that case, calling this function with `index == self.bucket_mask + 1 + Group::WIDTH`
-    /// will return a pointer to the end of the allocated table and it is useless on its own.
+    /// For the allocated [`buf`], the result is [`Undefined
+    /// Behavior`], if the `index` is greater than the `self.bucket_mask + 1 +
+    /// Group::WIDTH`. In that case, calling this function with `index ==
+    /// self.bucket_mask + 1 + Group::WIDTH` will return a pointer to the end of
+    /// the allocated table and it is useless on its own.
     ///
-    /// Calling this function with `index >= self.bucket_mask + 1 + Group::WIDTH` on a
-    /// table that has not been allocated results in [`Undefined Behavior`].
+    /// Calling this function with `index >= self.bucket_mask + 1 +
+    /// Group::WIDTH` on a table that has not been allocated results in
+    /// [`Undefined Behavior`].
     ///
     /// So to satisfy both requirements you should always follow the rule that
     /// `index < self.bucket_mask + 1 + Group::WIDTH`
     ///
-    /// Calling this function on [`RawTableInner`] that are not already allocated is safe
+    /// Calling this function on [`buf`] that are not already allocated is safe
     /// for read-only purpose.
     ///
-    /// See also [`Bucket::as_ptr()`] method, for more information about of properly removing
-    /// or saving `data element` from / into the [`Constructor`] / [`RawTableInner`].
+    /// See also [`Bucket::as_ptr()`] method, for more information about of
+    /// properly removing or saving `data element` from / into the
+    /// [`Constructor`] / [`buf`].
     ///
     /// [`Bucket::as_ptr()`]: Bucket::as_ptr()
-    /// [`Undefined Behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    /// [`Undefined Behavior`]:
+    ///     https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
     unsafe fn ctrl(&mut self, index: usize) -> *mut u8 {
         debug_assert!(index < self.num_ctrl_bytes());
@@ -613,7 +555,8 @@ impl<'a, T> Bucket<'a, T> {
     /// ```
     /// # #[cfg(feature = "raw")]
     /// # fn test() {
-    /// use core::hash::{BuildHasher, Hash};
+    /// use std::hash::{BuildHasher, Hash};
+    ///
     /// use hashbrown::raw::{Bucket, Constructor};
     ///
     /// type NewHashBuilder = core::hash::BuildHasherDefault<ahash::AHasher>;
@@ -657,4 +600,18 @@ impl<'a, T> Bucket<'a, T> {
 /// A reference to an empty bucket into which an can be inserted.
 pub struct InsertSlot {
     index: usize,
+}
+
+/// Returns the maximum effective capacity for the given bucket mask, taking
+/// the maximum load factor into account.
+#[inline]
+fn bucket_mask_to_capacity(bucket_mask: usize) -> usize {
+    if bucket_mask < 8 {
+        // For tables with 1/2/4/8 buckets, we always reserve one empty slot.
+        // Keep in mind that the bucket mask is one less than the bucket count.
+        bucket_mask
+    } else {
+        // For larger tables we reserve 12.5% of the slots as empty.
+        ((bucket_mask + 1) / 8) * 7
+    }
 }

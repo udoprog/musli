@@ -19,7 +19,8 @@ use crate::ZeroCopy;
 /// # Examples
 ///
 /// ```
-/// use core::mem::align_of;
+/// use std::mem::align_of;
+///
 /// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::pointer::Ref;
 ///

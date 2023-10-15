@@ -111,7 +111,8 @@ where
     /// # Examples
     ///
     /// ```
-    /// use core::ptr;
+    /// use std::ptr;
+    ///
     /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
     ///

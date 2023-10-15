@@ -140,7 +140,8 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// Validator a packed struct:
     ///
     /// ```
-    /// use core::num::NonZeroU64;
+    /// use std::num::NonZeroU64;
+    ///
     /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
@@ -190,7 +191,8 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// Validator a packed struct:
     ///
     /// ```
-    /// use core::num::NonZeroU64;
+    /// use std::num::NonZeroU64;
+    ///
     /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]

@@ -32,7 +32,8 @@ use crate::ZeroCopy;
 /// Manually constructing a slice into a buffer:
 ///
 /// ```
-/// use core::mem::align_of;
+/// use std::mem::align_of;
+///
 /// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::pointer::Slice;
 ///
@@ -55,7 +56,8 @@ use crate::ZeroCopy;
 /// Example using a slice with zero-sized elements:
 ///
 /// ```
-/// use core::mem::align_of;
+/// use std::mem::align_of;
+///
 /// use musli_zerocopy::OwnedBuf;
 /// use musli_zerocopy::pointer::Slice;
 ///
