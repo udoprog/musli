@@ -170,15 +170,20 @@ where
     let entries = entries.into_iter();
     let key = FIXED_SEED;
 
-    let (ctrl_len, ctrl_align, buckets) =
-        RawTable::<'_, U, O>::layout_and_offset_for(entries.len());
+    let Some(buckets) = raw::capacity_to_buckets(entries.len()) else {
+        panic!("Capacity overflow");
+    };
+
+    let ctrl_len = buckets + size_of::<raw::Group>();
+    let ctrl_align = raw::Group::WIDTH;
 
     debug_assert!(ctrl_align.is_power_of_two());
 
     let ctrl_ptr = unsafe { buf.next_offset_with(ctrl_align, ctrl_len) };
     // All ones indicates that the table is empty, since the ctrl byte for empty
     // buckets is 1111_1111.
-    buf.fill(raw::EMPTY, ctrl_len);
+    buf.fill(raw::EMPTY, ctrl_len + size_of::<raw::Group>());
+
     let base_ptr = buf.next_offset::<U>();
     buf.fill(0, size_of::<T>().wrapping_mul(buckets));
 

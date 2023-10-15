@@ -36,7 +36,6 @@ use crate::ZeroCopy;
 
 pub(crate) use self::imp::Group;
 
-use core::alloc::Layout;
 use core::convert::{identity as likely, identity as unlikely};
 use core::marker::PhantomData;
 use core::mem;
@@ -56,24 +55,6 @@ pub struct RawTable<'a, T, O: Size> {
 }
 
 impl<'a, T, O: Size> RawTable<'a, T, O> {
-    const TABLE_LAYOUT: TableLayout = TableLayout::new::<T>();
-
-    pub(crate) fn layout_and_offset_for(capacity: usize) -> (usize, usize, usize) {
-        let Some(buckets) = capacity_to_buckets(capacity) else {
-            panic!("Capacity overflow");
-        };
-
-        debug_assert!(buckets.is_power_of_two());
-
-        // Avoid `Option::ok_or_else` because it bloats LLVM IR.
-        let Some((ctrl_offset, ctrl_align)) = Self::TABLE_LAYOUT.calculate_ctrl_offset(buckets)
-        else {
-            panic!("Capacity overflow");
-        };
-
-        (ctrl_offset, ctrl_align, buckets)
-    }
-
     /// Allocates a new hash table using the given allocator, with at least enough capacity for
     /// inserting the given number of elements without reallocating.
     pub(crate) unsafe fn with_buf(
@@ -326,6 +307,7 @@ pub struct InsertSlot {
 ///
 /// Proof that the probe will visit every group in the table:
 /// <https://fgiesen.wordpress.com/2015/02/22/triangular-numbers-mod-2n/>
+#[derive(Debug)]
 pub(crate) struct ProbeSeq {
     pub(crate) pos: usize,
     stride: usize,
@@ -842,48 +824,6 @@ fn special_is_empty(ctrl: u8) -> bool {
     ctrl & 0x01 != 0
 }
 
-/// Helper which allows the max calculation for ctrl_align to be statically computed for each T
-/// while keeping the rest of `calculate_layout_for` independent of `T`
-#[derive(Copy, Clone)]
-struct TableLayout {
-    size: usize,
-    ctrl_align: usize,
-}
-
-impl TableLayout {
-    #[inline]
-    const fn new<T>() -> Self {
-        let layout = Layout::new::<T>();
-        Self {
-            size: layout.size(),
-            ctrl_align: if layout.align() > Group::WIDTH {
-                layout.align()
-            } else {
-                Group::WIDTH
-            },
-        }
-    }
-
-    #[inline]
-    fn calculate_ctrl_offset(self, buckets: usize) -> Option<(usize, usize)> {
-        debug_assert!(buckets.is_power_of_two());
-
-        let TableLayout { size, ctrl_align } = self;
-        // Manual layout calculation since Layout methods are not yet stable.
-        let ctrl_offset =
-            size.checked_mul(buckets)?.checked_add(ctrl_align - 1)? & !(ctrl_align - 1);
-        let len = ctrl_offset.checked_add(buckets + Group::WIDTH)?;
-
-        // We need an additional check to ensure that the allocation doesn't
-        // exceed `isize::MAX` (https://github.com/rust-lang/rust/pull/95295).
-        if len > isize::MAX as usize - (ctrl_align - 1) {
-            return None;
-        }
-
-        Some((ctrl_offset, ctrl_align))
-    }
-}
-
 /// Returns the number of buckets needed to hold the given number of items,
 /// taking the maximum load factor into account.
 ///
@@ -891,7 +831,7 @@ impl TableLayout {
 // Workaround for emscripten bug emscripten-core/emscripten-fastcomp#258
 #[cfg_attr(target_os = "emscripten", inline(never))]
 #[cfg_attr(not(target_os = "emscripten"), inline)]
-fn capacity_to_buckets(cap: usize) -> Option<usize> {
+pub(crate) fn capacity_to_buckets(cap: usize) -> Option<usize> {
     debug_assert_ne!(cap, 0);
 
     // For small tables we require at least 1 empty bucket so that lookups are

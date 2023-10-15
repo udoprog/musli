@@ -123,8 +123,8 @@ pub(crate) enum ErrorKind {
         index: usize,
         len: usize,
     },
-    ControlIndexOutOfBounds {
-        index: usize,
+    ControlRangeOutOfBounds {
+        range: Range<usize>,
         len: usize,
     },
     IllegalEnumRepr {
@@ -168,8 +168,8 @@ impl fmt::Display for ErrorKind {
             ErrorKind::IndexOutOfBounds { index, len } => {
                 write!(f, "Index {index} out of bound 0-{len}")
             }
-            ErrorKind::ControlIndexOutOfBounds { index, len } => {
-                write!(f, "Control index {index} out of bound 0-{len}")
+            ErrorKind::ControlRangeOutOfBounds { range, len } => {
+                write!(f, "Control range {range:?} out of bound 0-{len}")
             }
             ErrorKind::IllegalEnumRepr { name, repr } => {
                 write!(f, "Illegal enum representation {repr} for enum {name}")

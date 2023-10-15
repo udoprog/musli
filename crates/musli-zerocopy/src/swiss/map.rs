@@ -341,12 +341,11 @@ impl<'a, T> RawTable<'a, T> {
         let mut probe_seq = probe_seq(self.bucket_mask, hash);
 
         loop {
-            let Some(bytes) = self
-                .ctrl
-                .get(probe_seq.pos..probe_seq.pos.wrapping_add(size_of::<Group>()))
-            else {
-                return Err(Error::new(ErrorKind::ControlIndexOutOfBounds {
-                    index: probe_seq.pos,
+            let range = probe_seq.pos..probe_seq.pos.wrapping_add(size_of::<Group>());
+
+            let Some(bytes) = self.ctrl.get(range.clone()) else {
+                return Err(Error::new(ErrorKind::ControlRangeOutOfBounds {
+                    range,
                     len: self.ctrl.len(),
                 }));
             };
@@ -450,15 +449,18 @@ where
         let h2_hash = h2(hash);
         let mut probe_seq = probe_seq(self.bucket_mask, hash);
 
+        let ctrl = buf.load(self.ctrl)?;
+
         loop {
-            let Some(ctrl_at) = self.ctrl.get(probe_seq.pos) else {
-                return Err(Error::new(ErrorKind::ControlIndexOutOfBounds {
-                    index: probe_seq.pos,
+            let range = probe_seq.pos..probe_seq.pos.wrapping_add(size_of::<Group>());
+
+            let Some(bytes) = ctrl.get(range.clone()) else {
+                return Err(Error::new(ErrorKind::ControlRangeOutOfBounds {
+                    range,
                     len: self.ctrl.len(),
                 }));
             };
 
-            let bytes = buf.get(ctrl_at.offset(), size_of::<Group>())?;
             let group = unsafe { Group::load(bytes.as_ptr()) };
 
             for bit in group.match_byte(h2_hash) {
