@@ -315,7 +315,7 @@ impl<O: Size> OwnedBuf<O> {
     /// ```
     #[inline]
     pub fn reserve(&mut self, capacity: usize) {
-        let new_capacity = self.len.wrapping_add(capacity);
+        let new_capacity = self.len + capacity;
         self.ensure_capacity(new_capacity);
     }
 
@@ -325,8 +325,9 @@ impl<O: Size> OwnedBuf<O> {
     ///
     /// The caller must ensure that bytes up until `len() + size` has been
     /// initialized in this buffer.
+    #[inline]
     pub unsafe fn advance(&mut self, size: usize) {
-        self.len = self.len.wrapping_add(size);
+        self.len += size;
     }
 
     /// Return the current buffer as a raw and very unsafe to use [`BufMut`].
@@ -445,7 +446,7 @@ impl<O: Size> OwnedBuf<O> {
                 .as_ptr()
                 .add(self.len)
                 .write_bytes(0, size_of::<T>());
-            self.len = self.len.wrapping_add(size_of::<T>());
+            self.len += size_of::<T>();
             Ref::new_raw(offset)
         }
     }
@@ -459,7 +460,6 @@ impl<O: Size> OwnedBuf<O> {
     /// > **Note:** this does not return [`std::mem::MaybeUninit`], instead we
     /// > use an internal [`MaybeUninit`] which is similar but has different
     /// > properties. See [its documentation][MaybeUninit] for more.
-    ///
     ///
     /// # Panics
     ///
@@ -515,11 +515,10 @@ impl<O: Size> OwnedBuf<O> {
 
         // Note: We only need this as debug assertion, because `MaybeUninit<T>`
         // does not implement `ZeroCopy`, so there is no way to construct.
-        assert!(
-            at.wrapping_add(size_of::<T>()) <= self.len,
-            "Capacity overflow"
-        );
+        assert!(at + size_of::<T>() <= self.len, "Length overflow");
 
+        // SAFETY: `MaybeUninit<T>` has no representation requirements and is
+        // unaligned.
         unsafe { &mut *(self.data.as_ptr().add(at) as *mut MaybeUninit<T>) }
     }
 
@@ -598,7 +597,7 @@ impl<O: Size> OwnedBuf<O> {
         unsafe {
             self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
             let offset = self.len;
-            T::store_to(
+            T::store_unaligned(
                 value,
                 &mut BufMut::new(self.data.as_ptr().wrapping_add(offset)),
             );
@@ -631,7 +630,7 @@ impl<O: Size> OwnedBuf<O> {
         unsafe {
             self.next_offset_with_and_reserve(T::ALIGN, value.bytes());
             let offset = self.len;
-            value.store_to(&mut BufMut::new(self.data.as_ptr().wrapping_add(offset)));
+            value.store(&mut BufMut::new(self.data.as_ptr().wrapping_add(offset)));
             self.len += value.bytes();
             Unsized::new(offset, value.size())
         }
@@ -773,7 +772,7 @@ impl<O: Size> OwnedBuf<O> {
     {
         let dst = self.as_ptr_mut().wrapping_add(self.len);
         dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
-        self.len = self.len.wrapping_add(size_of_val(values));
+        self.len += size_of_val(values);
     }
 
     /// Align a buffer in place if necessary.
@@ -922,12 +921,12 @@ impl<O: Size> OwnedBuf<O> {
     #[inline]
     fn ensure_aligned_and_reserve(&mut self, align: usize, reserve: usize) {
         let extra = crate::buf::padding_to(self.len, align);
-        self.reserve(extra.wrapping_add(reserve));
+        self.reserve(extra + reserve);
 
         // SAFETY: The length is ensures to be within the address space.
         unsafe {
             self.data.as_ptr().add(self.len).write_bytes(0, extra);
-            self.len = self.len.wrapping_add(extra);
+            self.len += extra;
         }
     }
 
@@ -1078,7 +1077,7 @@ impl<O: Size> OwnedBuf<O> {
                 let mut buf = BufMut::new(self.data.as_ptr().wrapping_add(self.len));
 
                 for value in values {
-                    T::store_to(value, &mut buf);
+                    T::store_unaligned(value, &mut buf);
                 }
             } else {
                 self.data
@@ -1087,7 +1086,7 @@ impl<O: Size> OwnedBuf<O> {
                     .copy_from_nonoverlapping(values.as_ptr().cast::<u8>(), size);
             }
 
-            self.len = self.len.wrapping_add(size);
+            self.len += size;
         }
     }
 }

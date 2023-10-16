@@ -97,7 +97,7 @@ impl<T> MaybeUninit<T> {
     {
         unsafe {
             let ptr = self as *mut Self as *mut u8;
-            T::store_to(value, &mut BufMut::new(ptr));
+            T::store_unaligned(value, &mut BufMut::new(ptr));
             slice::from_raw_parts_mut(ptr, size_of::<T>())
         }
     }

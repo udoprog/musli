@@ -133,7 +133,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             match (repr, &output.first_field) {
                 (Repr::Transparent, Some((ty, member))) => {
                     store_to = quote! {
-                        <#ty as #zero_copy>::store_to(#ptr::addr_of!((*this).#member), buf);
+                        <#ty as #zero_copy>::store_unaligned(#ptr::addr_of!((*this).#member), buf);
                     };
 
                     pad = quote! {
@@ -467,7 +467,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             const PADDED: bool = #padded;
 
             #[inline]
-            unsafe fn store_to(this: *const Self, buf: &mut #buf_mut<'_>) {
+            unsafe fn store_unaligned(this: *const Self, buf: &mut #buf_mut<'_>) {
                 #store_to
             }
 
