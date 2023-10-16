@@ -97,28 +97,6 @@ macro_rules! miri {
     }
 }
 
-// Defines denies feature combinations.
-//
-// * Negative features are not supported in cargo, and feature blocking
-//   everything is too complex. model_map for example also depends on std.
-// * Benchmarks for these must be explicitly run, because they only include a
-//   subset of available data, we wouldn't be doing an apples-to-apples
-//   comparison if we allowed only a model subset to be compared against a
-//   serialization which supports a superset. If you do want to make this
-//   comparison, you can enable `model_minimal`.
-macro_rules! deny {
-    ($base:literal $(, $feature:literal)*) => {
-        $(
-            #[cfg(all(feature = $base, feature = $feature))]
-            compile_error!(concat!($base, ": does not support feature: ", $feature));
-        )*
-    }
-}
-
-deny!("rkyv", "model_tuple", "model_map_string_key", "model_usize");
-deny!("dlhn", "model_map", "model_128");
-deny!("bitcode", "model_128");
-
 mod mode;
 pub mod models;
 pub mod utils;
@@ -198,13 +176,13 @@ macro_rules! feature_matrix {
         $call!(musli_zerocopy, musli_zerocopy_buf $(, $($tt)*)*);
         #[cfg(feature = "zerocopy")]
         $call!(zerocopy, zerocopy_buf $(, $($tt)*)*);
-        #[cfg(all(feature = "dlhn", not(any(model_128, model_all))))]
+        #[cfg(feature = "dlhn")]
         $call!(serde_dlhn, serde_dlhn_buf $(, $($tt)*)*);
         #[cfg(feature = "serde_cbor")]
         $call!(serde_cbor, serde_cbor_buf $(, $($tt)*)*);
         #[cfg(feature = "bitcode")]
         $call!(serde_bitcode, serde_bitcode_buf $(, $($tt)*)*);
-        #[cfg(feature = "bitcode")]
+        #[cfg(feature = "bitcode-derive")]
         $call!(derive_bitcode, derive_bitcode_buf $(, $($tt)*)*);
         #[cfg(feature = "rkyv")]
         $call!(rkyv, rkyv_buf $(, $($tt)*)*);
@@ -216,12 +194,12 @@ macro_rules! feature_matrix {
 /// Only expand `$block` if the given test is supported by this framework.
 #[macro_export]
 macro_rules! if_supported {
-    (musli_zerocopy, lg, $block:block) => {};
+    (musli_zerocopy, large, $block:block) => {};
     (musli_zerocopy, allocated, $block:block) => {};
     (musli_zerocopy, medium_enum, $block:block) => {};
 
     (zerocopy, primitives, $block:block) => {};
-    (zerocopy, lg, $block:block) => {};
+    (zerocopy, large, $block:block) => {};
     (zerocopy, allocated, $block:block) => {};
     (zerocopy, medium_enum, $block:block) => {};
 
@@ -237,7 +215,7 @@ macro_rules! types {
             $($($tt)*,)?
             primitives, Primitives, PRIMITIVES, 1000,
             primpacked, PrimitivesPacked, PRIMITIVES_PACKED, 1000,
-            lg, LargeStruct, LARGE_STRUCTS, 10000,
+            large, LargeStruct, LARGE_STRUCTS, 10000,
             allocated, Allocated, ALLOCATED, 5000,
             medium_enum, MediumEnum, MEDIUM_ENUMS, 1000
         };

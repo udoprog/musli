@@ -1,4 +1,3 @@
-use std::collections::{BTreeSet, HashMap};
 #[allow(unused)]
 use std::hint::black_box;
 use std::io::Write;
@@ -275,80 +274,16 @@ fn main() -> Result<()> {
     musli_tests::types!(build);
 
     if !size_sets.is_empty() {
-        let mut footnotes = HashMap::new();
-
-        footnotes.insert("musli_json", "[^incomplete]");
-        footnotes.insert("rkyv", "[^incomplete]");
-        footnotes.insert("serde_bitcode", "[^i128]");
-        footnotes.insert("serde_cbor", "[^i128]");
-        footnotes.insert("serde_dlhn", "[^i128]");
-        footnotes.insert("serde_json", "[^incomplete]");
-        footnotes.insert("derive_bitcode", "[^i128]");
-
-        let mut columns = Vec::new();
-        let mut rows = BTreeSet::new();
-
-        macro_rules! build_column {
-            ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
-                $(columns.push(stringify!($name));)*
-            };
-        }
-
-        musli_tests::types!(build_column);
-
-        let mut index = HashMap::<_, SizeSet>::new();
-
-        for set in size_sets {
-            rows.insert(set.framework);
-            let replaced = index.insert((set.suite, set.framework), set);
-            assert!(replaced.is_none());
-        }
-
-        write!(o, "| **framework** |")?;
-
-        for suite in &columns {
-            write!(o, " **{suite}** |")?;
-        }
-
-        writeln!(o)?;
-        write!(o, "| - |")?;
-
-        for _ in &columns {
-            write!(o, " - |")?;
-        }
-
-        writeln!(o)?;
-
-        for framework in rows {
-            let footnote = footnotes.get(framework).copied().unwrap_or_default();
-            write!(o, "| {framework}{footnote} |")?;
-
-            for suite in &columns {
-                let Some(mut set) = index
-                    .remove(&(suite, framework))
-                    .filter(|s| !s.samples.is_empty())
-                else {
-                    write!(o, " - |")?;
-                    continue;
-                };
-
-                let len = set.samples.len() as f64;
-
-                set.samples.sort();
-                let mean = set.samples.iter().sum::<i64>() as f64 / len;
-
-                let (Some(mn), Some(mx)) = (set.samples.first(), set.samples.last()) else {
-                    write!(o, " - |")?;
-                    continue;
-                };
-
-                let ss = set.samples.iter().map(|s| (*s as f64 - mean).powf(2.0));
-                let stddev = (ss.sum::<f64>() / len).sqrt();
-
-                write!(o, " <a title=\"samples: {len}, min: {mn}, max: {mx}, stddev: {stddev}\">{mean:.2} ± {stddev:.2}</a> |")?;
-            }
-
-            writeln!(o)?;
+        for SizeSet {
+            suite,
+            framework,
+            samples,
+        } in size_sets
+        {
+            writeln!(
+                o,
+                "{{\"suite\":\"{suite}\",\"framework\":\"{framework}\",\"samples\":{samples:?}}}"
+            )?;
         }
     }
 

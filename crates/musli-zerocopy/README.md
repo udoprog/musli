@@ -5,10 +5,11 @@
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-musli--zerocopy-66c2a5?style=for-the-badge&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/musli-zerocopy)
 [<img alt="build status" src="https://img.shields.io/github/actions/workflow/status/udoprog/musli/ci.yml?branch=main&style=for-the-badge" height="20">](https://github.com/udoprog/musli/actions?query=branch%3Amain)
 
-Refreshingly simple zero copy primitives provided by Müsli.
+Refreshingly simple zero copy primitives by Müsli.
 
-This provides a base set of tools to deal with types which do not require
-copying during deserialization.
+This provides a basic set of tools to deal with types which do not require
+copying during deserialization. You define the `T`, and we provide the safe
+`&[u8]` to `&T` conversion.
 
 For a detailed overview of how this works, see the [`ZeroCopy`] derive.
 There's also a high level guide just below.
@@ -22,6 +23,42 @@ structures:
   functions.
 * [`swiss`] is a port of the [`hashbrown` crate] which is a Google
   SwissTable implementation.
+
+<br>
+
+## Why should I consider `musli-zerocopy` over X?
+
+Since this is the first question anyone will ask, here is how we differ from
+other popular libraries:
+* [`zerocopy`] doesn't support padded structs[^padded], bytes to reference
+  conversions, or conversions which do not permit all bit patterns to be
+  inhabited by zeroes[^zeroes]. We still want to provide more of a complete toolkit
+  that you'd need to build and interact with complex data structures, such
+  as the [`phf`] and [`swiss`] modules. This crate might indeed at some
+  point make use of `zerocopy`'s traits.
+* [`rkyv`] operates on `#[repr(Rust)]` types and from this derives an
+  optimized `Archived` variation for you. This library operates on the
+  equivalent of `Archived` variant directly instead that you should build
+  and interact with by hand. `rkyv` is also explicitly not sound unless you
+  build it with the `strict` feature, and even with the feature enabled it
+  doesn't pass Miri. Neither of these are strict blockers for users of the
+  library, but do constrain its safe applicability in ways this library does
+  not.
+
+[^padded]: This is on their roadmap.
+[^zeroes]: FromBytes extends FromZeroes.
+[`zerocopy`]: https://docs.rs/zerocopy
+[`rkyv`]: https://docs.rs/rkyv
+
+The `musli-tests` test suite has been extended to support some level of
+zerocopy types, all though since the feature sets vary so widely between the
+crates it's hard to compare all of them against each other, but the
+following showcases how they currently compare to `musli-zerocopy`.
+
+Encoding a packed variant of the `Primitives` model:
+
+[^musli-zerocopy]: Generated with `cargo bench -p musli-tests --no-default-features --features no-rt,musli-zerocopy,zerocopy -- primpacked`
+[^musli-rkyv]: Generated with `cargo bench -p musli-tests --no-default-features --features no-rt,musli-zerocopy,rkyv -- primitives`
 
 <br>
 
@@ -169,8 +206,7 @@ aligned `&'static [u8]` buffer:
 
 ```rust
 use core::mem::size_of;
-use musli_zerocopy::Buf;
-use musli_zerocopy::pointer::Ref;
+use musli_zerocopy::{Buf, Ref};
 
 // Helper to force the static buffer to be aligned like `A`.
 #[repr(C)]
@@ -200,8 +236,7 @@ at where the struct can be read will then simply be zero, and all the data
 it depends on are stored at subsequent offsets.
 
 ```rust
-use musli_zerocopy::OwnedBuf;
-use musli_zerocopy::pointer::Ref;
+use musli_zerocopy::{OwnedBuf, Ref};
 use musli_zerocopy::mem::MaybeUninit;
 
 let mut buf = OwnedBuf::new();
@@ -275,9 +310,9 @@ The [`Size`] you've specified during construction of an [`OwnedBuf`] will
 then carry into any pointers it return:
 
 ```rust
-use musli_zerocopy::{ZeroCopy, OwnedBuf};
+use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 use musli_zerocopy::buf::DefaultAlignment;
-use musli_zerocopy::pointer::{Ref, Slice, Unsized};
+use musli_zerocopy::pointer::{Slice, Unsized};
 
 #[derive(ZeroCopy)]
 #[repr(C)]

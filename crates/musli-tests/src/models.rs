@@ -2,12 +2,12 @@
 
 mod generate;
 
-#[cfg(any(feature = "model_map", feature = "model_map_string_key"))]
+#[cfg(not(feature = "model-no-map"))]
 use std::collections::HashMap;
 
 use core::ops::Range;
 
-#[cfg(feature = "model_cstring")]
+#[cfg(not(feature = "model-no-cstring"))]
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -36,8 +36,10 @@ miri! {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
+#[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(feature = "zerocopy", derive(AsBytes, FromBytes, FromZeroes))]
 #[cfg_attr(
     feature = "rkyv",
@@ -52,16 +54,18 @@ pub struct PrimitivesPacked {
     unsigned16: u16,
     unsigned32: u32,
     unsigned64: u64,
+    #[cfg(not(feature = "model-no-128"))]
     unsigned128: u128,
     signed8: i8,
     _pad1: [u8; 1],
     signed16: i16,
     signed32: i32,
     signed64: i64,
+    #[cfg(not(feature = "model-no-128"))]
     signed128: i128,
-    #[cfg(feature = "model_usize")]
+    #[cfg(not(feature = "model-no-usize"))]
     unsignedsize: usize,
-    #[cfg(feature = "model_usize")]
+    #[cfg(not(feature = "model-no-usize"))]
     signedsize: isize,
     float32: f32,
     _pad3: [u8; 4],
@@ -87,7 +91,7 @@ impl PartialEq<PrimitivesPacked> for &PrimitivesPacked {
 #[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
@@ -103,21 +107,21 @@ pub struct Primitives {
     unsigned16: u16,
     unsigned32: u32,
     unsigned64: u64,
-    #[cfg(feature = "model_128")]
+    #[cfg(not(feature = "model-no-128"))]
     unsigned128: u128,
     signed8: i8,
     signed16: i16,
     signed32: i32,
     signed64: i64,
-    #[cfg(feature = "model_128")]
+    #[cfg(not(feature = "model-no-128"))]
     signed128: i128,
-    #[cfg(feature = "model_usize")]
+    #[cfg(not(feature = "model-no-usize"))]
     unsignedsize: usize,
-    #[cfg(feature = "model_usize")]
+    #[cfg(not(feature = "model-no-usize"))]
     signedsize: isize,
-    #[cfg(feature = "model_float")]
+    #[cfg(not(feature = "model-no-float"))]
     float32: f32,
-    #[cfg(feature = "model_float")]
+    #[cfg(not(feature = "model-no-float"))]
     float64: f64,
 }
 
@@ -139,7 +143,7 @@ impl PartialEq<Primitives> for &Primitives {
 #[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
@@ -150,7 +154,7 @@ impl PartialEq<Primitives> for &Primitives {
 pub struct Allocated {
     string: String,
     bytes: Vec<u8>,
-    #[cfg(feature = "model_cstring")]
+    #[cfg(not(feature = "model-no-cstring"))]
     c_string: CString,
 }
 
@@ -172,7 +176,7 @@ impl PartialEq<Allocated> for &Allocated {
 #[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct Tuples {
     u0: (),
@@ -180,18 +184,18 @@ pub struct Tuples {
     u2: (bool, u8),
     u3: (bool, u8, u32),
     u4: (bool, u8, u32, u64),
-    #[cfg(feature = "model_float")]
+    #[cfg(not(feature = "model-no-float"))]
     u5: (bool, u8, u32, u64, f32),
-    #[cfg(feature = "model_float")]
+    #[cfg(not(feature = "model-no-float"))]
     u6: (bool, u8, u32, u64, f32, f64),
     i0: (),
     i1: (bool,),
     i2: (bool, i8),
     i3: (bool, i8, i32),
     i4: (bool, i8, i32, i64),
-    #[cfg(feature = "model_float")]
+    #[cfg(not(feature = "model-no-float"))]
     i5: (bool, i8, i32, i64, f32),
-    #[cfg(feature = "model_float")]
+    #[cfg(not(feature = "model-no-float"))]
     i6: (bool, i8, i32, i64, f32, f64),
 }
 
@@ -205,7 +209,7 @@ impl PartialEq<Tuples> for &Tuples {
 #[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
@@ -246,7 +250,7 @@ impl PartialEq<MediumEnum> for &MediumEnum {
 #[derive(Debug, Clone, PartialEq, Generate)]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "bitcode", derive(bitcode::Encode, bitcode::Decode))]
+#[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
@@ -257,19 +261,19 @@ impl PartialEq<MediumEnum> for &MediumEnum {
 pub struct LargeStruct {
     #[generate(range = PRIMITIVES_RANGE)]
     primitives: Vec<Primitives>,
-    #[cfg(all(feature = "model_vec", feature = "model_tuple"))]
+    #[cfg(not(any(feature = "model-no-vec", feature = "model-no-tuple")))]
     #[generate(range = PRIMITIVES_RANGE)]
     tuples: Vec<(Tuples, Tuples)>,
     #[generate(range = MEDIUM_RANGE)]
     medium_vec: Vec<MediumEnum>,
-    #[cfg(feature = "model_map_string_key")]
+    #[cfg(not(feature = "model-no-map-string-key"))]
     #[generate(range = MEDIUM_RANGE)]
     medium_map: HashMap<String, MediumEnum>,
-    #[cfg(feature = "model_map_string_key")]
+    #[cfg(not(feature = "model-no-map-string-key"))]
     string_keys: HashMap<String, u64>,
-    #[cfg(all(feature = "model_map", feature = "model_tuple"))]
+    #[cfg(not(feature = "model-no-map"))]
     number_keys: HashMap<u32, u64>,
-    #[cfg(feature = "model_tuple")]
+    #[cfg(not(feature = "model-no-tuple"))]
     number_vec: Vec<(u32, u64)>,
 }
 

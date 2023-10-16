@@ -39,7 +39,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         $buf.with(|mut state| {
                             $b.iter(|| {
                                 state.reset($size_hint, &$name);
-                                let _ = black_box(state.encode(&$name));
+                                let _ = black_box(state.encode(&$name).unwrap());
                             });
                         });
                     }};

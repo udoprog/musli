@@ -1,3 +1,5 @@
+#![allow(clippy::len_without_is_empty)]
+
 #[macro_use]
 mod macros;
 
@@ -306,7 +308,7 @@ pub mod musli_zerocopy {
     }
 
     #[inline(always)]
-    pub fn decode<'de, T>(bytes: &'de [u8]) -> Result<&'de T, Error>
+    pub fn decode<T>(bytes: &[u8]) -> Result<&T, Error>
     where
         T: ZeroCopy,
     {

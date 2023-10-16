@@ -53,13 +53,13 @@
 //! following showcases how they currently compare to `musli-zerocopy`.
 //!
 //! Encoding a packed variant of the `Primitives` model:
-//! 
+//!
 //! [^musli-zerocopy]: Generated with `cargo bench -p musli-tests --no-default-features --features no-rt,musli-zerocopy,zerocopy -- primpacked`
 //! [^musli-rkyv]: Generated with `cargo bench -p musli-tests --no-default-features --features no-rt,musli-zerocopy,rkyv -- primitives`
-//! 
+//!
 //! <br>
 //!
-//! # Guide
+//! ## Guide
 //!
 //! Zero-copy in this library refers to the act of interacting with data
 //! structures that reside directly in `&[u8]` memory without the need to first
