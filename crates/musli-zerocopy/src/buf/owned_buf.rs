@@ -130,20 +130,14 @@ impl OwnedBuf {
 }
 
 impl<O: Size> OwnedBuf<O> {
-    /// Allocate a new buffer with the given capacity and default alignment.
+    /// Allocate a new buffer with the given `capacity`` and an alignment
+    /// matching that of `T`.
     ///
     /// The buffer must allocate for at least the given `capacity`, but might
     /// allocate more. If the capacity specified is `0` it will not allocate.
     ///
     /// This constructor also allows for specifying the [`Size`] through the `O`
-    /// parameter.
-    ///
-    /// The available [`Size`] implementations are:
-    /// * `u32` for 32-bit sized pointers (the default).
-    /// * `usize` for target-dependently sized pointers.
-    ///
-    /// To initialize an [`OwnedBuf`] with a custom [`Size`] you simply use
-    /// this constructor while specifying one of the above parameters:
+    /// parameter type parameter.
     ///
     /// ```
     /// use musli_zerocopy::OwnedBuf;
@@ -231,6 +225,7 @@ impl<O: Size> OwnedBuf<O> {
     /// let buf = OwnedBuf::new();
     /// assert_eq!(buf.len(), 0);
     /// ```
+    #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
@@ -242,6 +237,7 @@ impl<O: Size> OwnedBuf<O> {
     /// The buffer must be allocated and initialized up to the given length.
     /// Failure to abide by this will result in safe APIs exhibiting undefined
     /// behavior.
+    #[inline]
     pub unsafe fn set_len(&mut self, len: usize) {
         self.len = len;
     }
@@ -264,6 +260,7 @@ impl<O: Size> OwnedBuf<O> {
     /// assert!(b.capacity() > 0);
     /// assert_eq!(b.len(), 0);
     /// ```
+    #[inline]
     pub fn clear(&mut self) {
         self.len = 0;
     }
@@ -278,6 +275,7 @@ impl<O: Size> OwnedBuf<O> {
     /// let buf = OwnedBuf::new();
     /// assert!(buf.is_empty());
     /// ```
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
@@ -292,6 +290,7 @@ impl<O: Size> OwnedBuf<O> {
     /// let buf = OwnedBuf::new();
     /// assert_eq!(buf.capacity(), 0);
     /// ```
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.capacity
     }
@@ -308,6 +307,7 @@ impl<O: Size> OwnedBuf<O> {
     /// assert!(buf.alignment() >= 8);
     /// assert_eq!(buf.requested(), 8);
     /// ```
+    #[inline]
     pub fn requested(&self) -> usize {
         self.requested
     }
@@ -325,17 +325,20 @@ impl<O: Size> OwnedBuf<O> {
     /// buf.reserve(10);
     /// assert!(buf.capacity() >= 10);
     /// ```
+    #[inline]
     pub fn reserve(&mut self, capacity: usize) {
         let new_capacity = self.len.wrapping_add(capacity);
         self.ensure_capacity(new_capacity);
     }
 
     /// Get get a raw pointer to the current buffer.
+    #[inline]
     pub fn as_ptr(&self) -> *const u8 {
         self.data.as_ptr() as *const _
     }
 
     /// Get get a raw mutable pointer to the current buffer.
+    #[inline]
     pub fn as_ptr_mut(&mut self) -> *mut u8 {
         self.data.as_ptr()
     }
@@ -351,6 +354,7 @@ impl<O: Size> OwnedBuf<O> {
     /// b.extend_from_slice(b"hello world");
     /// assert_eq!(b.as_slice(), b"hello world");
     /// ```
+    #[inline]
     pub fn as_slice(&self) -> &[u8] {
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len()) }
     }
@@ -367,6 +371,7 @@ impl<O: Size> OwnedBuf<O> {
     /// b.as_mut_slice().make_ascii_uppercase();
     /// assert_eq!(b.as_slice(), b"HELLO WORLD");
     /// ```
+    #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         unsafe { slice::from_raw_parts_mut(self.as_ptr_mut(), self.len()) }
     }
@@ -396,8 +401,8 @@ impl<O: Size> OwnedBuf<O> {
     ///
     /// ```
     /// use musli_zerocopy::mem::MaybeUninit;
-    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
-    /// use musli_zerocopy::pointer::{Ref, Unsized};
+    /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -421,7 +426,7 @@ impl<O: Size> OwnedBuf<O> {
     {
         // SAFETY: We've just reserved capacity for this write.
         unsafe {
-            let len = self.next_offset_with(align_of::<T>(), size_of::<T>());
+            let len = self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
             self.data.as_ptr().add(len).write_bytes(0, size_of::<T>());
             self.len = self.len.wrapping_add(size_of::<T>());
             Ref::new_raw(len)
@@ -465,8 +470,8 @@ impl<O: Size> OwnedBuf<O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
-    /// use musli_zerocopy::pointer::{Ref, Unsized};
+    /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
+    /// use musli_zerocopy::pointer::Unsized;
     /// use musli_zerocopy::mem::MaybeUninit;
     ///
     /// #[derive(ZeroCopy)]
@@ -574,7 +579,7 @@ impl<O: Size> OwnedBuf<O> {
         // SAFETY: We're ensuring that these elements are interacted with
         // correctly.
         unsafe {
-            let ptr = self.next_offset_with(align_of::<T>(), size_of::<T>());
+            let ptr = self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
             T::store_to(value, self);
             Ref::new(ptr)
         }
@@ -602,7 +607,7 @@ impl<O: Size> OwnedBuf<O> {
         T: ?Sized + UnsizedZeroCopy,
     {
         unsafe {
-            let ptr = self.next_offset_with(T::ALIGN, value.bytes());
+            let ptr = self.next_offset_with_and_reserve(T::ALIGN, value.bytes());
             value.store_to(self);
             Unsized::new(ptr, value.size())
         }
@@ -642,8 +647,15 @@ impl<O: Size> OwnedBuf<O> {
     where
         T: ZeroCopy,
     {
-        let ptr = self.store_array(values);
-        Slice::new(ptr, values.len())
+        let offset = self.next_offset_with_and_reserve(align_of::<T>(), size_of_val(values));
+
+        // SAFETY: We've both allocated space for the array we're about to write
+        // and ensured that the buffer is padded.
+        unsafe {
+            self.store_array(values);
+        }
+
+        Slice::new(offset, values.len())
     }
 
     /// Extend the buffer from a slice.
@@ -664,8 +676,7 @@ impl<O: Size> OwnedBuf<O> {
     /// required a 4-byte alignment:
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::pointer::Ref;
+    /// use musli_zerocopy::{OwnedBuf, Ref};
     ///
     /// let mut buf = OwnedBuf::with_alignment::<u32>();
     ///
@@ -686,8 +697,7 @@ impl<O: Size> OwnedBuf<O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::pointer::Ref;
+    /// use musli_zerocopy::{OwnedBuf, Ref};
     ///
     /// let mut buf = OwnedBuf::with_alignment::<()>();
     ///
@@ -880,17 +890,21 @@ impl<O: Size> OwnedBuf<O> {
         T: ZeroCopy,
     {
         self.requested = self.requested.max(align_of::<T>());
-        self.ensure_aligned(align_of::<T>(), size_of::<T>());
+        self.ensure_aligned_and_reserve(align_of::<T>(), size_of::<T>());
     }
 
+    /// Store the given bits directly in the owned buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer has the capacity to store the
+    /// given value.
     #[inline]
-    fn store_bits<T>(&mut self, value: *const T)
+    unsafe fn store_bits<T>(&mut self, value: *const T)
     where
         T: ZeroCopy,
     {
         let len = self.len.wrapping_add(size_of::<T>());
-        self.ensure_capacity(len);
-
         let start = self.as_ptr_mut().wrapping_add(self.len);
 
         unsafe {
@@ -900,25 +914,26 @@ impl<O: Size> OwnedBuf<O> {
         self.len = len;
     }
 
+    /// Store the bits of a struct directly in the current buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer has remaining capacity of
+    /// `size_of::<T>()`.
     #[inline]
     unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
     where
         T: ZeroCopy,
     {
         let len = self.len.wrapping_add(size_of::<T>());
-        self.ensure_capacity(len);
-
         let start = self.as_ptr_mut().wrapping_add(self.len);
+
+        start.copy_from_nonoverlapping(value.cast(), size_of::<T>());
 
         // This is what makes calling `store_struct` unsafe, we're preemptively
         // pretending that the buffer has been initialized, while in reality
-        // that is the job of the caller.
+        // that is the job of the caller using the returned padder.
         self.len = len;
-
-        unsafe {
-            start.copy_from_nonoverlapping(value.cast(), size_of::<T>());
-        }
-
         Padder::new(start)
     }
 
@@ -935,8 +950,22 @@ impl<O: Size> OwnedBuf<O> {
         T::store_to(value, self);
     }
 
+    /// Ensure that the current buffer is aligned under the assumption that it
+    /// has already been allocated.
     #[inline]
-    fn ensure_aligned(&mut self, align: usize, reserve: usize) {
+    unsafe fn ensure_aligned(&mut self, align: usize) {
+        let extra = crate::buf::padding_to(self.len, align);
+
+        // SAFETY: The length is ensures to be within the address space.
+        unsafe {
+            self.data.as_ptr().add(self.len).write_bytes(0, extra);
+            self.len = self.len.wrapping_add(extra);
+        }
+    }
+
+    /// Ensure that the current buffer is aligned under the assumption that it needs to be allocated.
+    #[inline]
+    fn ensure_aligned_and_reserve(&mut self, align: usize, reserve: usize) {
         let extra = crate::buf::padding_to(self.len, align);
         self.reserve(extra.wrapping_add(reserve));
 
@@ -950,9 +979,17 @@ impl<O: Size> OwnedBuf<O> {
     /// Construct a pointer aligned for `align` into the current buffer which
     /// points to the next location that will be written.
     #[inline]
-    pub(crate) unsafe fn next_offset_with(&mut self, align: usize, reserve: usize) -> usize {
+    pub(crate) fn next_offset_with_and_reserve(&mut self, align: usize, reserve: usize) -> usize {
         self.requested = self.requested.max(align);
-        self.ensure_aligned(align, reserve);
+        self.ensure_aligned_and_reserve(align, reserve);
+        self.len
+    }
+
+    /// Construct a pointer aligned for `align` into the current buffer which
+    /// points to the next location that will be written.
+    #[inline]
+    pub(crate) unsafe fn next_offset_with(&mut self, align: usize) -> usize {
+        self.ensure_aligned(align);
         self.len
     }
 
@@ -964,8 +1001,7 @@ impl<O: Size> OwnedBuf<O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::pointer::Ref;
+    /// use musli_zerocopy::{OwnedBuf, Ref};
     ///
     /// let mut buf = OwnedBuf::new();
     ///
@@ -986,11 +1022,16 @@ impl<O: Size> OwnedBuf<O> {
     where
         T: ZeroCopy,
     {
-        // SAFETY: The alignment of `T` is guaranteed to be a power of two.
-        unsafe { self.next_offset_with(align_of::<T>(), 0) }
+        // SAFETY: The alignment of `T` is guaranteed to be a power of two. We
+        // also make sure to reserve space for `T` since it is very likely that
+        // it will be written immediately after this.
+        self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>())
     }
 
-    #[inline]
+    // We never want this call to be inlined, because we take great care to
+    // ensure that reallocations we perform publicly are performed in a sparse
+    // way.
+    #[inline(never)]
     fn ensure_capacity(&mut self, new_capacity: usize) {
         let new_capacity = new_capacity.max(self.requested);
 
@@ -1058,6 +1099,7 @@ impl<O: Size> OwnedBuf<O> {
     }
 
     /// Perform a new allocation, deallocating the old one in the process.
+    #[inline(always)]
     fn alloc_new(&mut self, old_layout: Layout, new_layout: Layout) {
         unsafe {
             let ptr = alloc::alloc(new_layout);
@@ -1076,14 +1118,13 @@ impl<O: Size> OwnedBuf<O> {
         }
     }
 
-    fn store_array<T>(&mut self, values: &[T]) -> usize
+    unsafe fn store_array<T>(&mut self, values: &[T])
     where
         T: ZeroCopy,
     {
         // SAFETY: We're interacting with all elements correctly.
         unsafe {
             let size = size_of_val(values);
-            let offset = self.next_offset_with(align_of::<T>(), size);
 
             if T::PADDED {
                 for value in values {
@@ -1097,8 +1138,6 @@ impl<O: Size> OwnedBuf<O> {
 
                 self.len = self.len.wrapping_add(size);
             }
-
-            offset
         }
     }
 }
@@ -1269,6 +1308,7 @@ impl<O: Size> BufMut for OwnedBuf<O> {
     where
         T: ZeroCopy,
     {
+        self.next_offset_with(align_of::<T>());
         self.store_array(values);
     }
 }

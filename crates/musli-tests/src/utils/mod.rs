@@ -236,8 +236,8 @@ pub mod musli_value {
 
 #[cfg(feature = "musli-zerocopy")]
 pub mod musli_zerocopy {
-    use musli_zerocopy::pointer::{DefaultSize, Ref};
-    use musli_zerocopy::{Buf, Error, OwnedBuf, ZeroCopy};
+    use musli_zerocopy::pointer::DefaultSize;
+    use musli_zerocopy::{Buf, Error, OwnedBuf, Ref, ZeroCopy};
 
     pub struct Benchmarker {
         buf: OwnedBuf,

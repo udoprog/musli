@@ -19,9 +19,9 @@ use crate::traits::ZeroCopy;
 /// [`OwnedBuf`]: crate::buf::OwnedBuf
 ///
 /// ```
-/// use musli_zerocopy::{OwnedBuf, ZeroCopy};
+/// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 /// use musli_zerocopy::mem::MaybeUninit;
-/// use musli_zerocopy::pointer::{Ref, Unsized};
+/// use musli_zerocopy::pointer::Unsized;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]

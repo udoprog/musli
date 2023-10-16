@@ -1,7 +1,7 @@
-use musli_zerocopy::buf::OwnedBuf;
 use musli_zerocopy::mem::MaybeUninit;
-use musli_zerocopy::pointer::{Ref, Unsized};
+use musli_zerocopy::pointer::Unsized;
 use musli_zerocopy::{Error, ZeroCopy};
+use musli_zerocopy::{OwnedBuf, Ref};
 
 fn main() -> Result<(), Error> {
     #[derive(ZeroCopy)]

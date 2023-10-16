@@ -21,7 +21,7 @@ fn invalid_mut<T>(addr: usize) -> *mut T {
     addr as *mut T
 }
 
-/// A raw swizz table.
+/// Construction of a raw swiss table.
 pub struct Constructor<'a, T, O: Size> {
     buf: &'a mut OwnedBuf<O>,
 

@@ -176,8 +176,7 @@ pub unsafe trait ZeroSized {}
 /// ```
 /// use std::num::Wrapping;
 ///
-/// use musli_zerocopy::{buf, ZeroCopy};
-/// use musli_zerocopy::pointer::Ref;
+/// use musli_zerocopy::{buf, Ref, ZeroCopy};
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]
@@ -503,8 +502,7 @@ macro_rules! impl_number {
         /// ```
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{buf, ZeroCopy};
-        /// use musli_zerocopy::pointer::Ref;
+        /// use musli_zerocopy::{buf, Ref, ZeroCopy};
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
@@ -704,8 +702,7 @@ macro_rules! impl_nonzero_number {
         #[doc = concat!("use std::num::", stringify!($ty), ";")]
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{buf, ZeroCopy};
-        /// use musli_zerocopy::pointer::Ref;
+        /// use musli_zerocopy::{buf, Ref, ZeroCopy};
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
@@ -773,8 +770,7 @@ macro_rules! impl_nonzero_number {
         #[doc = concat!("use std::num::", stringify!($ty), ";")]
         /// use std::slice;
         /// use std::mem::size_of;
-        /// use musli_zerocopy::{buf, ZeroCopy};
-        /// use musli_zerocopy::pointer::Ref;
+        /// use musli_zerocopy::{buf, Ref, ZeroCopy};
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]

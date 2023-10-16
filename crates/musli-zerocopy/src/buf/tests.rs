@@ -4,8 +4,8 @@ use core::array;
 
 use crate::error::Error;
 use crate::mem::MaybeUninit;
-use crate::pointer::{Ref, Unsized};
-use crate::ZeroCopy;
+use crate::pointer::Unsized;
+use crate::{Ref, ZeroCopy};
 
 use super::OwnedBuf;
 

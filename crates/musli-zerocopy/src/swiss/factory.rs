@@ -13,17 +13,17 @@ use crate::ZeroCopy;
 
 const FIXED_SEED: u64 = 1234567890;
 
-/// Store a map based on a perfect hash function into the [`OwnedBuf`].
-///
-/// This will utilize a perfect hash functions derived from the [`hashbrown`
-/// crate] to construct a persistent hash Map.
+/// Store a [SwissTable] map into an [`OwnedBuf`].
 ///
 /// This returns a [`MapRef`] which can be bound into a [`Map`] through the
 /// [`bind()`] method for convenience.
 ///
-/// [`hashbrown` crate]: https://crates.io/crates/hashbrown
-/// [`Map`]: crate::swiss::Map
+/// See the [module level documentation] for more information.
+///
 /// [`bind()`]: crate::buf::Buf::bind
+/// [`Map`]: crate::swiss::Map
+/// [SwissTable]: https://abseil.io/about/design/swisstables
+/// [module level documentation]: crate::swiss
 ///
 /// # Examples
 ///
@@ -87,17 +87,17 @@ where
     ))
 }
 
-/// Store a set based on a perfect hash function into the [`OwnedBuf`].
-///
-/// This will utilize a perfect hash functions derived from the [`hashbrown`
-/// crate] to construct a persistent hash Map.
+/// Store a [SwissTable] set into an [`OwnedBuf`].
 ///
 /// This returns a [`SetRef`] which can be bound into a [`Set`] through the
 /// [`bind()`] method for convenience.
 ///
-/// [`hashbrown` crate]: https://crates.io/crates/hashbrown
-/// [`Set`]: crate::swiss::Set
+/// See the [module level documentation] for more information.
+///
 /// [`bind()`]: crate::buf::Buf::bind
+/// [`Set`]: crate::swiss::Set
+/// [SwissTable]: https://abseil.io/about/design/swisstables
+/// [module level documentation]: crate::swiss
 ///
 /// # Examples
 ///
@@ -186,7 +186,7 @@ where
 
     debug_assert!(ctrl_align.is_power_of_two());
 
-    let ctrl_ptr = unsafe { buf.next_offset_with(ctrl_align, ctrl_len) };
+    let ctrl_ptr = buf.next_offset_with_and_reserve(ctrl_align, ctrl_len);
     // All ones indicates that the table is empty, since the ctrl byte for empty
     // buckets is 1111_1111.
     buf.fill(raw::EMPTY, ctrl_len + size_of::<raw::Group>());

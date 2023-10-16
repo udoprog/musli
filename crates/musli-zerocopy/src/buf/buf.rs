@@ -86,8 +86,8 @@ impl Buf {
     /// ```no_run
     /// use std::fs::read;
     ///
-    /// use musli_zerocopy::{Buf, ZeroCopy};
-    /// use musli_zerocopy::pointer::{Ref, Unsized};
+    /// use musli_zerocopy::{Buf, Ref, ZeroCopy};
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -122,8 +122,8 @@ impl Buf {
     /// ```no_run
     /// use std::fs::read;
     ///
-    /// use musli_zerocopy::{Buf, ZeroCopy};
-    /// use musli_zerocopy::pointer::{Ref, Unsized};
+    /// use musli_zerocopy::{Buf, Ref, ZeroCopy};
+    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -497,16 +497,16 @@ impl Buf {
         end: usize,
         align: usize,
     ) -> Result<&Buf, Error> {
-        let buf = Buf::new(self.inner_get_unaligned(start, end)?);
+        let buf = self.inner_get_unaligned(start, end)?;
 
-        if !buf.is_aligned_with_unchecked(align) {
+        if !crate::buf::is_aligned_with(buf.as_ptr(), align) {
             return Err(Error::new(ErrorKind::AlignmentMismatch {
                 range: start..end,
                 align,
             }));
         }
 
-        Ok(buf)
+        Ok(Buf::new(buf))
     }
 
     /// Get the given range mutably while checking its required alignment.
@@ -616,21 +616,22 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(size_of::<T>());
-        // SAFETY: align_of::<T>() is always a power of two.
-        let buf = unsafe { self.inner_get(start, end, align_of::<T>())? };
 
-        if !T::ANY_BITS {
-            // SAFETY: We've checked the size and alignment of the buffer above.
-            // The remaining safety requirements depend on the implementation of
-            // validate.
-            unsafe {
+        unsafe {
+            // SAFETY: align_of::<T>() is always a power of two.
+            let buf = self.inner_get(start, end, align_of::<T>())?;
+
+            if !T::ANY_BITS {
+                // SAFETY: We've checked the size and alignment of the buffer above.
+                // The remaining safety requirements depend on the implementation of
+                // validate.
                 T::validate(&mut Validator::new(buf.as_ptr()))?;
             }
-        }
 
-        // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
-        // type being coerced into can really inhabit any bit pattern.
-        Ok(unsafe { buf.cast() })
+            // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
+            // type being coerced into can really inhabit any bit pattern.
+            Ok(buf.cast())
+        }
     }
 
     /// Load the given sized value as a mutable reference.
@@ -641,21 +642,22 @@ impl Buf {
     {
         let start = ptr.offset();
         let end = start.wrapping_add(size_of::<T>());
-        // SAFETY: align_of::<T>() is always a power of two.
-        let buf = unsafe { self.inner_get_mut(start, end, align_of::<T>())? };
 
-        if !T::ANY_BITS {
-            // SAFETY: We've checked the size and alignment of the buffer above.
-            // The remaining safety requirements depend on the implementation of
-            // validate.
-            unsafe {
+        unsafe {
+            // SAFETY: align_of::<T>() is always a power of two.
+            let buf = self.inner_get_mut(start, end, align_of::<T>())?;
+
+            if !T::ANY_BITS {
+                // SAFETY: We've checked the size and alignment of the buffer above.
+                // The remaining safety requirements depend on the implementation of
+                // validate.
                 T::validate(&mut Validator::new(buf.as_ptr()))?;
             }
-        }
 
-        // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
-        // type being coerced into can really inhabit any bit pattern.
-        Ok(unsafe { buf.cast_mut() })
+            // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
+            // type being coerced into can really inhabit any bit pattern.
+            Ok(buf.cast_mut())
+        }
     }
 
     /// Load the given slice.
@@ -697,16 +699,19 @@ impl Buf {
     }
 
     /// Access the underlying slice as a pointer.
+    #[inline]
     pub(crate) fn as_ptr(&self) -> *const u8 {
         self.data.as_ptr()
     }
 
     /// Access the underlying slice as a mutable pointer.
+    #[inline]
     pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
         self.data.as_mut_ptr()
     }
 
     /// The numerical range of the buffer.
+    #[inline]
     pub(crate) fn range(&self) -> Range<usize> {
         let range = self.data.as_ptr_range();
         range.start as usize..range.end as usize

@@ -15,9 +15,9 @@
 //! [`Slice<u8>`]: crate::pointer::Slice
 //!
 //! ```
-//! use musli_zerocopy::{Error, ZeroCopy};
+//! use musli_zerocopy::{Error, Ref, ZeroCopy};
 //! use musli_zerocopy::buf::{OwnedBuf, Buf, Load, LoadMut, Visit};
-//! use musli_zerocopy::pointer::{Slice, Ref};
+//! use musli_zerocopy::pointer::Slice;
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C, packed)]
@@ -154,9 +154,9 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 /// ```no_run
 /// use std::fs::read;
 ///
-/// use musli_zerocopy::ZeroCopy;
+/// use musli_zerocopy::{Ref, ZeroCopy};
 /// use musli_zerocopy::buf;
-/// use musli_zerocopy::pointer::{Ref, Unsized};
+/// use musli_zerocopy::pointer::Unsized;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]
@@ -190,9 +190,9 @@ pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
 /// ```no_run
 /// use std::fs::read;
 ///
-/// use musli_zerocopy::ZeroCopy;
+/// use musli_zerocopy::{Ref, ZeroCopy};
 /// use musli_zerocopy::buf;
-/// use musli_zerocopy::pointer::{Ref, Unsized};
+/// use musli_zerocopy::pointer::Unsized;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]
@@ -244,6 +244,7 @@ where
 }
 
 /// Calculate padding with the assumption that alignment is a power of two.
+#[inline(always)]
 pub(crate) fn padding_to(len: usize, align: usize) -> usize {
     let mask = align - 1;
     (align - (len & mask)) & mask

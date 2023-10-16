@@ -2,10 +2,11 @@
 //! [<img alt="crates.io" src="https://img.shields.io/crates/v/musli-zerocopy.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/musli-zerocopy)
 //! [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-musli--zerocopy-66c2a5?style=for-the-badge&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/musli-zerocopy)
 //!
-//! Refreshingly simple zero copy primitives provided by Müsli.
+//! Refreshingly simple zero copy primitives by Müsli.
 //!
-//! This provides a base set of tools to deal with types which do not require
-//! copying during deserialization.
+//! This provides a basic set of tools to deal with types which do not require
+//! copying during deserialization. You define the `T`, and we provide the safe
+//! `&[u8]` to `&T` conversion.
 //!
 //! For a detailed overview of how this works, see the [`ZeroCopy`] derive.
 //! There's also a high level guide just below.
@@ -23,6 +24,20 @@
 //! <br>
 //!
 //! ## Guide
+//!
+//! Since this is the first question anyone will ask, here is how we differ from
+//! other popular libraries:
+//! * [`zerocopy`] doesn't support padded structs, nor bytes to reference
+//!   conversions (all though that's on the roadmap). We still want to provide
+//!   more of a complete toolkit that you'd need to build complex data
+//!   structures, such as the [`phf`] and [`swiss`] modules.
+//! * [`rkyv`] operates on Rust types and builds the `Archived` variant for you.
+//!   We operate on the `Archived` variant directly instead. It's also
+//!   explicitly not sound unless you build it with the `strict` feature and
+//!   with the feature enabled it doesn't pass Miri.
+//!
+//! [`zerocopy`]: https://docs.rs/zerocopy
+//! [`rkyv`]: https://docs.rs/rkyv
 //!
 //! Zero-copy in this library refers to the act of interacting with data
 //! structures that reside directly in `&[u8]` memory without the need to first
@@ -181,8 +196,7 @@
 //! # #[repr(C)]
 //! # struct Custom { field: u32, string: Unsized<str> }
 //! use core::mem::size_of;
-//! use musli_zerocopy::Buf;
-//! use musli_zerocopy::pointer::Ref;
+//! use musli_zerocopy::{Buf, Ref};
 //!
 //! // Helper to force the static buffer to be aligned like `A`.
 //! #[repr(C)]
@@ -218,8 +232,7 @@
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom { field: u32, string: Unsized<str> }
-//! use musli_zerocopy::OwnedBuf;
-//! use musli_zerocopy::pointer::Ref;
+//! use musli_zerocopy::{OwnedBuf, Ref};
 //! use musli_zerocopy::mem::MaybeUninit;
 //!
 //! let mut buf = OwnedBuf::new();
@@ -248,8 +261,7 @@
 //! Example of using an address larger than `2^32` causing a panic:
 //!
 //! ```should_panic
-//! # use musli_zerocopy::ZeroCopy;
-//! # use musli_zerocopy::pointer::Ref;
+//! # use musli_zerocopy::{ZeroCopy, Ref};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom;
@@ -285,8 +297,8 @@
 //! * `usize` for target-dependently sized pointers.
 //!
 //! ```
-//! # use musli_zerocopy::ZeroCopy;
-//! # use musli_zerocopy::pointer::{Ref, Slice, Unsized};
+//! # use musli_zerocopy::{Ref, ZeroCopy};
+//! # use musli_zerocopy::pointer::{Slice, Unsized};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom;
@@ -310,9 +322,9 @@
 //! then carry into any pointers it return:
 //!
 //! ```
-//! use musli_zerocopy::{ZeroCopy, OwnedBuf};
+//! use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 //! use musli_zerocopy::buf::DefaultAlignment;
-//! use musli_zerocopy::pointer::{Ref, Slice, Unsized};
+//! use musli_zerocopy::pointer::{Slice, Unsized};
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
@@ -379,6 +391,9 @@ pub mod mem;
 pub use self::error::Error;
 mod error;
 
+/// `Result` alias provided for convenience.
+pub type Result<T, E = Error> = core::result::Result<T, E>;
+
 #[doc(inline)]
 pub use self::traits::ZeroCopy;
 pub mod traits;
@@ -388,6 +403,8 @@ pub(crate) mod sip;
 pub mod phf;
 pub mod swiss;
 
+#[doc(inline)]
+pub use self::pointer::Ref;
 pub mod pointer;
 
 /// Derive macro to implement [`ZeroCopy`].

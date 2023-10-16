@@ -5,7 +5,7 @@ authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
 description = """
-Zero copy primitives for use in Müsli.
+Refreshingly simple zero copy primitives by Müsli.
 """
 documentation = "https://docs.rs/musli"
 readme = "README.md"

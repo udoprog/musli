@@ -59,6 +59,8 @@ where
     /// # Examples
     ///
     /// ```
+    /// use std::mem::size_of;
+    ///
     /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
     ///
@@ -69,6 +71,8 @@ where
     /// let padded = ZeroPadded(0x01u8.to_be(), 0x0203u16.to_be());
     ///
     /// let mut buf = OwnedBuf::new();
+    /// // Note: You're responsible for allocating space when using this API.
+    /// buf.reserve(size_of::<ZeroPadded>());
     ///
     /// // SAFETY: We do not pad beyond known fields and are
     /// // making sure to initialize all of the buffer.
@@ -112,6 +116,7 @@ where
     ///
     /// ```
     /// use std::ptr;
+    /// use std::mem::size_of;
     ///
     /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
@@ -123,6 +128,9 @@ where
     /// let padded = ZeroPadded(0x01u8.to_be(), 0x02030405u32.to_be());
     ///
     /// let mut buf = OwnedBuf::new();
+    /// // Note: You're responsible for ensuring that the buffer has enough
+    /// // capacity.
+    /// buf.reserve(size_of::<ZeroPadded>());
     ///
     /// // SAFETY: We do not pad beyond known fields and are
     /// // making sure to initialize all of the buffer.
@@ -197,9 +205,8 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
-    /// use musli_zerocopy::pointer::Ref;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]

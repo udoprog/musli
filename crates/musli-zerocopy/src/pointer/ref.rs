@@ -21,8 +21,7 @@ use crate::ZeroCopy;
 /// ```
 /// use std::mem::align_of;
 ///
-/// use musli_zerocopy::OwnedBuf;
-/// use musli_zerocopy::pointer::Ref;
+/// use musli_zerocopy::{Ref, OwnedBuf};
 ///
 /// let mut buf = OwnedBuf::with_alignment::<u32>();
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
@@ -60,7 +59,7 @@ impl<T, O: Size> Ref<T, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::pointer::Ref;
+    /// use musli_zerocopy::Ref;
     ///
     /// let reference = Ref::<u64>::new(42);
     /// assert_eq!(reference.offset(), 42);
@@ -120,7 +119,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::pointer::Ref;
+    /// use musli_zerocopy::Ref;
     ///
     /// let reference = Ref::<u64>::zero();
     /// assert_eq!(reference.offset(), 0);
@@ -137,7 +136,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::pointer::Ref;
+    /// use musli_zerocopy::Ref;
     ///
     /// let reference = Ref::<u64>::new(42);
     /// assert_eq!(reference.offset(), 42);

@@ -83,9 +83,8 @@ pub trait BufMut: self::sealed::Sealed {
     /// ```
     /// use std::mem::size_of;
     ///
-    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
+    /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
-    /// use musli_zerocopy::pointer::Ref;
     ///
     /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
     /// #[repr(C)]
@@ -106,6 +105,8 @@ pub trait BufMut: self::sealed::Sealed {
     /// };
     ///
     /// let reference = Ref::<ZeroPadded>::new(buf.next_offset::<ZeroPadded>());
+    /// // You're responsible for reserving more elements when using this API.
+    /// buf.reserve(size_of::<ZeroPadded>() * 10);
     ///
     /// for _ in 0..10 {
     ///     // SAFETY: We do not pad beyond known fields and are

@@ -1,0 +1,9 @@
+[package]
+name = "musli-asm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+musli-tests = { path = "../musli-tests", features = ["musli-zerocopy"] }
+musli-zerocopy = { path = "../musli-zerocopy" }
