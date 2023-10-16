@@ -23,21 +23,43 @@
 //!
 //! <br>
 //!
-//! ## Guide
+//! ## Why should I consider `musli-zerocopy` over X?
 //!
 //! Since this is the first question anyone will ask, here is how we differ from
 //! other popular libraries:
-//! * [`zerocopy`] doesn't support padded structs, nor bytes to reference
-//!   conversions (all though that's on the roadmap). We still want to provide
-//!   more of a complete toolkit that you'd need to build complex data
-//!   structures, such as the [`phf`] and [`swiss`] modules.
-//! * [`rkyv`] operates on Rust types and builds the `Archived` variant for you.
-//!   We operate on the `Archived` variant directly instead. It's also
-//!   explicitly not sound unless you build it with the `strict` feature and
-//!   with the feature enabled it doesn't pass Miri.
+//! * [`zerocopy`] doesn't support padded structs[^padded], bytes to reference
+//!   conversions, or conversions which do not permit all bit patterns to be
+//!   inhabited by zeroes[^zeroes]. We still want to provide more of a complete toolkit
+//!   that you'd need to build and interact with complex data structures, such
+//!   as the [`phf`] and [`swiss`] modules. This crate might indeed at some
+//!   point make use of `zerocopy`'s traits.
+//! * [`rkyv`] operates on `#[repr(Rust)]` types and from this derives an
+//!   optimized `Archived` variation for you. This library operates on the
+//!   equivalent of `Archived` variant directly instead that you should build
+//!   and interact with by hand. `rkyv` is also explicitly not sound unless you
+//!   build it with the `strict` feature, and even with the feature enabled it
+//!   doesn't pass Miri. Neither of these are strict blockers for users of the
+//!   library, but do constrain its safe applicability in ways this library does
+//!   not.
 //!
+//! [^padded]: This is on their roadmap.
+//! [^zeroes]: FromBytes extends FromZeroes.
 //! [`zerocopy`]: https://docs.rs/zerocopy
 //! [`rkyv`]: https://docs.rs/rkyv
+//!
+//! The `musli-tests` test suite has been extended to support some level of
+//! zerocopy types, all though since the feature sets vary so widely between the
+//! crates it's hard to compare all of them against each other, but the
+//! following showcases how they currently compare to `musli-zerocopy`.
+//!
+//! Encoding a packed variant of the `Primitives` model:
+//! 
+//! [^musli-zerocopy]: Generated with `cargo bench -p musli-tests --no-default-features --features no-rt,musli-zerocopy,zerocopy -- primpacked`
+//! [^musli-rkyv]: Generated with `cargo bench -p musli-tests --no-default-features --features no-rt,musli-zerocopy,rkyv -- primitives`
+//! 
+//! <br>
+//!
+//! # Guide
 //!
 //! Zero-copy in this library refers to the act of interacting with data
 //! structures that reside directly in `&[u8]` memory without the need to first

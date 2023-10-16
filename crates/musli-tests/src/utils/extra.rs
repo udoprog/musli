@@ -258,3 +258,49 @@ pub mod derive_bitcode {
         }
     }
 }
+
+#[cfg(feature = "zerocopy")]
+pub mod zerocopy {
+    use core::fmt;
+
+    use alloc::vec::Vec;
+
+    use anyhow::Result;
+    use zerocopy::{AsBytes, FromBytes};
+
+    #[derive(Debug)]
+    pub struct Error;
+
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "Error during decoding")
+        }
+    }
+
+    benchmarker! {
+        'buf
+
+        pub fn buffer() -> Vec<u8> {
+            Vec::with_capacity(4096)
+        }
+
+        pub fn reset<T>(&mut self, _: usize, _: &T) {
+            self.buffer.clear();
+        }
+
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
+        where
+            T: AsBytes,
+        {
+            self.buffer.extend_from_slice(value.as_bytes());
+            Ok(self.buffer.as_slice())
+        }
+
+        pub fn decode<T>(&self) -> Result<T, Error>
+        where
+            T: FromBytes,
+        {
+            T::read_from(&self.buffer[..]).ok_or(Error)
+        }
+    }
+}

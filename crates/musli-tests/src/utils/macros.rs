@@ -109,12 +109,12 @@ macro_rules! benchmarker {
 
             #[inline(always)]
             $(#[$($encode_meta)*])*
-            $encode_vis fn encode<T>(&mut $encode_self, $encode_value: &T) -> Result<EncodeState, $encode_error>
+            $encode_vis fn encode<T>(&mut $encode_self, $encode_value: &T) -> Result<EncodeState<'_>, $encode_error>
             $(where
                 T: $encode_bound,)*
             {
-                let value: Result<_, $encode_error> = $encode;
-                let buffer = value?;
+                let buffer: Result<_, $encode_error> = $encode;
+                let buffer = buffer?;
 
                 Ok(EncodeState {
                     buffer,

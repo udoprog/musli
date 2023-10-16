@@ -1,3 +1,4 @@
+use core::array;
 #[cfg(feature = "std")]
 use core::hash::Hash;
 use core::ops::Range;
@@ -31,6 +32,19 @@ pub trait Generate: Sized {
         R: rand::Rng,
     {
         Self::generate(rng)
+    }
+}
+
+impl<T, const N: usize> Generate for [T; N]
+where
+    T: Generate,
+{
+    #[inline]
+    fn generate<R>(rng: &mut R) -> Self
+    where
+        R: rand::Rng,
+    {
+        array::from_fn(|_| T::generate(rng))
     }
 }
 

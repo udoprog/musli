@@ -161,8 +161,8 @@ macro_rules! musli_zerocopy_call {
     ($call:path) => {
     };
 
-    ($call:path, prim, $ty:ty, $size_hint:expr $(, $tt:tt)*) => {
-        $call!(musli_value, musli_value_buf, prim, $ty, $size_hint);
+    ($call:path, primitives, $ty:ty, $size_hint:expr $(, $tt:tt)*) => {
+        $call!(musli_value, musli_value_buf, primitives, $ty, $size_hint);
         $crate::musli_zerocopy_call!($call $(, $tt)*);
     };
 
@@ -196,6 +196,8 @@ macro_rules! feature_matrix {
         $call!(musli_value, musli_value_buf $(, $($tt)*)*);
         #[cfg(feature = "musli-zerocopy")]
         $call!(musli_zerocopy, musli_zerocopy_buf $(, $($tt)*)*);
+        #[cfg(feature = "zerocopy")]
+        $call!(zerocopy, zerocopy_buf $(, $($tt)*)*);
         #[cfg(all(feature = "dlhn", not(any(model_128, model_all))))]
         $call!(serde_dlhn, serde_dlhn_buf $(, $($tt)*)*);
         #[cfg(feature = "serde_cbor")]
@@ -217,6 +219,12 @@ macro_rules! if_supported {
     (musli_zerocopy, lg, $block:block) => {};
     (musli_zerocopy, allocated, $block:block) => {};
     (musli_zerocopy, medium_enum, $block:block) => {};
+
+    (zerocopy, primitives, $block:block) => {};
+    (zerocopy, lg, $block:block) => {};
+    (zerocopy, allocated, $block:block) => {};
+    (zerocopy, medium_enum, $block:block) => {};
+
     ($framework:ident, $test:ident, $block:block) => {
         $block
     };
@@ -227,7 +235,8 @@ macro_rules! types {
     ($call:path $(, $($tt:tt)*)?) => {
         $call! {
             $($($tt)*,)?
-            prim, Primitives, PRIMITIVES, 1000,
+            primitives, Primitives, PRIMITIVES, 1000,
+            primpacked, PrimitivesPacked, PRIMITIVES_PACKED, 1000,
             lg, LargeStruct, LARGE_STRUCTS, 10000,
             allocated, Allocated, ALLOCATED, 5000,
             medium_enum, MediumEnum, MEDIUM_ENUMS, 1000

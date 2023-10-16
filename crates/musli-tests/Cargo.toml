@@ -32,6 +32,8 @@ musli-storage = ["musli", "dep:musli-storage"]
 musli-json = ["musli", "dep:musli-json"]
 musli-value = ["musli", "dep:musli-value"]
 musli-zerocopy = ["dep:musli-zerocopy"]
+# skips rt benchmarks
+no-rt = []
 
 model_full = ["model_vec", "model_128", "model_usize", "model_tuple", "model_float", "model_map", "model_map_string_key", "model_cstring"]
 model_minimal = ["model_vec", "model_float"]
@@ -78,6 +80,7 @@ dlhn = { version = "0.1.6", default-features = false, optional = true }
 bitcode = { version = "0.4.0", default-features = false, optional = true, features = ["derive"] }
 rkyv = { version = "0.7.42", default-features = false, optional = true, features = ["alloc", "size_32", "validation", "strict"] }
 postcard = { version = "1.0.8",  default-features = false, optional = true }
+zerocopy = { version = "0.7.11", default-features = false, optional = true, features = ["byteorder", "derive"] }
 
 [dev-dependencies]
 musli = { path = "../musli", version = "0.0.72", default-features = false, features = ["alloc"] }

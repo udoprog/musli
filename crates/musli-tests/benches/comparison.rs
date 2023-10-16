@@ -75,6 +75,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     }};
                 }
 
+                #[cfg(not(feature = "no-rt"))]
                 group!(concat!("rt/", stringify!($name)), $name, it);
             })*
         };

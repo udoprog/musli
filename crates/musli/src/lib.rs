@@ -364,14 +364,14 @@
 //! > taken with a big grain of 🧂.
 //!
 //! The two benchmark suites portrayed are:
-//! * `rt-prim` - which is a small object containing one of each primitive type
-//!   and a string and a byte array.
-//! * `rt-lg` - which is roundtrip encoding of a large object, containing
+//! * `rt/primitives` - which is a small object containing one of each primitive
+//!   type and a string and a byte array.
+//! * `rt/large` - which is roundtrip encoding of a large object, containing
 //!   vectors and maps of other objects.
 //!
 //! <img src="https://raw.githubusercontent.com/udoprog/musli/main/images/rt-lg.png" alt="Roundtrip of a large object">
 //!
-//! <img src="https://raw.githubusercontent.com/udoprog/musli/main/images/rt-prim.png" alt="Roundtrip of a small object">
+//! <img src="https://raw.githubusercontent.com/udoprog/musli/main/images/rt-primitives.png" alt="Roundtrip of a small object">
 //!
 //! <br>
 //!
@@ -384,7 +384,7 @@
 //! Each test suite serializes a collection of values, which have all been
 //! randomly populated.
 //!
-//! * A struct containing one of every primitive value (`prim`).
+//! * A struct containing one of every primitive value (`primitives`).
 //! * A really big struct (`lg`).
 //! * A structure containing fairly sizable, allocated fields (`allocated`).
 //! * A moderately sized enum with many field variations (`medium_enum`).
@@ -393,7 +393,7 @@
 //! > rarely *this* random. But hopefully it should give an idea of the extreme
 //! > ranges.
 //!
-//! | **framework** | **prim** | **lg** | **allocated** | **medium_enum** |
+//! | **framework** | **primitives** | **lg** | **allocated** | **medium_enum** |
 //! | - | - | - | - | - |
 //! | derive_bitcode[^i128] | <a title="samples: 500, min: 53, max: 55, stddev: 0.24931105069771997">54.94 ± 0.25</a> | <a title="samples: 10, min: 5821, max: 15067, stddev: 2786.3727675958935">9442.00 ± 2786.37</a> | <a title="samples: 100, min: 51, max: 1102, stddev: 312.9389237535018">552.50 ± 312.94</a> | <a title="samples: 500, min: 9, max: 1011, stddev: 223.4092284217462">104.28 ± 223.41</a> |
 //! | musli_descriptive | <a title="samples: 500, min: 91, max: 98, stddev: 1.3101144988129874">95.06 ± 1.31</a> | <a title="samples: 10, min: 7434, max: 19833, stddev: 3802.4608400350426">12995.40 ± 3802.46</a> | <a title="samples: 100, min: 90, max: 1239, stddev: 317.05311794713515">636.98 ± 317.05</a> | <a title="samples: 500, min: 7, max: 1010, stddev: 222.81380212186133">111.17 ± 222.81</a> |

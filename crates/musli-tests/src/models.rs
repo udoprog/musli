@@ -15,6 +15,9 @@ use alloc::vec::Vec;
 #[cfg(feature = "musli-zerocopy")]
 use musli_zerocopy::ZeroCopy;
 
+#[cfg(feature = "zerocopy")]
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
+
 #[cfg(feature = "musli")]
 use musli::{Decode, Encode};
 use musli_macros::Generate;
@@ -30,6 +33,54 @@ pub use rand::prelude::*;
 miri! {
     const PRIMITIVES_RANGE: Range<usize> = 10..100, 1..3;
     const MEDIUM_RANGE: Range<usize> = 10..100, 1..3;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Generate)]
+#[cfg_attr(feature = "musli", derive(Encode, Decode))]
+#[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
+#[cfg_attr(feature = "zerocopy", derive(AsBytes, FromBytes, FromZeroes))]
+#[cfg_attr(
+    feature = "rkyv",
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
+    archive(compare(PartialEq), check_bytes),
+    archive_attr(derive(Debug))
+)]
+#[cfg_attr(any(feature = "musli-zerocopy", feature = "zerocopy"), repr(C))]
+pub struct PrimitivesPacked {
+    unsigned8: u8,
+    _pad0: [u8; 1],
+    unsigned16: u16,
+    unsigned32: u32,
+    unsigned64: u64,
+    unsigned128: u128,
+    signed8: i8,
+    _pad1: [u8; 1],
+    signed16: i16,
+    signed32: i32,
+    signed64: i64,
+    signed128: i128,
+    #[cfg(feature = "model_usize")]
+    unsignedsize: usize,
+    #[cfg(feature = "model_usize")]
+    signedsize: isize,
+    float32: f32,
+    _pad3: [u8; 4],
+    float64: f64,
+}
+
+#[cfg(feature = "rkyv")]
+impl PartialEq<PrimitivesPacked> for &ArchivedPrimitivesPacked {
+    #[inline]
+    fn eq(&self, other: &PrimitivesPacked) -> bool {
+        *other == **self
+    }
+}
+
+impl PartialEq<PrimitivesPacked> for &PrimitivesPacked {
+    #[inline]
+    fn eq(&self, other: &PrimitivesPacked) -> bool {
+        *other == **self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Generate)]

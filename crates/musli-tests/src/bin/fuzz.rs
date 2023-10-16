@@ -18,6 +18,7 @@ musli_tests::miri! {
     const ITER: usize = 10000, 2;
     const LARGE_STRUCTS: usize = 10, 2;
     const PRIMITIVES: usize = 500, 2;
+    const PRIMITIVES_PACKED: usize = 500, 2;
     const MEDIUM_ENUMS: usize = 500, 2;
     const ALLOCATED: usize = 100, 2;
 }
