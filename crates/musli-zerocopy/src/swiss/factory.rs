@@ -186,7 +186,9 @@ where
 
     debug_assert!(ctrl_align.is_power_of_two());
 
-    let ctrl_ptr = buf.next_offset_with_and_reserve(ctrl_align, ctrl_len);
+    buf.next_offset_with_and_reserve(ctrl_align, ctrl_len);
+    let ctrl_ptr = buf.len();
+
     // All ones indicates that the table is empty, since the ctrl byte for empty
     // buckets is 1111_1111.
     buf.fill(raw::EMPTY, ctrl_len + size_of::<raw::Group>());

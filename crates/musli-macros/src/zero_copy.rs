@@ -467,10 +467,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             const PADDED: bool = #padded;
 
             #[inline]
-            unsafe fn store_to<__B: ?Sized>(this: *const Self, buf: &mut __B)
-            where
-                __B: #buf_mut
-            {
+            unsafe fn store_to(this: *const Self, buf: &mut #buf_mut<'_>) {
                 #store_to
             }
 

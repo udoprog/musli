@@ -115,9 +115,6 @@ mod padder;
 pub use self::buf_mut::BufMut;
 mod buf_mut;
 
-pub(crate) use self::raw_buf_mut::RawBufMut;
-mod raw_buf_mut;
-
 #[cfg(feature = "alloc")]
 pub use self::owned_buf::OwnedBuf;
 #[cfg(feature = "alloc")]

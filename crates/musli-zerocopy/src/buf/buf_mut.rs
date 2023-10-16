@@ -1,17 +1,8 @@
+use core::marker::PhantomData;
+use core::mem::{replace, size_of, size_of_val};
+
 use crate::buf::Padder;
 use crate::traits::ZeroCopy;
-
-mod sealed {
-    #[cfg(feature = "alloc")]
-    use crate::pointer::Size;
-
-    pub trait Sealed {}
-
-    #[cfg(feature = "alloc")]
-    impl<O: Size> Sealed for crate::buf::OwnedBuf<O> {}
-    impl<B: ?Sized> Sealed for &mut B where B: Sealed {}
-    impl Sealed for crate::buf::RawBufMut {}
-}
 
 /// A mutable buffer to store zero copy types to.
 ///
@@ -24,8 +15,23 @@ mod sealed {
 /// writing out-of-bound.
 ///
 /// [`OwnedBuf`]: crate::OwnedBuf
-pub trait BufMut: self::sealed::Sealed {
-    /// Extend the current buffer from the given slice.
+pub struct BufMut<'a> {
+    start: *mut u8,
+    _marker: PhantomData<&'a [u8]>,
+}
+
+impl<'a> BufMut<'a> {
+    pub(crate) fn new(start: *mut u8) -> Self {
+        Self {
+            start,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a> BufMut<'a> {
+    /// Store the raw bytes associated with `[T]` into the buffer and advance
+    /// its position by `size_of::<T>() * bytes.len()`.
     ///
     /// # Safety
     ///
@@ -34,11 +40,19 @@ pub trait BufMut: self::sealed::Sealed {
     /// `ZeroCopy::PADDED`.
     ///
     /// Also see the [type level safety documentation][#safety]
-    unsafe fn store_bytes<T>(&mut self, bytes: &[T])
+    pub unsafe fn store_bytes<T>(&mut self, bytes: &[T])
     where
-        T: ZeroCopy;
+        T: ZeroCopy,
+    {
+        self.start
+            .copy_from_nonoverlapping(bytes.as_ptr().cast(), size_of_val(bytes));
+        self.start = self.start.wrapping_add(size_of_val(bytes));
+    }
 
-    /// Store the exact bits of the given ZeroCopy type.
+    /// Store the raw bytes associated with `*const T` into the buffer and
+    /// advance its position by `size_of::<T>()`.
+    ///
+    /// This does not require `T` to be aligned.
     ///
     /// # Safety
     ///
@@ -46,21 +60,14 @@ pub trait BufMut: self::sealed::Sealed {
     /// size of `Self`.
     ///
     /// Also see the [type level safety documentation][#safety]
-    unsafe fn store_bits<T>(&mut self, value: *const T)
+    pub unsafe fn store_unaligned<T>(&mut self, value: *const T)
     where
-        T: ZeroCopy;
-
-    /// Write the given zero copy type to the buffer.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that any store call only includes data up-to the
-    /// size of `Self`.
-    ///
-    /// Also see the [type level safety documentation][#safety]
-    unsafe fn store<T>(&mut self, value: &T)
-    where
-        T: ZeroCopy;
+        T: ZeroCopy,
+    {
+        self.start
+            .copy_from_nonoverlapping(value.cast(), size_of::<T>());
+        self.start = self.start.wrapping_add(size_of::<T>());
+    }
 
     /// Store the given struct and return a [`Padder`] to initialize the
     /// any padding in the type written.
@@ -108,19 +115,23 @@ pub trait BufMut: self::sealed::Sealed {
     /// // You're responsible for reserving more elements when using this API.
     /// buf.reserve(size_of::<ZeroPadded>() * 10);
     ///
-    /// for _ in 0..10 {
-    ///     // SAFETY: We do not pad beyond known fields and are
-    ///     // making sure to initialize all of the buffer.
-    ///     unsafe {
-    ///         let mut w = buf.store_struct(&padded);
+    /// unsafe {
+    ///     let mut buf_mut = buf.as_buf_mut();
+    ///
+    ///     for _ in 0..10 {
+    ///         // SAFETY: We do not pad beyond known fields and are
+    ///         // making sure to initialize all of the buffer.
+    ///         let mut w = buf_mut.store_struct(&padded);
     ///         w.pad(&padded.a);
     ///         w.pad(&padded.b);
     ///         w.pad(&padded.c);
     ///         w.pad(&padded.d);
     ///         w.end();
-    ///     };
     ///
-    ///     padded.a += 1;
+    ///         padded.a += 1;
+    ///     }
+    ///
+    ///     buf.advance(size_of::<ZeroPadded>() * 10);
     /// }
     ///
     /// for (index, chunk) in buf.as_slice().chunks_exact(size_of::<ZeroPadded>()).enumerate() {
@@ -134,19 +145,16 @@ pub trait BufMut: self::sealed::Sealed {
     /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
+    pub unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
     where
-        T: ZeroCopy;
+        T: ZeroCopy,
+    {
+        let end = self.start.wrapping_add(size_of::<T>());
 
-    /// Store an array immediately in the buffer.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that any store call only includes data up-to the
-    /// size of `Self`.
-    ///
-    /// Also see the [type level safety documentation][#safety]
-    unsafe fn store_array<T>(&mut self, values: &[T])
-    where
-        T: ZeroCopy;
+        self.start
+            .copy_from_nonoverlapping(value.cast(), size_of::<T>());
+
+        let start = replace(&mut self.start, end);
+        Padder::new(start)
+    }
 }

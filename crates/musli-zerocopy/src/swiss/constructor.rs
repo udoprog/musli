@@ -9,7 +9,7 @@ use core::mem;
 use core::ptr::NonNull;
 
 use crate::buf::OwnedBuf;
-use crate::buf::{Buf, RawBufMut};
+use crate::buf::{Buf, BufMut};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::Size;
 use crate::swiss::raw::{h2, is_full, probe_seq, special_is_empty, Group, ProbeSeq};
@@ -527,7 +527,7 @@ impl<'a, T> Bucket<'a, T> {
     where
         T: ZeroCopy,
     {
-        T::store_to(&val, &mut RawBufMut::new(self.as_ptr().cast()));
+        T::store_to(&val, &mut BufMut::new(self.as_ptr().cast()));
     }
 
     /// Acquires the underlying raw pointer `*mut T` to `data`.

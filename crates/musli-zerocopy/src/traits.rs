@@ -86,9 +86,7 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// [`OwnedBuf::store_unsized`].
     ///
     /// [`OwnedBuf::store_unsized`]: crate::buf::OwnedBuf::store_unsized
-    unsafe fn store_to<B: ?Sized>(&self, buf: &mut B)
-    where
-        B: BufMut;
+    unsafe fn store_to(&self, buf: &mut BufMut<'_>);
 
     /// Validate and coerce the buffer as this type.
     ///
@@ -207,10 +205,7 @@ where
     const PADDED: bool = T::PADDED;
 
     #[inline]
-    unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>) {
         T::store_to(this.cast(), buf);
     }
 
@@ -349,9 +344,7 @@ pub unsafe trait ZeroCopy: Sized {
     /// well-defined layout, and that the struct is stored in the passed in
     /// `buf` correctly, which includes enumerating every field including hidden
     /// ones.
-    unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-    where
-        B: BufMut;
+    unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>);
 
     /// Mark padding for the current type.
     ///
@@ -389,10 +382,7 @@ unsafe impl UnsizedZeroCopy for str {
     }
 
     #[inline]
-    unsafe fn store_to<B: ?Sized>(&self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    unsafe fn store_to(&self, buf: &mut BufMut<'_>) {
         buf.store_bytes(self.as_bytes());
     }
 
@@ -454,10 +444,7 @@ macro_rules! impl_unsized_primitive {
             }
 
             #[inline]
-            unsafe fn store_to<B: ?Sized>(&self, buf: &mut B)
-            where
-                B: BufMut,
-            {
+            unsafe fn store_to(&self, buf: &mut BufMut<'_>) {
                 buf.store_bytes(self);
             }
 
@@ -530,11 +517,8 @@ macro_rules! impl_number {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-            where
-                B: BufMut,
-            {
-                buf.store_bits(this);
+            unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>) {
+                buf.store_unaligned(this);
             }
 
             #[inline]
@@ -580,11 +564,8 @@ macro_rules! impl_float {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-            where
-                B: BufMut,
-            {
-                buf.store_bits(this);
+            unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>) {
+                buf.store_unaligned(this);
             }
 
             #[inline]
@@ -618,11 +599,8 @@ unsafe impl ZeroCopy for char {
     const PADDED: bool = false;
 
     #[inline]
-    unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-    where
-        B: BufMut,
-    {
-        buf.store_bits(this.cast::<u32>());
+    unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>) {
+        buf.store_unaligned(this.cast::<u32>());
     }
 
     #[inline]
@@ -658,11 +636,8 @@ unsafe impl ZeroCopy for bool {
     const PADDED: bool = false;
 
     #[inline]
-    unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-    where
-        B: BufMut,
-    {
-        buf.store_bits(this.cast::<u8>());
+    unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>) {
+        buf.store_unaligned(this.cast::<u8>());
     }
 
     #[inline]
@@ -728,11 +703,8 @@ macro_rules! impl_nonzero_number {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-            where
-                B: BufMut,
-            {
-                buf.store_bits(this.cast::<$inner>());
+            unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>) {
+                buf.store_unaligned(this.cast::<$inner>());
             }
 
             #[inline]
@@ -795,11 +767,8 @@ macro_rules! impl_nonzero_number {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-            where
-                B: BufMut,
-            {
-                buf.store_bits(this.cast::<$inner>());
+            unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>) {
+                buf.store_unaligned(this.cast::<$inner>());
             }
 
             #[inline]
@@ -869,10 +838,7 @@ macro_rules! impl_zst {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_to<B: ?Sized>(_: *const Self, _: &mut B)
-            where
-                B: BufMut,
-            {
+            unsafe fn store_to(_: *const Self, _: &mut BufMut) {
             }
 
             #[inline]
@@ -936,10 +902,7 @@ where
     const PADDED: bool = T::PADDED;
 
     #[inline]
-    unsafe fn store_to<B: ?Sized>(this: *const Self, buf: &mut B)
-    where
-        B: BufMut,
-    {
+    unsafe fn store_to(this: *const Self, buf: &mut BufMut<'_>) {
         // SAFETY: The buffer where we store the struct has been allocated for
         // the `[T; N]`.
         unsafe {

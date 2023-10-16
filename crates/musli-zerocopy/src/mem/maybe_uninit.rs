@@ -2,7 +2,7 @@ use core::fmt;
 use core::mem::{size_of, ManuallyDrop};
 use core::slice;
 
-use crate::buf::RawBufMut;
+use crate::buf::BufMut;
 use crate::traits::ZeroCopy;
 
 /// A value which might or might not have been initialized.
@@ -97,7 +97,7 @@ impl<T> MaybeUninit<T> {
     {
         unsafe {
             let ptr = self as *mut Self as *mut u8;
-            T::store_to(value, &mut RawBufMut::new(ptr));
+            T::store_to(value, &mut BufMut::new(ptr));
             slice::from_raw_parts_mut(ptr, size_of::<T>())
         }
     }

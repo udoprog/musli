@@ -2,7 +2,8 @@
 
 use core::array;
 
-use crate::error::Error;
+use anyhow::Result;
+
 use crate::mem::MaybeUninit;
 use crate::pointer::Unsized;
 use crate::{Ref, ZeroCopy};
@@ -18,7 +19,7 @@ struct Inner {
 }
 
 #[test]
-fn allocate_array_needing_padding() -> Result<(), Error> {
+fn allocate_array_needing_padding() -> Result<()> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[zero_copy(crate)]
     #[repr(C)]
@@ -59,7 +60,7 @@ fn allocate_array_needing_padding() -> Result<(), Error> {
 }
 
 #[test]
-fn allocate_array_not_needing_padding() -> Result<(), Error> {
+fn allocate_array_not_needing_padding() -> Result<()> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[zero_copy(crate)]
     #[repr(C)]
@@ -91,7 +92,7 @@ fn allocate_array_not_needing_padding() -> Result<(), Error> {
 }
 
 #[test]
-fn test_unaligned_write() -> Result<(), Error> {
+fn test_unaligned_write() -> Result<()> {
     #[derive(ZeroCopy)]
     #[repr(C)]
     #[zero_copy(crate)]
@@ -105,6 +106,7 @@ fn test_unaligned_write() -> Result<(), Error> {
     let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
 
     let string = buf.store_unsized("Hello World!");
+    std::dbg!(string);
 
     buf.load_uninit_mut(reference).write(&Custom { string });
 
@@ -113,13 +115,14 @@ fn test_unaligned_write() -> Result<(), Error> {
 
     assert_eq!(reference.offset(), 4);
 
+    std::dbg!(string);
     let custom = buf.load(reference)?;
     assert_eq!(buf.load(custom.string)?, "Hello World!");
     Ok(())
 }
 
 #[test]
-fn inner_padding() -> Result<(), Error> {
+fn inner_padding() -> Result<()> {
     #[derive(Debug, PartialEq, Clone, Copy, ZeroCopy)]
     #[repr(C, align(8))]
     #[zero_copy(crate)]

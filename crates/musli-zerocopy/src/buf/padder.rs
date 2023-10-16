@@ -71,16 +71,22 @@ where
     /// let padded = ZeroPadded(0x01u8.to_be(), 0x0203u16.to_be());
     ///
     /// let mut buf = OwnedBuf::new();
-    /// // Note: You're responsible for allocating space when using this API.
+    ///
+    /// // Note: You're responsible for ensuring that the buffer has enough
+    /// // capacity.
     /// buf.reserve(size_of::<ZeroPadded>());
     ///
     /// // SAFETY: We do not pad beyond known fields and are
     /// // making sure to initialize all of the buffer.
     /// unsafe {
-    ///     let mut w = buf.store_struct(&padded);
+    ///     let mut buf_mut = buf.as_buf_mut();
+    ///
+    ///     let mut w = buf_mut.store_struct(&padded);
     ///     w.pad::<u8>(&padded.0);
     ///     w.pad::<u16>(&padded.1);
     ///     w.end();
+    ///
+    ///     buf.advance(size_of::<ZeroPadded>());
     /// }
     ///
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
@@ -128,6 +134,7 @@ where
     /// let padded = ZeroPadded(0x01u8.to_be(), 0x02030405u32.to_be());
     ///
     /// let mut buf = OwnedBuf::new();
+    ///
     /// // Note: You're responsible for ensuring that the buffer has enough
     /// // capacity.
     /// buf.reserve(size_of::<ZeroPadded>());
@@ -135,10 +142,14 @@ where
     /// // SAFETY: We do not pad beyond known fields and are
     /// // making sure to initialize all of the buffer.
     /// unsafe {
-    ///     let mut w = buf.store_struct(&padded);
+    ///     let mut buf_mut = buf.as_buf_mut();
+    ///
+    ///     let mut w = buf_mut.store_struct(&padded);
     ///     w.pad_with::<u8>(ptr::addr_of!(padded.0), 2);
     ///     w.pad_with::<u32>(ptr::addr_of!(padded.1), 2);
     ///     w.end();
+    ///
+    ///     buf.advance(size_of::<ZeroPadded>());
     /// }
     ///
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
@@ -205,6 +216,8 @@ where
     /// # Examples
     ///
     /// ```
+    /// use core::mem::size_of;
+    ///
     /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
     /// use musli_zerocopy::buf::BufMut;
     ///
@@ -216,15 +229,20 @@ where
     ///
     /// let mut buf = OwnedBuf::new();
     ///
+    /// // Note: Calling `next_offset` allocates space for `ZeroPadded`.
     /// let reference = Ref::<ZeroPadded>::new(buf.next_offset::<ZeroPadded>());
     ///
     /// // SAFETY: We do not pad beyond known fields and are
     /// // making sure to initialize all of the buffer.
     /// unsafe {
-    ///     let mut w = buf.store_struct(&padded);
+    ///     let mut buf_mut = buf.as_buf_mut();
+    ///
+    ///     let mut w = buf_mut.store_struct(&padded);
     ///     w.pad(&padded.0);
     ///     w.pad(&padded.1);
     ///     w.end();
+    ///
+    ///     buf.advance(size_of::<ZeroPadded>());
     /// }
     ///
     /// // Note: The bytes are explicitly convert to big-endian encoding above.
