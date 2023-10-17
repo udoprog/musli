@@ -1,12 +1,18 @@
 [package]
 name = "asm"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 publish = false
 description = """
 Helper project to disassemble serialization.
 """
 
+[features]
+musli-zerocopy = ["dep:musli-zerocopy", "tests/musli-zerocopy"]
+zerocopy = ["dep:zerocopy", "tests/zerocopy"]
+
 [dependencies]
-tests = { path = "../tests", features = ["musli-zerocopy"] }
-musli-zerocopy = { path = "../musli-zerocopy" }
+tests = { path = "../tests", default-features = false, features = ["std"] }
+
+musli-zerocopy = { path = "../musli-zerocopy", optional = true }
+zerocopy = { version = "0.7.11", default-features = false, optional = true, features = ["byteorder", "derive"] }
