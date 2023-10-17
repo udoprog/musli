@@ -1,4 +1,9 @@
-Summary of the different kinds of benchmarks we support:
+# Benchmarks and size comparisons
+
+> The following are the results of preliminary benchmarking and should be
+> taken with a big grain of 🧂.
+
+Summary of the different kinds of benchmarks we support.
 
 - `primitives` which is a small object containing one of each primitive type and a string and a byte array.
 - `primpacked` Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries.
@@ -6,6 +11,13 @@ Summary of the different kinds of benchmarks we support:
 - `large` A really big and complex struct.
 - `allocated` A sparse struct which contains fairly plain allocated data like strings and vectors.
 
+The following are one section for each kind of benchmark we perform. They range from "Full features" to more specialized ones like zerocopy comparisons.
+- [Full features](#full-features)
+- [Fewer features](#fewer-features)
+- [Müsli vs rkyv](#zerocopy-rkyv)
+- [Müsli vs zerocopy](#zerocopy-zerocopy)
+
+Below you'll also find [Size comparisons](#size-comparisons).
 # Full features
 
 These frameworks provide a fair comparison against Müsli on various areas since
@@ -118,6 +130,10 @@ Each test suite serializes a collection of values, which have all been randomly 
 - A really big and complex struct. (`large`)
 - A sparse struct which contains fairly plain allocated data like strings and vectors. (`allocated`)
 
+> **Note** so far these are all synthetic examples. Real world data is
+> rarely *this* random. But hopefully it should give an idea of the extreme
+> ranges.
+
 #### Full features
 
 | **framework** | **primitives** | **primpacked** | **large** | **allocated** | **medium_enum** |
@@ -137,6 +153,10 @@ Each test suite serializes a collection of values, which have all been randomly 
 
 | **framework** | **primitives** | **primpacked** | **large** | **allocated** | **medium_enum** |
 | - | - | - | - | - | - |
+| musli_descriptive | <a title="samples: 500, min: 112, max: 120, stddev: 1.4613363746926964">116.36 ± 1.46</a> | <a title="samples: 500, min: 118, max: 126, stddev: 1.457772273024832">122.33 ± 1.46</a> | <a title="samples: 10, min: 18722, max: 48953, stddev: 9227.696842116131">33813.30 ± 9227.70</a> | <a title="samples: 100, min: 212, max: 1386, stddev: 304.0109160869064">819.27 ± 304.01</a> | <a title="samples: 500, min: 4, max: 971, stddev: 201.7107731778349">107.23 ± 201.71</a> |
+| musli_storage | <a title="samples: 500, min: 78, max: 82, stddev: 0.7069257386741584">80.98 ± 0.71</a> | <a title="samples: 500, min: 81, max: 84, stddev: 0.7482539675805259">83.05 ± 0.75</a> | <a title="samples: 10, min: 13917, max: 31871, stddev: 5640.419473762568">23399.40 ± 5640.42</a> | <a title="samples: 100, min: 150, max: 1233, stddev: 303.9451363322006">726.71 ± 303.95</a> | <a title="samples: 500, min: 2, max: 968, stddev: 200.91538581203773">96.91 ± 200.92</a> |
+| musli_storage_packed | <a title="samples: 500, min: 63, max: 67, stddev: 0.7069257386741584">65.98 ± 0.71</a> | <a title="samples: 500, min: 81, max: 84, stddev: 0.7482539675805259">83.05 ± 0.75</a> | <a title="samples: 10, min: 12262, max: 28386, stddev: 5080.307342080791">21124.90 ± 5080.31</a> | <a title="samples: 100, min: 146, max: 1229, stddev: 303.9451363322006">722.71 ± 303.95</a> | <a title="samples: 500, min: 2, max: 968, stddev: 200.98414628024776">94.21 ± 200.98</a> |
+| musli_wire | <a title="samples: 500, min: 96, max: 106, stddev: 1.7524143345681649">101.86 ± 1.75</a> | <a title="samples: 500, min: 102, max: 111, stddev: 1.7655310815729104">106.83 ± 1.77</a> | <a title="samples: 10, min: 17389, max: 45220, stddev: 8531.35352039757">31368.90 ± 8531.35</a> | <a title="samples: 100, min: 200, max: 1353, stddev: 303.8713286902863">801.66 ± 303.87</a> | <a title="samples: 500, min: 3, max: 970, stddev: 201.2672628223478">103.05 ± 201.27</a> |
 | serde_bitcode[^i128] | <a title="samples: 500, min: 62, max: 63, stddev: 0.21794494717703713">62.95 ± 0.22</a> | <a title="samples: 500, min: 64, max: 64, stddev: 0">64.00 ± 0.00</a> | <a title="samples: 10, min: 11499, max: 25967, stddev: 4601.526903105099">19646.60 ± 4601.53</a> | <a title="samples: 100, min: 147, max: 1229, stddev: 303.8831676812652">723.02 ± 303.88</a> | <a title="samples: 500, min: 1, max: 968, stddev: 201.29608441298603">92.28 ± 201.30</a> |
 | serde_cbor[^i128] | <a title="samples: 500, min: 210, max: 213, stddev: 0.5346961754117986">212.69 ± 0.53</a> | <a title="samples: 500, min: 218, max: 222, stddev: 0.847610759724064">221.17 ± 0.85</a> | <a title="samples: 10, min: 24915, max: 51982, stddev: 8302.228534556249">38302.40 ± 8302.23</a> | <a title="samples: 100, min: 203, max: 1329, stddev: 303.70707663799993">799.46 ± 303.71</a> | <a title="samples: 500, min: 15, max: 983, stddev: 207.98828100640665">138.66 ± 207.99</a> |
 [^i128]: Lacks 128-bit support.
