@@ -257,30 +257,22 @@ fn main() -> Result<()> {
 
     let mut size_sets = Vec::new();
 
-    for report @ Report {
-        id,
-        description,
-        features,
-        expected,
-        title,
-        only,
-        ..
-    } in REPORTS
-    {
-        let run_bench = if let Some(report) = do_report.as_deref() {
-            run_bench && report == *id
+    for report in REPORTS {
+        let run_bench = if let Some(do_report) = do_report.as_deref() {
+            run_bench && do_report == report.id
         } else {
             run_bench
         };
 
-        println!("Building: {title}");
+        println!("Building: {}", report.title);
 
-        writeln!(o, "# {title}")?;
+        writeln!(o, "# {}", report.title)?;
 
         writeln!(o)?;
 
-        if !expected.is_empty() {
-            let features = expected
+        if !report.expected.is_empty() {
+            let features = report
+                .expected
                 .iter()
                 .map(|f| format!("`{f}`"))
                 .collect::<Vec<_>>()
@@ -289,7 +281,7 @@ fn main() -> Result<()> {
             writeln!(o)?;
         }
 
-        for line in description.iter().copied() {
+        for line in report.description.iter().copied() {
             writeln!(o, "{line}")?;
         }
 
@@ -297,14 +289,11 @@ fn main() -> Result<()> {
 
         let size_set = build_report(
             &mut o,
-            id,
             &root,
-            features,
-            expected,
             run_bench,
             filter.as_deref(),
             branch.as_deref().unwrap_or("main"),
-            only,
+            *report,
         )?;
 
         size_sets.push((*report, size_set));
@@ -325,14 +314,11 @@ fn main() -> Result<()> {
 
 fn build_report<W>(
     o: &mut W,
-    id: &str,
     root: &Path,
-    features: &[&str],
-    expected: &[&str],
     run_bench: bool,
     filter: Option<&str>,
     branch: &str,
-    only: &[&str],
+    report: Report,
 ) -> Result<Vec<SizeSet>>
 where
     W: ?Sized + Write,
@@ -340,23 +326,9 @@ where
     let output = root.join("images");
     let target_dir = root.join("target");
 
-    let mut targets_missing = Vec::new();
+    let bins = build_bench(&COMMON, report.features, report.expected)?;
 
-    // Check if any group outputs are missing. Only run benches if they are.
-    for Group { id: group, .. } in GROUPS {
-        for (kind, _) in KINDS {
-            let to = output.join(format!("{kind}_{group}_{id}.svg"));
-            targets_missing.push(to);
-        }
-    }
-
-    let bins = build_bench(&COMMON, &features, expected)?;
-
-    if !targets_missing.is_empty() || run_bench {
-        if !run_bench {
-            bail!("Have to run `--bench` since a target is missing");
-        }
-
+    if run_bench {
         run_path(&bins.comparison, None::<String>)?;
 
         let mut args = vec!["--bench"];
@@ -370,25 +342,26 @@ where
     }
 
     for Group { id: group, .. } in GROUPS {
-        if !only.is_empty() && !only.contains(group) {
+        if !report.only.is_empty() && !report.only.contains(group) {
             continue;
         }
 
         let mut plots = Vec::new();
 
         for (kind, _) in KINDS {
-            let name = format!("{kind}_{group}_{id}.svg");
+            let name = format!("{kind}_{group}_{}.svg", report.id);
 
-            let report = target_dir
+            let criterion_dir = target_dir
                 .join("criterion")
                 .join(format!("{kind}_{group}"))
                 .join("report");
 
-            let from = report.join("violin.svg");
+            let from = criterion_dir.join("violin.svg");
             let to = output.join(&name);
 
-            if !to.is_file() {
-                copy_svg(&from, &to).with_context(|| anyhow!("{id}: {}", from.display()))?;
+            if run_bench {
+                copy_svg(&from, &to)
+                    .with_context(|| anyhow!("{}: {}", report.id, from.display()))?;
             }
 
             plots.push(name);
