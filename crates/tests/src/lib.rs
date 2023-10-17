@@ -27,6 +27,9 @@ mod mode;
 pub mod models;
 pub mod utils;
 
+pub use self::aligned_buf::AlignedBuf;
+mod aligned_buf;
+
 #[cfg(feature = "musli-wire")]
 pub mod wire {
     pub use musli_wire::*;

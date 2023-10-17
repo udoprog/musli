@@ -6,6 +6,7 @@ use std::fs;
 #[allow(unused)]
 use std::hint::black_box;
 use std::io::Write;
+use std::mem::align_of;
 use std::path::PathBuf;
 #[allow(unused)]
 use std::time::Instant;
@@ -16,6 +17,9 @@ use tests::models;
 use tests::models::*;
 #[allow(unused)]
 use tests::utils;
+use tests::AlignedBuf;
+
+const ALIGNMENT: usize = align_of::<u128>();
 
 struct SizeSet {
     framework: &'static str,
@@ -59,6 +63,8 @@ fn main() -> Result<()> {
     let mut size = false;
     let mut filter = Vec::new();
     let mut seed = tests::RNG_SEED;
+    let mut alignment = ALIGNMENT;
+    let mut verbose = false;
 
     while let Some(arg) = it.next() {
         match arg.as_str() {
@@ -76,11 +82,21 @@ fn main() -> Result<()> {
                     .parse()
                     .context("bad argument to --seed")?;
             }
+            "--align" => {
+                alignment = it
+                    .next()
+                    .context("missing argument for `--align`")?
+                    .parse()
+                    .context("bad argument to --align")?;
+            }
             "--random" => {
                 random = true;
             }
             "--size" => {
                 size = true;
+            }
+            "--verbose" => {
+                verbose = true;
             }
             "-h" | "--help" => {
                 println!("Available options:");
@@ -92,6 +108,10 @@ fn main() -> Result<()> {
                 println!(
                     " --seed <seed>  - Use the specified random seed (default: {}).",
                     tests::RNG_SEED
+                );
+                println!(
+                    " --align <align>  - Use the specified random seed (default: {}).",
+                    ALIGNMENT
                 );
                 println!();
                 println!(
@@ -123,8 +143,6 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut rng = tests::rng_with_seed(seed);
-
     #[allow(unused)]
     let condition = move |name: &str| {
         if filter.is_empty() {
@@ -137,17 +155,23 @@ fn main() -> Result<()> {
     let stdout = std::io::stdout();
     let mut o = stdout.lock();
 
-    let mut random_bytes: Vec<Vec<u8>> = Vec::new();
-    random_bytes.push(Vec::new());
+    let mut random_bytes: Vec<AlignedBuf> = Vec::new();
+
+    random_bytes.push(AlignedBuf::new(alignment));
 
     if random {
+        let mut rng = tests::rng_with_seed(seed);
+
         for _ in 0..iter {
-            random_bytes.push(Generate::generate_range(&mut rng, 0..256));
+            let mut alignable = AlignedBuf::new(alignment);
+            let bytes: Vec<u8> = Generate::generate_range(&mut rng, 0..256);
+            alignable.extend_from_slice(&bytes);
+            random_bytes.push(alignable);
         }
     }
 
     #[allow(unused)]
-    macro_rules! fuzz {
+    macro_rules! random {
         // musli value is not a bytes-oriented encoding.
         (musli_value $($tt:tt)*) => {
         };
@@ -165,21 +189,38 @@ fn main() -> Result<()> {
                         let start = Instant::now();
 
                         let step = random_bytes.len() / 10;
+                        let mut errors = Vec::new();
 
                         for (n, bytes) in random_bytes.iter().enumerate() {
-                            if step == 0 || n % step == 0 {
-                                write!(o, ".")?;
+                            if (step == 0 || n % step == 0) {
+                                if !errors.is_empty() {
+                                    write!(o, "E")?;
+                                } else {
+                                    write!(o, ".")?;
+                                }
+
+                                if verbose {
+                                    for error in errors.drain(..) {
+                                        writeln!(o)?;
+                                        writeln!(o, "{}", error)?;
+                                        // errors are expected, so don't log them as failures.
+                                        black_box(error);
+                                    }
+                                } else {
+                                    // errors are expected, so don't log them as failures.
+                                    black_box(errors.drain(..).collect::<Vec<_>>());
+                                }
+
                                 o.flush()?;
                             }
 
-                            match utils::$framework::decode::<$ty>(&bytes) {
+                            match utils::$framework::decode::<$ty>(bytes.as_slice()) {
                                 Ok(value) => {
-                                    // values *can* occur.
+                                    // values *can* randomly occur.
                                     black_box(value);
                                 }
                                 Err(error) => {
-                                    // errors are expected, so don't log them.
-                                    black_box(error);
+                                    errors.push(error);
                                 }
                             }
                         }
@@ -323,7 +364,7 @@ fn main() -> Result<()> {
     #[allow(unused)]
     macro_rules! test {
         ($base:ident, $buf:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {{
-            fuzz!($base $(, $name, $ty, $size_hint)*);
+            random!($base $(, $name, $ty, $size_hint)*);
             size!($base $(, $name, $ty, $size_hint)*);
             run!($base $(, $name, $ty, $size_hint)*);
         }};
@@ -331,6 +372,8 @@ fn main() -> Result<()> {
 
     macro_rules! build {
         ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),* $(,)?) => {
+            let mut rng = tests::rng_with_seed(seed);
+
             $(
                 let $name = generate::<$ty>(&mut rng, $num);
             )*
