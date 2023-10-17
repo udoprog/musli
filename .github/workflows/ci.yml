@@ -47,8 +47,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo run --release --bin fuzz
-    - run: cargo run --release --bin fuzz -- --random --iter 10000
+    - run: cargo run --release -p tests --bin fuzz
+    - run: cargo run --release -p tests --bin fuzz -- --random
 
   miri:
     needs: test
@@ -59,8 +59,8 @@ jobs:
       with:
         components: miri
     - run: cargo miri test --workspace --exclude no-std-examples --exclude musli-common --features test
-    - run: cargo miri run --bin fuzz
-    - run: cargo miri run --bin fuzz -- --random
+    - run: cargo miri run -p tests --bin fuzz
+    - run: cargo miri run -p tests --bin fuzz -- --random
 
   each_package:
     needs: [rustfmt, clippy]
