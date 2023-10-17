@@ -1,6 +1,9 @@
+use std::env;
+use std::fs;
 #[allow(unused)]
 use std::hint::black_box;
 use std::io::Write;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
@@ -36,6 +39,11 @@ where
 }
 
 fn main() -> Result<()> {
+    let root =
+        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").context("missing `CARGO_MANIFEST_DIR`")?)
+            .join("..")
+            .join("..");
+
     let mut rng = musli_tests::rng();
 
     let mut it = std::env::args().skip(1);
@@ -223,6 +231,13 @@ fn main() -> Result<()> {
                                             write!(o, "E")?;
                                             writeln!(o)?;
                                             writeln!(o, "{index}: error during decode: {error}")?;
+
+                                            if let Some(bytes) = out.as_bytes() {
+                                                let path = root.join("target").join(format!("{}_error.bin", stringify!($framework)));
+                                                fs::write(&path, bytes).with_context(|| path.display().to_string())?;
+                                                writeln!(o, "{index}: failing structure written to {}", path.display())?;
+                                            }
+
                                             return Ok(true);
                                         }
                                     };

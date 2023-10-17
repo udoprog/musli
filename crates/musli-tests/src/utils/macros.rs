@@ -1,14 +1,14 @@
 #[macro_export]
 macro_rules! check_length {
-    ({@nolen $($tail:tt)*}, $item:item) => {
+    ({@nolen $($tail:tt)*}, $($item:item)*) => {
     };
 
-    ({$head:tt $($tail:tt)*}, $item:item) => {
-        check_length!({$($tail)*}, $item);
+    ({$head:tt $($tail:tt)*}, $($item:item)*) => {
+        check_length!({$($tail)*}, $($item)*);
     };
 
-    ({}, $item:item) => {
-        $item
+    ({}, $($item:item)*) => {
+        $($item)*
     };
 }
 
@@ -136,6 +136,10 @@ macro_rules! benchmarker {
                 #[allow(clippy::len_without_is_empty)]
                 pub fn len(&self) -> usize {
                     self.buffer.len()
+                }
+
+                pub fn as_bytes(&self) -> Option<$encode_return> {
+                    Some(&self.buffer)
                 }
             }
 

@@ -328,6 +328,29 @@ where
     }
 
     #[inline]
+    fn decode_array<C, const N: usize>(self, cx: &mut C) -> Result<[u8; N], C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let mut seq = self.decode_sequence(cx)?;
+        let mut bytes = [0; N];
+        let mut index = 0;
+
+        while let Some(item) = SequenceDecoder::next(&mut seq, cx)? {
+            if index == N {
+                return Err(cx.message(format_args!(
+                    "Overflowed array at {index} elements, expected {N}"
+                )));
+            }
+
+            bytes[index] = item.decode_u8(cx)?;
+            index += 1;
+        }
+
+        Ok(bytes)
+    }
+
+    #[inline]
     fn decode_number<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,

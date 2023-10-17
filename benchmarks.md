@@ -1,4 +1,9 @@
-Summary of the different kinds of benchmarks we support:
+# Benchmarks and size comparisons
+
+> The following are the results of preliminary benchmarking and should be
+> taken with a big grain of 🧂.
+
+Summary of the different kinds of benchmarks we support.
 
 - `primitives` which is a small object containing one of each primitive type and a string and a byte array.
 - `primpacked` Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries.
@@ -6,6 +11,13 @@ Summary of the different kinds of benchmarks we support:
 - `large` A really big and complex struct.
 - `allocated` A sparse struct which contains fairly plain allocated data like strings and vectors.
 
+The following are one section for each kind of benchmark we perform. They range from "Full features" to more specialized ones like zerocopy comparisons.
+- [Full features](#full-features)
+- [Fewer features](#fewer-features)
+- [Müsli vs rkyv](#zerocopy-rkyv)
+- [Müsli vs zerocopy](#zerocopy-zerocopy)
+
+Below you'll also find [Size comparisons](#size-comparisons).
 # Full features
 
 These frameworks provide a fair comparison against Müsli on various areas since
@@ -13,33 +25,33 @@ they support the same set of features in what types of data they can represent.
 
 `primitives`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_primitives_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_primitives_full.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_primitives_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_primitives_full.svg">
 
 `primpacked`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_primpacked_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_primpacked_full.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_primpacked_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_primpacked_full.svg">
 
 `medium_enum`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_medium_enum_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_medium_enum_full.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_medium_enum_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_medium_enum_full.svg">
 
 `large`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_large_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_large_full.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_large_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_large_full.svg">
 
 `allocated`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_allocated_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_allocated_full.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_allocated_full.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_allocated_full.svg">
 
 # Fewer features
 
@@ -50,33 +62,33 @@ Usually because the underlying framework lacks support for them.
 
 `primitives`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_primitives_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_primitives_fewer.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_primitives_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_primitives_fewer.svg">
 
 `primpacked`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_primpacked_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_primpacked_fewer.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_primpacked_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_primpacked_fewer.svg">
 
 `medium_enum`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_medium_enum_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_medium_enum_fewer.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_medium_enum_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_medium_enum_fewer.svg">
 
 `large`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_large_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_large_fewer.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_large_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_large_fewer.svg">
 
 `allocated`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_allocated_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_allocated_fewer.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_allocated_fewer.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_allocated_fewer.svg">
 
 # Müsli vs rkyv
 
@@ -86,15 +98,15 @@ Note that `musli-zerocopy` only supports the `primitives` benchmark.
 
 `primitives`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_primitives_zerocopy-rkyv.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_primitives_zerocopy-rkyv.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_primitives_zerocopy-rkyv.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_primitives_zerocopy-rkyv.svg">
 
 `primpacked`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_primpacked_zerocopy-rkyv.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_primpacked_zerocopy-rkyv.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_primpacked_zerocopy-rkyv.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_primpacked_zerocopy-rkyv.svg">
 
 # Müsli vs zerocopy
 
@@ -104,9 +116,9 @@ Note that `zerocopy` only supports packed primitives, so we're only comparing wi
 
 `primpacked`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/dec_primpacked_zerocopy-zerocopy.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/dec_primpacked_zerocopy-zerocopy.svg">
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/benchmarks/images/enc_primpacked_zerocopy-zerocopy.svg">
+<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/main/images/enc_primpacked_zerocopy-zerocopy.svg">
 
 # Size comparisons
 
@@ -118,11 +130,16 @@ Each test suite serializes a collection of values, which have all been randomly 
 - A really big and complex struct. (`large`)
 - A sparse struct which contains fairly plain allocated data like strings and vectors. (`allocated`)
 
+> **Note** so far these are all synthetic examples. Real world data is
+> rarely *this* random. But hopefully it should give an idea of the extreme
+> ranges.
+
 #### Full features
 
 | **framework** | **primitives** | **primpacked** | **large** | **allocated** | **medium_enum** |
 | - | - | - | - | - | - |
 | musli_descriptive | <a title="samples: 500, min: 154, max: 164, stddev: 1.5621574824581534">159.89 ± 1.56</a> | <a title="samples: 500, min: 161, max: 170, stddev: 1.5612764008976794">165.80 ± 1.56</a> | <a title="samples: 10, min: 51160, max: 181513, stddev: 34252.25277978078">111443.90 ± 34252.25</a> | <a title="samples: 100, min: 144, max: 1294, stddev: 319.5851216812197">771.50 ± 319.59</a> | <a title="samples: 500, min: 4, max: 985, stddev: 205.01225144854146">112.77 ± 205.01</a> |
+| musli_json[^incomplete] | <a title="samples: 500, min: 308, max: 322, stddev: 2.370359466410104">315.41 ± 2.37</a> | <a title="samples: 500, min: 326, max: 343, stddev: 2.9921657708088594">335.29 ± 2.99</a> | <a title="samples: 10, min: 80410, max: 252118, stddev: 44122.575890466775">158613.70 ± 44122.58</a> | <a title="samples: 100, min: 221, max: 2022, stddev: 418.91296232033676">1148.30 ± 418.91</a> | <a title="samples: 500, min: 8, max: 987, stddev: 224.3716737915016">148.00 ± 224.37</a> |
 | musli_storage | <a title="samples: 500, min: 113, max: 116, stddev: 0.698558515802362">115.00 ± 0.70</a> | <a title="samples: 500, min: 116, max: 118, stddev: 0.7276785004382086">117.02 ± 0.73</a> | <a title="samples: 10, min: 42028, max: 158673, stddev: 31799.56734752849">96272.10 ± 31799.57</a> | <a title="samples: 100, min: 108, max: 1217, stddev: 312.23862333157956">687.39 ± 312.24</a> | <a title="samples: 500, min: 2, max: 982, stddev: 202.60038890387142">101.20 ± 202.60</a> |
 | musli_storage_packed | <a title="samples: 500, min: 96, max: 99, stddev: 0.698558515802362">98.00 ± 0.70</a> | <a title="samples: 500, min: 116, max: 118, stddev: 0.7276785004382086">117.02 ± 0.73</a> | <a title="samples: 10, min: 39765, max: 154012, stddev: 31392.538540869868">93107.60 ± 31392.54</a> | <a title="samples: 100, min: 104, max: 1213, stddev: 312.23862333157956">683.39 ± 312.24</a> | <a title="samples: 500, min: 2, max: 982, stddev: 202.2586117227151">98.27 ± 202.26</a> |
 | musli_wire | <a title="samples: 500, min: 137, max: 147, stddev: 1.7739210805444463">143.30 ± 1.77</a> | <a title="samples: 500, min: 143, max: 153, stddev: 1.8691292090168572">148.43 ± 1.87</a> | <a title="samples: 10, min: 48744, max: 176337, stddev: 33677.705130249">107970.40 ± 33677.71</a> | <a title="samples: 100, min: 133, max: 1273, stddev: 317.37806020580564">755.13 ± 317.38</a> | <a title="samples: 500, min: 3, max: 984, stddev: 203.93184057424665">108.38 ± 203.93</a> |
@@ -137,9 +154,15 @@ Each test suite serializes a collection of values, which have all been randomly 
 
 | **framework** | **primitives** | **primpacked** | **large** | **allocated** | **medium_enum** |
 | - | - | - | - | - | - |
+| musli_descriptive | <a title="samples: 500, min: 112, max: 120, stddev: 1.4613363746926964">116.36 ± 1.46</a> | <a title="samples: 500, min: 118, max: 126, stddev: 1.457772273024832">122.33 ± 1.46</a> | <a title="samples: 10, min: 18722, max: 48953, stddev: 9227.696842116131">33813.30 ± 9227.70</a> | <a title="samples: 100, min: 212, max: 1386, stddev: 304.0109160869064">819.27 ± 304.01</a> | <a title="samples: 500, min: 4, max: 971, stddev: 201.7107731778349">107.23 ± 201.71</a> |
+| musli_json[^incomplete] | <a title="samples: 500, min: 219, max: 232, stddev: 2.3275944663966017">225.95 ± 2.33</a> | <a title="samples: 500, min: 236, max: 253, stddev: 2.6396446730573486">245.67 ± 2.64</a> | <a title="samples: 10, min: 33138, max: 100818, stddev: 20683.993997533453">65473.10 ± 20683.99</a> | <a title="samples: 100, min: 303, max: 2026, stddev: 409.5710492698427">1256.66 ± 409.57</a> | <a title="samples: 500, min: 8, max: 973, stddev: 210.50014608070944">135.85 ± 210.50</a> |
+| musli_storage | <a title="samples: 500, min: 78, max: 82, stddev: 0.7069257386741584">80.98 ± 0.71</a> | <a title="samples: 500, min: 81, max: 84, stddev: 0.7482539675805259">83.05 ± 0.75</a> | <a title="samples: 10, min: 13917, max: 31871, stddev: 5640.419473762568">23399.40 ± 5640.42</a> | <a title="samples: 100, min: 150, max: 1233, stddev: 303.9451363322006">726.71 ± 303.95</a> | <a title="samples: 500, min: 2, max: 968, stddev: 200.91538581203773">96.91 ± 200.92</a> |
+| musli_storage_packed | <a title="samples: 500, min: 63, max: 67, stddev: 0.7069257386741584">65.98 ± 0.71</a> | <a title="samples: 500, min: 81, max: 84, stddev: 0.7482539675805259">83.05 ± 0.75</a> | <a title="samples: 10, min: 12262, max: 28386, stddev: 5080.307342080791">21124.90 ± 5080.31</a> | <a title="samples: 100, min: 146, max: 1229, stddev: 303.9451363322006">722.71 ± 303.95</a> | <a title="samples: 500, min: 2, max: 968, stddev: 200.98414628024776">94.21 ± 200.98</a> |
+| musli_wire | <a title="samples: 500, min: 96, max: 106, stddev: 1.7524143345681649">101.86 ± 1.75</a> | <a title="samples: 500, min: 102, max: 111, stddev: 1.7655310815729104">106.83 ± 1.77</a> | <a title="samples: 10, min: 17389, max: 45220, stddev: 8531.35352039757">31368.90 ± 8531.35</a> | <a title="samples: 100, min: 200, max: 1353, stddev: 303.8713286902863">801.66 ± 303.87</a> | <a title="samples: 500, min: 3, max: 970, stddev: 201.2672628223478">103.05 ± 201.27</a> |
 | serde_bitcode[^i128] | <a title="samples: 500, min: 62, max: 63, stddev: 0.21794494717703713">62.95 ± 0.22</a> | <a title="samples: 500, min: 64, max: 64, stddev: 0">64.00 ± 0.00</a> | <a title="samples: 10, min: 11499, max: 25967, stddev: 4601.526903105099">19646.60 ± 4601.53</a> | <a title="samples: 100, min: 147, max: 1229, stddev: 303.8831676812652">723.02 ± 303.88</a> | <a title="samples: 500, min: 1, max: 968, stddev: 201.29608441298603">92.28 ± 201.30</a> |
 | serde_cbor[^i128] | <a title="samples: 500, min: 210, max: 213, stddev: 0.5346961754117986">212.69 ± 0.53</a> | <a title="samples: 500, min: 218, max: 222, stddev: 0.847610759724064">221.17 ± 0.85</a> | <a title="samples: 10, min: 24915, max: 51982, stddev: 8302.228534556249">38302.40 ± 8302.23</a> | <a title="samples: 100, min: 203, max: 1329, stddev: 303.70707663799993">799.46 ± 303.71</a> | <a title="samples: 500, min: 15, max: 983, stddev: 207.98828100640665">138.66 ± 207.99</a> |
 [^i128]: Lacks 128-bit support.
+[^incomplete]: These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result.
 
 
 #### Müsli vs rkyv

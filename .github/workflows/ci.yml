@@ -21,7 +21,7 @@ jobs:
         toolchain: ${{matrix.rust}}
     - run: cargo build
       if: matrix.rust != 'stable'
-    - run: cargo test --all-targets
+    - run: cargo test --all-targets --features test
       if: matrix.rust == 'stable'
     - run: cargo test --doc
       if: matrix.rust == 'stable'

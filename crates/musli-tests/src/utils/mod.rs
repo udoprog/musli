@@ -234,6 +234,12 @@ pub mod musli_value {
             musli_value::decode(&self.buffer)
         }
     }
+
+    impl EncodeState<'_> {
+        pub fn as_bytes(&self) -> Option<&[u8]> {
+            None
+        }
+    }
 }
 
 #[cfg(feature = "musli-zerocopy")]
@@ -275,6 +281,10 @@ pub mod musli_zerocopy {
         #[inline(always)]
         pub fn len(&self) -> usize {
             self.buf.len()
+        }
+
+        pub fn as_bytes(&self) -> Option<&'buf [u8]> {
+            Some(&self.buf[..])
         }
 
         #[inline(always)]

@@ -118,6 +118,10 @@ pub mod rkyv {
             self.bytes.len()
         }
 
+        pub fn as_bytes(&self) -> Option<&'de [u8]> {
+            Some(self.bytes)
+        }
+
         #[inline(always)]
         pub fn decode<T>(
             &self,

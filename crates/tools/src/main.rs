@@ -11,12 +11,13 @@ use serde::{Deserialize, Serialize};
 
 const REPO: &'static str = "https://raw.githubusercontent.com/udoprog/musli";
 
-const COMMON: &'static [&'static str] = &["no-rt"];
+const COMMON: &'static [&'static str] = &["no-rt", "std"];
 
 const REPORTS: &'static [Report] = &[
     Report {
         id: "full",
         title: "Full features",
+        link: "full-features",
         description: &[
             "These frameworks provide a fair comparison against Müsli on various areas since",
             "they support the same set of features in what types of data they can represent.",
@@ -25,12 +26,12 @@ const REPORTS: &'static [Report] = &[
             "musli-wire",
             "musli-descriptive",
             "musli-storage",
+            "musli-json",
             "musli-value",
             "bincode",
             "rmp-serde",
             "postcard",
             "serde_json",
-            // "musli-json", # fixme: arrays being incorrectly decoded
         ],
         expected: &[],
         only: &[],
@@ -38,11 +39,17 @@ const REPORTS: &'static [Report] = &[
     Report {
         id: "fewer",
         title: "Fewer features",
+        link: "fewer-features",
         description: &[
             "This is a suite where support for 128-bit integers and maps are disabled.",
             "Usually because the underlying framework lacks support for them.",
         ],
         features: &[
+            "musli-wire",
+            "musli-descriptive",
+            "musli-storage",
+            "musli-json",
+            "musli-value",
             "serde_cbor",
             "bitcode",
             // "dlhn", # broken
@@ -53,6 +60,7 @@ const REPORTS: &'static [Report] = &[
     },
     Report {
         id: "zerocopy-rkyv",
+        link: "zerocopy-rkyv",
         description: &[
             "Comparison between [`musli-zerocopy`] and [`rkyv`].",
             "",
@@ -65,6 +73,7 @@ const REPORTS: &'static [Report] = &[
     },
     Report {
         id: "zerocopy-zerocopy",
+        link: "zerocopy-zerocopy",
         description: &[
             "Compares [`musli-zerocopy`] with [`zerocopy`].",
             "",
@@ -135,6 +144,7 @@ struct Report {
     id: &'static str,
     description: &'static [&'static str],
     title: &'static str,
+    link: &'static str,
     features: &'static [&'static str],
     expected: &'static [&'static str],
     only: &'static [&'static str],
@@ -207,9 +217,19 @@ fn main() -> Result<()> {
 
     let mut o = String::new();
 
+    writeln!(o, "# Benchmarks and size comparisons")?;
+    writeln!(o)?;
+
     writeln!(
         o,
-        "Summary of the different kinds of benchmarks we support:"
+        "> The following are the results of preliminary benchmarking and should be"
+    )?;
+    writeln!(o, "> taken with a big grain of 🧂.")?;
+    writeln!(o)?;
+
+    writeln!(
+        o,
+        "Summary of the different kinds of benchmarks we support."
     )?;
     writeln!(o)?;
 
@@ -222,6 +242,19 @@ fn main() -> Result<()> {
 
     writeln!(o)?;
 
+    writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
+
+    for Report { title, link, .. } in REPORTS {
+        writeln!(o, "- [{title}](#{link})")?;
+    }
+
+    writeln!(o)?;
+
+    writeln!(
+        o,
+        "Below you'll also find [Size comparisons](#size-comparisons)."
+    )?;
+
     let mut size_sets = Vec::new();
 
     for report @ Report {
@@ -231,6 +264,7 @@ fn main() -> Result<()> {
         expected,
         title,
         only,
+        ..
     } in REPORTS
     {
         let run_bench = if let Some(report) = do_report.as_deref() {
@@ -306,19 +340,23 @@ where
     let output = root.join("images");
     let target_dir = root.join("target");
 
-    let mut target_missing = false;
+    let mut targets_missing = Vec::new();
 
     // Check if any group outputs are missing. Only run benches if they are.
     for Group { id: group, .. } in GROUPS {
         for (kind, _) in KINDS {
             let to = output.join(format!("{kind}_{group}_{id}.svg"));
-            target_missing |= !to.is_file();
+            targets_missing.push(to);
         }
     }
 
     let bins = build_bench(&COMMON, &features, expected)?;
 
-    if target_missing && run_bench {
+    if !targets_missing.is_empty() || run_bench {
+        if !run_bench {
+            bail!("Have to run `--bench` since a target is missing");
+        }
+
         run_path(&bins.comparison, None::<String>)?;
 
         let mut args = vec!["--bench"];
@@ -396,6 +434,18 @@ where
     {
         writeln!(o, "- {description} (`{id}`)")?;
     }
+
+    writeln!(o)?;
+
+    writeln!(
+        o,
+        "> **Note** so far these are all synthetic examples. Real world data is"
+    )?;
+    writeln!(
+        o,
+        "> rarely *this* random. But hopefully it should give an idea of the extreme"
+    )?;
+    writeln!(o, "> ranges.")?;
 
     writeln!(o)?;
 
@@ -577,7 +627,7 @@ fn build_bench(common: &[&str], features: &[&str], expected_features: &[&str]) -
         .collect::<Vec<_>>()
         .join(",");
 
-    child.args(["--features", &features]);
+    child.args(["--no-default-features", "--features", &features]);
 
     print_command(&child);
 
