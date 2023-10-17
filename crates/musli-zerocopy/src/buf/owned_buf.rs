@@ -8,7 +8,7 @@ use core::slice;
 
 use alloc::alloc;
 
-use crate::buf::{Buf, BufMut, DefaultAlignment};
+use crate::buf::{Buf, BufMut, DefaultAlignment, Padder};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Ref, Size, Slice, Unsized};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -597,10 +597,14 @@ impl<O: Size> OwnedBuf<O> {
         unsafe {
             self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
             let offset = self.len;
-            T::store_unaligned(
-                value,
-                &mut BufMut::new(self.data.as_ptr().wrapping_add(offset)),
-            );
+
+            let mut buf_mut = BufMut::new(self.data.as_ptr().wrapping_add(offset));
+            let mut padder = buf_mut.store_struct(value);
+
+            if T::PADDED {
+                T::pad(value, &mut padder);
+            }
+
             self.len += size_of::<T>();
             Ref::new(offset)
         }
@@ -1072,18 +1076,15 @@ impl<O: Size> OwnedBuf<O> {
         // SAFETY: We're interacting with all elements correctly.
         unsafe {
             let size = size_of_val(values);
+            let ptr = self.data.as_ptr().add(self.len);
+            ptr.copy_from_nonoverlapping(values.as_ptr().cast::<u8>(), size);
 
             if T::PADDED {
-                let mut buf = BufMut::new(self.data.as_ptr().wrapping_add(self.len));
+                let mut padder = Padder::new(ptr);
 
                 for value in values {
-                    T::store_unaligned(value, &mut buf);
+                    T::pad(value, &mut padder);
                 }
-            } else {
-                self.data
-                    .as_ptr()
-                    .add(self.len)
-                    .copy_from_nonoverlapping(values.as_ptr().cast::<u8>(), size);
             }
 
             self.len += size;

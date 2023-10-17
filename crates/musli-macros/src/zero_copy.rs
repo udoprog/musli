@@ -159,7 +159,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                                 // fields on the struct.
                                 let mut padder = #buf_mut::store_struct(buf, this);
                                 #(#padder::pad_with::<#types>(&mut padder, #ptr::addr_of!((*this).#members), #align);)*
-                                #padder::end(padder);
+                                #padder::remaining(padder);
                             };
 
                             validate = quote! {
@@ -175,7 +175,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                                 // fields on the struct.
                                 let mut padder = #buf_mut::store_struct(buf, this);
                                 #(#padder::pad::<#types>(&mut padder, #ptr::addr_of!((*this).#members));)*
-                                #padder::end(padder);
+                                #padder::remaining(padder);
                             };
 
                             pad = quote! {
@@ -386,7 +386,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     #(#store_to_variants,)*
                 }
 
-                #padder::end(padder);
+                #padder::remaining(padder);
             };
 
             pad = quote! {

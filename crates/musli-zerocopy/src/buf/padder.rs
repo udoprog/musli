@@ -43,12 +43,12 @@ where
     /// Pad around the given field with zeros.
     ///
     /// Note that this is necessary to do correctly in order to satisfy the
-    /// safety requirements by [`end()`].
+    /// safety requirements by [`remaining()`].
     ///
     /// This is typically not called directly, but rather is implemented by the
     /// [`ZeroCopy`] derive.
     ///
-    /// [`end()`]: Self::end
+    /// [`remaining()`]: Self::remaining
     /// [`ZeroCopy`]: derive@crate::ZeroCopy
     ///
     /// # Safety
@@ -84,7 +84,7 @@ where
     ///     let mut w = buf_mut.store_struct(&padded);
     ///     w.pad::<u8>(&padded.0);
     ///     w.pad::<u16>(&padded.1);
-    ///     w.end();
+    ///     w.remaining();
     ///
     ///     buf.advance(size_of::<ZeroPadded>());
     /// }
@@ -104,12 +104,12 @@ where
     /// Pad around the given field with zeros using a custom alignment `align`.
     ///
     /// Note that this is necessary to do correctly in order to satisfy the
-    /// safety requirements by [`end()`].
+    /// safety requirements by [`remaining()`].
     ///
     /// This is typically not called directly, but rather is implemented by the
     /// [`ZeroCopy`] derive.
     ///
-    /// [`end()`]: Self::end
+    /// [`remaining()`]: Self::remaining
     /// [`ZeroCopy`]: derive@crate::ZeroCopy
     ///
     /// # Safety
@@ -147,7 +147,7 @@ where
     ///     let mut w = buf_mut.store_struct(&padded);
     ///     w.pad_with::<u8>(ptr::addr_of!(padded.0), 2);
     ///     w.pad_with::<u32>(ptr::addr_of!(padded.1), 2);
-    ///     w.end();
+    ///     w.remaining();
     ///
     ///     buf.advance(size_of::<ZeroPadded>());
     /// }
@@ -169,7 +169,7 @@ where
         if F::PADDED {
             let mut padder = Padder::new(self.ptr.wrapping_add(self.offset));
             F::pad(field, &mut padder);
-            padder.end();
+            padder.remaining();
         }
 
         self.offset = self.offset.wrapping_add(size_of::<F>());
@@ -202,7 +202,7 @@ where
     ///
     /// # Safety
     ///
-    /// Before calling `end()`, the caller must ensure that they've called
+    /// Before calling `remaining()`, the caller must ensure that they've called
     /// [`pad::<F>()`] *in order* for every field in a struct being serialized
     /// where `F` is the type of the field. Otherwise we might not have written
     /// the necessary padding to ensure that all bytes related to the struct are
@@ -240,7 +240,7 @@ where
     ///     let mut w = buf_mut.store_struct(&padded);
     ///     w.pad(&padded.0);
     ///     w.pad(&padded.1);
-    ///     w.end();
+    ///     w.remaining();
     ///
     ///     buf.advance(size_of::<ZeroPadded>());
     /// }
@@ -254,7 +254,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn end(self) {
+    pub unsafe fn remaining(self) {
         let count = size_of::<T>() - self.offset;
         ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
     }

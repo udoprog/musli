@@ -126,7 +126,7 @@ impl<'a> BufMut<'a> {
     ///         w.pad(&padded.b);
     ///         w.pad(&padded.c);
     ///         w.pad(&padded.d);
-    ///         w.end();
+    ///         w.remaining();
     ///
     ///         padded.a += 1;
     ///     }
