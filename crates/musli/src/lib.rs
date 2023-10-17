@@ -21,7 +21,7 @@
 //!
 //! * For information on how to implement [`Encode`] and [`Decode`], see
 //!   [`derives`].
-//! * For information on how this library is tested, see [`musli-tests`].
+//! * For information on how this library is tested, see [`tests`].
 //! * For [performance] and [size comparisons].
 //!
 //! <br>
@@ -354,7 +354,7 @@
 //!
 //! To ensure this library is correctly implemented with regards to memory
 //! safety, extensive testing is performed using `miri`. For more information on
-//! this, see [`musli-tests`] for more information on this.
+//! this, see [`tests`] for more information on this.
 //!
 //! <br>
 //!
@@ -371,8 +371,8 @@
 //! [`musli-descriptive`]: https://docs.rs/musli-descriptive
 //! [`musli-json`]: https://docs.rs/musli-json
 //! [`musli-storage`]: https://docs.rs/musli-storage
-//! [`musli-tests`]:
-//!     https://github.com/udoprog/musli/tree/main/crates/musli-tests
+//! [`tests`]:
+//!     https://github.com/udoprog/musli/tree/main/crates/tests
 //! [`musli-value`]: https://docs.rs/musli-value
 //! [`musli-wire`]: https://docs.rs/musli-wire
 //! [`protobuf`]: https://developers.google.com/protocol-buffers

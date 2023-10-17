@@ -1,0 +1,12 @@
+[package]
+name = "asm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = """
+Helper project to disassemble serialization.
+"""
+
+[dependencies]
+tests = { path = "../tests", features = ["musli-zerocopy"] }
+musli-zerocopy = { path = "../musli-zerocopy" }

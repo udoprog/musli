@@ -21,6 +21,7 @@ pub struct BufMut<'a> {
 }
 
 impl<'a> BufMut<'a> {
+    #[inline]
     pub(crate) fn new(start: *mut u8) -> Self {
         Self {
             start,
@@ -40,6 +41,7 @@ impl<'a> BufMut<'a> {
     /// `ZeroCopy::PADDED`.
     ///
     /// Also see the [type level safety documentation][#safety]
+    #[inline]
     pub unsafe fn store_bytes<T>(&mut self, bytes: &[T])
     where
         T: ZeroCopy,
@@ -60,6 +62,7 @@ impl<'a> BufMut<'a> {
     /// size of `Self`.
     ///
     /// Also see the [type level safety documentation][#safety]
+    #[inline]
     pub unsafe fn store_unaligned<T>(&mut self, value: *const T)
     where
         T: ZeroCopy,
@@ -145,6 +148,7 @@ impl<'a> BufMut<'a> {
     /// assert_eq!(buf.load(reference)?, &padded);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    #[inline]
     pub unsafe fn store_struct<T>(&mut self, value: *const T) -> Padder<'_, T>
     where
         T: ZeroCopy,
@@ -154,6 +158,25 @@ impl<'a> BufMut<'a> {
         self.start
             .copy_from_nonoverlapping(value.cast(), size_of::<T>());
 
+        let start = replace(&mut self.start, end);
+        Padder::new(start)
+    }
+
+    /// Perform an aligned store of the value `T`.
+    ///
+    /// # Safety
+    ///
+    /// This is produces more efficient code than [`store_struct()`], but
+    /// required the current buffer to be aligned.
+    ///
+    /// [`store_struct()`]: Self::store_struct
+    #[inline]
+    pub unsafe fn store_struct_aligned<T>(&mut self, value: &T) -> Padder<'_, T>
+    where
+        T: ZeroCopy,
+    {
+        let end = self.start.wrapping_add(size_of::<T>());
+        self.start.cast::<T>().copy_from(value, 1);
         let start = replace(&mut self.start, end);
         Padder::new(start)
     }

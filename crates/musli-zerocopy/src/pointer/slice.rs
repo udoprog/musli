@@ -95,6 +95,7 @@ where
     /// let slice = Slice::<u32>::new(0, 2);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    #[inline]
     pub fn new(offset: usize, len: usize) -> Self {
         let Some(offset) = O::from_usize(offset) else {
             panic!(
@@ -115,6 +116,7 @@ where
     }
 
     /// Coerce an offset and a length directly into a slice.
+    #[inline]
     pub(crate) fn new_with_offset(offset: O, len: usize) -> Self {
         let Some(len) = O::from_usize(len) else {
             panic!("Slice length {len} not in the legal range of 0-{}", O::MAX);
@@ -170,6 +172,7 @@ where
     /// let slice = Slice::<u32>::new(0, 2);
     /// assert!(!slice.is_empty());
     /// ```
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len.is_zero()
     }
@@ -195,7 +198,7 @@ where
     /// assert!(slice.get(4).is_none());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    ///
+    #[inline]
     pub fn get(&self, index: usize) -> Option<Ref<T, O>> {
         if index >= self.len() {
             return None;
@@ -213,6 +216,7 @@ impl<T, O: Size> fmt::Debug for Slice<T, O>
 where
     O: fmt::Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -228,6 +232,7 @@ impl<T, O: Size> Clone for Slice<T, O>
 where
     T: ZeroCopy,
 {
+    #[inline]
     fn clone(&self) -> Self {
         *self
     }
@@ -251,6 +256,7 @@ impl<T, O: Size> PartialOrd for Slice<T, O>
 where
     O: PartialOrd,
 {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match self.offset.partial_cmp(&other.offset) {
             Some(Ordering::Equal) => {}

@@ -46,15 +46,15 @@
 //! [^padded]: This is on their roadmap.
 //! [^zeroes]: FromBytes extends FromZeroes.
 //!
-//! The `musli-tests` test suite has been extended to support some level of
+//! The `tests` test suite has been extended to support some level of
 //! zerocopy types, all though since the feature sets vary so widely between the
 //! crates it's hard to compare all of them against each other, but the
 //! following showcases how they currently compare to `musli-zerocopy`.
 //!
 //! Encoding a packed variant of the `Primitives` model:
 //!
-//! [^musli-zerocopy]: Generated with `cargo bench -p musli-tests --no-default-features --features no-rt,musli-zerocopy,zerocopy -- primpacked`
-//! [^musli-rkyv]: Generated with `cargo bench -p musli-tests --no-default-features --features no-rt,musli-zerocopy,rkyv -- primitives`
+//! [^musli-zerocopy]: Generated with `cargo bench -p tests --no-default-features --features no-rt,musli-zerocopy,zerocopy -- primpacked`
+//! [^musli-rkyv]: Generated with `cargo bench -p tests --no-default-features --features no-rt,musli-zerocopy,rkyv -- primitives`
 //!
 //! <br>
 //!

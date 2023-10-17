@@ -205,7 +205,7 @@ where
             let mut hasher = SipHasher13::new_with_keys(0, key);
             let v = hash(table.buf(), v, &mut hasher)?;
             let hash = hasher.finish();
-            table.insert(hash, v)?;
+            table.insert(hash, &v)?;
         }
 
         (table.buckets(), table.bucket_mask())

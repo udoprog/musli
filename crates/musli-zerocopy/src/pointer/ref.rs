@@ -43,6 +43,7 @@ pub struct Ref<T, O: Size = DefaultSize> {
 
 impl<T, O: Size> Ref<T, O> {
     // Construct a reference that does not require `T` to be `ZeroCopy`.
+    #[inline]
     pub(crate) fn new_raw(offset: usize) -> Self {
         let Some(offset) = O::from_usize(offset) else {
             panic!("Ref offset {offset} not in the legal range of 0-{}", O::MAX);
@@ -91,6 +92,7 @@ where
     /// assert_eq!(buf.load(slice)?, &[1, 2, 3, 4]);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    #[inline]
     pub fn into_slice(self) -> Slice<T, O> {
         Slice::new_with_offset(self.offset, N)
     }
@@ -124,6 +126,7 @@ where
     /// let reference = Ref::<u64>::zero();
     /// assert_eq!(reference.offset(), 0);
     /// ```
+    #[inline]
     pub const fn zero() -> Self {
         Self {
             offset: O::ZERO,
@@ -141,6 +144,7 @@ where
     /// let reference = Ref::<u64>::new(42);
     /// assert_eq!(reference.offset(), 42);
     /// ```
+    #[inline]
     pub fn new(offset: usize) -> Self {
         Self::new_raw(offset)
     }
@@ -150,6 +154,7 @@ impl<T, O: Size> fmt::Debug for Ref<T, O>
 where
     O: fmt::Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

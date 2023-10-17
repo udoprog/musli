@@ -480,7 +480,7 @@ where
             };
         }
 
-        musli_tests::types!(build_column);
+        tests::types!(build_column);
 
         let mut index = HashMap::<_, SizeSet>::new();
 
@@ -617,7 +617,7 @@ struct Build {
 
 fn build_bench(common: &[&str], features: &[&str], expected_features: &[&str]) -> Result<Build> {
     let mut child = Command::new("cargo");
-    child.args(["build", "-p", "musli-tests", "--release", "--benches"]);
+    child.args(["build", "-p", "tests", "--release", "--benches"]);
     child.stdout(Stdio::piped());
 
     let features = common

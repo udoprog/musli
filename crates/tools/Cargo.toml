@@ -8,4 +8,4 @@ publish = false
 anyhow = "1.0.75"
 serde = { version = "1.0.189", features = ["derive"] }
 serde_json = "1.0.107"
-musli-tests = { path = "../musli-tests" }
+tests = { path = "../tests" }

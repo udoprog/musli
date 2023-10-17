@@ -93,7 +93,7 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     }
 
     /// Insert the given zero copy value into the table.
-    pub(crate) fn insert(&mut self, hash: u64, value: T) -> Result<Bucket<'_, T>, Error>
+    pub(crate) fn insert(&mut self, hash: u64, value: &T) -> Result<Bucket<'_, T>, Error>
     where
         T: ZeroCopy,
     {
@@ -127,7 +127,7 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     /// `find_or_find_insert_slot`, and no mutation of the table must have
     /// occurred since that call.
     #[inline]
-    pub unsafe fn insert_in_slot(&mut self, hash: u64, slot: InsertSlot, value: T) -> Bucket<T>
+    pub unsafe fn insert_in_slot(&mut self, hash: u64, slot: InsertSlot, value: &T) -> Bucket<T>
     where
         T: ZeroCopy,
     {
@@ -523,11 +523,11 @@ impl<'a, T> Bucket<'a, T> {
     /// Overwrites a memory location with the given `value` without reading or
     /// dropping the old value (like [`ptr::write`] function).
     #[inline]
-    pub(crate) unsafe fn write(&self, val: T)
+    pub(crate) unsafe fn write(&self, val: &T)
     where
         T: ZeroCopy,
     {
-        T::store_unaligned(&val, &mut BufMut::new(self.as_ptr().cast()));
+        T::store_unaligned(val, &mut BufMut::new(self.as_ptr().cast()));
     }
 
     /// Acquires the underlying raw pointer `*mut T` to `data`.

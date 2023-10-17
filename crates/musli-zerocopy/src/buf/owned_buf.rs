@@ -592,22 +592,83 @@ impl<O: Size> OwnedBuf<O> {
     where
         T: ZeroCopy,
     {
-        // SAFETY: We're ensuring that these elements are interacted with
-        // correctly.
-        unsafe {
-            self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
-            let offset = self.len;
+        self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
 
-            let mut buf_mut = BufMut::new(self.data.as_ptr().wrapping_add(offset));
-            let mut padder = buf_mut.store_struct(value);
+        // SAFETY: We're ensuring to both align the internal buffer and store
+        // the value.
+        unsafe { self.store_unchecked(value) }
+    }
 
-            if T::PADDED {
-                T::pad(value, &mut padder);
-            }
+    /// Insert a value with the given size without ensuring that the buffer has
+    /// the reserved capacity for to or is properly aligned.
+    ///
+    /// This is a low level API which is tricky to use correctly. The
+    /// recommended way to use this is through [`OwnedBuf::store`].
+    ///
+    /// [`OwnedBuf::store`]: Self::store
+    ///
+    /// # Safety
+    ///
+    /// The caller has to ensure that the buffer has the required capacity for
+    /// `&T` and is properly aligned. This can easily be accomplished by calling
+    /// [`request_align::<T>()`] followed by [`align_in_place()`] before this
+    /// function. A safe variant of this function is [`OwnedBuf::store`].
+    ///
+    /// [`align_in_place()`]: Self::align_in_place
+    /// [`OwnedBuf::store`]: Self::store
+    /// [`request_align::<T>()`]: Self::request_align
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::mem::size_of;
+    ///
+    /// use musli_zerocopy::{ZeroCopy, OwnedBuf};
+    /// use musli_zerocopy::pointer::Unsized;
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C, align(4096))]
+    /// struct Custom { field: u32, string: Unsized<str> }
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let string = buf.store_unsized("string");
+    ///
+    /// buf.request_align::<Custom>();
+    /// buf.reserve(2 * size_of::<Custom>());
+    /// buf.align_in_place();
+    ///
+    /// // SAFETY: We've ensure that the buffer is internally aligned and sized just above.
+    /// let custom = unsafe { buf.store_unchecked(&Custom { field: 1, string }) };
+    /// let custom2 = unsafe { buf.store_unchecked(&Custom { field: 2, string }) };
+    ///
+    /// let buf = buf.into_aligned();
+    ///
+    /// let custom = buf.load(custom)?;
+    /// assert_eq!(custom.field, 1);
+    /// assert_eq!(buf.load(custom.string)?, "string");
+    ///
+    /// let custom2 = buf.load(custom2)?;
+    /// assert_eq!(custom2.field, 2);
+    /// assert_eq!(buf.load(custom2.string)?, "string");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub unsafe fn store_unchecked<T>(&mut self, value: &T) -> Ref<T, O>
+    where
+        T: ZeroCopy,
+    {
+        let offset = self.len;
 
-            self.len += size_of::<T>();
-            Ref::new(offset)
+        let mut buf_mut = BufMut::new(self.data.as_ptr().wrapping_add(offset));
+        let mut padder = buf_mut.store_struct_aligned(value);
+
+        if T::PADDED {
+            T::pad(value, &mut padder);
         }
+
+        self.len += size_of::<T>();
+        Ref::new(offset)
     }
 
     /// Write a value to the buffer.

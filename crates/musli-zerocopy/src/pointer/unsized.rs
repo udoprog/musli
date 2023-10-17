@@ -61,6 +61,7 @@ where
     ///
     /// let bytes = Unsized::<str>::new(0, 2);
     /// ```
+    #[inline]
     pub fn new(offset: usize, size: usize) -> Self {
         let Some(offset) = O::from_usize(offset) else {
             panic!(
@@ -131,6 +132,7 @@ where
     /// assert_eq!(unsize.len(), 4);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    #[inline]
     pub fn len(&self) -> usize {
         self.size.as_usize()
     }
@@ -153,6 +155,7 @@ where
     /// assert!(!unsize.is_empty());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.size.is_zero()
     }
@@ -178,7 +181,7 @@ where
     /// assert!(unsize.get(4).is_none());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    ///
+    #[inline]
     pub fn get(&self, index: usize) -> Option<Ref<T, O>> {
         if index >= self.len() {
             return None;
@@ -193,6 +196,7 @@ impl<T: ?Sized, O: Size> fmt::Debug for Unsized<T, O>
 where
     O: fmt::Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -205,6 +209,7 @@ where
 }
 
 impl<T: ?Sized + UnsizedZeroCopy, O: Size> Clone for Unsized<T, O> {
+    #[inline]
     fn clone(&self) -> Self {
         *self
     }
@@ -228,6 +233,7 @@ impl<T: ?Sized, O: Size> PartialOrd for Unsized<T, O>
 where
     O: PartialOrd,
 {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match self.offset.partial_cmp(&other.offset) {
             Some(Ordering::Equal) => {}
