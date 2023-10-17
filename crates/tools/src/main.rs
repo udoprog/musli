@@ -52,8 +52,8 @@ const REPORTS: &'static [Report] = &[
             "musli-value",
             "serde_cbor",
             "bitcode",
+            "bitcode-derive",
             // "dlhn", # broken
-            // "bitcode-derive", # isn't appropriately scoped to decode call
         ],
         expected: &["model-no-128", "model-no-map"],
         only: &[],
