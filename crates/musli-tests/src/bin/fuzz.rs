@@ -40,9 +40,7 @@ where
 
 fn main() -> Result<()> {
     let root =
-        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").context("missing `CARGO_MANIFEST_DIR`")?)
-            .join("..")
-            .join("..");
+        env::var_os("CARGO_MANIFEST_DIR").map(|path| PathBuf::from(path).join("..").join(".."));
 
     let mut rng = musli_tests::rng();
 
@@ -232,7 +230,7 @@ fn main() -> Result<()> {
                                             writeln!(o)?;
                                             writeln!(o, "{index}: error during decode: {error}")?;
 
-                                            if let Some(bytes) = out.as_bytes() {
+                                            if let (Some(root), Some(bytes)) = (&root, out.as_bytes()) {
                                                 let path = root.join("target").join(format!("{}_error.bin", stringify!($framework)));
                                                 fs::write(&path, bytes).with_context(|| path.display().to_string())?;
                                                 writeln!(o, "{index}: failing structure written to {}", path.display())?;
