@@ -96,7 +96,7 @@ where
         }
     }
 
-    let entries = buf.store_slice(&entries);
+    let entries = buf.store_unsized(&entries[..]);
 
     let mut displacements = Vec::new();
 
@@ -104,7 +104,7 @@ where
         displacements.push(Entry::new(key, value));
     }
 
-    let displacements = buf.store_slice(&displacements);
+    let displacements = buf.store_unsized(&displacements[..]);
     Ok(MapRef::new(hash_state.key, entries, displacements))
 }
 
@@ -190,7 +190,7 @@ where
         }
     }
 
-    let entries = buf.store_slice(&entries);
+    let entries = buf.store_unsized(&entries[..]);
 
     let mut displacements = Vec::new();
 
@@ -198,6 +198,6 @@ where
         displacements.push(Entry::new(key, value));
     }
 
-    let displacements = buf.store_slice(&displacements);
+    let displacements = buf.store_unsized(&displacements[..]);
     Ok(SetRef::new(hash_state.key, entries, displacements))
 }

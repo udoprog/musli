@@ -87,7 +87,7 @@ where
 
     #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        buf.load_slice(*self)
+        buf.load_unsized(*self)
     }
 }
 
@@ -117,7 +117,7 @@ where
 {
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
-        buf.load_slice_mut(*self)
+        buf.load_unsized_mut(*self)
     }
 }
 

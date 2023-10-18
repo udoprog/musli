@@ -17,6 +17,6 @@ fn main() -> Result<(), Error> {
         strings.push(buf.load(*value)?);
     }
 
-    assert_eq!(&strings, &["first", "second"][..]);
+    assert_eq!(&strings, &["first", "second"]);
     Ok(())
 }

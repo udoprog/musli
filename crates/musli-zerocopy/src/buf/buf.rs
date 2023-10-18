@@ -2,7 +2,7 @@ use core::alloc::Layout;
 use core::fmt;
 use core::mem::{align_of, size_of};
 use core::ops::{Index, IndexMut, Range};
-use core::slice::{self, SliceIndex};
+use core::slice::SliceIndex;
 
 #[cfg(feature = "alloc")]
 use alloc::borrow::{Cow, ToOwned};
@@ -649,46 +649,6 @@ impl Buf {
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
             // type being coerced into can really inhabit any bit pattern.
             Ok(buf.cast_mut())
-        }
-    }
-
-    /// Load the given slice.
-    #[inline]
-    pub(crate) fn load_slice<T, O: Size>(&self, slice: Ref<[T], O>) -> Result<&[T], Error>
-    where
-        [T]: Pointee<Packed<O> = O, Metadata = usize>,
-        T: ZeroCopy,
-    {
-        let start = slice.offset();
-        let end = start.wrapping_add(slice.len().wrapping_mul(size_of::<T>()));
-
-        // SAFETY: align_of::<T>() is always a power of two.
-        unsafe {
-            let buf = self.inner_get(start, end, align_of::<T>())?;
-            let len = buf.len();
-            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf.as_ptr()), len)?;
-            Ok(slice::from_raw_parts(buf.as_ptr().cast(), slice.len()))
-        }
-    }
-
-    /// Load the given slice mutably.
-    #[inline]
-    pub(crate) fn load_slice_mut<T, O: Size>(&mut self, ptr: Ref<[T], O>) -> Result<&mut [T], Error>
-    where
-        [T]: Pointee<Packed<O> = O, Metadata = usize>,
-        T: ZeroCopy,
-    {
-        let start = ptr.offset();
-        let end = start.wrapping_add(ptr.len().wrapping_mul(size_of::<T>()));
-
-        unsafe {
-            let buf = self.inner_get_mut(start, end, align_of::<T>())?;
-            let len = buf.len();
-            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf.as_ptr()), len)?;
-            Ok(slice::from_raw_parts_mut(
-                buf.as_mut_ptr().cast(),
-                ptr.len(),
-            ))
         }
     }
 

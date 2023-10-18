@@ -90,7 +90,6 @@ where
 impl<T, O: Size> Ref<[T], O>
 where
     T: ZeroCopy,
-    [T]: Pointee<Packed<O> = O, Metadata = usize>,
 {
     /// The number of elements in the slice.
     ///
@@ -190,9 +189,8 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if [`TryPack::<U>::try_pack`] over the provided offset returns
-    /// `None`, indicating that the offset cannot be packed into the required
-    /// width.
+    /// Panics if [`TryFrom::try_from`] over the provided offset errors,
+    /// indicating that the offset cannot be packed into the required width.
     ///
     /// # Examples
     ///
@@ -256,6 +254,39 @@ where
     #[inline]
     pub fn offset(&self) -> usize {
         self.offset.as_usize()
+    }
+
+    /// Cast from one kind of reference to another.
+    ///
+    /// This statically checks that the metadata for the pointers are the same
+    /// to prevent casts over completely different references. For now this only
+    /// prevents `Ref<T>` to `Ref<[U]>` casts:
+    ///
+    /// ```compile_fail
+    /// use musli_zerocopy::Ref;
+    ///
+    /// let reference: Ref<u32> = Ref::zero();
+    /// let reference2 = reference.cast::<[u32]>();
+    /// ```
+    ///
+    /// The correct way to do the above would be to explicitly deconstruct the
+    /// reference:
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    ///
+    /// let reference: Ref<u32> = Ref::zero();
+    /// let reference2: Ref<[u32]> = Ref::with_metadata(reference.offset(), 1);
+    /// ```
+    pub fn cast<U: ?Sized>(self) -> Ref<U, O>
+    where
+        U: Pointee<Packed<O> = T::Packed<O>>,
+    {
+        Ref {
+            offset: self.offset,
+            metadata: self.metadata,
+            _marker: PhantomData,
+        }
     }
 }
 

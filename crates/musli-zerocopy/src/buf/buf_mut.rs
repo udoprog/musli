@@ -42,13 +42,26 @@ impl<'a> BufMut<'a> {
     ///
     /// Also see the [type level safety documentation][#safety]
     #[inline]
-    pub unsafe fn store_bytes<T>(&mut self, bytes: &[T])
+    pub unsafe fn store_unsized_slice<T>(&mut self, values: &[T])
     where
         T: ZeroCopy,
     {
         self.start
-            .copy_from_nonoverlapping(bytes.as_ptr().cast(), size_of_val(bytes));
-        self.start = self.start.wrapping_add(size_of_val(bytes));
+            .copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
+        let end = self.start.wrapping_add(size_of_val(values));
+
+        if T::PADDED {
+            let mut start = replace(&mut self.start, end);
+
+            for value in values {
+                let mut padder = Padder::new(start);
+                T::pad(value, &mut padder);
+                padder.remaining();
+                start = start.wrapping_add(size_of::<T>());
+            }
+        } else {
+            self.start = end;
+        }
     }
 
     /// Store the raw bytes associated with `*const T` into the buffer and

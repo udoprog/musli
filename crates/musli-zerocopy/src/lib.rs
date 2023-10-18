@@ -99,13 +99,13 @@
 //! stores the offset where to fetch the string, and the second field the length
 //! of the string.
 //!
-//! Let's have a look at a [`Ref<[u32]>`] next:
+//! Let's have a look at a [`Ref<[u32]>`][ref-u32] next:
 //!
 //! ```rust
-//! use musli_zerocopy::OwnedBuf;
+//! use musli_zerocopy::{Ref, OwnedBuf};
 //!
 //! let mut buf = OwnedBuf::new();
-//! let slice = buf.store_slice(&[1u32, 2, 3, 4]);
+//! let slice: Ref<[u32]> = buf.store_slice(&[1, 2, 3, 4]);
 //! let reference = buf.store(&slice);
 //!
 //! assert_eq!(reference.offset(), 16);
@@ -123,7 +123,8 @@
 //! 0020: length -> 4
 //! ```
 //!
-//! At address `0016` we store two fields which corresponds to a [`Ref<[u32]>`].
+//! At address `0016` we store two fields which corresponds to a
+//! [`Ref<[u32]>`][ref-u32].
 //!
 //! Next lets investigate an example using a `Custom` struct:
 //!
@@ -293,7 +294,7 @@
 //! Ref::<Custom>::new(1usize << 32);
 //! ```
 //!
-//! Example panic using a [`Slice`] with a length larger than `2^32`:
+//! Example panic using a [`Ref<\[T\]>`] with a length larger than `2^32`:
 //!
 //! ```should_panic
 //! # use musli_zerocopy::{Ref, ZeroCopy};
@@ -303,7 +304,7 @@
 //! Ref::<[Custom]>::with_metadata(0, 1usize << 32);
 //! ```
 //!
-//! Example panic using an [`Ref`] value with a size larger than `2^32`:
+//! Example panic using an [`Ref<str>`] value with a size larger than `2^32`:
 //!
 //! ```should_panic
 //! # use musli_zerocopy::Ref;
@@ -362,27 +363,18 @@
 //! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 //!
-//! [`swiss`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
+//! [`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
 //! [`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
 //! [`phf` crate]: https://docs.rs/phf
 //! [`hashbrown` crate]: https://docs.rs/phf
-//! [`requested()`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
-//! [`ZeroCopy`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
-//! [`Ref`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
-//! [`Ref<[u32]>`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
-//! [`Ref<str>`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
-//! [`OwnedBuf`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
-//! [`Size`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
-//! [`aligned_buf(bytes, align)`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+//! [`requested()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
+//! [`ZeroCopy`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
+//! [`Ref`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+//! [ref-u32]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+//! [`Ref<str>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+//! [`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
+//! [`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+//! [`aligned_buf(bytes, align)`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 
 #![no_std]
 #![allow(clippy::module_inception)]

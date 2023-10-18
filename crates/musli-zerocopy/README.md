@@ -100,7 +100,7 @@ Let's have a look at a [`Slice<u32>`] next:
 use musli_zerocopy::OwnedBuf;
 
 let mut buf = OwnedBuf::new();
-let slice = buf.store_slice(&[1u32, 2, 3, 4]);
+let slice = buf.store_unsized(&[1u32, 2, 3, 4]);
 let reference = buf.store(&slice);
 
 assert_eq!(reference.offset(), 16);
@@ -320,7 +320,7 @@ struct Custom { reference: Ref<u32, usize>, slice: Slice::<u32, usize>, unsize: 
 let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
 
 let reference = buf.store(&42u32);
-let slice = buf.store_slice(&[1, 2, 3, 4]);
+let slice = buf.store_unsized(&[1, 2, 3, 4]);
 let unsize = buf.store_unsized("Hello World");
 
 buf.store(&Custom { reference, slice, unsize });

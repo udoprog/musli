@@ -243,11 +243,9 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     {
         // SAFETY: We've ensured that the provided buffer is aligned and sized
         // appropriately above.
-        unsafe {
-            F::validate(&mut Validator::new(self.data))?;
-            self.data = self.data.wrapping_add(size_of::<F>());
-            Ok(())
-        }
+        F::validate(&mut Validator::new(self.data))?;
+        self.advance::<F>();
+        Ok(())
     }
 
     /// Align the current pointer by `F`.

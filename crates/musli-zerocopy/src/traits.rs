@@ -5,14 +5,14 @@
 //! Please see their corresponding safety documentation or use the
 //! [`ZeroCopy`][derive@crate::ZeroCopy] derive.
 //!
-//! * [`ZeroCopy`] for types which can safely be coerced from a [`Buf`] to
-//!   `&Self` or `&mut Self`.
+//! * [`ZeroCopy`] for types which can safely be coerced from a [`Ref<T>`] to
+//!   `&T` or `&mut T`.
 //! * [`UnsizedZeroCopy`] for types which can safely be coerced from an
-//!   [`Unsized<T>`] to `&T` or `&mut T`.
-//! * [`ZeroSized`] for types which can be ingored when deriving
+//!   [`Ref<T>`] where `T: ?Sized` to `&T` or `&mut T`.
+//! * [`ZeroSized`] for types which can be ignored when deriving
 //!   [`ZeroCopy`][derive@crate::ZeroCopy] using `#[zero_copy(ignore)]`.
 //!
-//! [`Unsized<T>`]: crate::pointer::Unsized
+//! [`Ref<T>`]: crate::pointer::Ref
 
 #![allow(clippy::missing_safety_doc)]
 
@@ -26,20 +26,21 @@ use crate::buf::{Buf, BufMut, Padder, Validator, Visit};
 use crate::error::{Error, ErrorKind};
 
 mod sealed {
+    use crate::ZeroCopy;
+
     pub trait Sealed {}
     impl Sealed for str {}
+    impl<T> Sealed for [T] where T: ZeroCopy {}
 }
 
-/// Trait governing which `T` in [`Unsized<T>`] the wrapper can handle.
+/// Trait governing which `T` in [`Ref<T>`] where `T: ?Sized` the wrapper can
+/// handle.
 ///
 /// We only support slice-like, unaligned unsized types, such as `str` and
 /// `[u8]`. We can't support types such as `dyn Debug` because metadata is a
 /// vtable which can't be serialized.
 ///
-/// For nested slices or arrays, use [`Slice<T>`] instead.
-///
-/// [`Unsized<T>`]: crate::pointer::Unsized
-/// [`Slice<T>`]: crate::pointer::Slice
+/// [`Ref<T>`]: crate::pointer::Ref
 ///
 /// # Safety
 ///
@@ -362,7 +363,7 @@ unsafe impl UnsizedZeroCopy for str {
 
     #[inline]
     unsafe fn store(&self, buf: &mut BufMut<'_>) {
-        buf.store_bytes(self.as_bytes());
+        buf.store_unsized_slice(self.as_bytes());
     }
 
     #[inline]
@@ -378,85 +379,46 @@ unsafe impl UnsizedZeroCopy for str {
     }
 }
 
-/// Macro to implement `UnsizedZeroCopy`.
-///
-/// Its requirements are the following:
-/// * Can only be implemented for types which can inhabit any bit-pattern.
-/// * Must only be implemented for types which are not padded (as per
-///   [`ZeroCopy::PADDED`]).
-macro_rules! impl_unsized_primitive {
-    ({$($param:ident)?}, $ty:ty, $example_ty:ty, $example:expr $(, $import:path)?) => {
-        impl $(<$param>)* self::sealed::Sealed for [$ty] {}
+unsafe impl<T> UnsizedZeroCopy for [T]
+where
+    T: ZeroCopy,
+{
+    const ALIGN: usize = align_of::<T>();
+    const SIZE: usize = size_of::<T>();
 
-        #[doc = concat!("[`UnsizedZeroCopy`] implementation for [", stringify!($ty), "]")]
-        ///
-        /// # Examples
-        ///
-        /// ```
-        $(#[doc = concat!("use ", stringify!($import), ";")])*
-        /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
-        ///
-        /// #[derive(ZeroCopy)]
-        /// #[repr(C)]
-        #[doc = concat!("struct Custom", stringify!($(<$param>)*) ," { field: Ref<[", stringify!($ty) ,"]> }")]
-        ///
-        /// let mut buf = OwnedBuf::new();
-        #[doc = concat!("let unsize: Ref<[", stringify!($example_ty), "]> = buf.store_unsized(&", stringify!($example), ");")]
-        /// let buf = buf.into_aligned();
-        #[doc = concat!("assert_eq!(buf.load(unsize)?, &", stringify!($example), ");")]
-        /// # Ok::<_, musli_zerocopy::Error>(())
-        /// ```
-        #[allow(rustdoc::invalid_html_tags)]
-        unsafe impl $(<$param>)* UnsizedZeroCopy for [$ty] {
-            const ALIGN: usize = align_of::<$ty>();
-            const SIZE: usize = size_of::<$ty>();
+    #[inline]
+    fn size(&self) -> usize {
+        self.len()
+    }
 
-            #[inline]
-            fn size(&self) -> usize {
-                self.len()
-            }
+    #[inline]
+    fn bytes(&self) -> usize {
+        size_of_val(self)
+    }
 
-            #[inline]
-            fn bytes(&self) -> usize {
-                size_of_val(self)
-            }
+    #[inline]
+    unsafe fn store(&self, buf: &mut BufMut<'_>) {
+        buf.store_unsized_slice(self);
+    }
 
-            #[inline]
-            unsafe fn store(&self, buf: &mut BufMut<'_>) {
-                buf.store_bytes(self);
-            }
-
-            #[inline]
-            unsafe fn coerce(buf: *const u8, size: usize) -> Result<*const Self, Error> {
-                Ok(slice::from_raw_parts(buf.cast(), size))
-            }
-
-            #[inline]
-            unsafe fn coerce_mut(buf: *mut u8, size: usize) -> Result<*mut Self, Error> {
-                Ok(slice::from_raw_parts_mut(buf.cast(), size))
-            }
+    #[inline]
+    unsafe fn coerce(buf: *const u8, len: usize) -> Result<*const Self, Error> {
+        if !T::ANY_BITS {
+            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf), len)?;
         }
-    };
-}
 
-impl_unsized_primitive!({}, u8, u8, [u8::MIN, 1, 2, 3, 4, u8::MAX]);
-impl_unsized_primitive!({}, i8, i8, [i8::MIN, -1, 2, -3, 4, i8::MAX]);
-impl_unsized_primitive!({}, u16, u16, [u16::MIN, 1, 2, 3, 4, u16::MAX]);
-impl_unsized_primitive!({}, i16, i16, [i16::MIN, -1, 2, -3, 4, i16::MAX]);
-impl_unsized_primitive!({}, u32, u32, [u32::MIN, 1, 2, 3, 4, u32::MAX]);
-impl_unsized_primitive!({}, i32, i32, [i32::MIN, -1, 2, -3, 4, i32::MAX]);
-impl_unsized_primitive!({}, u64, u64, [u64::MIN, 1, 2, 3, 4, u64::MAX]);
-impl_unsized_primitive!({}, i64, i64, [i64::MIN, -1, 2, -3, 4, i64::MAX]);
-impl_unsized_primitive!({}, u128, u128, [u128::MIN, 1, 2, 3, 4, u128::MAX]);
-impl_unsized_primitive!({}, i128, i128, [i128::MIN, -1, 2, -3, 4, i128::MAX]);
-impl_unsized_primitive!({}, (), (), [(), ()]);
-impl_unsized_primitive!(
-    { T },
-    PhantomData<T>,
-    PhantomData<u32>,
-    [PhantomData, PhantomData],
-    std::marker::PhantomData
-);
+        Ok(slice::from_raw_parts(buf.cast(), len))
+    }
+
+    #[inline]
+    unsafe fn coerce_mut(buf: *mut u8, size: usize) -> Result<*mut Self, Error> {
+        if !T::ANY_BITS {
+            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf), size)?;
+        }
+
+        Ok(slice::from_raw_parts_mut(buf.cast(), size))
+    }
+}
 
 macro_rules! impl_number {
     ($ty:ty) => {
@@ -773,7 +735,7 @@ macro_rules! impl_zst {
         ///
         /// let mut empty = OwnedBuf::new();
         /// let values = [Struct::default(); 100];
-        /// let slice = empty.store_slice(&values[..]);
+        /// let slice = empty.store_unsized(&values[..]);
         /// let buf = empty.into_aligned();
         /// assert_eq!(buf.len(), 0);
         ///
@@ -830,7 +792,7 @@ impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::Phan
 ///
 /// let mut empty = OwnedBuf::with_alignment::<u128>();
 /// let values = [Struct::<u128>::default(); 100];
-/// let slice = empty.store_slice(&values[..]);
+/// let slice = empty.store_unsized(&values[..]);
 /// let buf = empty.into_aligned();
 /// assert_eq!(buf.len(), 0);
 ///

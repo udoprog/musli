@@ -467,3 +467,181 @@ fn validate_packed() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod primitive_slices {
+    /// Macro to implement `UnsizedZeroCopy`.
+    ///
+    /// Its requirements are the following:
+    /// * Can only be implemented for types which can inhabit any bit-pattern.
+    /// * Must only be implemented for types which are not padded (as per
+    ///   [`ZeroCopy::PADDED`]).
+    macro_rules! test_case {
+        ({$($param:ident)?}, $ty:ident, $example:expr) => {
+            #[test]
+            fn $ty() -> Result<(), crate::Error> {
+                use crate::{OwnedBuf, Ref, ZeroCopy};
+
+                #[derive(ZeroCopy)]
+                #[repr(C)]
+                #[zero_copy(crate)]
+                struct Custom $(<$param>)* { field: Ref<[$ty]> }
+
+                let mut buf = OwnedBuf::new();
+                let slice: Ref<[$ty]> = buf.store_slice(&$example);
+                let buf = buf.into_aligned();
+                assert_eq!(buf.load(slice)?, &$example);
+                Ok(())
+            }
+        };
+    }
+
+    test_case!({}, u8, [u8::MIN, 1, 2, 3, 4, u8::MAX]);
+    test_case!({}, i8, [i8::MIN, -1, 2, -3, 4, i8::MAX]);
+    test_case!({}, u16, [u16::MIN, 1, 2, 3, 4, u16::MAX]);
+    test_case!({}, i16, [i16::MIN, -1, 2, -3, 4, i16::MAX]);
+    test_case!({}, u32, [u32::MIN, 1, 2, 3, 4, u32::MAX]);
+    test_case!({}, i32, [i32::MIN, -1, 2, -3, 4, i32::MAX]);
+    test_case!({}, u64, [u64::MIN, 1, 2, 3, 4, u64::MAX]);
+    test_case!({}, i64, [i64::MIN, -1, 2, -3, 4, i64::MAX]);
+    test_case!({}, u128, [u128::MIN, 1, 2, 3, 4, u128::MAX]);
+    test_case!({}, i128, [i128::MIN, -1, 2, -3, 4, i128::MAX]);
+}
+
+#[cfg(test)]
+mod nonzero_slices {
+    macro_rules! test_case {
+        ($name:ident, $ty:ident, $example:expr $(, $import:path)?) => {
+            #[test]
+            fn $name() -> Result<(), crate::Error> {
+                $(use $import;)*
+                use crate::{OwnedBuf, Ref, ZeroCopy};
+
+                #[derive(ZeroCopy)]
+                #[repr(C)]
+                #[zero_copy(crate)]
+                struct Custom { field: Ref<[$ty]> }
+
+                let mut buf = OwnedBuf::new();
+                let slice: Ref<[$ty]> = buf.store_slice(&$example).cast::<[$ty]>();
+                let buf = buf.into_aligned();
+                let example: &[$ty] = unsafe { core::mem::transmute(&$example[..]) };
+                assert_eq!(buf.load(slice)?, example);
+                Ok(())
+            }
+        };
+    }
+
+    macro_rules! error_case {
+        ($name:ident, $ty:ident, $example:expr $(, $import:path)?) => {
+            #[test]
+            fn $name() -> Result<(), crate::Error> {
+                $(use $import;)*
+                use crate::{OwnedBuf, Ref, ZeroCopy};
+
+                #[derive(ZeroCopy)]
+                #[repr(C)]
+                #[zero_copy(crate)]
+                struct Custom { field: Ref<[$ty]> }
+
+                let mut buf = OwnedBuf::new();
+                let slice: Ref<[$ty]> = buf.store_slice(&$example).cast::<[$ty]>();
+                let buf = buf.into_aligned();
+                assert!(buf.load(slice).is_err());
+                Ok(())
+            }
+        };
+    }
+
+    test_case!(
+        non_zero_u8,
+        NonZeroU8,
+        [1, 2, 3, 4, u8::MAX],
+        core::num::NonZeroU8
+    );
+    test_case!(
+        non_zero_i8,
+        NonZeroI8,
+        [i8::MIN, -1, 2, -3, 4, i8::MAX],
+        core::num::NonZeroI8
+    );
+    test_case!(
+        non_zero_u16,
+        NonZeroU16,
+        [1, 2, 3, 4, u16::MAX],
+        core::num::NonZeroU16
+    );
+    test_case!(
+        non_zero_i16,
+        NonZeroI16,
+        [-1, 2, -3, 4, i16::MAX],
+        core::num::NonZeroI16
+    );
+    test_case!(
+        non_zero_u32,
+        NonZeroU32,
+        [1, 2, 3, 4, u32::MAX],
+        core::num::NonZeroU32
+    );
+    test_case!(
+        non_zero_i32,
+        NonZeroI32,
+        [i32::MIN, -1, 2, -3, 4, i32::MAX],
+        core::num::NonZeroI32
+    );
+    test_case!(
+        non_zero_u64,
+        NonZeroU64,
+        [1, 2, 3, 4, u64::MAX],
+        core::num::NonZeroU64
+    );
+    test_case!(
+        non_zero_i64,
+        NonZeroI64,
+        [i64::MIN, -1, 2, -3, 4, i64::MAX],
+        core::num::NonZeroI64
+    );
+    test_case!(
+        non_zero_u128,
+        NonZeroU128,
+        [1, 2, 3, 4, u128::MAX],
+        core::num::NonZeroU128
+    );
+    test_case!(
+        non_zero_i128,
+        NonZeroI128,
+        [i128::MIN, -1, 2, -3, 4, i128::MAX],
+        core::num::NonZeroI128
+    );
+
+    error_case!(
+        zero_non_zero_u8,
+        NonZeroU8,
+        [u8::MIN, 1, 2, 3, 4, u8::MAX],
+        core::num::NonZeroU8
+    );
+    error_case!(
+        zero_non_zero_u16,
+        NonZeroU16,
+        [u16::MIN, 1, 2, 3, 4, u16::MAX],
+        core::num::NonZeroU16
+    );
+    error_case!(
+        zero_non_zero_u32,
+        NonZeroU32,
+        [u32::MIN, 1, 2, 3, 4, u32::MAX],
+        core::num::NonZeroU32
+    );
+    error_case!(
+        zero_non_zero_u64,
+        NonZeroU64,
+        [u64::MIN, 1, 2, 3, 4, u64::MAX],
+        core::num::NonZeroU64
+    );
+    error_case!(
+        zero_non_zero_u128,
+        NonZeroU128,
+        [u128::MIN, 1, 2, 3, 4, u128::MAX],
+        core::num::NonZeroU128
+    );
+}

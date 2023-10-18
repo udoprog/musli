@@ -119,7 +119,7 @@ pub use self::owned_buf::OwnedBuf;
 #[cfg(feature = "alloc")]
 mod owned_buf;
 
-use core::mem::{align_of, size_of};
+use core::mem::align_of;
 
 #[cfg(feature = "alloc")]
 use alloc::borrow::Cow;
@@ -225,8 +225,8 @@ where
 {
     validator.align_with(align_of::<T>());
 
-    if !T::ANY_BITS && size_of::<T>() > 0 {
-        for _ in 0..len / size_of::<T>() {
+    if !T::ANY_BITS {
+        for _ in 0..len {
             // SAFETY: The passed in buffer is required to be aligned per the
             // requirements of this trait, so any size_of::<T>() chunks are
             // aligned too.

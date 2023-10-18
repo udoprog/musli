@@ -4,12 +4,10 @@ use core::ptr;
 
 use crate::traits::ZeroCopy;
 
-/// A struct padder as returned from [`BufMut::store_struct`].
+/// A struct padder as provided to the [`ZeroCopy::pad`] method.
 ///
 /// This knows how to find and initialize padding regions in `repr(C)` types,
 /// and provides a builder-like API to doing so.
-///
-/// [`BufMut::store_struct`]: crate::buf::BufMut::store_struct
 #[must_use = "For the writer to have an effect on `OwnedBuf` you must call `Padder::finish`"]
 pub struct Padder<'a, T> {
     ptr: *mut u8,

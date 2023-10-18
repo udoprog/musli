@@ -8,7 +8,7 @@ use core::slice;
 
 use alloc::alloc;
 
-use crate::buf::{Buf, BufMut, DefaultAlignment, Padder};
+use crate::buf::{Buf, BufMut, DefaultAlignment};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -724,22 +724,13 @@ impl<O: Size> OwnedBuf<O> {
     /// assert_eq!(&strings, &["first", "second"][..]);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn store_slice<T>(&mut self, values: &[T]) -> Ref<[T], O>
     where
         [T]: Pointee<Packed<O> = O, Metadata = usize>,
         T: ZeroCopy,
     {
-        self.next_offset_with_and_reserve(align_of::<T>(), size_of_val(values));
-        let offset = self.len;
-
-        // SAFETY: We've both allocated space for the array we're about to write
-        // and ensured that the buffer is padded.
-        unsafe {
-            self.store_array(values);
-        }
-
-        Ref::with_metadata(offset, values.len())
+        self.store_unsized(values)
     }
 
     /// Extend the buffer from a slice.
@@ -1122,28 +1113,6 @@ impl<O: Size> OwnedBuf<O> {
             self.data = NonNull::new_unchecked(ptr);
             self.capacity = new_layout.size();
             self.align = self.requested;
-        }
-    }
-
-    unsafe fn store_array<T>(&mut self, values: &[T])
-    where
-        T: ZeroCopy,
-    {
-        // SAFETY: We're interacting with all elements correctly.
-        unsafe {
-            let size = size_of_val(values);
-            let ptr = self.data.as_ptr().add(self.len);
-            ptr.copy_from_nonoverlapping(values.as_ptr().cast::<u8>(), size);
-
-            if T::PADDED {
-                let mut padder = Padder::new(ptr);
-
-                for value in values {
-                    T::pad(value, &mut padder);
-                }
-            }
-
-            self.len += size;
         }
     }
 }
