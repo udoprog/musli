@@ -28,3 +28,6 @@ mod slice;
 
 pub use self::r#unsized::Unsized;
 mod r#unsized;
+
+pub use self::pointee::Pointee;
+mod pointee;

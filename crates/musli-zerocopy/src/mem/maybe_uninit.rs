@@ -3,6 +3,7 @@ use core::mem::{size_of, ManuallyDrop};
 use core::slice;
 
 use crate::buf::BufMut;
+use crate::pointer::Pointee;
 use crate::traits::ZeroCopy;
 
 /// A value which might or might not have been initialized.
@@ -107,4 +108,11 @@ impl<T> fmt::Debug for MaybeUninit<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MaybeUninit").finish_non_exhaustive()
     }
+}
+
+impl<T> Pointee for MaybeUninit<T>
+where
+    T: Pointee,
+{
+    type Metadata = T::Metadata;
 }
