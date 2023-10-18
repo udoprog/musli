@@ -9,7 +9,7 @@ use musli::context::Buffer;
 
 use crate::allocator::Allocator;
 
-/// Buffer used in combination with [`AllocContext`].
+/// Buffer used in combination with an [`Allocator`].
 ///
 /// This can be safely re-used.
 pub struct Alloc {

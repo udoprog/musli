@@ -38,11 +38,11 @@
 //!   this derives an optimized `Archived` variation for you. This library
 //!   operates on the equivalent of `Archived` variant directly instead that you
 //!   should build and interact with by hand. `rkyv` is also explicitly not
-//!   sound unless you build it with the [`strict` feature], and even with the
-//!   feature enabled it doesn't pass Miri[^miri] under the testing conditions
-//!   I've subjected it to. Neither of these are strict blockers for users of
-//!   the library, but do constrain its safe applicability in ways this library
-//!   does not.
+//!   sound unless you build it with the [`strict` feature], with the feature
+//!   enabled it doesn't pass Miri[^miri] under Stacked
+//!   Borrows[^stacked-borrows]. Neither of these are strict blockers for users
+//!   of the library, but do constrain its safe applicability in ways this
+//!   library does not.
 //!
 //! [`strict` feature]: https://docs.rs/rkyv/latest/rkyv/#features
 //!
@@ -51,7 +51,7 @@
 //!
 //! [^zeroes]: [FromBytes extends FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html).
 //!
-//! [^miri]: This is on rkyv's roadmap.
+//! [^stacked-borrows]: <https://github.com/rkyv/rkyv/issues/436>
 //!
 //! The `tests` test suite has been extended to support some level of
 //! zerocopy types, all though since the feature sets vary so widely between the
