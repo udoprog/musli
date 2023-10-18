@@ -19,7 +19,7 @@ use core::mem::size_of;
 
 use crate::buf::{Bindable, Buf, Visit};
 use crate::error::{Error, ErrorKind};
-use crate::pointer::{DefaultSize, Size, Slice, Unsized};
+use crate::pointer::{DefaultSize, Ref, Size};
 use crate::sip::SipHasher13;
 use crate::swiss::raw::{h2, probe_seq, Group};
 use crate::swiss::Entry;
@@ -378,8 +378,8 @@ pub(crate) struct RawTableRef<T, O: Size = DefaultSize>
 where
     T: ZeroCopy,
 {
-    ctrl: Unsized<[u8], O>,
-    entries: Slice<T, O>,
+    ctrl: Ref<[u8], O>,
+    entries: Ref<[T], O>,
     bucket_mask: usize,
 }
 
@@ -388,7 +388,7 @@ where
     T: ZeroCopy,
 {
     #[cfg(feature = "alloc")]
-    pub(crate) fn new(ctrl: Unsized<[u8], O>, entries: Slice<T, O>, bucket_mask: usize) -> Self {
+    pub(crate) fn new(ctrl: Ref<[u8], O>, entries: Ref<[T], O>, bucket_mask: usize) -> Self {
         Self {
             ctrl,
             entries,

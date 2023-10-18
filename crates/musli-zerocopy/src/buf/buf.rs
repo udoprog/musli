@@ -11,7 +11,7 @@ use alloc::borrow::{Cow, ToOwned};
 use crate::buf::OwnedBuf;
 use crate::buf::{Bindable, Load, LoadMut, Validator};
 use crate::error::{Error, ErrorKind};
-use crate::pointer::{Ref, Size, Slice, Unsized};
+use crate::pointer::{Pointee, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
 /// A buffer wrapping a slice of bytes.
@@ -19,11 +19,10 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::Buf;
-/// use musli_zerocopy::pointer::Unsized;
+/// use musli_zerocopy::{Buf, Ref};
 ///
 /// let buf = Buf::new(b"Hello World!");
-/// let unsize = Unsized::<str>::new(0, 12);
+/// let unsize: Ref<str> = Ref::with_metadata(0, 12);
 ///
 /// assert_eq!(buf.load(unsize)?, "Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
@@ -39,11 +38,10 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Buf;
-    /// use musli_zerocopy::pointer::Unsized;
+    /// use musli_zerocopy::{Buf, Ref};
     ///
     /// let buf = Buf::new(b"Hello World!");
-    /// let unsize = Unsized::<str>::new(0, 12);
+    /// let unsize: Ref<str> = Ref::with_metadata(0, 12);
     ///
     /// assert_eq!(buf.load(unsize)?, "Hello World!");
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -59,13 +57,12 @@ impl Buf {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Buf;
-    /// use musli_zerocopy::pointer::Unsized;
+    /// use musli_zerocopy::{Buf, Ref};
     ///
     /// let mut bytes: [u8; 12] = *b"Hello World!";
     ///
     /// let buf = Buf::new_mut(&mut bytes[..]);
-    /// let unsize = Unsized::<str>::new(0, 12);
+    /// let unsize = Ref::<str>::with_metadata(0, 12);
     ///
     /// buf.load_mut(unsize)?.make_ascii_uppercase();
     /// assert_eq!(buf.load(unsize)?, "HELLO WORLD!");
@@ -87,12 +84,11 @@ impl Buf {
     /// use std::fs::read;
     ///
     /// use musli_zerocopy::{Buf, Ref, ZeroCopy};
-    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
     /// struct Person {
-    ///     name: Unsized<str>,
+    ///     name: Ref<str>,
     ///     age: u32,
     /// }
     ///
@@ -123,12 +119,11 @@ impl Buf {
     /// use std::fs::read;
     ///
     /// use musli_zerocopy::{Buf, Ref, ZeroCopy};
-    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
     /// struct Person {
-    ///     name: Unsized<str>,
+    ///     name: Ref<str>,
     ///     age: u32,
     /// }
     ///
@@ -568,12 +563,9 @@ impl Buf {
 
     /// Load an unsized reference.
     #[inline]
-    pub(crate) fn load_unsized<T: ?Sized, O: Size>(
-        &self,
-        unsize: Unsized<T, O>,
-    ) -> Result<&T, Error>
+    pub(crate) fn load_unsized<T: ?Sized, O: Size>(&self, unsize: Ref<T, O>) -> Result<&T, Error>
     where
-        T: UnsizedZeroCopy,
+        T: Pointee<Metadata<O> = O> + UnsizedZeroCopy,
     {
         let start = unsize.offset();
         let size = unsize.size();
@@ -591,10 +583,10 @@ impl Buf {
     #[inline]
     pub(crate) fn load_unsized_mut<T: ?Sized, O: Size>(
         &mut self,
-        unsize: Unsized<T, O>,
+        unsize: Ref<T, O>,
     ) -> Result<&mut T, Error>
     where
-        T: UnsizedZeroCopy,
+        T: Pointee<Metadata<O> = O> + UnsizedZeroCopy,
     {
         let start = unsize.offset();
         let size = unsize.size();
@@ -662,8 +654,9 @@ impl Buf {
 
     /// Load the given slice.
     #[inline]
-    pub(crate) fn load_slice<T, O: Size>(&self, slice: Slice<T, O>) -> Result<&[T], Error>
+    pub(crate) fn load_slice<T, O: Size>(&self, slice: Ref<[T], O>) -> Result<&[T], Error>
     where
+        [T]: Pointee<Metadata<O> = O>,
         T: ZeroCopy,
     {
         let start = slice.offset();
@@ -680,8 +673,10 @@ impl Buf {
 
     /// Load the given slice mutably.
     #[inline]
-    pub(crate) fn load_slice_mut<T, O: Size>(&mut self, ptr: Slice<T, O>) -> Result<&mut [T], Error>
+    pub(crate) fn load_slice_mut<T, O: Size>(&mut self, ptr: Ref<[T], O>) -> Result<&mut [T], Error>
     where
+        [T]: Pointee,
+        <[T] as Pointee>::Metadata<O>: Size,
         T: ZeroCopy,
     {
         let start = ptr.offset();

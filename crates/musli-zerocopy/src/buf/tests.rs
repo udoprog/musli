@@ -5,7 +5,6 @@ use core::array;
 use anyhow::Result;
 
 use crate::mem::MaybeUninit;
-use crate::pointer::Unsized;
 use crate::{Ref, ZeroCopy};
 
 use super::OwnedBuf;
@@ -97,7 +96,7 @@ fn test_unaligned_write() -> Result<()> {
     #[repr(C)]
     #[zero_copy(crate)]
     struct Custom {
-        string: Unsized<str>,
+        string: Ref<str>,
     }
 
     let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128);

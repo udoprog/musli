@@ -1,13 +1,11 @@
 use musli_zerocopy::mem::MaybeUninit;
-use musli_zerocopy::pointer::Unsized;
-use musli_zerocopy::{Error, ZeroCopy};
-use musli_zerocopy::{OwnedBuf, Ref};
+use musli_zerocopy::{Error, OwnedBuf, Ref, ZeroCopy};
 
 fn main() -> Result<(), Error> {
     #[derive(ZeroCopy)]
     #[repr(C)]
     struct Custom {
-        string: Unsized<str>,
+        string: Ref<str>,
     }
 
     let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128);

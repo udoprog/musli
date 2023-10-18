@@ -10,7 +10,7 @@ use alloc::alloc;
 
 use crate::buf::{Buf, BufMut, DefaultAlignment, Padder};
 use crate::mem::MaybeUninit;
-use crate::pointer::{DefaultSize, Ref, Size, Slice, Unsized};
+use crate::pointer::{DefaultSize, Pointee, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
 /// An allocating buffer with dynamic alignment.
@@ -416,11 +416,10 @@ impl<O: Size> OwnedBuf<O> {
     /// ```
     /// use musli_zerocopy::mem::MaybeUninit;
     /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
-    /// use musli_zerocopy::pointer::Unsized;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
-    /// struct Custom { field: u32, string: Unsized<str> }
+    /// struct Custom { field: u32, string: Ref<str> }
     ///
     /// let mut buf = OwnedBuf::new();
     /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
@@ -488,12 +487,11 @@ impl<O: Size> OwnedBuf<O> {
     ///
     /// ```
     /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
-    /// use musli_zerocopy::pointer::Unsized;
     /// use musli_zerocopy::mem::MaybeUninit;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
-    /// struct Custom { field: u32, string: Unsized<str> }
+    /// struct Custom { field: u32, string: Ref<str> }
     ///
     /// let mut buf = OwnedBuf::new();
     /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
@@ -537,12 +535,11 @@ impl<O: Size> OwnedBuf<O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{ZeroCopy, OwnedBuf};
-    /// use musli_zerocopy::pointer::Unsized;
+    /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
-    /// struct Custom { field: u32, string: Unsized<str> }
+    /// struct Custom { field: u32, string: Ref<str> }
     ///
     /// let mut buf = OwnedBuf::new();
     ///
@@ -623,12 +620,11 @@ impl<O: Size> OwnedBuf<O> {
     /// ```
     /// use std::mem::size_of;
     ///
-    /// use musli_zerocopy::{ZeroCopy, OwnedBuf};
-    /// use musli_zerocopy::pointer::Unsized;
+    /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C, align(4096))]
-    /// struct Custom { field: u32, string: Unsized<str> }
+    /// struct Custom { field: u32, string: Ref<str> }
     ///
     /// let mut buf = OwnedBuf::new();
     ///
@@ -678,21 +674,24 @@ impl<O: Size> OwnedBuf<O> {
     ///
     /// let buf = buf.into_aligned();
     ///
+    /// dbg!(first, second);
+    ///
     /// assert_eq!(buf.load(first)?, "first");
     /// assert_eq!(buf.load(second)?, "second");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_unsized<T>(&mut self, value: &T) -> Unsized<T, O>
+    pub fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, O>
     where
-        T: ?Sized + UnsizedZeroCopy,
+        T: Pointee<Metadata<O> = O>,
+        T: UnsizedZeroCopy,
     {
         unsafe {
             self.next_offset_with_and_reserve(T::ALIGN, value.bytes());
             let offset = self.len;
             value.store(&mut BufMut::new(self.data.as_ptr().wrapping_add(offset)));
             self.len += value.bytes();
-            Unsized::new(offset, value.size())
+            Ref::with_metadata(offset, value.size())
         }
     }
 
@@ -726,8 +725,9 @@ impl<O: Size> OwnedBuf<O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_slice<T>(&mut self, values: &[T]) -> Slice<T, O>
+    pub fn store_slice<T>(&mut self, values: &[T]) -> Ref<[T], O>
     where
+        [T]: Pointee<Metadata<O> = O>,
         T: ZeroCopy,
     {
         self.next_offset_with_and_reserve(align_of::<T>(), size_of_val(values));
@@ -739,7 +739,7 @@ impl<O: Size> OwnedBuf<O> {
             self.store_array(values);
         }
 
-        Slice::new(offset, values.len())
+        Ref::with_metadata(offset, values.len())
     }
 
     /// Extend the buffer from a slice.

@@ -1,13 +1,12 @@
 use anyhow::{Context, Result};
 use musli_zerocopy::phf;
-use musli_zerocopy::pointer::Unsized;
-use musli_zerocopy::{OwnedBuf, ZeroCopy};
+use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
 struct Custom {
     field: u32,
-    string: Unsized<str>,
+    string: Ref<str>,
 }
 
 fn main() -> Result<()> {

@@ -19,7 +19,7 @@ use crate::buf::{Bindable, Buf, Visit};
 use crate::error::Error;
 use crate::phf::hashing::HashKey;
 use crate::phf::Entry;
-use crate::pointer::{DefaultSize, Size, Slice};
+use crate::pointer::{DefaultSize, Ref, Size};
 use crate::ZeroCopy;
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
@@ -221,8 +221,8 @@ where
     V: ZeroCopy,
 {
     key: HashKey,
-    entries: Slice<Entry<K, V>, O>,
-    displacements: Slice<Entry<u32, u32>, O>,
+    entries: Ref<[Entry<K, V>], O>,
+    displacements: Ref<[Entry<u32, u32>], O>,
 }
 
 impl<K, V, O: Size> MapRef<K, V, O>
@@ -233,8 +233,8 @@ where
     #[cfg(feature = "alloc")]
     pub(crate) fn new(
         key: HashKey,
-        entries: Slice<Entry<K, V>, O>,
-        displacements: Slice<Entry<u32, u32>, O>,
+        entries: Ref<[Entry<K, V>], O>,
+        displacements: Ref<[Entry<u32, u32>], O>,
     ) -> Self {
         Self {
             key,

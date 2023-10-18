@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use crate::buf::{Buf, OwnedBuf, Visit};
 use crate::error::Error;
-use crate::pointer::{Size, Slice, Unsized};
+use crate::pointer::{Ref, Size};
 use crate::sip::SipHasher13;
 use crate::swiss::constructor::Constructor;
 use crate::swiss::map::RawTableRef;
@@ -160,7 +160,7 @@ where
 }
 
 // Output from storing raw values.
-type Raw<U, O> = (u64, Unsized<[u8], O>, Slice<U, O>, usize);
+type Raw<U, O> = (u64, Ref<[u8], O>, Ref<[U], O>, usize);
 
 // Raw store function which is capable of storing any value using a hashing
 // adapter.
@@ -211,7 +211,7 @@ where
         (table.buckets(), table.bucket_mask())
     };
 
-    let ctrl = Unsized::new(ctrl_ptr, ctrl_len);
-    let buckets = Slice::new(base_ptr, buckets);
+    let ctrl = Ref::with_metadata(ctrl_ptr, ctrl_len);
+    let buckets = Ref::with_metadata(base_ptr, buckets);
     Ok((key, ctrl, buckets, bucket_mask))
 }

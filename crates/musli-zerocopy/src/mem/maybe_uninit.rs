@@ -22,11 +22,10 @@ use crate::traits::ZeroCopy;
 /// ```
 /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 /// use musli_zerocopy::mem::MaybeUninit;
-/// use musli_zerocopy::pointer::Unsized;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]
-/// struct Custom { string: Unsized<str> }
+/// struct Custom { string: Ref<str> }
 ///
 /// let mut buf = OwnedBuf::new();
 ///
@@ -114,5 +113,5 @@ impl<T> Pointee for MaybeUninit<T>
 where
     T: Pointee,
 {
-    type Metadata = T::Metadata;
+    type Metadata<O> = T::Metadata<O> where O: Copy;
 }

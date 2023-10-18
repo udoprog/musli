@@ -9,15 +9,14 @@
 //! This module provides a couple of extension traits which can be used to alter
 //! how types interact with buffers.
 //!
-//! The following is a more compact [`Slice<u8>`] which only occupies 4 bytes,
+//! The following is a more compact [`Ref<[u8]>`] which only occupies 4 bytes,
 //! but restricts the offset and length.
 //!
-//! [`Slice<u8>`]: crate::pointer::Slice
+//! [`Ref<u8>`]: crate::pointer::Ref
 //!
 //! ```
 //! use musli_zerocopy::{Error, Ref, ZeroCopy};
 //! use musli_zerocopy::buf::{OwnedBuf, Buf, Load, LoadMut, Visit};
-//! use musli_zerocopy::pointer::Slice;
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C, packed)]
@@ -46,10 +45,10 @@
 //!         self.len as usize
 //!     }
 //!
-//!     fn to_slice(&self) -> Slice<u8> {
+//!     fn to_slice(&self) -> Ref<[u8]> {
 //!         let [a, b, c] = self.offset;
 //!         let offset = u32::from_le_bytes([a, b, c, 0]);
-//!         Slice::new(offset as usize, self.len as usize)
+//!         Ref::with_metadata(offset as usize, self.len as usize)
 //!     }
 //! }
 //!
@@ -69,7 +68,7 @@
 //!
 //! let mut buf1 = OwnedBuf::new();
 //! let slice = buf1.store_slice(&[1u8, 2, 3, 4]);
-//! let slice_ref: Ref<Slice<u8>> = buf1.store(&slice);
+//! let slice_ref: Ref<Ref<[u8]>> = buf1.store(&slice);
 //! assert_eq!(buf1.len(), 12);
 //!
 //! let buf1 = buf1.into_aligned();
@@ -153,12 +152,11 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 ///
 /// use musli_zerocopy::{Ref, ZeroCopy};
 /// use musli_zerocopy::buf;
-/// use musli_zerocopy::pointer::Unsized;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]
 /// struct Person {
-///     name: Unsized<str>,
+///     name: Ref<str>,
 ///     age: u32,
 /// }
 ///
@@ -189,12 +187,11 @@ pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
 ///
 /// use musli_zerocopy::{Ref, ZeroCopy};
 /// use musli_zerocopy::buf;
-/// use musli_zerocopy::pointer::Unsized;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]
 /// struct Person {
-///     name: Unsized<str>,
+///     name: Ref<str>,
 ///     age: u32,
 /// }
 ///

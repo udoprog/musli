@@ -1,7 +1,7 @@
 use crate::buf::Buf;
 use crate::error::Error;
-use crate::pointer::{Ref, Size, Slice, Unsized};
-use crate::traits::{UnsizedZeroCopy, ZeroCopy};
+use crate::pointer::{Pointee, Ref, Size};
+use crate::traits::ZeroCopy;
 
 /// Trait used for loading any kind of reference through [`Buf::load`].
 ///
@@ -66,18 +66,6 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> Load for Unsized<T, O>
-where
-    T: UnsizedZeroCopy,
-{
-    type Target = T;
-
-    #[inline]
-    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        buf.load_unsized(*self)
-    }
-}
-
 impl<T, O: Size> Load for Ref<T, O>
 where
     T: ZeroCopy,
@@ -90,8 +78,9 @@ where
     }
 }
 
-impl<T, O: Size> Load for Slice<T, O>
+impl<T, O: Size> Load for Ref<[T], O>
 where
+    [T]: Pointee<Metadata<O> = O>,
     T: ZeroCopy,
 {
     type Target = [T];
@@ -102,13 +91,12 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> LoadMut for Unsized<T, O>
-where
-    T: UnsizedZeroCopy,
-{
+impl<O: Size> Load for Ref<str, O> {
+    type Target = str;
+
     #[inline]
-    fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
-        buf.load_unsized_mut(*self)
+    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
+        buf.load_unsized(*self)
     }
 }
 
@@ -122,12 +110,20 @@ where
     }
 }
 
-impl<T, O: Size> LoadMut for Slice<T, O>
+impl<T, O: Size> LoadMut for Ref<[T], O>
 where
+    [T]: Pointee<Metadata<O> = O>,
     T: ZeroCopy,
 {
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
         buf.load_slice_mut(*self)
+    }
+}
+
+impl<O: Size> LoadMut for Ref<str, O> {
+    #[inline]
+    fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
+        buf.load_unsized_mut(*self)
     }
 }

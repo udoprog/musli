@@ -394,15 +394,14 @@ macro_rules! impl_unsized_primitive {
         ///
         /// ```
         $(#[doc = concat!("use ", stringify!($import), ";")])*
-        /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
-        /// use musli_zerocopy::pointer::Unsized;
+        /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
         ///
         /// #[derive(ZeroCopy)]
         /// #[repr(C)]
-        #[doc = concat!("struct Custom", stringify!($(<$param>)*) ," { field: Unsized<[", stringify!($ty) ,"]> }")]
+        #[doc = concat!("struct Custom", stringify!($(<$param>)*) ," { field: Ref<[", stringify!($ty) ,"]> }")]
         ///
         /// let mut buf = OwnedBuf::new();
-        #[doc = concat!("let unsize: Unsized<[", stringify!($example_ty), "]> = buf.store_unsized(&", stringify!($example), ");")]
+        #[doc = concat!("let unsize: Ref<[", stringify!($example_ty), "]> = buf.store_unsized(&", stringify!($example), ");")]
         /// let buf = buf.into_aligned();
         #[doc = concat!("assert_eq!(buf.load(unsize)?, &", stringify!($example), ");")]
         /// # Ok::<_, musli_zerocopy::Error>(())

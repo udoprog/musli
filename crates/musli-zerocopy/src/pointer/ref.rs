@@ -2,10 +2,11 @@ use core::cmp::Ordering;
 use core::fmt;
 use core::hash::Hash;
 use core::marker::PhantomData;
+use core::mem::size_of;
 
 use crate::mem::MaybeUninit;
-use crate::pointer::Pointee;
-use crate::pointer::{DefaultSize, Size, Slice};
+use crate::pointer::{DefaultSize, Pointee, Size};
+use crate::traits::UnsizedZeroCopy;
 use crate::ZeroCopy;
 
 /// A sized reference.
@@ -36,26 +37,158 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate)]
-pub struct Ref<T, O: Size = DefaultSize>
+#[zero_copy(crate, bounds = {T::Metadata<O>: ZeroCopy})]
+pub struct Ref<T: ?Sized, O: Size = DefaultSize>
 where
     T: Pointee,
 {
     offset: O,
-    metadata: T::Metadata,
+    metadata: T::Metadata<O>,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
+impl<T: ?Sized, O: Size> Ref<T, O>
+where
+    T: Pointee<Metadata<O> = O>,
+{
+    /// Construct a reference with custom metadata.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    ///
+    /// let reference = Ref::<[u64]>::with_metadata(42, 10);
+    /// assert_eq!(reference.offset(), 42);
+    /// assert_eq!(reference.len(), 10);
+    /// ```
+    #[inline]
+    pub fn with_metadata(offset: usize, metadata: usize) -> Self {
+        let Some(offset) = O::from_usize(offset) else {
+            panic!("Offset {offset} not in legal range 0-{}", O::MAX);
+        };
+
+        let Some(metadata) = O::from_usize(metadata) else {
+            panic!("Metadata {metadata} not in legal range 0-{}", O::MAX);
+        };
+
+        Self {
+            offset,
+            metadata,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T, O: Size> Ref<[T], O>
+where
+    [T]: Pointee,
+    <[T] as Pointee>::Metadata<O>: Size,
+{
+    /// The number of elements in the slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let slice = Ref::<[u32]>::with_metadata(0, 2);
+    /// assert_eq!(slice.len(), 2);
+    /// ```
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.metadata.as_usize()
+    }
+
+    /// If the slice is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let slice = Ref::<[u32]>::with_metadata(0, 0);
+    /// assert!(slice.is_empty());
+    ///
+    /// let slice = Ref::<[u32]>::with_metadata(0, 2);
+    /// assert!(!slice.is_empty());
+    /// ```
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.metadata.is_zero()
+    }
+
+    /// Try to get a reference directly out of the slice without validation.
+    ///
+    /// This avoids having to validate every element in a slice in order to
+    /// address them.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    ///
+    /// let buf = buf.into_aligned();
+    ///
+    /// let two = slice.get(2).expect("Missing element 2");
+    /// assert_eq!(buf.load(two)?, &3);
+    ///
+    /// assert!(slice.get(4).is_none());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn get(&self, index: usize) -> Option<Ref<T, O>>
+    where
+        T: Pointee<Metadata<O> = ()>,
+    {
+        if index >= self.len() {
+            return None;
+        }
+
+        let ptr = self
+            .offset
+            .as_usize()
+            .wrapping_add(size_of::<T>().wrapping_mul(index));
+
+        Some(Ref::new(ptr))
+    }
+}
+
+impl<T: ?Sized, O: Size> Ref<T, O>
+where
+    T: UnsizedZeroCopy,
+    T: Pointee,
+    <T as Pointee>::Metadata<O>: Size,
+{
+    /// The number of elements in the slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let slice = Ref::<str>::with_metadata(0, 10);
+    /// assert_eq!(slice.size(), 10);
+    /// ```
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.metadata.as_usize()
+    }
+}
+
 impl<T, O: Size> Ref<T, O>
 where
-    T: Pointee<Metadata = ()>,
+    T: Pointee<Metadata<O> = ()>,
 {
     // Construct a reference that does not require `T` to be `ZeroCopy`.
     #[inline]
     pub(crate) fn new_raw(offset: usize) -> Self {
         let Some(offset) = O::from_usize(offset) else {
-            panic!("Ref offset {offset} not in the legal range of 0-{}", O::MAX);
+            panic!("Offset {offset} not in the legal range 0-{}", O::MAX);
         };
 
         Self {
@@ -100,7 +233,7 @@ where
     }
 }
 
-impl<T, O: Size> Ref<T, O>
+impl<T: ?Sized, O: Size> Ref<T, O>
 where
     T: Pointee,
 {
@@ -134,7 +267,7 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = buf.store(&[1, 2, 3, 4]);
-    /// let slice = values.into_slice();
+    /// let slice = values.array_into_slice();
     ///
     /// let buf = buf.into_aligned();
     ///
@@ -142,8 +275,16 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn into_slice(self) -> Slice<T, O> {
-        Slice::new_with_offset(self.offset, N)
+    pub fn array_into_slice(self) -> Ref<[T], O> {
+        let Some(len) = O::from_usize(N) else {
+            panic!("Array length {N} out of bounds 0-{}", O::MAX);
+        };
+
+        Ref {
+            offset: self.offset,
+            metadata: len,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -165,10 +306,10 @@ where
     }
 }
 
-impl<T, O: Size> fmt::Debug for Ref<T, O>
+impl<T: ?Sized, O: Size> fmt::Debug for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata: fmt::Debug,
+    T::Metadata<O>: fmt::Debug,
     O: fmt::Debug,
 {
     #[inline]
@@ -183,9 +324,10 @@ where
     }
 }
 
-impl<T, O: Size> Clone for Ref<T, O>
+impl<T: ?Sized, O: Size> Clone for Ref<T, O>
 where
     T: Pointee,
+    T::Metadata<O>: Copy,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -193,12 +335,17 @@ where
     }
 }
 
-impl<T, O: Size> Copy for Ref<T, O> where T: Pointee {}
-
-impl<T, O: Size> PartialEq for Ref<T, O>
+impl<T: ?Sized, O: Size> Copy for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata: PartialEq,
+    T::Metadata<O>: Copy,
+{
+}
+
+impl<T: ?Sized, O: Size> PartialEq for Ref<T, O>
+where
+    T: Pointee,
+    T::Metadata<O>: PartialEq,
     O: PartialEq,
 {
     #[inline]
@@ -207,18 +354,18 @@ where
     }
 }
 
-impl<T, O: Size> Eq for Ref<T, O>
+impl<T: ?Sized, O: Size> Eq for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata: Eq,
+    T::Metadata<O>: Eq,
     O: Eq,
 {
 }
 
-impl<T, O: Size> PartialOrd for Ref<T, O>
+impl<T: ?Sized, O: Size> PartialOrd for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata: PartialOrd,
+    T::Metadata<O>: PartialOrd,
     O: Ord,
 {
     #[inline]
@@ -232,10 +379,10 @@ where
     }
 }
 
-impl<T, O: Size> Ord for Ref<T, O>
+impl<T: ?Sized, O: Size> Ord for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata: Ord,
+    T::Metadata<O>: Ord,
     O: Ord,
 {
     #[inline]
@@ -249,10 +396,10 @@ where
     }
 }
 
-impl<T, O: Size> Hash for Ref<T, O>
+impl<T: ?Sized, O: Size> Hash for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata: Hash,
+    T::Metadata<O>: Hash,
     O: Hash,
 {
     #[inline]

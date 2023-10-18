@@ -5,12 +5,25 @@ use crate::ZeroCopy;
 /// [`Ref<T>`]: crate::Ref
 pub trait Pointee {
     /// The metadata of the pointee.
-    type Metadata: ZeroCopy + Copy;
+    type Metadata<O>: Copy
+    where
+        O: Copy;
 }
 
 impl<T> Pointee for T
 where
     T: ZeroCopy,
 {
-    type Metadata = ();
+    type Metadata<O> = () where O: Copy;
+}
+
+impl<T> Pointee for [T]
+where
+    T: ZeroCopy,
+{
+    type Metadata<O> = O where O: Copy;
+}
+
+impl Pointee for str {
+    type Metadata<O> = O where O: Copy;
 }

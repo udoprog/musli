@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 
-use crate::pointer::{Ref, Slice};
+use crate::pointer::Ref;
 use crate::{Error, OwnedBuf, ZeroCopy};
 
 #[test]
@@ -20,7 +20,7 @@ fn test_ref_to_slice() -> Result<(), Error> {
     #[repr(C)]
     #[zero_copy(crate)]
     pub struct RefToSlice {
-        index: Ref<Slice<u8>>,
+        index: Ref<Ref<[u8]>>,
         extra: InnerEnum,
     }
 

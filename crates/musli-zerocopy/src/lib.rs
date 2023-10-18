@@ -95,11 +95,11 @@
 //! 0016: size -> 12
 //! ```
 //!
-//! What we see at offset `0016` is an 8 byte [`Unsized<str>`]. The first field
+//! What we see at offset `0016` is an 8 byte [`Ref<str>`]. The first field
 //! stores the offset where to fetch the string, and the second field the length
 //! of the string.
 //!
-//! Let's have a look at a [`Slice<u32>`] next:
+//! Let's have a look at a [`Ref<[u32]>`] next:
 //!
 //! ```rust
 //! use musli_zerocopy::OwnedBuf;
@@ -123,21 +123,20 @@
 //! 0020: length -> 4
 //! ```
 //!
-//! At address `0016` we store two fields which corresponds to a [`Slice<u32>`].
+//! At address `0016` we store two fields which corresponds to a [`Ref<[u32]>`].
 //!
 //! Next lets investigate an example using a `Custom` struct:
 //!
 //! ```
 //! # use anyhow::Context;
 //! use core::mem::size_of;
-//! use musli_zerocopy::{OwnedBuf, ZeroCopy};
-//! use musli_zerocopy::pointer::Unsized;
+//! use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
 //! struct Custom {
 //!     field: u32,
-//!     string: Unsized<str>,
+//!     string: Ref<str>,
 //! }
 //!
 //! let mut buf = OwnedBuf::new();
@@ -212,8 +211,7 @@
 //! aligned `&'static [u8]` buffer:
 //!
 //! ```
-//! # use musli_zerocopy::ZeroCopy;
-//! # use musli_zerocopy::pointer::Unsized;
+//! # use musli_zerocopy::{Ref, ZeroCopy};
 //! # macro_rules! include_bytes {
 //! # ($path:literal) => { &[
 //! #    b'H', b'e', b'l', b'l', b'o', b' ', b'W', b'o', b'r', b'l', b'd', b'!',
@@ -222,9 +220,9 @@
 //! # }
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
-//! # struct Custom { field: u32, string: Unsized<str> }
+//! # struct Custom { field: u32, string: Ref<str> }
 //! use core::mem::size_of;
-//! use musli_zerocopy::{Buf, Ref};
+//! use musli_zerocopy::Buf;
 //!
 //! // Helper to force the static buffer to be aligned like `A`.
 //! #[repr(C)]
@@ -255,12 +253,11 @@
 //! it depends on are stored at subsequent offsets.
 //!
 //! ```
-//! # use musli_zerocopy::ZeroCopy;
-//! # use musli_zerocopy::pointer::Unsized;
+//! # use musli_zerocopy::{Ref, ZeroCopy};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
-//! # struct Custom { field: u32, string: Unsized<str> }
-//! use musli_zerocopy::{OwnedBuf, Ref};
+//! # struct Custom { field: u32, string: Ref<str> }
+//! use musli_zerocopy::OwnedBuf;
 //! use musli_zerocopy::mem::MaybeUninit;
 //!
 //! let mut buf = OwnedBuf::new();
@@ -299,19 +296,18 @@
 //! Example panic using a [`Slice`] with a length larger than `2^32`:
 //!
 //! ```should_panic
-//! # use musli_zerocopy::ZeroCopy;
-//! # use musli_zerocopy::pointer::Slice;
+//! # use musli_zerocopy::{Ref, ZeroCopy};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom;
-//! Slice::<Custom>::new(0, 1usize << 32);
+//! Ref::<[Custom]>::with_metadata(0, 1usize << 32);
 //! ```
 //!
-//! Example panic using an [`Unsized`] value with a size larger than `2^32`:
+//! Example panic using an [`Ref`] value with a size larger than `2^32`:
 //!
 //! ```should_panic
-//! # use musli_zerocopy::pointer::Unsized;
-//! Unsized::<str>::new(0, 1usize << 32);
+//! # use musli_zerocopy::Ref;
+//! Ref::<str>::with_metadata(0, 1usize << 32);
 //! ```
 //!
 //! If you want to address data larger than this limit, it is recommended that
@@ -326,14 +322,13 @@
 //!
 //! ```
 //! # use musli_zerocopy::{Ref, ZeroCopy};
-//! # use musli_zerocopy::pointer::{Slice, Unsized};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom;
 //! // These no longer panic:
 //! let reference = Ref::<Custom, usize>::new(1usize << 32);
-//! let slice = Slice::<Custom, usize>::new(0, 1usize << 32);
-//! let unsize = Unsized::<str, usize>::new(0, 1usize << 32);
+//! let slice = Ref::<[Custom], usize>::with_metadata(0, 1usize << 32);
+//! let unsize = Ref::<str, usize>::with_metadata(0, 1usize << 32);
 //! ```
 //!
 //! To initialize an [`OwnedBuf`] with a custom [`Size`] you use this
@@ -352,11 +347,10 @@
 //! ```
 //! use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 //! use musli_zerocopy::buf::DefaultAlignment;
-//! use musli_zerocopy::pointer::{Slice, Unsized};
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
-//! struct Custom { reference: Ref<u32, usize>, slice: Slice::<u32, usize>, unsize: Unsized::<str, usize> }
+//! struct Custom { reference: Ref<u32, usize>, slice: Ref::<[u32], usize>, unsize: Ref::<str, usize> }
 //!
 //! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
 //!
@@ -379,14 +373,10 @@
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
 //! [`Ref`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
-//! [`Slice`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Slice.html
-//! [`Slice<u32>`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Slice.html
-//! [`Unsized`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Unsized.html
-//! [`Unsized<str>`]:
-//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Unsized.html
+//! [`Ref<[u32]>`]:
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+//! [`Ref<str>`]:
+//!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 //! [`OwnedBuf`]:
 //!     https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
 //! [`Size`]:
