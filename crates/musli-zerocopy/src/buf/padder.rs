@@ -55,44 +55,6 @@ where
     ///
     /// The caller must ensure that the field type `F` is an actual field in
     /// order in the struct being padded.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::mem::size_of;
-    ///
-    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
-    /// use musli_zerocopy::buf::BufMut;
-    ///
-    /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
-    /// #[repr(C)]
-    /// struct ZeroPadded(u8, u16);
-    ///
-    /// let padded = ZeroPadded(0x01u8.to_be(), 0x0203u16.to_be());
-    ///
-    /// let mut buf = OwnedBuf::new();
-    ///
-    /// // Note: You're responsible for ensuring that the buffer has enough
-    /// // capacity.
-    /// buf.reserve(size_of::<ZeroPadded>());
-    ///
-    /// // SAFETY: We do not pad beyond known fields and are
-    /// // making sure to initialize all of the buffer.
-    /// unsafe {
-    ///     let mut buf_mut = buf.as_buf_mut();
-    ///
-    ///     let mut w = buf_mut.store_struct(&padded);
-    ///     w.pad::<u8>(&padded.0);
-    ///     w.pad::<u16>(&padded.1);
-    ///     w.remaining();
-    ///
-    ///     buf.advance(size_of::<ZeroPadded>());
-    /// }
-    ///
-    /// // Note: The bytes are explicitly convert to big-endian encoding above.
-    /// assert_eq!(buf.as_slice(), &[1, 0, 2, 3]);
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
     #[inline]
     pub unsafe fn pad<F>(&mut self, field: *const F)
     where
@@ -117,45 +79,6 @@ where
     /// The caller must ensure that the field type `F` is an actual field in
     /// order in the struct being padded and that `align` matches the argument
     /// provided to `#[repr(packed)]` (note that empty means 1).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::ptr;
-    /// use std::mem::size_of;
-    ///
-    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
-    /// use musli_zerocopy::buf::BufMut;
-    ///
-    /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
-    /// #[repr(C, packed(2))]
-    /// struct ZeroPadded(u8, u32);
-    ///
-    /// let padded = ZeroPadded(0x01u8.to_be(), 0x02030405u32.to_be());
-    ///
-    /// let mut buf = OwnedBuf::new();
-    ///
-    /// // Note: You're responsible for ensuring that the buffer has enough
-    /// // capacity.
-    /// buf.reserve(size_of::<ZeroPadded>());
-    ///
-    /// // SAFETY: We do not pad beyond known fields and are
-    /// // making sure to initialize all of the buffer.
-    /// unsafe {
-    ///     let mut buf_mut = buf.as_buf_mut();
-    ///
-    ///     let mut w = buf_mut.store_struct(&padded);
-    ///     w.pad_with::<u8>(ptr::addr_of!(padded.0), 2);
-    ///     w.pad_with::<u32>(ptr::addr_of!(padded.1), 2);
-    ///     w.remaining();
-    ///
-    ///     buf.advance(size_of::<ZeroPadded>());
-    /// }
-    ///
-    /// // Note: The bytes are explicitly convert to big-endian encoding above.
-    /// assert_eq!(buf.as_slice(), &[1, 0, 2, 3, 4, 5]);
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
     #[inline]
     pub unsafe fn pad_with<F>(&mut self, field: *const F, align: usize)
     where
@@ -212,50 +135,53 @@ where
     ///
     /// [`pad::<F>()`]: Self::pad
     /// [`ZeroSized`]: crate::traits::ZeroSized
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use core::mem::size_of;
-    ///
-    /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
-    /// use musli_zerocopy::buf::BufMut;
-    ///
-    /// #[derive(Debug, PartialEq, Eq, ZeroCopy)]
-    /// #[repr(C)]
-    /// struct ZeroPadded(u8, u16);
-    ///
-    /// let padded = ZeroPadded(0x01u8.to_be(), 0x0203u16.to_be());
-    ///
-    /// let mut buf = OwnedBuf::new();
-    ///
-    /// // Note: Calling `next_offset` allocates space for `ZeroPadded`.
-    /// let reference = Ref::<ZeroPadded>::new(buf.next_offset::<ZeroPadded>());
-    ///
-    /// // SAFETY: We do not pad beyond known fields and are
-    /// // making sure to initialize all of the buffer.
-    /// unsafe {
-    ///     let mut buf_mut = buf.as_buf_mut();
-    ///
-    ///     let mut w = buf_mut.store_struct(&padded);
-    ///     w.pad(&padded.0);
-    ///     w.pad(&padded.1);
-    ///     w.remaining();
-    ///
-    ///     buf.advance(size_of::<ZeroPadded>());
-    /// }
-    ///
-    /// // Note: The bytes are explicitly convert to big-endian encoding above.
-    /// assert_eq!(buf.as_slice(), &[1, 0, 2, 3]);
-    ///
-    /// let buf = buf.into_aligned();
-    ///
-    /// assert_eq!(buf.load(reference)?, &padded);
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
     #[inline]
     pub unsafe fn remaining(self) {
         let count = size_of::<T>() - self.offset;
         ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+
+    use anyhow::Result;
+
+    use crate::{OwnedBuf, ZeroCopy};
+
+    #[test]
+    fn ensure_padding() -> Result<()> {
+        #[derive(Debug, PartialEq, Eq, ZeroCopy)]
+        #[repr(C)]
+        #[zero_copy(crate)]
+        struct ZeroPadded(u8, u16, u64);
+
+        let padded = ZeroPadded(
+            0x01u8.to_be(),
+            0x0203u16.to_be(),
+            0x0405060708090a0bu64.to_be(),
+        );
+
+        let mut buf = OwnedBuf::new();
+
+        // Note: You're responsible for ensuring that the buffer has enough
+        // capacity.
+        buf.reserve(size_of::<ZeroPadded>());
+
+        // SAFETY: We do not pad beyond known fields and are making sure to
+        // initialize all of the buffer.
+        unsafe {
+            buf.as_buf_mut().store_unaligned(&padded);
+            buf.advance(size_of::<ZeroPadded>());
+        }
+
+        // Note: The bytes are explicitly convert to big-endian encoding above.
+        assert_eq!(
+            buf.as_slice(),
+            &[1, 0, 2, 3, 0, 0, 0, 0, 4, 5, 6, 7, 8, 9, 10, 11]
+        );
+
+        Ok(())
     }
 }

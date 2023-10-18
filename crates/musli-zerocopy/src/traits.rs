@@ -205,11 +205,6 @@ where
     const PADDED: bool = T::PADDED;
 
     #[inline]
-    unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>) {
-        T::store_unaligned(this.cast(), buf);
-    }
-
-    #[inline]
     unsafe fn pad(this: *const Self, padder: &mut Padder<'_, Self>) {
         padder.pad(this.cast::<T>());
     }
@@ -331,26 +326,10 @@ pub unsafe trait ZeroCopy: Sized {
     /// that is aligned to `align_of::<Self>()`.
     const PADDED: bool;
 
-    /// Store the current unaligned value to the mutable buffer.
-    ///
-    /// This is usually called indirectly through methods such as
-    /// [`OwnedBuf::store`].
-    ///
-    /// [`OwnedBuf::store`]: crate::buf::OwnedBuf::store
-    ///
-    /// # Safety
-    ///
-    /// The implementor is responsible for ensuring that the struct has a
-    /// well-defined layout, and that the struct is stored in the passed in
-    /// `buf` correctly, which includes enumerating every field including hidden
-    /// ones.
-    unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>);
-
     /// Mark padding for the current type.
     ///
     /// The `this` receiver takes the current type as pointer instead of a
-    /// reference, because it might not be aligned in the case of packed
-    /// types.
+    /// reference, because it might not be aligned in the case of packed types.
     ///
     /// # Safety
     ///
@@ -517,11 +496,6 @@ macro_rules! impl_number {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>) {
-                buf.store_unaligned(this);
-            }
-
-            #[inline]
             unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
 
             #[inline]
@@ -564,11 +538,6 @@ macro_rules! impl_float {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>) {
-                buf.store_unaligned(this);
-            }
-
-            #[inline]
             unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
 
             #[inline]
@@ -597,11 +566,6 @@ impl_float!(f64);
 unsafe impl ZeroCopy for char {
     const ANY_BITS: bool = false;
     const PADDED: bool = false;
-
-    #[inline]
-    unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>) {
-        buf.store_unaligned(this.cast::<u32>());
-    }
 
     #[inline]
     unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
@@ -634,11 +598,6 @@ impl Visit for char {
 unsafe impl ZeroCopy for bool {
     const ANY_BITS: bool = false;
     const PADDED: bool = false;
-
-    #[inline]
-    unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>) {
-        buf.store_unaligned(this.cast::<u8>());
-    }
 
     #[inline]
     unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
@@ -703,11 +662,6 @@ macro_rules! impl_nonzero_number {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>) {
-                buf.store_unaligned(this.cast::<$inner>());
-            }
-
-            #[inline]
             unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
 
             #[inline]
@@ -765,11 +719,6 @@ macro_rules! impl_nonzero_number {
         unsafe impl ZeroCopy for Option<::core::num::$ty> {
             const ANY_BITS: bool = true;
             const PADDED: bool = false;
-
-            #[inline]
-            unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>) {
-                buf.store_unaligned(this.cast::<$inner>());
-            }
 
             #[inline]
             unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
@@ -838,10 +787,6 @@ macro_rules! impl_zst {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn store_unaligned(_: *const Self, _: &mut BufMut) {
-            }
-
-            #[inline]
             unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {
             }
 
@@ -900,16 +845,6 @@ where
 {
     const ANY_BITS: bool = T::ANY_BITS;
     const PADDED: bool = T::PADDED;
-
-    #[inline]
-    unsafe fn store_unaligned(this: *const Self, buf: &mut BufMut<'_>) {
-        // SAFETY: The buffer where we store the struct has been allocated for
-        // the `[T; N]`.
-        unsafe {
-            let mut padder = buf.store_struct(this);
-            Self::pad(this, &mut padder);
-        }
-    }
 
     #[inline]
     unsafe fn pad(this: *const Self, padder: &mut Padder<'_, Self>) {

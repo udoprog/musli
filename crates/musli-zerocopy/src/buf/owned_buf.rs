@@ -661,12 +661,7 @@ impl<O: Size> OwnedBuf<O> {
         let offset = self.len;
 
         let mut buf_mut = BufMut::new(self.data.as_ptr().wrapping_add(offset));
-        let mut padder = buf_mut.store_struct_aligned(value);
-
-        if T::PADDED {
-            T::pad(value, &mut padder);
-        }
-
+        buf_mut.store_unaligned(value);
         self.len += size_of::<T>();
         Ref::new(offset)
     }

@@ -527,7 +527,8 @@ impl<'a, T> Bucket<'a, T> {
     where
         T: ZeroCopy,
     {
-        T::store_unaligned(val, &mut BufMut::new(self.as_ptr().cast()));
+        let mut buf_mut = BufMut::new(self.as_ptr().cast());
+        buf_mut.store_unaligned(val);
     }
 
     /// Acquires the underlying raw pointer `*mut T` to `data`.

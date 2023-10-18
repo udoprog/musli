@@ -102,7 +102,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
         return Err(());
     };
 
-    let buf_mut: syn::Path = syn::parse_quote!(#krate::buf::BufMut);
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let mem: syn::Path = syn::parse_quote!(#krate::__private::mem);
     let padder: syn::Path = syn::parse_quote!(#krate::buf::Padder);
@@ -112,7 +111,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
 
-    let store_to;
     let pad;
     let validate;
     let impl_zero_sized;
@@ -132,10 +130,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
             match (repr, &output.first_field) {
                 (Repr::Transparent, Some((ty, member))) => {
-                    store_to = quote! {
-                        <#ty as #zero_copy>::store_unaligned(#ptr::addr_of!((*this).#member), buf);
-                    };
-
                     pad = quote! {
                         <#ty as #zero_copy>::pad(#ptr::addr_of!((*this).#member), #padder::transparent::<#ty>(padder));
                     };
@@ -154,14 +148,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                                 #(#padder::pad_with(padder, #ptr::addr_of!((*this).#members), #align);)*
                             };
 
-                            store_to = quote! {
-                                // SAFETY: We've systematically ensured to pad all
-                                // fields on the struct.
-                                let mut padder = #buf_mut::store_struct(buf, this);
-                                #(#padder::pad_with::<#types>(&mut padder, #ptr::addr_of!((*this).#members), #align);)*
-                                #padder::remaining(padder);
-                            };
-
                             validate = quote! {
                                 // SAFETY: We've systematically ensured that we're
                                 // only validating over fields within the size of
@@ -170,14 +156,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                             };
                         }
                         _ => {
-                            store_to = quote! {
-                                // SAFETY: We've systematically ensured to pad all
-                                // fields on the struct.
-                                let mut padder = #buf_mut::store_struct(buf, this);
-                                #(#padder::pad::<#types>(&mut padder, #ptr::addr_of!((*this).#members));)*
-                                #padder::remaining(padder);
-                            };
-
                             pad = quote! {
                                 #(#padder::pad(padder, #ptr::addr_of!((*this).#members));)*
                             };
@@ -257,7 +235,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             let ty = syn::Ident::new(num.as_ty(), span);
 
             let mut validate_variants = Vec::new();
-            let mut store_to_variants = Vec::new();
             let mut pad_variants = Vec::new();
             let mut padded_variants = Vec::new();
             let mut variant_fields = Vec::new();
@@ -338,12 +315,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     }
                 });
 
-                store_to_variants.push(quote! {
-                    Self::#ident { #(#assigns,)* .. } => {
-                        #(#padder::pad(&mut padder, #variables);)*
-                    }
-                });
-
                 pad_variants.push(quote! {
                     Self::#ident { #(#assigns,)* .. } => {
                         #(#padder::pad(padder, #variables);)*
@@ -373,21 +344,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     quote!(#pat => ())
                 });
             }
-
-            store_to = quote! {
-                // SAFETY: We've systematically ensured to pad all fields on the
-                // struct.
-                let mut padder = #buf_mut::store_struct(buf, this);
-                #padder::pad_primitive::<#ty>(&mut padder);
-
-                // NOTE: this is assumed to be properly, since enums cannot
-                // be packed.
-                match &*this {
-                    #(#store_to_variants,)*
-                }
-
-                #padder::remaining(padder);
-            };
 
             pad = quote! {
                 #padder::pad_primitive::<#ty>(padder);
@@ -465,11 +421,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
             const ANY_BITS: bool = #any_bits;
             const PADDED: bool = #padded;
-
-            #[inline]
-            unsafe fn store_unaligned(this: *const Self, buf: &mut #buf_mut<'_>) {
-                #store_to
-            }
 
             #[inline]
             unsafe fn pad(this: *const Self, padder: &mut #padder<'_, Self>) {
