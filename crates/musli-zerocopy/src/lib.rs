@@ -28,23 +28,30 @@
 //! Since this is the first question anyone will ask, here is how we differ from
 //! other popular libraries:
 //! * [`zerocopy`](https://docs.rs/zerocopy) doesn't support padded
-//!   structs[^padded], bytes to reference conversions, or conversions which do
-//!   not permit all bit patterns to be inhabited by zeroes[^zeroes]. We still
-//!   want to provide more of a complete toolkit that you'd need to build and
-//!   interact with complex data structures, such as the [`phf`] and [`swiss`]
-//!   modules. This crate might indeed at some point make use of `zerocopy`'s
-//!   traits.
+//!   structs[^padded], bytes to reference conversions, or conversions which
+//!   does not permit decoding types unless all bit patterns an be inhabited by
+//!   zeroes[^zeroes]. We still want to provide more of a complete toolkit that
+//!   you'd need to build and interact with complex data structures, such as the
+//!   [`phf`] and [`swiss`] modules. This crate might indeed at some point make
+//!   use of `zerocopy`'s traits.
 //! * [`rkyv`](https://docs.rs/rkyv) operates on `#[repr(Rust)]` types and from
 //!   this derives an optimized `Archived` variation for you. This library
 //!   operates on the equivalent of `Archived` variant directly instead that you
 //!   should build and interact with by hand. `rkyv` is also explicitly not
-//!   sound unless you build it with the `strict` feature, and even with the
-//!   feature enabled it doesn't pass Miri. Neither of these are strict blockers
-//!   for users of the library, but do constrain its safe applicability in ways
-//!   this library does not.
+//!   sound unless you build it with the [`strict` feature], and even with the
+//!   feature enabled it doesn't pass Miri[^miri] under the testing conditions
+//!   I've subjected it to. Neither of these are strict blockers for users of
+//!   the library, but do constrain its safe applicability in ways this library
+//!   does not.
 //!
-//! [^padded]: This is on their roadmap.
-//! [^zeroes]: FromBytes extends FromZeroes.
+//! [`strict` feature]: https://docs.rs/rkyv/latest/rkyv/#features
+//!
+//! [^padded]: This is on zerocopy's roadmap, but it fundamentally doesn't play well
+//!     with the central `FromBytes` / `ToBytes` pair of traits.
+//!
+//! [^zeroes]: [FromBytes extends FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html).
+//!
+//! [^miri]: This is on rkyv's roadmap.
 //!
 //! The `tests` test suite has been extended to support some level of
 //! zerocopy types, all though since the feature sets vary so widely between the

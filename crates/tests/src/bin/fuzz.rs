@@ -1,13 +1,14 @@
 #![allow(unused_assignments)]
 
 use std::env;
+use std::fmt;
 #[allow(unused)]
 use std::fs;
 #[allow(unused)]
 use std::hint::black_box;
 use std::io::Write;
 use std::mem::align_of;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[allow(unused)]
 use std::time::Instant;
 
@@ -51,8 +52,9 @@ where
 
 fn main() -> Result<()> {
     #[allow(unused)]
-    let root =
-        env::var_os("CARGO_MANIFEST_DIR").map(|path| PathBuf::from(path).join("..").join(".."));
+    let root = env::var_os("CARGO_MANIFEST_DIR")
+        .map(|path| PathBuf::from(path).join("..").join(".."))
+        .unwrap_or_else(|| PathBuf::from("."));
 
     let mut it = std::env::args().skip(1);
 
@@ -65,6 +67,7 @@ fn main() -> Result<()> {
     let mut seed = tests::RNG_SEED;
     let mut alignment = ALIGNMENT;
     let mut verbose = false;
+    let mut save = false;
 
     while let Some(arg) = it.next() {
         match arg.as_str() {
@@ -98,20 +101,27 @@ fn main() -> Result<()> {
             "--verbose" => {
                 verbose = true;
             }
+            "--save" => {
+                save = true;
+            }
             "-h" | "--help" => {
                 println!("Available options:");
-                println!(" --iter <count> - Perform the <count> number of iterations when fuzzing, (default: {})", ITER);
-                println!(" --random       - Feed each framework randomly generated.");
                 println!(
-                    " --size         - Construct random data structures and print their sizes."
+                    " --iter <count>  - Perform the <count> number of iterations when fuzzing, (default: {})", ITER);
+                println!(" --random        - Feed each framework randomly generated.");
+                println!(
+                    " --size          - Construct random data structures and print their sizes."
                 );
                 println!(
-                    " --seed <seed>  - Use the specified random seed (default: {}).",
+                    " --seed <seed>   - Use the specified random seed (default: {}).",
                     tests::RNG_SEED
                 );
                 println!(
-                    " --align <align>  - Use the specified random seed (default: {}).",
+                    " --align <align> - Use the specified random seed (default: {}).",
                     ALIGNMENT
+                );
+                println!(
+                    " --save          - Before decoding something, save the bytes to the `target` folder. Use `--verbose` to figure out where."
                 );
                 println!();
                 println!(
@@ -212,6 +222,10 @@ fn main() -> Result<()> {
                                 }
 
                                 o.flush()?;
+                            }
+
+                            if save {
+                                save_decode(&mut o, &root, verbose, bytes.as_slice(), format_args!("{n}_{}", stringify!($framework)))?;
                             }
 
                             match utils::$framework::decode::<$ty>(bytes.as_slice()) {
@@ -318,6 +332,12 @@ fn main() -> Result<()> {
                                         }
                                     };
 
+                                    if let Some(bytes) = out.as_bytes() {
+                                        if save {
+                                            save_decode(&mut o, &root, verbose, bytes, format_args!("{index}_{}", stringify!($framework)))?;
+                                        }
+                                    }
+
                                     let actual = match out.decode::<$ty>() {
                                         Ok(value) => value,
                                         Err(error) => {
@@ -325,7 +345,7 @@ fn main() -> Result<()> {
                                             writeln!(o)?;
                                             writeln!(o, "{index}: error during decode: {error}")?;
 
-                                            if let (Some(root), Some(bytes)) = (&root, out.as_bytes()) {
+                                            if let Some(bytes) = out.as_bytes() {
                                                 let path = root.join("target").join(format!("{}_error.bin", stringify!($framework)));
                                                 fs::write(&path, bytes).with_context(|| path.display().to_string())?;
                                                 writeln!(o, "{index}: failing structure written to {}", path.display())?;
@@ -398,5 +418,26 @@ fn main() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+#[allow(unused)]
+fn save_decode<W>(
+    o: &mut W,
+    root: &Path,
+    verbose: bool,
+    bytes: &[u8],
+    name: impl fmt::Display,
+) -> Result<()>
+where
+    W: ?Sized + Write,
+{
+    let path = root.join("target").join(format!("{}_decode.bin", name));
+
+    if verbose {
+        writeln!(o, "Saving: {}", path.display())?;
+    }
+
+    fs::write(&path, bytes).with_context(|| path.display().to_string())?;
     Ok(())
 }
