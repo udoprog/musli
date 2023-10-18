@@ -105,8 +105,9 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
     let error: syn::Path = syn::parse_quote!(#krate::Error);
     let mem: syn::Path = syn::parse_quote!(#krate::__private::mem);
     let padder: syn::Path = syn::parse_quote!(#krate::buf::Padder);
-    let ptr: syn::Path = syn::parse_quote!(#krate::__private::ptr);
     let result: syn::Path = syn::parse_quote!(#krate::__private::result::Result);
+    let unknown_discriminant: syn::Path =
+        syn::parse_quote!(#krate::__private::unknown_discriminant);
     let validator: syn::Path = syn::parse_quote!(#krate::buf::Validator);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
@@ -129,9 +130,9 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             check_zero_sized.append(&mut output.check_zero_sized);
 
             match (repr, &output.first_field) {
-                (Repr::Transparent, Some((ty, member))) => {
+                (Repr::Transparent, Some(ty)) => {
                     pad = quote! {
-                        <#ty as #zero_copy>::pad(#ptr::addr_of!((*this).#member), #padder::transparent::<#ty>(padder));
+                        <#ty as #zero_copy>::pad(#padder::transparent::<#ty>(padder));
                     };
 
                     validate = quote! {
@@ -139,13 +140,12 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     };
                 }
                 _ => {
-                    let members = &output.members;
                     let types = &output.types;
 
                     match r.repr_packed {
                         Some((_, align)) => {
                             pad = quote! {
-                                #(#padder::pad_with(padder, #ptr::addr_of!((*this).#members), #align);)*
+                                #(#padder::pad_with::<#types>(padder, #align);)*
                             };
 
                             validate = quote! {
@@ -157,7 +157,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                         }
                         _ => {
                             pad = quote! {
-                                #(#padder::pad(padder, #ptr::addr_of!((*this).#members));)*
+                                #(#padder::pad::<#types>(padder);)*
                             };
 
                             validate = quote! {
@@ -207,7 +207,9 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     const _: () = {
                         #[allow(unused)]
                         fn check_struct_fields #impl_generics(this: #name #ty_generics) #where_clause {
-                            let #pat = this;
+                            match this {
+                                #pat => {}
+                            }
                         }
                     };
                 )
@@ -294,7 +296,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     lit: syn::Lit::Int(current.clone()),
                 });
 
-                let discriminator = if *neg {
+                let discriminant = if *neg {
                     syn::Expr::Unary(syn::ExprUnary {
                         attrs: Vec::new(),
                         op: syn::UnOp::Neg(<Token![-]>::default()),
@@ -304,20 +306,17 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     expr
                 };
 
-                let ident = &variant.ident;
                 let types = &output.types;
-                let variables = &output.variables;
-                let assigns = &output.assigns;
 
                 validate_variants.push(quote! {
-                    #discriminator => {
+                    #discriminant => {
                         #(#validator::validate::<#types>(validator)?;)*
                     }
                 });
 
                 pad_variants.push(quote! {
-                    Self::#ident { #(#assigns,)* .. } => {
-                        #(#padder::pad(padder, #variables);)*
+                    #discriminant => {
+                        #(#padder::pad::<#types>(padder);)*
                     }
                 });
 
@@ -346,12 +345,11 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             }
 
             pad = quote! {
-                #padder::pad_primitive::<#ty>(padder);
-
                 // NOTE: this is assumed to be properly, since enums cannot be
                 // packed.
-                match &*this {
+                match #padder::pad_discriminator::<#ty>(padder) {
                     #(#pad_variants,)*
+                    discriminant => #unknown_discriminant(discriminant),
                 }
             };
 
@@ -360,9 +358,9 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             validate = quote! {
                 // SAFETY: We've systematically ensured that we're only
                 // validating over fields within the size of this type.
-                let discriminator = *#validator::field::<#ty>(validator)?;
+                let discriminant = *#validator::field::<#ty>(validator)?;
 
-                match discriminator {
+                match discriminant {
                     #(#validate_variants,)*
                     value => return #result::Err(#error::#illegal_enum::<Self>(value)),
                 }
@@ -378,7 +376,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             check_fields = quote!(
                 const _: () = {
                     #[allow(unused)]
-                    fn check_variants_fields #impl_generics(this: &#name #ty_generics) #where_clause {
+                    fn check_variant_fields #impl_generics(this: &#name #ty_generics) #where_clause {
                         match this {
                             #(#variant_fields,)*
                         }
@@ -423,7 +421,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             const PADDED: bool = #padded;
 
             #[inline]
-            unsafe fn pad(this: *const Self, padder: &mut #padder<'_, Self>) {
+            unsafe fn pad(padder: &mut #padder<'_, Self>) {
                 #pad
             }
 
@@ -503,11 +501,8 @@ fn build_field_exhaustive_pattern<const N: usize>(
 #[derive(Default)]
 struct Fields<'a> {
     types: Vec<&'a syn::Type>,
-    members: Vec<syn::Member>,
     exhaustive: Vec<syn::Member>,
-    variables: Vec<syn::Ident>,
-    assigns: Vec<syn::FieldValue>,
-    first_field: Option<(&'a syn::Type, syn::Member)>,
+    first_field: Option<&'a syn::Type>,
     check_zero_sized: Vec<&'a syn::Type>,
 }
 
@@ -553,23 +548,9 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
         }
 
         output.types.push(ty);
-        output.members.push(member.clone());
-
-        let variable = match &field.ident {
-            Some(ident) => ident.clone(),
-            None => quote::format_ident!("_{}", index),
-        };
-
-        if matches!(&member, syn::Member::Named(..)) {
-            output.assigns.push(syn::parse_quote!(#member));
-        } else {
-            output.assigns.push(syn::parse_quote!(#member: #variable));
-        }
-
-        output.variables.push(variable);
 
         if output.first_field.is_none() {
-            output.first_field = Some((ty, member));
+            output.first_field = Some(ty);
         }
     }
 

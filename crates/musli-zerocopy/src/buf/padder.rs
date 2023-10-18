@@ -54,11 +54,11 @@ where
     /// The caller must ensure that the field type `F` is an actual field in
     /// order in the struct being padded.
     #[inline]
-    pub unsafe fn pad<F>(&mut self, field: *const F)
+    pub unsafe fn pad<F>(&mut self)
     where
         F: ZeroCopy,
     {
-        self.pad_with(field, align_of::<F>());
+        self.pad_with::<F>(align_of::<F>());
     }
 
     /// Pad around the given field with zeros using a custom alignment `align`.
@@ -78,7 +78,7 @@ where
     /// order in the struct being padded and that `align` matches the argument
     /// provided to `#[repr(packed)]` (note that empty means 1).
     #[inline]
-    pub unsafe fn pad_with<F>(&mut self, field: *const F, align: usize)
+    pub unsafe fn pad_with<F>(&mut self, align: usize)
     where
         F: ZeroCopy,
     {
@@ -89,7 +89,7 @@ where
 
         if F::PADDED {
             let mut padder = Padder::new(self.ptr.wrapping_add(self.offset));
-            F::pad(field, &mut padder);
+            F::pad(&mut padder);
             padder.remaining();
         }
 
@@ -104,14 +104,17 @@ where
     /// order in the struct being padded and that `F` is a primitive that does
     /// not contain any interior padding.
     #[inline]
-    pub unsafe fn pad_primitive<F>(&mut self)
+    pub unsafe fn pad_discriminator<D>(&mut self) -> D
     where
-        F: ZeroCopy,
+        D: ZeroCopy,
     {
-        let count = crate::buf::padding_to(self.offset, align_of::<F>());
+        let count = crate::buf::padding_to(self.offset, align_of::<D>());
         // zero out padding.
         ptr::write_bytes(self.ptr.add(self.offset), 0, count);
-        self.offset = self.offset.wrapping_add(count.wrapping_add(size_of::<F>()));
+        let at = self.offset.wrapping_add(count);
+        let value = self.ptr.add(at).cast::<D>().read_unaligned();
+        self.offset = at.wrapping_add(size_of::<D>());
+        value
     }
 
     /// Finish writing the current buffer.
@@ -136,6 +139,13 @@ where
     #[inline]
     pub unsafe fn remaining(self) {
         let count = size_of::<T>() - self.offset;
+        ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
+    }
+
+    /// Finalize remaining padding with a custom size.
+    #[inline]
+    pub(crate) unsafe fn remaining_with(self, size: usize) {
+        let count = size - self.offset;
         ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
     }
 }

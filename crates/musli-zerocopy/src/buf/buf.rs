@@ -480,6 +480,56 @@ impl Buf {
         Ok(Validator::new(self.data.as_ptr()))
     }
 
+    pub(crate) unsafe fn get_range_from(
+        &self,
+        start: usize,
+        align: usize,
+    ) -> Result<(*const u8, usize), Error> {
+        if self.data.len() < start {
+            return Err(Error::new(ErrorKind::OutOfRangeFromBounds {
+                range: start..,
+                len: self.data.len(),
+            }));
+        };
+
+        let ptr = self.data.as_ptr().wrapping_add(start);
+        let remaining = self.data.len() - start;
+
+        if !crate::buf::is_aligned_with(ptr, align) {
+            return Err(Error::new(ErrorKind::AlignmentRangeFromMismatch {
+                range: start..,
+                align,
+            }));
+        }
+
+        Ok((ptr, remaining))
+    }
+
+    pub(crate) unsafe fn get_mut_range_from(
+        &mut self,
+        start: usize,
+        align: usize,
+    ) -> Result<(*mut u8, usize), Error> {
+        if self.data.len() < start {
+            return Err(Error::new(ErrorKind::OutOfRangeFromBounds {
+                range: start..,
+                len: self.data.len(),
+            }));
+        };
+
+        let ptr = self.data.as_mut_ptr().wrapping_add(start);
+        let remaining = self.data.len() - start;
+
+        if !crate::buf::is_aligned_with(ptr, align) {
+            return Err(Error::new(ErrorKind::AlignmentRangeFromMismatch {
+                range: start..,
+                align,
+            }));
+        }
+
+        Ok((ptr, remaining))
+    }
+
     /// Get the given range while checking its required alignment.
     ///
     /// # Safety
@@ -495,7 +545,7 @@ impl Buf {
         let buf = self.inner_get_unaligned(start, end)?;
 
         if !crate::buf::is_aligned_with(buf.as_ptr(), align) {
-            return Err(Error::new(ErrorKind::AlignmentMismatch {
+            return Err(Error::new(ErrorKind::AlignmentRangeMismatch {
                 range: start..end,
                 align,
             }));
@@ -519,7 +569,7 @@ impl Buf {
         let buf = Buf::new_mut(self.inner_get_mut_unaligned(start, end)?);
 
         if !buf.is_aligned_with_unchecked(align) {
-            return Err(Error::new(ErrorKind::AlignmentMismatch {
+            return Err(Error::new(ErrorKind::AlignmentRangeMismatch {
                 range: start..end,
                 align,
             }));
@@ -565,17 +615,17 @@ impl Buf {
     #[inline]
     pub(crate) fn load_unsized<T: ?Sized, O: Size>(&self, unsize: Ref<T, O>) -> Result<&T, Error>
     where
-        T: Pointee<O, Packed = O> + UnsizedZeroCopy,
+        T: Pointee<O, Packed = O> + UnsizedZeroCopy<T, O>,
     {
         let start = unsize.offset();
-        let size = unsize.size();
-        let end = start.wrapping_add(size.wrapping_mul(T::SIZE));
+        let metadata = unsize.metadata();
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
         unsafe {
-            let buf = self.inner_get(start, end, T::ALIGN)?;
-            Ok(&*T::coerce(buf.as_ptr(), size)?)
+            let (buf, remaining) = self.get_range_from(start, T::ALIGN)?;
+            let metadata = T::validate(buf, remaining, metadata)?;
+            Ok(&*T::coerce(buf, metadata))
         }
     }
 
@@ -586,17 +636,17 @@ impl Buf {
         unsize: Ref<T, O>,
     ) -> Result<&mut T, Error>
     where
-        T: Pointee<O, Packed = O> + UnsizedZeroCopy,
+        T: Pointee<O, Packed = O> + UnsizedZeroCopy<T, O>,
     {
         let start = unsize.offset();
-        let size = unsize.size();
-        let end = start.wrapping_add(size.wrapping_mul(T::SIZE));
+        let metadata = unsize.metadata();
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
         unsafe {
-            let buf = self.inner_get_mut(start, end, T::ALIGN)?;
-            Ok(&mut *T::coerce_mut(buf.as_mut_ptr(), size)?)
+            let (buf, remaining) = self.get_mut_range_from(start, T::ALIGN)?;
+            let metadata = T::validate(buf, remaining, metadata)?;
+            Ok(&mut *T::coerce_mut(buf, metadata))
         }
     }
 
@@ -656,12 +706,6 @@ impl Buf {
     #[inline]
     pub(crate) fn as_ptr(&self) -> *const u8 {
         self.data.as_ptr()
-    }
-
-    /// Access the underlying slice as a mutable pointer.
-    #[inline]
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.data.as_mut_ptr()
     }
 
     /// The numerical range of the buffer.

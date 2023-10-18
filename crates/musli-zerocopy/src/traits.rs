@@ -24,6 +24,7 @@ use core::str;
 
 use crate::buf::{Buf, BufMut, Padder, Validator, Visit};
 use crate::error::{Error, ErrorKind};
+use crate::pointer::{Pointee, Size};
 
 mod sealed {
     use crate::ZeroCopy;
@@ -63,7 +64,10 @@ mod sealed {
 /// assert_eq!(buf.load(bytes)?, b"Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
+pub unsafe trait UnsizedZeroCopy<P: ?Sized, O>: self::sealed::Sealed
+where
+    P: Pointee<O>,
+{
     /// Alignment of the pointed to data. We can only support unsized types
     /// which have a known alignment.
     ///
@@ -72,14 +76,13 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// This must be a power of two.
     const ALIGN: usize;
 
-    /// The size of the base type.
-    const SIZE: usize;
-
-    /// The size of the unsized value.
+    /// The size in bytes of the unsized value.
+    ///
+    /// This is known as long as the value is accessed through a reference.
     fn size(&self) -> usize;
 
-    /// The size in bytes of the unsized value.
-    fn bytes(&self) -> usize;
+    /// Metadata associated with the unsized value.
+    fn metadata(&self) -> P::Metadata;
 
     /// Write to the owned buffer.
     ///
@@ -89,6 +92,13 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// [`OwnedBuf::store_unsized`]: crate::buf::OwnedBuf::store_unsized
     unsafe fn store(&self, buf: &mut BufMut<'_>);
 
+    /// Validate the buffer with the given capacity and return the decoded metadata.
+    unsafe fn validate(
+        buf: *const u8,
+        len: usize,
+        metadata: P::Packed,
+    ) -> Result<P::Metadata, Error>;
+
     /// Validate and coerce the buffer as this type.
     ///
     /// # Safety
@@ -96,7 +106,7 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// The caller is responsible for ensuring that the pointer is valid up to
     /// the reported size of `Self`. If `Self` is `[T]` then `size` is the
     /// length of the `T`-containing slice.
-    unsafe fn coerce(buf: *const u8, size: usize) -> Result<*const Self, Error>;
+    unsafe fn coerce(buf: *const u8, metadata: P::Metadata) -> *const Self;
 
     /// Validate and coerce the buffer as this type mutably.
     ///
@@ -105,7 +115,7 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed {
     /// The caller is responsible for ensuring that the pointer is valid up to
     /// the reported size of `Self`. If `Self` is `[T]` then `size` is the
     /// length of the `T`-containing slice.
-    unsafe fn coerce_mut(buf: *mut u8, size: usize) -> Result<*mut Self, Error>;
+    unsafe fn coerce_mut(buf: *mut u8, metadata: P::Metadata) -> *mut Self;
 }
 
 /// This is a marker trait that must be implemented for a type in order to use
@@ -206,8 +216,8 @@ where
     const PADDED: bool = T::PADDED;
 
     #[inline]
-    unsafe fn pad(this: *const Self, padder: &mut Padder<'_, Self>) {
-        padder.pad(this.cast::<T>());
+    unsafe fn pad(padder: &mut Padder<'_, Self>) {
+        padder.pad::<T>();
     }
 
     #[inline]
@@ -336,7 +346,7 @@ pub unsafe trait ZeroCopy: Sized {
     ///
     /// The implementor is responsible for ensuring that every field is provided
     /// to `padder`, including potentially hidden ones.
-    unsafe fn pad(this: *const Self, padder: &mut Padder<'_, Self>);
+    unsafe fn pad(padder: &mut Padder<'_, Self>);
 
     /// Validate the current type.
     ///
@@ -347,18 +357,21 @@ pub unsafe trait ZeroCopy: Sized {
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error>;
 }
 
-unsafe impl UnsizedZeroCopy for str {
+unsafe impl<P: ?Sized, O> UnsizedZeroCopy<P, O> for str
+where
+    P: Pointee<O, Packed = O, Metadata = usize>,
+    O: Size,
+{
     const ALIGN: usize = align_of::<u8>();
-    const SIZE: usize = size_of::<u8>();
 
     #[inline]
     fn size(&self) -> usize {
-        <str>::len(self)
+        size_of_val(self)
     }
 
     #[inline]
-    fn bytes(&self) -> usize {
-        size_of_val(self)
+    fn metadata(&self) -> P::Metadata {
+        <str>::len(self)
     }
 
     #[inline]
@@ -367,33 +380,54 @@ unsafe impl UnsizedZeroCopy for str {
     }
 
     #[inline]
-    unsafe fn coerce(buf: *const u8, size: usize) -> Result<*const Self, Error> {
-        let buf = slice::from_raw_parts(buf, size);
-        Ok(str::from_utf8(buf).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))?)
+    unsafe fn validate(
+        ptr: *const u8,
+        len: usize,
+        metadata: P::Packed,
+    ) -> Result<P::Metadata, Error> {
+        let metadata = metadata.as_usize();
+
+        if metadata > len {
+            return Err(Error::new(ErrorKind::OutOfRangeBounds {
+                range: 0..metadata,
+                len,
+            }));
+        };
+
+        let buf = slice::from_raw_parts(ptr, metadata);
+        str::from_utf8(buf).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))?;
+        Ok(metadata)
     }
 
     #[inline]
-    unsafe fn coerce_mut(buf: *mut u8, size: usize) -> Result<*mut Self, Error> {
-        let buf = slice::from_raw_parts_mut(buf, size);
-        Ok(str::from_utf8_mut(buf).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))?)
+    unsafe fn coerce(ptr: *const u8, metadata: P::Metadata) -> *const Self {
+        let slice = slice::from_raw_parts(ptr, metadata);
+        str::from_utf8_unchecked(slice)
+    }
+
+    #[inline]
+    unsafe fn coerce_mut(ptr: *mut u8, metadata: P::Metadata) -> *mut Self {
+        let slice = slice::from_raw_parts_mut(ptr, metadata);
+        str::from_utf8_unchecked_mut(slice)
     }
 }
 
-unsafe impl<T> UnsizedZeroCopy for [T]
+unsafe impl<T, P: ?Sized, O> UnsizedZeroCopy<P, O> for [T]
 where
     T: ZeroCopy,
+    P: Pointee<O, Packed = O, Metadata = usize>,
+    O: Size,
 {
     const ALIGN: usize = align_of::<T>();
-    const SIZE: usize = size_of::<T>();
 
     #[inline]
     fn size(&self) -> usize {
-        self.len()
+        size_of_val(self)
     }
 
     #[inline]
-    fn bytes(&self) -> usize {
-        size_of_val(self)
+    fn metadata(&self) -> usize {
+        self.len()
     }
 
     #[inline]
@@ -402,21 +436,42 @@ where
     }
 
     #[inline]
-    unsafe fn coerce(buf: *const u8, len: usize) -> Result<*const Self, Error> {
+    unsafe fn validate(
+        buf: *const u8,
+        len: usize,
+        metadata: P::Packed,
+    ) -> Result<P::Metadata, Error> {
+        let metadata = metadata.as_usize();
+
+        let Some(size) = metadata.checked_mul(size_of::<T>()) else {
+            return Err(Error::new(ErrorKind::LengthOverflow {
+                len: metadata,
+                size: size_of::<T>(),
+            }));
+        };
+
+        if size > len {
+            return Err(Error::new(ErrorKind::OutOfRangeBounds {
+                range: 0..metadata,
+                len,
+            }));
+        };
+
         if !T::ANY_BITS {
-            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf), len)?;
+            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf), metadata)?;
         }
 
-        Ok(slice::from_raw_parts(buf.cast(), len))
+        Ok(metadata)
     }
 
     #[inline]
-    unsafe fn coerce_mut(buf: *mut u8, size: usize) -> Result<*mut Self, Error> {
-        if !T::ANY_BITS {
-            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf), size)?;
-        }
+    unsafe fn coerce(buf: *const u8, metadata: P::Metadata) -> *const Self {
+        slice::from_raw_parts(buf.cast(), metadata)
+    }
 
-        Ok(slice::from_raw_parts_mut(buf.cast(), size))
+    #[inline]
+    unsafe fn coerce_mut(buf: *mut u8, metadata: P::Metadata) -> *mut Self {
+        slice::from_raw_parts_mut(buf.cast(), metadata)
     }
 }
 
@@ -457,7 +512,7 @@ macro_rules! impl_number {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
+            unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
             #[inline]
             unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
@@ -499,7 +554,7 @@ macro_rules! impl_float {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
+            unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
             #[inline]
             unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
@@ -529,7 +584,7 @@ unsafe impl ZeroCopy for char {
     const PADDED: bool = false;
 
     #[inline]
-    unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
+    unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
@@ -561,7 +616,7 @@ unsafe impl ZeroCopy for bool {
     const PADDED: bool = false;
 
     #[inline]
-    unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
+    unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
     #[allow(clippy::missing_safety_doc)]
     #[inline]
@@ -623,7 +678,7 @@ macro_rules! impl_nonzero_number {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
+            unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
             #[inline]
             unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
@@ -682,7 +737,7 @@ macro_rules! impl_nonzero_number {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {}
+            unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
             #[inline]
             unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
@@ -748,7 +803,7 @@ macro_rules! impl_zst {
             const PADDED: bool = false;
 
             #[inline]
-            unsafe fn pad(_: *const Self, _: &mut Padder<'_, Self>) {
+            unsafe fn pad(_: &mut Padder<'_, Self>) {
             }
 
             #[inline]
@@ -808,14 +863,10 @@ where
     const PADDED: bool = T::PADDED;
 
     #[inline]
-    unsafe fn pad(this: *const Self, padder: &mut Padder<'_, Self>) {
+    unsafe fn pad(padder: &mut Padder<'_, Self>) {
         if T::PADDED {
-            // Cast the array to a pointer of the first element.
-            let mut first = this.cast::<T>();
-
             for _ in 0..N {
-                padder.pad::<T>(first);
-                first = first.add(1);
+                padder.pad::<T>();
             }
         }
     }

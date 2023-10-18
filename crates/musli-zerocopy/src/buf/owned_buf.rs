@@ -684,14 +684,14 @@ impl<O: Size> OwnedBuf<O> {
     pub fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, O>
     where
         T: Pointee<O, Packed = O, Metadata = usize>,
-        T: UnsizedZeroCopy,
+        T: UnsizedZeroCopy<T, O>,
     {
         unsafe {
-            self.next_offset_with_and_reserve(T::ALIGN, value.bytes());
+            self.next_offset_with_and_reserve(T::ALIGN, value.size());
             let offset = self.len;
             value.store(&mut BufMut::new(self.data.as_ptr().wrapping_add(offset)));
-            self.len += value.bytes();
-            Ref::with_metadata(offset, value.size())
+            self.len += value.size();
+            Ref::with_metadata(offset, value.metadata())
         }
     }
 

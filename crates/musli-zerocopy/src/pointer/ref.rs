@@ -6,7 +6,6 @@ use core::mem::size_of;
 
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Size};
-use crate::traits::UnsizedZeroCopy;
 use crate::ZeroCopy;
 
 /// A sized reference.
@@ -162,7 +161,6 @@ where
 
 impl<T: ?Sized, O: Size> Ref<T, O>
 where
-    T: UnsizedZeroCopy,
     T: Pointee<O, Packed = O>,
 {
     /// The number of elements in the slice.
@@ -173,11 +171,11 @@ where
     /// use musli_zerocopy::pointer::Ref;
     ///
     /// let slice = Ref::<str>::with_metadata(0, 10);
-    /// assert_eq!(slice.size(), 10);
+    /// assert_eq!(slice.metadata(), 10);
     /// ```
     #[inline]
-    pub fn size(&self) -> usize {
-        self.metadata.as_usize()
+    pub fn metadata(&self) -> T::Packed {
+        self.metadata
     }
 }
 

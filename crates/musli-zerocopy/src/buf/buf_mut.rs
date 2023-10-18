@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use core::mem::{replace, size_of, size_of_val};
+use core::mem::{size_of, size_of_val};
 
 use crate::buf::Padder;
 use crate::traits::ZeroCopy;
@@ -48,20 +48,18 @@ impl<'a> BufMut<'a> {
     {
         self.start
             .copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
-        let end = self.start.wrapping_add(size_of_val(values));
 
         if T::PADDED {
-            let mut start = replace(&mut self.start, end);
+            let mut padder = Padder::new(self.start);
 
-            for value in values {
-                let mut padder = Padder::new(start);
-                T::pad(value, &mut padder);
-                padder.remaining();
-                start = start.wrapping_add(size_of::<T>());
+            for _ in 0..values.len() {
+                T::pad(&mut padder);
             }
-        } else {
-            self.start = end;
+
+            padder.remaining_with(size_of_val(values));
         }
+
+        self.start = self.start.wrapping_add(size_of_val(values));
     }
 
     /// Store the raw bytes associated with `*const T` into the buffer and
@@ -85,12 +83,11 @@ impl<'a> BufMut<'a> {
         let end = self.start.wrapping_add(size_of::<T>());
 
         if T::PADDED {
-            let start = replace(&mut self.start, end);
-            let mut padder = Padder::new(start);
-            T::pad(value, &mut padder);
+            let mut padder = Padder::new(self.start);
+            T::pad(&mut padder);
             padder.remaining();
-        } else {
-            self.start = end;
         }
+
+        self.start = end;
     }
 }

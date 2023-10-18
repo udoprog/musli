@@ -1,7 +1,7 @@
 use core::alloc::Layout;
 use core::any::type_name;
 use core::fmt;
-use core::ops::Range;
+use core::ops::{Range, RangeFrom};
 use core::str::Utf8Error;
 
 /// Indicates the representation that was tried to coerce into an enum.
@@ -104,8 +104,16 @@ impl std::error::Error for Error {
 #[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]
 pub(crate) enum ErrorKind {
-    AlignmentMismatch {
+    LengthOverflow {
+        len: usize,
+        size: usize,
+    },
+    AlignmentRangeMismatch {
         range: Range<usize>,
+        align: usize,
+    },
+    AlignmentRangeFromMismatch {
+        range: RangeFrom<usize>,
         align: usize,
     },
     LayoutMismatch {
@@ -114,6 +122,10 @@ pub(crate) enum ErrorKind {
     },
     OutOfRangeBounds {
         range: Range<usize>,
+        len: usize,
+    },
+    OutOfRangeFromBounds {
+        range: RangeFrom<usize>,
         len: usize,
     },
     NonZeroZeroed {
@@ -153,7 +165,19 @@ pub(crate) enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorKind::AlignmentMismatch { range, align } => {
+            ErrorKind::LengthOverflow { len, size } => {
+                write!(
+                    f,
+                    "Length overflowed when trying to take {len} elements of size {size}"
+                )
+            }
+            ErrorKind::AlignmentRangeMismatch { range, align } => {
+                write!(
+                    f,
+                    "Alignment mismatch, expected alignment {align} for range {range:?}"
+                )
+            }
+            ErrorKind::AlignmentRangeFromMismatch { range, align } => {
                 write!(
                     f,
                     "Alignment mismatch, expected alignment {align} for range {range:?}"
@@ -166,6 +190,9 @@ impl fmt::Display for ErrorKind {
                 )
             }
             ErrorKind::OutOfRangeBounds { range, len } => {
+                write!(f, "Range {range:?} out of bound 0-{len}")
+            }
+            ErrorKind::OutOfRangeFromBounds { range, len } => {
                 write!(f, "Range {range:?} out of bound 0-{len}")
             }
             ErrorKind::NonZeroZeroed { range } => {

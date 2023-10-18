@@ -621,6 +621,8 @@ mod tests;
 
 #[doc(hidden)]
 pub mod __private {
+    use core::fmt;
+
     pub mod result {
         pub use ::core::result::Result;
     }
@@ -629,7 +631,11 @@ pub mod __private {
         pub use ::core::mem::{align_of, size_of};
     }
 
-    pub mod ptr {
-        pub use ::core::ptr::addr_of;
+    #[inline(always)]
+    pub fn unknown_discriminant<D>(discriminant: D)
+    where
+        D: fmt::Display,
+    {
+        core::unreachable!("Unknown discriminant `{discriminant}`, this is a bug since it should be present in the type being padded.")
     }
 }

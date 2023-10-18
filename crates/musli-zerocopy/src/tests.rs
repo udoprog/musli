@@ -2,12 +2,15 @@
 
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
+use core::ptr;
+
+use anyhow::Result;
 
 use crate::pointer::Ref;
 use crate::{Error, OwnedBuf, ZeroCopy};
 
 #[test]
-fn test_ref_to_slice() -> Result<(), Error> {
+fn test_ref_to_slice() -> Result<()> {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ZeroCopy)]
     #[repr(u32)]
     #[zero_copy(crate)]
@@ -67,7 +70,7 @@ fn test_zero_padded() {
 }
 
 #[test]
-fn test_inner_padded() -> Result<(), Error> {
+fn test_inner_padded() -> Result<()> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[zero_copy(crate)]
     #[repr(C)]
@@ -92,7 +95,7 @@ fn test_inner_padded() -> Result<(), Error> {
 }
 
 #[test]
-fn test_inner_not_padded() -> Result<(), Error> {
+fn test_inner_not_padded() -> Result<()> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[zero_copy(crate)]
     #[repr(C)]
@@ -119,7 +122,7 @@ fn test_inner_not_padded() -> Result<(), Error> {
 }
 
 #[test]
-fn test_inner_not_padded_by_align() -> Result<(), Error> {
+fn test_inner_not_padded_by_align() -> Result<()> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[zero_copy(crate)]
     #[repr(C, align(128))]
@@ -146,7 +149,7 @@ fn test_inner_not_padded_by_align() -> Result<(), Error> {
 }
 
 #[test]
-fn weird_alignment() -> Result<(), Error> {
+fn weird_alignment() -> Result<()> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[repr(C, align(128))]
     #[zero_copy(crate)]
@@ -170,7 +173,7 @@ fn weird_alignment() -> Result<(), Error> {
 }
 
 #[test]
-fn enum_boundaries() -> Result<(), Error> {
+fn enum_boundaries() -> Result<()> {
     macro_rules! test_case {
         ($name:ident, $repr:ident, $num:ty, $min:literal, $max:literal, $illegal_repr:ident $(,)?) => {{
             #[derive(Debug, PartialEq, ZeroCopy)]
@@ -269,7 +272,7 @@ fn enum_boundaries() -> Result<(), Error> {
 }
 
 #[test]
-fn test_signed_wraparound() -> Result<(), Error> {
+fn test_signed_wraparound() -> Result<()> {
     macro_rules! test_case {
         ($name:ident, $repr:ident, $num:ty, $illegal_repr:ident $(,)?) => {{
             #[derive(Debug, PartialEq, ZeroCopy)]
@@ -314,7 +317,7 @@ fn test_signed_wraparound() -> Result<(), Error> {
 }
 
 #[test]
-fn test_neg0() -> Result<(), Error> {
+fn test_neg0() -> Result<()> {
     macro_rules! test_case {
         ($name:ident, $repr:ident, $num:ty, $illegal_repr:ident $(,)?) => {{
             #[derive(Debug, PartialEq, ZeroCopy)]
@@ -359,7 +362,7 @@ fn test_neg0() -> Result<(), Error> {
 }
 
 #[test]
-fn test_needs_padding() -> Result<(), Error> {
+fn test_needs_padding() -> Result<()> {
     #[derive(ZeroCopy)]
     #[repr(transparent)]
     #[zero_copy(crate)]
@@ -388,7 +391,7 @@ fn test_needs_padding() -> Result<(), Error> {
 }
 
 #[test]
-fn test_enum_with_fields() -> Result<(), Error> {
+fn test_enum_with_fields() -> Result<()> {
     #[derive(Debug, PartialEq, ZeroCopy)]
     #[repr(u8)]
     #[zero_copy(crate)]
@@ -431,7 +434,7 @@ fn test_enum_with_fields() -> Result<(), Error> {
 }
 
 #[test]
-fn validate_packed() -> Result<(), Error> {
+fn validate_packed() -> Result<()> {
     use core::num::NonZeroU64;
 
     #[derive(ZeroCopy)]
@@ -644,4 +647,76 @@ mod nonzero_slices {
         [u128::MIN, 1, 2, 3, 4, u128::MAX],
         core::num::NonZeroU128
     );
+}
+
+#[test]
+fn padded_enum() -> Result<()> {
+    // We add a padded interior struct.
+    #[derive(Debug, Clone, Copy, PartialEq, ZeroCopy)]
+    #[repr(C)]
+    #[zero_copy(crate)]
+    struct InnerStruct(u32, u8);
+
+    #[derive(Debug, Clone, Copy, PartialEq, ZeroCopy)]
+    #[repr(u8)]
+    #[zero_copy(crate)]
+    enum Enum {
+        Variant1,
+        Variant2(u32),
+        Variant3(InnerStruct, u64),
+    }
+
+    // In another test, we try to store the enum inside of a packed struct,
+    // which will force us to assert that accessing any enum data during
+    // validation only uses unaligned loads.
+    #[derive(ZeroCopy)]
+    #[repr(C, packed)]
+    #[zero_copy(crate)]
+    struct PackedStruct(u16, Enum);
+
+    let mut buf = OwnedBuf::with_alignment::<Enum>();
+
+    macro_rules! test_case {
+        ($variant:expr, $slice:expr) => {{
+            let slice = $slice;
+
+            assert_eq!(size_of::<Enum>(), slice.len());
+
+            buf.clear();
+            let r = buf.store(&$variant);
+            assert_eq!(buf.as_slice(), slice);
+            assert_eq!(buf.load(r)?, &$variant);
+
+            buf.clear();
+            let packed = PackedStruct(0x1020u16.to_be(), $variant);
+            let r = buf.store(&packed);
+            assert_eq!(&buf.as_slice()[0..2], &[16, 32]);
+            assert_eq!(&buf.as_slice()[2..], slice);
+            assert_eq!(
+                unsafe { ptr::read_unaligned(ptr::addr_of!(buf.load(r)?.1)) },
+                $variant
+            );
+        }};
+    }
+
+    let variant1 = Enum::Variant1;
+    let variant2 = Enum::Variant2(0x02030405u32.to_be());
+    let variant3 = Enum::Variant3(
+        InnerStruct(0x02030405u32.to_be(), 6),
+        0x060708090a0b0c0du64.to_be(),
+    );
+
+    test_case!(
+        variant1,
+        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    );
+    test_case!(
+        variant2,
+        &[1, 0, 0, 0, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    );
+    test_case!(
+        variant3,
+        &[2, 0, 0, 0, 2, 3, 4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 6, 7, 8, 9, 10, 11, 12, 13]
+    );
+    Ok(())
 }

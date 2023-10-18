@@ -15,7 +15,7 @@ use crate::ZeroCopy;
 /// ```
 ///
 /// [`Ref<T>`]: crate::Ref
-pub trait Pointee<O> {
+pub trait Pointee<O: ?Sized> {
     /// Metadata associated with the pointee.
     type Metadata: Copy;
 
