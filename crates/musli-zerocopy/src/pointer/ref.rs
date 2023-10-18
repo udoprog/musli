@@ -37,20 +37,20 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, bounds = {T::Packed<O>: ZeroCopy})]
+#[zero_copy(crate, bounds = {T::Packed: ZeroCopy})]
 pub struct Ref<T: ?Sized, O: Size = DefaultSize>
 where
-    T: Pointee,
+    T: Pointee<O>,
 {
     offset: O,
-    metadata: T::Packed<O>,
+    metadata: T::Packed,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
 impl<T: ?Sized, O: Size> Ref<T, O>
 where
-    T: Pointee,
+    T: Pointee<O>,
 {
     /// Construct a reference with custom metadata.
     ///
@@ -69,7 +69,7 @@ where
         U: Copy + fmt::Debug,
         O: TryFrom<U>,
         T::Metadata: fmt::Debug,
-        T::Packed<O>: TryFrom<T::Metadata>,
+        T::Packed: TryFrom<T::Metadata>,
     {
         let Some(offset) = O::try_from(offset).ok() else {
             panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
@@ -163,7 +163,7 @@ where
 impl<T: ?Sized, O: Size> Ref<T, O>
 where
     T: UnsizedZeroCopy,
-    T: Pointee<Packed<O> = O>,
+    T: Pointee<O, Packed = O>,
 {
     /// The number of elements in the slice.
     ///
@@ -183,7 +183,7 @@ where
 
 impl<T, O: Size> Ref<T, O>
 where
-    T: Pointee<Packed<O> = ()>,
+    T: Pointee<O, Packed = ()>,
 {
     /// Construct a reference at the given offset.
     ///
@@ -239,7 +239,7 @@ where
 
 impl<T: ?Sized, O: Size> Ref<T, O>
 where
-    T: Pointee,
+    T: Pointee<O>,
 {
     /// Get the offset the reference points to.
     ///
@@ -280,7 +280,7 @@ where
     /// ```
     pub fn cast<U: ?Sized>(self) -> Ref<U, O>
     where
-        U: Pointee<Packed<O> = T::Packed<O>>,
+        U: Pointee<O, Packed = T::Packed>,
     {
         Ref {
             offset: self.offset,
@@ -319,7 +319,7 @@ where
 
 impl<T, O: Size> Ref<MaybeUninit<T>, O>
 where
-    T: Pointee,
+    T: Pointee<O>,
 {
     /// Assume that the reference is initialized.
     ///
@@ -337,8 +337,8 @@ where
 
 impl<T: ?Sized, O: Size> fmt::Debug for Ref<T, O>
 where
-    T: Pointee,
-    T::Packed<O>: fmt::Debug,
+    T: Pointee<O>,
+    T::Packed: fmt::Debug,
     O: fmt::Debug,
 {
     #[inline]
@@ -355,7 +355,7 @@ where
 
 impl<T: ?Sized, O: Size> Clone for Ref<T, O>
 where
-    T: Pointee,
+    T: Pointee<O>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -363,12 +363,12 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> Copy for Ref<T, O> where T: Pointee {}
+impl<T: ?Sized, O: Size> Copy for Ref<T, O> where T: Pointee<O> {}
 
 impl<T: ?Sized, O: Size> PartialEq for Ref<T, O>
 where
-    T: Pointee,
-    T::Packed<O>: PartialEq,
+    T: Pointee<O>,
+    T::Packed: PartialEq,
     O: PartialEq,
 {
     #[inline]
@@ -379,16 +379,16 @@ where
 
 impl<T: ?Sized, O: Size> Eq for Ref<T, O>
 where
-    T: Pointee,
-    T::Packed<O>: Eq,
+    T: Pointee<O>,
+    T::Packed: Eq,
     O: Eq,
 {
 }
 
 impl<T: ?Sized, O: Size> PartialOrd for Ref<T, O>
 where
-    T: Pointee,
-    T::Packed<O>: PartialOrd,
+    T: Pointee<O>,
+    T::Packed: PartialOrd,
     O: Ord,
 {
     #[inline]
@@ -404,8 +404,8 @@ where
 
 impl<T: ?Sized, O: Size> Ord for Ref<T, O>
 where
-    T: Pointee,
-    T::Packed<O>: Ord,
+    T: Pointee<O>,
+    T::Packed: Ord,
     O: Ord,
 {
     #[inline]
@@ -421,8 +421,8 @@ where
 
 impl<T: ?Sized, O: Size> Hash for Ref<T, O>
 where
-    T: Pointee,
-    T::Packed<O>: Hash,
+    T: Pointee<O>,
+    T::Packed: Hash,
     O: Hash,
 {
     #[inline]

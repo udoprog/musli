@@ -565,7 +565,7 @@ impl Buf {
     #[inline]
     pub(crate) fn load_unsized<T: ?Sized, O: Size>(&self, unsize: Ref<T, O>) -> Result<&T, Error>
     where
-        T: Pointee<Packed<O> = O> + UnsizedZeroCopy,
+        T: Pointee<O, Packed = O> + UnsizedZeroCopy,
     {
         let start = unsize.offset();
         let size = unsize.size();
@@ -586,7 +586,7 @@ impl Buf {
         unsize: Ref<T, O>,
     ) -> Result<&mut T, Error>
     where
-        T: Pointee<Packed<O> = O> + UnsizedZeroCopy,
+        T: Pointee<O, Packed = O> + UnsizedZeroCopy,
     {
         let start = unsize.offset();
         let size = unsize.size();

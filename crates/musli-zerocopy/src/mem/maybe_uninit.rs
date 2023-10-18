@@ -109,10 +109,10 @@ impl<T> fmt::Debug for MaybeUninit<T> {
     }
 }
 
-impl<T> Pointee for MaybeUninit<T>
+impl<T, O> Pointee<O> for MaybeUninit<T>
 where
-    T: Pointee,
+    T: Pointee<O>,
 {
     type Metadata = T::Metadata;
-    type Packed<O> = T::Packed<O> where O: Copy;
+    type Packed = T::Packed;
 }

@@ -15,33 +15,35 @@ use crate::ZeroCopy;
 /// ```
 ///
 /// [`Ref<T>`]: crate::Ref
-pub trait Pointee {
+pub trait Pointee<O> {
     /// Metadata associated with the pointee.
     type Metadata: Copy;
 
     /// The packed representation of the pointer metadata.
-    type Packed<O>: Copy
-    where
-        O: Copy;
+    type Packed: Copy;
 }
 
-impl<T> Pointee for T
+impl<T, O> Pointee<O> for T
 where
     T: ZeroCopy,
 {
     type Metadata = ();
-    type Packed<O> = () where O: Copy;
+    type Packed = ();
 }
 
-impl<T> Pointee for [T]
+impl<T, O> Pointee<O> for [T]
 where
     T: ZeroCopy,
+    O: Copy,
 {
     type Metadata = usize;
-    type Packed<O> = O where O: Copy;
+    type Packed = O;
 }
 
-impl Pointee for str {
+impl<O> Pointee<O> for str
+where
+    O: Copy,
+{
     type Metadata = usize;
-    type Packed<O> = O where O: Copy;
+    type Packed = O;
 }
