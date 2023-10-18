@@ -565,7 +565,7 @@ impl Buf {
     #[inline]
     pub(crate) fn load_unsized<T: ?Sized, O: Size>(&self, unsize: Ref<T, O>) -> Result<&T, Error>
     where
-        T: Pointee<Metadata<O> = O> + UnsizedZeroCopy,
+        T: Pointee<Packed<O> = O> + UnsizedZeroCopy,
     {
         let start = unsize.offset();
         let size = unsize.size();
@@ -586,7 +586,7 @@ impl Buf {
         unsize: Ref<T, O>,
     ) -> Result<&mut T, Error>
     where
-        T: Pointee<Metadata<O> = O> + UnsizedZeroCopy,
+        T: Pointee<Packed<O> = O> + UnsizedZeroCopy,
     {
         let start = unsize.offset();
         let size = unsize.size();
@@ -656,7 +656,7 @@ impl Buf {
     #[inline]
     pub(crate) fn load_slice<T, O: Size>(&self, slice: Ref<[T], O>) -> Result<&[T], Error>
     where
-        [T]: Pointee<Metadata<O> = O>,
+        [T]: Pointee<Packed<O> = O, Metadata = usize>,
         T: ZeroCopy,
     {
         let start = slice.offset();
@@ -675,8 +675,7 @@ impl Buf {
     #[inline]
     pub(crate) fn load_slice_mut<T, O: Size>(&mut self, ptr: Ref<[T], O>) -> Result<&mut [T], Error>
     where
-        [T]: Pointee,
-        <[T] as Pointee>::Metadata<O>: Size,
+        [T]: Pointee<Packed<O> = O, Metadata = usize>,
         T: ZeroCopy,
     {
         let start = ptr.offset();

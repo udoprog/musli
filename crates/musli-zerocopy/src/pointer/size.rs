@@ -14,7 +14,6 @@ compile_error!("musli-zerocopy is only supported on 32, 64, or 128-bit platforms
 
 mod sealed {
     pub trait Sealed {}
-    impl Sealed for () {}
     impl Sealed for u8 {}
     impl Sealed for u16 {}
     impl Sealed for u32 {}
@@ -32,7 +31,16 @@ mod sealed {
 ///
 /// This trait is sealed and its internals hidden. Publicly it's only used as a
 /// marker trait.
-pub trait Size: self::sealed::Sealed + 'static + Sized + ZeroCopy + Copy + fmt::Display {
+pub trait Size:
+    TryFrom<usize>
+    + self::sealed::Sealed
+    + 'static
+    + Sized
+    + ZeroCopy
+    + Copy
+    + fmt::Display
+    + fmt::Debug
+{
     /// The default zero pointer.
     #[doc(hidden)]
     const ZERO: Self;
@@ -40,10 +48,6 @@ pub trait Size: self::sealed::Sealed + 'static + Sized + ZeroCopy + Copy + fmt::
     /// The max size of a pointer.
     #[doc(hidden)]
     const MAX: Self;
-
-    /// Convert a usize to a pointer.
-    #[doc(hidden)]
-    fn from_usize(value: usize) -> Option<Self>;
 
     /// Convert the pointer to a usize.
     #[doc(hidden)]
@@ -57,15 +61,6 @@ pub trait Size: self::sealed::Sealed + 'static + Sized + ZeroCopy + Copy + fmt::
 impl Size for u16 {
     const ZERO: Self = 0;
     const MAX: Self = u16::MAX;
-
-    #[inline]
-    fn from_usize(offset: usize) -> Option<Self> {
-        if offset > u16::MAX as usize {
-            None
-        } else {
-            Some(offset as u16)
-        }
-    }
 
     #[inline]
     fn as_usize(self) -> usize {
@@ -83,15 +78,6 @@ impl Size for u32 {
     const MAX: Self = u32::MAX;
 
     #[inline]
-    fn from_usize(offset: usize) -> Option<Self> {
-        if offset > u32::MAX as usize {
-            None
-        } else {
-            Some(offset as u32)
-        }
-    }
-
-    #[inline]
     fn as_usize(self) -> usize {
         self as usize
     }
@@ -105,11 +91,6 @@ impl Size for u32 {
 impl Size for usize {
     const ZERO: Self = 0;
     const MAX: Self = usize::MAX;
-
-    #[inline]
-    fn from_usize(offset: usize) -> Option<Self> {
-        Some(offset)
-    }
 
     #[inline]
     fn as_usize(self) -> usize {

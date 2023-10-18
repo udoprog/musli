@@ -446,7 +446,7 @@ impl<O: Size> OwnedBuf<O> {
                 .add(self.len)
                 .write_bytes(0, size_of::<T>());
             self.len += size_of::<T>();
-            Ref::new_raw(offset)
+            Ref::new(offset)
         }
     }
 
@@ -683,7 +683,7 @@ impl<O: Size> OwnedBuf<O> {
     #[inline]
     pub fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, O>
     where
-        T: Pointee<Metadata<O> = O>,
+        T: Pointee<Packed<O> = O, Metadata = usize>,
         T: UnsizedZeroCopy,
     {
         unsafe {
@@ -727,7 +727,7 @@ impl<O: Size> OwnedBuf<O> {
     #[inline]
     pub fn store_slice<T>(&mut self, values: &[T]) -> Ref<[T], O>
     where
-        [T]: Pointee<Metadata<O> = O>,
+        [T]: Pointee<Packed<O> = O, Metadata = usize>,
         T: ZeroCopy,
     {
         self.next_offset_with_and_reserve(align_of::<T>(), size_of_val(values));

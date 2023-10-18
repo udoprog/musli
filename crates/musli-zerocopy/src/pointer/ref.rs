@@ -37,20 +37,20 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, bounds = {T::Metadata<O>: ZeroCopy})]
+#[zero_copy(crate, bounds = {T::Packed<O>: ZeroCopy})]
 pub struct Ref<T: ?Sized, O: Size = DefaultSize>
 where
     T: Pointee,
 {
     offset: O,
-    metadata: T::Metadata<O>,
+    metadata: T::Packed<O>,
     #[zero_copy(ignore)]
     _marker: PhantomData<T>,
 }
 
 impl<T: ?Sized, O: Size> Ref<T, O>
 where
-    T: Pointee<Metadata<O> = O>,
+    T: Pointee,
 {
     /// Construct a reference with custom metadata.
     ///
@@ -64,13 +64,19 @@ where
     /// assert_eq!(reference.len(), 10);
     /// ```
     #[inline]
-    pub fn with_metadata(offset: usize, metadata: usize) -> Self {
-        let Some(offset) = O::from_usize(offset) else {
-            panic!("Offset {offset} not in legal range 0-{}", O::MAX);
+    pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
+    where
+        U: Copy + fmt::Debug,
+        O: TryFrom<U>,
+        T::Metadata: fmt::Debug,
+        T::Packed<O>: TryFrom<T::Metadata>,
+    {
+        let Some(offset) = O::try_from(offset).ok() else {
+            panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
         };
 
-        let Some(metadata) = O::from_usize(metadata) else {
-            panic!("Metadata {metadata} not in legal range 0-{}", O::MAX);
+        let Some(metadata) = T::Packed::try_from(metadata).ok() else {
+            panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
         };
 
         Self {
@@ -83,8 +89,8 @@ where
 
 impl<T, O: Size> Ref<[T], O>
 where
-    [T]: Pointee,
-    <[T] as Pointee>::Metadata<O>: Size,
+    T: ZeroCopy,
+    [T]: Pointee<Packed<O> = O, Metadata = usize>,
 {
     /// The number of elements in the slice.
     ///
@@ -141,10 +147,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn get(&self, index: usize) -> Option<Ref<T, O>>
-    where
-        T: Pointee<Metadata<O> = ()>,
-    {
+    pub fn get(&self, index: usize) -> Option<Ref<T, O>> {
         if index >= self.len() {
             return None;
         }
@@ -161,8 +164,7 @@ where
 impl<T: ?Sized, O: Size> Ref<T, O>
 where
     T: UnsizedZeroCopy,
-    T: Pointee,
-    <T as Pointee>::Metadata<O>: Size,
+    T: Pointee<Packed<O> = O>,
 {
     /// The number of elements in the slice.
     ///
@@ -182,13 +184,32 @@ where
 
 impl<T, O: Size> Ref<T, O>
 where
-    T: Pointee<Metadata<O> = ()>,
+    T: Pointee<Packed<O> = ()>,
 {
-    // Construct a reference that does not require `T` to be `ZeroCopy`.
+    /// Construct a reference at the given offset.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`TryPack::<U>::try_pack`] over the provided offset returns
+    /// `None`, indicating that the offset cannot be packed into the required
+    /// width.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    ///
+    /// let reference = Ref::<u64>::new(42);
+    /// assert_eq!(reference.offset(), 42);
+    /// ```
     #[inline]
-    pub(crate) fn new_raw(offset: usize) -> Self {
-        let Some(offset) = O::from_usize(offset) else {
-            panic!("Offset {offset} not in the legal range 0-{}", O::MAX);
+    pub fn new<U>(offset: U) -> Self
+    where
+        U: Copy + fmt::Debug,
+        O: TryFrom<U>,
+    {
+        let Some(offset) = O::try_from(offset).ok() else {
+            panic!("Offset {offset:?} not in the legal range 0-{}", O::MAX);
         };
 
         Self {
@@ -215,21 +236,6 @@ where
             metadata: (),
             _marker: PhantomData,
         }
-    }
-
-    /// Construct a reference wrapping the given type at the specified offset.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::Ref;
-    ///
-    /// let reference = Ref::<u64>::new(42);
-    /// assert_eq!(reference.offset(), 42);
-    /// ```
-    #[inline]
-    pub fn new(offset: usize) -> Self {
-        Self::new_raw(offset)
     }
 }
 
@@ -276,15 +282,7 @@ where
     /// ```
     #[inline]
     pub fn array_into_slice(self) -> Ref<[T], O> {
-        let Some(len) = O::from_usize(N) else {
-            panic!("Array length {N} out of bounds 0-{}", O::MAX);
-        };
-
-        Ref {
-            offset: self.offset,
-            metadata: len,
-            _marker: PhantomData,
-        }
+        Ref::with_metadata(self.offset, N)
     }
 }
 
@@ -309,7 +307,7 @@ where
 impl<T: ?Sized, O: Size> fmt::Debug for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata<O>: fmt::Debug,
+    T::Packed<O>: fmt::Debug,
     O: fmt::Debug,
 {
     #[inline]
@@ -327,7 +325,6 @@ where
 impl<T: ?Sized, O: Size> Clone for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata<O>: Copy,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -335,17 +332,12 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> Copy for Ref<T, O>
-where
-    T: Pointee,
-    T::Metadata<O>: Copy,
-{
-}
+impl<T: ?Sized, O: Size> Copy for Ref<T, O> where T: Pointee {}
 
 impl<T: ?Sized, O: Size> PartialEq for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata<O>: PartialEq,
+    T::Packed<O>: PartialEq,
     O: PartialEq,
 {
     #[inline]
@@ -357,7 +349,7 @@ where
 impl<T: ?Sized, O: Size> Eq for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata<O>: Eq,
+    T::Packed<O>: Eq,
     O: Eq,
 {
 }
@@ -365,7 +357,7 @@ where
 impl<T: ?Sized, O: Size> PartialOrd for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata<O>: PartialOrd,
+    T::Packed<O>: PartialOrd,
     O: Ord,
 {
     #[inline]
@@ -382,7 +374,7 @@ where
 impl<T: ?Sized, O: Size> Ord for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata<O>: Ord,
+    T::Packed<O>: Ord,
     O: Ord,
 {
     #[inline]
@@ -399,7 +391,7 @@ where
 impl<T: ?Sized, O: Size> Hash for Ref<T, O>
 where
     T: Pointee,
-    T::Metadata<O>: Hash,
+    T::Packed<O>: Hash,
     O: Hash,
 {
     #[inline]

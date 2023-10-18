@@ -113,5 +113,6 @@ impl<T> Pointee for MaybeUninit<T>
 where
     T: Pointee,
 {
-    type Metadata<O> = T::Metadata<O> where O: Copy;
+    type Metadata = T::Metadata;
+    type Packed<O> = T::Packed<O> where O: Copy;
 }

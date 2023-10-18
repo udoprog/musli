@@ -80,7 +80,7 @@ where
 
 impl<T, O: Size> Load for Ref<[T], O>
 where
-    [T]: Pointee<Metadata<O> = O>,
+    [T]: Pointee<Packed<O> = O, Metadata = usize>,
     T: ZeroCopy,
 {
     type Target = [T];
@@ -112,7 +112,7 @@ where
 
 impl<T, O: Size> LoadMut for Ref<[T], O>
 where
-    [T]: Pointee<Metadata<O> = O>,
+    [T]: Pointee<Packed<O> = O, Metadata = usize>,
     T: ZeroCopy,
 {
     #[inline]

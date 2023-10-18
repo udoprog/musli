@@ -483,10 +483,10 @@ macro_rules! impl_number {
         #[doc = concat!("let one = ", stringify!($ty), "::to_ne_bytes(1);")]
         #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one);")]
         ///
-        /// let st = zero.load(Ref::<Struct>::new(0))?;
+        /// let st = zero.load(Ref::<Struct>::zero())?;
         /// assert_eq!(st.field, 0);
         ///
-        /// let st = one.load(Ref::<Struct>::new(0))?;
+        /// let st = one.load(Ref::<Struct>::zero())?;
         /// assert_eq!(st.field, 1);
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
@@ -708,10 +708,10 @@ macro_rules! impl_nonzero_number {
         #[doc = concat!("let one = ", stringify!($inner), "::to_ne_bytes(1);")]
         #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one);")]
         ///
-        /// let st = zero.load(Ref::<Struct>::new(0))?;
+        /// let st = zero.load(Ref::<Struct>::zero())?;
         /// assert_eq!(st.field, None);
         ///
-        /// let st = one.load(Ref::<Struct>::new(0))?;
+        /// let st = one.load(Ref::<Struct>::zero())?;
         #[doc = concat!("assert_eq!(st.field, ", stringify!($ty), "::new(1));")]
         /// # Ok::<_, musli_zerocopy::Error>(())
         /// ```
