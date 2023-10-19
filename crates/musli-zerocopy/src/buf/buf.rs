@@ -546,6 +546,7 @@ impl Buf {
 
         if !crate::buf::is_aligned_with(buf.as_ptr(), align) {
             return Err(Error::new(ErrorKind::AlignmentRangeMismatch {
+                addr: buf.as_ptr() as usize,
                 range: start..end,
                 align,
             }));
@@ -566,16 +567,17 @@ impl Buf {
         end: usize,
         align: usize,
     ) -> Result<&mut Buf, Error> {
-        let buf = Buf::new_mut(self.inner_get_mut_unaligned(start, end)?);
+        let buf = self.inner_get_mut_unaligned(start, end)?;
 
-        if !buf.is_aligned_with_unchecked(align) {
+        if !crate::buf::is_aligned_with(buf.as_ptr(), align) {
             return Err(Error::new(ErrorKind::AlignmentRangeMismatch {
+                addr: buf.as_ptr() as usize,
                 range: start..end,
                 align,
             }));
         }
 
-        Ok(buf)
+        Ok(Buf::new_mut(buf))
     }
 
     /// Get the given range without checking that it corresponds to any given

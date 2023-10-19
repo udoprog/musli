@@ -25,6 +25,7 @@ use core::str;
 use crate::buf::{Buf, BufMut, Padder, Validator, Visit};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Pointee, Size};
+use crate::Ref;
 
 mod sealed {
     use crate::ZeroCopy;
@@ -315,6 +316,47 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 ///
 /// # Examples
 ///
+/// Using [`to_bytes`], [`from_bytes`], and [`from_bytes_mut`]:
+///
+/// [`to_bytes`]: Self::to_bytes
+/// [`from_bytes`]: Self::from_bytes
+/// [`from_bytes_mut`]: Self::from_bytes_mut
+///
+/// ```
+/// use musli_zerocopy::{buf, ZeroCopy};
+///
+/// #[derive(ZeroCopy, Debug, PartialEq)]
+/// #[repr(C)]
+/// struct Weapon {
+///     id: u8,
+///     damage: u32,
+/// }
+///
+/// let mut weapon = Weapon {
+///     id: 1,
+///     damage: 42u32,
+/// };
+///
+/// let bytes = weapon.to_bytes();
+///
+/// # #[cfg(target_endian = "little")]
+/// assert_eq!(bytes, &[1, 0, 0, 0, 42, 0, 0, 0]);
+/// Weapon::from_bytes_mut(bytes)?.damage += 10;
+/// # #[cfg(target_endian = "little")]
+/// assert_eq!(bytes, &[1, 0, 0, 0, 52, 0, 0, 0]);
+///
+/// // Make a copy so we no longer borrow `weapon`.
+/// let bytes = buf::aligned_buf::<Weapon>(bytes).into_owned();
+///
+/// assert_eq!(weapon.damage, 52);
+/// assert_eq!(&weapon, Weapon::from_bytes(&bytes[..])?);
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
+///
+/// Storing inside of an [`OwnedBuf`]:
+///
+/// [`OwnedBuf`]: crate::buf::OwnedBuf
+///
 /// ```
 /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
 ///
@@ -331,10 +373,12 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 pub unsafe trait ZeroCopy: Sized {
     /// Indicates if the type can inhabit all possible bit patterns within its
     /// `size_of::<Self>()` bytes.
+    #[doc(hidden)]
     const ANY_BITS: bool;
 
     /// Indicates that a type needs padding in case it is stored in an array
     /// that is aligned to `align_of::<Self>()`.
+    #[doc(hidden)]
     const PADDED: bool;
 
     /// Mark padding for the current type.
@@ -346,6 +390,7 @@ pub unsafe trait ZeroCopy: Sized {
     ///
     /// The implementor is responsible for ensuring that every field is provided
     /// to `padder`, including potentially hidden ones.
+    #[doc(hidden)]
     unsafe fn pad(padder: &mut Padder<'_, Self>);
 
     /// Validate the current type.
@@ -354,7 +399,63 @@ pub unsafe trait ZeroCopy: Sized {
     ///
     /// This assumes that the provided validator is wrapping a buffer that is
     /// appropriately sized and aligned.
+    #[doc(hidden)]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error>;
+
+    /// Convert a `ZeroCopy` type into bytes.
+    ///
+    /// This requires mutable access to `self`, since it might need to apply
+    /// padding.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [type level documentation]: Self
+    #[inline]
+    fn to_bytes(&mut self) -> &mut [u8] {
+        unsafe {
+            let ptr = (self as *mut Self).cast::<u8>();
+
+            if Self::PADDED {
+                let mut padder = Padder::new(ptr);
+                Self::pad(&mut padder);
+                padder.remaining();
+            }
+
+            slice::from_raw_parts_mut(ptr, size_of::<Self>())
+        }
+    }
+
+    /// Load bytes into a reference of `Self`.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [type level documentation]: Self
+    ///
+    /// # Errors
+    ///
+    /// This will ensure that `bytes` is aligned, appropriately sized, and valid
+    /// to inhabit `&Self`. Anything else will cause an [`Error`] detailing why
+    /// the conversion failed.
+    #[inline]
+    fn from_bytes(bytes: &[u8]) -> Result<&Self, Error> {
+        Buf::new(bytes).load(Ref::<Self>::zero())
+    }
+
+    /// Load bytes into a mutable reference of `Self`.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [type level documentation]: Self
+    ///
+    /// # Errors
+    ///
+    /// This will ensure that `bytes` is aligned, appropriately sized, and valid
+    /// to inhabit `&Self`. Anything else will cause an [`Error`] detailing why
+    /// the conversion failed.
+    #[inline]
+    fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
+        Buf::new_mut(bytes).load_mut(Ref::<Self>::zero())
+    }
 }
 
 unsafe impl<P: ?Sized, O> UnsizedZeroCopy<P, O> for str

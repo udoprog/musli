@@ -109,6 +109,7 @@ pub(crate) enum ErrorKind {
         size: usize,
     },
     AlignmentRangeMismatch {
+        addr: usize,
         range: Range<usize>,
         align: usize,
     },
@@ -171,10 +172,10 @@ impl fmt::Display for ErrorKind {
                     "Length overflowed when trying to take {len} elements of size {size}"
                 )
             }
-            ErrorKind::AlignmentRangeMismatch { range, align } => {
+            ErrorKind::AlignmentRangeMismatch { addr, range, align } => {
                 write!(
                     f,
-                    "Alignment mismatch, expected alignment {align} for range {range:?}"
+                    "Alignment mismatch, expected alignment {align} for range {range:?} at address {addr:x}"
                 )
             }
             ErrorKind::AlignmentRangeFromMismatch { range, align } => {
