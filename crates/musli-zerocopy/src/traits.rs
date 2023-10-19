@@ -337,23 +337,50 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 ///     damage: 42u32,
 /// };
 ///
-/// let bytes = weapon.to_bytes();
+/// let original = weapon.to_bytes();
 ///
-/// # #[cfg(target_endian = "little")]
-/// assert_eq!(bytes, &[1, 0, 0, 0, 42, 0, 0, 0]);
-/// Weapon::from_bytes_mut(bytes)?.damage += 10;
-/// # #[cfg(target_endian = "little")]
-/// assert_eq!(bytes, &[1, 0, 0, 0, 52, 0, 0, 0]);
+/// // Make a copy that we can play around with.
+/// let mut bytes = buf::aligned_buf::<Weapon>(original).into_owned();
 ///
-/// // Make a copy so we no longer borrow `weapon`.
-/// let bytes = buf::aligned_buf::<Weapon>(bytes).into_owned();
-///
-/// assert_eq!(weapon.damage, 52);
+/// assert_eq!(weapon.damage, 42);
 /// assert_eq!(&weapon, Weapon::from_bytes(&bytes[..])?);
+///
+/// # #[cfg(target_endian = "little")]
+/// assert_eq!(&bytes[..], &[1, 0, 0, 0, 42, 0, 0, 0]);
+/// Weapon::from_bytes_mut(&mut bytes[..])?.damage += 10;
+/// # #[cfg(target_endian = "little")]
+/// assert_eq!(&bytes[..], &[1, 0, 0, 0, 52, 0, 0, 0]);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///
-/// Storing inside of an [`OwnedBuf`]:
+/// Unsafely access an immutable reference by manually padding the struct using
+/// [`init_padding()`] and [`to_bytes_unchecked()`]:
+///
+/// [`init_padding()`]: Self::init_padding
+/// [`to_bytes_unchecked()`]: Self::to_bytes_unchecked
+///
+/// ```
+/// use musli_zerocopy::ZeroCopy;
+/// # #[derive(ZeroCopy, Debug, PartialEq)]
+/// # #[repr(C)]
+/// # struct Weapon { id: u8, damage: u32 }
+///
+/// let mut weapon = Weapon {
+///     id: 1,
+///     damage: 42u32,
+/// };
+///
+/// weapon.init_padding();
+///
+/// // SAFETY: Padding for the type has been initialized, and the type has not been moved since it was padded.
+/// let bytes = unsafe { weapon.to_bytes_unchecked() };
+/// # #[cfg(target_endian = "little")]
+/// assert_eq!(bytes, &[1, 0, 0, 0, 42, 0, 0, 0]);
+/// assert_eq!(Weapon::from_bytes(&bytes)?, &weapon);
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
+///
+/// Interacting with an [`OwnedBuf`]:
 ///
 /// [`OwnedBuf`]: crate::buf::OwnedBuf
 ///
@@ -402,16 +429,17 @@ pub unsafe trait ZeroCopy: Sized {
     #[doc(hidden)]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error>;
 
-    /// Convert a `ZeroCopy` type into bytes.
+    /// Ensure that the padding for the current value is initialized.
     ///
-    /// This requires mutable access to `self`, since it might need to apply
-    /// padding.
+    /// This can be used in combination with [`to_bytes_unchecked()`] to relax
+    /// the borrowing requirement for [`to_bytes()`], but is `unsafe`.
     ///
     /// See the [type level documentation] for examples.
     ///
+    /// [`to_bytes_unchecked()`]: Self::to_bytes_unchecked
+    /// [`to_bytes()`]: Self::to_bytes
     /// [type level documentation]: Self
-    #[inline]
-    fn to_bytes(&mut self) -> &mut [u8] {
+    fn init_padding(&mut self) {
         unsafe {
             let ptr = (self as *mut Self).cast::<u8>();
 
@@ -420,8 +448,46 @@ pub unsafe trait ZeroCopy: Sized {
                 Self::pad(&mut padder);
                 padder.remaining();
             }
+        }
+    }
 
-            slice::from_raw_parts_mut(ptr, size_of::<Self>())
+    /// Convert a `ZeroCopy` type into bytes.
+    ///
+    /// This requires mutable access to `self`, since it must call
+    /// [`init_padding()`] to ensure that the returned buffer is fully
+    /// initialized.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [`init_padding()`]: Self::init_padding
+    /// [type level documentation]: Self
+    #[inline]
+    fn to_bytes(&mut self) -> &[u8] {
+        self.init_padding();
+
+        unsafe {
+            let ptr = (self as *mut Self).cast::<u8>();
+            slice::from_raw_parts(ptr, size_of::<Self>())
+        }
+    }
+
+    /// Convert a `ZeroCopy` type into bytes.
+    ///
+    /// This does not require mutable access to `self`, but the caller must
+    /// ensure that [`init_padding()`] has been called at some point before this
+    /// function and that the type that was padded has not been moved.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [`init_padding()`]: Self::init_padding
+    /// [type level documentation]: Self
+    #[inline]
+    unsafe fn to_bytes_unchecked(&mut self) -> &[u8] {
+        self.init_padding();
+
+        unsafe {
+            let ptr = (self as *mut Self).cast::<u8>();
+            slice::from_raw_parts(ptr, size_of::<Self>())
         }
     }
 
