@@ -489,25 +489,81 @@ pub mod pointer;
 /// # Using with enums
 ///
 /// The following are the requirements for deriving for enums:
-/// * The enum must be marked with a valid, fixed representation. Such as
-///   `#[repr(u8)]`, or `#[repr(usize)]`.
-/// * If custom discriminators are used, only constant values can be used.
+///
+/// The enum must be marked with a valid, fixed representation. Such as
+/// `#[repr(u8)]`, or `#[repr(usize)]`.
+///
+/// ```
+/// use musli_zerocopy::ZeroCopy;
+///
+/// #[derive(ZeroCopy)]
+/// #[repr(u8)]
+/// enum Flags {
+///     First ,
+///     Second(u32),
+///     Third {
+///         first: u32,
+///         second: u64,
+///     },
+/// }
+/// ```
+///
+/// If a custom discriminant is used, only constant values are supported:
+///
+/// ```
+/// # use musli_zerocopy::ZeroCopy;
+/// #[derive(ZeroCopy)]
+/// #[repr(u8)]
+/// enum Flags {
+///     First = 1,
+///     Second(u32), // will automatically assigned 2
+///     Third {
+///         first: u32,
+///         second: u64,
+///     } = 5,
+/// }
+/// ```
+///
+/// This is rejected:
+///
+/// ```compile_fail
+/// # use musli_zerocopy::ZeroCopy;
+/// #[derive(ZeroCopy)]
+/// #[repr(u8)]
+/// enum Flags {
+///     Max = u8::MAX,
+/// }
+/// ```
+///
+/// Complete example:
 ///
 /// ```
 /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
 ///
 /// #[derive(Debug, PartialEq, ZeroCopy)]
-/// #[repr(u32)]
+/// #[repr(u8)]
 /// enum Flags {
-///     First = 1,
-///     Second, // will be automatically assigned 2
-///     Third = 5,
+///     First,
+///     Second(u32),
+///     Third {
+///         first: u32,
+///         second: u64,
+///     },
 /// }
 ///
-/// let mut buf = OwnedBuf::new();
+/// let mut buf = OwnedBuf::with_alignment::<Flags>();
+///
+/// buf.clear();
 /// let ptr = buf.store(&Flags::First);
-/// let buf = buf.into_aligned();
 /// assert_eq!(buf.load(ptr)?, &Flags::First);
+///
+/// buf.clear();
+/// let ptr = buf.store(&Flags::Second(42));
+/// assert_eq!(buf.load(ptr)?, &Flags::Second(42));
+///
+/// buf.clear();
+/// let ptr = buf.store(&Flags::Third { first: 42, second: 84 });
+/// assert_eq!(buf.load(ptr)?, &Flags::Third { first: 42, second: 84 });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///
@@ -515,22 +571,21 @@ pub mod pointer;
 ///
 /// # Padding
 ///
-/// The constant [`ZeroCopy::PADDING`] determines whether the derives struct
-/// uses padding or not. This derive currently uses a fairly conservative
-/// algorithm:
+/// The constant [`ZeroCopy::Padded`] determines whether the derives struct uses
+/// padding or not. This derive currently uses a fairly conservative algorithm:
 ///
-/// The constant [`ZeroCopy::PADDING`] will be set to `true` if:
+/// The constant [`ZeroCopy::Padded`] will be set to `true` if:
 /// * The size of the type is 0, and the alignment is larger than 1. This
 ///   indicates a zero-sized type with an explicit `#[repr(align(N))]` that is
 ///   not set to 1.
 /// * The sum of the size of all the fields is not the same as the size of the
 ///   type.
-/// * Any of the fields has its [`ZeroCopy::PADDING`] set to `true`.
+/// * Any of the fields has its [`ZeroCopy::Padded`] set to `true`.
 /// * For enums, we test every variant with the same rules, except each variant
 ///   is treated as a struct where the discriminant (`u32` in `#[repr(u32)]`) is
 ///   treated like [a leading hidden field].
 ///
-/// [`ZeroCopy::PADDING`]: crate::traits::ZeroCopy::PADDING
+/// [`ZeroCopy::Padded`]: crate::traits::ZeroCopy::Padded
 /// [a first hidden field]: https://doc.rust-lang.org/beta/reference/type-layout.html#primitive-representation-of-enums-with-fields
 ///
 /// ```
@@ -549,7 +604,7 @@ pub mod pointer;
 /// #[derive(ZeroCopy)]
 /// #[repr(C, align(128))]
 /// struct ZstPadded;
-/// const _: () = assert!(ZstPadded::PADDED);
+/// const _: () = assert!(!ZstPadded::PADDED);
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(u8)]

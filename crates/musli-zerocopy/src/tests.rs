@@ -59,7 +59,8 @@ fn test_zero_padded() {
     #[repr(C, align(128))]
     struct EmptyPadded;
 
-    const _: () = assert!(EmptyPadded::PADDED);
+    const _: () = assert!(!EmptyPadded::PADDED);
+    const _: () = assert!(!<[EmptyPadded; 0]>::PADDED);
 
     #[derive(ZeroCopy)]
     #[zero_copy(crate)]

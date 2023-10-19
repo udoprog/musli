@@ -182,7 +182,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             // ZSTs are padded if their alignment is not 1, any other type is
             // padded if the sum of all their field sizes does not match the
             // size of the type itself.
-            padded = quote!((#mem::size_of::<Self>() == 0 && #mem::align_of::<Self>() > 1) || #mem::size_of::<Self>() != (0 #(+ #field_sizes)*) #(|| #field_padded)*);
+            padded = quote!(#mem::size_of::<Self>() > (0 #(+ #field_sizes)*) #(|| #field_padded)*);
 
             let types = &output.types;
 
@@ -332,7 +332,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                 // Struct does not need to be padded if all elements are the
                 // same size and alignment.
-                padded_variants.push(quote!((#mem::size_of::<Self>() != (#base_size #(+ #field_sizes)*) #(|| #field_padded)*)));
+                padded_variants.push(quote!((#mem::size_of::<Self>() > (#base_size #(+ #field_sizes)*) #(|| #field_padded)*)));
 
                 variant_fields.push({
                     let pat = build_field_exhaustive_pattern(
