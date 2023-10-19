@@ -14,8 +14,8 @@ Summary of the different kinds of benchmarks we support.
 The following are one section for each kind of benchmark we perform. They range from "Full features" to more specialized ones like zerocopy comparisons.
 - [Full features](#full-features)
 - [Fewer features](#fewer-features)
-- [Müsli vs rkyv](#zerocopy-rkyv)
-- [Müsli vs zerocopy](#zerocopy-zerocopy)
+- [Müsli vs rkyv](#müsli-vs-rkyv)
+- [Müsli vs zerocopy](#müsli-vs-zerocopy)
 
 Below you'll also find [Size comparisons](#size-comparisons).
 # Full features
