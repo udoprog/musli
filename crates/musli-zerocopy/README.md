@@ -77,7 +77,7 @@ other popular libraries:
   you build the equivalent of the  `Archived` variant directly and the way
   you interact with the data model doesn't incur the cost of validation up
   front unless you want to. `rkyv` is only sound if you  build it with the
-  [`strict` feature set], and with the feature enabled it doesn't pass Miri
+  [`strict` feature] set, and with the feature enabled it doesn't pass Miri
   under Stacked Borrows[^stacked-borrows]. Neither of these are strict
   blockers for users of the library, but do constrain its safe applicability
   in ways this library does not.
@@ -225,9 +225,11 @@ the safe APIs or abide by the safety documentation of the unsafe APIs.
 > as long as you include the alignment of the buffer and the endianness of
 > the data structure. Both of these can be retrieved:
 >
-> ```no_run
-> use musli_zerocopy::OwnedBuf;
-> let buf: OwnedBuf = todo!();
+> ```
+> # use musli_zerocopy::OwnedBuf;
+> let buf = OwnedBuf::new();
+>
+> /* write something */
 >
 > let is_little_endian = cfg!(target_endian = "little");
 > let alignment = buf.requested();
