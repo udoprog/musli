@@ -191,6 +191,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                 quote! {
                     // SAFETY: Type has no fields and has the necessary `repr`.
+                    #[automatically_derived]
                     unsafe impl #impl_generics #zero_sized for #name #ty_generics #where_clause {}
                 }
             });
@@ -416,6 +417,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
         #impl_zero_sized
 
+        #[automatically_derived]
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
             const ANY_BITS: bool = #any_bits;
             const PADDED: bool = #padded;
