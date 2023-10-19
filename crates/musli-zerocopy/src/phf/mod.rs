@@ -20,13 +20,16 @@ pub(crate) mod hashing;
 pub(crate) use self::entry::Entry;
 mod entry;
 
+#[doc(inline)]
 pub use self::map::{Map, MapRef};
 pub mod map;
 
+#[doc(inline)]
 pub use self::set::{Set, SetRef};
 pub mod set;
 
 #[cfg(feature = "alloc")]
+#[doc(inline)]
 pub use self::factory::*;
 #[cfg(feature = "alloc")]
 mod factory;

@@ -1013,7 +1013,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// let value = musli_value::Value::Number(42u32.into());
     /// assert_eq!(musli_value::decode::<BytesReference>(&value).unwrap_err().to_string(), "Expected bytes, but found number");
-    /// Ok::<_, musli_value::Error>(())
+    /// # Ok::<_, musli_value::Error>(())
     /// ```
     #[inline]
     fn decode_bytes<C, V>(self, cx: &mut C, _: V) -> Result<V::Ok, C::Error>
@@ -1080,7 +1080,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// let value = musli_value::Value::Number(42u32.into());
     /// assert_eq!(musli_value::decode::<StringReference>(&value).unwrap_err().to_string(), "Expected string, but found number");
-    /// Ok::<_, musli_value::Error>(())
+    /// # Ok::<_, musli_value::Error>(())
     /// ```
     #[inline]
     fn decode_string<C, V>(self, cx: &mut C, _: V) -> Result<V::Ok, C::Error>

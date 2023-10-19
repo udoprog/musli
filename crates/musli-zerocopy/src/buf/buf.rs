@@ -366,28 +366,30 @@ impl Buf {
     /// Bind the current buffer to a value.
     ///
     /// This provides a more convenient API for complex types like
-    /// [`phf::MapRef`] and [`phf::SetRef`], and makes sure that all the
+    /// [`swiss::MapRef`] and [`swiss::SetRef`], and makes sure that all the
     /// internals related to the type being bound have been validated.
     ///
     /// Binding a type can be be faster in cases where you interact with the
     /// bound type a lot since accesses do not require validation, but might be
     /// slower if the access is a "one of", or infrequent.
     ///
-    /// [`phf::MapRef`]: crate::phf::MapRef
-    /// [`phf::SetRef`]: crate::phf::SetRef
+    /// [`swiss::MapRef`]: crate::swiss::MapRef
+    /// [`swiss::SetRef`]: crate::swiss::SetRef
     ///
     /// ## Examples
     ///
-    /// Binding a [`phf::Map`] ensures that all the internals of the map have
+    /// Binding a [`swiss::Map`] ensures that all the internals of the map have
     /// been validated:
+    ///
+    /// [`swiss::Map`]: crate::swiss::Map
     ///
     /// ```
     /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::phf;
+    /// use musli_zerocopy::swiss;
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
+    /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -397,10 +399,8 @@ impl Buf {
     ///
     /// assert!(map.contains_key(&1)?);
     /// assert!(!map.contains_key(&3)?);
-    /// Ok::<_, musli_zerocopy::Error>(())
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    ///
-    /// [`phf::Map`]: crate::phf::Map
     #[inline]
     pub fn bind<T>(&self, ptr: T) -> Result<T::Bound<'_>, Error>
     where

@@ -42,7 +42,7 @@ use crate::Context;
 /// let value = musli_value::Value::String("A".to_string());
 ///
 /// assert_eq!(musli_value::decode::<Enum>(&value)?, Enum::A);
-/// Ok::<_, musli_value::Error>(())
+/// # Ok::<_, musli_value::Error>(())
 /// ```
 pub fn visit_owned_fn<'de, E, U, C, T, O>(
     expected: E,
