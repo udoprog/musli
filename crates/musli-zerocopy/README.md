@@ -31,23 +31,30 @@ structures:
 Since this is the first question anyone will ask, here is how we differ from
 other popular libraries:
 * [`zerocopy`](https://docs.rs/zerocopy) doesn't support padded
-  structs[^padded], bytes to reference conversions, or conversions which do
-  not permit all bit patterns to be inhabited by zeroes[^zeroes]. We still
-  want to provide more of a complete toolkit that you'd need to build and
-  interact with complex data structures, such as the [`phf`] and [`swiss`]
-  modules. This crate might indeed at some point make use of `zerocopy`'s
-  traits.
+  structs[^padded], bytes to reference conversions, or conversions which
+  does not permit decoding types unless all bit patterns an be inhabited by
+  zeroes[^zeroes]. We still want to provide more of a complete toolkit that
+  you'd need to build and interact with complex data structures, such as the
+  [`phf`] and [`swiss`] modules. This crate might indeed at some point make
+  use of `zerocopy`'s traits.
 * [`rkyv`](https://docs.rs/rkyv) operates on `#[repr(Rust)]` types and from
   this derives an optimized `Archived` variation for you. This library
   operates on the equivalent of `Archived` variant directly instead that you
   should build and interact with by hand. `rkyv` is also explicitly not
-  sound unless you build it with the `strict` feature, and even with the
-  feature enabled it doesn't pass Miri. Neither of these are strict blockers
-  for users of the library, but do constrain its safe applicability in ways
-  this library does not.
+  sound unless you build it with the [`strict` feature], with the feature
+  enabled it doesn't pass Miri[^miri] under Stacked
+  Borrows[^stacked-borrows]. Neither of these are strict blockers for users
+  of the library, but do constrain its safe applicability in ways this
+  library does not.
 
-[^padded]: This is on their roadmap.
-[^zeroes]: FromBytes extends FromZeroes.
+[`strict` feature]: https://docs.rs/rkyv/latest/rkyv/#features
+
+[^padded]: This is on zerocopy's roadmap, but it fundamentally doesn't play well
+    with the central `FromBytes` / `ToBytes` pair of traits.
+
+[^zeroes]: [FromBytes extends FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html).
+
+[^stacked-borrows]: <https://github.com/rkyv/rkyv/issues/436>
 
 The `tests` test suite has been extended to support some level of
 zerocopy types, all though since the feature sets vary so widely between the
@@ -90,17 +97,17 @@ This would result in the following buffer:
 0016: size -> 12
 ```
 
-What we see at offset `0016` is an 8 byte [`Unsized<str>`]. The first field
+What we see at offset `0016` is an 8 byte [`Ref<str>`]. The first field
 stores the offset where to fetch the string, and the second field the length
 of the string.
 
-Let's have a look at a [`Slice<u32>`] next:
+Let's have a look at a [`Ref<[u32]>`][ref-u32] next:
 
 ```rust
-use musli_zerocopy::OwnedBuf;
+use musli_zerocopy::{Ref, OwnedBuf};
 
 let mut buf = OwnedBuf::new();
-let slice = buf.store_unsized(&[1u32, 2, 3, 4]);
+let slice: Ref<[u32]> = buf.store_slice(&[1, 2, 3, 4]);
 let reference = buf.store(&slice);
 
 assert_eq!(reference.offset(), 16);
@@ -117,20 +124,20 @@ This would result in the following buffer:
 0020: length -> 4
 ```
 
-At address `0016` we store two fields which corresponds to a [`Slice<u32>`].
+At address `0016` we store two fields which corresponds to a
+[`Ref<[u32]>`][ref-u32].
 
 Next lets investigate an example using a `Custom` struct:
 
 ```rust
 use core::mem::size_of;
-use musli_zerocopy::{OwnedBuf, ZeroCopy};
-use musli_zerocopy::pointer::Unsized;
+use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
 struct Custom {
     field: u32,
-    string: Unsized<str>,
+    string: Ref<str>,
 }
 
 let mut buf = OwnedBuf::new();
@@ -205,7 +212,7 @@ aligned `&'static [u8]` buffer:
 
 ```rust
 use core::mem::size_of;
-use musli_zerocopy::{Buf, Ref};
+use musli_zerocopy::Buf;
 
 // Helper to force the static buffer to be aligned like `A`.
 #[repr(C)]
@@ -235,7 +242,7 @@ at where the struct can be read will then simply be zero, and all the data
 it depends on are stored at subsequent offsets.
 
 ```rust
-use musli_zerocopy::{OwnedBuf, Ref};
+use musli_zerocopy::OwnedBuf;
 use musli_zerocopy::mem::MaybeUninit;
 
 let mut buf = OwnedBuf::new();
@@ -266,16 +273,16 @@ Example of using an address larger than `2^32` causing a panic:
 Ref::<Custom>::new(1usize << 32);
 ```
 
-Example panic using a [`Slice`] with a length larger than `2^32`:
+Example panic using a [`Ref<\[T\]>`] with a length larger than `2^32`:
 
 ```rust
-Slice::<Custom>::new(0, 1usize << 32);
+Ref::<[Custom]>::with_metadata(0, 1usize << 32);
 ```
 
-Example panic using an [`Unsized`] value with a size larger than `2^32`:
+Example panic using an [`Ref<str>`] value with a size larger than `2^32`:
 
 ```rust
-Unsized::<str>::new(0, 1usize << 32);
+Ref::<str>::with_metadata(0, 1usize << 32);
 ```
 
 If you want to address data larger than this limit, it is recommended that
@@ -291,8 +298,8 @@ The available [`Size`] implementations are:
 ```rust
 // These no longer panic:
 let reference = Ref::<Custom, usize>::new(1usize << 32);
-let slice = Slice::<Custom, usize>::new(0, 1usize << 32);
-let unsize = Unsized::<str, usize>::new(0, 1usize << 32);
+let slice = Ref::<[Custom], usize>::with_metadata(0, 1usize << 32);
+let unsize = Ref::<str, usize>::with_metadata(0, 1usize << 32);
 ```
 
 To initialize an [`OwnedBuf`] with a custom [`Size`] you use this
@@ -311,43 +318,29 @@ then carry into any pointers it return:
 ```rust
 use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 use musli_zerocopy::buf::DefaultAlignment;
-use musli_zerocopy::pointer::{Slice, Unsized};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
-struct Custom { reference: Ref<u32, usize>, slice: Slice::<u32, usize>, unsize: Unsized::<str, usize> }
+struct Custom { reference: Ref<u32, usize>, slice: Ref::<[u32], usize>, unsize: Ref::<str, usize> }
 
 let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
 
 let reference = buf.store(&42u32);
-let slice = buf.store_unsized(&[1, 2, 3, 4]);
+let slice = buf.store_slice(&[1, 2, 3, 4]);
 let unsize = buf.store_unsized("Hello World");
 
 buf.store(&Custom { reference, slice, unsize });
 ```
 
-[`swiss`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
+[`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
 [`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
 [`phf` crate]: https://docs.rs/phf
 [`hashbrown` crate]: https://docs.rs/phf
-[`requested()`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
-[`ZeroCopy`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
-[`Ref`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
-[`Slice`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Slice.html
-[`Slice<u32>`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Slice.html
-[`Unsized`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Unsized.html
-[`Unsized<str>`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Unsized.html
-[`OwnedBuf`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
-[`Size`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
-[`aligned_buf(bytes, align)`]:
-    https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+[`requested()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
+[`ZeroCopy`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
+[`Ref`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+[ref-u32]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+[`Ref<str>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+[`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
+[`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+[`aligned_buf(bytes, align)`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
