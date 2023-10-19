@@ -49,17 +49,17 @@
 //! should go to
 //! [`benchmarks.md`](https://github.com/udoprog/musli/blob/main/benchmarks.md).
 //! I will be extending this suite with more zero-copy types, but for now we
-//! have a clear lead in every use case I've tested it for.
+//! have a clear lead in the use cases I've tested it for.
 //!
 //! This is because:
 //! * Zero-copy doesn't incur a deserialization overhead if done correctly. You
 //!   take bytes in one place, validate them, and treat them as the destination
-//!   type. There are only so many ways this can be done.
+//!   type. There are only so many ways this can be done;
 //! * Padding has been implemented and optimized in such a way that it mostly
-//!   generates the equivalent assembly as if you'd written it by hand.
-//! * Finally, incremental validation means that you only need to pay for what
-//!   you're accessing. So for random access use cases we only need to validate
-//!   the parts that are being accessed.
+//!   generates the equivalent code you'd write by hand, and;
+//! * Incremental validation means that you only need to pay for what you're
+//!   accessing. So for random access we only need to validate the parts that
+//!   are being accessed.
 //!
 //! <br>
 //!
