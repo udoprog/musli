@@ -47,8 +47,8 @@ fn test_ref_to_slice() -> Result<()> {
 
     let buf = buf.into_aligned();
 
-    assert_eq!(buf.load(&to_slice1_ref)?, &to_slice1);
-    assert_eq!(buf.load(&to_slice2_ref)?, &to_slice2);
+    assert_eq!(buf.load(to_slice1_ref)?, &to_slice1);
+    assert_eq!(buf.load(to_slice2_ref)?, &to_slice2);
     Ok(())
 }
 

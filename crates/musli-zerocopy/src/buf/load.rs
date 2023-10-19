@@ -32,40 +32,6 @@ pub trait LoadMut: Load {
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error>;
 }
 
-impl<T: ?Sized> Load for &T
-where
-    T: Load,
-{
-    type Target = T::Target;
-
-    #[inline]
-    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        T::load(self, buf)
-    }
-}
-
-impl<T: ?Sized> Load for &mut T
-where
-    T: Load,
-{
-    type Target = T::Target;
-
-    #[inline]
-    fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        T::load(self, buf)
-    }
-}
-
-impl<T: ?Sized> LoadMut for &mut T
-where
-    T: LoadMut,
-{
-    #[inline]
-    fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
-        T::load_mut(self, buf)
-    }
-}
-
 impl<P, O: Size> Load for Ref<P, O>
 where
     P: ZeroCopy,

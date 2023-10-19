@@ -39,7 +39,7 @@ impl<P: ?Sized, O> Visit for Ref<P, O>
 where
     P: Pointee<O>,
     O: Size,
-    Ref<P, O>: Load,
+    Self: Load,
 {
     type Target = <Ref<P, O> as Load>::Target;
 
@@ -48,7 +48,7 @@ where
     where
         V: FnOnce(&Self::Target) -> U,
     {
-        let value = buf.load(self)?;
+        let value = buf.load(*self)?;
         Ok(visitor(value))
     }
 }

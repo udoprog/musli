@@ -21,11 +21,11 @@ fn main() -> Result<()> {
     let buf = buf.into_aligned();
     let map = buf.bind(map)?;
 
-    let c1 = buf.load(map.get(&1)?.context("Missing key 1")?)?;
+    let c1 = buf.load(*map.get(&1)?.context("Missing key 1")?)?;
     assert_eq!(c1.field, 1);
     assert_eq!(buf.load(c1.string)?, "string");
 
-    let c2 = buf.load(map.get(&2)?.context("Missing key 2")?)?;
+    let c2 = buf.load(*map.get(&2)?.context("Missing key 2")?)?;
     assert_eq!(c2.field, 2);
     assert_eq!(buf.load(c2.string)?, "string");
 

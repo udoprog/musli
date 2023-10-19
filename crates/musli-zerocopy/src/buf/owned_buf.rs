@@ -8,7 +8,7 @@ use core::slice;
 
 use alloc::alloc;
 
-use crate::buf::{Buf, BufMut, DefaultAlignment};
+use crate::buf::{Buf, DefaultAlignment, Padder};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -330,21 +330,6 @@ impl<O: Size> OwnedBuf<O> {
         self.len += size;
     }
 
-    /// Return the current buffer as a raw and very unsafe to use [`BufMut`].
-    ///
-    /// See it [type level documentation] for more information.
-    ///
-    /// [type level documentation]: BufMut
-    ///
-    /// # Safety
-    ///
-    /// Calling this method is not inherently unsafe, but use of [`BufMut`] has
-    /// many potential safety implications, so this is marked as unsafe.
-    #[inline]
-    pub unsafe fn as_buf_mut(&mut self) -> BufMut<'_> {
-        BufMut::new(self.data.as_ptr())
-    }
-
     /// Get get a raw pointer to the current buffer.
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
@@ -656,8 +641,7 @@ impl<O: Size> OwnedBuf<O> {
     {
         let offset = self.len;
 
-        let mut buf_mut = BufMut::new(self.data.as_ptr().wrapping_add(offset));
-        buf_mut.store_unaligned(value);
+        crate::buf::store_unaligned(self.data.as_ptr().wrapping_add(offset), value);
         self.len += size_of::<P>();
         Ref::new(offset)
     }
@@ -687,10 +671,19 @@ impl<O: Size> OwnedBuf<O> {
         P: UnsizedZeroCopy<P, O>,
     {
         unsafe {
-            self.next_offset_with_and_reserve(P::ALIGN, value.size());
+            let size = size_of_val(value);
+            self.next_offset_with_and_reserve(P::ALIGN, size);
             let offset = self.len;
-            value.store(&mut BufMut::new(self.data.as_ptr().wrapping_add(offset)));
-            self.len += value.size();
+            let ptr = self.data.as_ptr().wrapping_add(offset);
+            ptr.copy_from_nonoverlapping(value.as_ptr(), size);
+
+            if P::PADDED {
+                let mut padder = Padder::new(ptr);
+                value.pad(&mut padder);
+                padder.remaining_unsized(value);
+            }
+
+            self.len += size;
             Ref::with_metadata(offset, value.metadata())
         }
     }

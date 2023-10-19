@@ -18,7 +18,7 @@
 //! use musli_zerocopy::{Error, Ref, ZeroCopy};
 //! use musli_zerocopy::buf::{OwnedBuf, Buf, Load, LoadMut, Visit};
 //!
-//! #[derive(ZeroCopy)]
+//! #[derive(Clone, Copy, ZeroCopy)]
 //! #[repr(C, packed)]
 //! struct CompactSlice {
 //!     // 3 bytes of offset.
@@ -74,7 +74,7 @@
 //! let buf1 = buf1.into_aligned();
 //! let slice = buf1.load(slice_ref)?;
 //! assert_eq!(slice.len(), 4);
-//! assert_eq!(buf1.load(slice)?, &[1, 2, 3, 4]);
+//! assert_eq!(buf1.load(*slice)?, &[1, 2, 3, 4]);
 //!
 //! let mut buf2 = OwnedBuf::new();
 //! let slice = buf2.store_slice(&[1u8, 2, 3, 4]);
@@ -85,7 +85,7 @@
 //! let buf2 = buf2.into_aligned();
 //! let slice = buf2.load(slice_ref)?;
 //! assert_eq!(slice.len(), 4);
-//! assert_eq!(buf2.load(slice)?, &[1, 2, 3, 4]);
+//! assert_eq!(buf2.load(*slice)?, &[1, 2, 3, 4]);
 //! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 
@@ -111,15 +111,12 @@ mod validator;
 pub use self::padder::Padder;
 mod padder;
 
-pub use self::buf_mut::BufMut;
-mod buf_mut;
-
 #[cfg(feature = "alloc")]
 pub use self::owned_buf::OwnedBuf;
 #[cfg(feature = "alloc")]
 mod owned_buf;
 
-use core::mem::align_of;
+use core::mem::{align_of, size_of};
 
 #[cfg(feature = "alloc")]
 use alloc::borrow::Cow;
@@ -242,4 +239,29 @@ where
 pub(crate) fn padding_to(len: usize, align: usize) -> usize {
     let mask = align - 1;
     (align - (len & mask)) & mask
+}
+
+/// Store the raw bytes associated with `*const T` into the buffer and advance
+/// its position by `size_of::<T>()`.
+///
+/// This does not require `T` to be aligned.
+///
+/// # Safety
+///
+/// The caller must ensure that any store call only includes data up-to the size
+/// of `Self`.
+///
+/// Also see the [type level safety documentation][#safety]
+#[inline]
+pub(crate) unsafe fn store_unaligned<T>(ptr: *mut u8, value: *const T)
+where
+    T: ZeroCopy,
+{
+    ptr.copy_from_nonoverlapping(value.cast(), size_of::<T>());
+
+    if T::PADDED {
+        let mut padder = Padder::new(ptr);
+        T::pad(&mut padder);
+        padder.remaining();
+    }
 }

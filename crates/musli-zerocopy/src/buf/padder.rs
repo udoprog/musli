@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, transmute};
+use core::mem::{align_of, size_of, size_of_val, transmute};
 use core::ptr;
 
 use crate::traits::ZeroCopy;
@@ -8,17 +8,14 @@ use crate::traits::ZeroCopy;
 ///
 /// This knows how to find and initialize padding regions in `repr(C)` types,
 /// and provides a builder-like API to doing so.
-#[must_use = "For the writer to have an effect on `OwnedBuf` you must call `Padder::finish`"]
-pub struct Padder<'a, T> {
+#[must_use = "For the writer to have an effect on `OwnedBuf` you must call `Padder::remaining` / `Padder::remaining_unsized`"]
+pub struct Padder<'a, T: ?Sized> {
     ptr: *mut u8,
     offset: usize,
     _marker: PhantomData<&'a mut T>,
 }
 
-impl<'a, T> Padder<'a, T>
-where
-    T: ZeroCopy,
-{
+impl<'a, T: ?Sized> Padder<'a, T> {
     #[inline]
     pub(crate) fn new(ptr: *mut u8) -> Self {
         Self {
@@ -137,15 +134,18 @@ where
     /// [`pad::<F>()`]: Self::pad
     /// [`ZeroSized`]: crate::traits::ZeroSized
     #[inline]
-    pub unsafe fn remaining(self) {
+    pub unsafe fn remaining(self)
+    where
+        T: Sized,
+    {
         let count = size_of::<T>() - self.offset;
         ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
     }
 
-    /// Finalize remaining padding with a custom size.
+    /// Finalize remaining padding based on the size of an unsized value.
     #[inline]
-    pub(crate) unsafe fn remaining_with(self, size: usize) {
-        let count = size - self.offset;
+    pub(crate) unsafe fn remaining_unsized(self, value: &T) {
+        let count = size_of_val(value) - self.offset;
         ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
     }
 }
@@ -180,7 +180,7 @@ mod tests {
         // SAFETY: We do not pad beyond known fields and are making sure to
         // initialize all of the buffer.
         unsafe {
-            buf.as_buf_mut().store_unaligned(&padded);
+            crate::buf::store_unaligned(buf.as_ptr_mut(), &padded);
             buf.advance(size_of::<ZeroPadded>());
         }
 

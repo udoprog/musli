@@ -8,8 +8,8 @@ use core::marker::PhantomData;
 use core::mem;
 use core::ptr::NonNull;
 
+use crate::buf::Buf;
 use crate::buf::OwnedBuf;
-use crate::buf::{Buf, BufMut};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::Size;
 use crate::swiss::raw::{h2, is_full, probe_seq, special_is_empty, Group, ProbeSeq};
@@ -523,12 +523,11 @@ impl<'a, T> Bucket<'a, T> {
     /// Overwrites a memory location with the given `value` without reading or
     /// dropping the old value (like [`ptr::write`] function).
     #[inline]
-    pub(crate) unsafe fn write(&self, val: &T)
+    pub(crate) unsafe fn write(&self, value: &T)
     where
         T: ZeroCopy,
     {
-        let mut buf_mut = BufMut::new(self.as_ptr().cast());
-        buf_mut.store_unaligned(val);
+        crate::buf::store_unaligned(self.as_ptr().cast(), value)
     }
 
     /// Acquires the underlying raw pointer `*mut T` to `data`.

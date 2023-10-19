@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::ZeroCopy;
+use crate::traits::ZeroCopy;
 
 /// The default [`Size`] in use by this crate.
 pub type DefaultSize = u32;
@@ -32,14 +32,7 @@ mod sealed {
 /// This trait is sealed and its internals hidden. Publicly it's only used as a
 /// marker trait.
 pub trait Size:
-    TryFrom<usize>
-    + self::sealed::Sealed
-    + 'static
-    + Sized
-    + ZeroCopy
-    + Copy
-    + fmt::Display
-    + fmt::Debug
+    'static + TryFrom<usize> + Copy + fmt::Display + fmt::Debug + ZeroCopy + self::sealed::Sealed
 {
     /// The default zero pointer.
     #[doc(hidden)]

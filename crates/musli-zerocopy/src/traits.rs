@@ -17,12 +17,12 @@
 #![allow(clippy::missing_safety_doc)]
 
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, size_of_val};
+use core::mem::{align_of, size_of};
 use core::num::Wrapping;
 use core::slice;
 use core::str;
 
-use crate::buf::{Buf, BufMut, Padder, Validator, Visit};
+use crate::buf::{Buf, Padder, Validator, Visit};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Pointee, Size};
 use crate::Ref;
@@ -77,21 +77,17 @@ where
     /// This must be a power of two.
     const ALIGN: usize;
 
-    /// The size in bytes of the unsized value.
-    ///
-    /// This is known as long as the value is accessed through a reference.
-    fn size(&self) -> usize;
+    /// If the unsized type is padded.
+    const PADDED: bool;
+
+    /// Return a pointer to the base of the unsized value.
+    fn as_ptr(&self) -> *const u8;
 
     /// Metadata associated with the unsized value.
     fn metadata(&self) -> P::Metadata;
 
-    /// Write to the owned buffer.
-    ///
-    /// This is usually called indirectly through methods such as
-    /// [`OwnedBuf::store_unsized`].
-    ///
-    /// [`OwnedBuf::store_unsized`]: crate::buf::OwnedBuf::store_unsized
-    unsafe fn store(&self, buf: &mut BufMut<'_>);
+    /// Pad the buffer associated with the current buffer.
+    unsafe fn pad(&self, pad: &mut Padder<'_, Self>);
 
     /// Validate the buffer with the given capacity and return the decoded metadata.
     unsafe fn validate(
@@ -528,21 +524,20 @@ where
     O: Size,
 {
     const ALIGN: usize = align_of::<u8>();
+    const PADDED: bool = false;
 
     #[inline]
-    fn size(&self) -> usize {
-        size_of_val(self)
+    fn as_ptr(&self) -> *const u8 {
+        str::as_ptr(self)
     }
 
     #[inline]
     fn metadata(&self) -> P::Metadata {
-        <str>::len(self)
+        str::len(self)
     }
 
     #[inline]
-    unsafe fn store(&self, buf: &mut BufMut<'_>) {
-        buf.store_unsized_slice(self.as_bytes());
-    }
+    unsafe fn pad(&self, _: &mut Padder<'_, Self>) {}
 
     #[inline]
     unsafe fn validate(
@@ -584,20 +579,23 @@ where
     O: Size,
 {
     const ALIGN: usize = align_of::<T>();
+    const PADDED: bool = T::PADDED;
 
     #[inline]
-    fn size(&self) -> usize {
-        size_of_val(self)
+    fn as_ptr(&self) -> *const u8 {
+        <[T]>::as_ptr(self).cast()
+    }
+
+    #[inline]
+    unsafe fn pad(&self, padder: &mut Padder<'_, Self>) {
+        for _ in 0..self.len() {
+            padder.pad::<T>();
+        }
     }
 
     #[inline]
     fn metadata(&self) -> usize {
         self.len()
-    }
-
-    #[inline]
-    unsafe fn store(&self, buf: &mut BufMut<'_>) {
-        buf.store_unsized_slice(self);
     }
 
     #[inline]
