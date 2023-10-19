@@ -60,7 +60,7 @@ const REPORTS: &'static [Report] = &[
     },
     Report {
         id: "zerocopy-rkyv",
-        link: "zerocopy-rkyv",
+        link: "musli-vs-rkyv",
         description: &[
             "Comparison between [`musli-zerocopy`] and [`rkyv`].",
             "",
@@ -73,7 +73,7 @@ const REPORTS: &'static [Report] = &[
     },
     Report {
         id: "zerocopy-zerocopy",
-        link: "zerocopy-zerocopy",
+        link: "musli-vs-zerocopy",
         description: &[
             "Compares [`musli-zerocopy`] with [`zerocopy`].",
             "",

@@ -2,24 +2,64 @@
 //! [<img alt="crates.io" src="https://img.shields.io/crates/v/musli-zerocopy.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/musli-zerocopy)
 //! [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-musli--zerocopy-66c2a5?style=for-the-badge&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/musli-zerocopy)
 //!
-//! Refreshingly simple zero copy primitives by Müsli.
+//! Refreshingly simple, blazingly fast zero copy primitives by Müsli.
 //!
 //! This provides a basic set of tools to deal with types which do not require
 //! copying during deserialization. You define the `T`, and we provide the safe
-//! `&[u8]` to `&T` conversion.
-//!
-//! For a detailed overview of how this works, see the [`ZeroCopy`] derive.
-//! There's also a high level guide just below.
+//! `&[u8]` <-> `&T` conversions.
 //!
 //! Reading a zero-copy structure has full `#[no_std]` support. Constructing
-//! ones currently require the `alloc` feature to be enabled.
+//! ones currently requires the `alloc` feature to be enabled.
 //!
-//! This crate also includes a couple of neat and very efficient high level data
-//! structures:
+//! ```no_run
+//! # #[cfg(target_endian = "little")]
+//! # macro_rules! include_bytes { ("author.bin") => { &[35, 0, 0, 0, 12, 0, 0, 0, 9, 0, 0, 0, 74, 111, 104, 110, 45, 74, 111, 104, 110] } }
+//! # #[cfg(target_endian = "big")]
+//! # macro_rules! include_bytes { ("author.bin") => { &[0, 0, 0, 35, 0, 0, 0, 12, 0, 0, 0, 9, 74, 111, 104, 110, 45, 74, 111, 104, 110] } }
+//! use musli_zerocopy::{buf, Ref, ZeroCopy};
+//!
+//! #[derive(ZeroCopy)]
+//! #[repr(C)]
+//! struct Person {
+//!     age: u8,
+//!     name: Ref<str>,
+//! }
+//!
+//! let buf = buf::aligned_buf::<Person>(include_bytes!("author.bin"));
+//! let person = Person::from_bytes(&buf[..])?;
+//!
+//! assert_eq!(person.age, 35);
+//! // References are incrementally validated.
+//! assert_eq!(buf.load(person.name)?, "John-John");
+//! # Ok::<_, musli_zerocopy::Error>(())
+//! ```
+//!
+//! For a detailed overview of how this works, see the [`ZeroCopy`] and its
+//! corresponding [`ZeroCopy`][derive] derive. There's also a high level guide
+//! just below.
+//!
+//! This crate also includes a couple of neat high level data structures you
+//! might be interested in:
 //! * [`phf`] provides maps and sets based on [`phf` crate], or perfect hash
 //!   functions.
 //! * [`swiss`] is a port of the [`hashbrown` crate] which is a Google
 //!   SwissTable implementation.
+//!
+//! Finally if you're interested in the performance of `musli-zerocopy` you
+//! should go to
+//! [`benchmarks.md`](https://github.com/udoprog/musli/blob/main/benchmarks.md).
+//! I will be extending this suite with more zero-copy types, but for now we
+//! have a clear lead in every use case I've tested it for.
+//!
+//! This is because:
+//! * Zero-copy doesn't incur a deserialization overhead if done correctly. You
+//!   take bytes in one place, validate them, and treat them as the destination
+//!   type. There are only so many ways this can be done.
+//! * Padding has been implemented and optimized in such a way that it mostly
+//!   generates the equivalent assembly as if you'd written it by hand.
+//! * Finally, incremental validation means that you only need to pay for what
+//!   you're accessing. So for random access use cases we only need to validate
+//!   the parts that are being accessed.
 //!
 //! <br>
 //!
@@ -35,14 +75,14 @@
 //!   [`phf`] and [`swiss`] modules. This crate might indeed at some point make
 //!   use of `zerocopy`'s traits.
 //! * [`rkyv`](https://docs.rs/rkyv) operates on `#[repr(Rust)]` types and from
-//!   this derives an optimized `Archived` variation for you. This library
-//!   operates on the equivalent of `Archived` variant directly instead that you
-//!   should build and interact with by hand. `rkyv` is also explicitly not
-//!   sound unless you build it with the [`strict` feature], with the feature
-//!   enabled it doesn't pass Miri[^miri] under Stacked
-//!   Borrows[^stacked-borrows]. Neither of these are strict blockers for users
-//!   of the library, but do constrain its safe applicability in ways this
-//!   library does not.
+//!   this derives an optimized `Archived` variation for you. This library lets
+//!   you build the equivalent of the  `Archived` variant directly and the way
+//!   you interact with the data model doesn't incur the cost of validation up
+//!   front unless you want to. `rkyv` is only sound if you  build it with the
+//!   [`strict` feature set], and with the feature enabled it doesn't pass
+//!   Miri[^miri] under Stacked Borrows[^stacked-borrows]. Neither of these are
+//!   strict blockers for users of the library, but do constrain its safe
+//!   applicability in ways this library does not.
 //!
 //! [`strict` feature]: https://docs.rs/rkyv/latest/rkyv/#features
 //!
@@ -52,16 +92,6 @@
 //! [^zeroes]: [FromBytes extends FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html).
 //!
 //! [^stacked-borrows]: <https://github.com/rkyv/rkyv/issues/436>
-//!
-//! The `tests` test suite has been extended to support some level of
-//! zerocopy types, all though since the feature sets vary so widely between the
-//! crates it's hard to compare all of them against each other, but the
-//! following showcases how they currently compare to `musli-zerocopy`.
-//!
-//! Encoding a packed variant of the `Primitives` model:
-//!
-//! [^musli-zerocopy]: Generated with `cargo bench -p tests --no-default-features --features no-rt,musli-zerocopy,zerocopy -- primpacked`
-//! [^musli-rkyv]: Generated with `cargo bench -p tests --no-default-features --features no-rt,musli-zerocopy,rkyv -- primitives`
 //!
 //! <br>
 //!
@@ -368,7 +398,8 @@
 //! [`phf` crate]: https://docs.rs/phf
 //! [`hashbrown` crate]: https://docs.rs/phf
 //! [`requested()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
-//! [`ZeroCopy`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
+//! [`ZeroCopy`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.ZeroCopy.html
+//! [derive]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
 //! [`Ref`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 //! [ref-u32]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 //! [`Ref<str>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
@@ -450,7 +481,7 @@ pub mod pointer;
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///
-/// [`ZeroCopy`]: trait@crate::zero_copy::ZeroCopy
+/// [`ZeroCopy`]: crate::traits::ZeroCopy
 ///
 /// <br>
 ///
@@ -580,7 +611,7 @@ pub mod pointer;
 ///
 /// <br>
 ///
-/// ### `zero_copy(bounds = {<bound>,*})`
+/// ### `#[zero_copy(bounds = {<bound>,*})]`
 ///
 /// Allows for adding additional bounds to implement `ZeroCopy` for generic
 /// types:
@@ -599,7 +630,7 @@ pub mod pointer;
 ///
 /// <br>
 ///
-/// ### `zero_copy(crate = <path>)`
+/// ### `#[zero_copy(crate = <path>)]`
 ///
 /// Allows for specifying a custom path to the `musli_zerocopy`` crate
 /// (default).

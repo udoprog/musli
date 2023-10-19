@@ -482,11 +482,9 @@ pub unsafe trait ZeroCopy: Sized {
     /// [`init_padding()`]: Self::init_padding
     /// [type level documentation]: Self
     #[inline]
-    unsafe fn to_bytes_unchecked(&mut self) -> &[u8] {
-        self.init_padding();
-
+    unsafe fn to_bytes_unchecked(&self) -> &[u8] {
         unsafe {
-            let ptr = (self as *mut Self).cast::<u8>();
+            let ptr = (self as *const Self).cast::<u8>();
             slice::from_raw_parts(ptr, size_of::<Self>())
         }
     }
