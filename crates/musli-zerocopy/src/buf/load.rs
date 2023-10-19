@@ -66,11 +66,11 @@ where
     }
 }
 
-impl<T, O: Size> Load for Ref<T, O>
+impl<P, O: Size> Load for Ref<P, O>
 where
-    T: ZeroCopy,
+    P: ZeroCopy,
 {
-    type Target = T;
+    type Target = P;
 
     #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
@@ -100,9 +100,9 @@ impl<O: Size> Load for Ref<str, O> {
     }
 }
 
-impl<T, O: Size> LoadMut for Ref<T, O>
+impl<P, O: Size> LoadMut for Ref<P, O>
 where
-    T: ZeroCopy,
+    P: ZeroCopy,
 {
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {

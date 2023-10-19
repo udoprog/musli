@@ -36,20 +36,20 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, bounds = {T::Packed: ZeroCopy})]
-pub struct Ref<T: ?Sized, O: Size = DefaultSize>
+#[zero_copy(crate, bounds = {P::Packed: ZeroCopy})]
+pub struct Ref<P: ?Sized, O: Size = DefaultSize>
 where
-    T: Pointee<O>,
+    P: Pointee<O>,
 {
     offset: O,
-    metadata: T::Packed,
+    metadata: P::Packed,
     #[zero_copy(ignore)]
-    _marker: PhantomData<T>,
+    _marker: PhantomData<P>,
 }
 
-impl<T: ?Sized, O: Size> Ref<T, O>
+impl<P: ?Sized, O: Size> Ref<P, O>
 where
-    T: Pointee<O>,
+    P: Pointee<O>,
 {
     /// Construct a reference with custom metadata.
     ///
@@ -63,18 +63,18 @@ where
     /// assert_eq!(reference.len(), 10);
     /// ```
     #[inline]
-    pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
+    pub fn with_metadata<U>(offset: U, metadata: P::Metadata) -> Self
     where
         U: Copy + fmt::Debug,
         O: TryFrom<U>,
-        T::Metadata: fmt::Debug,
-        T::Packed: TryFrom<T::Metadata>,
+        P::Metadata: fmt::Debug,
+        P::Packed: TryFrom<P::Metadata>,
     {
         let Some(offset) = O::try_from(offset).ok() else {
             panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
         };
 
-        let Some(metadata) = T::Packed::try_from(metadata).ok() else {
+        let Some(metadata) = P::Packed::try_from(metadata).ok() else {
             panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
         };
 
@@ -86,9 +86,9 @@ where
     }
 }
 
-impl<T, O: Size> Ref<[T], O>
+impl<P, O: Size> Ref<[P], O>
 where
-    T: ZeroCopy,
+    P: ZeroCopy,
 {
     /// The number of elements in the slice.
     ///
@@ -145,7 +145,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn get(&self, index: usize) -> Option<Ref<T, O>> {
+    pub fn get(&self, index: usize) -> Option<Ref<P, O>> {
         if index >= self.len() {
             return None;
         }
@@ -153,15 +153,15 @@ where
         let ptr = self
             .offset
             .as_usize()
-            .wrapping_add(size_of::<T>().wrapping_mul(index));
+            .wrapping_add(size_of::<P>().wrapping_mul(index));
 
         Some(Ref::new(ptr))
     }
 }
 
-impl<T: ?Sized, O: Size> Ref<T, O>
+impl<P: ?Sized, O: Size> Ref<P, O>
 where
-    T: Pointee<O, Packed = O>,
+    P: Pointee<O>,
 {
     /// The number of elements in the slice.
     ///
@@ -174,14 +174,14 @@ where
     /// assert_eq!(slice.metadata(), 10);
     /// ```
     #[inline]
-    pub fn metadata(&self) -> T::Packed {
+    pub fn metadata(&self) -> P::Packed {
         self.metadata
     }
 }
 
-impl<T, O: Size> Ref<T, O>
+impl<P, O: Size> Ref<P, O>
 where
-    T: Pointee<O, Packed = ()>,
+    P: Pointee<O, Packed = ()>,
 {
     /// Construct a reference at the given offset.
     ///
@@ -235,9 +235,9 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> Ref<T, O>
+impl<P: ?Sized, O: Size> Ref<P, O>
 where
-    T: Pointee<O>,
+    P: Pointee<O>,
 {
     /// Get the offset the reference points to.
     ///
@@ -258,7 +258,7 @@ where
     ///
     /// This statically checks that the metadata for the pointers are the same
     /// to prevent casts over completely different references. For now this only
-    /// prevents `Ref<T>` to `Ref<[U]>` casts:
+    /// prevents `Ref<P>` to `Ref<[U]>` casts:
     ///
     /// ```compile_fail
     /// use musli_zerocopy::Ref;
@@ -278,7 +278,7 @@ where
     /// ```
     pub fn cast<U: ?Sized>(self) -> Ref<U, O>
     where
-        U: Pointee<O, Packed = T::Packed>,
+        U: Pointee<O, Packed = P::Packed>,
     {
         Ref {
             offset: self.offset,
@@ -288,9 +288,9 @@ where
     }
 }
 
-impl<T, const N: usize, O: Size> Ref<[T; N], O>
+impl<P, const N: usize, O: Size> Ref<[P; N], O>
 where
-    T: ZeroCopy,
+    P: ZeroCopy,
 {
     /// Coerce a reference to an array into a slice.
     ///
@@ -310,21 +310,21 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn array_into_slice(self) -> Ref<[T], O> {
+    pub fn array_into_slice(self) -> Ref<[P], O> {
         Ref::with_metadata(self.offset, N)
     }
 }
 
-impl<T, O: Size> Ref<MaybeUninit<T>, O>
+impl<P, O: Size> Ref<MaybeUninit<P>, O>
 where
-    T: Pointee<O>,
+    P: Pointee<O>,
 {
     /// Assume that the reference is initialized.
     ///
     /// Unlike the counterpart in Rust, this isn't actually unsafe. Because in
     /// order to load the reference again we'd have to validate it anyways.
     #[inline]
-    pub const fn assume_init(self) -> Ref<T, O> {
+    pub const fn assume_init(self) -> Ref<P, O> {
         Ref {
             offset: self.offset,
             metadata: self.metadata,
@@ -333,10 +333,10 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> fmt::Debug for Ref<T, O>
+impl<P: ?Sized, O: Size> fmt::Debug for Ref<P, O>
 where
-    T: Pointee<O>,
-    T::Packed: fmt::Debug,
+    P: Pointee<O>,
+    P::Packed: fmt::Debug,
     O: fmt::Debug,
 {
     #[inline]
@@ -344,16 +344,16 @@ where
         write!(
             f,
             "Ref<{}> {{ offset: {:?}, metadata: {:?} }}",
-            core::any::type_name::<T>(),
+            core::any::type_name::<P>(),
             self.offset,
             self.metadata,
         )
     }
 }
 
-impl<T: ?Sized, O: Size> Clone for Ref<T, O>
+impl<P: ?Sized, O: Size> Clone for Ref<P, O>
 where
-    T: Pointee<O>,
+    P: Pointee<O>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -361,12 +361,12 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> Copy for Ref<T, O> where T: Pointee<O> {}
+impl<P: ?Sized, O: Size> Copy for Ref<P, O> where P: Pointee<O> {}
 
-impl<T: ?Sized, O: Size> PartialEq for Ref<T, O>
+impl<P: ?Sized, O: Size> PartialEq for Ref<P, O>
 where
-    T: Pointee<O>,
-    T::Packed: PartialEq,
+    P: Pointee<O>,
+    P::Packed: PartialEq,
     O: PartialEq,
 {
     #[inline]
@@ -375,18 +375,18 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> Eq for Ref<T, O>
+impl<P: ?Sized, O: Size> Eq for Ref<P, O>
 where
-    T: Pointee<O>,
-    T::Packed: Eq,
+    P: Pointee<O>,
+    P::Packed: Eq,
     O: Eq,
 {
 }
 
-impl<T: ?Sized, O: Size> PartialOrd for Ref<T, O>
+impl<P: ?Sized, O: Size> PartialOrd for Ref<P, O>
 where
-    T: Pointee<O>,
-    T::Packed: PartialOrd,
+    P: Pointee<O>,
+    P::Packed: PartialOrd,
     O: Ord,
 {
     #[inline]
@@ -400,10 +400,10 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> Ord for Ref<T, O>
+impl<P: ?Sized, O: Size> Ord for Ref<P, O>
 where
-    T: Pointee<O>,
-    T::Packed: Ord,
+    P: Pointee<O>,
+    P::Packed: Ord,
     O: Ord,
 {
     #[inline]
@@ -417,10 +417,10 @@ where
     }
 }
 
-impl<T: ?Sized, O: Size> Hash for Ref<T, O>
+impl<P: ?Sized, O: Size> Hash for Ref<P, O>
 where
-    T: Pointee<O>,
-    T::Packed: Hash,
+    P: Pointee<O>,
+    P::Packed: Hash,
     O: Hash,
 {
     #[inline]

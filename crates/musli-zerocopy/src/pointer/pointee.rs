@@ -1,8 +1,8 @@
 use crate::ZeroCopy;
 
-/// The trait for a value that can be pointed to by a [`Ref<T>`].
+/// The trait for a value that can be pointed to by a [`Ref<P>`].
 ///
-/// This ultimately determines the layout of [`Ref<T>`] as for unsized types it
+/// This ultimately determines the layout of [`Ref<P>`] as for unsized types it
 /// needs to accommodate the size of the pointed-to type as well.
 ///
 /// ```
@@ -14,7 +14,7 @@ use crate::ZeroCopy;
 /// assert_eq!(size_of::<Ref::<[u32]>>(), 8);
 /// ```
 ///
-/// [`Ref<T>`]: crate::Ref
+/// [`Ref<P>`]: crate::Ref
 pub trait Pointee<O: ?Sized> {
     /// Metadata associated with the pointee.
     type Metadata: Copy;

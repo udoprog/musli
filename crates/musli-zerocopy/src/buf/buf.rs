@@ -615,9 +615,9 @@ impl Buf {
 
     /// Load an unsized reference.
     #[inline]
-    pub(crate) fn load_unsized<T: ?Sized, O: Size>(&self, unsize: Ref<T, O>) -> Result<&T, Error>
+    pub(crate) fn load_unsized<P: ?Sized, O: Size>(&self, unsize: Ref<P, O>) -> Result<&P, Error>
     where
-        T: Pointee<O, Packed = O> + UnsizedZeroCopy<T, O>,
+        P: Pointee<O, Packed = O> + UnsizedZeroCopy<P, O>,
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();
@@ -625,20 +625,20 @@ impl Buf {
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
         unsafe {
-            let (buf, remaining) = self.get_range_from(start, T::ALIGN)?;
-            let metadata = T::validate(buf, remaining, metadata)?;
-            Ok(&*T::coerce(buf, metadata))
+            let (buf, remaining) = self.get_range_from(start, P::ALIGN)?;
+            let metadata = P::validate(buf, remaining, metadata)?;
+            Ok(&*P::coerce(buf, metadata))
         }
     }
 
     /// Load an unsized mutable reference.
     #[inline]
-    pub(crate) fn load_unsized_mut<T: ?Sized, O: Size>(
+    pub(crate) fn load_unsized_mut<P: ?Sized, O: Size>(
         &mut self,
-        unsize: Ref<T, O>,
-    ) -> Result<&mut T, Error>
+        unsize: Ref<P, O>,
+    ) -> Result<&mut P, Error>
     where
-        T: Pointee<O, Packed = O> + UnsizedZeroCopy<T, O>,
+        P: Pointee<O, Packed = O> + UnsizedZeroCopy<P, O>,
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();
@@ -646,30 +646,30 @@ impl Buf {
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
         unsafe {
-            let (buf, remaining) = self.get_mut_range_from(start, T::ALIGN)?;
-            let metadata = T::validate(buf, remaining, metadata)?;
-            Ok(&mut *T::coerce_mut(buf, metadata))
+            let (buf, remaining) = self.get_mut_range_from(start, P::ALIGN)?;
+            let metadata = P::validate(buf, remaining, metadata)?;
+            Ok(&mut *P::coerce_mut(buf, metadata))
         }
     }
 
     /// Load the given sized value as a reference.
     #[inline]
-    pub(crate) fn load_sized<T, O: Size>(&self, ptr: Ref<T, O>) -> Result<&T, Error>
+    pub(crate) fn load_sized<P, O: Size>(&self, ptr: Ref<P, O>) -> Result<&P, Error>
     where
-        T: ZeroCopy,
+        P: ZeroCopy,
     {
         let start = ptr.offset();
-        let end = start.wrapping_add(size_of::<T>());
+        let end = start.wrapping_add(size_of::<P>());
 
         unsafe {
             // SAFETY: align_of::<T>() is always a power of two.
-            let buf = self.inner_get(start, end, align_of::<T>())?;
+            let buf = self.inner_get(start, end, align_of::<P>())?;
 
-            if !T::ANY_BITS {
+            if !P::ANY_BITS {
                 // SAFETY: We've checked the size and alignment of the buffer above.
                 // The remaining safety requirements depend on the implementation of
                 // validate.
-                T::validate(&mut Validator::new(buf.as_ptr()))?;
+                P::validate(&mut Validator::new(buf.as_ptr()))?;
             }
 
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
@@ -680,22 +680,22 @@ impl Buf {
 
     /// Load the given sized value as a mutable reference.
     #[inline]
-    pub(crate) fn load_sized_mut<T, O: Size>(&mut self, ptr: Ref<T, O>) -> Result<&mut T, Error>
+    pub(crate) fn load_sized_mut<P, O: Size>(&mut self, ptr: Ref<P, O>) -> Result<&mut P, Error>
     where
-        T: ZeroCopy,
+        P: ZeroCopy,
     {
         let start = ptr.offset();
-        let end = start.wrapping_add(size_of::<T>());
+        let end = start.wrapping_add(size_of::<P>());
 
         unsafe {
             // SAFETY: align_of::<T>() is always a power of two.
-            let buf = self.inner_get_mut(start, end, align_of::<T>())?;
+            let buf = self.inner_get_mut(start, end, align_of::<P>())?;
 
-            if !T::ANY_BITS {
+            if !P::ANY_BITS {
                 // SAFETY: We've checked the size and alignment of the buffer above.
                 // The remaining safety requirements depend on the implementation of
                 // validate.
-                T::validate(&mut Validator::new(buf.as_ptr()))?;
+                P::validate(&mut Validator::new(buf.as_ptr()))?;
             }
 
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the

@@ -97,6 +97,10 @@ where
 
     'outer: for (bucket, displacement) in buckets.iter().zip(displacements.iter_mut()) {
         for d1 in 0..(table_len as u32) {
+            if d1 % 10000 == 0 {
+                std::println!("{}", d1);
+            }
+
             'inner: for d2 in 0..(table_len as u32) {
                 values_to_add.clear();
                 generation += 1;

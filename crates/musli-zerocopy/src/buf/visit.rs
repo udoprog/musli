@@ -1,5 +1,6 @@
 use crate::buf::{Buf, Load};
 use crate::error::Error;
+use crate::pointer::{Pointee, Ref, Size};
 
 /// Trait used for accessing the value behind a reference when interacting with
 /// higher level containers such as [`phf`] or [`swiss`].
@@ -23,16 +24,29 @@ pub trait Visit {
         V: FnOnce(&Self::Target) -> O;
 }
 
-impl<T: ?Sized> Visit for T
-where
-    T: Load,
-{
-    type Target = T::Target;
+impl<T: ?Sized> Visit for &T {
+    type Target = T;
 
-    #[inline]
-    fn visit<V, O>(&self, buf: &Buf, visitor: V) -> Result<O, Error>
+    fn visit<V, O>(&self, _: &Buf, visitor: V) -> Result<O, Error>
     where
         V: FnOnce(&Self::Target) -> O,
+    {
+        Ok(visitor(*self))
+    }
+}
+
+impl<P: ?Sized, O> Visit for Ref<P, O>
+where
+    P: Pointee<O>,
+    O: Size,
+    Ref<P, O>: Load,
+{
+    type Target = <Ref<P, O> as Load>::Target;
+
+    #[inline]
+    fn visit<V, U>(&self, buf: &Buf, visitor: V) -> Result<U, Error>
+    where
+        V: FnOnce(&Self::Target) -> U,
     {
         let value = buf.load(self)?;
         Ok(visitor(value))

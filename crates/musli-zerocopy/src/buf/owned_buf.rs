@@ -585,11 +585,11 @@ impl<O: Size> OwnedBuf<O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store<T>(&mut self, value: &T) -> Ref<T, O>
+    pub fn store<P>(&mut self, value: &P) -> Ref<P, O>
     where
-        T: ZeroCopy,
+        P: ZeroCopy,
     {
-        self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
+        self.next_offset_with_and_reserve(align_of::<P>(), size_of::<P>());
 
         // SAFETY: We're ensuring to both align the internal buffer and store
         // the value.
@@ -650,15 +650,15 @@ impl<O: Size> OwnedBuf<O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn store_unchecked<T>(&mut self, value: &T) -> Ref<T, O>
+    pub unsafe fn store_unchecked<P>(&mut self, value: &P) -> Ref<P, O>
     where
-        T: ZeroCopy,
+        P: ZeroCopy,
     {
         let offset = self.len;
 
         let mut buf_mut = BufMut::new(self.data.as_ptr().wrapping_add(offset));
         buf_mut.store_unaligned(value);
-        self.len += size_of::<T>();
+        self.len += size_of::<P>();
         Ref::new(offset)
     }
 
@@ -681,13 +681,13 @@ impl<O: Size> OwnedBuf<O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, O>
+    pub fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, O>
     where
-        T: Pointee<O, Packed = O, Metadata = usize>,
-        T: UnsizedZeroCopy<T, O>,
+        P: Pointee<O, Packed = O, Metadata = usize>,
+        P: UnsizedZeroCopy<P, O>,
     {
         unsafe {
-            self.next_offset_with_and_reserve(T::ALIGN, value.size());
+            self.next_offset_with_and_reserve(P::ALIGN, value.size());
             let offset = self.len;
             value.store(&mut BufMut::new(self.data.as_ptr().wrapping_add(offset)));
             self.len += value.size();
