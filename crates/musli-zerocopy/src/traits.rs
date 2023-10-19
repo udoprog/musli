@@ -69,50 +69,54 @@ pub unsafe trait UnsizedZeroCopy<P: ?Sized, O>: self::sealed::Sealed
 where
     P: Pointee<O>,
 {
-    /// Alignment of the pointed to data. We can only support unsized types
-    /// which have a known alignment.
-    ///
-    /// # Safety
-    ///
-    /// This must be a power of two.
+    /// Alignment of the pointed-to data
     const ALIGN: usize;
 
-    /// If the unsized type is padded.
+    /// If the pointed-to data contains any padding.
     const PADDED: bool;
 
-    /// Return a pointer to the base of the unsized value.
+    /// Return a pointer to the base of the pointed-to value.
     fn as_ptr(&self) -> *const u8;
 
-    /// Metadata associated with the unsized value.
+    /// Metadata associated with the unsized value that is embedded in the
+    /// pointer.
     fn metadata(&self) -> P::Metadata;
 
-    /// Pad the buffer associated with the current buffer.
+    /// Apply padding as per the pointed-to value.
     unsafe fn pad(&self, pad: &mut Padder<'_, Self>);
 
-    /// Validate the buffer with the given capacity and return the decoded metadata.
+    /// Validate the buffer with the given capacity and return the decoded
+    /// metadata.
     unsafe fn validate(
-        buf: *const u8,
+        ptr: *const u8,
         len: usize,
         metadata: P::Packed,
     ) -> Result<P::Metadata, Error>;
 
-    /// Validate and coerce the buffer as this type.
+    /// Construct a wide pointer from a pointer and its associated metadata.
     ///
     /// # Safety
     ///
-    /// The caller is responsible for ensuring that the pointer is valid up to
-    /// the reported size of `Self`. If `Self` is `[T]` then `size` is the
-    /// length of the `T`-containing slice.
-    unsafe fn coerce(buf: *const u8, metadata: P::Metadata) -> *const Self;
+    /// The caller is responsible for ensuring that the pointer is valid. The
+    /// base pointer `ptr` has to point to a region of memory that is
+    /// initialized per `P::Metadata` requirements. Practically that means it's
+    /// passed a call to [`validate()`].
+    ///
+    /// [`validate()`]: Self::validate
+    unsafe fn ptr_with_metadata(ptr: *const u8, metadata: P::Metadata) -> *const Self;
 
-    /// Validate and coerce the buffer as this type mutably.
+    /// Construct a wide mutable pointer from a pointer and its associated
+    /// metadata.
     ///
     /// # Safety
     ///
-    /// The caller is responsible for ensuring that the pointer is valid up to
-    /// the reported size of `Self`. If `Self` is `[T]` then `size` is the
-    /// length of the `T`-containing slice.
-    unsafe fn coerce_mut(buf: *mut u8, metadata: P::Metadata) -> *mut Self;
+    /// The caller is responsible for ensuring that the pointer is valid. The
+    /// base pointer `ptr` has to point to a region of memory that is
+    /// initialized per `P::Metadata` requirements. Practically that means it's
+    /// passed a call to [`validate()`].
+    ///
+    /// [`validate()`]: Self::validate
+    unsafe fn ptr_with_metadata_mut(ptr: *mut u8, metadata: P::Metadata) -> *mut Self;
 }
 
 /// This is a marker trait that must be implemented for a type in order to use
@@ -560,13 +564,13 @@ where
     }
 
     #[inline]
-    unsafe fn coerce(ptr: *const u8, metadata: P::Metadata) -> *const Self {
+    unsafe fn ptr_with_metadata(ptr: *const u8, metadata: P::Metadata) -> *const Self {
         let slice = slice::from_raw_parts(ptr, metadata);
         str::from_utf8_unchecked(slice)
     }
 
     #[inline]
-    unsafe fn coerce_mut(ptr: *mut u8, metadata: P::Metadata) -> *mut Self {
+    unsafe fn ptr_with_metadata_mut(ptr: *mut u8, metadata: P::Metadata) -> *mut Self {
         let slice = slice::from_raw_parts_mut(ptr, metadata);
         str::from_utf8_unchecked_mut(slice)
     }
@@ -628,12 +632,12 @@ where
     }
 
     #[inline]
-    unsafe fn coerce(buf: *const u8, metadata: P::Metadata) -> *const Self {
+    unsafe fn ptr_with_metadata(buf: *const u8, metadata: P::Metadata) -> *const Self {
         slice::from_raw_parts(buf.cast(), metadata)
     }
 
     #[inline]
-    unsafe fn coerce_mut(buf: *mut u8, metadata: P::Metadata) -> *mut Self {
+    unsafe fn ptr_with_metadata_mut(buf: *mut u8, metadata: P::Metadata) -> *mut Self {
         slice::from_raw_parts_mut(buf.cast(), metadata)
     }
 }

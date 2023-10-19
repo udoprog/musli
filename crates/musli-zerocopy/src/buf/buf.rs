@@ -627,7 +627,7 @@ impl Buf {
         unsafe {
             let (buf, remaining) = self.get_range_from(start, P::ALIGN)?;
             let metadata = P::validate(buf, remaining, metadata)?;
-            Ok(&*P::coerce(buf, metadata))
+            Ok(&*P::ptr_with_metadata(buf, metadata))
         }
     }
 
@@ -648,7 +648,7 @@ impl Buf {
         unsafe {
             let (buf, remaining) = self.get_mut_range_from(start, P::ALIGN)?;
             let metadata = P::validate(buf, remaining, metadata)?;
-            Ok(&mut *P::coerce_mut(buf, metadata))
+            Ok(&mut *P::ptr_with_metadata_mut(buf, metadata))
         }
     }
 
