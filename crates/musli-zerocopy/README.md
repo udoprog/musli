@@ -77,19 +77,20 @@ other popular libraries:
   you build the equivalent of the  `Archived` variant directly and the way
   you interact with the data model doesn't incur the cost of validation up
   front unless you want to. `rkyv` is only sound if you  build it with the
-  [`strict` feature set], and with the feature enabled it doesn't pass
-  Miri[^miri] under Stacked Borrows[^stacked-borrows]. Neither of these are
-  strict blockers for users of the library, but do constrain its safe
-  applicability in ways this library does not.
+  [`strict` feature set], and with the feature enabled it doesn't pass Miri
+  under Stacked Borrows[^stacked-borrows]. Neither of these are strict
+  blockers for users of the library, but do constrain its safe applicability
+  in ways this library does not.
 
 [`strict` feature]: https://docs.rs/rkyv/latest/rkyv/#features
 
-[^padded]: This is on zerocopy's roadmap, but it fundamentally doesn't play well
-    with the central `FromBytes` / `ToBytes` pair of traits.
+[^padded]: This is on zerocopy's roadmap, but it fundamentally doesn't play
+    well with the central `FromBytes` / `ToBytes` pair of traits.
 
-[^zeroes]: [FromBytes extends FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html).
+[^zeroes]: [FromBytes extends
+    FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html).
 
-[^stacked-borrows]: <https://github.com/rkyv/rkyv/issues/436>
+[^stacked-borrows]: [rkyv#436](https://github.com/rkyv/rkyv/issues/436)
 
 <br>
 
