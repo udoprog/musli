@@ -93,15 +93,16 @@ impl<'a, T: ?Sized> Padder<'a, T> {
         self.offset = self.offset.wrapping_add(size_of::<F>());
     }
 
-    /// Only pad a field where the value of the field doesn't matter.
+    /// Specific method to both pad for a discriminant and load it
+    /// simultaneously for inspection.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the field type `F` is an actual field in
-    /// order in the struct being padded and that `F` is a primitive that does
-    /// not contain any interior padding.
+    /// The caller must ensure that the field type `D` is the actual type of the
+    /// discriminant first in order in the enum being padded and that `D` is a
+    /// primitive that does not contain any interior padding.
     #[inline]
-    pub unsafe fn pad_discriminator<D>(&mut self) -> D
+    pub unsafe fn pad_discriminant<D>(&mut self) -> D
     where
         D: ZeroCopy,
     {

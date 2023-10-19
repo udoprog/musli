@@ -348,7 +348,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             pad = quote! {
                 // NOTE: this is assumed to be properly, since enums cannot be
                 // packed.
-                match #padder::pad_discriminator::<#ty>(padder) {
+                match #padder::pad_discriminant::<#ty>(padder) {
                     #(#pad_variants,)*
                     discriminant => #unknown_discriminant(discriminant),
                 }
