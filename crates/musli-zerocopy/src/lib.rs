@@ -11,7 +11,7 @@
 //! Reading a zero-copy structure has full `#[no_std]` support. Constructing
 //! ones currently requires the `alloc` feature to be enabled.
 //!
-//! ```no_run
+//! ```
 //! # #[cfg(target_endian = "little")]
 //! # macro_rules! include_bytes { ("author.bin") => { &[35, 0, 0, 0, 12, 0, 0, 0, 9, 0, 0, 0, 74, 111, 104, 110, 45, 74, 111, 104, 110] } }
 //! # #[cfg(target_endian = "big")]
@@ -79,7 +79,7 @@
 //!   you build the equivalent of the  `Archived` variant directly and the way
 //!   you interact with the data model doesn't incur the cost of validation up
 //!   front unless you want to. `rkyv` is only sound if you  build it with the
-//!   [`strict` feature set], and with the feature enabled it doesn't pass Miri
+//!   [`strict` feature] set, and with the feature enabled it doesn't pass Miri
 //!   under Stacked Borrows[^stacked-borrows]. Neither of these are strict
 //!   blockers for users of the library, but do constrain its safe applicability
 //!   in ways this library does not.
@@ -231,9 +231,11 @@
 //! > as long as you include the alignment of the buffer and the endianness of
 //! > the data structure. Both of these can be retrieved:
 //! >
-//! > ```no_run
-//! > use musli_zerocopy::OwnedBuf;
-//! > let buf: OwnedBuf = todo!();
+//! > ```
+//! > # use musli_zerocopy::OwnedBuf;
+//! > let buf = OwnedBuf::new();
+//! >
+//! > /* write something */
 //! >
 //! > let is_little_endian = cfg!(target_endian = "little");
 //! > let alignment = buf.requested();
