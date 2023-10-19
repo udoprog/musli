@@ -66,31 +66,29 @@ This is because:
 Since this is the first question anyone will ask, here is how we differ from
 other popular libraries:
 * [`zerocopy`](https://docs.rs/zerocopy) doesn't support padded
-  structs[^padded], bytes to reference conversions, or conversions which
-  does not permit decoding types unless all bit patterns an be inhabited by
+  types[^padded], bytes to reference conversions, or conversions which does
+  not permit decoding types unless all bit patterns can be inhabited by
   zeroes[^zeroes]. We still want to provide more of a complete toolkit that
-  you'd need to build and interact with complex data structures, such as the
-  [`phf`] and [`swiss`] modules. This crate might indeed at some point make
-  use of `zerocopy`'s traits.
+  you'd need to build and interact with complex data structures like we get
+  through the [`phf`] and [`swiss`] modules. This crate might indeed at some
+  point make use of `zerocopy`'s traits.
 * [`rkyv`](https://docs.rs/rkyv) operates on `#[repr(Rust)]` types and from
   this derives an optimized `Archived` variation for you. This library lets
   you build the equivalent of the  `Archived` variant directly and the way
   you interact with the data model doesn't incur the cost of validation up
-  front unless you want to. `rkyv` is only sound if you  build it with the
-  [`strict` feature] set, and with the feature enabled it doesn't pass Miri
-  under Stacked Borrows[^stacked-borrows]. Neither of these are strict
-  blockers for users of the library, but do constrain its safe applicability
-  in ways this library does not.
-
-[`strict` feature]: https://docs.rs/rkyv/latest/rkyv/#features
+  front. With `rkyv` it took my computer 100% of a CPU core and about half a
+  second to load 12 million dictionary entries[^dictionary], which is a cost
+  that is simply not incurred by incrementally validating. Not validating is
+  not an option since that would be wildly unsound - your application would
+  be vulnerable to malicious dictionary files.
 
 [^padded]: This is on zerocopy's roadmap, but it fundamentally doesn't play
-    well with the central `FromBytes` / `ToBytes` pair of traits.
+    well with the central `FromBytes` / `ToBytes` pair of traits
 
 [^zeroes]: [FromBytes extends
-    FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html).
+    FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html)
 
-[^stacked-borrows]: [rkyv#436](https://github.com/rkyv/rkyv/issues/436)
+[^dictionary]: [udoprog/jpv](https://github.com/udoprog/jpv/blob/main/crates/lib/src/database.rs)
 
 <br>
 
