@@ -329,7 +329,7 @@ where
     let bins = build_bench(&COMMON, report.features, report.expected)?;
 
     if run_bench {
-        run_path(&bins.comparison, None::<String>)?;
+        run_path(&bins.comparison, &[])?;
 
         let mut args = vec!["--bench"];
 
@@ -338,7 +338,15 @@ where
             args.push(filter);
         }
 
-        run_path(&bins.comparison, args)?;
+        args.extend([
+            "--save-baseline",
+            report.id,
+            "--measurement-time",
+            "0.5",
+            "--warm-up-time",
+            "0.1",
+        ]);
+        run_path(&bins.comparison, &args)?;
     }
 
     for Group { id: group, .. } in GROUPS {
@@ -560,15 +568,11 @@ fn copy_svg(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
-fn run_path<'a, A>(path: &Path, args: A) -> Result<()>
-where
-    A: IntoIterator,
-    A::Item: AsRef<str>,
-{
+fn run_path(path: &Path, args: &[&str]) -> Result<()> {
     let mut command = Command::new(path);
 
     for arg in args {
-        command.arg(arg.as_ref());
+        command.arg(arg);
     }
 
     print_command(&command);
