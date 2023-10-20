@@ -1,8 +1,10 @@
+use self::num::{Enumerator, NumericalRepr};
+mod num;
+
 use std::cell::RefCell;
-use std::mem::take;
 
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::meta::ParseNestedMeta;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -242,70 +244,20 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             let mut padded_variants = Vec::new();
             let mut variant_fields = Vec::new();
 
-            let mut current = (
-                false,
-                syn::LitInt::new(&format!("0{}", num.as_ty()), ty.span()),
-            );
-            let mut first = true;
+            let mut enumerator = Enumerator::new(num, ty.span());
 
             for variant in &en.variants {
-                let first = take(&mut first);
-
                 let mut output = process_fields(cx, &variant.fields);
                 check_zero_sized.append(&mut output.check_zero_sized);
 
-                fn as_int(expr: &syn::Expr) -> Option<(bool, &syn::LitInt)> {
-                    match expr {
-                        syn::Expr::Lit(syn::ExprLit {
-                            lit: syn::Lit::Int(int),
-                            ..
-                        }) => Some((false, int)),
-                        syn::Expr::Group(syn::ExprGroup { expr, .. }) => as_int(expr),
-                        syn::Expr::Unary(syn::ExprUnary {
-                            op: syn::UnOp::Neg(..),
-                            expr,
-                            ..
-                        }) => as_int(expr).map(|(neg, int)| (!neg, int)),
-                        _ => None,
-                    }
-                }
-
-                if let Some((_, expr)) = &variant.discriminant {
-                    let Some((neg, int)) = as_int(expr) else {
-                        cx.error(syn::Error::new_spanned(
-                            expr,
-                            format!("Only numerical discriminants are supported: {:?}", expr),
-                        ));
-                        continue;
-                    };
-
-                    current = (neg, int.clone());
-                } else if !first {
-                    current = match num.next_index(current) {
-                        Ok(out) => out,
+                let discriminant =
+                    match enumerator.next(variant.discriminant.as_ref().map(|(_, expr)| expr)) {
+                        Ok(discriminant) => discriminant,
                         Err(error) => {
                             cx.error(error);
                             break;
                         }
                     };
-                }
-
-                let (neg, current) = &current;
-
-                let expr = syn::Expr::Lit(syn::ExprLit {
-                    attrs: Vec::new(),
-                    lit: syn::Lit::Int(current.clone()),
-                });
-
-                let discriminant = if *neg {
-                    syn::Expr::Unary(syn::ExprUnary {
-                        attrs: Vec::new(),
-                        op: syn::UnOp::Neg(<Token![-]>::default()),
-                        expr: Box::new(expr),
-                    })
-                } else {
-                    expr
-                };
 
                 let types = &output.types;
 
@@ -587,18 +539,18 @@ impl ReprAttr {
 
             repr!(C, Repr::C);
             repr!(transparent, Repr::Transparent);
-            repr!(u8, Repr::Num(meta.path.span(), Num::U8));
-            repr!(u16, Repr::Num(meta.path.span(), Num::U16));
-            repr!(u32, Repr::Num(meta.path.span(), Num::U32));
-            repr!(u64, Repr::Num(meta.path.span(), Num::U64));
-            repr!(u128, Repr::Num(meta.path.span(), Num::U128));
-            repr!(i8, Repr::Num(meta.path.span(), Num::I8));
-            repr!(i16, Repr::Num(meta.path.span(), Num::I16));
-            repr!(i32, Repr::Num(meta.path.span(), Num::I32));
-            repr!(i64, Repr::Num(meta.path.span(), Num::I64));
-            repr!(i128, Repr::Num(meta.path.span(), Num::I128));
-            repr!(isize, Repr::Num(meta.path.span(), Num::Isize));
-            repr!(Usize, Repr::Num(meta.path.span(), Num::Usize));
+            repr!(u8, Repr::Num(meta.path.span(), NumericalRepr::U8));
+            repr!(u16, Repr::Num(meta.path.span(), NumericalRepr::U16));
+            repr!(u32, Repr::Num(meta.path.span(), NumericalRepr::U32));
+            repr!(u64, Repr::Num(meta.path.span(), NumericalRepr::U64));
+            repr!(u128, Repr::Num(meta.path.span(), NumericalRepr::U128));
+            repr!(i8, Repr::Num(meta.path.span(), NumericalRepr::I8));
+            repr!(i16, Repr::Num(meta.path.span(), NumericalRepr::I16));
+            repr!(i32, Repr::Num(meta.path.span(), NumericalRepr::I32));
+            repr!(i64, Repr::Num(meta.path.span(), NumericalRepr::I64));
+            repr!(i128, Repr::Num(meta.path.span(), NumericalRepr::I128));
+            repr!(isize, Repr::Num(meta.path.span(), NumericalRepr::Isize));
+            repr!(Usize, Repr::Num(meta.path.span(), NumericalRepr::Usize));
 
             // #[repr(align(N))]
             if meta.path.is_ident("align") {
@@ -640,150 +592,11 @@ impl ReprAttr {
 enum Repr {
     C,
     Transparent,
-    Num(Span, Num),
-}
-
-enum NumSize<'a> {
-    Fixed(usize),
-    Pointer(&'a syn::Path),
-}
-
-impl ToTokens for NumSize<'_> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            NumSize::Fixed(size) => size.to_tokens(tokens),
-            NumSize::Pointer(mem) => {
-                tokens.extend(quote!(#mem::size_of::<usize>()));
-            }
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-enum Num {
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    Isize,
-    Usize,
-}
-
-impl Num {
-    fn size(self, mem: &syn::Path) -> NumSize<'_> {
-        match self {
-            Num::U8 => NumSize::Fixed(1),
-            Num::U16 => NumSize::Fixed(2),
-            Num::U32 => NumSize::Fixed(4),
-            Num::U64 => NumSize::Fixed(8),
-            Num::U128 => NumSize::Fixed(16),
-            Num::I8 => NumSize::Fixed(1),
-            Num::I16 => NumSize::Fixed(2),
-            Num::I32 => NumSize::Fixed(4),
-            Num::I64 => NumSize::Fixed(8),
-            Num::I128 => NumSize::Fixed(16),
-            Num::Isize => NumSize::Pointer(mem),
-            Num::Usize => NumSize::Pointer(mem),
-        }
-    }
-
-    fn as_ty(self) -> &'static str {
-        match self {
-            Num::U8 => "u8",
-            Num::U16 => "u16",
-            Num::U32 => "u32",
-            Num::U64 => "u64",
-            Num::U128 => "u128",
-            Num::I8 => "i8",
-            Num::I16 => "i16",
-            Num::I32 => "i32",
-            Num::I64 => "i64",
-            Num::I128 => "i128",
-            Num::Isize => "isize",
-            Num::Usize => "isize",
-        }
-    }
-
-    fn next_index(self, (neg, lit): (bool, syn::LitInt)) -> syn::Result<(bool, syn::LitInt)> {
-        macro_rules! arm {
-            ($kind:ident, $parse:ty, $ty:ty) => {{
-                macro_rules! handle_neg {
-                    (signed, $lit:ident) => {{
-                        if neg && $lit != 0 {
-                            let Some($lit) = $lit.checked_sub(1) else {
-                                return Err(syn::Error::new_spanned(
-                                    $lit,
-                                    "Discriminant overflow for representation",
-                                ));
-                            };
-
-                            ($lit != 0, $lit)
-                        } else {
-                            let Some($lit) = $lit.checked_add(1) else {
-                                return Err(syn::Error::new_spanned(
-                                    $lit,
-                                    "Discriminant overflow for representation",
-                                ));
-                            };
-
-                            (false, $lit)
-                        }
-                    }};
-
-                    (unsigned, $lit:ident) => {{
-                        if neg {
-                            return Err(syn::Error::new_spanned(
-                                $lit,
-                                "Unsigned types can't be negative",
-                            ));
-                        }
-
-                        let Some($lit) = $lit.checked_add(1) else {
-                            return Err(syn::Error::new_spanned(
-                                $lit,
-                                "Discriminant overflow for representation",
-                            ));
-                        };
-
-                        (false, $lit)
-                    }};
-                }
-
-                let lit = lit.base10_parse::<$parse>()?;
-                let (neg, lit) = handle_neg!($kind, lit);
-
-                Ok((
-                    neg,
-                    syn::LitInt::new(&format!("{lit}{}", stringify!($ty)), lit.span()),
-                ))
-            }};
-        }
-
-        match self {
-            Num::U8 => arm!(unsigned, u8, u8),
-            Num::U16 => arm!(unsigned, u16, u16),
-            Num::U32 => arm!(unsigned, u32, u32),
-            Num::U64 => arm!(unsigned, u64, u64),
-            Num::U128 => arm!(unsigned, u128, u128),
-            Num::Usize => arm!(unsigned, usize, usize),
-            Num::I8 => arm!(signed, u8, i8),
-            Num::I16 => arm!(signed, u16, i16),
-            Num::I32 => arm!(signed, u32, i32),
-            Num::I64 => arm!(signed, u64, i64),
-            Num::I128 => arm!(signed, u128, i128),
-            Num::Isize => arm!(signed, usize, isize),
-        }
-    }
+    Num(Span, NumericalRepr),
 }
 
 impl Repr {
-    fn as_numerical_repr(self) -> Option<(Span, Num)> {
+    fn as_numerical_repr(self) -> Option<(Span, NumericalRepr)> {
         match self {
             Repr::C => None,
             Repr::Transparent => None,
