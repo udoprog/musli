@@ -1,4 +1,6 @@
-use core::mem::take;
+use std::fmt;
+use std::mem::take;
+use std::str::FromStr;
 
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
@@ -77,6 +79,8 @@ pub(super) struct Enumerator {
     current: Option<syn::Expr>,
     num: NumericalRepr,
     span: Span,
+    zero: syn::LitInt,
+    one: syn::LitInt,
 }
 
 impl Enumerator {
@@ -85,69 +89,90 @@ impl Enumerator {
             current: None,
             num,
             span,
+            zero: syn::LitInt::new(&format!("0{}", num.as_ty()), span),
+            one: syn::LitInt::new(&format!("1{}", num.as_ty()), span),
         }
     }
 
-    pub(super) fn next_index(
-        &self,
-        negative: bool,
-        lit: &syn::LitInt,
-    ) -> syn::Result<(bool, syn::LitInt)> {
+    pub(super) fn next_index(&self, negative: bool, lit: &syn::LitInt) -> syn::Result<syn::Expr> {
+        // Helper trait to process base numeral arithmetics.
+        trait Numeral: Copy + FromStr {
+            fn is_zero(self) -> bool;
+            fn inc(self) -> Option<Self>;
+            fn dec(self) -> Option<Self>;
+        }
+
+        macro_rules! impl_numeral {
+            ($($ty:ty),*) => {
+                $(impl Numeral for $ty {
+                    #[inline] fn is_zero(self) -> bool { self == 0 }
+                    #[inline] fn inc(self) -> Option<Self> { self.checked_add(1) }
+                    #[inline] fn dec(self) -> Option<Self> { self.checked_sub(1) }
+                })*
+            }
+        }
+
+        impl_numeral!(u8, u16, u32, u64, u128, usize);
+
+        fn signed<T>(neg: bool, lit: &syn::LitInt) -> syn::Result<(bool, T)>
+        where
+            T: Numeral,
+            T::Err: fmt::Display,
+        {
+            let number = lit.base10_parse::<T>()?;
+
+            // We still need to zero-check, because numerical literals can be
+            // `-0`.
+            if neg && !number.is_zero() {
+                // NB: negative numbers are numerically decremented, as in -4
+                // becomes -3.
+                let Some(number) = number.dec() else {
+                    return Err(syn::Error::new_spanned(
+                        lit,
+                        "Discriminant overflow for representation",
+                    ));
+                };
+
+                // If we reached 0, then the sign flips.
+                Ok((!number.is_zero(), number))
+            } else {
+                let Some(number) = number.inc() else {
+                    return Err(syn::Error::new_spanned(
+                        lit,
+                        "Discriminant overflow for representation",
+                    ));
+                };
+
+                Ok((false, number))
+            }
+        }
+
+        fn unsigned<T>(neg: bool, lit: &syn::LitInt) -> syn::Result<(bool, T)>
+        where
+            T: Numeral,
+            T::Err: fmt::Display,
+        {
+            let (neg, number) = signed(neg, lit)?;
+
+            if neg {
+                return Err(syn::Error::new_spanned(
+                    lit,
+                    "Unsigned discriminants cannot be negative",
+                ));
+            }
+
+            Ok((false, number))
+        }
+
         macro_rules! arm {
             ($kind:ident, $parse:ty, $ty:ty) => {{
-                macro_rules! handle_neg {
-                    (signed, $lit:ident) => {{
-                        if negative && $lit != 0 {
-                            let Some($lit) = $lit.checked_sub(1) else {
-                                return Err(syn::Error::new_spanned(
-                                    $lit,
-                                    "Discriminant overflow for representation",
-                                ));
-                            };
-
-                            ($lit != 0, $lit)
-                        } else {
-                            let Some($lit) = $lit.checked_add(1) else {
-                                return Err(syn::Error::new_spanned(
-                                    $lit,
-                                    "Discriminant overflow for representation",
-                                ));
-                            };
-
-                            (false, $lit)
-                        }
-                    }};
-
-                    (unsigned, $lit:ident) => {{
-                        if negative {
-                            return Err(syn::Error::new_spanned(
-                                $lit,
-                                "Unsigned types can't be negative",
-                            ));
-                        }
-
-                        let Some($lit) = $lit.checked_add(1) else {
-                            return Err(syn::Error::new_spanned(
-                                $lit,
-                                "Discriminant overflow for representation",
-                            ));
-                        };
-
-                        (false, $lit)
-                    }};
-                }
-
-                let lit = lit.base10_parse::<$parse>()?;
-                let (neg, lit) = handle_neg!($kind, lit);
-
-                Ok((
-                    neg,
-                    syn::LitInt::new(&format!("{lit}{}", stringify!($ty)), self.span),
-                ))
+                let (negative, lit) = $kind::<$parse>(negative, lit)?;
+                let lit = syn::LitInt::new(&format!("{lit}{}", stringify!($ty)), self.span);
+                (negative, lit)
             }};
         }
 
-        match self.num {
+        let (negative, lit) = match self.num {
             NumericalRepr::U8 => arm!(unsigned, u8, u8),
             NumericalRepr::U16 => arm!(unsigned, u16, u16),
             NumericalRepr::U32 => arm!(unsigned, u32, u32),
@@ -160,7 +185,17 @@ impl Enumerator {
             NumericalRepr::I64 => arm!(signed, u64, i64),
             NumericalRepr::I128 => arm!(signed, u128, i128),
             NumericalRepr::Isize => arm!(signed, usize, isize),
-        }
+        };
+
+        Ok(if negative {
+            syn::Expr::Unary(syn::ExprUnary {
+                attrs: Vec::new(),
+                op: syn::UnOp::Neg(<Token![-]>::default()),
+                expr: Box::new(int_expr(lit)),
+            })
+        } else {
+            int_expr(lit)
+        })
     }
 
     /// Get the next discriminant based on the provided expression.
@@ -171,61 +206,38 @@ impl Enumerator {
         } else {
             let current = match take(&mut self.current) {
                 Some(existing) => {
-                    // We keep as_int, while it slightly bloats the macro it
-                    // simplifies the resulting outgoing expression, which
-                    // improves diagnostics.
                     if let Some((negative, lit)) = as_int(&existing) {
-                        let (negative, lit) = self.next_index(negative, lit)?;
+                        // We keep as_int, while it slightly bloats the macro it
+                        // simplifies the resulting outgoing expression, which
+                        // improves diagnostics.
 
-                        if negative {
-                            syn::Expr::Unary(syn::ExprUnary {
-                                attrs: Vec::new(),
-                                op: syn::UnOp::Neg(<Token![-]>::default()),
-                                expr: Box::new(syn::Expr::Lit(syn::ExprLit {
-                                    attrs: Vec::new(),
-                                    lit: syn::Lit::Int(lit),
-                                })),
-                            })
-                        } else {
-                            syn::Expr::Lit(syn::ExprLit {
-                                attrs: Vec::new(),
-                                lit: syn::Lit::Int(lit),
-                            })
-                        }
+                        self.next_index(negative, lit)?
                     } else {
+                        // Prior expression + 1
                         syn::Expr::Binary(syn::ExprBinary {
                             attrs: Vec::new(),
                             left: Box::new(existing),
                             op: syn::BinOp::Add(<Token![+]>::default()),
-                            right: Box::new(syn::Expr::Lit(syn::ExprLit {
-                                attrs: Vec::new(),
-                                lit: syn::Lit::Int(syn::LitInt::new(
-                                    &format!("1{}", self.num.as_ty()),
-                                    self.span,
-                                )),
-                            })),
+                            right: Box::new(int_expr(self.one.clone())),
                         })
                     }
                 }
-                None => syn::Expr::Lit(syn::ExprLit {
-                    attrs: Vec::new(),
-                    lit: syn::Lit::Int(syn::LitInt::new(
-                        &format!("0{}", self.num.as_ty()),
-                        self.span,
-                    )),
-                }),
+                None => int_expr(self.zero.clone()),
             };
 
             self.current = Some(current.clone());
             current
         };
 
-        Ok(syn::Expr::Group(syn::ExprGroup {
-            attrs: Vec::new(),
-            group_token: syn::token::Group { span: self.span },
-            expr: Box::new(current),
-        }))
+        Ok(current)
     }
+}
+
+fn int_expr(lit: syn::LitInt) -> syn::Expr {
+    syn::Expr::Lit(syn::ExprLit {
+        attrs: Vec::new(),
+        lit: syn::Lit::Int(lit),
+    })
 }
 
 fn as_int(expr: &syn::Expr) -> Option<(bool, &syn::LitInt)> {

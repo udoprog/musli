@@ -1,0 +1,13 @@
+error: Discriminant overflow for representation
+  --> tests/ui/numerical_discriminant_error.rs:15:15
+   |
+15 |     Variant = 255,
+   |               ^^^
+
+error[E0370]: enum discriminant overflowed
+  --> tests/ui/numerical_discriminant_error.rs:16:5
+   |
+16 |     Variant2
+   |     ^^^^^^^^ overflowed on value after 255
+   |
+   = note: explicitly set `Variant2 = 0` if that is desired outcome
