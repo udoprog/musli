@@ -2,7 +2,7 @@ use core::mem::take;
 
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, Token};
+use syn::Token;
 
 #[derive(Clone, Copy)]
 pub(super) enum NumericalRepr {
@@ -54,9 +54,42 @@ impl NumericalRepr {
             NumericalRepr::Usize => "isize",
         }
     }
+}
+
+pub(super) enum NumericalSize<'a> {
+    Fixed(usize),
+    Pointer(&'a syn::Path),
+}
+
+impl ToTokens for NumericalSize<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            NumericalSize::Fixed(size) => size.to_tokens(tokens),
+            NumericalSize::Pointer(mem) => {
+                tokens.extend(quote!(#mem::size_of::<usize>()));
+            }
+        }
+    }
+}
+
+/// Helper to enumerate discriminants of an enum.
+pub(super) struct Enumerator {
+    current: Option<syn::Expr>,
+    num: NumericalRepr,
+    span: Span,
+}
+
+impl Enumerator {
+    pub(super) fn new(num: NumericalRepr, span: Span) -> Self {
+        Self {
+            current: None,
+            num,
+            span,
+        }
+    }
 
     pub(super) fn next_index(
-        self,
+        &self,
         negative: bool,
         lit: &syn::LitInt,
     ) -> syn::Result<(bool, syn::LitInt)> {
@@ -109,12 +142,12 @@ impl NumericalRepr {
 
                 Ok((
                     neg,
-                    syn::LitInt::new(&format!("{lit}{}", stringify!($ty)), lit.span()),
+                    syn::LitInt::new(&format!("{lit}{}", stringify!($ty)), self.span),
                 ))
             }};
         }
 
-        match self {
+        match self.num {
             NumericalRepr::U8 => arm!(unsigned, u8, u8),
             NumericalRepr::U16 => arm!(unsigned, u16, u16),
             NumericalRepr::U32 => arm!(unsigned, u32, u32),
@@ -129,91 +162,84 @@ impl NumericalRepr {
             NumericalRepr::Isize => arm!(signed, usize, isize),
         }
     }
-}
-
-pub(super) enum NumericalSize<'a> {
-    Fixed(usize),
-    Pointer(&'a syn::Path),
-}
-
-impl ToTokens for NumericalSize<'_> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            NumericalSize::Fixed(size) => size.to_tokens(tokens),
-            NumericalSize::Pointer(mem) => {
-                tokens.extend(quote!(#mem::size_of::<usize>()));
-            }
-        }
-    }
-}
-
-/// Helper to enumerate discriminants of an enum.
-pub(super) struct Enumerator {
-    first: bool,
-    negative: bool,
-    current: syn::LitInt,
-    num: NumericalRepr,
-}
-
-impl Enumerator {
-    pub(super) fn new(num: NumericalRepr, span: Span) -> Self {
-        Self {
-            first: true,
-            negative: false,
-            current: syn::LitInt::new(&format!("0{}", num.as_ty()), span),
-            num,
-        }
-    }
 
     /// Get the next discriminant based on the provided expression.
     pub(super) fn next(&mut self, discriminant: Option<&syn::Expr>) -> syn::Result<syn::Expr> {
-        fn as_int(expr: &syn::Expr) -> Option<(bool, &syn::LitInt)> {
-            match expr {
-                syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Int(int),
-                    ..
-                }) => Some((false, int)),
-                syn::Expr::Group(syn::ExprGroup { expr, .. }) => as_int(expr),
-                syn::Expr::Unary(syn::ExprUnary {
-                    op: syn::UnOp::Neg(..),
-                    expr,
-                    ..
-                }) => as_int(expr).map(|(neg, int)| (!neg, int)),
-                _ => None,
-            }
-        }
+        let current = if let Some(expr) = discriminant {
+            self.current = Some(expr.clone());
+            expr.clone()
+        } else {
+            let current = match take(&mut self.current) {
+                Some(existing) => {
+                    // We keep as_int, while it slightly bloats the macro it
+                    // simplifies the resulting outgoing expression, which
+                    // improves diagnostics.
+                    if let Some((negative, lit)) = as_int(&existing) {
+                        let (negative, lit) = self.next_index(negative, lit)?;
 
-        let first = take(&mut self.first);
-
-        if let Some(expr) = discriminant {
-            let Some((neg, int)) = as_int(expr) else {
-                return Err(syn::Error::new_spanned(
-                    expr,
-                    format!("Only numerical discriminants are supported: {:?}", expr),
-                ));
+                        if negative {
+                            syn::Expr::Unary(syn::ExprUnary {
+                                attrs: Vec::new(),
+                                op: syn::UnOp::Neg(<Token![-]>::default()),
+                                expr: Box::new(syn::Expr::Lit(syn::ExprLit {
+                                    attrs: Vec::new(),
+                                    lit: syn::Lit::Int(lit),
+                                })),
+                            })
+                        } else {
+                            syn::Expr::Lit(syn::ExprLit {
+                                attrs: Vec::new(),
+                                lit: syn::Lit::Int(lit),
+                            })
+                        }
+                    } else {
+                        syn::Expr::Binary(syn::ExprBinary {
+                            attrs: Vec::new(),
+                            left: Box::new(existing),
+                            op: syn::BinOp::Add(<Token![+]>::default()),
+                            right: Box::new(syn::Expr::Lit(syn::ExprLit {
+                                attrs: Vec::new(),
+                                lit: syn::Lit::Int(syn::LitInt::new(
+                                    &format!("1{}", self.num.as_ty()),
+                                    self.span,
+                                )),
+                            })),
+                        })
+                    }
+                }
+                None => syn::Expr::Lit(syn::ExprLit {
+                    attrs: Vec::new(),
+                    lit: syn::Lit::Int(syn::LitInt::new(
+                        &format!("0{}", self.num.as_ty()),
+                        self.span,
+                    )),
+                }),
             };
 
-            self.negative = neg;
-            self.current = int.clone();
-        } else if !first {
-            let (negative, current) = self.num.next_index(self.negative, &self.current)?;
-            self.negative = negative;
-            self.current = current;
-        }
+            self.current = Some(current.clone());
+            current
+        };
 
-        let expr = syn::Expr::Lit(syn::ExprLit {
+        Ok(syn::Expr::Group(syn::ExprGroup {
             attrs: Vec::new(),
-            lit: syn::Lit::Int(self.current.clone()),
-        });
+            group_token: syn::token::Group { span: self.span },
+            expr: Box::new(current),
+        }))
+    }
+}
 
-        Ok(if self.negative {
-            syn::Expr::Unary(syn::ExprUnary {
-                attrs: Vec::new(),
-                op: syn::UnOp::Neg(<Token![-]>::default()),
-                expr: Box::new(expr),
-            })
-        } else {
-            expr
-        })
+fn as_int(expr: &syn::Expr) -> Option<(bool, &syn::LitInt)> {
+    match expr {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Int(int),
+            ..
+        }) => Some((false, int)),
+        syn::Expr::Group(syn::ExprGroup { expr, .. }) => as_int(expr),
+        syn::Expr::Unary(syn::ExprUnary {
+            op: syn::UnOp::Neg(..),
+            expr,
+            ..
+        }) => as_int(expr).map(|(neg, int)| (!neg, int)),
+        _ => None,
     }
 }

@@ -174,6 +174,41 @@ fn weird_alignment() -> Result<()> {
 }
 
 #[test]
+fn enum_discriminants() -> Result<()> {
+    const fn my_constant_fn(base: u8) -> u8 {
+        base + 3
+    }
+
+    macro_rules! test_case {
+        ($($variant:ident $(= $variants:expr)?, $expected:expr, $constant:ident),* $(,)?) => {
+            #[derive(ZeroCopy)]
+            #[repr(u8)]
+            #[zero_copy(crate)]
+            enum E {
+                $($variant $(= $variants)*),*
+            }
+
+            $(
+            assert_eq!(E::$constant, $expected);
+            unsafe {
+                assert_eq!(*(&E::$variant as *const E).cast::<u8>(), $expected);
+            }
+            )*
+        }
+    }
+
+    test_case! {
+        A = 1, 1, DISCRIMINANT0,
+        B, 2, DISCRIMINANT1,
+        C = u8::MAX, u8::MAX, DISCRIMINANT2,
+        D = my_constant_fn(u8::MAX >> 2), (u8::MAX >> 2) + 3, DISCRIMINANT3,
+        E, (u8::MAX >> 2) + 4, DISCRIMINANT4,
+    }
+
+    Ok(())
+}
+
+#[test]
 fn enum_boundaries() -> Result<()> {
     macro_rules! test_case {
         ($name:ident, $repr:ident, $num:ty, $min:literal, $max:literal, $illegal_repr:ident $(,)?) => {{

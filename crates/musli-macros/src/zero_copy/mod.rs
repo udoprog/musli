@@ -123,6 +123,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
     // expands only to the fields visible to the proc macro or causes a compile
     // error.
     let check_fields;
+    let type_impls;
     let mut check_zero_sized = Vec::new();
 
     match &data {
@@ -217,6 +218,8 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     };
                 )
             };
+
+            type_impls = None;
         }
         syn::Data::Enum(en) => {
             if let Some((span, _)) = r.repr_packed {
@@ -239,6 +242,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
             let ty = syn::Ident::new(num.as_ty(), span);
 
+            let mut discriminants = Vec::new();
             let mut validate_variants = Vec::new();
             let mut pad_variants = Vec::new();
             let mut padded_variants = Vec::new();
@@ -246,7 +250,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
             let mut enumerator = Enumerator::new(num, ty.span());
 
-            for variant in &en.variants {
+            for (index, variant) in en.variants.iter().enumerate() {
                 let mut output = process_fields(cx, &variant.fields);
                 check_zero_sized.append(&mut output.check_zero_sized);
 
@@ -261,14 +265,21 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                 let types = &output.types;
 
+                let discriminant_const =
+                    syn::Ident::new(&format!("DISCRIMINANT{}", index), variant.ident.span());
+
+                discriminants.push(quote! {
+                    const #discriminant_const: #ty = #discriminant;
+                });
+
                 validate_variants.push(quote! {
-                    #discriminant => {
+                    #discriminant_const => {
                         #(#validator::validate::<#types>(validator)?;)*
                     }
                 });
 
                 pad_variants.push(quote! {
-                    #discriminant => {
+                    #discriminant_const => {
                         #(#padder::pad::<#types>(padder);)*
                     }
                 });
@@ -298,6 +309,8 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             }
 
             pad = quote! {
+                #(#discriminants)*
+
                 // NOTE: this is assumed to be properly, since enums cannot be
                 // packed.
                 match #padder::pad_discriminant::<#ty>(padder) {
@@ -309,11 +322,11 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             let illegal_enum = quote::format_ident!("__illegal_enum_{}", num.as_ty());
 
             validate = quote! {
+                #(#discriminants)*
+
                 // SAFETY: We've systematically ensured that we're only
                 // validating over fields within the size of this type.
-                let discriminant = *#validator::field::<#ty>(validator)?;
-
-                match discriminant {
+                match *#validator::field::<#ty>(validator)? {
                     #(#validate_variants,)*
                     value => return #result::Err(#error::#illegal_enum::<Self>(value)),
                 }
@@ -336,6 +349,13 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     }
                 };
             );
+
+            type_impls = Some(quote! {
+                #[cfg(test)]
+                impl #impl_generics #name #ty_generics #where_clause {
+                    #(#discriminants)*
+                }
+            })
         }
         syn::Data::Union(data) => {
             cx.error(syn::Error::new_spanned(
@@ -368,6 +388,8 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
         #check_fields
 
         #impl_zero_sized
+
+        #type_impls
 
         #[automatically_derived]
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {

@@ -508,9 +508,18 @@ pub mod pointer;
 /// }
 /// ```
 ///
-/// If a custom discriminant is used, only constant values are supported:
+/// If a custom discriminant is used, only constant expressions are supported.
+///
+/// For example:
+/// * A literal like `42`,
+/// * A simple constant expression like `u32::MIN + 10`.
+/// * A more complex constant expression like `my_constant_fn(u32::MIN >> 2)`.
 ///
 /// ```
+/// const fn my_constant_fn(base: u8) -> u8 {
+///     base + 3
+/// }
+///
 /// # use musli_zerocopy::ZeroCopy;
 /// #[derive(ZeroCopy)]
 /// #[repr(u8)]
@@ -520,18 +529,8 @@ pub mod pointer;
 ///     Third {
 ///         first: u32,
 ///         second: u64,
-///     } = 5,
-/// }
-/// ```
-///
-/// This is rejected:
-///
-/// ```compile_fail
-/// # use musli_zerocopy::ZeroCopy;
-/// #[derive(ZeroCopy)]
-/// #[repr(u8)]
-/// enum Flags {
-///     Max = u8::MAX,
+///     } = u8::MAX,
+///     Fourth = my_constant_fn(u8::MIN >> 2),
 /// }
 /// ```
 ///
@@ -545,10 +544,7 @@ pub mod pointer;
 /// enum Flags {
 ///     First,
 ///     Second(u32),
-///     Third {
-///         first: u32,
-///         second: u64,
-///     },
+///     Third { first: u32, second: u64 },
 /// }
 ///
 /// let mut buf = OwnedBuf::with_alignment::<Flags>();
