@@ -2,6 +2,7 @@ use core::hash::{Hash, Hasher};
 use core::mem::size_of;
 
 use crate::buf::{Buf, OwnedBuf, Visit};
+use crate::endian::ByteOrder;
 use crate::error::Error;
 use crate::pointer::{Ref, Size};
 use crate::sip::SipHasher13;
@@ -65,10 +66,10 @@ const FIXED_SEED: u64 = 1234567890;
 /// assert_eq!(map.get(&30u64)?, None);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_map<K, V, I, O: Size>(
-    buf: &mut OwnedBuf<O>,
+pub fn store_map<K, V, I, O: Size, E: ByteOrder>(
+    buf: &mut OwnedBuf<O, E>,
     entries: I,
-) -> Result<MapRef<K, V, O>, Error>
+) -> Result<MapRef<K, V, O, E>, Error>
 where
     K: Visit + ZeroCopy,
     V: ZeroCopy,
@@ -141,7 +142,10 @@ where
 /// assert!(!set.contains(&3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_set<T, I, O: Size>(buf: &mut OwnedBuf<O>, entries: I) -> Result<SetRef<T, O>, Error>
+pub fn store_set<T, I, O: Size, E: ByteOrder>(
+    buf: &mut OwnedBuf<O, E>,
+    entries: I,
+) -> Result<SetRef<T, O, E>, Error>
 where
     T: Visit + ZeroCopy,
     T::Target: Hash,
@@ -160,15 +164,15 @@ where
 }
 
 // Output from storing raw values.
-type Raw<U, O> = (u64, Ref<[u8], O>, Ref<[U], O>, usize);
+type Raw<U, O, E> = (u64, Ref<[u8], O, E>, Ref<[U], O, E>, usize);
 
 // Raw store function which is capable of storing any value using a hashing
 // adapter.
-fn store_raw<T, U, I, O: Size>(
+fn store_raw<T, U, I, O: Size, E: ByteOrder>(
     entries: I,
-    buf: &mut OwnedBuf<O>,
+    buf: &mut OwnedBuf<O, E>,
     hash: fn(&Buf, T, &mut SipHasher13) -> Result<U, Error>,
-) -> Result<Raw<U, O>, Error>
+) -> Result<Raw<U, O, E>, Error>
 where
     U: ZeroCopy,
     I: IntoIterator<Item = T>,
@@ -196,10 +200,11 @@ where
     let base_ptr = buf.next_offset::<U>();
     buf.fill(0, size_of::<T>().wrapping_mul(buckets));
 
-    let (buckets, bucket_mask) = {
+    let bucket_mask = {
         buf.align_in_place();
 
-        let mut table = unsafe { Constructor::<U, O>::with_buf(buf, ctrl_ptr, base_ptr, buckets) };
+        let mut table =
+            unsafe { Constructor::<U, _, _>::with_buf(buf, ctrl_ptr, base_ptr, buckets) };
 
         for v in entries {
             let mut hasher = SipHasher13::new_with_keys(0, key);
@@ -208,7 +213,7 @@ where
             table.insert(hash, &v)?;
         }
 
-        (table.buckets(), table.bucket_mask())
+        table.bucket_mask()
     };
 
     let ctrl = Ref::with_metadata(ctrl_ptr, ctrl_len);

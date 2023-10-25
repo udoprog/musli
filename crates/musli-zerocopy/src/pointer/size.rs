@@ -1,5 +1,6 @@
 use core::fmt;
 
+use crate::endian::ByteOrder;
 use crate::traits::ZeroCopy;
 
 /// The default [`Size`] in use by this crate.
@@ -17,6 +18,7 @@ mod sealed {
     impl Sealed for u8 {}
     impl Sealed for u16 {}
     impl Sealed for u32 {}
+    impl Sealed for u64 {}
     impl Sealed for usize {}
 }
 
@@ -32,7 +34,14 @@ mod sealed {
 /// This trait is sealed and its internals hidden. Publicly it's only used as a
 /// marker trait.
 pub trait Size:
-    'static + TryFrom<usize> + Copy + fmt::Display + fmt::Debug + ZeroCopy + self::sealed::Sealed
+    'static
+    + Sized
+    + TryFrom<usize>
+    + Copy
+    + fmt::Display
+    + fmt::Debug
+    + ZeroCopy
+    + self::sealed::Sealed
 {
     /// The default zero pointer.
     #[doc(hidden)]
@@ -44,54 +53,49 @@ pub trait Size:
 
     /// Convert the pointer to a usize.
     #[doc(hidden)]
-    fn as_usize(self) -> usize;
+    fn as_usize<E: ByteOrder>(self) -> usize;
 
     /// Test if the value is zero.
     #[doc(hidden)]
     fn is_zero(self) -> bool;
 }
 
-impl Size for u16 {
-    const ZERO: Self = 0;
-    const MAX: Self = u16::MAX;
+macro_rules! impl_size {
+    ($ty:ty, $swap:path) => {
+        #[doc = concat!("Size implementation for `", stringify!($ty), "`")]
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli_zerocopy::pointer::Size;
+        /// use musli_zerocopy::endian::{BigEndian, LittleEndian};
+        ///
+        #[doc = concat!("let max = ", stringify!($ty), "::MAX.as_usize::<LittleEndian>();")]
+        #[doc = concat!("let min = ", stringify!($ty), "::MIN.as_usize::<LittleEndian>();")]
+        /// ```
+        impl Size for $ty {
+            const ZERO: Self = 0;
+            const MAX: Self = <$ty>::MAX;
 
-    #[inline]
-    fn as_usize(self) -> usize {
-        self as usize
-    }
+            #[inline]
+            fn as_usize<E: ByteOrder>(self) -> usize {
+                if self > usize::MAX as $ty {
+                    usize::MAX
+                } else {
+                    $swap(self) as usize
+                }
+            }
 
-    #[inline]
-    fn is_zero(self) -> bool {
-        self == 0
-    }
+            #[inline]
+            fn is_zero(self) -> bool {
+                self == 0
+            }
+        }
+    };
 }
 
-impl Size for u32 {
-    const ZERO: Self = 0;
-    const MAX: Self = u32::MAX;
-
-    #[inline]
-    fn as_usize(self) -> usize {
-        self as usize
-    }
-
-    #[inline]
-    fn is_zero(self) -> bool {
-        self == 0
-    }
-}
-
-impl Size for usize {
-    const ZERO: Self = 0;
-    const MAX: Self = usize::MAX;
-
-    #[inline]
-    fn as_usize(self) -> usize {
-        self
-    }
-
-    #[inline]
-    fn is_zero(self) -> bool {
-        self == 0
-    }
-}
+impl_size!(u8, core::convert::identity);
+impl_size!(u16, E::swap_u16);
+impl_size!(u32, E::swap_u32);
+impl_size!(u64, E::swap_u64);
+impl_size!(usize, core::convert::identity);

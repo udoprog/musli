@@ -115,3 +115,21 @@ pub mod zerocopy_store {
 
     tests::types!(build);
 }
+
+#[cfg(feature = "musli-zerocopy")]
+pub mod musli_zerocopy_swap {
+    use musli_zerocopy::endian::{BigEndian, LittleEndian};
+    use musli_zerocopy::{Ref, ZeroCopy};
+
+    pub fn array_little_endian(value: [u32; 16]) -> [u32; 16] {
+        value.swap_bytes::<LittleEndian>()
+    }
+
+    pub fn array_big_endian(value: [u32; 16]) -> [u32; 16] {
+        value.swap_bytes::<BigEndian>()
+    }
+
+    pub fn reference_noop(value: Ref<u32>) -> Ref<u32> {
+        value.swap_bytes::<BigEndian>()
+    }
+}

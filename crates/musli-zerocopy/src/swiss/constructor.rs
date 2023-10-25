@@ -10,6 +10,7 @@ use core::ptr::NonNull;
 
 use crate::buf::Buf;
 use crate::buf::OwnedBuf;
+use crate::endian::ByteOrder;
 use crate::error::{Error, ErrorKind};
 use crate::pointer::Size;
 use crate::swiss::raw::{h2, is_full, probe_seq, special_is_empty, Group, ProbeSeq};
@@ -22,8 +23,8 @@ fn invalid_mut<T>(addr: usize) -> *mut T {
 }
 
 /// Construction of a raw swiss table.
-pub struct Constructor<'a, T, O: Size> {
-    buf: &'a mut OwnedBuf<O>,
+pub struct Constructor<'a, T, O: Size, E: ByteOrder> {
+    buf: &'a mut OwnedBuf<O, E>,
 
     // Mask to get an index from a hash value. The value is one less than the
     // number of buckets in the table.
@@ -44,7 +45,7 @@ pub struct Constructor<'a, T, O: Size> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T, O: Size> Constructor<'a, T, O> {
+impl<'a, T, O: Size, E: ByteOrder> Constructor<'a, T, O, E> {
     /// Wrap the given buffer for table construction.
     ///
     /// # Safety
@@ -56,10 +57,11 @@ impl<'a, T, O: Size> Constructor<'a, T, O> {
     ///   sized for `Group` which has been bitwise initialized to [`EMPTY`].
     /// * `base_ptr` must point to a memory region that is `buckets` length
     ///   sized for `T`.
+    /// * `buckets` must be a power of two.
     ///
     /// [`EMPTY`]: crate::swiss::raw::EMPTY
     pub(crate) unsafe fn with_buf(
-        buf: &'a mut OwnedBuf<O>,
+        buf: &'a mut OwnedBuf<O, E>,
         ctrl_ptr: usize,
         base_ptr: usize,
         buckets: usize,

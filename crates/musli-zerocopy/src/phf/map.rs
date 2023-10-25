@@ -16,11 +16,12 @@ use core::borrow::Borrow;
 use core::hash::Hash;
 
 use crate::buf::{Bindable, Buf, Visit};
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::error::Error;
 use crate::phf::hashing::HashKey;
 use crate::phf::Entry;
 use crate::pointer::{DefaultSize, Ref, Size};
-use crate::ZeroCopy;
+use crate::{Ordered, ZeroCopy};
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///
@@ -165,16 +166,17 @@ where
 }
 
 /// Bind a [`MapRef`] into a [`Map`].
-impl<K, V, O: Size> Bindable for MapRef<K, V, O>
+impl<K, V, O: Size, E: ByteOrder> Bindable for MapRef<K, V, O, E>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
     type Bound<'a> = Map<'a, K, V> where Self: 'a;
 
+    #[inline]
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {
         Ok(Map {
-            key: self.key,
+            key: self.key.into_value(),
             entries: buf.load(self.entries)?,
             displacements: buf.load(self.displacements)?,
             buf,
@@ -215,17 +217,17 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct MapRef<K, V, O: Size = DefaultSize>
+pub struct MapRef<K, V, O: Size = DefaultSize, E: ByteOrder = DefaultEndian>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
-    key: HashKey,
-    entries: Ref<[Entry<K, V>], O>,
-    displacements: Ref<[Entry<u32, u32>], O>,
+    key: Ordered<HashKey, E>,
+    entries: Ref<[Entry<K, V>], O, E>,
+    displacements: Ref<[Entry<u32, u32>], O, E>,
 }
 
-impl<K, V, O: Size> MapRef<K, V, O>
+impl<K, V, O: Size, E: ByteOrder> MapRef<K, V, O, E>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -233,18 +235,18 @@ where
     #[cfg(feature = "alloc")]
     pub(crate) fn new(
         key: HashKey,
-        entries: Ref<[Entry<K, V>], O>,
-        displacements: Ref<[Entry<u32, u32>], O>,
+        entries: Ref<[Entry<K, V>], O, E>,
+        displacements: Ref<[Entry<u32, u32>], O, E>,
     ) -> Self {
         Self {
-            key,
+            key: Ordered::new(key),
             entries,
             displacements,
         }
     }
 }
 
-impl<K, V, O: Size> MapRef<K, V, O>
+impl<K, V, O: Size, E: ByteOrder> MapRef<K, V, O, E>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -335,7 +337,7 @@ where
             return Ok(None);
         }
 
-        let hashes = crate::phf::hashing::hash(buf, key, &self.key)?;
+        let hashes = crate::phf::hashing::hash(buf, key, &self.key.into_value())?;
 
         let displacements = |index| match self.displacements.get(index) {
             Some(entry) => Ok(Some(buf.load(entry)?)),
@@ -363,7 +365,7 @@ where
     }
 }
 
-impl<K, V, O: Size> Clone for MapRef<K, V, O>
+impl<K, V, O: Size, E: ByteOrder> Clone for MapRef<K, V, O, E>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -373,7 +375,7 @@ where
     }
 }
 
-impl<K, V, O: Size> Copy for MapRef<K, V, O>
+impl<K, V, O: Size, E: ByteOrder> Copy for MapRef<K, V, O, E>
 where
     K: ZeroCopy,
     V: ZeroCopy,

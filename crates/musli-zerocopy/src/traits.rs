@@ -16,13 +16,15 @@
 
 #![allow(clippy::missing_safety_doc)]
 
+use core::array;
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of};
+use core::mem::{align_of, size_of, transmute};
 use core::num::Wrapping;
 use core::slice;
 use core::str;
 
 use crate::buf::{Buf, Padder, Validator, Visit};
+use crate::endian::ByteOrder;
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Pointee, Size};
 use crate::Ref;
@@ -87,7 +89,7 @@ where
 
     /// Validate the buffer with the given capacity and return the decoded
     /// metadata.
-    unsafe fn validate(
+    unsafe fn validate_unsized<E: ByteOrder>(
         ptr: *const u8,
         len: usize,
         metadata: P::Packed,
@@ -215,6 +217,7 @@ where
 {
     const ANY_BITS: bool = T::ANY_BITS;
     const PADDED: bool = T::PADDED;
+    const CAN_SWAP_BYTES: bool = T::CAN_SWAP_BYTES;
 
     #[inline]
     unsafe fn pad(padder: &mut Padder<'_, Self>) {
@@ -224,6 +227,11 @@ where
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
         validator.validate::<T>()
+    }
+
+    #[inline]
+    fn swap_bytes<E: ByteOrder>(self) -> Self {
+        Wrapping(T::swap_bytes::<E>(self.0))
     }
 }
 
@@ -408,6 +416,11 @@ pub unsafe trait ZeroCopy: Sized {
     #[doc(hidden)]
     const PADDED: bool;
 
+    /// Indicates if the type has a valid byte-ordered transformation.
+    ///
+    /// Most notably this is not implemented by `char`.
+    const CAN_SWAP_BYTES: bool;
+
     /// Mark padding for the current type.
     ///
     /// The `this` receiver takes the current type as pointer instead of a
@@ -520,6 +533,58 @@ pub unsafe trait ZeroCopy: Sized {
     fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
         Buf::new_mut(bytes).load_mut(Ref::<Self>::zero())
     }
+
+    /// Swap the bytes of `self` using the specified byte ordering to match the
+    /// native byte ordering.
+    ///
+    /// If the specified [`ByteOrder`] matches the current ordering, this is a
+    /// no-op.
+    ///
+    /// This will cause any byte-order sensitive primitives to be converted to
+    /// the native byte order.
+    ///
+    /// # Complex types
+    ///
+    /// For complex types, this will walk the type hierarchy and swap each
+    /// composite field that is apart of that type.
+    ///
+    /// ```
+    /// use musli_zerocopy::{Ref, ZeroCopy};
+    /// use musli_zerocopy::endian::{BigEndian, LittleEndian};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Struct {
+    ///     number: u32,
+    ///     reference: Ref<u32, usize, LittleEndian>,
+    /// }
+    ///
+    /// let st = Struct {
+    ///     number: 0x10203040u32.to_le(),
+    ///     reference: Ref::new(0x50607080usize.to_le()),
+    /// };
+    ///
+    /// assert_eq!(st.number, 0x10203040u32.to_le());
+    /// assert_eq!(st.reference.offset(), 0x50607080usize);
+    ///
+    /// let st2 = st.swap_bytes::<BigEndian>();
+    /// assert_eq!(st2.number, 0x10203040u32.to_be());
+    /// assert_eq!(st2.reference.offset(), 0x50607080usize);
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// There's nothing fundamentally unsafe about byte swapping, all though it
+    /// should be noted that the exact output is not guaranteed to be stable in
+    /// case a type cannot be safely byte-swapped. This is the case for
+    /// [`char`], since byte swapping one might cause it to inhabit an illegal
+    /// bit pattern.
+    ///
+    /// To test whether a type can be byte swapped, the [`CAN_SWAP_BYTES`]
+    /// constant should be advised.
+    ///
+    /// [`CAN_SWAP_BYTES`]: Self::CAN_SWAP_BYTES
+    fn swap_bytes<E: ByteOrder>(self) -> Self;
 }
 
 unsafe impl<P: ?Sized, O> UnsizedZeroCopy<P, O> for str
@@ -544,12 +609,12 @@ where
     unsafe fn pad(&self, _: &mut Padder<'_, Self>) {}
 
     #[inline]
-    unsafe fn validate(
+    unsafe fn validate_unsized<E: ByteOrder>(
         ptr: *const u8,
         len: usize,
         metadata: P::Packed,
     ) -> Result<P::Metadata, Error> {
-        let metadata = metadata.as_usize();
+        let metadata = metadata.as_usize::<E>();
 
         if metadata > len {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
@@ -603,12 +668,12 @@ where
     }
 
     #[inline]
-    unsafe fn validate(
+    unsafe fn validate_unsized<E: ByteOrder>(
         buf: *const u8,
         len: usize,
         metadata: P::Packed,
     ) -> Result<P::Metadata, Error> {
-        let metadata = metadata.as_usize();
+        let metadata = metadata.as_usize::<E>();
 
         let Some(size) = metadata.checked_mul(size_of::<T>()) else {
             return Err(Error::new(ErrorKind::LengthOverflow {
@@ -643,7 +708,7 @@ where
 }
 
 macro_rules! impl_number {
-    ($ty:ty) => {
+    ($ty:ty, $from_be:path) => {
         #[doc = concat!(" [`ZeroCopy`] implementation for `", stringify!($ty), "`")]
         ///
         /// # Examples
@@ -677,6 +742,7 @@ macro_rules! impl_number {
         unsafe impl ZeroCopy for $ty {
             const ANY_BITS: bool = true;
             const PADDED: bool = false;
+            const CAN_SWAP_BYTES: bool = true;
 
             #[inline]
             unsafe fn pad(_: &mut Padder<'_, Self>) {}
@@ -684,6 +750,11 @@ macro_rules! impl_number {
             #[inline]
             unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
                 Ok(())
+            }
+
+            #[inline]
+            fn swap_bytes<E: ByteOrder>(self) -> Self {
+                $from_be(self)
             }
         }
 
@@ -701,24 +772,25 @@ macro_rules! impl_number {
     };
 }
 
-impl_number!(usize);
-impl_number!(isize);
-impl_number!(u8);
-impl_number!(u16);
-impl_number!(u32);
-impl_number!(u64);
-impl_number!(u128);
-impl_number!(i8);
-impl_number!(i16);
-impl_number!(i32);
-impl_number!(i64);
-impl_number!(i128);
+impl_number!(usize, E::swap_usize);
+impl_number!(isize, E::swap_isize);
+impl_number!(u8, core::convert::identity);
+impl_number!(u16, E::swap_u16);
+impl_number!(u32, E::swap_u32);
+impl_number!(u64, E::swap_u64);
+impl_number!(u128, E::swap_u128);
+impl_number!(i8, core::convert::identity);
+impl_number!(i16, E::swap_i16);
+impl_number!(i32, E::swap_i32);
+impl_number!(i64, E::swap_i64);
+impl_number!(i128, E::swap_i128);
 
 macro_rules! impl_float {
-    ($ty:ty) => {
+    ($ty:ty, $from_fn:path) => {
         unsafe impl ZeroCopy for $ty {
             const ANY_BITS: bool = true;
             const PADDED: bool = false;
+            const CAN_SWAP_BYTES: bool = true;
 
             #[inline]
             unsafe fn pad(_: &mut Padder<'_, Self>) {}
@@ -726,6 +798,10 @@ macro_rules! impl_float {
             #[inline]
             unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
                 Ok(())
+            }
+
+            fn swap_bytes<E: ByteOrder>(self) -> Self {
+                $from_fn(self)
             }
         }
 
@@ -743,12 +819,21 @@ macro_rules! impl_float {
     };
 }
 
-impl_float!(f32);
-impl_float!(f64);
+impl_float!(f32, E::swap_f32);
+impl_float!(f64, E::swap_f64);
 
+/// The `ZeroCopy` implementation for `char`.
+///
+/// Validating this type is byte-order sensitive, since the bit-pattern it
+/// inhabits needs to align with the bit-patterns it can inhabit.
+///
+/// Using a wrapper such as `Ordered<char, E>` will ensure that the type can be
+/// transparently referenced, since it enforces an ordered load onto the wrapped
+/// type.
 unsafe impl ZeroCopy for char {
     const ANY_BITS: bool = false;
     const PADDED: bool = false;
+    const CAN_SWAP_BYTES: bool = false;
 
     #[inline]
     unsafe fn pad(_: &mut Padder<'_, Self>) {}
@@ -763,6 +848,11 @@ unsafe impl ZeroCopy for char {
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn swap_bytes<E: ByteOrder>(self) -> Self {
+        self
     }
 }
 
@@ -781,6 +871,7 @@ impl Visit for char {
 unsafe impl ZeroCopy for bool {
     const ANY_BITS: bool = false;
     const PADDED: bool = false;
+    const CAN_SWAP_BYTES: bool = true;
 
     #[inline]
     unsafe fn pad(_: &mut Padder<'_, Self>) {}
@@ -794,6 +885,11 @@ unsafe impl ZeroCopy for bool {
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn swap_bytes<E: ByteOrder>(self) -> Self {
+        self
     }
 }
 
@@ -843,12 +939,14 @@ macro_rules! impl_nonzero_number {
         unsafe impl ZeroCopy for ::core::num::$ty {
             const ANY_BITS: bool = false;
             const PADDED: bool = false;
+            const CAN_SWAP_BYTES: bool = true;
 
             #[inline]
             unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
             #[inline]
             unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+                // NB: A zeroed bit-pattern is byte-order independent.
                 if validator.load_unaligned::<$inner>()? == 0 {
                     return Err(Error::new(ErrorKind::NonZeroZeroed {
                         range: validator.range::<::core::num::$ty>(),
@@ -856,6 +954,16 @@ macro_rules! impl_nonzero_number {
                 }
 
                 Ok(())
+            }
+
+            #[inline]
+            fn swap_bytes<E: ByteOrder>(self) -> Self {
+                // SAFETY: a value inhabiting zero is byte-order independent.
+                unsafe {
+                    ::core::num::$ty::new_unchecked(<$inner as ZeroCopy>::swap_bytes::<E>(
+                        self.get(),
+                    ))
+                }
             }
         }
 
@@ -902,6 +1010,7 @@ macro_rules! impl_nonzero_number {
         unsafe impl ZeroCopy for Option<::core::num::$ty> {
             const ANY_BITS: bool = true;
             const PADDED: bool = false;
+            const CAN_SWAP_BYTES: bool = true;
 
             #[inline]
             unsafe fn pad(_: &mut Padder<'_, Self>) {}
@@ -909,6 +1018,17 @@ macro_rules! impl_nonzero_number {
             #[inline]
             unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
                 Ok(())
+            }
+
+            #[inline]
+            fn swap_bytes<E: ByteOrder>(self) -> Self {
+                // SAFETY: All bit-patterns are habitable, zero we can rely on
+                // byte-order conversion from the inner type.
+                unsafe {
+                    transmute(<$inner as ZeroCopy>::swap_bytes::<E>(
+                        transmute::<_, $inner>(self),
+                    ))
+                }
             }
         }
 
@@ -968,6 +1088,7 @@ macro_rules! impl_zst {
         unsafe impl $(<$($bounds)*>)* ZeroCopy for $ty {
             const ANY_BITS: bool = true;
             const PADDED: bool = false;
+            const CAN_SWAP_BYTES: bool = true;
 
             #[inline]
             unsafe fn pad(_: &mut Padder<'_, Self>) {
@@ -976,6 +1097,11 @@ macro_rules! impl_zst {
             #[inline]
             unsafe fn validate(_: &mut Validator<'_, Self>) -> Result<(), Error> {
                 Ok(())
+            }
+
+            #[inline]
+            fn swap_bytes<E: ByteOrder>(self) -> Self {
+                self
             }
         }
 
@@ -1028,6 +1154,7 @@ where
 {
     const ANY_BITS: bool = T::ANY_BITS;
     const PADDED: bool = T::PADDED;
+    const CAN_SWAP_BYTES: bool = T::CAN_SWAP_BYTES;
 
     #[inline]
     unsafe fn pad(padder: &mut Padder<'_, Self>) {
@@ -1043,6 +1170,12 @@ where
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
         crate::buf::validate_array::<_, T>(validator, N)?;
         Ok(())
+    }
+
+    #[inline]
+    fn swap_bytes<E: ByteOrder>(self) -> Self {
+        let mut iter = self.into_iter();
+        array::from_fn(move |_| T::swap_bytes::<E>(iter.next().unwrap()))
     }
 }
 

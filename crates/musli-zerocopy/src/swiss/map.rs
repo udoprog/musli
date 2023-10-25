@@ -18,12 +18,13 @@ use core::hash::{Hash, Hasher};
 use core::mem::size_of;
 
 use crate::buf::{Bindable, Buf, Visit};
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{DefaultSize, Ref, Size};
 use crate::sip::SipHasher13;
 use crate::swiss::raw::{h2, probe_seq, Group};
 use crate::swiss::Entry;
-use crate::ZeroCopy;
+use crate::{Ordered, ZeroCopy};
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///
@@ -143,16 +144,17 @@ where
 }
 
 /// Bind a [`MapRef`] into a [`Map`].
-impl<K, V, O: Size> Bindable for MapRef<K, V, O>
+impl<K, V, O: Size, E: ByteOrder> Bindable for MapRef<K, V, O, E>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
     type Bound<'a> = Map<'a, K, V> where Self: 'a;
 
+    #[inline]
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {
         Ok(Map {
-            key: self.key,
+            key: self.key.into_value(),
             table: self.table.bind(buf)?,
             buf,
         })
@@ -192,23 +194,26 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct MapRef<K, V, O: Size = DefaultSize>
+pub struct MapRef<K, V, O: Size = DefaultSize, E: ByteOrder = DefaultEndian>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
-    key: u64,
-    table: RawTableRef<Entry<K, V>, O>,
+    key: Ordered<u64, E>,
+    table: RawTableRef<Entry<K, V>, O, E>,
 }
 
-impl<K, V, O: Size> MapRef<K, V, O>
+impl<K, V, O: Size, E: ByteOrder> MapRef<K, V, O, E>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
     #[cfg(feature = "alloc")]
-    pub(crate) fn new(key: u64, table: RawTableRef<Entry<K, V>, O>) -> Self {
-        Self { key, table }
+    pub(crate) fn new(key: u64, table: RawTableRef<Entry<K, V>, O, E>) -> Self {
+        Self {
+            key: Ordered::new(key),
+            table,
+        }
     }
 
     /// Get a value from the map.
@@ -281,11 +286,12 @@ where
         Ok(entry.is_some())
     }
 
+    #[inline]
     fn hash<H: ?Sized>(&self, value: &H) -> u64
     where
         H: Hash,
     {
-        let mut hasher = SipHasher13::new_with_keys(0, self.key);
+        let mut hasher = SipHasher13::new_with_keys(0, self.key.into_value());
         value.hash(&mut hasher);
         hasher.finish()
     }
@@ -374,38 +380,40 @@ impl<'a, T> RawTable<'a, T> {
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub(crate) struct RawTableRef<T, O: Size = DefaultSize>
+pub(crate) struct RawTableRef<T, O: Size = DefaultSize, E: ByteOrder = DefaultEndian>
 where
     T: ZeroCopy,
 {
-    ctrl: Ref<[u8], O>,
-    entries: Ref<[T], O>,
-    bucket_mask: usize,
+    ctrl: Ref<[u8], O, E>,
+    entries: Ref<[T], O, E>,
+    bucket_mask: Ordered<usize, E>,
 }
 
-impl<T, O: Size> RawTableRef<T, O>
+impl<T, O: Size, E: ByteOrder> RawTableRef<T, O, E>
 where
     T: ZeroCopy,
 {
     #[cfg(feature = "alloc")]
-    pub(crate) fn new(ctrl: Ref<[u8], O>, entries: Ref<[T], O>, bucket_mask: usize) -> Self {
+    #[inline]
+    pub(crate) fn new(ctrl: Ref<[u8], O, E>, entries: Ref<[T], O, E>, bucket_mask: usize) -> Self {
         Self {
             ctrl,
             entries,
-            bucket_mask,
+            bucket_mask: Ordered::new(bucket_mask),
         }
     }
 
+    #[inline]
     pub(crate) fn bind<'buf>(&self, buf: &'buf Buf) -> Result<RawTable<'buf, T>, Error> {
         Ok(RawTable {
             ctrl: buf.load(self.ctrl)?,
             entries: buf.load(self.entries)?,
-            bucket_mask: self.bucket_mask,
+            bucket_mask: self.bucket_mask.into_value(),
         })
     }
 }
 
-impl<T, O: Size> RawTableRef<T, O>
+impl<T, O: Size, E: ByteOrder> RawTableRef<T, O, E>
 where
     T: ZeroCopy,
 {
@@ -446,7 +454,7 @@ where
         eq: &mut dyn FnMut(usize) -> Result<bool, Error>,
     ) -> Result<Option<usize>, Error> {
         let h2_hash = h2(hash);
-        let mut probe_seq = probe_seq(self.bucket_mask, hash);
+        let mut probe_seq = probe_seq(self.bucket_mask.into_value(), hash);
 
         let ctrl = buf.load(self.ctrl)?;
 
@@ -465,7 +473,7 @@ where
             for bit in group.match_byte(h2_hash) {
                 // This is the same as `(probe_seq.pos + bit) % self.buckets()` because the number
                 // of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
-                let index = (probe_seq.pos + bit) & self.bucket_mask;
+                let index = (probe_seq.pos + bit) & self.bucket_mask.into_value();
 
                 if likely(eq(index)?) {
                     return Ok(Some(index));
@@ -476,7 +484,7 @@ where
                 return Ok(None);
             }
 
-            probe_seq.move_next(self.bucket_mask)?;
+            probe_seq.move_next(self.bucket_mask.into_value())?;
         }
     }
 }

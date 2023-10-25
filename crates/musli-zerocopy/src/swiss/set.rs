@@ -16,6 +16,7 @@ use core::borrow::Borrow;
 use core::hash::{Hash, Hasher};
 
 use crate::buf::{Bindable, Buf, Visit};
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::error::Error;
 use crate::pointer::{DefaultSize, Size};
 use crate::sip::SipHasher13;
@@ -97,12 +98,13 @@ where
 }
 
 /// Bind a [`SetRef`] into a [`Set`].
-impl<T, O: Size> Bindable for SetRef<T, O>
+impl<T, O: Size, E: ByteOrder> Bindable for SetRef<T, O, E>
 where
     T: ZeroCopy,
 {
     type Bound<'a> = Set<'a, T> where Self: 'a;
 
+    #[inline]
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {
         Ok(Set {
             key: self.key,
@@ -141,20 +143,20 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct SetRef<T, O: Size = DefaultSize>
+pub struct SetRef<T, O: Size = DefaultSize, E: ByteOrder = DefaultEndian>
 where
     T: ZeroCopy,
 {
     key: u64,
-    table: RawTableRef<T, O>,
+    table: RawTableRef<T, O, E>,
 }
 
-impl<T, O: Size> SetRef<T, O>
+impl<T, O: Size, E: ByteOrder> SetRef<T, O, E>
 where
     T: ZeroCopy,
 {
     #[cfg(feature = "alloc")]
-    pub(crate) fn new(key: u64, table: RawTableRef<T, O>) -> Self {
+    pub(crate) fn new(key: u64, table: RawTableRef<T, O, E>) -> Self {
         Self { key, table }
     }
 
