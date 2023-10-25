@@ -3,6 +3,7 @@ use core::hash::Hash;
 use alloc::vec::Vec;
 
 use crate::buf::Visit;
+use crate::endian::ByteOrder;
 use crate::error::Error;
 use crate::phf::{Entry, MapRef, SetRef};
 use crate::pointer::Size;
@@ -61,10 +62,10 @@ use crate::ZeroCopy;
 /// assert_eq!(map.get(&30u64)?, None);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_map<K, V, I, O: Size>(
-    buf: &mut OwnedBuf<O>,
+pub fn store_map<K, V, I, O: Size, E: ByteOrder>(
+    buf: &mut OwnedBuf<O, E>,
     entries: I,
-) -> Result<MapRef<K, V, O>, Error>
+) -> Result<MapRef<K, V, O, E>, Error>
 where
     K: Visit + ZeroCopy,
     V: ZeroCopy,
@@ -162,7 +163,10 @@ where
 /// assert!(!set.contains(&3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_set<T, I, O: Size>(buf: &mut OwnedBuf<O>, iter: I) -> Result<SetRef<T, O>, Error>
+pub fn store_set<T, I, O: Size, E: ByteOrder>(
+    buf: &mut OwnedBuf<O, E>,
+    iter: I,
+) -> Result<SetRef<T, O, E>, Error>
 where
     T: Visit + ZeroCopy,
     T::Target: Hash,

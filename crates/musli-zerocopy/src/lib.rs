@@ -363,14 +363,15 @@
 //! let unsize = Ref::<str, usize>::with_metadata(0, 1usize << 32);
 //! ```
 //!
-//! To initialize an [`OwnedBuf`] with a custom [`Size`] you use this
-//! constructor with a custom parameter and :
+//! To initialize an [`OwnedBuf`] with a custom [`Size`], you can use
+//! [`OwnedBuf::with_size`]:
 //!
 //! ```
 //! use musli_zerocopy::OwnedBuf;
 //! use musli_zerocopy::buf::DefaultAlignment;
 //!
-//! let mut buf = OwnedBuf::<usize>::with_capacity_and_alignment::<DefaultAlignment>(0);
+//! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
+//!     .with_size::<usize>();
 //! ```
 //!
 //! The [`Size`] you've specified during construction of an [`OwnedBuf`] will
@@ -384,7 +385,8 @@
 //! #[repr(C)]
 //! struct Custom { reference: Ref<u32, usize>, slice: Ref::<[u32], usize>, unsize: Ref::<str, usize> }
 //!
-//! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
+//! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
+//!     .with_size::<usize>();
 //!
 //! let reference = buf.store(&42u32);
 //! let slice = buf.store_slice(&[1, 2, 3, 4]);
@@ -393,6 +395,8 @@
 //! buf.store(&Custom { reference, slice, unsize });
 //! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
+//!
+//! <br>
 //!
 //! [`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
 //! [`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
@@ -405,6 +409,7 @@
 //! [ref-u32]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 //! [`Ref<str>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 //! [`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
+//! [`OwnedBuf::with_size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_size
 //! [`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 //! [`aligned_buf(bytes, align)`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 
@@ -448,6 +453,11 @@ pub mod swiss;
 #[doc(inline)]
 pub use self::pointer::Ref;
 pub mod pointer;
+
+mod ordered;
+pub use self::ordered::Ordered;
+
+pub mod endian;
 
 /// Derive macro to implement [`ZeroCopy`].
 ///
@@ -713,6 +723,8 @@ pub mod __private {
     pub mod mem {
         pub use ::core::mem::{align_of, size_of};
     }
+
+    pub use crate::endian::ByteOrder;
 
     #[inline(always)]
     pub fn unknown_discriminant<D>(discriminant: D)

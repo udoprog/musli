@@ -54,6 +54,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
     let mut r = ReprAttr::default();
     let mut krate: syn::Path = syn::parse_quote!(musli_zerocopy);
+    let mut swap_bytes_self = false;
 
     for attr in &attrs {
         if attr.path().is_ident("repr") {
@@ -81,6 +82,11 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                         krate = syn::parse_quote!(crate);
                     }
 
+                    return Ok(());
+                }
+
+                if meta.path.is_ident("swap_bytes") {
+                    swap_bytes_self = true;
                     return Ok(());
                 }
 
@@ -113,12 +119,18 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
     let validator: syn::Path = syn::parse_quote!(#krate::buf::Validator);
     let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
     let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
+    let byte_order: syn::Path = syn::parse_quote!(#krate::__private::ByteOrder);
+
+    let endianness = quote::format_ident!("__E");
 
     let pad;
     let validate;
     let impl_zero_sized;
     let any_bits;
     let padded;
+    let can_swap_bytes;
+    let swap_bytes_block;
+
     // Expands to an expression which is not executed, but ensures that the type
     // expands only to the fields visible to the proc macro or causes a compile
     // error.
@@ -133,13 +145,22 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             check_zero_sized.append(&mut output.check_zero_sized);
 
             match (repr, &output.first_field) {
-                (Repr::Transparent, Some(ty)) => {
+                (Repr::Transparent, Some((ty, member))) => {
                     pad = quote! {
                         <#ty as #zero_copy>::pad(#padder::transparent::<#ty>(padder));
                     };
 
                     validate = quote! {
                         <#ty as #zero_copy>::validate(#validator::transparent::<#ty>(validator))?;
+                    };
+
+                    let ignored_members = &output.ignored_members;
+
+                    swap_bytes_block = quote! {
+                        Self {
+                            #member: <#ty as #zero_copy>::swap_bytes::<#endianness>(self.#member),
+                            #(#ignored_members: self.#ignored_members,)*
+                        }
                     };
                 }
                 _ => {
@@ -171,21 +192,37 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                             };
                         }
                     }
+
+                    let Fields {
+                        members,
+                        ignored_members,
+                        ..
+                    } = &output;
+
+                    swap_bytes_block = quote! {
+                        Self {
+                            #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(self.#members),)*
+                            #(#ignored_members: self.#ignored_members,)*
+                        }
+                    };
                 }
             }
 
             let mut field_sizes = Vec::new();
             let mut field_padded = Vec::new();
+            let mut field_byte_ordered = Vec::new();
 
             for ty in output.types.iter() {
                 field_sizes.push(quote!(#mem::size_of::<#ty>()));
                 field_padded.push(quote!(<#ty as #zero_copy>::PADDED));
+                field_byte_ordered.push(quote!(<#ty as #zero_copy>::CAN_SWAP_BYTES));
             }
 
             // ZSTs are padded if their alignment is not 1, any other type is
             // padded if the sum of all their field sizes does not match the
             // size of the type itself.
             padded = quote!(#mem::size_of::<Self>() > (0 #(+ #field_sizes)*) #(|| #field_padded)*);
+            can_swap_bytes = quote!(true #(&& #field_byte_ordered)*);
 
             let types = &output.types;
 
@@ -244,8 +281,10 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
             let mut discriminants = Vec::new();
             let mut validate_variants = Vec::new();
+            let mut load_variants = Vec::new();
             let mut pad_variants = Vec::new();
             let mut padded_variants = Vec::new();
+            let mut byte_ordered_variants = Vec::new();
             let mut variant_fields = Vec::new();
 
             let mut enumerator = Enumerator::new(num, ty.span());
@@ -278,6 +317,27 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     }
                 });
 
+                let ident = &variant.ident;
+
+                let Fields {
+                    assigns,
+                    members,
+                    types,
+                    variables,
+                    ignored_variables,
+                    ignored_members,
+                    ..
+                } = &output;
+
+                load_variants.push(quote! {
+                    Self::#ident { #(#assigns),* } => {
+                        Self::#ident {
+                            #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
+                            #(#ignored_members: #ignored_variables,)*
+                        }
+                    }
+                });
+
                 pad_variants.push(quote! {
                     #discriminant_const => {
                         #(#padder::pad::<#types>(padder);)*
@@ -286,10 +346,12 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                 let mut field_sizes = Vec::new();
                 let mut field_padded = Vec::new();
+                let mut field_byte_ordered = Vec::new();
 
                 for ty in output.types.iter() {
                     field_sizes.push(quote!(#mem::size_of::<#ty>()));
                     field_padded.push(quote!(<#ty as #zero_copy>::PADDED));
+                    field_byte_ordered.push(quote!(<#ty as #zero_copy>::CAN_SWAP_BYTES));
                 }
 
                 let base_size = num.size(&mem);
@@ -297,6 +359,8 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 // Struct does not need to be padded if all elements are the
                 // same size and alignment.
                 padded_variants.push(quote!((#mem::size_of::<Self>() > (#base_size #(+ #field_sizes)*) #(|| #field_padded)*)));
+
+                byte_ordered_variants.push(quote!((true #(&& #field_byte_ordered)*)));
 
                 variant_fields.push({
                     let pat = build_field_exhaustive_pattern(
@@ -332,9 +396,16 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 }
             };
 
+            swap_bytes_block = quote! {
+                match self {
+                    #(#load_variants),*
+                }
+            };
+
             impl_zero_sized = None;
             any_bits = quote!(false);
             padded = quote!(false #(|| #padded_variants)*);
+            can_swap_bytes = quote!(true #(&& #byte_ordered_variants)*);
 
             let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -382,6 +453,12 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
+    let (swap_bytes_block, can_swap_bytes) = if swap_bytes_self {
+        (quote!(self), quote!(true))
+    } else {
+        (swap_bytes_block, can_swap_bytes)
+    };
+
     Ok(quote! {
         #check_zero_sized
 
@@ -395,6 +472,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
         unsafe impl #impl_generics #zero_copy for #name #ty_generics #where_clause {
             const ANY_BITS: bool = #any_bits;
             const PADDED: bool = #padded;
+            const CAN_SWAP_BYTES: bool = #can_swap_bytes;
 
             #[inline]
             unsafe fn pad(padder: &mut #padder<'_, Self>) {
@@ -405,6 +483,11 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             unsafe fn validate(validator: &mut #validator<'_, Self>) -> #result<(), #error> {
                 #validate
                 #result::Ok(())
+            }
+
+            #[inline]
+            fn swap_bytes<#endianness: #byte_order>(self) -> Self {
+                #swap_bytes_block
             }
         }
     })
@@ -478,17 +561,28 @@ fn build_field_exhaustive_pattern<const N: usize>(
 struct Fields<'a> {
     types: Vec<&'a syn::Type>,
     exhaustive: Vec<syn::Member>,
-    first_field: Option<&'a syn::Type>,
+    assigns: Vec<syn::FieldValue>,
+    members: Vec<syn::Member>,
+    variables: Vec<syn::Ident>,
+    first_field: Option<(&'a syn::Type, syn::Member)>,
+    ignored_members: Vec<syn::Member>,
+    ignored_variables: Vec<syn::Ident>,
     check_zero_sized: Vec<&'a syn::Type>,
 }
 
 fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
     let mut output = Fields::default();
 
-    for (index, field) in fields.iter().enumerate() {
+    for (
+        index,
+        syn::Field {
+            attrs, ident, ty, ..
+        },
+    ) in fields.iter().enumerate()
+    {
         let mut ignore = None;
 
-        for attr in &field.attrs {
+        for attr in attrs {
             if attr.path().is_ident("zero_copy") {
                 let result = attr.parse_nested_meta(|meta: ParseNestedMeta| {
                     if meta.path.is_ident("ignore") {
@@ -508,9 +602,7 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
             }
         }
 
-        let ty = &field.ty;
-
-        let member = match &field.ident {
+        let member = match ident {
             Some(ident) => syn::Member::Named(ident.clone()),
             None => syn::Member::Unnamed(syn::Index::from(index)),
         };
@@ -518,16 +610,30 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
         // Ignored fields are ignored in bindings.
         output.exhaustive.push(member.clone());
 
+        let variable = match &member {
+            syn::Member::Named(ident) => ident.clone(),
+            syn::Member::Unnamed(index) => quote::format_ident!("_{}", index.index),
+        };
+
+        output.assigns.push(match &member {
+            syn::Member::Named(ident) => syn::parse_quote!(#ident),
+            syn::Member::Unnamed(index) => syn::parse_quote!(#index: #variable),
+        });
+
         if ignore.is_some() {
             output.check_zero_sized.push(ty);
+            output.ignored_members.push(member);
+            output.ignored_variables.push(variable);
             continue;
         }
 
-        output.types.push(ty);
-
         if output.first_field.is_none() {
-            output.first_field = Some(ty);
+            output.first_field = Some((ty, member.clone()));
         }
+
+        output.types.push(ty);
+        output.members.push(member);
+        output.variables.push(variable);
     }
 
     output

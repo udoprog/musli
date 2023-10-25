@@ -254,7 +254,7 @@ pub mod musli_zerocopy {
     #[inline(always)]
     pub fn new() -> Benchmarker {
         Benchmarker {
-            buf: OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(4096),
+            buf: OwnedBuf::with_capacity(4096).with_size(),
         }
     }
 

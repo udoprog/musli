@@ -10,6 +10,7 @@ use alloc::borrow::{Cow, ToOwned};
 #[cfg(feature = "alloc")]
 use crate::buf::OwnedBuf;
 use crate::buf::{Bindable, Load, LoadMut, Validator};
+use crate::endian::ByteOrder;
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Pointee, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -615,7 +616,10 @@ impl Buf {
 
     /// Load an unsized reference.
     #[inline]
-    pub(crate) fn load_unsized<P: ?Sized, O: Size>(&self, unsize: Ref<P, O>) -> Result<&P, Error>
+    pub(crate) fn load_unsized<P: ?Sized, O: Size, E: ByteOrder>(
+        &self,
+        unsize: Ref<P, O, E>,
+    ) -> Result<&P, Error>
     where
         P: Pointee<O, Packed = O> + UnsizedZeroCopy<P, O>,
     {
@@ -626,16 +630,16 @@ impl Buf {
         // buffer slice.
         unsafe {
             let (buf, remaining) = self.get_range_from(start, P::ALIGN)?;
-            let metadata = P::validate(buf, remaining, metadata)?;
+            let metadata = P::validate_unsized::<E>(buf, remaining, metadata)?;
             Ok(&*P::ptr_with_metadata(buf, metadata))
         }
     }
 
     /// Load an unsized mutable reference.
     #[inline]
-    pub(crate) fn load_unsized_mut<P: ?Sized, O: Size>(
+    pub(crate) fn load_unsized_mut<P: ?Sized, O: Size, E: ByteOrder>(
         &mut self,
-        unsize: Ref<P, O>,
+        unsize: Ref<P, O, E>,
     ) -> Result<&mut P, Error>
     where
         P: Pointee<O, Packed = O> + UnsizedZeroCopy<P, O>,
@@ -647,14 +651,17 @@ impl Buf {
         // buffer slice.
         unsafe {
             let (buf, remaining) = self.get_mut_range_from(start, P::ALIGN)?;
-            let metadata = P::validate(buf, remaining, metadata)?;
+            let metadata = P::validate_unsized::<E>(buf, remaining, metadata)?;
             Ok(&mut *P::ptr_with_metadata_mut(buf, metadata))
         }
     }
 
     /// Load the given sized value as a reference.
     #[inline]
-    pub(crate) fn load_sized<P, O: Size>(&self, ptr: Ref<P, O>) -> Result<&P, Error>
+    pub(crate) fn load_sized<P, O: Size, E: ByteOrder>(
+        &self,
+        ptr: Ref<P, O, E>,
+    ) -> Result<&P, Error>
     where
         P: ZeroCopy,
     {
@@ -680,7 +687,10 @@ impl Buf {
 
     /// Load the given sized value as a mutable reference.
     #[inline]
-    pub(crate) fn load_sized_mut<P, O: Size>(&mut self, ptr: Ref<P, O>) -> Result<&mut P, Error>
+    pub(crate) fn load_sized_mut<P, O: Size, E: ByteOrder>(
+        &mut self,
+        ptr: Ref<P, O, E>,
+    ) -> Result<&mut P, Error>
     where
         P: ZeroCopy,
     {

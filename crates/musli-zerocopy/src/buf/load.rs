@@ -1,4 +1,5 @@
 use crate::buf::Buf;
+use crate::endian::ByteOrder;
 use crate::error::Error;
 use crate::pointer::{Pointee, Ref, Size};
 use crate::traits::ZeroCopy;
@@ -32,7 +33,7 @@ pub trait LoadMut: Load {
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error>;
 }
 
-impl<P, O: Size> Load for Ref<P, O>
+impl<P, O: Size, E: ByteOrder> Load for Ref<P, O, E>
 where
     P: ZeroCopy,
 {
@@ -44,7 +45,7 @@ where
     }
 }
 
-impl<T, O: Size> Load for Ref<[T], O>
+impl<T, O: Size, E: ByteOrder> Load for Ref<[T], O, E>
 where
     [T]: Pointee<O, Packed = O, Metadata = usize>,
     T: ZeroCopy,
@@ -66,7 +67,7 @@ impl<O: Size> Load for Ref<str, O> {
     }
 }
 
-impl<P, O: Size> LoadMut for Ref<P, O>
+impl<P, O: Size, E: ByteOrder> LoadMut for Ref<P, O, E>
 where
     P: ZeroCopy,
 {
@@ -76,7 +77,7 @@ where
     }
 }
 
-impl<T, O: Size> LoadMut for Ref<[T], O>
+impl<T, O: Size, E: ByteOrder> LoadMut for Ref<[T], O, E>
 where
     [T]: Pointee<O, Packed = O, Metadata = usize>,
     T: ZeroCopy,

@@ -1,9 +1,10 @@
 use core::cmp::Ordering;
-use core::fmt;
 use core::hash::Hash;
 use core::marker::PhantomData;
 use core::mem::size_of;
+use core::{any, fmt};
 
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Size};
 use crate::ZeroCopy;
@@ -36,18 +37,18 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, bounds = {P::Packed: ZeroCopy})]
-pub struct Ref<P: ?Sized, O: Size = DefaultSize>
+#[zero_copy(crate, swap_bytes, bounds = {P::Packed: ZeroCopy})]
+pub struct Ref<P: ?Sized, O: Size = DefaultSize, E: ByteOrder = DefaultEndian>
 where
     P: Pointee<O>,
 {
     offset: O,
     metadata: P::Packed,
     #[zero_copy(ignore)]
-    _marker: PhantomData<P>,
+    _marker: PhantomData<(E, P)>,
 }
 
-impl<P: ?Sized, O: Size> Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, O, E>
 where
     P: Pointee<O>,
 {
@@ -70,6 +71,12 @@ where
         P::Metadata: fmt::Debug,
         P::Packed: TryFrom<P::Metadata>,
     {
+        assert!(
+            O::CAN_SWAP_BYTES,
+            "Type `{}` cannot be byte-ordered since it would not inhabit valid types",
+            any::type_name::<O>()
+        );
+
         let Some(offset) = O::try_from(offset).ok() else {
             panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
         };
@@ -79,14 +86,14 @@ where
         };
 
         Self {
-            offset,
+            offset: O::swap_bytes::<E>(offset),
             metadata,
             _marker: PhantomData,
         }
     }
 }
 
-impl<P, O: Size> Ref<[P], O>
+impl<P, O: Size, E: ByteOrder> Ref<[P], O, E>
 where
     P: ZeroCopy,
 {
@@ -102,7 +109,7 @@ where
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        self.metadata.as_usize()
+        self.metadata.as_usize::<E>()
     }
 
     /// If the slice is empty.
@@ -145,21 +152,21 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn get(&self, index: usize) -> Option<Ref<P, O>> {
+    pub fn get(&self, index: usize) -> Option<Ref<P, O, E>> {
         if index >= self.len() {
             return None;
         }
 
         let ptr = self
             .offset
-            .as_usize()
+            .as_usize::<E>()
             .wrapping_add(size_of::<P>().wrapping_mul(index));
 
         Some(Ref::new(ptr))
     }
 }
 
-impl<P: ?Sized, O: Size> Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, O, E>
 where
     P: Pointee<O>,
 {
@@ -179,7 +186,7 @@ where
     }
 }
 
-impl<P, O: Size> Ref<P, O>
+impl<P, O: Size, E: ByteOrder> Ref<P, O, E>
 where
     P: Pointee<O, Packed = ()>,
 {
@@ -204,12 +211,18 @@ where
         U: Copy + fmt::Debug,
         O: TryFrom<U>,
     {
+        assert!(
+            O::CAN_SWAP_BYTES,
+            "Type `{}` cannot be byte-ordered since it would not inhabit valid types",
+            any::type_name::<O>()
+        );
+
         let Some(offset) = O::try_from(offset).ok() else {
             panic!("Offset {offset:?} not in the legal range 0-{}", O::MAX);
         };
 
         Self {
-            offset,
+            offset: O::swap_bytes::<E>(offset),
             metadata: (),
             _marker: PhantomData,
         }
@@ -235,7 +248,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size> Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, O, E>
 where
     P: Pointee<O>,
 {
@@ -251,7 +264,7 @@ where
     /// ```
     #[inline]
     pub fn offset(&self) -> usize {
-        self.offset.as_usize()
+        self.offset.as_usize::<E>()
     }
 
     /// Cast from one kind of reference to another.
@@ -288,7 +301,7 @@ where
     }
 }
 
-impl<P, const N: usize, O: Size> Ref<[P; N], O>
+impl<P, const N: usize, O: Size, E: ByteOrder> Ref<[P; N], O, E>
 where
     P: ZeroCopy,
 {
@@ -315,7 +328,7 @@ where
     }
 }
 
-impl<P, O: Size> Ref<MaybeUninit<P>, O>
+impl<P, O: Size, E: ByteOrder> Ref<MaybeUninit<P>, O, E>
 where
     P: Pointee<O>,
 {
@@ -324,7 +337,7 @@ where
     /// Unlike the counterpart in Rust, this isn't actually unsafe. Because in
     /// order to load the reference again we'd have to validate it anyways.
     #[inline]
-    pub const fn assume_init(self) -> Ref<P, O> {
+    pub const fn assume_init(self) -> Ref<P, O, E> {
         Ref {
             offset: self.offset,
             metadata: self.metadata,
@@ -333,7 +346,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size> fmt::Debug for Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> fmt::Debug for Ref<P, O, E>
 where
     P: Pointee<O>,
     P::Packed: fmt::Debug,
@@ -351,7 +364,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size> Clone for Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> Clone for Ref<P, O, E>
 where
     P: Pointee<O>,
 {
@@ -361,9 +374,9 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size> Copy for Ref<P, O> where P: Pointee<O> {}
+impl<P: ?Sized, O: Size, E: ByteOrder> Copy for Ref<P, O, E> where P: Pointee<O> {}
 
-impl<P: ?Sized, O: Size> PartialEq for Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> PartialEq for Ref<P, O, E>
 where
     P: Pointee<O>,
     P::Packed: PartialEq,
@@ -375,7 +388,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size> Eq for Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> Eq for Ref<P, O, E>
 where
     P: Pointee<O>,
     P::Packed: Eq,
@@ -383,7 +396,7 @@ where
 {
 }
 
-impl<P: ?Sized, O: Size> PartialOrd for Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> PartialOrd for Ref<P, O, E>
 where
     P: Pointee<O>,
     P::Packed: PartialOrd,
@@ -400,7 +413,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size> Ord for Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> Ord for Ref<P, O, E>
 where
     P: Pointee<O>,
     P::Packed: Ord,
@@ -417,7 +430,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size> Hash for Ref<P, O>
+impl<P: ?Sized, O: Size, E: ByteOrder> Hash for Ref<P, O, E>
 where
     P: Pointee<O>,
     P::Packed: Hash,
