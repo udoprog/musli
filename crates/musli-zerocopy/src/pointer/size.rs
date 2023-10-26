@@ -67,8 +67,7 @@ macro_rules! impl_size {
         /// # Examples
         ///
         /// ```
-        /// use musli_zerocopy::pointer::Size;
-        /// use musli_zerocopy::endian::{BigEndian, LittleEndian};
+        /// use musli_zerocopy::{BigEndian, LittleEndian, Size};
         ///
         #[doc = concat!("let max = ", stringify!($ty), "::MAX.as_usize::<LittleEndian>();")]
         #[doc = concat!("let min = ", stringify!($ty), "::MIN.as_usize::<LittleEndian>();")]

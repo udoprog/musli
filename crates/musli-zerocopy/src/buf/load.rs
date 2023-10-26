@@ -58,7 +58,7 @@ where
     }
 }
 
-impl<O: Size> Load for Ref<str, O> {
+impl<O: Size, E: ByteOrder> Load for Ref<str, O, E> {
     type Target = str;
 
     #[inline]
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<O: Size> LoadMut for Ref<str, O> {
+impl<O: Size, E: ByteOrder> LoadMut for Ref<str, O, E> {
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
         buf.load_unsized_mut(*self)

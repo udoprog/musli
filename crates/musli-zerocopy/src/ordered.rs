@@ -1,8 +1,7 @@
 use core::marker::PhantomData;
 use core::{any, fmt};
 
-use crate::buf::{Padder, Validator};
-use crate::endian::ByteOrder;
+use crate::endian::{BigEndian, ByteOrder, LittleEndian};
 use crate::ZeroCopy;
 
 /// A value capable of enforcing a custom [`ByteOrder`].
@@ -10,26 +9,49 @@ use crate::ZeroCopy;
 /// This can be used to store values in a zero-copy container in a portable
 /// manner, which is especially important to transfer types such as `char` which
 /// have a limited supported bit-pattern.
-///
-/// # Examples
-///
-/// ```
-/// use musli_zerocopy::{Ordered, ZeroCopy};
-/// use musli_zerocopy::endian::{BigEndian, LittleEndian};
-///
-/// let mut a: Ordered<_, BigEndian> = Ordered::new('a' as u32);
-/// let mut b: Ordered<_, LittleEndian> = Ordered::new('a' as u32);
-///
-/// assert_eq!(a.into_value(), 'a' as u32);
-/// assert_eq!(a.to_bytes(), &[0, 0, 0, 97]);
-///
-/// assert_eq!(b.into_value(), 'a' as u32);
-/// assert_eq!(b.to_bytes(), &[97, 0, 0, 0]);
-/// ```
+#[derive(ZeroCopy)]
+#[zero_copy(crate, swap_bytes, bounds = {T: ZeroCopy})]
 #[repr(transparent)]
 pub struct Ordered<T, E: ByteOrder> {
     value: T,
+    #[zero_copy(ignore)]
     _marker: PhantomData<E>,
+}
+
+impl<T: ZeroCopy> Ordered<T, LittleEndian> {
+    /// Construct new value wrapper with [`LittleEndian`] [`ByteOrder`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ordered;
+    ///
+    /// let value = Ordered::le(42u32);
+    /// assert_eq!(value.to_ne(), 42);
+    /// assert_eq!(value.to_raw(), 42u32.to_le());
+    /// ```
+    #[inline]
+    pub fn le(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T: ZeroCopy> Ordered<T, BigEndian> {
+    /// Construct new value wrapper with [`BigEndian`] [`ByteOrder`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ordered;
+    ///
+    /// let value = Ordered::be(42u32);
+    /// assert_eq!(value.to_ne(), 42);
+    /// assert_eq!(value.to_raw(), 42u32.to_be());
+    /// ```
+    #[inline]
+    pub fn be(value: T) -> Self {
+        Self::new(value)
+    }
 }
 
 impl<T: ZeroCopy, E: ByteOrder> Ordered<T, E> {
@@ -41,10 +63,24 @@ impl<T: ZeroCopy, E: ByteOrder> Ordered<T, E> {
     /// byte-ordered.
     ///
     /// ```should_panic
-    /// use musli_zerocopy::Ordered;
-    /// use musli_zerocopy::endian::LittleEndian;
+    /// use musli_zerocopy::{LittleEndian, Ordered};
     ///
     /// let _: Ordered<_, LittleEndian> = Ordered::new('a');
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{BigEndian, LittleEndian, Ordered, ZeroCopy};
+    ///
+    /// let mut a: Ordered<_, BigEndian> = Ordered::new('a' as u32);
+    /// let mut b: Ordered<_, LittleEndian> = Ordered::new('a' as u32);
+    ///
+    /// assert_eq!(a.to_ne(), 'a' as u32);
+    /// assert_eq!(a.to_bytes(), &[0, 0, 0, 97]);
+    ///
+    /// assert_eq!(b.to_ne(), 'a' as u32);
+    /// assert_eq!(b.to_bytes(), &[97, 0, 0, 0]);
     /// ```
     #[inline]
     pub fn new(value: T) -> Self {
@@ -60,37 +96,36 @@ impl<T: ZeroCopy, E: ByteOrder> Ordered<T, E> {
         }
     }
 
-    /// Get interior value with the desired native alignment.
+    /// Get interior value in native [`ByteOrder`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ordered;
+    ///
+    /// let value = Ordered::le(42u32);
+    /// assert_eq!(value.to_ne(), 42);
+    /// assert_eq!(value.to_raw(), 42u32.to_le());
+    /// ```
     #[inline]
-    pub fn into_value(self) -> T {
+    pub fn to_ne(self) -> T {
         T::swap_bytes::<E>(self.value)
     }
-}
 
-unsafe impl<T, E> ZeroCopy for Ordered<T, E>
-where
-    T: ZeroCopy,
-    E: ByteOrder,
-{
-    const ANY_BITS: bool = T::ANY_BITS;
-    const PADDED: bool = T::PADDED;
-    const CAN_SWAP_BYTES: bool = true;
-
+    /// Get the raw inner value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ordered;
+    ///
+    /// let value = Ordered::le(42u32);
+    /// assert_eq!(value.to_ne(), 42);
+    /// assert_eq!(value.to_raw(), 42u32.to_le());
+    /// ```
     #[inline]
-    unsafe fn pad(padder: &mut Padder<'_, Self>) {
-        T::pad(padder.transparent())
-    }
-
-    #[inline]
-    unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), crate::Error> {
-        T::validate(validator.transparent())
-    }
-
-    #[inline]
-    fn swap_bytes<__E: ByteOrder>(self) -> Self {
-        // NB: This is a no-op, since the byte-ordering is recorded at the type
-        // level and doesn't change no matter what ordering is requested.
-        self
+    pub fn to_raw(self) -> T {
+        self.value
     }
 }
 

@@ -51,6 +51,7 @@ where
 impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, O, E>
 where
     P: Pointee<O>,
+    P::Packed: ZeroCopy,
 {
     /// Construct a reference with custom metadata.
     ///
@@ -73,8 +74,14 @@ where
     {
         assert!(
             O::CAN_SWAP_BYTES,
-            "Type `{}` cannot be byte-ordered since it would not inhabit valid types",
+            "Offset `{}` cannot be byte-ordered since it would not inhabit valid types",
             any::type_name::<O>()
+        );
+
+        assert!(
+            P::Packed::CAN_SWAP_BYTES,
+            "Packed metadata `{}` cannot be byte-ordered since it would not inhabit valid types",
+            any::type_name::<P::Metadata>()
         );
 
         let Some(offset) = O::try_from(offset).ok() else {
@@ -87,7 +94,7 @@ where
 
         Self {
             offset: O::swap_bytes::<E>(offset),
-            metadata,
+            metadata: P::Packed::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         }
     }

@@ -102,9 +102,9 @@ where
     /// The caller is responsible for ensuring that the pointer is valid. The
     /// base pointer `ptr` has to point to a region of memory that is
     /// initialized per `P::Metadata` requirements. Practically that means it's
-    /// passed a call to [`validate()`].
+    /// passed a call to [`validate_unsized()`].
     ///
-    /// [`validate()`]: Self::validate
+    /// [`validate_unsized()`]: Self::validate_unsized
     unsafe fn ptr_with_metadata(ptr: *const u8, metadata: P::Metadata) -> *const Self;
 
     /// Construct a wide mutable pointer from a pointer and its associated
@@ -115,9 +115,9 @@ where
     /// The caller is responsible for ensuring that the pointer is valid. The
     /// base pointer `ptr` has to point to a region of memory that is
     /// initialized per `P::Metadata` requirements. Practically that means it's
-    /// passed a call to [`validate()`].
+    /// passed a call to [`validate_unsized()`].
     ///
-    /// [`validate()`]: Self::validate
+    /// [`validate_unsized()`]: Self::validate_unsized
     unsafe fn ptr_with_metadata_mut(ptr: *mut u8, metadata: P::Metadata) -> *mut Self;
 }
 
@@ -549,8 +549,7 @@ pub unsafe trait ZeroCopy: Sized {
     /// composite field that is apart of that type.
     ///
     /// ```
-    /// use musli_zerocopy::{Ref, ZeroCopy};
-    /// use musli_zerocopy::endian::{BigEndian, LittleEndian};
+    /// use musli_zerocopy::{BigEndian, LittleEndian, Ref, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]

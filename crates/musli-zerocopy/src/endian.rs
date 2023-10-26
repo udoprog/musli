@@ -1,6 +1,6 @@
 //! Marker types which define a [`ByteOrder`] to use.
 
-/// Default [`Endianness`].
+/// Default [`ByteOrder`].
 pub type DefaultEndian = NativeEndian;
 
 /// Alias for the native endian [`ByteOrder`].

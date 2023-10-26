@@ -198,7 +198,7 @@ where
     #[inline]
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {
         Ok(Map {
-            key: self.key.into_value(),
+            key: self.key.to_ne(),
             table: self.table.bind(buf)?,
             buf,
         })
@@ -314,7 +314,7 @@ where
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        self.table.len.into_value()
+        self.table.len.to_ne()
     }
 
     /// Test if the map is empty.
@@ -334,7 +334,7 @@ where
     /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.table.len.into_value() == 0
+        self.table.len.to_ne() == 0
     }
 
     /// Test if the map contains the given `key`.
@@ -375,7 +375,7 @@ where
     where
         H: Hash,
     {
-        let mut hasher = SipHasher13::new_with_keys(0, self.key.into_value());
+        let mut hasher = SipHasher13::new_with_keys(0, self.key.to_ne());
         value.hash(&mut hasher);
         hasher.finish()
     }
@@ -500,8 +500,8 @@ where
         Ok(RawTable {
             ctrl: buf.load(self.ctrl)?,
             entries: buf.load(self.entries)?,
-            bucket_mask: self.bucket_mask.into_value(),
-            len: self.len.into_value(),
+            bucket_mask: self.bucket_mask.to_ne(),
+            len: self.len.to_ne(),
         })
     }
 }
@@ -547,7 +547,7 @@ where
         eq: &mut dyn FnMut(usize) -> Result<bool, Error>,
     ) -> Result<Option<usize>, Error> {
         let h2_hash = h2(hash);
-        let mut probe_seq = probe_seq(self.bucket_mask.into_value(), hash);
+        let mut probe_seq = probe_seq(self.bucket_mask.to_ne(), hash);
 
         let ctrl = buf.load(self.ctrl)?;
 
@@ -566,7 +566,7 @@ where
             for bit in group.match_byte(h2_hash) {
                 // This is the same as `(probe_seq.pos + bit) % self.buckets()` because the number
                 // of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
-                let index = (probe_seq.pos + bit) & self.bucket_mask.into_value();
+                let index = (probe_seq.pos + bit) & self.bucket_mask.to_ne();
 
                 if likely(eq(index)?) {
                     return Ok(Some(index));
@@ -577,7 +577,7 @@ where
                 return Ok(None);
             }
 
-            probe_seq.move_next(self.bucket_mask.into_value())?;
+            probe_seq.move_next(self.bucket_mask.to_ne())?;
         }
     }
 }

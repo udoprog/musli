@@ -176,7 +176,7 @@ where
     #[inline]
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {
         Ok(Map {
-            key: self.key.into_value(),
+            key: self.key.to_ne(),
             entries: buf.load(self.entries)?,
             displacements: buf.load(self.displacements)?,
             buf,
@@ -337,7 +337,7 @@ where
             return Ok(None);
         }
 
-        let hashes = crate::phf::hashing::hash(buf, key, &self.key.into_value())?;
+        let hashes = crate::phf::hashing::hash(buf, key, &self.key.to_ne())?;
 
         let displacements = |index| match self.displacements.get(index) {
             Some(entry) => Ok(Some(buf.load(entry)?)),

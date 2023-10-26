@@ -200,8 +200,7 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::endian::LittleEndian;
+    /// use musli_zerocopy::{LittleEndian, OwnedBuf};
     ///
     /// let mut buf = OwnedBuf::with_capacity(1024)
     ///     .with_byte_order::<LittleEndian>();
