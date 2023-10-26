@@ -98,7 +98,7 @@
 //! [^zeroes]: [FromBytes extends
 //!     FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html)
 //!
-//! [^dictionary]: [udoprog/jpv](https://github.com/udoprog/jpv/blob/main/crates/lib/src/database.rs)
+//! [^dictionary]: <https://github.com/udoprog/jpv/blob/main/crates/lib/src/database.rs>
 //!
 //! <br>
 //!
@@ -330,13 +330,13 @@
 //! maximally flexible as an example:
 //!
 //! ```
-//! use musli_zerocopy::{Size, ByteOrder, Ref, Ordered, ZeroCopy};
+//! use musli_zerocopy::{Size, ByteOrder, Ref, Order, ZeroCopy};
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
 //! struct Archive<O, E> where O: Size, E: ByteOrder {
 //!     string: Ref<str, O, E>,
-//!     number: Ordered<u32, E>,
+//!     number: Order<u32, E>,
 //! }
 //! ```
 //!
@@ -346,21 +346,21 @@
 //! during construction:
 //!
 //! ```
-//! use musli_zerocopy::{BigEndian, LittleEndian, Ordered, OwnedBuf};
+//! use musli_zerocopy::{BigEndian, LittleEndian, Order, OwnedBuf};
 //! # use musli_zerocopy::{Size, ByteOrder, Ref, ZeroCopy};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Archive<O, E> where O: Size, E: ByteOrder {
 //! #     string: Ref<str, O, E>,
-//! #     number: Ordered<u32, E>
+//! #     number: Order<u32, E>
 //! # }
 //!
 //! let mut buf = OwnedBuf::new().with_byte_order::<LittleEndian>();
 //!
-//! let first = buf.store(&Ordered::le(42u16));
+//! let first = buf.store(&Order::le(42u16));
 //! let portable = Archive {
 //!     string: buf.store_unsized("Hello World!"),
-//!     number: Ordered::new(10),
+//!     number: Order::new(10),
 //! };
 //! let portable = buf.store(&portable);
 //!
@@ -379,10 +379,10 @@
 //!
 //! let mut buf = OwnedBuf::new().with_byte_order::<BigEndian>();
 //!
-//! let first = buf.store(&Ordered::be(42u16));
+//! let first = buf.store(&Order::be(42u16));
 //! let portable = Archive {
 //!     string: buf.store_unsized("Hello World!"),
-//!     number: Ordered::new(10),
+//!     number: Order::new(10),
 //! };
 //! let portable = buf.store(&portable);
 //!
@@ -555,7 +555,7 @@ pub use self::pointer::{Ref, Size};
 pub mod pointer;
 
 mod ordered;
-pub use self::ordered::Ordered;
+pub use self::ordered::Order;
 
 pub use self::endian::{BigEndian, ByteOrder, LittleEndian};
 pub mod endian;

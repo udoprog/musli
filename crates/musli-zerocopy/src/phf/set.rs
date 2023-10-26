@@ -16,12 +16,12 @@ use core::borrow::Borrow;
 use core::hash::Hash;
 
 use crate::buf::{Bindable, Buf, Visit};
-use crate::endian::{ByteOrder, DefaultEndian};
+use crate::endian::{ByteOrder, NativeEndian};
 use crate::error::Error;
 use crate::phf::hashing::HashKey;
 use crate::phf::Entry;
 use crate::pointer::{DefaultSize, Ref, Size};
-use crate::{Ordered, ZeroCopy};
+use crate::{Order, ZeroCopy};
 
 /// A set bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///
@@ -143,11 +143,11 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct SetRef<T, O: Size = DefaultSize, E: ByteOrder = DefaultEndian>
+pub struct SetRef<T, O: Size = DefaultSize, E: ByteOrder = NativeEndian>
 where
     T: ZeroCopy,
 {
-    key: Ordered<HashKey, E>,
+    key: Order<HashKey, E>,
     entries: Ref<[T], O, E>,
     displacements: Ref<[Entry<u32, u32>], O, E>,
 }
@@ -164,7 +164,7 @@ where
         displacements: Ref<[Entry<u32, u32>], O, E>,
     ) -> Self {
         Self {
-            key: Ordered::new(key),
+            key: Order::new(key),
             entries,
             displacements,
         }

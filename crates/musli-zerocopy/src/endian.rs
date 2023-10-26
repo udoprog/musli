@@ -1,8 +1,5 @@
 //! Marker types which define a [`ByteOrder`] to use.
 
-/// Default [`ByteOrder`].
-pub type DefaultEndian = NativeEndian;
-
 /// Alias for the native endian [`ByteOrder`].
 #[cfg(target_endian = "little")]
 pub type NativeEndian = LittleEndian;

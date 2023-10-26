@@ -825,10 +825,6 @@ impl_float!(f64, E::swap_f64);
 ///
 /// Validating this type is byte-order sensitive, since the bit-pattern it
 /// inhabits needs to align with the bit-patterns it can inhabit.
-///
-/// Using a wrapper such as `Ordered<char, E>` will ensure that the type can be
-/// transparently referenced, since it enforces an ordered load onto the wrapped
-/// type.
 unsafe impl ZeroCopy for char {
     const ANY_BITS: bool = false;
     const PADDED: bool = false;

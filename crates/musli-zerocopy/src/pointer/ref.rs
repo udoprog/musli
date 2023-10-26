@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::mem::size_of;
 use core::{any, fmt};
 
-use crate::endian::{ByteOrder, DefaultEndian};
+use crate::endian::{ByteOrder, NativeEndian};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Size};
 use crate::ZeroCopy;
@@ -38,7 +38,7 @@ use crate::ZeroCopy;
 #[derive(ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate, swap_bytes, bounds = {P::Packed: ZeroCopy})]
-pub struct Ref<P: ?Sized, O: Size = DefaultSize, E: ByteOrder = DefaultEndian>
+pub struct Ref<P: ?Sized, O: Size = DefaultSize, E: ByteOrder = NativeEndian>
 where
     P: Pointee<O>,
 {

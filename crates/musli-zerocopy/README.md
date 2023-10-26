@@ -96,7 +96,7 @@ other popular libraries:
 [^zeroes]: [FromBytes extends
     FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html)
 
-[^dictionary]: [udoprog/jpv](https://github.com/udoprog/jpv/blob/main/crates/lib/src/database.rs)
+[^dictionary]: <https://github.com/udoprog/jpv/blob/main/crates/lib/src/database.rs>
 
 <br>
 
@@ -308,13 +308,13 @@ explicitly specify a desired byte order but doing it like this makes it
 maximally flexible as an example:
 
 ```rust
-use musli_zerocopy::{Size, ByteOrder, Ref, Ordered, ZeroCopy};
+use musli_zerocopy::{Size, ByteOrder, Ref, Order, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
 struct Archive<O, E> where O: Size, E: ByteOrder {
     string: Ref<str, O, E>,
-    number: Ordered<u32, E>,
+    number: Order<u32, E>,
 }
 ```
 
@@ -324,14 +324,14 @@ specify a "sticky" [`ByteOrder`] to use in types which interact with it
 during construction:
 
 ```rust
-use musli_zerocopy::{BigEndian, LittleEndian, Ordered, OwnedBuf};
+use musli_zerocopy::{BigEndian, LittleEndian, Order, OwnedBuf};
 
 let mut buf = OwnedBuf::new().with_byte_order::<LittleEndian>();
 
-let first = buf.store(&Ordered::le(42u16));
+let first = buf.store(&Order::le(42u16));
 let portable = Archive {
     string: buf.store_unsized("Hello World!"),
-    number: Ordered::new(10),
+    number: Order::new(10),
 };
 let portable = buf.store(&portable);
 
@@ -347,10 +347,10 @@ let portable = buf.load(portable)?;
 
 let mut buf = OwnedBuf::new().with_byte_order::<BigEndian>();
 
-let first = buf.store(&Ordered::be(42u16));
+let first = buf.store(&Order::be(42u16));
 let portable = Archive {
     string: buf.store_unsized("Hello World!"),
-    number: Ordered::new(10),
+    number: Order::new(10),
 };
 let portable = buf.store(&portable);
 
