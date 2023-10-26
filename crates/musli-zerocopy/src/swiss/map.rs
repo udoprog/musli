@@ -2,15 +2,15 @@
 //! up by keys.
 //!
 //! This map are implemented using a perfect hash functions, and are inserted
-//! into a buffering using [`phf::store_map`].
+//! into a buffering using [`swiss::store_map`].
 //!
 //! There's two types provided by this module:
 //! * [`Map<K, V>`] which is a *bound* reference to a map, providing a
 //!   convenient map-like access.
 //! * [`MapRef<K, V>`] which is the *pointer* of the map. This is what you store
-//!   in [`ZeroCopy`] types and is what is returned by [`phf::store_map`].
+//!   in [`ZeroCopy`] types and is what is returned by [`swiss::store_map`].
 //!
-//! [`phf::store_map`]: crate::phf::store_map
+//! [`swiss::store_map`]: crate::swiss::store_map
 
 use core::borrow::Borrow;
 use core::convert::identity as likely;
@@ -32,11 +32,11 @@ use crate::{Ordered, ZeroCopy};
 ///
 /// ```
 /// use musli_zerocopy::OwnedBuf;
-/// use musli_zerocopy::phf;
+/// use musli_zerocopy::swiss;
 ///
 /// let mut buf = OwnedBuf::new();
 ///
-/// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
+/// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
 /// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
@@ -65,11 +65,11 @@ where
     ///
     /// ```
     /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::phf;
+    /// use musli_zerocopy::swiss;
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
+    /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -98,17 +98,61 @@ where
         }
     }
 
+    /// Get the length of the map.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::swiss;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
+    /// let buf = buf.into_aligned();
+    /// let map = buf.bind(map)?;
+    ///
+    /// assert_eq!(map.len(), 2);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.table.len
+    }
+
+    /// Test if the map is empty.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::swiss;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
+    /// let buf = buf.into_aligned();
+    /// let map = buf.bind(map)?;
+    ///
+    /// assert!(!map.is_empty());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.table.len == 0
+    }
+
     /// Test if the map contains the given `key`.
     ///
     /// ## Examples
     ///
     /// ```
     /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::phf;
+    /// use musli_zerocopy::swiss;
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
+    /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
     /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
@@ -168,20 +212,20 @@ where
 /// [`bind()`] is used and might result in better performance if the data is
 /// infrequently accessed.
 ///
-/// Constructed through [`phf::store_map`].
+/// Constructed through [`swiss::store_map`].
 ///
-/// [`phf::store_map`]: crate::phf::store_map
+/// [`swiss::store_map`]: crate::swiss::store_map
 /// [`bind()`]: crate::buf::Buf::bind
 ///
 /// ## Examples
 ///
 /// ```
 /// use musli_zerocopy::OwnedBuf;
-/// use musli_zerocopy::phf;
+/// use musli_zerocopy::swiss;
 ///
 /// let mut buf = OwnedBuf::new();
 ///
-/// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
+/// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
 ///
 /// assert_eq!(map.get(&buf, &1)?, Some(&2));
 /// assert_eq!(map.get(&buf, &2)?, Some(&3));
@@ -222,11 +266,11 @@ where
     ///
     /// ```
     /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::phf;
+    /// use musli_zerocopy::swiss;
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
+    /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
     ///
     /// assert_eq!(map.get(&buf, &1)?, Some(&2));
     /// assert_eq!(map.get(&buf, &2)?, Some(&3));
@@ -251,6 +295,46 @@ where
         } else {
             Ok(None)
         }
+    }
+
+    /// Get the length of the map.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::swiss;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
+    ///
+    /// assert_eq!(map.len(), 2);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.table.len.into_value()
+    }
+
+    /// Test if the map is empty.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    /// use musli_zerocopy::swiss;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
+    ///
+    /// assert!(!map.is_empty());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.table.len.into_value() == 0
     }
 
     /// Test if the map contains the given `key`.
@@ -301,6 +385,7 @@ pub(crate) struct RawTable<'a, T> {
     ctrl: &'a [u8],
     entries: &'a [T],
     bucket_mask: usize,
+    len: usize,
 }
 
 impl<'a, T> RawTable<'a, T> {
@@ -387,6 +472,7 @@ where
     ctrl: Ref<[u8], O, E>,
     entries: Ref<[T], O, E>,
     bucket_mask: Ordered<usize, E>,
+    len: Ordered<usize, E>,
 }
 
 impl<T, O: Size, E: ByteOrder> RawTableRef<T, O, E>
@@ -395,11 +481,17 @@ where
 {
     #[cfg(feature = "alloc")]
     #[inline]
-    pub(crate) fn new(ctrl: Ref<[u8], O, E>, entries: Ref<[T], O, E>, bucket_mask: usize) -> Self {
+    pub(crate) fn new(
+        ctrl: Ref<[u8], O, E>,
+        entries: Ref<[T], O, E>,
+        bucket_mask: usize,
+        len: usize,
+    ) -> Self {
         Self {
             ctrl,
             entries,
             bucket_mask: Ordered::new(bucket_mask),
+            len: Ordered::new(len),
         }
     }
 
@@ -409,6 +501,7 @@ where
             ctrl: buf.load(self.ctrl)?,
             entries: buf.load(self.entries)?,
             bucket_mask: self.bucket_mask.into_value(),
+            len: self.len.into_value(),
         })
     }
 }
