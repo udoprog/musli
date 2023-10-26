@@ -166,7 +166,7 @@ where
 }
 
 /// Bind a [`MapRef`] into a [`Map`].
-impl<K, V, O: Size, E: ByteOrder> Bindable for MapRef<K, V, O, E>
+impl<K, V, E: ByteOrder, O: Size> Bindable for MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -217,17 +217,17 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct MapRef<K, V, O: Size = DefaultSize, E: ByteOrder = NativeEndian>
+pub struct MapRef<K, V, E: ByteOrder = NativeEndian, O: Size = DefaultSize>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
     key: Order<HashKey, E>,
-    entries: Ref<[Entry<K, V>], O, E>,
-    displacements: Ref<[Entry<u32, u32>], O, E>,
+    entries: Ref<[Entry<K, V>], E, O>,
+    displacements: Ref<[Entry<u32, u32>], E, O>,
 }
 
-impl<K, V, O: Size, E: ByteOrder> MapRef<K, V, O, E>
+impl<K, V, E: ByteOrder, O: Size> MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -235,8 +235,8 @@ where
     #[cfg(feature = "alloc")]
     pub(crate) fn new(
         key: HashKey,
-        entries: Ref<[Entry<K, V>], O, E>,
-        displacements: Ref<[Entry<u32, u32>], O, E>,
+        entries: Ref<[Entry<K, V>], E, O>,
+        displacements: Ref<[Entry<u32, u32>], E, O>,
     ) -> Self {
         Self {
             key: Order::new(key),
@@ -246,7 +246,7 @@ where
     }
 }
 
-impl<K, V, O: Size, E: ByteOrder> MapRef<K, V, O, E>
+impl<K, V, E: ByteOrder, O: Size> MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -365,7 +365,7 @@ where
     }
 }
 
-impl<K, V, O: Size, E: ByteOrder> Clone for MapRef<K, V, O, E>
+impl<K, V, E: ByteOrder, O: Size> Clone for MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -375,7 +375,7 @@ where
     }
 }
 
-impl<K, V, O: Size, E: ByteOrder> Copy for MapRef<K, V, O, E>
+impl<K, V, E: ByteOrder, O: Size> Copy for MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,

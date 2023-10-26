@@ -1,4 +1,5 @@
 use crate::buf::{Buf, Load};
+use crate::endian::ByteOrder;
 use crate::error::Error;
 use crate::pointer::{Pointee, Ref, Size};
 
@@ -35,13 +36,12 @@ impl<T: ?Sized> Visit for &T {
     }
 }
 
-impl<P: ?Sized, O> Visit for Ref<P, O>
+impl<P: ?Sized, E: ByteOrder, O: Size> Visit for Ref<P, E, O>
 where
     P: Pointee<O>,
-    O: Size,
     Self: Load,
 {
-    type Target = <Ref<P, O> as Load>::Target;
+    type Target = <Ref<P, E, O> as Load>::Target;
 
     #[inline]
     fn visit<V, U>(&self, buf: &Buf, visitor: V) -> Result<U, Error>

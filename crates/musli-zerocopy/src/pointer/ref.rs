@@ -41,7 +41,7 @@ use crate::ZeroCopy;
 #[derive(ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate, swap_bytes, bounds = {P::Packed: ZeroCopy})]
-pub struct Ref<P: ?Sized, O: Size = DefaultSize, E: ByteOrder = NativeEndian>
+pub struct Ref<P: ?Sized, E: ByteOrder = NativeEndian, O: Size = DefaultSize>
 where
     P: Pointee<O>,
 {
@@ -51,7 +51,7 @@ where
     _marker: PhantomData<(E, P)>,
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, E, O>
 where
     P: Pointee<O>,
     P::Packed: ZeroCopy,
@@ -118,7 +118,7 @@ where
     }
 }
 
-impl<P, O: Size, E: ByteOrder> Ref<[P], O, E>
+impl<P, O: Size, E: ByteOrder> Ref<[P], E, O>
 where
     P: ZeroCopy,
 {
@@ -177,7 +177,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn get(&self, index: usize) -> Option<Ref<P, O, E>> {
+    pub fn get(&self, index: usize) -> Option<Ref<P, E, O>> {
         if index >= self.len() {
             return None;
         }
@@ -191,7 +191,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, E, O>
 where
     P: Pointee<O>,
 {
@@ -211,7 +211,7 @@ where
     }
 }
 
-impl<P, O: Size, E: ByteOrder> Ref<P, O, E>
+impl<P, O: Size, E: ByteOrder> Ref<P, E, O>
 where
     P: Pointee<O, Packed = ()>,
 {
@@ -275,7 +275,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, E, O>
 where
     P: Pointee<O>,
 {
@@ -316,7 +316,7 @@ where
     /// let reference: Ref<u32> = Ref::zero();
     /// let reference2: Ref<[u32]> = Ref::with_metadata(reference.offset(), 1);
     /// ```
-    pub fn cast<U: ?Sized>(self) -> Ref<U, O>
+    pub fn cast<U: ?Sized>(self) -> Ref<U, E, O>
     where
         U: Pointee<O, Packed = P::Packed>,
     {
@@ -328,7 +328,7 @@ where
     }
 }
 
-impl<P, const N: usize, O: Size, E: ByteOrder> Ref<[P; N], O, E>
+impl<P, const N: usize, O: Size, E: ByteOrder> Ref<[P; N], E, O>
 where
     P: ZeroCopy,
 {
@@ -350,12 +350,12 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn array_into_slice(self) -> Ref<[P], O> {
+    pub fn array_into_slice(self) -> Ref<[P], E, O> {
         Ref::with_metadata(self.offset, N)
     }
 }
 
-impl<P, O: Size, E: ByteOrder> Ref<MaybeUninit<P>, O, E>
+impl<P, O: Size, E: ByteOrder> Ref<MaybeUninit<P>, E, O>
 where
     P: Pointee<O>,
 {
@@ -364,7 +364,7 @@ where
     /// Unlike the counterpart in Rust, this isn't actually unsafe. Because in
     /// order to load the reference again we'd have to validate it anyways.
     #[inline]
-    pub const fn assume_init(self) -> Ref<P, O, E> {
+    pub const fn assume_init(self) -> Ref<P, E, O> {
         Ref {
             offset: self.offset,
             metadata: self.metadata,
@@ -373,7 +373,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> fmt::Debug for Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> fmt::Debug for Ref<P, E, O>
 where
     P: Pointee<O>,
     P::Packed: fmt::Debug,
@@ -391,7 +391,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Clone for Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> Clone for Ref<P, E, O>
 where
     P: Pointee<O>,
 {
@@ -401,9 +401,9 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Copy for Ref<P, O, E> where P: Pointee<O> {}
+impl<P: ?Sized, O: Size, E: ByteOrder> Copy for Ref<P, E, O> where P: Pointee<O> {}
 
-impl<P: ?Sized, O: Size, E: ByteOrder> PartialEq for Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> PartialEq for Ref<P, E, O>
 where
     P: Pointee<O>,
     P::Packed: PartialEq,
@@ -415,7 +415,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Eq for Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> Eq for Ref<P, E, O>
 where
     P: Pointee<O>,
     P::Packed: Eq,
@@ -423,7 +423,7 @@ where
 {
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> PartialOrd for Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> PartialOrd for Ref<P, E, O>
 where
     P: Pointee<O>,
     P::Packed: PartialOrd,
@@ -440,7 +440,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Ord for Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> Ord for Ref<P, E, O>
 where
     P: Pointee<O>,
     P::Packed: Ord,
@@ -457,7 +457,7 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Hash for Ref<P, O, E>
+impl<P: ?Sized, O: Size, E: ByteOrder> Hash for Ref<P, E, O>
 where
     P: Pointee<O>,
     P::Packed: Hash,

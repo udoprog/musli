@@ -125,7 +125,8 @@ use crate::error::Error;
 use crate::traits::ZeroCopy;
 
 /// The type used to calculate default alignment for [`OwnedBuf`].
-pub type DefaultAlignment = usize;
+#[repr(transparent)]
+pub struct DefaultAlignment(usize);
 
 /// Return the max capacity of this vector. This depends on the requested
 /// alignment.

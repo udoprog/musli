@@ -588,7 +588,7 @@ pub unsafe trait ZeroCopy: Sized {
     /// #[repr(C)]
     /// struct Struct {
     ///     number: u32,
-    ///     reference: Ref<u32, usize, LittleEndian>,
+    ///     reference: Ref<u32, LittleEndian, usize>,
     /// }
     ///
     /// let st = Struct {

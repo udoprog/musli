@@ -188,7 +188,7 @@ where
 }
 
 /// Bind a [`MapRef`] into a [`Map`].
-impl<K, V, O: Size, E: ByteOrder> Bindable for MapRef<K, V, O, E>
+impl<K, V, E: ByteOrder, O: Size> Bindable for MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -238,22 +238,22 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct MapRef<K, V, O: Size = DefaultSize, E: ByteOrder = NativeEndian>
+pub struct MapRef<K, V, E: ByteOrder = NativeEndian, O: Size = DefaultSize>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
     key: Order<u64, E>,
-    table: RawTableRef<Entry<K, V>, O, E>,
+    table: RawTableRef<Entry<K, V>, E, O>,
 }
 
-impl<K, V, O: Size, E: ByteOrder> MapRef<K, V, O, E>
+impl<K, V, E: ByteOrder, O: Size> MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
     #[cfg(feature = "alloc")]
-    pub(crate) fn new(key: u64, table: RawTableRef<Entry<K, V>, O, E>) -> Self {
+    pub(crate) fn new(key: u64, table: RawTableRef<Entry<K, V>, E, O>) -> Self {
         Self {
             key: Order::new(key),
             table,
@@ -465,25 +465,25 @@ impl<'a, T> RawTable<'a, T> {
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub(crate) struct RawTableRef<T, O: Size = DefaultSize, E: ByteOrder = NativeEndian>
+pub(crate) struct RawTableRef<T, E: ByteOrder = NativeEndian, O: Size = DefaultSize>
 where
     T: ZeroCopy,
 {
-    ctrl: Ref<[u8], O, E>,
-    entries: Ref<[T], O, E>,
+    ctrl: Ref<[u8], E, O>,
+    entries: Ref<[T], E, O>,
     bucket_mask: Order<usize, E>,
     len: Order<usize, E>,
 }
 
-impl<T, O: Size, E: ByteOrder> RawTableRef<T, O, E>
+impl<T, E: ByteOrder, O: Size> RawTableRef<T, E, O>
 where
     T: ZeroCopy,
 {
     #[cfg(feature = "alloc")]
     #[inline]
     pub(crate) fn new(
-        ctrl: Ref<[u8], O, E>,
-        entries: Ref<[T], O, E>,
+        ctrl: Ref<[u8], E, O>,
+        entries: Ref<[T], E, O>,
         bucket_mask: usize,
         len: usize,
     ) -> Self {
@@ -506,7 +506,7 @@ where
     }
 }
 
-impl<T, O: Size, E: ByteOrder> RawTableRef<T, O, E>
+impl<T, E: ByteOrder, O: Size> RawTableRef<T, E, O>
 where
     T: ZeroCopy,
 {

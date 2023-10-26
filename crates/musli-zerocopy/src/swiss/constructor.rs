@@ -16,8 +16,8 @@ use crate::swiss::raw::{h2, is_full, probe_seq, special_is_empty, Group, ProbeSe
 use crate::traits::ZeroCopy;
 
 /// Construction of a raw swiss table.
-pub struct Constructor<'a, T, O: Size, E: ByteOrder> {
-    buf: &'a mut OwnedBuf<O, E>,
+pub struct Constructor<'a, T, E: ByteOrder, O: Size> {
+    buf: &'a mut OwnedBuf<E, O>,
 
     // Mask to get an index from a hash value. The value is one less than the
     // number of buckets in the table.
@@ -38,7 +38,7 @@ pub struct Constructor<'a, T, O: Size, E: ByteOrder> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T, O: Size, E: ByteOrder> Constructor<'a, T, O, E> {
+impl<'a, T, E: ByteOrder, O: Size> Constructor<'a, T, E, O> {
     /// Wrap the given buffer for table construction.
     ///
     /// # Safety
@@ -54,7 +54,7 @@ impl<'a, T, O: Size, E: ByteOrder> Constructor<'a, T, O, E> {
     ///
     /// [`EMPTY`]: crate::swiss::raw::EMPTY
     pub(crate) fn with_buf(
-        buf: &'a mut OwnedBuf<O, E>,
+        buf: &'a mut OwnedBuf<E, O>,
         ctrl_ptr: usize,
         base_ptr: usize,
         buckets: usize,

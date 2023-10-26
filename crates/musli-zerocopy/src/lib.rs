@@ -322,7 +322,7 @@
 //!
 //! This is done by specifying the byte order in use during buffer construction
 //! and expliclty setting the `E` parameter in types which received it such as
-//! [`Ref<T, O, E>`].
+//! [`Ref<T, E, O>`].
 //!
 //! We can start of by defining a fully `Portable` archive structure, which
 //! received both size and [`ByteOrder`]. Note that it could also just
@@ -334,8 +334,8 @@
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
-//! struct Archive<O, E> where O: Size, E: ByteOrder {
-//!     string: Ref<str, O, E>,
+//! struct Archive<E, O> where E: ByteOrder, O: Size {
+//!     string: Ref<str, E, O>,
 //!     number: Order<u32, E>,
 //! }
 //! ```
@@ -350,8 +350,8 @@
 //! # use musli_zerocopy::{Size, ByteOrder, Ref, ZeroCopy};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
-//! # struct Archive<O, E> where O: Size, E: ByteOrder {
-//! #     string: Ref<str, O, E>,
+//! # struct Archive<E, O> where E: ByteOrder, O: Size {
+//! #     string: Ref<str, E, O>,
 //! #     number: Order<u32, E>
 //! # }
 //!
@@ -450,14 +450,14 @@
 //! * `usize` for target-dependently sized pointers.
 //!
 //! ```
-//! # use musli_zerocopy::{Ref, ZeroCopy};
+//! # use musli_zerocopy::{Ref, NativeEndian, ZeroCopy};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom;
 //! // These no longer panic:
-//! let reference = Ref::<Custom, usize>::new(1usize << 32);
-//! let slice = Ref::<[Custom], usize>::with_metadata(0, 1usize << 32);
-//! let unsize = Ref::<str, usize>::with_metadata(0, 1usize << 32);
+//! let reference = Ref::<Custom, NativeEndian, usize>::new(1usize << 32);
+//! let slice = Ref::<[Custom], NativeEndian, usize>::with_metadata(0, 1usize << 32);
+//! let unsize = Ref::<str, NativeEndian, usize>::with_metadata(0, 1usize << 32);
 //! ```
 //!
 //! To initialize an [`OwnedBuf`] with a custom [`Size`], you can use
@@ -475,12 +475,16 @@
 //! then carry into any pointers it return:
 //!
 //! ```
-//! use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
+//! use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy, NativeEndian};
 //! use musli_zerocopy::buf::DefaultAlignment;
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
-//! struct Custom { reference: Ref<u32, usize>, slice: Ref::<[u32], usize>, unsize: Ref::<str, usize> }
+//! struct Custom {
+//!     reference: Ref<u32, NativeEndian, usize>,
+//!     slice: Ref::<[u32], NativeEndian, usize>,
+//!     unsize: Ref::<str, NativeEndian, usize>,
+//! }
 //!
 //! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
 //!     .with_size::<usize>();
@@ -505,7 +509,7 @@
 //! [`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
 //! [`Ref`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 //! [`Ref<str>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
-//! [`Ref<T, O, E>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+//! [`Ref<T, E, O>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 //! [`requested()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
 //! [`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 //! [`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
@@ -525,11 +529,11 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[doc(inline)]
-pub use self::buf::Buf;
 #[cfg(feature = "alloc")]
 #[doc(inline)]
 pub use self::buf::OwnedBuf;
+#[doc(inline)]
+pub use self::buf::{Buf, DefaultAlignment};
 pub mod buf;
 
 pub mod mem;

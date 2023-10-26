@@ -32,7 +32,7 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// let mut buf = OwnedBuf::new();
 /// buf.store(&Custom { field: 10 });
 /// ```
-pub struct OwnedBuf<O: Size = DefaultSize, E: ByteOrder = NativeEndian> {
+pub struct OwnedBuf<E: ByteOrder = NativeEndian, O: Size = DefaultSize> {
     data: NonNull<u8>,
     /// The initialized length of the buffer.
     len: usize,
@@ -43,7 +43,7 @@ pub struct OwnedBuf<O: Size = DefaultSize, E: ByteOrder = NativeEndian> {
     /// The current alignment.
     align: usize,
     /// Holding onto the current pointer size.
-    _marker: PhantomData<(O, E)>,
+    _marker: PhantomData<(E, O)>,
 }
 
 impl OwnedBuf {
@@ -81,11 +81,10 @@ impl OwnedBuf {
     /// ```should_panic
     /// use std::mem::align_of;
     ///
-    /// use musli_zerocopy::OwnedBuf;
-    /// use musli_zerocopy::buf::DefaultAlignment;
+    /// use musli_zerocopy::{NativeEndian, DefaultAlignment, OwnedBuf};
     ///
     /// let max = isize::MAX as usize - (align_of::<DefaultAlignment>() - 1);
-    /// OwnedBuf::<u32>::with_capacity(max);
+    /// OwnedBuf::<NativeEndian, u32>::with_capacity(max);
     /// ```
     ///
     /// # Examples
@@ -112,10 +111,7 @@ impl OwnedBuf {
     /// assert!(buf.alignment() >= 8);
     /// assert_eq!(buf.requested(), 8);
     /// ```
-    pub const fn with_alignment<T>() -> Self
-    where
-        T: ZeroCopy,
-    {
+    pub const fn with_alignment<T>() -> Self {
         let align = align_of::<T>();
 
         Self {
@@ -159,16 +155,13 @@ impl OwnedBuf {
     /// assert!(buf.capacity() >= 6);
     /// assert!(buf.alignment() >= 2);
     /// ```
-    pub fn with_capacity_and_alignment<T>(capacity: usize) -> Self
-    where
-        T: ZeroCopy,
-    {
+    pub fn with_capacity_and_alignment<T>(capacity: usize) -> Self {
         // SAFETY: Alignment of `T` is always a power of two.
         unsafe { Self::with_capacity_and_custom_alignment(capacity, align_of::<T>()) }
     }
 }
 
-impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
+impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     /// Modify the buffer to utilize the specified pointer size when inserting
     /// references.
     ///
@@ -181,7 +174,7 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     ///     .with_size::<u8>();
     /// ```
     #[inline]
-    pub fn with_size<T: Size>(self) -> OwnedBuf<T, E> {
+    pub fn with_size<U: Size>(self) -> OwnedBuf<E, U> {
         let this = ManuallyDrop::new(self);
 
         OwnedBuf {
@@ -206,7 +199,7 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     ///     .with_byte_order::<LittleEndian>();
     /// ```
     #[inline]
-    pub fn with_byte_order<T: ByteOrder>(self) -> OwnedBuf<O, T> {
+    pub fn with_byte_order<U: ByteOrder>(self) -> OwnedBuf<U, O> {
         let this = ManuallyDrop::new(self);
 
         OwnedBuf {
@@ -459,7 +452,7 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_uninit<T>(&mut self) -> Ref<MaybeUninit<T>, O, E>
+    pub fn store_uninit<T>(&mut self) -> Ref<MaybeUninit<T>, E, O>
     where
         T: ZeroCopy,
     {
@@ -531,9 +524,9 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn load_uninit_mut<T, U: ByteOrder>(
+    pub fn load_uninit_mut<T, U: ByteOrder, I: Size>(
         &mut self,
-        reference: Ref<MaybeUninit<T>, O, U>,
+        reference: Ref<MaybeUninit<T>, U, I>,
     ) -> &mut MaybeUninit<T>
     where
         T: ZeroCopy,
@@ -614,7 +607,7 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store<P>(&mut self, value: &P) -> Ref<P, O, E>
+    pub fn store<P>(&mut self, value: &P) -> Ref<P, E, O>
     where
         P: ZeroCopy,
     {
@@ -679,7 +672,7 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn store_unchecked<P>(&mut self, value: &P) -> Ref<P, O, E>
+    pub unsafe fn store_unchecked<P>(&mut self, value: &P) -> Ref<P, E, O>
     where
         P: ZeroCopy,
     {
@@ -709,7 +702,7 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, O, E>
+    pub fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, E, O>
     where
         P: Pointee<O, Packed = O, Metadata = usize>,
         P: UnsizedZeroCopy<P, O>,
@@ -762,7 +755,7 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline(always)]
-    pub fn store_slice<T>(&mut self, values: &[T]) -> Ref<[T], O, E>
+    pub fn store_slice<T>(&mut self, values: &[T]) -> Ref<[T], E, O>
     where
         [T]: Pointee<O, Packed = O, Metadata = usize>,
         T: ZeroCopy,
@@ -962,8 +955,8 @@ impl<O: Size, E: ByteOrder> OwnedBuf<O, E> {
     /// if a reallocation is triggered due to reaching its [`capacity()`].
     ///
     /// ```
-    /// use musli_zerocopy::OwnedBuf;
-    /// let mut buf = OwnedBuf::<u32>::with_capacity_and_alignment::<u16>(32);
+    /// use musli_zerocopy::{NativeEndian, OwnedBuf};
+    /// let mut buf = OwnedBuf::<NativeEndian, u32>::with_capacity_and_alignment::<u16>(32);
     ///
     /// buf.extend_from_slice(&[1, 2]);
     /// assert!(buf.alignment() >= 2);
@@ -1160,7 +1153,7 @@ unsafe impl Send for OwnedBuf {}
 /// unaliased.
 unsafe impl Sync for OwnedBuf {}
 
-impl<O: Size, E: ByteOrder> Deref for OwnedBuf<O, E> {
+impl<E: ByteOrder, O: Size> Deref for OwnedBuf<E, O> {
     type Target = Buf;
 
     #[inline]
@@ -1169,14 +1162,14 @@ impl<O: Size, E: ByteOrder> Deref for OwnedBuf<O, E> {
     }
 }
 
-impl<O: Size, E: ByteOrder> DerefMut for OwnedBuf<O, E> {
+impl<E: ByteOrder, O: Size> DerefMut for OwnedBuf<E, O> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         Buf::new_mut(self.as_mut_slice())
     }
 }
 
-impl<O: Size, E: ByteOrder> AsRef<Buf> for OwnedBuf<O, E> {
+impl<E: ByteOrder, O: Size> AsRef<Buf> for OwnedBuf<E, O> {
     /// Trivial `AsRef<Buf>` implementation for `OwnedBuf<O>`.
     ///
     /// # Examples
@@ -1197,7 +1190,7 @@ impl<O: Size, E: ByteOrder> AsRef<Buf> for OwnedBuf<O, E> {
     }
 }
 
-impl<O: Size, E: ByteOrder> AsMut<Buf> for OwnedBuf<O, E> {
+impl<E: ByteOrder, O: Size> AsMut<Buf> for OwnedBuf<E, O> {
     /// Trivial `AsMut<Buf>` implementation for `OwnedBuf<O>`.
     ///
     /// # Examples
@@ -1239,11 +1232,12 @@ impl Borrow<Buf> for OwnedBuf {
 ///
 /// ```
 /// use std::mem::align_of;
-/// use musli_zerocopy::OwnedBuf;
+///
+/// use musli_zerocopy::{NativeEndian, OwnedBuf};
 ///
 /// assert_ne!(align_of::<u16>(), align_of::<u32>());
 ///
-/// let mut buf = OwnedBuf::<u32>::with_capacity_and_alignment::<u16>(32);
+/// let mut buf = OwnedBuf::<NativeEndian, u32>::with_capacity_and_alignment::<u16>(32);
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 /// buf.request_align::<u32>();
 ///
@@ -1253,7 +1247,7 @@ impl Borrow<Buf> for OwnedBuf {
 /// let buf3 = buf.into_aligned();
 /// assert!(buf3.alignment() >= align_of::<u32>());
 /// ```
-impl<O: Size, E: ByteOrder> Clone for OwnedBuf<O, E> {
+impl<E: ByteOrder, O: Size> Clone for OwnedBuf<E, O> {
     fn clone(&self) -> Self {
         unsafe {
             let mut new = ManuallyDrop::new(Self::with_capacity_and_custom_alignment(
@@ -1269,7 +1263,7 @@ impl<O: Size, E: ByteOrder> Clone for OwnedBuf<O, E> {
     }
 }
 
-impl<O: Size, E: ByteOrder> Drop for OwnedBuf<O, E> {
+impl<E: ByteOrder, O: Size> Drop for OwnedBuf<E, O> {
     fn drop(&mut self) {
         unsafe {
             if self.capacity != 0 {

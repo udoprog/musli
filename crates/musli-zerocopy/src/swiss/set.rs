@@ -98,7 +98,7 @@ where
 }
 
 /// Bind a [`SetRef`] into a [`Set`].
-impl<T, O: Size, E: ByteOrder> Bindable for SetRef<T, O, E>
+impl<T, E: ByteOrder, O: Size> Bindable for SetRef<T, E, O>
 where
     T: ZeroCopy,
 {
@@ -143,20 +143,20 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct SetRef<T, O: Size = DefaultSize, E: ByteOrder = NativeEndian>
+pub struct SetRef<T, E: ByteOrder = NativeEndian, O: Size = DefaultSize>
 where
     T: ZeroCopy,
 {
     key: u64,
-    table: RawTableRef<T, O, E>,
+    table: RawTableRef<T, E, O>,
 }
 
-impl<T, O: Size, E: ByteOrder> SetRef<T, O, E>
+impl<T, E: ByteOrder, O: Size> SetRef<T, E, O>
 where
     T: ZeroCopy,
 {
     #[cfg(feature = "alloc")]
-    pub(crate) fn new(key: u64, table: RawTableRef<T, O, E>) -> Self {
+    pub(crate) fn new(key: u64, table: RawTableRef<T, E, O>) -> Self {
         Self { key, table }
     }
 

@@ -108,10 +108,10 @@ const FIXED_SEED: u64 = 1234567890;
 /// assert_eq!(map.get(&())?, Some(&()));
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_map<K, V, I, O: Size, E: ByteOrder>(
-    buf: &mut OwnedBuf<O, E>,
+pub fn store_map<K, V, I, E: ByteOrder, O: Size>(
+    buf: &mut OwnedBuf<E, O>,
     entries: I,
-) -> Result<MapRef<K, V, O, E>, Error>
+) -> Result<MapRef<K, V, E, O>, Error>
 where
     K: Visit + ZeroCopy,
     V: ZeroCopy,
@@ -208,10 +208,10 @@ where
 /// assert!(set.contains(&())?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_set<T, I, O: Size, E: ByteOrder>(
-    buf: &mut OwnedBuf<O, E>,
+pub fn store_set<T, I, E: ByteOrder, O: Size>(
+    buf: &mut OwnedBuf<E, O>,
     entries: I,
-) -> Result<SetRef<T, O, E>, Error>
+) -> Result<SetRef<T, E, O>, Error>
 where
     T: Visit + ZeroCopy,
     T::Target: Hash,
@@ -230,15 +230,15 @@ where
 }
 
 // Output from storing raw values.
-type Raw<U, O, E> = (u64, Ref<[u8], O, E>, Ref<[U], O, E>, usize, usize);
+type Raw<U, E, O> = (u64, Ref<[u8], E, O>, Ref<[U], E, O>, usize, usize);
 
 // Raw store function which is capable of storing any value using a hashing
 // adapter.
-fn store_raw<T, U, I, O: Size, E: ByteOrder>(
+fn store_raw<T, U, I, E: ByteOrder, O: Size>(
     entries: I,
-    buf: &mut OwnedBuf<O, E>,
+    buf: &mut OwnedBuf<E, O>,
     hash: fn(&Buf, T, &mut SipHasher13) -> Result<U, Error>,
-) -> Result<Raw<U, O, E>, Error>
+) -> Result<Raw<U, E, O>, Error>
 where
     U: ZeroCopy,
     I: IntoIterator<Item = T>,

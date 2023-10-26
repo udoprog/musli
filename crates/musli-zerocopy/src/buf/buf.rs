@@ -709,7 +709,7 @@ impl Buf {
     #[inline]
     pub(crate) fn load_unsized<P: ?Sized, O: Size, E: ByteOrder>(
         &self,
-        unsize: Ref<P, O, E>,
+        unsize: Ref<P, E, O>,
     ) -> Result<&P, Error>
     where
         P: Pointee<O, Packed = O> + UnsizedZeroCopy<P, O>,
@@ -730,7 +730,7 @@ impl Buf {
     #[inline]
     pub(crate) fn load_unsized_mut<P: ?Sized, O: Size, E: ByteOrder>(
         &mut self,
-        unsize: Ref<P, O, E>,
+        unsize: Ref<P, E, O>,
     ) -> Result<&mut P, Error>
     where
         P: Pointee<O, Packed = O> + UnsizedZeroCopy<P, O>,
