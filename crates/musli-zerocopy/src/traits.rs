@@ -27,7 +27,6 @@ use crate::buf::{Buf, Padder, Validator, Visit};
 use crate::endian::ByteOrder;
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Pointee, Size};
-use crate::Ref;
 
 mod sealed {
     use crate::ZeroCopy;
@@ -524,15 +523,18 @@ pub unsafe trait ZeroCopy: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::ZeroCopy;
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
-    /// let mut bytes: [u8; 4] = 1u32.to_ne_bytes();
-    /// assert_eq!(*u32::from_bytes(&mut bytes)?, 1);
+    /// let mut buf = OwnedBuf::new();
+    /// buf.extend_from_slice(&1u32.to_ne_bytes());
+    ///
+    /// let bytes: &[u8] = &buf[..];
+    /// assert_eq!(*u32::from_bytes(&bytes)?, 1);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<&Self, Error> {
-        Buf::new(bytes).load(Ref::<Self>::zero())
+        Buf::new(bytes).load_at::<Self>(0)
     }
 
     /// Load bytes into a mutable reference of `Self`.
@@ -550,17 +552,19 @@ pub unsafe trait ZeroCopy: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::ZeroCopy;
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
-    /// let mut bytes = [0, 0, 0, 0];
-    /// *u32::from_bytes_mut(&mut bytes)? += 1;
-    /// let expected: [u8; 4] = 1u32.to_ne_bytes();
-    /// assert_eq!(bytes, expected);
+    /// let mut buf = OwnedBuf::new();
+    /// buf.extend_from_slice(&1u32.to_ne_bytes());
+    ///
+    /// *u32::from_bytes_mut(&mut buf[..])? += 10;
+    ///
+    /// assert_eq!(*u32::from_bytes(&buf[..])?, 11);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
-        Buf::new_mut(bytes).load_mut(Ref::<Self>::zero())
+        Buf::new_mut(bytes).load_at_mut::<Self>(0)
     }
 
     /// Swap the bytes of `self` using the specified byte ordering to match the

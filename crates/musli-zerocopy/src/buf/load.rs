@@ -41,7 +41,7 @@ where
 
     #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        buf.load_sized(*self)
+        buf.load_sized::<P>(self.offset())
     }
 }
 
@@ -73,7 +73,7 @@ where
 {
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
-        buf.load_sized_mut(*self)
+        buf.load_sized_mut::<P>(self.offset())
     }
 }
 

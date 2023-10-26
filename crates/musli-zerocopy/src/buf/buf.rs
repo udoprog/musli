@@ -2,6 +2,7 @@ use core::alloc::Layout;
 use core::fmt;
 use core::mem::{align_of, size_of};
 use core::ops::{Index, IndexMut, Range};
+use core::ptr::read_unaligned;
 use core::slice::SliceIndex;
 
 #[cfg(feature = "alloc")]
@@ -328,6 +329,96 @@ impl Buf {
         T: Load,
     {
         ptr.load(self)
+    }
+
+    /// Load a value of type `T` at the given `offset`.
+    ///
+    /// # Errors
+    ///
+    /// This will error if the current buffer is not aligned for the type `T`,
+    /// or for other reasons specific to what needs to be done to validate a
+    /// `&T` reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// buf.store(&1u32);
+    /// buf.store(&2u32);
+    ///
+    /// let buf = buf.as_ref();
+    ///
+    /// assert_eq!(buf.load_at::<u32>(0)?, &1u32);
+    /// assert_eq!(buf.load_at::<u32>(4)?, &2u32);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn load_at<T>(&self, offset: usize) -> Result<&T, Error>
+    where
+        T: ZeroCopy,
+    {
+        self.load_sized::<T>(offset)
+    }
+
+    /// Load a value of type `T` mutably at the given `offset`.
+    ///
+    /// # Errors
+    ///
+    /// This will error if the current buffer is not aligned for the type `T`,
+    /// or for other reasons specific to what needs to be done to validate a
+    /// `&T` reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// buf.store(&1u32);
+    /// buf.store(&2u32);
+    ///
+    /// *buf.load_at_mut::<u32>(0)? += 10;
+    ///
+    /// assert_eq!(buf.load_at::<u32>(0)?, &11u32);
+    /// assert_eq!(buf.load_at::<u32>(4)?, &2u32);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn load_at_mut<T>(&mut self, offset: usize) -> Result<&mut T, Error>
+    where
+        T: ZeroCopy,
+    {
+        self.load_sized_mut::<T>(offset)
+    }
+
+    /// Load an unaligned value of type `T` at the given `offset`.
+    ///
+    /// # Errors
+    ///
+    /// This will error if the memory at `offset` is not valid for the type `T`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// buf.store(&42u8);
+    /// buf.store(&[1u8, 0, 0, 0]);
+    /// buf.store(&[2u8, 0, 0, 0]);
+    ///
+    /// assert_eq!(buf.load_at_unaligned::<u32>(1)?, 1u32.to_le());
+    /// assert_eq!(buf.load_at_unaligned::<u32>(5)?, 2u32.to_le());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn load_at_unaligned<T>(&self, offset: usize) -> Result<T, Error>
+    where
+        T: ZeroCopy,
+    {
+        self.load_sized_unaligned::<T>(offset)
     }
 
     /// Load the given value as a mutable reference.
@@ -658,25 +749,21 @@ impl Buf {
 
     /// Load the given sized value as a reference.
     #[inline]
-    pub(crate) fn load_sized<P, O: Size, E: ByteOrder>(
-        &self,
-        ptr: Ref<P, O, E>,
-    ) -> Result<&P, Error>
+    pub(crate) fn load_sized<T>(&self, offset: usize) -> Result<&T, Error>
     where
-        P: ZeroCopy,
+        T: ZeroCopy,
     {
-        let start = ptr.offset();
-        let end = start.wrapping_add(size_of::<P>());
+        let end = offset.wrapping_add(size_of::<T>());
 
         unsafe {
             // SAFETY: align_of::<T>() is always a power of two.
-            let buf = self.inner_get(start, end, align_of::<P>())?;
+            let buf = self.inner_get(offset, end, align_of::<T>())?;
 
-            if !P::ANY_BITS {
+            if !T::ANY_BITS {
                 // SAFETY: We've checked the size and alignment of the buffer above.
                 // The remaining safety requirements depend on the implementation of
                 // validate.
-                P::validate(&mut Validator::new(buf.as_ptr()))?;
+                T::validate(&mut Validator::new(buf.as_ptr()))?;
             }
 
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
@@ -687,30 +774,51 @@ impl Buf {
 
     /// Load the given sized value as a mutable reference.
     #[inline]
-    pub(crate) fn load_sized_mut<P, O: Size, E: ByteOrder>(
-        &mut self,
-        ptr: Ref<P, O, E>,
-    ) -> Result<&mut P, Error>
+    pub(crate) fn load_sized_mut<T>(&mut self, offset: usize) -> Result<&mut T, Error>
     where
-        P: ZeroCopy,
+        T: ZeroCopy,
     {
-        let start = ptr.offset();
-        let end = start.wrapping_add(size_of::<P>());
+        let end = offset.wrapping_add(size_of::<T>());
 
         unsafe {
             // SAFETY: align_of::<T>() is always a power of two.
-            let buf = self.inner_get_mut(start, end, align_of::<P>())?;
+            let buf = self.inner_get_mut(offset, end, align_of::<T>())?;
 
-            if !P::ANY_BITS {
+            if !T::ANY_BITS {
                 // SAFETY: We've checked the size and alignment of the buffer above.
                 // The remaining safety requirements depend on the implementation of
                 // validate.
-                P::validate(&mut Validator::new(buf.as_ptr()))?;
+                T::validate(&mut Validator::new(buf.as_ptr()))?;
             }
 
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
             // type being coerced into can really inhabit any bit pattern.
             Ok(buf.cast_mut())
+        }
+    }
+
+    /// Load the given sized value as a reference.
+    #[inline]
+    pub(crate) fn load_sized_unaligned<T>(&self, start: usize) -> Result<T, Error>
+    where
+        T: ZeroCopy,
+    {
+        let end = start.wrapping_add(size_of::<T>());
+
+        unsafe {
+            // SAFETY: align_of::<T>() is always a power of two.
+            let buf = self.inner_get_unaligned(start, end)?;
+
+            if !T::ANY_BITS {
+                // SAFETY: We've checked the size and alignment of the buffer above.
+                // The remaining safety requirements depend on the implementation of
+                // validate.
+                T::validate(&mut Validator::new(buf.as_ptr()))?;
+            }
+
+            // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
+            // type being coerced into can really inhabit any bit pattern.
+            Ok(read_unaligned(buf.as_ptr().cast()))
         }
     }
 

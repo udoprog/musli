@@ -551,7 +551,7 @@ pub mod phf;
 pub mod swiss;
 
 #[doc(inline)]
-pub use self::pointer::{Ref, Size};
+pub use self::pointer::{DefaultSize, Ref, Size};
 pub mod pointer;
 
 #[doc(inline)]
