@@ -59,6 +59,14 @@ This is because:
   accessing. So for random access we only need to validate the parts that
   are being accessed.
 
+Overview:
+* [Why should I consider `musli-zerocopy` over X?](#why-should-i-consider-musli-zerocopy-over-x)
+* [Guide](#guide)
+* [Reading data](#reading-data)
+* [Writing data at offset zero](#writing-data-at-offset-zero)
+* [Portability](#portability)
+* [Limits](#limits)
+
 <br>
 
 ## Why should I consider `musli-zerocopy` over X?
@@ -284,6 +292,81 @@ assert_eq!(reference.offset(), 0);
 
 <br>
 
+## Portability
+
+By default archives will use the native [`ByteOrder`]. In order to construct
+and load a portable archive, the byte order in use has to be explicitly
+specified.
+
+This is done by specifying the byte order in use during buffer construction
+and expliclty setting the `E` parameter in types which received it such as
+[`Ref<T, O, E>`].
+
+We can start of by defining a fully `Portable` archive structure, which
+received both size and [`ByteOrder`]. Note that it could also just
+explicitly specify a desired byte order but doing it like this makes it
+maximally flexible as an example:
+
+```rust
+use musli_zerocopy::{Size, ByteOrder, Ref, Ordered, ZeroCopy};
+
+#[derive(ZeroCopy)]
+#[repr(C)]
+struct Archive<O, E> where O: Size, E: ByteOrder {
+    string: Ref<str, O, E>,
+    number: Ordered<u32, E>,
+}
+```
+
+Building a buffer out of the structure is fairly straight forward,
+[`OwnedBuf`] has the [`with_byte_order::<E>()`] method which allows us to
+specify a "sticky" [`ByteOrder`] to use in types which interact with it
+during construction:
+
+```rust
+use musli_zerocopy::{BigEndian, LittleEndian, Ordered, OwnedBuf};
+
+let mut buf = OwnedBuf::new().with_byte_order::<LittleEndian>();
+
+let first = buf.store(&Ordered::le(42u16));
+let portable = Archive {
+    string: buf.store_unsized("Hello World!"),
+    number: Ordered::new(10),
+};
+let portable = buf.store(&portable);
+
+assert_eq!(&buf[..], &[
+    42, 0, // 42u16
+    72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33, // "Hello World!"
+    0, 0, // padding
+    2, 0, 0, 0, 12, 0, 0, 0, // Ref<str>
+    10, 0, 0, 0 // 10u32
+]);
+
+let portable = buf.load(portable)?;
+
+let mut buf = OwnedBuf::new().with_byte_order::<BigEndian>();
+
+let first = buf.store(&Ordered::be(42u16));
+let portable = Archive {
+    string: buf.store_unsized("Hello World!"),
+    number: Ordered::new(10),
+};
+let portable = buf.store(&portable);
+
+assert_eq!(&buf[..], &[
+    0, 42, // 42u16
+    72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33, // "Hello World!"
+    0, 0, // padding
+    0, 0, 0, 2, 0, 0, 0, 12, // Ref<str>
+    0, 0, 0, 10 // 10u32
+]);
+
+let portable = buf.load(portable)?;
+```
+
+<br>
+
 ## Limits
 
 Offset, the size of unsized values, and slice lengths are all limited to
@@ -328,14 +411,15 @@ let slice = Ref::<[Custom], usize>::with_metadata(0, 1usize << 32);
 let unsize = Ref::<str, usize>::with_metadata(0, 1usize << 32);
 ```
 
-To initialize an [`OwnedBuf`] with a custom [`Size`] you use this
-constructor with a custom parameter and :
+To initialize an [`OwnedBuf`] with a custom [`Size`], you can use
+[`OwnedBuf::with_size`]:
 
 ```rust
 use musli_zerocopy::OwnedBuf;
 use musli_zerocopy::buf::DefaultAlignment;
 
-let mut buf = OwnedBuf::<usize>::with_capacity_and_alignment::<DefaultAlignment>(0);
+let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
+    .with_size::<usize>();
 ```
 
 The [`Size`] you've specified during construction of an [`OwnedBuf`] will
@@ -349,7 +433,8 @@ use musli_zerocopy::buf::DefaultAlignment;
 #[repr(C)]
 struct Custom { reference: Ref<u32, usize>, slice: Ref::<[u32], usize>, unsize: Ref::<str, usize> }
 
-let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0);
+let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
+    .with_size::<usize>();
 
 let reference = buf.store(&42u32);
 let slice = buf.store_slice(&[1, 2, 3, 4]);
@@ -358,16 +443,22 @@ let unsize = buf.store_unsized("Hello World");
 buf.store(&Custom { reference, slice, unsize });
 ```
 
-[`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
-[`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
-[`phf` crate]: https://docs.rs/phf
+<br>
+
+[`aligned_buf(bytes, align)`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+[`ByteOrder`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.ByteOrder.html
 [`hashbrown` crate]: https://docs.rs/phf
+[`OwnedBuf::with_size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_size
+[`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
+[`with_byte_order::<E>()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_byte_order
+[`phf` crate]: https://docs.rs/phf
+[`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
+[`Ref`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+[`Ref<str>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
+[`Ref<T, O, E>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 [`requested()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
+[`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+[`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
 [`ZeroCopy`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.ZeroCopy.html
 [derive]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
-[`Ref`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 [ref-u32]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
-[`Ref<str>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
-[`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
-[`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
-[`aligned_buf(bytes, align)`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html

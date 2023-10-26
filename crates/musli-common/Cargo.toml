@@ -1,6 +1,6 @@
 [package]
 name = "musli-common"
-version = "0.0.80"
+version = "0.0.81"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
@@ -21,7 +21,7 @@ std = ["musli/std", "simdutf8?/std"]
 alloc = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.80", default-features = false }
+musli = { path = "../musli", version = "0.0.81", default-features = false }
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 
 [dev-dependencies]
