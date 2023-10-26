@@ -9,15 +9,18 @@ use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Size};
 use crate::ZeroCopy;
 
-/// A sized reference.
+/// A stored reference to a type `P`.
 ///
-/// This is used to type a pointer with a [`ZeroCopy`] parameter so that it can
-/// be used in combination with [`Buf`] to load the value from a buffer.
-///
-/// Note that the constructor is safe, because alignment and validation checks
-/// happens whenever a value is loaded from a bare buffer.
+/// A reference is made up of two components:
+/// * An [`offset()`] indicating the absolute offset into a [`Buf`] where the
+///   pointed-to (pointee) data is located.
+/// * An optional [`metadata()`] components, which if set indicates that this
+///   reference is a wide pointer. This is used when encoding types such as
+///   `[T]` or `str` to include additional data necessary to handle the type.
 ///
 /// [`Buf`]: crate::buf::Buf
+/// [`offset()`]: Ref::offset
+/// [`metadata()`]: Ref::metadata
 ///
 /// # Examples
 ///
@@ -54,6 +57,21 @@ where
     P::Packed: ZeroCopy,
 {
     /// Construct a reference with custom metadata.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if either:
+    /// * The `offset` or `metadata` can't be byte swapped as per
+    ///   [`ZeroCopy::CAN_SWAP_BYTES`].
+    /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
+    /// * Packed [`metadata()`] cannot be constructed from `P::Metadata` (reason
+    ///   depends on the exact metadata).
+    ///
+    /// To guarantee that this constructor will never panic, [`Ref<T, usize,
+    /// E>`] can be used.
+    ///
+    /// [`offset()`]: Ref::offset
+    /// [`metadata()`]: Ref::metadata
     ///
     /// # Examples
     ///
@@ -104,7 +122,7 @@ impl<P, O: Size, E: ByteOrder> Ref<[P], O, E>
 where
     P: ZeroCopy,
 {
-    /// The number of elements in the slice.
+    /// Return the number of elements in the slice `[P]`.
     ///
     /// # Examples
     ///
@@ -119,7 +137,7 @@ where
         self.metadata.as_usize::<E>()
     }
 
-    /// If the slice is empty.
+    /// Test if the slice `[P]` is empty.
     ///
     /// # Examples
     ///
@@ -201,8 +219,10 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if [`TryFrom::try_from`] over the provided offset errors,
-    /// indicating that the offset cannot be packed into the required width.
+    /// This will panic if either:
+    /// * The `offset` can't be byte swapped as per
+    ///   [`ZeroCopy::CAN_SWAP_BYTES`].
+    /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     ///
     /// # Examples
     ///

@@ -554,10 +554,12 @@ pub mod swiss;
 pub use self::pointer::{Ref, Size};
 pub mod pointer;
 
-mod ordered;
-pub use self::ordered::Order;
+#[doc(inline)]
+pub use self::order::Order;
+mod order;
 
-pub use self::endian::{BigEndian, ByteOrder, LittleEndian};
+#[doc(inline)]
+pub use self::endian::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 pub mod endian;
 
 /// Derive macro to implement [`ZeroCopy`].

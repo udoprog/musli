@@ -362,9 +362,9 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// ```
 ///
 /// Unsafely access an immutable reference by manually padding the struct using
-/// [`init_padding()`] and [`to_bytes_unchecked()`]:
+/// [`initialize_padding()`] and [`to_bytes_unchecked()`]:
 ///
-/// [`init_padding()`]: Self::init_padding
+/// [`initialize_padding()`]: Self::initialize_padding
 /// [`to_bytes_unchecked()`]: Self::to_bytes_unchecked
 ///
 /// ```
@@ -378,7 +378,7 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 ///     damage: 42u32,
 /// };
 ///
-/// weapon.init_padding();
+/// weapon.initialize_padding();
 ///
 /// // SAFETY: Padding for the type has been initialized, and the type has not been moved since it was padded.
 /// let bytes = unsafe { weapon.to_bytes_unchecked() };
@@ -407,18 +407,15 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// ```
 pub unsafe trait ZeroCopy: Sized {
     /// Indicates if the type can inhabit all possible bit patterns within its
-    /// `size_of::<Self>()` bytes.
-    #[doc(hidden)]
+    /// [`size_of::<Self>()`] bytes.
     const ANY_BITS: bool;
 
-    /// Indicates that a type needs padding in case it is stored in an array
-    /// that is aligned to `align_of::<Self>()`.
-    #[doc(hidden)]
+    /// Indicates if a type is padded.
     const PADDED: bool;
 
     /// Indicates if the type has a valid byte-ordered transformation.
     ///
-    /// Most notably this is not implemented by `char`.
+    /// Most notably this is `false` for [`char`].
     const CAN_SWAP_BYTES: bool;
 
     /// Mark padding for the current type.
@@ -452,7 +449,7 @@ pub unsafe trait ZeroCopy: Sized {
     /// [`to_bytes_unchecked()`]: Self::to_bytes_unchecked
     /// [`to_bytes()`]: Self::to_bytes
     /// [type level documentation]: Self
-    fn init_padding(&mut self) {
+    fn initialize_padding(&mut self) {
         unsafe {
             let ptr = (self as *mut Self).cast::<u8>();
 
@@ -464,19 +461,29 @@ pub unsafe trait ZeroCopy: Sized {
         }
     }
 
-    /// Convert a `ZeroCopy` type into bytes.
+    /// Convert a reference to a `ZeroCopy` type into bytes.
     ///
     /// This requires mutable access to `self`, since it must call
-    /// [`init_padding()`] to ensure that the returned buffer is fully
+    /// [`initialize_padding()`] to ensure that the returned buffer is fully
     /// initialized.
     ///
     /// See the [type level documentation] for examples.
     ///
-    /// [`init_padding()`]: Self::init_padding
+    /// [`initialize_padding()`]: Self::initialize_padding
     /// [type level documentation]: Self
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    ///
+    /// let mut value = 42u32;
+    /// assert_eq!(value.to_bytes(), 42u32.to_ne_bytes());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     #[inline]
     fn to_bytes(&mut self) -> &[u8] {
-        self.init_padding();
+        self.initialize_padding();
 
         unsafe {
             let ptr = (self as *mut Self).cast::<u8>();
@@ -487,12 +494,12 @@ pub unsafe trait ZeroCopy: Sized {
     /// Convert a `ZeroCopy` type into bytes.
     ///
     /// This does not require mutable access to `self`, but the caller must
-    /// ensure that [`init_padding()`] has been called at some point before this
+    /// ensure that [`initialize_padding()`] has been called at some point before this
     /// function and that the type that was padded has not been moved.
     ///
     /// See the [type level documentation] for examples.
     ///
-    /// [`init_padding()`]: Self::init_padding
+    /// [`initialize_padding()`]: Self::initialize_padding
     /// [type level documentation]: Self
     #[inline]
     unsafe fn to_bytes_unchecked(&self) -> &[u8] {
@@ -513,6 +520,16 @@ pub unsafe trait ZeroCopy: Sized {
     /// This will ensure that `bytes` is aligned, appropriately sized, and valid
     /// to inhabit `&Self`. Anything else will cause an [`Error`] detailing why
     /// the conversion failed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    ///
+    /// let mut bytes: [u8; 4] = 1u32.to_ne_bytes();
+    /// assert_eq!(*u32::from_bytes(&mut bytes)?, 1);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<&Self, Error> {
         Buf::new(bytes).load(Ref::<Self>::zero())
@@ -529,6 +546,18 @@ pub unsafe trait ZeroCopy: Sized {
     /// This will ensure that `bytes` is aligned, appropriately sized, and valid
     /// to inhabit `&Self`. Anything else will cause an [`Error`] detailing why
     /// the conversion failed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    ///
+    /// let mut bytes = [0, 0, 0, 0];
+    /// *u32::from_bytes_mut(&mut bytes)? += 1;
+    /// let expected: [u8; 4] = 1u32.to_ne_bytes();
+    /// assert_eq!(bytes, expected);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     #[inline]
     fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
         Buf::new_mut(bytes).load_mut(Ref::<Self>::zero())
@@ -1153,10 +1182,8 @@ where
 
     #[inline]
     unsafe fn pad(padder: &mut Padder<'_, Self>) {
-        if T::PADDED {
-            for _ in 0..N {
-                padder.pad::<T>();
-            }
+        for _ in 0..N {
+            padder.pad::<T>();
         }
     }
 
