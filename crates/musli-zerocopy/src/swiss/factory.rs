@@ -26,6 +26,32 @@ const FIXED_SEED: u64 = 1234567890;
 /// [SwissTable]: https://abseil.io/about/design/swisstables
 /// [module level documentation]: crate::swiss
 ///
+/// # Duplicates
+///
+/// The caller is responsible for ensuring that no duplicate keys are provided
+/// to the constructor, since the input will be used to size the table.
+///
+/// In the face of duplicate keys, the default accessor will return a random
+/// element and the table will waste space.
+///
+/// Technically the elements are stored so the length is affected, and a future
+/// update might make them available.
+///
+/// ```
+/// use musli_zerocopy::OwnedBuf;
+/// use musli_zerocopy::swiss;
+///
+/// let mut buf = OwnedBuf::new();
+///
+/// let map = swiss::store_map(&mut buf, [(10, 1u32), (10, 2u32)])?;
+/// let buf = buf.into_aligned();
+/// let map = buf.bind(map)?;
+///
+/// assert!(matches!(map.get(&10)?, Some(&1) | Some(&2)));
+/// assert_eq!(map.len(), 2);
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
+///
 /// # Examples
 ///
 /// ```
@@ -66,6 +92,22 @@ const FIXED_SEED: u64 = 1234567890;
 /// assert_eq!(map.get(&30u64)?, None);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
+///
+/// Storing a zero-sized type:
+///
+/// ```
+/// use musli_zerocopy::OwnedBuf;
+/// use musli_zerocopy::swiss;
+///
+/// let mut buf = OwnedBuf::new();
+///
+/// let map = swiss::store_map(&mut buf, [((), ()), ((), ())])?;
+/// let buf = buf.into_aligned();
+/// let map = buf.bind(map)?;
+///
+/// assert_eq!(map.get(&())?, Some(&()));
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
 pub fn store_map<K, V, I, O: Size, E: ByteOrder>(
     buf: &mut OwnedBuf<O, E>,
     entries: I,
@@ -77,14 +119,14 @@ where
     I: IntoIterator<Item = (K, V)>,
     I::IntoIter: ExactSizeIterator,
 {
-    let (key, ctrl, buckets, bucket_mask) = store_raw(entries, buf, |buf, (k, v), hasher| {
+    let (key, ctrl, buckets, bucket_mask, len) = store_raw(entries, buf, |buf, (k, v), hasher| {
         k.visit(buf, |key| key.hash(hasher))?;
         Ok(Entry::new(k, v))
     })?;
 
     Ok(MapRef::new(
         key,
-        RawTableRef::new(ctrl, buckets, bucket_mask),
+        RawTableRef::new(ctrl, buckets, bucket_mask, len),
     ))
 }
 
@@ -99,6 +141,14 @@ where
 /// [`Set`]: crate::swiss::Set
 /// [SwissTable]: https://abseil.io/about/design/swisstables
 /// [module level documentation]: crate::swiss
+///
+/// # Duplicates
+///
+/// The caller is responsible for ensuring that no duplicate values are provided
+/// to the constructor, since the input will be used to size the table.
+///
+/// In the face of duplicate values, one of the entries will be preserved at
+/// random and the table will waste space.
 ///
 /// # Examples
 ///
@@ -142,6 +192,22 @@ where
 /// assert!(!set.contains(&3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
+///
+/// Storing a zero-sized type:
+///
+/// ```
+/// use musli_zerocopy::OwnedBuf;
+/// use musli_zerocopy::swiss;
+///
+/// let mut buf = OwnedBuf::new();
+///
+/// let set = swiss::store_set(&mut buf, [(), ()])?;
+/// let buf = buf.into_aligned();
+/// let set = buf.bind(set)?;
+///
+/// assert!(set.contains(&())?);
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
 pub fn store_set<T, I, O: Size, E: ByteOrder>(
     buf: &mut OwnedBuf<O, E>,
     entries: I,
@@ -152,19 +218,19 @@ where
     I: IntoIterator<Item = T>,
     I::IntoIter: ExactSizeIterator,
 {
-    let (key, ctrl, buckets, bucket_mask) = store_raw(entries, buf, |buf, v, hasher| {
+    let (key, ctrl, buckets, bucket_mask, len) = store_raw(entries, buf, |buf, v, hasher| {
         v.visit(buf, |key| key.hash(hasher))?;
         Ok(v)
     })?;
 
     Ok(SetRef::new(
         key,
-        RawTableRef::new(ctrl, buckets, bucket_mask),
+        RawTableRef::new(ctrl, buckets, bucket_mask, len),
     ))
 }
 
 // Output from storing raw values.
-type Raw<U, O, E> = (u64, Ref<[u8], O, E>, Ref<[U], O, E>, usize);
+type Raw<U, O, E> = (u64, Ref<[u8], O, E>, Ref<[U], O, E>, usize, usize);
 
 // Raw store function which is capable of storing any value using a hashing
 // adapter.
@@ -200,11 +266,10 @@ where
     let base_ptr = buf.next_offset::<U>();
     buf.fill(0, size_of::<T>().wrapping_mul(buckets));
 
-    let bucket_mask = {
+    let (bucket_mask, len) = {
         buf.align_in_place();
 
-        let mut table =
-            unsafe { Constructor::<U, _, _>::with_buf(buf, ctrl_ptr, base_ptr, buckets) };
+        let mut table = Constructor::<U, _, _>::with_buf(buf, ctrl_ptr, base_ptr, buckets);
 
         for v in entries {
             let mut hasher = SipHasher13::new_with_keys(0, key);
@@ -213,10 +278,10 @@ where
             table.insert(hash, &v)?;
         }
 
-        table.bucket_mask()
+        (table.bucket_mask(), table.len())
     };
 
     let ctrl = Ref::with_metadata(ctrl_ptr, ctrl_len);
     let buckets = Ref::with_metadata(base_ptr, buckets);
-    Ok((key, ctrl, buckets, bucket_mask))
+    Ok((key, ctrl, buckets, bucket_mask, len))
 }
