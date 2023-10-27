@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
+use core::ops::{Deref, DerefMut};
 use core::{any, fmt};
 
-use crate::endian::{Big, ByteOrder, Little};
+use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::ZeroCopy;
 
 /// Wrapper capable of enforcing a custom [`ByteOrder`].
@@ -129,10 +130,9 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     }
 }
 
-impl<T, E> fmt::Debug for Endian<T, E>
+impl<T: ZeroCopy, E: ByteOrder> fmt::Debug for Endian<T, E>
 where
-    T: fmt::Debug + ZeroCopy,
-    E: ByteOrder,
+    T: fmt::Debug,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -140,10 +140,9 @@ where
     }
 }
 
-impl<T, E> Clone for Endian<T, E>
+impl<T: ZeroCopy, E: ByteOrder> Clone for Endian<T, E>
 where
-    T: Clone + ZeroCopy,
-    E: ByteOrder,
+    T: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -153,9 +152,42 @@ where
     }
 }
 
-impl<T, E> Copy for Endian<T, E>
-where
-    T: Copy + ZeroCopy,
-    E: ByteOrder,
-{
+impl<T: ZeroCopy, E: ByteOrder> Copy for Endian<T, E> where T: Copy {}
+
+/// Any `Endian<T>` implements [`Deref<Target = T>`] for natively wrapped types.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::Endian;
+///
+/// let value = Endian::new(42u32);
+/// assert_eq!(*value, 42u32);
+/// ```
+impl<T> Deref for Endian<T, Native> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+/// Any `Endian<T>` implements [`DerefMut<Target = T>`] for natively wrapped types.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::Endian;
+///
+/// let mut value = Endian::new(42u32);
+/// assert_eq!(*value, 42u32);
+/// *value += 1;
+/// assert_eq!(*value, 43u32);
+/// ```
+impl<T> DerefMut for Endian<T, Native> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
 }
