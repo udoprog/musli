@@ -1,6 +1,6 @@
 use core::alloc::Layout;
 use core::fmt;
-use core::mem::{align_of, size_of};
+use core::mem::{align_of, size_of, MaybeUninit};
 use core::ops::{Index, IndexMut, Range};
 use core::ptr::read_unaligned;
 use core::slice::SliceIndex;
@@ -789,12 +789,16 @@ impl Buf {
         }
 
         unsafe {
-            let a = self.data.as_mut_ptr().add(a);
-            let b = self.data.as_mut_ptr().add(b);
+            let mut tmp = MaybeUninit::<T>::uninit();
+            let base = self.data.as_mut_ptr();
 
-            for n in 0..size_of::<T>() {
-                a.add(n).swap(b.add(n));
-            }
+            let tmp = tmp.as_mut_ptr().cast::<u8>();
+            let a = base.add(a);
+            let b = base.add(b);
+
+            tmp.copy_from_nonoverlapping(a, size_of::<T>());
+            a.copy_from_nonoverlapping(b, size_of::<T>());
+            b.copy_from_nonoverlapping(tmp, size_of::<T>());
         }
 
         Ok(())

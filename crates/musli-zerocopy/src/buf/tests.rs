@@ -101,7 +101,6 @@ fn test_unaligned_write() -> Result<()> {
     let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
 
     let string = buf.store_unsized("Hello World!");
-    std::dbg!(string);
 
     buf.load_uninit_mut(reference).write(&Custom { string });
 
@@ -109,7 +108,8 @@ fn test_unaligned_write() -> Result<()> {
 
     assert_eq!(reference.offset(), 4);
 
-    std::dbg!(string);
+    buf.align_in_place();
+
     let custom = buf.load(reference)?;
     assert_eq!(buf.load(custom.string)?, "Hello World!");
     Ok(())

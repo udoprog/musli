@@ -164,6 +164,51 @@ where
     S: ?Sized + StoreBuf,
     F: Fn(&I::Item) -> &K,
 {
+    let entries = build_slice(buf, entries);
+    let len = crate::phf::generator::displacements_len(entries.len());
+    let displacements = build_slice(buf, (0..len).map(|_| Entry::new(0, 0)));
+
+    let len = buf.len();
+
+    let map = build_slice(buf, (0..entries.len()).map(|_| usize::MAX));
+
+    let hash_state = {
+        buf.align_in_place();
+        crate::phf::generator::generate_hash(
+            buf.as_mut_buf(),
+            &entries,
+            &displacements,
+            &map,
+            access,
+        )?
+    };
+
+    for (from, a) in map.iter().enumerate() {
+        loop {
+            let to = *buf.as_mut_buf().load(a)?;
+
+            if from != to {
+                buf.swap(entries.at(from), entries.at(to))?;
+                buf.swap(map.at(from), map.at(to))?;
+                continue;
+            }
+
+            break;
+        }
+    }
+
+    // Free up temporary memory we needed to build the map.
+    buf.truncate(len);
+    Ok((hash_state.key, entries, displacements))
+}
+
+fn build_slice<S, I>(buf: &mut S, entries: I) -> Ref<[I::Item], S::ByteOrder, S::Size>
+where
+    S: ?Sized + StoreBuf,
+    I: IntoIterator,
+    I::Item: ZeroCopy,
+    I::IntoIter: ExactSizeIterator,
+{
     let offset = buf.next_offset::<I::Item>();
     let iter = entries.into_iter();
     let len = iter.len();
@@ -172,43 +217,5 @@ where
         buf.store(&value);
     }
 
-    let entries: Ref<[I::Item], _, _> = Ref::with_metadata(offset, len);
-
-    let offset = buf.next_offset::<Entry<u32, u32>>();
-    let len = crate::phf::generator::displacements_len(entries.len());
-
-    for _ in 0..len {
-        buf.store(&Entry::new(0, 0));
-    }
-
-    let displacements = Ref::with_metadata(offset, len);
-
-    let mut hash_state = {
-        buf.align_in_place();
-        crate::phf::generator::generate_hash(buf.as_mut_buf(), &entries, &displacements, access)?
-    };
-
-    for a in 0..hash_state.map.len() {
-        loop {
-            let b = hash_state.map[a];
-
-            if hash_state.map[a] != a {
-                let Some(ref_a) = entries.get(a) else {
-                    panic!("Missing entry at index {a}");
-                };
-
-                let Some(ref_b) = entries.get(b) else {
-                    panic!("Missing entry at index {b}");
-                };
-
-                buf.swap(ref_a, ref_b)?;
-                hash_state.map.swap(a, b);
-                continue;
-            }
-
-            break;
-        }
-    }
-
-    Ok((hash_state.key, entries, displacements))
+    Ref::with_metadata(offset, len)
 }

@@ -24,7 +24,7 @@ pub(crate) struct Entry<K, V> {
 impl<K, V> Entry<K, V> {
     /// Construct a new pair.
     #[cfg(feature = "alloc")]
-    pub(crate) fn new(key: K, value: V) -> Self {
+    pub(crate) const fn new(key: K, value: V) -> Self {
         Self { key, value }
     }
 }

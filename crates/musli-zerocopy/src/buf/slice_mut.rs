@@ -973,6 +973,13 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     }
 
     #[inline]
+    fn truncate(&mut self, len: usize) {
+        if self.len > len {
+            self.len = len;
+        }
+    }
+
+    #[inline]
     fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
         P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,

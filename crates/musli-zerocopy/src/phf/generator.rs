@@ -18,7 +18,6 @@ const FIXED_SEED: u64 = 1234567890;
 
 pub(crate) struct HashState {
     pub(crate) key: HashKey,
-    pub(crate) map: Vec<usize>,
 }
 
 /// Calculate displacements length.
@@ -30,6 +29,7 @@ pub(crate) fn generate_hash<K, T, F, E: ByteOrder, O: Size>(
     buf: &mut Buf,
     entries: &Ref<[T], E, O>,
     displacements: &Ref<[Entry<u32, u32>], E, O>,
+    map: &Ref<[usize], E, O>,
     access: F,
 ) -> Result<HashState, Error>
 where
@@ -39,8 +39,17 @@ where
     T: ZeroCopy,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
-        if let Some(hash) = try_generate_hash(buf, entries, displacements, key, &access)? {
+        if let Some(hash) = try_generate_hash(buf, entries, displacements, map, key, &access)? {
             return Ok(hash);
+        }
+
+        // Reset the state of displacements and maps since we're trying again.
+        for d in buf.load_mut(*displacements)? {
+            *d = Entry::new(0, 0);
+        }
+
+        for m in buf.load_mut(*map)? {
+            *m = usize::MAX;
         }
     }
 
@@ -51,6 +60,7 @@ fn try_generate_hash<K, T, F, E: ByteOrder, O: Size>(
     buf: &mut Buf,
     entries: &Ref<[T], E, O>,
     displacements: &Ref<[Entry<u32, u32>], E, O>,
+    map: &Ref<[usize], E, O>,
     key: HashKey,
     access: &F,
 ) -> Result<Option<HashState>, Error>
@@ -62,17 +72,9 @@ where
 {
     let mut hashes = Vec::new();
 
-    for n in 0..entries.len() {
-        let Some(entry) = entries.get(n) else {
-            return Err(Error::new(ErrorKind::IndexOutOfBounds {
-                index: n,
-                len: entries.len(),
-            }));
-        };
-
+    for entry in entries.iter() {
         let entry = buf.load(entry)?;
         let entry_key = access(entry);
-
         let h = hash(buf, entry_key, &key)?;
         hashes.push(h);
     }
@@ -87,7 +89,7 @@ where
     buckets.sort_by_key(|a| a.len());
 
     let table_len = hashes.len();
-    let mut map = vec![usize::MAX; table_len];
+    // let mut map = vec![usize::MAX; table_len];
 
     // store whether an element from the bucket being placed is
     // located at a certain position, to allow for efficient overlap
@@ -115,7 +117,7 @@ where
                     let index = displace(f1, f2, d1, d2) as usize;
                     let index = index % table_len;
 
-                    if map[index] != usize::MAX || try_map[index] == generation {
+                    if *buf.load(map.at(index))? != usize::MAX || try_map[index] == generation {
                         continue 'inner;
                     }
 
@@ -127,7 +129,8 @@ where
                 *buf.load_mut(d_ref)? = Entry::new(d1, d2);
 
                 for &(i, key) in &values_to_add {
-                    map[i] = key;
+                    let m = buf.load_mut(map.at(i))?;
+                    *m = key;
                 }
 
                 continue 'outer;
@@ -138,5 +141,5 @@ where
         return Ok(None);
     }
 
-    Ok(Some(HashState { key, map }))
+    Ok(Some(HashState { key }))
 }

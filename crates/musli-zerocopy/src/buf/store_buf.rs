@@ -31,6 +31,10 @@ pub trait StoreBuf: self::sealed::Sealed {
     #[doc(hidden)]
     fn len(&self) -> usize;
 
+    /// Truncate the buffer to the given length.
+    #[doc(hidden)]
+    fn truncate(&mut self, len: usize);
+
     /// Store an unsigned value.
     #[doc(hidden)]
     fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
