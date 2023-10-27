@@ -22,7 +22,7 @@ mod sealed {
 #[allow(clippy::len_without_is_empty)]
 pub trait StoreBuf: self::sealed::Sealed {
     /// The sticky endianness associated with the buffer.
-    type Endianness: ByteOrder;
+    type ByteOrder: ByteOrder;
 
     /// The sticky size associated with the buffer.
     type Size: Size;
@@ -33,14 +33,14 @@ pub trait StoreBuf: self::sealed::Sealed {
 
     /// Store an unsigned value.
     #[doc(hidden)]
-    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
         P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
         P: UnsizedZeroCopy<P, Self::Size>;
 
     /// Store a [`ZeroCopy`] value.
     #[doc(hidden)]
-    fn store<P>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    fn store<P>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
         P: ZeroCopy;
 
@@ -48,8 +48,8 @@ pub trait StoreBuf: self::sealed::Sealed {
     #[doc(hidden)]
     fn swap<P>(
         &mut self,
-        a: Ref<P, Self::Endianness, Self::Size>,
-        b: Ref<P, Self::Endianness, Self::Size>,
+        a: Ref<P, Self::ByteOrder, Self::Size>,
+        b: Ref<P, Self::ByteOrder, Self::Size>,
     ) -> Result<(), Error>
     where
         P: ZeroCopy;

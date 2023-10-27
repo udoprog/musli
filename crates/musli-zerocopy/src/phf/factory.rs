@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use core::hash::Hash;
 
 use crate::buf::{StoreBuf, Visit};
@@ -7,7 +9,7 @@ use crate::phf::{Entry, MapRef, SetRef};
 use crate::Ref;
 use crate::ZeroCopy;
 
-/// Store a map based on a perfect hash function into the [`OwnedBuf`].
+/// Store a map based on a perfect hash function into a buffer.
 ///
 /// This will utilize a perfect hash functions derived from the [`phf` crate] to
 /// construct a persistent hash set.
@@ -60,7 +62,7 @@ use crate::ZeroCopy;
 pub fn store_map<K, V, S, I>(
     buf: &mut S,
     entries: I,
-) -> Result<MapRef<K, V, S::Endianness, S::Size>, Error>
+) -> Result<MapRef<K, V, S::ByteOrder, S::Size>, Error>
 where
     K: Visit + ZeroCopy,
     V: ZeroCopy,
@@ -74,7 +76,7 @@ where
     Ok(MapRef::new(key, entries, displacements))
 }
 
-/// Store a set based on a perfect hash function into the [`OwnedBuf`].
+/// Store a set based on a perfect hash function into a buffer.
 ///
 /// This will utilize a perfect hash functions derived from the [`phf` crate] to
 /// construct a persistent hash map.
@@ -129,7 +131,7 @@ where
 pub fn store_set<S, I>(
     buf: &mut S,
     entries: I,
-) -> Result<SetRef<I::Item, S::Endianness, S::Size>, Error>
+) -> Result<SetRef<I::Item, S::ByteOrder, S::Size>, Error>
 where
     S: ?Sized + StoreBuf,
     I: IntoIterator,
@@ -148,8 +150,8 @@ fn store_raw<K, I, S, F>(
 ) -> Result<
     (
         HashKey,
-        Ref<[I::Item], S::Endianness, S::Size>,
-        Ref<[Entry<u32, u32>], S::Endianness, S::Size>,
+        Ref<[I::Item], S::ByteOrder, S::Size>,
+        Ref<[Entry<u32, u32>], S::ByteOrder, S::Size>,
     ),
     Error,
 >

@@ -1253,7 +1253,7 @@ const fn invalid_mut<T>(addr: usize) -> *mut T {
 }
 
 impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
-    type Endianness = E;
+    type ByteOrder = E;
     type Size = O;
 
     #[inline]
@@ -1262,7 +1262,7 @@ impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
     }
 
     #[inline]
-    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
         P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
         P: UnsizedZeroCopy<P, Self::Size>,
@@ -1271,7 +1271,7 @@ impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
     }
 
     #[inline]
-    fn store<P>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    fn store<P>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
         P: ZeroCopy,
     {
@@ -1281,8 +1281,8 @@ impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
     #[inline]
     fn swap<P>(
         &mut self,
-        a: Ref<P, Self::Endianness, Self::Size>,
-        b: Ref<P, Self::Endianness, Self::Size>,
+        a: Ref<P, Self::ByteOrder, Self::Size>,
+        b: Ref<P, Self::ByteOrder, Self::Size>,
     ) -> Result<(), Error>
     where
         P: ZeroCopy,

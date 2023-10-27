@@ -180,12 +180,83 @@ where
             return None;
         }
 
-        let ptr = self
-            .offset
-            .as_usize::<E>()
-            .wrapping_add(size_of::<P>().wrapping_mul(index));
+        let offset = self.offset.as_usize::<E>() + size_of::<P>() * index;
+        Some(Ref::new(offset))
+    }
 
-        Some(Ref::new(ptr))
+    /// Construct an iterator over this reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    ///
+    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    ///
+    /// buf.align_in_place();
+    ///
+    /// let mut out = Vec::new();
+    ///
+    /// for r in slice.iter() {
+    ///     out.push(*buf.load(r)?);
+    /// }
+    ///
+    /// for r in slice.iter().rev() {
+    ///     out.push(*buf.load(r)?);
+    /// }
+    ///
+    /// assert_eq!(out, [1, 2, 3, 4, 4, 3, 2, 1]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, P, E, O> {
+        let start = self.offset.as_usize::<E>();
+        let end = start + self.metadata.as_usize::<E>() * size_of::<P>();
+
+        Iter {
+            start,
+            end,
+            _marker: PhantomData,
+        }
+    }
+}
+
+/// An iterator over a `Ref<[P]>` which produces `Ref<P>` values.
+///
+/// See [Ref::<[P]>::iter].
+pub struct Iter<'a, P, E, O> {
+    start: usize,
+    end: usize,
+    _marker: PhantomData<(&'a (), P, E, O)>,
+}
+
+impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<'a, P, E, O> {
+    type Item = Ref<P, E, O>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start == self.end {
+            return None;
+        }
+
+        let start = self.start;
+        self.start += size_of::<P>();
+        Some(Ref::new(start))
+    }
+}
+
+impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<'a, P, E, O> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.start == self.end {
+            return None;
+        }
+
+        self.end -= size_of::<P>();
+        Some(Ref::new(self.end))
     }
 }
 
@@ -221,6 +292,8 @@ where
     /// * The `offset` can't be byte swapped as per
     ///   [`ZeroCopy::CAN_SWAP_BYTES`].
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
+    ///
+    /// [`offset()`]: Self::offset
     ///
     /// # Examples
     ///

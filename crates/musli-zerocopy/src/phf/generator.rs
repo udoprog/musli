@@ -104,7 +104,7 @@ where
     // chosen the right displacements.
     let mut values_to_add = vec![];
 
-    'outer: for (n, bucket) in buckets.iter().enumerate() {
+    'outer: for (bucket, d_ref) in buckets.iter().zip(displacements.iter()) {
         for d1 in 0..(table_len as u32) {
             'inner: for d2 in 0..(table_len as u32) {
                 values_to_add.clear();
@@ -122,10 +122,6 @@ where
                     try_map[index] = generation;
                     values_to_add.push((index, key));
                 }
-
-                let Some(d_ref) = displacements.get(n) else {
-                    panic!("Missing displacement at {n}");
-                };
 
                 // We've picked a good set of displacements
                 *buf.load_mut(d_ref)? = Entry::new(d1, d2);

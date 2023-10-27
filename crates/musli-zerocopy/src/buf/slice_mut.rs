@@ -591,12 +591,10 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
         Ref::new(offset)
     }
 
-    /// Construct a buffer with the [`requested()`] alignment which is either
-    /// wrapped in a [`Buf`] if it is already correctly aligned, or inside of a
-    /// specifically allocated [`OwnedBuf`].
+    /// Either return the current buffer, or allocate one which has a
+    /// [`requested()`] alignment.
     ///
     /// [`requested()`]: Self::requested
-    /// [`OwnedBuf`]: crate::buf::OwnedBuf
     ///
     /// # Examples
     ///
@@ -966,7 +964,7 @@ impl<'a, E: ByteOrder, O: Size> Borrow<Buf> for SliceMut<'a, E, O> {
 }
 
 impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
-    type Endianness = E;
+    type ByteOrder = E;
     type Size = O;
 
     #[inline]
@@ -975,7 +973,7 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     }
 
     #[inline]
-    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
         P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
         P: UnsizedZeroCopy<P, Self::Size>,
@@ -984,7 +982,7 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     }
 
     #[inline]
-    fn store<P>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    fn store<P>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
         P: ZeroCopy,
     {
@@ -994,8 +992,8 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     #[inline]
     fn swap<P>(
         &mut self,
-        a: Ref<P, Self::Endianness, Self::Size>,
-        b: Ref<P, Self::Endianness, Self::Size>,
+        a: Ref<P, Self::ByteOrder, Self::Size>,
+        b: Ref<P, Self::ByteOrder, Self::Size>,
     ) -> Result<(), Error>
     where
         P: ZeroCopy,

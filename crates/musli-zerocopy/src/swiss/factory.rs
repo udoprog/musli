@@ -204,7 +204,7 @@ where
 pub fn store_set<T, I, S>(
     buf: &mut S,
     entries: I,
-) -> Result<SetRef<T, S::Endianness, S::Size>, Error>
+) -> Result<SetRef<T, S::ByteOrder, S::Size>, Error>
 where
     T: Visit + ZeroCopy,
     T::Target: Hash,
@@ -232,7 +232,7 @@ fn store_raw<T, U, I, S>(
     entries: I,
     buf: &mut S,
     hash: fn(&Buf, T, &mut SipHasher13) -> Result<U, Error>,
-) -> Result<Raw<U, S::Endianness, S::Size>, Error>
+) -> Result<Raw<U, S::ByteOrder, S::Size>, Error>
 where
     U: ZeroCopy,
     I: IntoIterator<Item = T>,
