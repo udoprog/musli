@@ -330,13 +330,13 @@
 //! maximally flexible as an example:
 //!
 //! ```
-//! use musli_zerocopy::{Size, ByteOrder, Ref, Order, ZeroCopy};
+//! use musli_zerocopy::{Size, ByteOrder, Ref, Endian, ZeroCopy};
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
 //! struct Archive<E, O> where E: ByteOrder, O: Size {
 //!     string: Ref<str, E, O>,
-//!     number: Order<u32, E>,
+//!     number: Endian<u32, E>,
 //! }
 //! ```
 //!
@@ -346,21 +346,21 @@
 //! during construction:
 //!
 //! ```
-//! use musli_zerocopy::{BigEndian, LittleEndian, Order, OwnedBuf};
+//! use musli_zerocopy::{endian, Endian, OwnedBuf};
 //! # use musli_zerocopy::{Size, ByteOrder, Ref, ZeroCopy};
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Archive<E, O> where E: ByteOrder, O: Size {
 //! #     string: Ref<str, E, O>,
-//! #     number: Order<u32, E>
+//! #     number: Endian<u32, E>
 //! # }
+//! let mut buf = OwnedBuf::new()
+//!     .with_byte_order::<endian::Little>();
 //!
-//! let mut buf = OwnedBuf::new().with_byte_order::<LittleEndian>();
-//!
-//! let first = buf.store(&Order::le(42u16));
+//! let first = buf.store(&Endian::le(42u16));
 //! let portable = Archive {
 //!     string: buf.store_unsized("Hello World!"),
-//!     number: Order::new(10),
+//!     number: Endian::new(10),
 //! };
 //! let portable = buf.store(&portable);
 //!
@@ -377,12 +377,13 @@
 //! # assert_eq!(buf.load(portable.string)?, "Hello World!");
 //! # assert_eq!(portable.number.to_ne(), 10);
 //!
-//! let mut buf = OwnedBuf::new().with_byte_order::<BigEndian>();
+//! let mut buf = OwnedBuf::new()
+//!     .with_byte_order::<endian::Big>();
 //!
-//! let first = buf.store(&Order::be(42u16));
+//! let first = buf.store(&Endian::be(42u16));
 //! let portable = Archive {
 //!     string: buf.store_unsized("Hello World!"),
-//!     number: Order::new(10),
+//!     number: Endian::new(10),
 //! };
 //! let portable = buf.store(&portable);
 //!
@@ -450,14 +451,15 @@
 //! * `usize` for target-dependently sized pointers.
 //!
 //! ```
-//! # use musli_zerocopy::{Ref, NativeEndian, ZeroCopy};
+//! # use musli_zerocopy::{Ref, ZeroCopy};
+//! # use musli_zerocopy::endian::Native;
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom;
 //! // These no longer panic:
-//! let reference = Ref::<Custom, NativeEndian, usize>::new(1usize << 32);
-//! let slice = Ref::<[Custom], NativeEndian, usize>::with_metadata(0, 1usize << 32);
-//! let unsize = Ref::<str, NativeEndian, usize>::with_metadata(0, 1usize << 32);
+//! let reference = Ref::<Custom, Native, usize>::new(1usize << 32);
+//! let slice = Ref::<[Custom], Native, usize>::with_metadata(0, 1usize << 32);
+//! let unsize = Ref::<str, Native, usize>::with_metadata(0, 1usize << 32);
 //! ```
 //!
 //! To initialize an [`OwnedBuf`] with a custom [`Size`], you can use
@@ -475,18 +477,18 @@
 //! then carry into any pointers it return:
 //!
 //! ```
-//! use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy, NativeEndian};
-//! use musli_zerocopy::buf::DefaultAlignment;
+//! use musli_zerocopy::{DefaultAlignment, OwnedBuf, Ref, ZeroCopy};
+//! use musli_zerocopy::endian::Native;
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
 //! struct Custom {
-//!     reference: Ref<u32, NativeEndian, usize>,
-//!     slice: Ref::<[u32], NativeEndian, usize>,
-//!     unsize: Ref::<str, NativeEndian, usize>,
+//!     reference: Ref<u32, Native, usize>,
+//!     slice: Ref::<[u32], Native, usize>,
+//!     unsize: Ref::<str, Native, usize>,
 //! }
 //!
-//! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
+//! let mut buf = OwnedBuf::with_capacity(0)
 //!     .with_size::<usize>();
 //!
 //! let reference = buf.store(&42u32);
@@ -559,11 +561,7 @@ pub use self::pointer::{DefaultSize, Ref, Size};
 pub mod pointer;
 
 #[doc(inline)]
-pub use self::order::Order;
-mod order;
-
-#[doc(inline)]
-pub use self::endian::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
+pub use self::endian::{ByteOrder, Endian};
 pub mod endian;
 
 /// Derive macro to implement [`ZeroCopy`].

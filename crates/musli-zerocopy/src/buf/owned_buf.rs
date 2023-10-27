@@ -9,7 +9,7 @@ use core::slice::{self, SliceIndex};
 use alloc::alloc;
 
 use crate::buf::{Buf, DefaultAlignment, Padder, StoreBuf};
-use crate::endian::{ByteOrder, NativeEndian};
+use crate::endian::{ByteOrder, Native};
 use crate::error::Error;
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Ref, Size};
@@ -33,7 +33,7 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// let mut buf = OwnedBuf::new();
 /// buf.store(&Custom { field: 10 });
 /// ```
-pub struct OwnedBuf<E: ByteOrder = NativeEndian, O: Size = DefaultSize> {
+pub struct OwnedBuf<E: ByteOrder = Native, O: Size = DefaultSize> {
     data: NonNull<u8>,
     /// The initialized length of the buffer.
     len: usize,
@@ -82,10 +82,10 @@ impl OwnedBuf {
     /// ```should_panic
     /// use std::mem::align_of;
     ///
-    /// use musli_zerocopy::{NativeEndian, DefaultAlignment, OwnedBuf};
+    /// use musli_zerocopy::{endian, DefaultAlignment, OwnedBuf};
     ///
     /// let max = isize::MAX as usize - (align_of::<DefaultAlignment>() - 1);
-    /// OwnedBuf::<NativeEndian, u32>::with_capacity(max);
+    /// OwnedBuf::<endian::Native, u32>::with_capacity(max);
     /// ```
     ///
     /// # Examples
@@ -194,10 +194,10 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{LittleEndian, OwnedBuf};
+    /// use musli_zerocopy::{endian, OwnedBuf};
     ///
     /// let mut buf = OwnedBuf::with_capacity(1024)
-    ///     .with_byte_order::<LittleEndian>();
+    ///     .with_byte_order::<endian::Little>();
     /// ```
     #[inline]
     pub fn with_byte_order<U: ByteOrder>(self) -> OwnedBuf<U, O> {
@@ -919,8 +919,8 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     /// if a reallocation is triggered due to reaching its [`capacity()`].
     ///
     /// ```
-    /// use musli_zerocopy::{NativeEndian, OwnedBuf};
-    /// let mut buf = OwnedBuf::<NativeEndian, u32>::with_capacity_and_alignment::<u16>(32);
+    /// use musli_zerocopy::{endian, OwnedBuf};
+    /// let mut buf = OwnedBuf::<endian::Native, u32>::with_capacity_and_alignment::<u16>(32);
     ///
     /// buf.extend_from_slice(&[1, 2]);
     /// assert!(buf.alignment() >= 2);
@@ -1194,11 +1194,11 @@ impl<E: ByteOrder, O: Size> Borrow<Buf> for OwnedBuf<E, O> {
 /// ```
 /// use std::mem::align_of;
 ///
-/// use musli_zerocopy::{NativeEndian, OwnedBuf};
+/// use musli_zerocopy::{endian, OwnedBuf};
 ///
 /// assert_ne!(align_of::<u16>(), align_of::<u32>());
 ///
-/// let mut buf = OwnedBuf::<NativeEndian, u32>::with_capacity_and_alignment::<u16>(32);
+/// let mut buf = OwnedBuf::<endian::Native, u32>::with_capacity_and_alignment::<u16>(32);
 /// buf.extend_from_slice(&[1, 2, 3, 4]);
 /// buf.request_align::<u32>();
 ///

@@ -1,34 +1,38 @@
 //! Marker types which define a [`ByteOrder`] to use.
 
+#[doc(inline)]
+pub use self::endian::Endian;
+mod endian;
+
 /// Alias for the native endian [`ByteOrder`].
 #[cfg(target_endian = "little")]
-pub type NativeEndian = LittleEndian;
+pub type Native = Little;
 
 /// Alias for the native endian [`ByteOrder`].
 #[cfg(target_endian = "big")]
-pub type NativeEndian = BigEndian;
+pub type Native = Big;
 
 /// Marker type indicating that the big endian [`ByteOrder`] is in use.
 #[non_exhaustive]
-pub struct BigEndian;
+pub struct Big;
 
 /// Marker type indicating that the little endian [`ByteOrder`] is in use.
 #[non_exhaustive]
-pub struct LittleEndian;
+pub struct Little;
 
 mod sealed {
-    use super::{BigEndian, LittleEndian};
+    use super::{Big, Little};
 
     pub trait Sealed {}
 
-    impl Sealed for BigEndian {}
-    impl Sealed for LittleEndian {}
+    impl Sealed for Big {}
+    impl Sealed for Little {}
 }
 
 /// Defines a byte order to use.
 ///
-/// This trait is implemented by two marker types [`BigEndian`] and
-/// [`LittleEndian`], and its internals are intentionally hidden. Do not attempt
+/// This trait is implemented by two marker types [`Big`] and
+/// [`Little`], and its internals are intentionally hidden. Do not attempt
 /// to use them yourself.
 pub trait ByteOrder: 'static + Sized + self::sealed::Sealed {
     /// Swap the bytes for a `usize` with the current byte order.
@@ -80,7 +84,7 @@ pub trait ByteOrder: 'static + Sized + self::sealed::Sealed {
     fn swap_f64(value: f64) -> f64;
 }
 
-impl ByteOrder for LittleEndian {
+impl ByteOrder for Little {
     #[inline]
     fn swap_usize(value: usize) -> usize {
         usize::from_le(value)
@@ -142,7 +146,7 @@ impl ByteOrder for LittleEndian {
     }
 }
 
-impl ByteOrder for BigEndian {
+impl ByteOrder for Big {
     #[inline]
     fn swap_usize(value: usize) -> usize {
         usize::from_be(value)

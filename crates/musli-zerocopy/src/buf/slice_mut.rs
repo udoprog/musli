@@ -9,7 +9,7 @@ use core::slice::{self, SliceIndex};
 use alloc::borrow::Cow;
 
 use crate::buf::{Buf, DefaultAlignment, Padder, StoreBuf};
-use crate::endian::{ByteOrder, NativeEndian};
+use crate::endian::{ByteOrder, Native};
 use crate::error::Error;
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Ref, Size};
@@ -34,7 +34,7 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// let mut buf = SliceMut::new(&mut buf);
 /// buf.store(&Custom { field: 10 });
 /// ```
-pub struct SliceMut<'a, E: ByteOrder = NativeEndian, O: Size = DefaultSize> {
+pub struct SliceMut<'a, E: ByteOrder = Native, O: Size = DefaultSize> {
     /// Base data pointer.
     data: NonNull<u8>,
     /// The initialized length of the buffer.
@@ -125,11 +125,11 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{LittleEndian, SliceMut};
+    /// use musli_zerocopy::{endian, SliceMut};
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf)
-    ///     .with_byte_order::<LittleEndian>();
+    ///     .with_byte_order::<endian::Little>();
     /// ```
     #[inline]
     pub fn with_byte_order<U: ByteOrder>(self) -> SliceMut<'a, U, O> {

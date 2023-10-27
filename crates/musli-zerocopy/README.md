@@ -324,9 +324,9 @@ specify a "sticky" [`ByteOrder`] to use in types which interact with it
 during construction:
 
 ```rust
-use musli_zerocopy::{BigEndian, LittleEndian, Order, OwnedBuf};
+use musli_zerocopy::{Big, Little, Order, OwnedBuf};
 
-let mut buf = OwnedBuf::new().with_byte_order::<LittleEndian>();
+let mut buf = OwnedBuf::new().with_byte_order::<Little>();
 
 let first = buf.store(&Order::le(42u16));
 let portable = Archive {
@@ -345,7 +345,7 @@ assert_eq!(&buf[..], &[
 
 let portable = buf.load(portable)?;
 
-let mut buf = OwnedBuf::new().with_byte_order::<BigEndian>();
+let mut buf = OwnedBuf::new().with_byte_order::<Big>();
 
 let first = buf.store(&Order::be(42u16));
 let portable = Archive {
@@ -406,9 +406,9 @@ The available [`Size`] implementations are:
 
 ```rust
 // These no longer panic:
-let reference = Ref::<Custom, NativeEndian, usize>::new(1usize << 32);
-let slice = Ref::<[Custom], NativeEndian, usize>::with_metadata(0, 1usize << 32);
-let unsize = Ref::<str, NativeEndian, usize>::with_metadata(0, 1usize << 32);
+let reference = Ref::<Custom, Native, usize>::new(1usize << 32);
+let slice = Ref::<[Custom], Native, usize>::with_metadata(0, 1usize << 32);
+let unsize = Ref::<str, Native, usize>::with_metadata(0, 1usize << 32);
 ```
 
 To initialize an [`OwnedBuf`] with a custom [`Size`], you can use
@@ -426,15 +426,15 @@ The [`Size`] you've specified during construction of an [`OwnedBuf`] will
 then carry into any pointers it return:
 
 ```rust
-use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy, NativeEndian};
+use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy, Native};
 use musli_zerocopy::buf::DefaultAlignment;
 
 #[derive(ZeroCopy)]
 #[repr(C)]
 struct Custom {
-    reference: Ref<u32, NativeEndian, usize>,
-    slice: Ref::<[u32], NativeEndian, usize>,
-    unsize: Ref::<str, NativeEndian, usize>,
+    reference: Ref<u32, Native, usize>,
+    slice: Ref::<[u32], Native, usize>,
+    unsize: Ref::<str, Native, usize>,
 }
 
 let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
