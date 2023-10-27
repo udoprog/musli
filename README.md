@@ -35,8 +35,8 @@ Add the following to your `Cargo.toml` using the [format](#formats) you want
 to use:
 
 ```toml
-musli = "0.0.83"
-musli-wire = "0.0.83"
+musli = "0.0.84"
+musli-wire = "0.0.84"
 ```
 
 <br>

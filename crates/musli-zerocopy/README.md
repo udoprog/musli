@@ -308,13 +308,13 @@ explicitly specify a desired byte order but doing it like this makes it
 maximally flexible as an example:
 
 ```rust
-use musli_zerocopy::{Size, ByteOrder, Ref, Order, ZeroCopy};
+use musli_zerocopy::{Size, ByteOrder, Ref, Endian, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
 struct Archive<E, O> where E: ByteOrder, O: Size {
     string: Ref<str, E, O>,
-    number: Order<u32, E>,
+    number: Endian<u32, E>,
 }
 ```
 
@@ -324,14 +324,14 @@ specify a "sticky" [`ByteOrder`] to use in types which interact with it
 during construction:
 
 ```rust
-use musli_zerocopy::{Big, Little, Order, OwnedBuf};
+use musli_zerocopy::{endian, Endian, OwnedBuf};
+let mut buf = OwnedBuf::new()
+    .with_byte_order::<endian::Little>();
 
-let mut buf = OwnedBuf::new().with_byte_order::<Little>();
-
-let first = buf.store(&Order::le(42u16));
+let first = buf.store(&Endian::le(42u16));
 let portable = Archive {
     string: buf.store_unsized("Hello World!"),
-    number: Order::new(10),
+    number: Endian::new(10),
 };
 let portable = buf.store(&portable);
 
@@ -345,12 +345,13 @@ assert_eq!(&buf[..], &[
 
 let portable = buf.load(portable)?;
 
-let mut buf = OwnedBuf::new().with_byte_order::<Big>();
+let mut buf = OwnedBuf::new()
+    .with_byte_order::<endian::Big>();
 
-let first = buf.store(&Order::be(42u16));
+let first = buf.store(&Endian::be(42u16));
 let portable = Archive {
     string: buf.store_unsized("Hello World!"),
-    number: Order::new(10),
+    number: Endian::new(10),
 };
 let portable = buf.store(&portable);
 
@@ -426,8 +427,8 @@ The [`Size`] you've specified during construction of an [`OwnedBuf`] will
 then carry into any pointers it return:
 
 ```rust
-use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy, Native};
-use musli_zerocopy::buf::DefaultAlignment;
+use musli_zerocopy::{DefaultAlignment, OwnedBuf, Ref, ZeroCopy};
+use musli_zerocopy::endian::Native;
 
 #[derive(ZeroCopy)]
 #[repr(C)]
@@ -437,7 +438,7 @@ struct Custom {
     unsize: Ref::<str, Native, usize>,
 }
 
-let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
+let mut buf = OwnedBuf::with_capacity(0)
     .with_size::<usize>();
 
 let reference = buf.store(&42u32);
