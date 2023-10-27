@@ -1,7 +1,7 @@
 use core::hash::{Hash, Hasher};
 use core::mem::size_of;
 
-use crate::buf::{Buf, OwnedBuf, Visit};
+use crate::buf::{Buf, OwnedBuf, StoreBuf, Visit};
 use crate::endian::ByteOrder;
 use crate::error::Error;
 use crate::pointer::{Ref, Size};
@@ -201,15 +201,16 @@ where
 /// assert!(set.contains(&())?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_set<T, I, E: ByteOrder, O: Size>(
-    buf: &mut OwnedBuf<E, O>,
+pub fn store_set<T, I, S>(
+    buf: &mut S,
     entries: I,
-) -> Result<SetRef<T, E, O>, Error>
+) -> Result<SetRef<T, S::Endianness, S::Size>, Error>
 where
     T: Visit + ZeroCopy,
     T::Target: Hash,
     I: IntoIterator<Item = T>,
     I::IntoIter: ExactSizeIterator,
+    S: ?Sized + StoreBuf,
 {
     let (key, ctrl, buckets, bucket_mask, len) = store_raw(entries, buf, |buf, v, hasher| {
         v.visit(buf, |key| key.hash(hasher))?;
@@ -227,15 +228,16 @@ type Raw<U, E, O> = (u64, Ref<[u8], E, O>, Ref<[U], E, O>, usize, usize);
 
 // Raw store function which is capable of storing any value using a hashing
 // adapter.
-fn store_raw<T, U, I, E: ByteOrder, O: Size>(
+fn store_raw<T, U, I, S>(
     entries: I,
-    buf: &mut OwnedBuf<E, O>,
+    buf: &mut S,
     hash: fn(&Buf, T, &mut SipHasher13) -> Result<U, Error>,
-) -> Result<Raw<U, E, O>, Error>
+) -> Result<Raw<U, S::Endianness, S::Size>, Error>
 where
     U: ZeroCopy,
     I: IntoIterator<Item = T>,
     I::IntoIter: ExactSizeIterator,
+    S: ?Sized + StoreBuf,
 {
     let entries = entries.into_iter();
     let key = FIXED_SEED;
@@ -261,8 +263,7 @@ where
 
     let (bucket_mask, len) = {
         buf.align_in_place();
-
-        let mut table = Constructor::<U, _, _>::with_buf(buf, ctrl_ptr, base_ptr, buckets);
+        let mut table = Constructor::<U, _>::with_buf(buf, ctrl_ptr, base_ptr, buckets);
 
         for v in entries {
             let mut hasher = SipHasher13::new_with_keys(0, key);

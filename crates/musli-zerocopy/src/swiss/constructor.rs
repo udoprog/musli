@@ -7,17 +7,14 @@ use core::convert::{identity as likely, identity as unlikely};
 use core::marker::PhantomData;
 use core::mem::size_of;
 
-use crate::buf::Buf;
-use crate::buf::OwnedBuf;
-use crate::endian::ByteOrder;
+use crate::buf::{Buf, StoreBuf};
 use crate::error::{Error, ErrorKind};
-use crate::pointer::Size;
 use crate::swiss::raw::{h2, is_full, probe_seq, special_is_empty, Group, ProbeSeq};
 use crate::traits::ZeroCopy;
 
 /// Construction of a raw swiss table.
-pub struct Constructor<'a, T, E: ByteOrder, O: Size> {
-    buf: &'a mut OwnedBuf<E, O>,
+pub struct Constructor<'a, T, S: ?Sized> {
+    buf: &'a mut S,
 
     // Mask to get an index from a hash value. The value is one less than the
     // number of buckets in the table.
@@ -38,7 +35,10 @@ pub struct Constructor<'a, T, E: ByteOrder, O: Size> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T, E: ByteOrder, O: Size> Constructor<'a, T, E, O> {
+impl<'a, T, S: ?Sized> Constructor<'a, T, S>
+where
+    S: StoreBuf,
+{
     /// Wrap the given buffer for table construction.
     ///
     /// # Safety
@@ -54,7 +54,7 @@ impl<'a, T, E: ByteOrder, O: Size> Constructor<'a, T, E, O> {
     ///
     /// [`EMPTY`]: crate::swiss::raw::EMPTY
     pub(crate) fn with_buf(
-        buf: &'a mut OwnedBuf<E, O>,
+        buf: &'a mut S,
         ctrl_ptr: usize,
         base_ptr: usize,
         buckets: usize,
@@ -72,8 +72,8 @@ impl<'a, T, E: ByteOrder, O: Size> Constructor<'a, T, E, O> {
     }
 
     /// Access the underlying buffer.
-    pub(crate) fn buf(&mut self) -> &Buf {
-        self.buf
+    pub(crate) fn buf(&self) -> &Buf {
+        self.buf.as_buf()
     }
 
     /// Export bucket mask.

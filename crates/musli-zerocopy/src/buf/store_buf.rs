@@ -1,3 +1,8 @@
+use core::slice::SliceIndex;
+
+use crate::pointer::Pointee;
+use crate::{traits::UnsizedZeroCopy, Buf, ByteOrder, Ref, Size};
+
 mod sealed {
     #[cfg(feature = "alloc")]
     use crate::buf::OwnedBuf;
@@ -13,4 +18,57 @@ mod sealed {
 }
 
 /// A buffer that we can store things into.
-pub trait StoreBuf: self::sealed::Sealed {}
+#[allow(clippy::len_without_is_empty)]
+pub trait StoreBuf: self::sealed::Sealed {
+    /// The sticky endianness associated with the buffer.
+    type Endianness: ByteOrder;
+
+    /// The sticky size associated with the buffer.
+    type Size: Size;
+
+    /// The current initialized length of the buffer.
+    #[doc(hidden)]
+    fn len(&self) -> usize;
+
+    /// Store an unsigned value.
+    #[doc(hidden)]
+    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    where
+        P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
+        P: UnsizedZeroCopy<P, Self::Size>;
+
+    /// Ensure that the store buffer is aligned.
+    ///
+    /// For buffers which cannot be re-aligned, this will simply panic.
+    #[doc(hidden)]
+    fn align_in_place(&mut self);
+
+    /// Construct an offset aligned for `T` into the current buffer which points
+    /// to the next location that will be written.
+    #[doc(hidden)]
+    fn next_offset<T>(&mut self) -> usize;
+
+    /// Align by `align` and `reserve` additional space in the buffer or panic.
+    #[doc(hidden)]
+    fn next_offset_with_and_reserve(&mut self, align: usize, reserve: usize);
+
+    /// Fill the buffer with `len` repetitions of `byte`.
+    #[doc(hidden)]
+    fn fill(&mut self, byte: u8, len: usize);
+
+    /// Get an immutable slice.
+    #[doc(hidden)]
+    fn get<I>(&self, index: I) -> Option<&I::Output>
+    where
+        I: SliceIndex<[u8]>;
+
+    /// Get a mutable slice.
+    #[doc(hidden)]
+    fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    where
+        I: SliceIndex<[u8]>;
+
+    /// Get the underlying buffer.
+    #[doc(hidden)]
+    fn as_buf(&self) -> &Buf;
+}
