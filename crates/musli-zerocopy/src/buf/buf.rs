@@ -857,7 +857,7 @@ impl Buf {
     /// ```
     #[inline]
     pub fn is_aligned<T>(&self) -> bool {
-        unsafe { crate::buf::is_aligned_with(self.as_ptr(), align_of::<T>()) }
+        crate::buf::is_aligned_with(self.as_ptr(), align_of::<T>())
     }
 
     /// Test if the current allocation uses the specified alignment.
@@ -885,7 +885,7 @@ impl Buf {
     pub fn is_aligned_with(&self, align: usize) -> bool {
         assert!(align.is_power_of_two(), "Alignment is not a power of two");
         // SAFETY: align is a power of two.
-        unsafe { crate::buf::is_aligned_with(self.as_ptr(), align) }
+        crate::buf::is_aligned_with(self.as_ptr(), align)
     }
 
     #[inline]

@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::mem::{align_of, size_of, size_of_val, ManuallyDrop};
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
-use core::slice;
+use core::slice::{self, SliceIndex};
 
 use alloc::alloc;
 
@@ -891,7 +891,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     #[inline]
     pub fn align_in_place(&mut self) {
         // SAFETY: self.requested is guaranteed to be a power of two.
-        if !unsafe { crate::buf::is_aligned_with(self.as_ptr(), self.requested) } {
+        if !crate::buf::is_aligned_with(self.as_ptr(), self.requested) {
             let (old_layout, new_layout) = self.layouts(self.capacity);
             self.alloc_new(old_layout, new_layout);
         }
@@ -982,7 +982,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
         self.ensure_aligned_and_reserve(align, reserve);
     }
 
-    /// Construct a pointer aligned for `T` into the current buffer which points
+    /// Construct an offset aligned for `T` into the current buffer which points
     /// to the next location that will be written.
     ///
     /// This ensures that the alignment of the pointer is a multiple of `align`
@@ -1008,10 +1008,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn next_offset<T>(&mut self) -> usize
-    where
-        T: ZeroCopy,
-    {
+    pub fn next_offset<T>(&mut self) -> usize {
         // SAFETY: The alignment of `T` is guaranteed to be a power of two. We
         // also make sure to reserve space for `T` since it is very likely that
         // it will be written immediately after this.
@@ -1254,4 +1251,62 @@ const fn invalid_mut<T>(addr: usize) -> *mut T {
     unsafe { core::mem::transmute(addr) }
 }
 
-impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {}
+impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
+    type Endianness = E;
+    type Size = O;
+
+    #[inline]
+    fn len(&self) -> usize {
+        OwnedBuf::len(self)
+    }
+
+    #[inline]
+    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    where
+        P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
+        P: UnsizedZeroCopy<P, Self::Size>,
+    {
+        OwnedBuf::store_unsized(self, value)
+    }
+
+    #[inline]
+    fn align_in_place(&mut self) {
+        OwnedBuf::align_in_place(self);
+    }
+
+    #[inline]
+    fn next_offset<T>(&mut self) -> usize {
+        OwnedBuf::next_offset::<T>(self)
+    }
+
+    #[inline]
+    fn next_offset_with_and_reserve(&mut self, align: usize, reserve: usize) {
+        OwnedBuf::next_offset_with_and_reserve(self, align, reserve)
+    }
+
+    #[inline]
+    fn fill(&mut self, byte: u8, len: usize) {
+        OwnedBuf::fill(self, byte, len);
+    }
+
+    #[inline]
+    fn get<I>(&self, index: I) -> Option<&I::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        Buf::get(self, index)
+    }
+
+    #[inline]
+    fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        Buf::get_mut(self, index)
+    }
+
+    #[inline]
+    fn as_buf(&self) -> &Buf {
+        self
+    }
+}

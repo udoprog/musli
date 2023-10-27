@@ -2,7 +2,7 @@ use core::hash::Hash;
 
 use alloc::vec::Vec;
 
-use crate::buf::Visit;
+use crate::buf::{StoreBuf, Visit};
 use crate::endian::ByteOrder;
 use crate::error::Error;
 use crate::phf::{Entry, MapRef, SetRef};
@@ -60,16 +60,17 @@ use crate::ZeroCopy;
 /// assert_eq!(map.get(&30u64)?, None);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_map<K, V, I, E: ByteOrder, O: Size>(
-    buf: &mut OwnedBuf<E, O>,
+pub fn store_map<K, V, I, S>(
+    buf: &mut S,
     entries: I,
-) -> Result<MapRef<K, V, E, O>, Error>
+) -> Result<MapRef<K, V, S::Endianness, S::Size>, Error>
 where
     K: Visit + ZeroCopy,
     V: ZeroCopy,
     K::Target: Hash,
     I: IntoIterator<Item = (K, V)>,
     I::IntoIter: ExactSizeIterator,
+    S: ?Sized + StoreBuf,
 {
     let mut entries = entries
         .into_iter()
@@ -78,7 +79,7 @@ where
 
     let mut hash_state = {
         buf.align_in_place();
-        crate::phf::generator::generate_hash(buf, &entries, |entry| &entry.key)?
+        crate::phf::generator::generate_hash(buf.as_buf(), &entries, |entry| &entry.key)?
     };
 
     for a in 0..hash_state.map.len() {

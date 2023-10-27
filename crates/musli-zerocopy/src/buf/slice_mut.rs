@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use core::mem::{align_of, size_of, size_of_val, ManuallyDrop};
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
-use core::slice;
+use core::slice::{self, SliceIndex};
 
 #[cfg(feature = "alloc")]
 use alloc::borrow::Cow;
@@ -867,10 +867,7 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn next_offset<T>(&mut self) -> usize
-    where
-        T: ZeroCopy,
-    {
+    pub fn next_offset<T>(&mut self) -> usize {
         // SAFETY: The alignment of `T` is guaranteed to be a power of two. We
         // also make sure to reserve space for `T` since it is very likely that
         // it will be written immediately after this.
@@ -968,4 +965,65 @@ impl<'a, E: ByteOrder, O: Size> Borrow<Buf> for SliceMut<'a, E, O> {
     }
 }
 
-impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {}
+impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
+    type Endianness = E;
+    type Size = O;
+
+    #[inline]
+    fn len(&self) -> usize {
+        SliceMut::len(self)
+    }
+
+    #[inline]
+    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    where
+        P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
+        P: UnsizedZeroCopy<P, Self::Size>,
+    {
+        SliceMut::store_unsized(self, value)
+    }
+
+    #[inline]
+    fn align_in_place(&mut self) {
+        // SAFETY: self.requested is guaranteed to be a power of two.
+        if !crate::buf::is_aligned_with(self.as_ptr(), self.requested) {
+            panic!("Slice is not aligned by {}", self.requested);
+        }
+    }
+
+    #[inline]
+    fn next_offset<T>(&mut self) -> usize {
+        SliceMut::next_offset::<T>(self)
+    }
+
+    #[inline]
+    fn next_offset_with_and_reserve(&mut self, align: usize, reserve: usize) {
+        SliceMut::next_offset_with_and_reserve(self, align, reserve)
+    }
+
+    #[inline]
+    fn fill(&mut self, byte: u8, len: usize) {
+        SliceMut::fill(self, byte, len);
+    }
+
+    #[inline]
+    fn get<I>(&self, index: I) -> Option<&I::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        Buf::get(self, index)
+    }
+
+    #[inline]
+    fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        Buf::get_mut(self, index)
+    }
+
+    #[inline]
+    fn as_buf(&self) -> &Buf {
+        self
+    }
+}
