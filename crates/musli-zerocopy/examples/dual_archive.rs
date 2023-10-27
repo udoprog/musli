@@ -7,7 +7,7 @@ use musli_zerocopy::{ByteOrder, Endian, OwnedBuf, Ref, ZeroCopy};
 #[derive(ZeroCopy)]
 #[repr(C)]
 struct Header {
-    big: Ref<Data<Big>, Little>,
+    big: Ref<Data<Big>, Big>,
     little: Ref<Data<Little>, Little>,
 }
 
@@ -40,7 +40,10 @@ fn main() -> Result<()> {
         age: Endian::new(35),
     });
 
-    buf.load_uninit_mut(header).write(&Header { big, little });
+    buf.load_uninit_mut(header).write(&Header {
+        big: big.to_endian(),
+        little: little.to_endian(),
+    });
 
     buf.align_in_place();
 
@@ -53,5 +56,15 @@ fn main() -> Result<()> {
 
     dbg!(buf.load(big.name)?);
     dbg!(big.age.to_ne(), big.age.to_raw());
+
+    let (name, age) = if cfg!(target_endian = "big") {
+        let big = buf.load(header.big)?;
+        (buf.load(big.name)?, big.age.to_ne())
+    } else {
+        let little = buf.load(header.little)?;
+        (buf.load(little.name)?, big.age.to_ne())
+    };
+
+    dbg!(name, age);
     Ok(())
 }
