@@ -400,7 +400,7 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 ///
 /// let mut buf = OwnedBuf::new();
 /// let ptr = buf.store(&Custom { field: 42, ignore: () });
-/// let buf = buf.into_aligned();
+/// buf.align_in_place();
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 42, ignore: () });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -1103,10 +1103,10 @@ macro_rules! impl_zst {
         #[doc = concat!("    field: ", stringify!($example), ",")]
         /// }
         ///
-        /// let mut empty = OwnedBuf::new();
+        /// let mut buf = OwnedBuf::new();
         /// let values = [Struct::default(); 100];
-        /// let slice = empty.store_unsized(&values[..]);
-        /// let buf = empty.into_aligned();
+        /// let slice = buf.store_unsized(&values[..]);
+        /// buf.align_in_place();
         /// assert_eq!(buf.len(), 0);
         ///
         /// let slice = buf.load(slice)?;
@@ -1166,10 +1166,10 @@ impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::Phan
 ///     field: [T; 0],
 /// }
 ///
-/// let mut empty = OwnedBuf::with_alignment::<u128>();
+/// let mut buf = OwnedBuf::with_alignment::<u128>();
 /// let values = [Struct::<u128>::default(); 100];
-/// let slice = empty.store_unsized(&values[..]);
-/// let buf = empty.into_aligned();
+/// let slice = buf.store_unsized(&values[..]);
+/// buf.align_in_place();
 /// assert_eq!(buf.len(), 0);
 ///
 /// let slice = buf.load(slice)?;

@@ -44,7 +44,6 @@ const FIXED_SEED: u64 = 1234567890;
 /// let mut buf = OwnedBuf::new();
 ///
 /// let map = swiss::store_map(&mut buf, [(10, 1u32), (10, 2u32)])?;
-/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert!(matches!(map.get(&10)?, Some(&1) | Some(&2)));
@@ -66,7 +65,6 @@ const FIXED_SEED: u64 = 1234567890;
 /// ];
 ///
 /// let map = swiss::store_map(&mut buf, pairs)?;
-/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get("first")?, Some(&1));
@@ -84,7 +82,6 @@ const FIXED_SEED: u64 = 1234567890;
 /// let mut buf = OwnedBuf::new();
 ///
 /// let map = swiss::store_map(&mut buf, [(10u64, 1u32), (20u64, 2u32)])?;
-/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get(&10u64)?, Some(&1));
@@ -102,7 +99,6 @@ const FIXED_SEED: u64 = 1234567890;
 /// let mut buf = OwnedBuf::new();
 ///
 /// let map = swiss::store_map(&mut buf, [((), ()), ((), ())])?;
-/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get(&())?, Some(&()));
@@ -163,7 +159,6 @@ where
 /// let third = buf.store_unsized("third");
 ///
 /// let set = swiss::store_set(&mut buf, [first, second])?;
-/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains("first")?);
@@ -184,7 +179,6 @@ where
 /// let mut buf = OwnedBuf::new();
 ///
 /// let set = swiss::store_set(&mut buf, [1, 2])?;
-/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains(&1)?);
@@ -202,7 +196,6 @@ where
 /// let mut buf = OwnedBuf::new();
 ///
 /// let set = swiss::store_set(&mut buf, [(), ()])?;
-/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains(&())?);

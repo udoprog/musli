@@ -8,7 +8,7 @@ fn main() -> Result<(), Error> {
 
     let values = phf::store_map(&mut buf, [(10u32, string), (20u32, string)])?;
 
-    let buf = buf.into_aligned();
+    buf.align_in_place();
 
     let values = buf.bind(values)?;
 

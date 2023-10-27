@@ -34,7 +34,6 @@ use crate::ZeroCopy;
 /// let mut buf = OwnedBuf::new();
 ///
 /// let set = swiss::store_set(&mut buf, [1, 2])?;
-/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains(&1)?);
@@ -63,7 +62,6 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let set = swiss::store_set(&mut buf, [1, 2])?;
-    /// let buf = buf.into_aligned();
     /// let set = buf.bind(set)?;
     ///
     /// assert!(set.contains(&1)?);

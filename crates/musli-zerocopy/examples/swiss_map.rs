@@ -6,7 +6,8 @@ fn main() -> Result<(), Error> {
 
     let values = swiss::store_map(&mut buf, [(10u32, 1u32), (20u32, 2u32)])?;
 
-    let buf = buf.into_aligned();
+    buf.align_in_place();
+
     let values = buf.bind(values)?;
 
     assert_eq!(values.get(&10u32)?, Some(&1));

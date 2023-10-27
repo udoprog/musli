@@ -71,7 +71,6 @@
 //! let slice_ref: Ref<Ref<[u8]>> = buf1.store(&slice);
 //! assert_eq!(buf1.len(), 12);
 //!
-//! let buf1 = buf1.into_aligned();
 //! let slice = buf1.load(slice_ref)?;
 //! assert_eq!(slice.len(), 4);
 //! assert_eq!(buf1.load(*slice)?, &[1, 2, 3, 4]);
@@ -82,7 +81,6 @@
 //! let slice_ref: Ref<CompactSlice> = buf2.store(&slice);
 //! assert_eq!(buf2.len(), 8);
 //!
-//! let buf2 = buf2.into_aligned();
 //! let slice = buf2.load(slice_ref)?;
 //! assert_eq!(slice.len(), 4);
 //! assert_eq!(buf2.load(*slice)?, &[1, 2, 3, 4]);
@@ -111,10 +109,16 @@ mod validator;
 pub use self::padder::Padder;
 mod padder;
 
+pub use self::store_buf::StoreBuf;
+mod store_buf;
+
 #[cfg(feature = "alloc")]
 pub use self::owned_buf::OwnedBuf;
 #[cfg(feature = "alloc")]
 mod owned_buf;
+
+pub use self::slice_mut::SliceMut;
+mod slice_mut;
 
 use core::mem::{align_of, size_of};
 
