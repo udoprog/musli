@@ -533,7 +533,7 @@ extern crate std;
 #[doc(inline)]
 pub use self::buf::OwnedBuf;
 #[doc(inline)]
-pub use self::buf::{Buf, DefaultAlignment};
+pub use self::buf::{Buf, DefaultAlignment, SliceMut};
 pub mod buf;
 
 pub mod mem;
@@ -594,7 +594,7 @@ pub mod endian;
 ///
 /// let mut buf = OwnedBuf::new();
 /// let ptr = buf.store(&Custom { field: 10 });
-/// let buf = buf.into_aligned();
+/// buf.align_in_place();
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 10 });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```

@@ -34,7 +34,6 @@ use crate::ZeroCopy;
 /// let second = buf.store_unsized("second");
 ///
 /// let map = phf::store_map(&mut buf, [(first, 1u32), (second, 2u32)])?;
-/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get("first")?, Some(&1));
@@ -54,7 +53,6 @@ use crate::ZeroCopy;
 /// let mut buf = OwnedBuf::new();
 ///
 /// let map = phf::store_map(&mut buf, [(10u64, 1), (20u64, 2)])?;
-/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get(&10u64)?, Some(&1));
@@ -134,7 +132,6 @@ where
 /// let third = buf.store_unsized("third");
 ///
 /// let set = phf::store_set(&mut buf, [first, second])?;
-/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains("first")?);
@@ -155,7 +152,6 @@ where
 /// let mut buf = OwnedBuf::new();
 ///
 /// let set = phf::store_set(&mut buf, [1, 2])?;
-/// let buf = buf.into_aligned();
 /// let set = buf.bind(set)?;
 ///
 /// assert!(set.contains(&1)?);

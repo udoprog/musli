@@ -34,7 +34,6 @@ use crate::{Order, ZeroCopy};
 /// let mut buf = OwnedBuf::new();
 ///
 /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-/// let buf = buf.into_aligned();
 /// let map = buf.bind(map)?;
 ///
 /// assert_eq!(map.get(&1)?, Some(&2));
@@ -68,7 +67,6 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get(&1)?, Some(&2));
@@ -101,7 +99,6 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert!(map.contains_key(&1)?);
@@ -130,7 +127,6 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let map = phf::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get_entry(&1)?, Some((&1, &2)));

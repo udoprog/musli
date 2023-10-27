@@ -17,7 +17,8 @@ fn main() -> Result<(), Error> {
 
     buf.load_uninit_mut(reference).write(&Custom { string });
 
-    let buf = buf.into_aligned();
+    buf.align_in_place();
+
     let reference = reference.assume_init();
 
     assert_eq!(reference.offset(), 4);

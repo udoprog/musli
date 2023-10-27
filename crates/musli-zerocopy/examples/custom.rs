@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     let c2 = buf.store(&Custom { field: 2, string });
 
     let map = phf::store_map(&mut buf, [(1, c1), (2, c2)])?;
-    let buf = buf.into_aligned();
+    buf.align_in_place();
     let map = buf.bind(map)?;
 
     let c1 = buf.load(*map.get(&1)?.context("Missing key 1")?)?;

@@ -168,8 +168,6 @@ where
     /// let mut buf = OwnedBuf::new();
     /// let slice = buf.store_slice(&[1, 2, 3, 4]);
     ///
-    /// let buf = buf.into_aligned();
-    ///
     /// let two = slice.get(2).expect("Missing element 2");
     /// assert_eq!(buf.load(two)?, &3);
     ///
@@ -343,8 +341,6 @@ where
     ///
     /// let values = buf.store(&[1, 2, 3, 4]);
     /// let slice = values.array_into_slice();
-    ///
-    /// let buf = buf.into_aligned();
     ///
     /// assert_eq!(buf.load(slice)?, &[1, 2, 3, 4]);
     /// # Ok::<_, musli_zerocopy::Error>(())

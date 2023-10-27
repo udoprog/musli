@@ -171,7 +171,6 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::with_alignment::<u32>();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
-    /// let buf = buf.into_aligned();
     ///
     /// assert!(buf.is_compatible_with::<u32>());
     /// assert!(!buf.is_compatible_with::<u64>());
@@ -193,7 +192,6 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::with_alignment::<u32>();
     /// buf.extend_from_slice(&[1, 2, 3, 4]);
-    /// let buf = buf.into_aligned();
     ///
     /// assert!(buf.ensure_compatible_with::<u32>().is_ok());
     /// assert!(buf.ensure_compatible_with::<u64>().is_err());
@@ -482,7 +480,6 @@ impl Buf {
     /// let mut buf = OwnedBuf::new();
     ///
     /// let map = swiss::store_map(&mut buf, [(1, 2), (2, 3)])?;
-    /// let buf = buf.into_aligned();
     /// let map = buf.bind(map)?;
     ///
     /// assert_eq!(map.get(&1)?, Some(&2));
@@ -551,7 +548,6 @@ impl Buf {
     /// let mut buf = OwnedBuf::new();
     ///
     /// let custom = buf.store(&Custom { field: 42, field2: 85 });
-    /// let buf = buf.into_aligned();
     ///
     /// let mut v = buf.validate_struct::<Custom>()?;
     ///
