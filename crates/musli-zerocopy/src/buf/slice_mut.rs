@@ -42,14 +42,12 @@ pub struct SliceMut<'a, E: ByteOrder = NativeEndian, O: Size = DefaultSize> {
     capacity: usize,
     /// The requested alignment.
     requested: usize,
-    /// The current alignment.
-    align: usize,
     /// Sticky endianness and pointer size.
     _marker: PhantomData<(&'a mut [u8], E, O)>,
 }
 
 impl<'a> SliceMut<'a> {
-    /// Construct a new empty buffer with the default alignment.
+    /// Construct a new empty buffer with a requested default alignment.
     ///
     /// The default alignment is guaranteed to be larger than 0.
     ///
@@ -61,14 +59,15 @@ impl<'a> SliceMut<'a> {
     /// let mut buf = [0; 1024];
     /// let buf = SliceMut::new(&mut buf);
     /// assert!(buf.is_empty());
-    /// assert!(buf.alignment() > 0);
-    /// assert!(buf.alignment() >= buf.requested());
     /// ```
     pub fn new(bytes: &'a mut [u8]) -> Self {
         Self::with_alignment::<DefaultAlignment>(bytes)
     }
 
-    /// Construct a new empty buffer with the an alignment matching that of `T`.
+    /// Construct a new empty buffer with the an alignment request matching that
+    /// of `T`
+    ///
+    /// Note that this does not guarantee that the underlying buffer is aligned.
     ///
     /// # Examples
     ///
@@ -78,7 +77,6 @@ impl<'a> SliceMut<'a> {
     /// let mut buf = [0; 1024];
     /// let buf = SliceMut::with_alignment::<u64>(&mut buf);
     /// assert!(buf.is_empty());
-    /// assert!(buf.alignment() >= 8);
     /// assert_eq!(buf.requested(), 8);
     /// ```
     pub fn with_alignment<T>(bytes: &'a mut [u8]) -> Self {
@@ -90,7 +88,6 @@ impl<'a> SliceMut<'a> {
             len: 0,
             capacity,
             requested: align,
-            align,
             _marker: PhantomData,
         }
     }
@@ -117,7 +114,6 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
             len: this.len,
             capacity: this.capacity,
             requested: this.requested,
-            align: this.align,
             _marker: PhantomData,
         }
     }
@@ -143,7 +139,6 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
             len: this.len,
             capacity: this.capacity,
             requested: this.requested,
-            align: this.align,
             _marker: PhantomData,
         }
     }
@@ -228,7 +223,6 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// let mut buf = [0; 1024];
     /// let buf = SliceMut::with_alignment::<u64>(&mut buf);
     /// assert!(buf.is_empty());
-    /// assert!(buf.alignment() >= 8);
     /// assert_eq!(buf.requested(), 8);
     /// ```
     #[inline]
@@ -479,6 +473,8 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// let custom = buf.store(&Custom { field: 1, string });
     /// let custom2 = buf.store(&Custom { field: 2, string });
     ///
+    /// let buf = buf.to_requested();
+    ///
     /// let custom = buf.load(custom)?;
     /// assert_eq!(custom.field, 1);
     /// assert_eq!(buf.load(custom.string)?, "string");
@@ -511,6 +507,9 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
     /// let array = buf.store(&values);
+    ///
+    /// let buf = buf.to_requested();
+    ///
     /// assert_eq!(buf.load(array)?, &values);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```

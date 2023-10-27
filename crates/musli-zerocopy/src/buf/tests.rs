@@ -158,6 +158,8 @@ fn inner_padding() -> Result<()> {
 
     assert_eq!(reference.offset(), 16);
 
+    buf.align_in_place();
+
     let custom = buf.load(reference)?;
     assert_eq!(&custom.inner, &inner);
     assert_eq!(&custom.inner2, &inner2);
