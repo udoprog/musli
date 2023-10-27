@@ -1,10 +1,10 @@
 use core::marker::PhantomData;
 use core::{any, fmt};
 
-use crate::endian::{BigEndian, ByteOrder, LittleEndian};
+use crate::endian::{Big, ByteOrder, Little};
 use crate::ZeroCopy;
 
-/// A value capable of enforcing a custom [`ByteOrder`].
+/// Wrapper capable of enforcing a custom [`ByteOrder`].
 ///
 /// This can be used to store values in a zero-copy container in a portable
 /// manner, which is especially important to transfer types such as `char` which
@@ -12,21 +12,21 @@ use crate::ZeroCopy;
 #[derive(ZeroCopy)]
 #[zero_copy(crate, swap_bytes, bounds = {T: ZeroCopy})]
 #[repr(transparent)]
-pub struct Order<T, E: ByteOrder> {
+pub struct Endian<T, E: ByteOrder> {
     value: T,
     #[zero_copy(ignore)]
     _marker: PhantomData<E>,
 }
 
-impl<T: ZeroCopy> Order<T, LittleEndian> {
-    /// Construct new value wrapper with [`LittleEndian`] [`ByteOrder`].
+impl<T: ZeroCopy> Endian<T, Little> {
+    /// Construct new value wrapper with [`Little`] [`ByteOrder`].
     ///
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Order;
+    /// use musli_zerocopy::Endian;
     ///
-    /// let value = Order::le(42u32);
+    /// let value = Endian::le(42u32);
     /// assert_eq!(value.to_ne(), 42);
     /// assert_eq!(value.to_raw(), 42u32.to_le());
     /// ```
@@ -36,15 +36,15 @@ impl<T: ZeroCopy> Order<T, LittleEndian> {
     }
 }
 
-impl<T: ZeroCopy> Order<T, BigEndian> {
-    /// Construct new value wrapper with [`BigEndian`] [`ByteOrder`].
+impl<T: ZeroCopy> Endian<T, Big> {
+    /// Construct new value wrapper with [`Big`] [`ByteOrder`].
     ///
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Order;
+    /// use musli_zerocopy::Endian;
     ///
-    /// let value = Order::be(42u32);
+    /// let value = Endian::be(42u32);
     /// assert_eq!(value.to_ne(), 42);
     /// assert_eq!(value.to_raw(), 42u32.to_be());
     /// ```
@@ -54,7 +54,7 @@ impl<T: ZeroCopy> Order<T, BigEndian> {
     }
 }
 
-impl<T: ZeroCopy, E: ByteOrder> Order<T, E> {
+impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     /// Construct new value wrapper with the specified [`ByteOrder`].
     ///
     /// # Panics
@@ -63,18 +63,18 @@ impl<T: ZeroCopy, E: ByteOrder> Order<T, E> {
     /// byte-ordered.
     ///
     /// ```should_panic
-    /// use musli_zerocopy::{LittleEndian, Order};
+    /// use musli_zerocopy::{endian, Endian};
     ///
-    /// let _: Order<_, LittleEndian> = Order::new('a');
+    /// let _: Endian<_, endian::Little> = Endian::new('a');
     /// ```
     ///
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::{BigEndian, LittleEndian, Order, ZeroCopy};
+    /// use musli_zerocopy::{endian, Endian, ZeroCopy};
     ///
-    /// let mut a: Order<_, BigEndian> = Order::new('a' as u32);
-    /// let mut b: Order<_, LittleEndian> = Order::new('a' as u32);
+    /// let mut a: Endian<_, endian::Big> = Endian::new('a' as u32);
+    /// let mut b: Endian<_, endian::Little> = Endian::new('a' as u32);
     ///
     /// assert_eq!(a.to_ne(), 'a' as u32);
     /// assert_eq!(a.to_bytes(), &[0, 0, 0, 97]);
@@ -101,9 +101,9 @@ impl<T: ZeroCopy, E: ByteOrder> Order<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Order;
+    /// use musli_zerocopy::Endian;
     ///
-    /// let value = Order::le(42u32);
+    /// let value = Endian::le(42u32);
     /// assert_eq!(value.to_ne(), 42);
     /// assert_eq!(value.to_raw(), 42u32.to_le());
     /// ```
@@ -117,9 +117,9 @@ impl<T: ZeroCopy, E: ByteOrder> Order<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Order;
+    /// use musli_zerocopy::Endian;
     ///
-    /// let value = Order::le(42u32);
+    /// let value = Endian::le(42u32);
     /// assert_eq!(value.to_ne(), 42);
     /// assert_eq!(value.to_raw(), 42u32.to_le());
     /// ```
@@ -129,20 +129,18 @@ impl<T: ZeroCopy, E: ByteOrder> Order<T, E> {
     }
 }
 
-impl<T, E> fmt::Debug for Order<T, E>
+impl<T, E> fmt::Debug for Endian<T, E>
 where
     T: fmt::Debug + ZeroCopy,
     E: ByteOrder,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Order")
-            .field("value", &self.value)
-            .field("_marker", &self._marker)
-            .finish()
+        write!(f, "Endian<{}>({:?})", any::type_name::<E>(), self.value)
     }
 }
 
-impl<T, E> Clone for Order<T, E>
+impl<T, E> Clone for Endian<T, E>
 where
     T: Clone + ZeroCopy,
     E: ByteOrder,
@@ -155,7 +153,7 @@ where
     }
 }
 
-impl<T, E> Copy for Order<T, E>
+impl<T, E> Copy for Endian<T, E>
 where
     T: Copy + ZeroCopy,
     E: ByteOrder,

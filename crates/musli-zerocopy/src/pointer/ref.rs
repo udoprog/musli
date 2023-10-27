@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::mem::size_of;
 use core::{any, fmt};
 
-use crate::endian::{ByteOrder, NativeEndian};
+use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Size};
 use crate::ZeroCopy;
@@ -41,7 +41,7 @@ use crate::ZeroCopy;
 #[derive(ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate, swap_bytes, bounds = {P::Packed: ZeroCopy})]
-pub struct Ref<P: ?Sized, E: ByteOrder = NativeEndian, O: Size = DefaultSize>
+pub struct Ref<P: ?Sized, E: ByteOrder = Native, O: Size = DefaultSize>
 where
     P: Pointee<O>,
 {
@@ -49,6 +49,100 @@ where
     metadata: P::Packed,
     #[zero_copy(ignore)]
     _marker: PhantomData<(E, P)>,
+}
+
+impl<P: ?Sized, E: ByteOrder, O: Size> Ref<P, E, O>
+where
+    P: Pointee<O>,
+    P::Packed: ZeroCopy,
+{
+    /// Convert this reference into a [`Big`]-endian [`ByteOrder`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{endian, Ref};
+    ///
+    /// let r: Ref<u32> = Ref::new(10);
+    /// assert_eq!(r.offset(), 10);
+    ///
+    /// let r: Ref<u32, endian::Little> = Ref::new(10);
+    /// assert_eq!(r.offset(), 10);
+    ///
+    /// let r: Ref<u32, endian::Big> = r.to_be();
+    /// assert_eq!(r.offset(), 10);
+    /// ```
+    #[inline]
+    pub fn to_be(self) -> Ref<P, Big, O> {
+        self.to_endian()
+    }
+
+    /// Convert this reference into a [`Little`]-endian [`ByteOrder`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{endian, Ref};
+    ///
+    /// let r: Ref<u32> = Ref::new(10);
+    /// assert_eq!(r.offset(), 10);
+    ///
+    /// let r: Ref<u32, endian::Big> = Ref::new(10);
+    /// assert_eq!(r.offset(), 10);
+    ///
+    /// let r: Ref<u32, endian::Little> = r.to_le();
+    /// assert_eq!(r.offset(), 10);
+    /// ```
+    #[inline]
+    pub fn to_le(self) -> Ref<P, Little, O> {
+        self.to_endian()
+    }
+
+    /// Convert this reference into a [`Native`]-endian [`ByteOrder`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{endian, Ref};
+    ///
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Big>::new(10).to_ne();
+    /// assert_eq!(r.offset(), 10);
+    ///
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Little>::new(10).to_ne();
+    /// assert_eq!(r.offset(), 10);
+    ///
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Native>::new(10).to_ne();
+    /// assert_eq!(r.offset(), 10);
+    /// ```
+    #[inline]
+    pub fn to_ne(self) -> Ref<P, Native, O> {
+        self.to_endian()
+    }
+
+    /// Convert this reference into a `U`-endian [`ByteOrder`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{endian, Ref};
+    ///
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Big>::new(10).to_endian();
+    /// assert_eq!(r.offset(), 10);
+    ///
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Little>::new(10).to_endian();
+    /// assert_eq!(r.offset(), 10);
+    ///
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Native>::new(10).to_endian();
+    /// assert_eq!(r.offset(), 10);
+    /// ```
+    #[inline]
+    pub fn to_endian<U: ByteOrder>(self) -> Ref<P, U, O> {
+        Ref {
+            offset: self.offset.transpose_bytes::<E, U>(),
+            metadata: self.metadata.transpose_bytes::<E, U>(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, E, O>
@@ -232,6 +326,41 @@ where
             end,
             _marker: PhantomData,
         }
+    }
+}
+
+impl<O: Size, E: ByteOrder> Ref<str, E, O> {
+    /// Return the length of the string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let slice = Ref::<str>::with_metadata(0, 2);
+    /// assert_eq!(slice.len(), 2);
+    /// ```
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.metadata.as_usize::<E>()
+    }
+
+    /// Test if the slice `[P]` is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::pointer::Ref;
+    ///
+    /// let slice = Ref::<str>::with_metadata(0, 0);
+    /// assert!(slice.is_empty());
+    ///
+    /// let slice = Ref::<str>::with_metadata(0, 2);
+    /// assert!(!slice.is_empty());
+    /// ```
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.metadata.is_zero()
     }
 }
 

@@ -18,13 +18,13 @@ use core::hash::{Hash, Hasher};
 use core::mem::size_of;
 
 use crate::buf::{Bindable, Buf, Visit};
-use crate::endian::{ByteOrder, NativeEndian};
+use crate::endian::{ByteOrder, Native};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{DefaultSize, Ref, Size};
 use crate::sip::SipHasher13;
 use crate::swiss::raw::{h2, probe_seq, Group};
 use crate::swiss::Entry;
-use crate::{Order, ZeroCopy};
+use crate::{Endian, ZeroCopy};
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///
@@ -233,12 +233,12 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct MapRef<K, V, E: ByteOrder = NativeEndian, O: Size = DefaultSize>
+pub struct MapRef<K, V, E: ByteOrder = Native, O: Size = DefaultSize>
 where
     K: ZeroCopy,
     V: ZeroCopy,
 {
-    key: Order<u64, E>,
+    key: Endian<u64, E>,
     table: RawTableRef<Entry<K, V>, E, O>,
 }
 
@@ -250,7 +250,7 @@ where
     #[cfg(feature = "alloc")]
     pub(crate) fn new(key: u64, table: RawTableRef<Entry<K, V>, E, O>) -> Self {
         Self {
-            key: Order::new(key),
+            key: Endian::new(key),
             table,
         }
     }
@@ -460,14 +460,14 @@ impl<'a, T> RawTable<'a, T> {
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub(crate) struct RawTableRef<T, E: ByteOrder = NativeEndian, O: Size = DefaultSize>
+pub(crate) struct RawTableRef<T, E: ByteOrder = Native, O: Size = DefaultSize>
 where
     T: ZeroCopy,
 {
     ctrl: Ref<[u8], E, O>,
     entries: Ref<[T], E, O>,
-    bucket_mask: Order<usize, E>,
-    len: Order<usize, E>,
+    bucket_mask: Endian<usize, E>,
+    len: Endian<usize, E>,
 }
 
 impl<T, E: ByteOrder, O: Size> RawTableRef<T, E, O>
@@ -485,8 +485,8 @@ where
         Self {
             ctrl,
             entries,
-            bucket_mask: Order::new(bucket_mask),
-            len: Order::new(len),
+            bucket_mask: Endian::new(bucket_mask),
+            len: Endian::new(len),
         }
     }
 

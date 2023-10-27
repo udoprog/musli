@@ -582,13 +582,13 @@ pub unsafe trait ZeroCopy: Sized {
     /// composite field that is apart of that type.
     ///
     /// ```
-    /// use musli_zerocopy::{BigEndian, LittleEndian, Ref, ZeroCopy};
+    /// use musli_zerocopy::{endian, Ref, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
     /// struct Struct {
     ///     number: u32,
-    ///     reference: Ref<u32, LittleEndian, usize>,
+    ///     reference: Ref<u32, endian::Little, usize>,
     /// }
     ///
     /// let st = Struct {
@@ -599,7 +599,7 @@ pub unsafe trait ZeroCopy: Sized {
     /// assert_eq!(st.number, 0x10203040u32.to_le());
     /// assert_eq!(st.reference.offset(), 0x50607080usize);
     ///
-    /// let st2 = st.swap_bytes::<BigEndian>();
+    /// let st2 = st.swap_bytes::<endian::Big>();
     /// assert_eq!(st2.number, 0x10203040u32.to_be());
     /// assert_eq!(st2.reference.offset(), 0x50607080usize);
     /// ```
@@ -617,6 +617,12 @@ pub unsafe trait ZeroCopy: Sized {
     ///
     /// [`CAN_SWAP_BYTES`]: Self::CAN_SWAP_BYTES
     fn swap_bytes<E: ByteOrder>(self) -> Self;
+
+    /// Transpose a type from one byte order `F` to another `T`.
+    #[inline]
+    fn transpose_bytes<F: ByteOrder, T: ByteOrder>(self) -> Self {
+        self.swap_bytes::<F>().swap_bytes::<T>()
+    }
 }
 
 unsafe impl<P: ?Sized, O> UnsizedZeroCopy<P, O> for str

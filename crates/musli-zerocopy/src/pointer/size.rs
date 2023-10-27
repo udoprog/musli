@@ -67,10 +67,10 @@ macro_rules! impl_size {
         /// # Examples
         ///
         /// ```
-        /// use musli_zerocopy::{BigEndian, LittleEndian, Size};
+        /// use musli_zerocopy::{endian, Size};
         ///
-        #[doc = concat!("let max = ", stringify!($ty), "::MAX.as_usize::<LittleEndian>();")]
-        #[doc = concat!("let min = ", stringify!($ty), "::MIN.as_usize::<LittleEndian>();")]
+        #[doc = concat!("let max = ", stringify!($ty), "::MAX.as_usize::<endian::Big>();")]
+        #[doc = concat!("let min = ", stringify!($ty), "::MIN.as_usize::<endian::Little>();")]
         /// ```
         impl Size for $ty {
             const ZERO: Self = 0;
