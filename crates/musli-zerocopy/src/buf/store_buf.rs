@@ -1,7 +1,8 @@
 use core::slice::SliceIndex;
 
 use crate::pointer::Pointee;
-use crate::{traits::UnsizedZeroCopy, Buf, ByteOrder, Ref, Size};
+use crate::traits::{UnsizedZeroCopy, ZeroCopy};
+use crate::{Buf, ByteOrder, Error, Ref, Size};
 
 mod sealed {
     #[cfg(feature = "alloc")]
@@ -37,6 +38,22 @@ pub trait StoreBuf: self::sealed::Sealed {
         P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
         P: UnsizedZeroCopy<P, Self::Size>;
 
+    /// Store a [`ZeroCopy`] value.
+    #[doc(hidden)]
+    fn store<P>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    where
+        P: ZeroCopy;
+
+    /// Swap the location of two references.
+    #[doc(hidden)]
+    fn swap<P>(
+        &mut self,
+        a: Ref<P, Self::Endianness, Self::Size>,
+        b: Ref<P, Self::Endianness, Self::Size>,
+    ) -> Result<(), Error>
+    where
+        P: ZeroCopy;
+
     /// Ensure that the store buffer is aligned.
     ///
     /// For buffers which cannot be re-aligned, this will simply panic.
@@ -71,4 +88,8 @@ pub trait StoreBuf: self::sealed::Sealed {
     /// Get the underlying buffer.
     #[doc(hidden)]
     fn as_buf(&self) -> &Buf;
+
+    /// Get the underlying buffer mutably.
+    #[doc(hidden)]
+    fn as_mut_buf(&mut self) -> &mut Buf;
 }

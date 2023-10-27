@@ -10,6 +10,7 @@ use alloc::alloc;
 
 use crate::buf::{Buf, DefaultAlignment, Padder, StoreBuf};
 use crate::endian::{ByteOrder, NativeEndian};
+use crate::error::Error;
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -1270,6 +1271,26 @@ impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
     }
 
     #[inline]
+    fn store<P>(&mut self, value: &P) -> Ref<P, Self::Endianness, Self::Size>
+    where
+        P: ZeroCopy,
+    {
+        OwnedBuf::store(self, value)
+    }
+
+    #[inline]
+    fn swap<P>(
+        &mut self,
+        a: Ref<P, Self::Endianness, Self::Size>,
+        b: Ref<P, Self::Endianness, Self::Size>,
+    ) -> Result<(), Error>
+    where
+        P: ZeroCopy,
+    {
+        Buf::swap::<P>(self, a.offset(), b.offset())
+    }
+
+    #[inline]
     fn align_in_place(&mut self) {
         OwnedBuf::align_in_place(self);
     }
@@ -1307,6 +1328,11 @@ impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
 
     #[inline]
     fn as_buf(&self) -> &Buf {
+        self
+    }
+
+    #[inline]
+    fn as_mut_buf(&mut self) -> &mut Buf {
         self
     }
 }

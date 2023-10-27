@@ -768,6 +768,38 @@ impl Buf {
         }
     }
 
+    /// Swap type `T` at offsets `a` and `b`.
+    #[inline]
+    pub(crate) fn swap<T>(&mut self, a: usize, b: usize) -> Result<(), Error>
+    where
+        T: ZeroCopy,
+    {
+        if a == b {
+            return Ok(());
+        }
+
+        let start = a.max(b);
+        let end = start.wrapping_add(size_of::<T>());
+
+        if end > self.data.len() {
+            return Err(Error::new(ErrorKind::OutOfRangeBounds {
+                range: start..end,
+                len: self.data.len(),
+            }));
+        }
+
+        unsafe {
+            let a = self.data.as_mut_ptr().add(a);
+            let b = self.data.as_mut_ptr().add(b);
+
+            for n in 0..size_of::<T>() {
+                a.add(n).swap(b.add(n));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Load the given sized value as a mutable reference.
     #[inline]
     pub(crate) fn load_sized_mut<T>(&mut self, offset: usize) -> Result<&mut T, Error>

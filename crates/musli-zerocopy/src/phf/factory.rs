@@ -1,13 +1,10 @@
 use core::hash::Hash;
 
-use alloc::vec::Vec;
-
 use crate::buf::{StoreBuf, Visit};
-use crate::endian::ByteOrder;
 use crate::error::Error;
+use crate::phf::hashing::HashKey;
 use crate::phf::{Entry, MapRef, SetRef};
-use crate::pointer::Size;
-use crate::OwnedBuf;
+use crate::Ref;
 use crate::ZeroCopy;
 
 /// Store a map based on a perfect hash function into the [`OwnedBuf`].
@@ -60,7 +57,7 @@ use crate::ZeroCopy;
 /// assert_eq!(map.get(&30u64)?, None);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_map<K, V, I, S>(
+pub fn store_map<K, V, S, I>(
     buf: &mut S,
     entries: I,
 ) -> Result<MapRef<K, V, S::Endianness, S::Size>, Error>
@@ -68,44 +65,13 @@ where
     K: Visit + ZeroCopy,
     V: ZeroCopy,
     K::Target: Hash,
+    S: ?Sized + StoreBuf,
     I: IntoIterator<Item = (K, V)>,
     I::IntoIter: ExactSizeIterator,
-    S: ?Sized + StoreBuf,
 {
-    let mut entries = entries
-        .into_iter()
-        .map(|(k, v)| Entry::new(k, v))
-        .collect::<Vec<_>>();
-
-    let mut hash_state = {
-        buf.align_in_place();
-        crate::phf::generator::generate_hash(buf.as_buf(), &entries, |entry| &entry.key)?
-    };
-
-    for a in 0..hash_state.map.len() {
-        loop {
-            let b = hash_state.map[a];
-
-            if hash_state.map[a] != a {
-                entries.swap(a, b);
-                hash_state.map.swap(a, b);
-                continue;
-            }
-
-            break;
-        }
-    }
-
-    let entries = buf.store_unsized(&entries[..]);
-
-    let mut displacements = Vec::new();
-
-    for (key, value) in hash_state.displacements {
-        displacements.push(Entry::new(key, value));
-    }
-
-    let displacements = buf.store_unsized(&displacements[..]);
-    Ok(MapRef::new(hash_state.key, entries, displacements))
+    let entries = entries.into_iter().map(|(k, v)| Entry::new(k, v));
+    let (key, entries, displacements) = store_raw(buf, entries, |entry| &entry.key)?;
+    Ok(MapRef::new(key, entries, displacements))
 }
 
 /// Store a set based on a perfect hash function into the [`OwnedBuf`].
@@ -160,21 +126,64 @@ where
 /// assert!(!set.contains(&3)?);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_set<T, I, E: ByteOrder, O: Size>(
-    buf: &mut OwnedBuf<E, O>,
-    iter: I,
-) -> Result<SetRef<T, E, O>, Error>
+pub fn store_set<S, I>(
+    buf: &mut S,
+    entries: I,
+) -> Result<SetRef<I::Item, S::Endianness, S::Size>, Error>
 where
-    T: Visit + ZeroCopy,
-    T::Target: Hash,
-    I: IntoIterator<Item = T>,
+    S: ?Sized + StoreBuf,
+    I: IntoIterator,
+    I::Item: Visit + ZeroCopy,
+    <I::Item as Visit>::Target: Hash,
     I::IntoIter: ExactSizeIterator,
 {
-    let mut entries = iter.into_iter().collect::<Vec<_>>();
+    let (key, entries, displacements) = store_raw(buf, entries, |entry| entry)?;
+    Ok(SetRef::new(key, entries, displacements))
+}
+
+fn store_raw<K, I, S, F>(
+    buf: &mut S,
+    entries: I,
+    access: F,
+) -> Result<
+    (
+        HashKey,
+        Ref<[I::Item], S::Endianness, S::Size>,
+        Ref<[Entry<u32, u32>], S::Endianness, S::Size>,
+    ),
+    Error,
+>
+where
+    K: Visit + ZeroCopy,
+    K::Target: Hash,
+    I: IntoIterator,
+    I::Item: ZeroCopy,
+    I::IntoIter: ExactSizeIterator,
+    S: ?Sized + StoreBuf,
+    F: Fn(&I::Item) -> &K,
+{
+    let offset = buf.next_offset::<I::Item>();
+    let iter = entries.into_iter();
+    let len = iter.len();
+
+    for value in iter {
+        buf.store(&value);
+    }
+
+    let entries: Ref<[I::Item], _, _> = Ref::with_metadata(offset, len);
+
+    let offset = buf.next_offset::<Entry<u32, u32>>();
+    let len = crate::phf::generator::displacements_len(entries.len());
+
+    for _ in 0..len {
+        buf.store(&Entry::new(0, 0));
+    }
+
+    let displacements = Ref::with_metadata(offset, len);
 
     let mut hash_state = {
         buf.align_in_place();
-        crate::phf::generator::generate_hash(buf, &entries, |value| value)?
+        crate::phf::generator::generate_hash(buf.as_mut_buf(), &entries, &displacements, access)?
     };
 
     for a in 0..hash_state.map.len() {
@@ -182,7 +191,15 @@ where
             let b = hash_state.map[a];
 
             if hash_state.map[a] != a {
-                entries.swap(a, b);
+                let Some(ref_a) = entries.get(a) else {
+                    panic!("Missing entry at index {a}");
+                };
+
+                let Some(ref_b) = entries.get(b) else {
+                    panic!("Missing entry at index {b}");
+                };
+
+                buf.swap(ref_a, ref_b)?;
                 hash_state.map.swap(a, b);
                 continue;
             }
@@ -191,14 +208,5 @@ where
         }
     }
 
-    let entries = buf.store_unsized(&entries[..]);
-
-    let mut displacements = Vec::new();
-
-    for (key, value) in hash_state.displacements {
-        displacements.push(Entry::new(key, value));
-    }
-
-    let displacements = buf.store_unsized(&displacements[..]);
-    Ok(SetRef::new(hash_state.key, entries, displacements))
+    Ok((hash_state.key, entries, displacements))
 }

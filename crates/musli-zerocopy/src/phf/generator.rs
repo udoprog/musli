@@ -6,6 +6,8 @@ use alloc::vec::Vec;
 use crate::buf::{Buf, Visit};
 use crate::error::{Error, ErrorKind};
 use crate::phf::hashing::{displace, hash, HashKey, Hashes};
+use crate::phf::Entry;
+use crate::{ByteOrder, Ref, Size, ZeroCopy};
 
 use rand::distributions::Standard;
 use rand::rngs::SmallRng;
@@ -16,22 +18,28 @@ const FIXED_SEED: u64 = 1234567890;
 
 pub(crate) struct HashState {
     pub(crate) key: HashKey,
-    pub(crate) displacements: Vec<(u32, u32)>,
     pub(crate) map: Vec<usize>,
 }
 
-pub(crate) fn generate_hash<K, E, F>(
-    buf: &Buf,
-    entries: &[E],
+/// Calculate displacements length.
+pub(crate) fn displacements_len(len: usize) -> usize {
+    (len + DEFAULT_LAMBDA - 1) / DEFAULT_LAMBDA
+}
+
+pub(crate) fn generate_hash<K, T, F, E: ByteOrder, O: Size>(
+    buf: &mut Buf,
+    entries: &Ref<[T], E, O>,
+    displacements: &Ref<[Entry<u32, u32>], E, O>,
     access: F,
 ) -> Result<HashState, Error>
 where
     K: Visit,
     K::Target: Hash,
-    F: Fn(&E) -> &K,
+    F: Fn(&T) -> &K,
+    T: ZeroCopy,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
-        if let Some(hash) = try_generate_hash(buf, entries, key, &access)? {
+        if let Some(hash) = try_generate_hash(buf, entries, displacements, key, &access)? {
             return Ok(hash);
         }
     }
@@ -39,16 +47,18 @@ where
     Err(Error::new(ErrorKind::FailedPhf))
 }
 
-fn try_generate_hash<K, E, F>(
-    buf: &Buf,
-    entries: &[E],
+fn try_generate_hash<K, T, F, E: ByteOrder, O: Size>(
+    buf: &mut Buf,
+    entries: &Ref<[T], E, O>,
+    displacements: &Ref<[Entry<u32, u32>], E, O>,
     key: HashKey,
     access: &F,
 ) -> Result<Option<HashState>, Error>
 where
     K: Visit,
     K::Target: Hash,
-    F: ?Sized + Fn(&E) -> &K,
+    F: ?Sized + Fn(&T) -> &K,
+    T: ZeroCopy,
 {
     let mut hashes = Vec::new();
 
@@ -60,14 +70,14 @@ where
             }));
         };
 
-        let entry = access(entry);
+        let entry = buf.load(entry)?;
+        let entry_key = access(entry);
 
-        let h = hash(buf, entry, &key)?;
+        let h = hash(buf, entry_key, &key)?;
         hashes.push(h);
     }
 
-    let buckets_len = (hashes.len() + DEFAULT_LAMBDA - 1) / DEFAULT_LAMBDA;
-    let mut buckets = vec![Vec::<usize>::new(); buckets_len];
+    let mut buckets = vec![Vec::<usize>::new(); displacements.len()];
 
     for (index, hash) in hashes.iter().enumerate() {
         let to = hash.g % buckets.len();
@@ -78,7 +88,6 @@ where
 
     let table_len = hashes.len();
     let mut map = vec![usize::MAX; table_len];
-    let mut displacements = vec![(0u32, 0u32); buckets.len()];
 
     // store whether an element from the bucket being placed is
     // located at a certain position, to allow for efficient overlap
@@ -95,12 +104,8 @@ where
     // chosen the right displacements.
     let mut values_to_add = vec![];
 
-    'outer: for (bucket, displacement) in buckets.iter().zip(displacements.iter_mut()) {
+    'outer: for (n, bucket) in buckets.iter().enumerate() {
         for d1 in 0..(table_len as u32) {
-            if d1 % 10000 == 0 {
-                std::println!("{}", d1);
-            }
-
             'inner: for d2 in 0..(table_len as u32) {
                 values_to_add.clear();
                 generation += 1;
@@ -118,8 +123,12 @@ where
                     values_to_add.push((index, key));
                 }
 
+                let Some(d_ref) = displacements.get(n) else {
+                    panic!("Missing displacement at {n}");
+                };
+
                 // We've picked a good set of displacements
-                *displacement = (d1, d2);
+                *buf.load_mut(d_ref)? = Entry::new(d1, d2);
 
                 for &(i, key) in &values_to_add {
                     map[i] = key;
@@ -133,9 +142,5 @@ where
         return Ok(None);
     }
 
-    Ok(Some(HashState {
-        key,
-        displacements,
-        map,
-    }))
+    Ok(Some(HashState { key, map }))
 }
