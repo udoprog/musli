@@ -244,11 +244,11 @@ pub mod musli_value {
 
 #[cfg(feature = "musli-zerocopy")]
 pub mod musli_zerocopy {
-    use musli_zerocopy::buf::DefaultAlignment;
+    use musli_zerocopy::endian;
     use musli_zerocopy::{Buf, Error, OwnedBuf, Ref, ZeroCopy};
 
     pub struct Benchmarker {
-        buf: OwnedBuf<usize>,
+        buf: OwnedBuf<endian::Native, usize>,
     }
 
     #[inline(always)]
@@ -269,7 +269,7 @@ pub mod musli_zerocopy {
     }
 
     pub struct State<'buf> {
-        buf: &'buf mut OwnedBuf<usize>,
+        buf: &'buf mut OwnedBuf<endian::Native, usize>,
     }
 
     pub struct DecodeState<'buf> {
@@ -326,6 +326,6 @@ pub mod musli_zerocopy {
     where
         T: ZeroCopy,
     {
-        Buf::new(bytes).load(Ref::<T, usize>::zero())
+        Buf::new(bytes).load(Ref::<T, endian::Native, usize>::zero())
     }
 }

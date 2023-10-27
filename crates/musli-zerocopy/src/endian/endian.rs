@@ -10,6 +10,43 @@ use crate::ZeroCopy;
 /// This can be used to store values in a zero-copy container in a portable
 /// manner, which is especially important to transfer types such as `char` which
 /// have a limited supported bit-pattern.
+///
+/// # Wrapping fields
+///
+/// Any type which implements [`ZeroCopy`] and has [`ZeroCopy::CAN_SWAP_BYTES`]
+/// set to `true` can be portably wrapped with this type.
+///
+/// [`ZeroCopy::CAN_SWAP_BYTES`] is not `true` it indicates that the type
+/// contains data which cannot be safely byte-swapped, such as [`char`]. Byte
+/// swapping such a type is a no-op and will return the original type.
+///
+/// ```
+/// use musli_zerocopy::{endian, Endian, OwnedBuf, Ref, ZeroCopy};
+///
+/// #[derive(Clone, Copy, ZeroCopy)]
+/// #[repr(C)]
+/// struct Struct {
+///     name: Ref<str>,
+///     age: Endian<u32, endian::Big>,
+/// }
+///
+/// let mut buf = OwnedBuf::new();
+///
+/// let name = buf.store_unsized("John");
+///
+/// let data = buf.store(&Struct {
+///     name,
+///     age: Endian::new(35),
+/// });
+///
+/// buf.align_in_place();
+///
+/// let data = buf.load(data)?;
+///
+/// assert_eq!(buf.load(data.name)?, "John");
+/// assert_eq!(data.age.to_ne(), 35);
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
 #[derive(ZeroCopy)]
 #[zero_copy(crate, swap_bytes, bounds = {T: ZeroCopy})]
 #[repr(transparent)]

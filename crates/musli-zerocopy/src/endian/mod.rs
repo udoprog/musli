@@ -105,6 +105,128 @@ pub struct Big;
 #[non_exhaustive]
 pub struct Little;
 
+use crate::ZeroCopy;
+
+/// Convert the value `T` from [`Big`] to [`Native`] endian.
+///
+/// This ignores types which has [`ZeroCopy::CAN_SWAP_BYTES`] set to `false`,
+/// such as [`char`]. Such values will simply pass through.
+///
+/// Swapping the bytes of a type which explicitly records its own byte order
+/// like [`Ref<T>`] is a no-op.
+///
+/// [`Ref<T>`]: crate::Ref
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::{endian, ZeroCopy};
+///
+/// #[derive(Debug, PartialEq, ZeroCopy)]
+/// #[repr(C)]
+/// struct Struct {
+///     c: char,
+///     bits32: u32,
+///     bits64: u64,
+/// }
+///
+/// let st = endian::from_be(Struct {
+///     c: 'a',
+///     bits32: 0x10203040u32.to_be(),
+///     bits64: 0x5060708090a0b0c0u64.to_be(),
+/// });
+///
+/// assert_eq!(st, Struct {
+///     c: 'a',
+///     bits32: 0x10203040,
+///     bits64: 0x5060708090a0b0c0,
+/// });
+/// ```
+pub fn from_be<T: ZeroCopy>(value: T) -> T {
+    from_endian::<_, Big>(value)
+}
+
+/// Convert the value `T` from [`Little`] to [`Native`] endian.
+///
+/// This ignores types which has [`ZeroCopy::CAN_SWAP_BYTES`] set to `false`,
+/// such as [`char`]. Such values will simply pass through.
+///
+/// Swapping the bytes of a type which explicitly records its own byte order
+/// like [`Ref<T>`] is a no-op.
+///
+/// [`Ref<T>`]: crate::Ref
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::{endian, ZeroCopy};
+///
+/// #[derive(Debug, PartialEq, ZeroCopy)]
+/// #[repr(C)]
+/// struct Struct {
+///     c: char,
+///     bits32: u32,
+///     bits64: u64,
+/// }
+///
+/// let st = endian::from_le(Struct {
+///     c: 'a',
+///     bits32: 0x10203040u32.to_le(),
+///     bits64: 0x5060708090a0b0c0u64.to_le(),
+/// });
+///
+/// assert_eq!(st, Struct {
+///     c: 'a',
+///     bits32: 0x10203040,
+///     bits64: 0x5060708090a0b0c0,
+/// });
+/// ```
+#[inline]
+pub fn from_le<T: ZeroCopy>(value: T) -> T {
+    from_endian::<_, Little>(value)
+}
+
+/// Convert the value `T` from the specified [`ByteOrder`] `E` to [`Native`]
+/// endian.
+///
+/// This ignores types which has [`ZeroCopy::CAN_SWAP_BYTES`] set to `false`,
+/// such as [`char`]. Such values will simply pass through.
+///
+/// Swapping the bytes of a type which explicitly records its own byte order
+/// like [`Ref<T>`] is a no-op.
+///
+/// [`Ref<T>`]: crate::Ref
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::{endian, ZeroCopy};
+///
+/// #[derive(Debug, PartialEq, ZeroCopy)]
+/// #[repr(C)]
+/// struct Struct {
+///     c: char,
+///     bits32: u32,
+///     bits64: u64,
+/// }
+///
+/// let st = endian::from_endian::<_, endian::Big>(Struct {
+///     c: 'a',
+///     bits32: 0x10203040u32.to_be(),
+///     bits64: 0x5060708090a0b0c0u64.to_be(),
+/// });
+///
+/// assert_eq!(st, Struct {
+///     c: 'a',
+///     bits32: 0x10203040,
+///     bits64: 0x5060708090a0b0c0,
+/// });
+/// ```
+#[inline]
+pub fn from_endian<T: ZeroCopy, E: ByteOrder>(value: T) -> T {
+    value.transpose_bytes::<E, Native>()
+}
+
 mod sealed {
     use super::{Big, Little};
 
