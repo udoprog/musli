@@ -1005,7 +1005,7 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     where
         P: ZeroCopy,
     {
-        Buf::swap::<P>(self, a.offset(), b.offset())
+        Buf::swap(self, a, b)
     }
 
     #[inline]

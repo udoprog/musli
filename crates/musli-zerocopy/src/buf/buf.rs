@@ -768,18 +768,81 @@ impl Buf {
         }
     }
 
-    /// Swap type `T` at offsets `a` and `b`.
+    /// Swap a type `P` by reference.
+    ///
+    /// There are no requirements on alignment, and the two swapped locations
+    /// are permitted to overlap. If the values do overlap, then the overlapping
+    /// region of memory from `a` will be used. This is demonstrated in the
+    /// second example below.
+    ///
+    /// # Errors
+    ///
+    /// Errors in case any of the swapped reference is out of bounds for the
+    /// current buffer.
+    ///
+    /// ```
+    /// use musli_zerocopy::{Buf, Ref};
+    ///
+    /// let mut buf = [0, 1, 2, 3];
+    /// let mut buf = Buf::new_mut(&mut buf);
+    ///
+    /// let mut a = Ref::<u32>::new(0);
+    /// let mut b = Ref::<u32>::new(4);
+    ///
+    /// assert!(buf.swap(a, b).is_err());
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{Buf, Ref};
+    ///
+    /// let mut buf: [u8; 12] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    /// let mut buf = Buf::new_mut(&mut buf);
+    ///
+    /// let mut a = Ref::<u32>::new(2);
+    /// let mut b = Ref::<u32>::new(6);
+    ///
+    /// buf.swap(a, b)?;
+    ///
+    /// assert_eq!(&buf[..], [0, 1, 6, 7, 8, 9, 2, 3, 4, 5, 10, 11]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    ///
+    /// Overlapping positions:
+    ///
+    /// ```
+    /// use musli_zerocopy::{Buf, Ref};
+    ///
+    /// let mut buf: [u8; 7] = [0, 1, 2, 3, 4, 5, 7];
+    /// let mut buf = Buf::new_mut(&mut buf);
+    ///
+    /// let mut a = Ref::<u32>::new(1);
+    /// let mut b = Ref::<u32>::new(2);
+    ///
+    /// buf.swap(a, b)?;
+    ///
+    /// assert_eq!(&buf[..], [0, 2, 1, 2, 3, 4, 7]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     #[inline]
-    pub(crate) fn swap<T>(&mut self, a: usize, b: usize) -> Result<(), Error>
+    pub fn swap<P, E: ByteOrder, O: Size>(
+        &mut self,
+        a: Ref<P, E, O>,
+        b: Ref<P, E, O>,
+    ) -> Result<(), Error>
     where
-        T: ZeroCopy,
+        P: ZeroCopy,
     {
+        let a = a.offset();
+        let b = b.offset();
+
         if a == b {
             return Ok(());
         }
 
         let start = a.max(b);
-        let end = start.wrapping_add(size_of::<T>());
+        let end = start.wrapping_add(size_of::<P>());
 
         if end > self.data.len() {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
@@ -788,17 +851,20 @@ impl Buf {
             }));
         }
 
+        // SAFETY: We've checked that both locations are in bound and we're
+        // ensuring to utilize the appropriate copy primitive depending on
+        // whether two values may or may not overlap.
         unsafe {
-            let mut tmp = MaybeUninit::<T>::uninit();
+            let mut tmp = MaybeUninit::<P>::uninit();
             let base = self.data.as_mut_ptr();
 
             let tmp = tmp.as_mut_ptr().cast::<u8>();
             let a = base.add(a);
             let b = base.add(b);
 
-            tmp.copy_from_nonoverlapping(a, size_of::<T>());
-            a.copy_from_nonoverlapping(b, size_of::<T>());
-            b.copy_from_nonoverlapping(tmp, size_of::<T>());
+            tmp.copy_from_nonoverlapping(a, size_of::<P>());
+            a.copy_from(b, size_of::<P>());
+            b.copy_from_nonoverlapping(tmp, size_of::<P>());
         }
 
         Ok(())

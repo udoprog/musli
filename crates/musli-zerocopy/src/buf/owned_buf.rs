@@ -1294,7 +1294,7 @@ impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
     where
         P: ZeroCopy,
     {
-        Buf::swap::<P>(self, a.offset(), b.offset())
+        Buf::swap(self, a, b)
     }
 
     #[inline]
