@@ -99,7 +99,7 @@ impl OwnedBuf {
         Self::with_capacity_and_alignment::<DefaultAlignment>(capacity)
     }
 
-    /// Construct a new empty buffer with the an alignment matching that of `T`.
+    /// Construct a new empty buffer with an alignment matching that of `T`.
     ///
     /// # Examples
     ///
