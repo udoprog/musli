@@ -1,19 +1,20 @@
 //! Example showcasing how to build an archive which contains mixed endian data.
 
 use anyhow::Result;
-use musli_zerocopy::endian::{Big, Little};
+
+use musli_zerocopy::endian;
 use musli_zerocopy::{ByteOrder, Endian, OwnedBuf, Ref, ZeroCopy};
 
 #[derive(ZeroCopy)]
 #[repr(C)]
 struct Header {
-    big: Ref<Data<Big>, Big>,
-    little: Ref<Data<Little>, Little>,
+    big: Ref<Data<endian::Big>, endian::Big>,
+    little: Ref<Data<endian::Little>, endian::Little>,
 }
 
 #[derive(ZeroCopy)]
 #[repr(C)]
-struct Data<E>
+struct Data<E = endian::Native>
 where
     E: ByteOrder,
 {
@@ -48,23 +49,9 @@ fn main() -> Result<()> {
     buf.align_in_place();
 
     let header = buf.load_at::<Header>(0)?;
-    let little = buf.load(header.little)?;
-    let big = buf.load(header.big)?;
+    let data = buf.load(endian::pick!(header.big, header.little))?;
 
-    dbg!(buf.load(little.name)?);
-    dbg!(little.age.to_ne(), little.age.to_raw());
-
-    dbg!(buf.load(big.name)?);
-    dbg!(big.age.to_ne(), big.age.to_raw());
-
-    let (name, age) = if cfg!(target_endian = "big") {
-        let big = buf.load(header.big)?;
-        (buf.load(big.name)?, big.age.to_ne())
-    } else {
-        let little = buf.load(header.little)?;
-        (buf.load(little.name)?, big.age.to_ne())
-    };
-
-    dbg!(name, age);
+    dbg!(buf.load(data.name)?);
+    dbg!(*data.age + 1);
     Ok(())
 }
