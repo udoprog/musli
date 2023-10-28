@@ -242,6 +242,13 @@ mod sealed {
 /// [`Little`], and its internals are intentionally hidden. Do not attempt
 /// to use them yourself.
 pub trait ByteOrder: 'static + Sized + self::sealed::Sealed {
+    /// Maps the `value` through `map`, unless the current byte order is
+    /// [`Native`].
+    #[doc(hidden)]
+    fn try_map<T, F>(value: T, map: F) -> T
+    where
+        F: FnOnce(T) -> T;
+
     /// Swap the bytes for a `usize` with the current byte order.
     #[doc(hidden)]
     fn swap_usize(value: usize) -> usize;
@@ -292,6 +299,24 @@ pub trait ByteOrder: 'static + Sized + self::sealed::Sealed {
 }
 
 impl ByteOrder for Little {
+    #[cfg(target_endian = "little")]
+    #[inline(always)]
+    fn try_map<T, F>(value: T, _: F) -> T
+    where
+        F: FnOnce(T) -> T,
+    {
+        value
+    }
+
+    #[cfg(not(target_endian = "little"))]
+    #[inline(always)]
+    fn try_map<T, F>(value: T, map: F) -> T
+    where
+        F: FnOnce(T) -> T,
+    {
+        map(value)
+    }
+
     #[inline]
     fn swap_usize(value: usize) -> usize {
         usize::from_le(value)
@@ -354,6 +379,24 @@ impl ByteOrder for Little {
 }
 
 impl ByteOrder for Big {
+    #[cfg(target_endian = "big")]
+    #[inline(always)]
+    fn try_map<T, F>(value: T, _: F) -> T
+    where
+        F: FnOnce(T) -> T,
+    {
+        value
+    }
+
+    #[cfg(not(target_endian = "big"))]
+    #[inline(always)]
+    fn try_map<T, F>(value: T, map: F) -> T
+    where
+        F: FnOnce(T) -> T,
+    {
+        map(value)
+    }
+
     #[inline]
     fn swap_usize(value: usize) -> usize {
         usize::from_be(value)

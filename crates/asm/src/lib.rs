@@ -142,20 +142,22 @@ pub mod musli_zerocopy_swap {
     pub struct Struct {
         bits32: u32,
         bits64: u64,
+        bits128: u128,
+        array: [u8; 16],
     }
 
     #[inline(never)]
-    pub fn ensure_struct_native(st: Struct) -> Struct {
+    pub fn ensure_struct_ne(st: Struct) -> Struct {
         st.swap_bytes::<endian::Native>()
     }
 
     #[inline(never)]
-    pub fn ensure_struct_little(st: Struct) -> Struct {
+    pub fn ensure_struct_le(st: Struct) -> Struct {
         st.swap_bytes::<endian::Little>()
     }
 
     #[inline(never)]
-    pub fn ensure_struct_big(st: Struct) -> Struct {
+    pub fn ensure_struct_be(st: Struct) -> Struct {
         st.swap_bytes::<endian::Big>()
     }
 
@@ -167,17 +169,29 @@ pub mod musli_zerocopy_swap {
     }
 
     #[inline(never)]
-    pub fn ensure_enum_native(st: Enum) -> Enum {
+    pub fn ensure_enum_ne(st: Enum) -> Enum {
         st.swap_bytes::<endian::Native>()
     }
 
     #[inline(never)]
-    pub fn ensure_enum_little(st: Enum) -> Enum {
+    pub fn ensure_enum_le(st: Enum) -> Enum {
         st.swap_bytes::<endian::Little>()
     }
 
     #[inline(never)]
-    pub fn ensure_enum_big(st: Enum) -> Enum {
+    pub fn ensure_enum_be(st: Enum) -> Enum {
         st.swap_bytes::<endian::Big>()
+    }
+}
+
+pub mod generic {
+    pub enum Enum {
+        Empty,
+        One(u32),
+        Two(u32, u64),
+    }
+
+    pub fn do_nothing(en: Enum) -> Enum {
+        en
     }
 }

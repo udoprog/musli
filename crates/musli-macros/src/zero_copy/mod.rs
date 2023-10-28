@@ -158,8 +158,8 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                     swap_bytes_block = quote! {
                         Self {
-                            #member: <#ty as #zero_copy>::swap_bytes::<#endianness>(self.#member),
-                            #(#ignored_members: self.#ignored_members,)*
+                            #member: <#ty as #zero_copy>::swap_bytes::<#endianness>(this.#member),
+                            #(#ignored_members: this.#ignored_members,)*
                         }
                     };
                 }
@@ -201,8 +201,8 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                     swap_bytes_block = quote! {
                         Self {
-                            #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(self.#members),)*
-                            #(#ignored_members: self.#ignored_members,)*
+                            #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(this.#members),)*
+                            #(#ignored_members: this.#ignored_members,)*
                         }
                     };
                 }
@@ -397,7 +397,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             };
 
             swap_bytes_block = quote! {
-                match self {
+                match this {
                     #(#load_variants),*
                 }
             };
@@ -454,7 +454,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let (swap_bytes_block, can_swap_bytes) = if swap_bytes_self {
-        (quote!(self), quote!(true))
+        (quote!(this), quote!(true))
     } else {
         (swap_bytes_block, can_swap_bytes)
     };
@@ -487,7 +487,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
             #[inline]
             fn swap_bytes<#endianness: #byte_order>(self) -> Self {
-                #swap_bytes_block
+                <#endianness as #byte_order>::try_map(self, |this| #swap_bytes_block)
             }
         }
     })
