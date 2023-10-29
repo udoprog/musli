@@ -217,17 +217,17 @@ impl PartialEq<Tuples> for &Tuples {
 #[cfg_attr(feature = "musli", musli(mode = Packed))]
 pub enum MediumEnum {
     #[cfg_attr(feature = "musli", musli(transparent))]
-    StringVariant(String),
+    String(String),
     #[cfg_attr(feature = "musli", musli(transparent))]
-    NumberedVariant(u64),
-    EmptyTupleVariant(),
-    NamedEmptyVariant {},
-    NamedVariant {
+    Numbered(u64),
+    EmptyTuple(),
+    NamedEmpty {},
+    Named {
         a: u32,
         primitives: Primitives,
         b: u64,
     },
-    UnnamedVariant,
+    Unnamed,
 }
 
 #[cfg(feature = "rkyv")]

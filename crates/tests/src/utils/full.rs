@@ -123,7 +123,7 @@ pub mod postcard {
 
             // Figure out the size of the buffer to use. Don't worry, anything we do
             // in `reset` doesn't count towards benchmarking.
-            while let Err(error) = postcard::to_slice(value, &mut self.buffer) {
+            while let Err(error) = postcard::to_slice(value, self.buffer) {
                 match error {
                     postcard::Error::SerializeBufferFull => {
                         let new_size = (self.buffer.len() as f32 * 1.5f32) as usize;
@@ -140,7 +140,7 @@ pub mod postcard {
         where
             T: Serialize,
         {
-            let buf = postcard::to_slice(value, &mut self.buffer)?;
+            let buf = postcard::to_slice(value, self.buffer)?;
             Ok(buf)
         }
 

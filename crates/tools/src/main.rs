@@ -1,12 +1,14 @@
 use std::collections::{BTreeSet, HashMap};
 use std::env;
+use std::ffi::{OsStr, OsString};
 use std::fmt::Write;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitStatus, Stdio};
 
 use anyhow::{anyhow, bail, Context, Result};
+use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 const REPO: &'static str = "https://raw.githubusercontent.com/udoprog/musli";
@@ -176,10 +178,75 @@ struct Target {
 }
 
 #[derive(Deserialize)]
-struct CopmilerArtifact {
+struct Profile {
+    test: bool,
+}
+
+#[derive(Deserialize)]
+struct CompilerArtifact {
     executable: Option<String>,
     features: Vec<String>,
     target: Target,
+    profile: Profile,
+}
+
+#[derive(Deserialize)]
+struct Message {
+    rendered: String,
+}
+
+#[derive(Deserialize)]
+struct CompilerMessage {
+    message: Message,
+}
+
+#[derive(Default, Parser)]
+struct ArgsReport {
+    /// Filter to pass to benchmarks when running them.
+    #[arg(short = 'f', long)]
+    filter: Option<String>,
+    /// Run benchmarks.
+    #[arg(short, long)]
+    bench: bool,
+    /// Reference graphics from the given branch.
+    #[arg(long)]
+    branch: Option<String>,
+}
+
+#[derive(Parser)]
+struct ArgsClippy {
+    remaining: Vec<OsString>,
+}
+
+#[derive(Parser)]
+struct ArgsBuild {
+    remaining: Vec<OsString>,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    /// Run all benchmarks and generate report.
+    Report(ArgsReport),
+    /// Run `cargo clippy` with over all supported feature configurations.
+    Clippy(ArgsClippy),
+    /// Run `cargo build` with over all supported feature configurations.
+    Build(ArgsBuild),
+}
+
+impl Default for Cmd {
+    #[inline]
+    fn default() -> Self {
+        Self::Report(ArgsReport::default())
+    }
+}
+
+#[derive(Parser)]
+struct Args {
+    /// Only run benchmarks for the given report.
+    #[arg(short = 'r', long)]
+    report: Option<String>,
+    #[command(subcommand)]
+    command: Option<Cmd>,
 }
 
 fn main() -> Result<()> {
@@ -188,138 +255,178 @@ fn main() -> Result<()> {
             .join("..")
             .join("..");
 
-    let mut it = env::args().skip(1);
+    let args = Args::try_parse()?;
 
-    let mut filter = None;
-    let mut run_bench = false;
-    let mut do_report = None;
-    let mut branch = None;
+    let command = args.command.unwrap_or_default();
 
-    while let Some(arg) = it.next() {
-        match arg.as_str() {
-            "--bench" => {
-                run_bench = true;
-            }
-            "-f" | "--filter" => {
-                filter = Some(it.next().context("missing argument to filter")?);
-            }
-            "-r" | "--report" => {
-                do_report = Some(it.next().context("missing argument to filter")?);
-            }
-            "-b" | "--branch" => {
-                branch = Some(it.next().context("missing argument to filter")?);
-            }
-            "--help" => {
-                println!("Supported options:");
-                println!();
-                println!("--bench - run benchmarks.");
-                println!(
-                    "-f | --filter <filter> - filter to pass to benchmarks when running them."
-                );
-                println!("-r | --report <report> - only run benchmarks for the given report.");
-                println!("-b | --branch <branch> - reference graphics from the given branch.");
-                return Ok(());
-            }
-            option => {
-                bail!("Unsupported option: {option}");
-            }
-        }
-    }
+    match command {
+        Cmd::Report(a) => {
+            let mut o = String::new();
 
-    let mut o = String::new();
-
-    writeln!(o, "# Benchmarks and size comparisons")?;
-    writeln!(o)?;
-
-    writeln!(
-        o,
-        "> The following are the results of preliminary benchmarking and should be"
-    )?;
-    writeln!(o, "> taken with a big grain of 🧂.")?;
-    writeln!(o)?;
-
-    writeln!(
-        o,
-        "Summary of the different kinds of benchmarks we support."
-    )?;
-    writeln!(o)?;
-
-    for Group {
-        id, description, ..
-    } in GROUPS
-    {
-        writeln!(o, "- `{id}` {description}")?;
-    }
-
-    writeln!(o)?;
-
-    writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
-
-    for Report { title, link, .. } in REPORTS {
-        writeln!(o, "- [{title}](#{link})")?;
-    }
-
-    writeln!(o)?;
-
-    writeln!(
-        o,
-        "Below you'll also find [Size comparisons](#size-comparisons)."
-    )?;
-
-    let mut size_sets = Vec::new();
-
-    for report in REPORTS {
-        let run_bench = if let Some(do_report) = do_report.as_deref() {
-            run_bench && do_report == report.id
-        } else {
-            run_bench
-        };
-
-        println!("Building: {}", report.title);
-
-        writeln!(o, "# {}", report.title)?;
-
-        writeln!(o)?;
-
-        if !report.expected.is_empty() {
-            let features = report
-                .expected
-                .iter()
-                .map(|f| format!("`{f}`"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            writeln!(o, "> **Missing features:** {features}")?;
+            writeln!(o, "# Benchmarks and size comparisons")?;
             writeln!(o)?;
+
+            writeln!(
+                o,
+                "> The following are the results of preliminary benchmarking and should be"
+            )?;
+            writeln!(o, "> taken with a big grain of 🧂.")?;
+            writeln!(o)?;
+
+            writeln!(
+                o,
+                "Summary of the different kinds of benchmarks we support."
+            )?;
+            writeln!(o)?;
+
+            for Group {
+                id, description, ..
+            } in GROUPS
+            {
+                writeln!(o, "- `{id}` {description}")?;
+            }
+
+            writeln!(o)?;
+
+            writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
+
+            for Report { title, link, .. } in REPORTS {
+                writeln!(o, "- [{title}](#{link})")?;
+            }
+
+            writeln!(o)?;
+
+            writeln!(
+                o,
+                "Below you'll also find [Size comparisons](#size-comparisons)."
+            )?;
+
+            let mut size_sets = Vec::new();
+
+            for report in REPORTS {
+                if let Some(do_report) = args.report.as_deref() {
+                    if do_report != report.id {
+                        continue;
+                    }
+                }
+
+                println!("Building: {}", report.title);
+
+                writeln!(o, "# {}", report.title)?;
+
+                writeln!(o)?;
+
+                if !report.expected.is_empty() {
+                    let features = report
+                        .expected
+                        .iter()
+                        .map(|f| format!("`{f}`"))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    writeln!(o, "> **Missing features:** {features}")?;
+                    writeln!(o)?;
+                }
+
+                for line in report.description.iter().copied() {
+                    writeln!(o, "{line}")?;
+                }
+
+                writeln!(o)?;
+
+                let size_set = build_report(
+                    &mut o,
+                    &root,
+                    a.bench,
+                    a.filter.as_deref(),
+                    a.branch.as_deref().unwrap_or("main"),
+                    *report,
+                )?;
+
+                size_sets.push((*report, size_set));
+            }
+
+            size_comparisons(&mut o, size_sets)?;
+
+            for Link { title, href } in LINKS {
+                writeln!(o, "[{title}]: {href}")?;
+            }
+
+            let report = root.join("benchmarks.md");
+
+            println!("Writing: {}", report.display());
+            fs::write(&report, o.as_bytes())?;
         }
+        Cmd::Clippy(a) => {
+            let mut remaining = Vec::new();
 
-        for line in report.description.iter().copied() {
-            writeln!(o, "{line}")?;
+            for arg in a.remaining {
+                remaining.push(arg);
+            }
+
+            let mut builds = Vec::new();
+
+            for report in REPORTS {
+                if let Some(do_report) = args.report.as_deref() {
+                    if do_report != report.id {
+                        continue;
+                    }
+                }
+
+                let build = build_tests(
+                    report.features,
+                    report.expected,
+                    "clippy",
+                    &[],
+                    &remaining[..],
+                )?;
+
+                builds.push(build);
+            }
+
+            if builds.iter().any(|b| !b.status.success()) {
+                for build in builds {
+                    for message in build.messages {
+                        print!("{message}")
+                    }
+                }
+
+                bail!("One or more commands failed")
+            }
         }
+        Cmd::Build(a) => {
+            let mut remaining = Vec::new();
 
-        writeln!(o)?;
+            for arg in a.remaining {
+                remaining.push(arg);
+            }
 
-        let size_set = build_report(
-            &mut o,
-            &root,
-            run_bench,
-            filter.as_deref(),
-            branch.as_deref().unwrap_or("main"),
-            *report,
-        )?;
+            let mut builds = Vec::new();
 
-        size_sets.push((*report, size_set));
+            for report in REPORTS {
+                if let Some(do_report) = args.report.as_deref() {
+                    if do_report != report.id {
+                        continue;
+                    }
+                }
+
+                let build =
+                    build_tests(report.features, report.expected, "build", &[], &remaining)?;
+
+                builds.push(build);
+            }
+
+            if builds.iter().any(|b| !b.status.success()) {
+                for build in builds {
+                    for message in build.messages {
+                        print!("{message}")
+                    }
+                }
+
+                bail!("One or more commands failed")
+            }
+        }
     }
 
-    size_comparisons(&mut o, size_sets)?;
-
-    for Link { title, href } in LINKS {
-        writeln!(o, "[{title}]: {href}")?;
-    }
-
-    let report = root.join("benchmarks.md");
-
-    println!("Writing: {}", report.display());
-    fs::write(&report, o.as_bytes())?;
     Ok(())
 }
 
@@ -337,7 +444,7 @@ where
     let output = root.join("images");
     let target_dir = root.join("target");
 
-    let bins = build_bench(&COMMON, report.features, report.expected)?;
+    let bins = build_bench(report.features, report.expected)?;
 
     if run_bench {
         run_path(&bins.comparison, &[])?;
@@ -597,18 +704,55 @@ fn run_path(path: &Path, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
+struct CustomBuild {
+    status: ExitStatus,
+    all: Vec<(String, String, PathBuf)>,
+    messages: Vec<String>,
+}
+
+impl CustomBuild {
+    fn bin(&self, kind: &str, name: &str) -> Option<PathBuf> {
+        let mut bins = Vec::new();
+
+        for (k, n, path) in &self.all {
+            if k == kind && n == name {
+                bins.push(path.clone());
+            }
+        }
+
+        bins.pop()
+    }
+}
+
 struct Build {
     fuzz: PathBuf,
     comparison: PathBuf,
 }
 
-fn build_bench(common: &[&str], features: &[&str], expected_features: &[&str]) -> Result<Build> {
+fn build_tests<C, S>(
+    features: &[&str],
+    expected_features: &[&str],
+    command: C,
+    head: &[S],
+    remaining: &[S],
+) -> Result<CustomBuild>
+where
+    C: AsRef<OsStr>,
+    S: AsRef<OsStr>,
+{
     let mut child = Command::new("cargo");
-    child.args(["build", "-p", "tests", "--release", "--benches"]);
+    child.arg(command);
+    child.args(["-p", "tests"]);
+
+    if !head.is_empty() {
+        child.args(head);
+    }
+
+    child.arg("--message-format=json");
     child.stdout(Stdio::piped());
 
-    let features = common
+    let features = COMMON
         .iter()
         .chain(features)
         .copied()
@@ -617,64 +761,75 @@ fn build_bench(common: &[&str], features: &[&str], expected_features: &[&str]) -
 
     child.args(["--no-default-features", "--features", &features]);
 
-    print_command(&child);
+    if !remaining.is_empty() {
+        child.arg("--");
+        child.args(remaining);
+    }
 
-    child.arg("--message-format=json");
+    print_command(&child);
 
     let mut child = child.spawn()?;
 
     let stdout = BufReader::new(child.stdout.take().context("missing stdout")?);
 
-    let mut comparison = None;
-    let mut fuzz = None;
+    let mut all = Vec::new();
+    let mut messages = Vec::new();
 
     for line in stdout.lines() {
         let line = line?;
         let line: Line = serde_json::from_str(&line)?;
 
-        if line.reason != "compiler-artifact" {
-            continue;
-        }
-
-        let artifact: CopmilerArtifact = serde_json::from_value(line.extra)?;
-
-        if !(artifact
-            .target
-            .crate_types
-            .iter()
-            .any(|value| value == "bin"))
-        {
-            continue;
-        }
-
-        let Some(executable) = artifact.executable else {
-            continue;
-        };
-
-        let mut expected = expected_features.iter().copied().collect::<BTreeSet<_>>();
-
-        for feature in &artifact.features {
-            expected.remove(feature.as_str());
-        }
-
-        if !expected.is_empty() {
-            bail!(
-                "Building executable did not have model features: {:?}",
-                expected
-            );
-        }
-
-        match (
-            artifact.target.kind.first().map(|s| s.as_str()),
-            artifact.target.name.as_str(),
-        ) {
-            (Some("bin"), "fuzz") => {
-                if !executable.contains("deps") {
-                    fuzz = Some(PathBuf::from(executable));
-                }
+        match line.reason.as_str() {
+            "compiler-message" => {
+                let message: CompilerMessage = serde_json::from_value(line.extra)?;
+                messages.push(message.message.rendered);
             }
-            (Some("bench"), "comparison") => {
-                comparison = Some(PathBuf::from(executable));
+            "compiler-artifact" => {
+                let artifact: CompilerArtifact = serde_json::from_value(line.extra.clone())?;
+
+                if !(artifact
+                    .target
+                    .crate_types
+                    .iter()
+                    .any(|value| value == "bin"))
+                {
+                    continue;
+                }
+
+                let Some(executable) = artifact.executable else {
+                    continue;
+                };
+
+                let mut expected = expected_features.iter().copied().collect::<BTreeSet<_>>();
+
+                for feature in &artifact.features {
+                    expected.remove(feature.as_str());
+                }
+
+                if !expected.is_empty() {
+                    bail!(
+                        "Building executable did not have model features: {:?}",
+                        expected
+                    );
+                }
+
+                match (
+                    artifact.target.kind.first().map(|s| s.as_str()),
+                    artifact.target.name.as_str(),
+                ) {
+                    (Some(kind), name) => {
+                        if kind == "bin" && artifact.profile.test {
+                            continue;
+                        }
+
+                        all.push((
+                            kind.to_owned(),
+                            name.to_owned(),
+                            PathBuf::from(executable.clone()),
+                        ));
+                    }
+                    _ => {}
+                }
             }
             _ => {}
         }
@@ -682,13 +837,36 @@ fn build_bench(common: &[&str], features: &[&str], expected_features: &[&str]) -
 
     let status = child.wait()?;
 
-    if !status.success() {
-        bail!("Command failed: {}", status.success());
+    Ok(CustomBuild {
+        status,
+        all,
+        messages,
+    })
+}
+
+/// Build benchmarks.
+fn build_bench(features: &[&str], expected_features: &[&str]) -> Result<Build> {
+    let build = build_tests(
+        features,
+        expected_features,
+        "build",
+        &["--release", "--benches"],
+        &[],
+    )?;
+
+    if !build.status.success() {
+        for message in build.messages {
+            print!("{}", message);
+        }
+
+        bail!("Command failed: {}", build.status.success());
     }
 
-    let fuzz = fuzz.context("missing fuzz")?;
-    let comparison = comparison.context("missing fuzz")?;
-
+    dbg!(&build.all);
+    let fuzz = build.bin("bin", "fuzz").context("missing fuzz")?;
+    let comparison = build
+        .bin("bench", "comparison")
+        .context("missing comparison")?;
     Ok(Build { fuzz, comparison })
 }
 
