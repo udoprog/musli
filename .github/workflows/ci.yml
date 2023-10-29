@@ -42,16 +42,16 @@ jobs:
       - run: cargo +nightly run -p no-std-examples --example no-std-${{matrix.example}}
 
   fuzz:
-    needs: each_package
+    needs: [test, each_package]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo run --release -p tests --bin fuzz
-    - run: cargo run --release -p tests --bin fuzz -- --random
+    - run: cargo run --release -p tests --features test --bin fuzz
+    - run: cargo run --release -p tests --features test --bin fuzz -- --random
 
   miri:
-    needs: test
+    needs: [test, each_package]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -59,8 +59,8 @@ jobs:
       with:
         components: miri
     - run: cargo miri test --workspace --exclude no-std-examples --exclude musli-common --features test
-    - run: cargo miri run -p tests --bin fuzz
-    - run: cargo miri run -p tests --bin fuzz -- --random
+    - run: cargo miri run -p tests --features test --bin fuzz
+    - run: cargo miri run -p tests --features test --bin fuzz -- --random
 
   each_package:
     needs: [rustfmt, clippy]
@@ -88,6 +88,15 @@ jobs:
       with:
         components: clippy
     - run: cargo clippy --all-targets --features test -- -D warnings
+
+  clippy_tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@1.73
+      with:
+        components: clippy
+    - run: cargo run -p tools -- clippy -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest
