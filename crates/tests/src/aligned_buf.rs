@@ -43,7 +43,7 @@ impl AlignedBuf {
     }
 
     #[inline]
-    pub unsafe fn store_bytes<T>(&mut self, values: &[T]) {
+    pub(crate) unsafe fn store_bytes<T>(&mut self, values: &[T]) {
         let dst = self.data.as_ptr().wrapping_add(self.len);
         dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
         self.len += size_of_val(values);

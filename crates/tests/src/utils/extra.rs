@@ -304,7 +304,7 @@ pub mod zerocopy {
         where
             T: FromBytes,
         {
-            T::read_from(&self.buffer[..]).ok_or(Error)
+            T::read_from(self.buffer).ok_or(Error)
         }
     }
 }
