@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "bitcode", allow(clippy::assign_op_pattern))]
-
 #[cfg(not(feature = "model-no-map"))]
 use std::collections::HashMap;
 

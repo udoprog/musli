@@ -152,3 +152,67 @@ pub mod postcard {
         }
     }
 }
+
+/// Bitcode lives in here with two variants, one using serde and another using
+/// its own derives.
+#[cfg(feature = "bitcode")]
+pub mod serde_bitcode {
+    use bitcode::Buffer;
+    use serde::{Deserialize, Serialize};
+
+    benchmarker! {
+        'buf
+
+        pub fn buffer() -> Buffer {
+            Buffer::with_capacity(4096)
+        }
+
+        pub fn reset<T>(&mut self, _: usize, _: &T) {}
+
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], bitcode::Error>
+        where
+            T: Serialize,
+        {
+            self.buffer.serialize(value)
+        }
+
+        pub fn decode<T>(&self) -> Result<T, bitcode::Error>
+        where
+            for<'de> T: Deserialize<'de>,
+        {
+            bitcode::deserialize(self.buffer)
+        }
+    }
+}
+
+/// Bitcode lives in here with two variants, one using serde and another using
+/// its own derives.
+#[cfg(feature = "bitcode")]
+pub mod derive_bitcode {
+    use bitcode::Buffer;
+    use bitcode::{Decode, Encode};
+
+    benchmarker! {
+        'buf
+
+        pub fn buffer() -> Buffer {
+            Buffer::with_capacity(4096)
+        }
+
+        pub fn reset<T>(&mut self, _: usize, _: &T) {}
+
+        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], bitcode::Error>
+        where
+            T: Encode,
+        {
+            self.buffer.encode(value)
+        }
+
+        pub fn decode<T>(&self) -> Result<T, bitcode::Error>
+        where
+            T: Decode,
+        {
+            bitcode::decode(self.buffer)
+        }
+    }
+}

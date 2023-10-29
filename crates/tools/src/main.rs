@@ -32,6 +32,8 @@ const REPORTS: &'static [Report] = &[
             "bincode",
             "rmp-serde",
             "postcard",
+            "bitcode",
+            "bitcode-derive",
         ],
         expected: &[],
         only: &[],
@@ -64,8 +66,6 @@ const REPORTS: &'static [Report] = &[
             "musli-storage",
             "musli-value",
             "serde_cbor",
-            "bitcode",
-            "bitcode-derive",
             // "dlhn", # broken
         ],
         expected: &["model-no-128", "model-no-map"],
