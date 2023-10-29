@@ -1,7 +1,8 @@
 //! Marker types which define a [`ByteOrder`] to use.
 
 /// A macro that picks which `$expr` to evaluate to based on if the current
-/// `#[cfg(target_endian = "..")]` matches `$endian`.
+/// `#[cfg(target_endian = "..")]` matches `$endian` and optionally
+/// #[cfg(target_pointer_width = "..")] matches `$pointer_width`.
 ///
 /// A fallback branch is supported with `_ => $expr`.
 ///
@@ -45,13 +46,13 @@
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __pick {
-    ($($endian:literal => $expr:expr),+ $(, _ => $fallback:expr)? $(,)?) => {
+    ($($endian:literal $(/ $pointer_width:literal)? => $expr:expr),+ $(, _ => $fallback:expr)? $(,)?) => {
         match () {
             $(
-                #[cfg(target_endian = $endian)]
+                #[cfg(all(target_endian = $endian $(, target_pointer_width = $pointer_width)*))]
                 () => $expr,
             )*
-            #[cfg(not(any($(target_endian = $endian),*)))]
+            #[cfg(not(any($(all(target_endian = $endian $(, target_pointer_width = $pointer_width)*)),*)))]
             () => $crate::__pick_fallback!($($fallback)*)
         }
     };
@@ -70,7 +71,9 @@ macro_rules! __pick_fallback {
     };
 }
 
-/// A macro that matches `$expr` to the `$pat` if the current target is $endian.
+/// A macro that matches `$expr` to its associated `$pat` if the current
+/// `#[cfg(target_endian = "..")]` matches `$endian` and optionally
+/// #[cfg(target_pointer_width = "..")] matches `$pointer_width`.
 ///
 /// Note that if running on a platform which is not covered, the result will
 /// always be `false`:
@@ -104,13 +107,13 @@ macro_rules! __pick_fallback {
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __matches {
-    ($expr:expr, $($endian:literal => $pat:pat),+ $(,)?) => {
+    ($expr:expr, $($endian:literal $(/ $pointer_width:literal)? => $pat:pat),+ $(,)?) => {
         match $expr {
             $(
-                #[cfg(target_endian = $endian)]
+                #[cfg(all(target_endian = $endian $(, target_pointer_width = $pointer_width)*))]
                 value => matches!(value, $pat),
             )*
-            #[cfg(not(any($(target_endian = $endian),*)))]
+            #[cfg(not(any($(all(target_endian = $endian $(, target_pointer_width = $pointer_width)*)),*)))]
             _ => false,
         }
     };
