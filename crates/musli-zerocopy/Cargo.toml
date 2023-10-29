@@ -1,6 +1,6 @@
 [package]
 name = "musli-zerocopy"
-version = "0.0.85"
+version = "0.0.86"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
@@ -22,10 +22,10 @@ alloc = []
 nightly = []
 
 [dependencies]
-musli-zerocopy-macros = { version = "=0.0.85", path = "../musli-zerocopy-macros" }
+musli-zerocopy-macros = { version = "=0.0.86", path = "../musli-zerocopy-macros" }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 
 [dev-dependencies]
 anyhow = "1.0.75"
 trybuild = "1.0.85"
-musli-zerocopy-macros = { version = "=0.0.85", path = "../musli-zerocopy-macros", features = ["sneaky-fields"] }
+musli-zerocopy-macros = { version = "=0.0.86", path = "../musli-zerocopy-macros", features = ["sneaky-fields"] }
