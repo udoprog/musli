@@ -12,7 +12,7 @@ readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no_std", "serialization"]
+keywords = ["no_std", "serialization", "zerocopy"]
 categories = ["encoding"]
 
 [features]
@@ -22,10 +22,10 @@ alloc = []
 nightly = []
 
 [dependencies]
-musli-macros = { version = "=0.0.85", path = "../musli-macros" }
+musli-zerocopy-macros = { version = "=0.0.85", path = "../musli-zerocopy-macros" }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 
 [dev-dependencies]
 anyhow = "1.0.75"
 trybuild = "1.0.85"
-musli-macros = { version = "=0.0.85", path = "../musli-macros", features = ["sneaky-fields"] }
+musli-zerocopy-macros = { version = "=0.0.85", path = "../musli-zerocopy-macros", features = ["sneaky-fields"] }

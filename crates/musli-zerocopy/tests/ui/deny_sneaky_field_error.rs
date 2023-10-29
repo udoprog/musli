@@ -2,7 +2,7 @@
 //! sneakily introduced by an attribute macro.
 
 use musli_zerocopy::ZeroCopy;
-use musli_macros::sneaky_fields;
+use musli_zerocopy_macros::sneaky_fields;
 
 #[derive(ZeroCopy)]
 #[repr(C)]

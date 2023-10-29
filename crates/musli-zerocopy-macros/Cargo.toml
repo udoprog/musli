@@ -1,18 +1,18 @@
 [package]
-name = "musli-macros"
+name = "musli-zerocopy-macros"
 version = "0.0.85"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
 description = """
-Macros for Müsli.
+Macros for Müsli zero-copy.
 """
 documentation = "https://docs.rs/musli"
 readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no_std", "serialization"]
+keywords = ["no_std", "serialization", "zerocopy"]
 categories = ["encoding"]
 
 [lib]
@@ -20,7 +20,7 @@ proc-macro = true
 path = "src/lib.rs"
 
 [features]
-test = []
+sneaky-fields = []
 
 [dependencies]
 proc-macro2 = "1.0.69"

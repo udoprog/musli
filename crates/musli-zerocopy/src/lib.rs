@@ -812,7 +812,7 @@ pub mod endian;
 /// struct Custom { field: u32 }
 /// ```
 #[doc(inline)]
-pub use musli_macros::ZeroCopy;
+pub use musli_zerocopy_macros::ZeroCopy;
 
 #[cfg(test)]
 mod tests;

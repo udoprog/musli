@@ -100,7 +100,6 @@ pub use self::load::{Load, LoadMut};
 mod load;
 
 pub use self::visit::Visit;
-pub use musli_macros::Visit;
 pub(crate) mod visit;
 
 pub use self::validator::Validator;
