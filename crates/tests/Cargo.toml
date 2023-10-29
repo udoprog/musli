@@ -12,8 +12,8 @@ publish = false
 
 [features]
 default = ["std"]
-extra = ["rkyv", "dlhn", "bitcode", "serde_cbor"]
-full = ["rmp-serde", "bincode", "postcard", "musli-json", "serde_json"]
+extra = ["rkyv", "dlhn", "serde_cbor"]
+full = ["rmp-serde", "bincode", "postcard", "musli-json", "serde_json", "bitcode"]
 text = ["musli-json", "serde_json"]
 std = ["alloc", "musli?/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "serde?/std"]
 alloc = ["musli?/alloc", "musli-wire?/alloc", "musli-storage?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
