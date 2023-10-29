@@ -112,7 +112,7 @@ macro_rules! feature_matrix {
         $call!(serde_dlhn, serde_dlhn_buf $(, $($tt)*)*);
         #[cfg(feature = "serde_cbor")]
         $call!(serde_cbor, serde_cbor_buf $(, $($tt)*)*);
-        #[cfg(feature = "bitcode")]
+        #[cfg(all(feature = "bitcode", feature = "serde"))]
         $call!(serde_bitcode, serde_bitcode_buf $(, $($tt)*)*);
         #[cfg(feature = "bitcode-derive")]
         $call!(derive_bitcode, derive_bitcode_buf $(, $($tt)*)*);

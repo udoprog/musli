@@ -155,7 +155,7 @@ pub mod postcard {
 
 /// Bitcode lives in here with two variants, one using serde and another using
 /// its own derives.
-#[cfg(feature = "bitcode")]
+#[cfg(all(feature = "bitcode", feature = "serde"))]
 pub mod serde_bitcode {
     use bitcode::Buffer;
     use serde::{Deserialize, Serialize};
@@ -187,7 +187,7 @@ pub mod serde_bitcode {
 
 /// Bitcode lives in here with two variants, one using serde and another using
 /// its own derives.
-#[cfg(feature = "bitcode")]
+#[cfg(feature = "bitcode-derive")]
 pub mod derive_bitcode {
     use bitcode::Buffer;
     use bitcode::{Decode, Encode};

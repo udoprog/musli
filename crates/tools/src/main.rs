@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 const REPO: &'static str = "https://raw.githubusercontent.com/udoprog/musli";
 
-const COMMON: &'static [&'static str] = &["no-rt", "std"];
+const COMMON: &'static [&'static str] = &["no-rt", "std", "alloc"];
 
 const REPORTS: &'static [Report] = &[
     Report {
@@ -35,7 +35,9 @@ const REPORTS: &'static [Report] = &[
             "bitcode",
             "bitcode-derive",
         ],
-        expected: &[],
+        expected: &[
+            "musli", "serde", "simdutf8"
+        ],
         only: &[],
     },
     Report {
@@ -49,7 +51,9 @@ const REPORTS: &'static [Report] = &[
             "musli-json",
             "serde_json",
         ],
-        expected: &[],
+        expected: &[
+            "musli", "serde", "simdutf8"
+        ],
         only: &[],
     },
     Report {
@@ -68,7 +72,10 @@ const REPORTS: &'static [Report] = &[
             "serde_cbor",
             // "dlhn", # broken
         ],
-        expected: &["model-no-128", "model-no-map"],
+        expected: &[
+            "musli", "serde", "simdutf8",
+            "model-no-128", "model-no-map", "model-no-map-string-key"
+        ],
         only: &[],
     },
     Report {
@@ -81,7 +88,9 @@ const REPORTS: &'static [Report] = &[
         ],
         title: "Müsli vs rkyv",
         features: &["musli-zerocopy", "rkyv"],
-        expected: &[],
+        expected: &[
+            "model-no-cstring", "model-no-map", "model-no-map-string-key", "model-no-tuple", "model-no-usize"
+        ],
         only: &["primitives", "primpacked"],
     },
     Report {
@@ -172,7 +181,6 @@ struct Line {
 
 #[derive(Deserialize)]
 struct Target {
-    crate_types: Vec<String>,
     kind: Vec<String>,
     name: String,
 }
@@ -184,6 +192,7 @@ struct Profile {
 
 #[derive(Deserialize)]
 struct CompilerArtifact {
+    package_id: String,
     executable: Option<String>,
     features: Vec<String>,
     target: Target,
@@ -335,11 +344,11 @@ fn main() -> Result<()> {
 
                 let size_set = build_report(
                     &mut o,
+                    report,
                     &root,
                     a.bench,
                     a.filter.as_deref(),
                     a.branch.as_deref().unwrap_or("main"),
-                    *report,
                 )?;
 
                 size_sets.push((*report, size_set));
@@ -380,12 +389,28 @@ fn main() -> Result<()> {
                     &remaining[..],
                 )?;
 
-                builds.push(build);
+                builds.push((report, build));
             }
 
-            if builds.iter().any(|b| !b.status.success()) {
-                for build in builds {
-                    for message in build.messages {
+            if builds
+                .iter()
+                .any(|(_, b)| !b.status.success() || !b.bad_features.is_empty())
+            {
+                for (report, b) in builds {
+                    if !b.bad_features.is_empty() {
+                        for (name, bad_features) in b.bad_features {
+                            match bad_features {
+                                Features::Expected(expected) => {
+                                    println!("{}: Expected `{name}`: {expected:?}", report.id)
+                                }
+                                Features::Unexpected(unexpected) => {
+                                    println!("{}: Unexpected `{name}`: {unexpected:?}", report.id)
+                                }
+                            }
+                        }
+                    }
+
+                    for message in b.messages {
                         print!("{message}")
                     }
                 }
@@ -432,11 +457,11 @@ fn main() -> Result<()> {
 
 fn build_report<W>(
     o: &mut W,
+    report: &Report,
     root: &Path,
     run_bench: bool,
     filter: Option<&str>,
     branch: &str,
-    report: Report,
 ) -> Result<Vec<SizeSet>>
 where
     W: ?Sized + Write,
@@ -444,7 +469,7 @@ where
     let output = root.join("images");
     let target_dir = root.join("target");
 
-    let bins = build_bench(report.features, report.expected)?;
+    let bins = build_bench(report)?;
 
     if run_bench {
         run_path(&bins.comparison, &[])?;
@@ -704,11 +729,18 @@ fn run_path(path: &Path, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
+enum Features {
+    Expected(BTreeSet<String>),
+    Unexpected(BTreeSet<String>),
+}
+
 #[derive(Default, Debug)]
 struct CustomBuild {
     status: ExitStatus,
     all: Vec<(String, String, PathBuf)>,
     messages: Vec<String>,
+    bad_features: Vec<(String, Features)>,
 }
 
 impl CustomBuild {
@@ -732,7 +764,7 @@ struct Build {
 
 fn build_tests<C, S>(
     features: &[&str],
-    expected_features: &[&str],
+    expected: &[&str],
     command: C,
     head: &[S],
     remaining: &[S],
@@ -752,14 +784,14 @@ where
     child.arg("--message-format=json");
     child.stdout(Stdio::piped());
 
-    let features = COMMON
+    let features_argument = COMMON
         .iter()
         .chain(features)
         .copied()
         .collect::<Vec<_>>()
         .join(",");
 
-    child.args(["--no-default-features", "--features", &features]);
+    child.args(["--no-default-features", "--features", &features_argument]);
 
     if !remaining.is_empty() {
         child.arg("--");
@@ -774,6 +806,7 @@ where
 
     let mut all = Vec::new();
     let mut messages = Vec::new();
+    let mut bad_features = Vec::new();
 
     for line in stdout.lines() {
         let line = line?;
@@ -785,48 +818,49 @@ where
                 messages.push(message.message.rendered);
             }
             "compiler-artifact" => {
-                let artifact: CompilerArtifact = serde_json::from_value(line.extra.clone())?;
+                let a: CompilerArtifact = serde_json::from_value(line.extra.clone())?;
 
-                if !(artifact
-                    .target
-                    .crate_types
-                    .iter()
-                    .any(|value| value == "bin"))
-                {
-                    continue;
-                }
-
-                let Some(executable) = artifact.executable else {
+                let Some((head, _)) = a.package_id.split_once(' ') else {
                     continue;
                 };
 
-                let mut expected = expected_features.iter().copied().collect::<BTreeSet<_>>();
+                if head != "tests" {
+                    continue;
+                }
 
-                for feature in &artifact.features {
-                    expected.remove(feature.as_str());
+                let mut expected = features
+                    .iter()
+                    .chain(expected)
+                    .chain(COMMON)
+                    .map(|s| (*s).to_owned())
+                    .collect::<BTreeSet<_>>();
+
+                let mut unexpected = BTreeSet::new();
+
+                for feature in &a.features {
+                    if !expected.remove(feature.as_str()) {
+                        unexpected.insert(feature.clone());
+                    }
                 }
 
                 if !expected.is_empty() {
-                    bail!(
-                        "Building executable did not have model features: {:?}",
-                        expected
-                    );
+                    bad_features.push((a.target.name.clone(), Features::Expected(expected)));
+                }
+
+                if !unexpected.is_empty() {
+                    bad_features.push((a.target.name.clone(), Features::Unexpected(unexpected)));
                 }
 
                 match (
-                    artifact.target.kind.first().map(|s| s.as_str()),
-                    artifact.target.name.as_str(),
+                    a.target.kind.first().map(|s| s.as_str()),
+                    a.executable.as_deref(),
                 ) {
-                    (Some(kind), name) => {
-                        if kind == "bin" && artifact.profile.test {
+                    (Some(kind), Some(executable)) => {
+                        if kind == "bin" && a.profile.test {
                             continue;
                         }
 
-                        all.push((
-                            kind.to_owned(),
-                            name.to_owned(),
-                            PathBuf::from(executable.clone()),
-                        ));
+                        all.push((kind.to_owned(), a.target.name, PathBuf::from(executable)));
                     }
                     _ => {}
                 }
@@ -841,18 +875,34 @@ where
         status,
         all,
         messages,
+        bad_features,
     })
 }
 
 /// Build benchmarks.
-fn build_bench(features: &[&str], expected_features: &[&str]) -> Result<Build> {
+fn build_bench(report: &Report) -> Result<Build> {
     let build = build_tests(
-        features,
-        expected_features,
+        report.features,
+        report.expected,
         "build",
         &["--release", "--benches"],
         &[],
     )?;
+
+    if !build.bad_features.is_empty() {
+        for (name, bad_features) in build.bad_features {
+            match bad_features {
+                Features::Expected(expected) => {
+                    println!("{}: Expected `{name}`: {expected:?}", report.id)
+                }
+                Features::Unexpected(unexpected) => {
+                    println!("{}: Unexpected `{name}`: {unexpected:?}", report.id)
+                }
+            }
+        }
+
+        bail!("{}: Got bad features during build", report.id);
+    }
 
     if !build.status.success() {
         for message in build.messages {
