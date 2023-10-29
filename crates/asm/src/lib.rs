@@ -123,12 +123,12 @@ pub mod musli_zerocopy_swap {
     use musli_zerocopy::{endian, ByteOrder, Endian, Ref, ZeroCopy};
 
     #[inline(never)]
-    pub fn array_little_endian(value: [u32; 16]) -> [u32; 16] {
+    pub fn array_le(value: [u32; 8]) -> [u32; 8] {
         value.swap_bytes::<endian::Little>()
     }
 
     #[inline(never)]
-    pub fn array_big_endian(value: [u32; 16]) -> [u32; 16] {
+    pub fn array_be(value: [u32; 8]) -> [u32; 8] {
         value.swap_bytes::<endian::Big>()
     }
 

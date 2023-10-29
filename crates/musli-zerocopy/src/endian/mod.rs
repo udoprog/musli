@@ -1,7 +1,9 @@
 //! Marker types which define a [`ByteOrder`] to use.
 
-/// A macro that evaluated to `$big` argument if the current target is big
-/// endian, else the `$little` argument.
+/// A macro that picks which `$expr` to evaluate to based on if the current
+/// `#[cfg(target_endian = "..")]` matches `$endian`.
+///
+/// A fallback branch is supported with `_ => $expr`.
 ///
 /// # Examples
 ///
@@ -26,57 +28,92 @@
 /// }
 ///
 /// let header: Header = todo!();
-/// let data: Ref<Data> = endian::pick!(header.big, header.little);
+/// let data: Ref<Data> = endian::pick!("big" => header.big, "little" => header.little);
+/// // Example using fallback:
+/// let data: Ref<Data> = endian::pick!("big" => header.big, _ => header.little);
+/// ```
+///
+/// Note that this evaluates to a private type in case the current endianness is
+/// not covered:
+///
+/// ```compile_fail
+/// #[cfg(target_endian = "little")]
+/// let data: u32 = endian::pick!("big" => 1u32);
+/// #[cfg(target_endian = "big")]
+/// let data: u32 = endian::pick!("little" => 1u32);
 /// ```
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __pick {
-    ($big:expr, $little:expr) => {{
-        #[cfg(target_endian = "big")]
-        {
-            $big
+    ($($endian:literal => $expr:expr),+ $(, _ => $fallback:expr)? $(,)?) => {
+        match () {
+            $(
+                #[cfg(target_endian = $endian)]
+                () => $expr,
+            )*
+            #[cfg(not(any($(target_endian = $endian),*)))]
+            () => $crate::__pick_fallback!($($fallback)*)
         }
-
-        #[cfg(not(target_endian = "big"))]
-        {
-            $little
-        }
-    }};
+    };
 }
 
-/// A macro that matches `$expr` to `$big` if the current target is big endian,
-/// else `$expr` is matched against the `$little` argument.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __pick_fallback {
+    () => {
+        struct UnsupportedEndian;
+        UnsupportedEndian
+    };
+
+    ($expr:expr) => {
+        $expr
+    };
+}
+
+/// A macro that matches `$expr` to the `$pat` if the current target is $endian.
 ///
-/// # Examples
+/// Note that if running on a platform which is not covered, the result will
+/// always be `false`:
 ///
-/// ```no_run
+/// ```
 /// use musli_zerocopy::endian;
 ///
 /// #[derive(Debug, PartialEq)]
-/// enum Endianness {
-///     Little,
-///     Big,
-/// }
+/// enum Endian { Little, Big }
 ///
-/// use Endianness::*;
+/// let e = endian::pick!("little" => Endian::Little, "big" => Endian::Big);
 ///
-/// let endianness = Little;
-/// assert!(endian::matches!(endianness, Little, Big));
+/// #[cfg(target_endian = "little")]
+/// assert!(!endian::matches!(e, "big" => Big));
+/// #[cfg(target_endian = "big")]
+/// assert!(!endian::matches!(e, "little" => Little));
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::endian;
+///
+/// #[derive(Debug, PartialEq)]
+/// enum Endian { Little, Big }
+///
+/// let e = endian::pick!("little" => Endian::Little, "big" => Endian::Big);
+///
+/// assert!(endian::matches!(e, "little" => Endian::Little, "big" => Endian::Big));
 /// ```
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __matches {
-    ($expr:expr, $big:pat, $little:pat) => {{
-        #[cfg(target_endian = "big")]
-        {
-            matches!($expr, $big)
+    ($expr:expr, $($endian:literal => $pat:pat),+ $(,)?) => {
+        match $expr {
+            $(
+                #[cfg(target_endian = $endian)]
+                value => matches!(value, $pat),
+            )*
+            #[cfg(not(any($(target_endian = $endian),*)))]
+            _ => false,
         }
-
-        #[cfg(not(target_endian = "big"))]
-        {
-            matches!($expr, $little)
-        }
-    }};
+    };
 }
 
 #[doc(inline)]

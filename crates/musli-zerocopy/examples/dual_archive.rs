@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     buf.align_in_place();
 
     let header = buf.load_at::<Header>(0)?;
-    let data = buf.load(endian::pick!(header.big, header.little))?;
+    let data = buf.load(endian::pick!("big" => header.big, "little" => header.little))?;
 
     dbg!(buf.load(data.name)?);
     dbg!(*data.age + 1);
