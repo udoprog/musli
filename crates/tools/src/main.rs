@@ -34,9 +34,10 @@ const REPORTS: &'static [Report] = &[
             "postcard",
             "bitcode",
             "bitcode-derive",
+            "simdutf8",
         ],
         expected: &[
-            "musli", "serde", "simdutf8"
+            "musli", "serde"
         ],
         only: &[],
     },
@@ -50,9 +51,10 @@ const REPORTS: &'static [Report] = &[
         features: &[
             "musli-json",
             "serde_json",
+            "simdutf8",
         ],
         expected: &[
-            "musli", "serde", "simdutf8"
+            "musli", "serde",
         ],
         only: &[],
     },
@@ -71,9 +73,10 @@ const REPORTS: &'static [Report] = &[
             "musli-value",
             "serde_cbor",
             // "dlhn", # broken
+            "simdutf8",
         ],
         expected: &[
-            "musli", "serde", "simdutf8",
+            "musli", "serde",
             "model-no-128", "model-no-map", "model-no-map-string-key"
         ],
         only: &[],
