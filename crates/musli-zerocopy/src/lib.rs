@@ -535,7 +535,7 @@ extern crate std;
 #[doc(inline)]
 pub use self::buf::OwnedBuf;
 #[doc(inline)]
-pub use self::buf::{Buf, DefaultAlignment, SliceMut};
+pub use self::buf::{Buf, DefaultAlignment, SliceMut, Visit};
 pub mod buf;
 
 pub mod mem;
@@ -563,6 +563,9 @@ pub mod pointer;
 #[doc(inline)]
 pub use self::endian::{ByteOrder, Endian};
 pub mod endian;
+
+/// Macro to derive a simple [`Visit`] implementation.
+pub use musli_zerocopy_macros::Visit;
 
 /// Derive macro to implement [`ZeroCopy`].
 ///
@@ -829,6 +832,7 @@ pub mod __private {
         pub use ::core::mem::{align_of, size_of};
     }
 
+    pub use crate::buf::{Buf, Visit};
     pub use crate::endian::ByteOrder;
 
     #[inline(always)]

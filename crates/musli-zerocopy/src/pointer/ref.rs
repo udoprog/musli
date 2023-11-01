@@ -177,12 +177,12 @@ where
     /// assert_eq!(reference.len(), 10);
     /// ```
     #[inline]
-    pub fn with_metadata<U>(offset: U, metadata: P::Metadata) -> Self
+    pub fn with_metadata<U, M>(offset: U, metadata: M) -> Self
     where
         U: Copy + fmt::Debug,
+        M: Copy + fmt::Debug,
         O: TryFrom<U>,
-        P::Metadata: fmt::Debug,
-        P::Packed: TryFrom<P::Metadata>,
+        P::Packed: TryFrom<M>,
     {
         assert!(
             O::CAN_SWAP_BYTES,
