@@ -1,6 +1,6 @@
 [package]
 name = "musli-storage"
-version = "0.0.86"
+version = "0.0.87"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.73"
@@ -23,5 +23,5 @@ test = []
 simdutf8 = ["musli-common/simdutf8"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.86", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.86", default-features = false }
+musli = { path = "../musli", version = "0.0.87", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.87", default-features = false }
