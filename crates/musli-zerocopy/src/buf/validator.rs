@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of, transmute};
 use core::ops::Range;
-use core::ptr;
+use core::ptr::{self, NonNull};
 
 use crate::error::Error;
 use crate::traits::ZeroCopy;
@@ -13,13 +13,27 @@ use crate::traits::ZeroCopy;
 #[must_use = "Must call `Validator::end` when validation is completed"]
 #[repr(transparent)]
 pub struct Validator<'a, T: ?Sized> {
-    data: *const u8,
+    data: NonNull<u8>,
     _marker: PhantomData<&'a T>,
 }
 
 impl<'a, T: ?Sized> Validator<'a, T> {
+    /// Construct a validator around a slice.
+    ///
+    /// This does not require that the slice is a valid instance of `T`.
+    pub(crate) fn from_slice(slice: &[u8]) -> Self {
+        // SAFETY: a slice is guaranteed to be non-null.
+        unsafe { Self::new(NonNull::new_unchecked(slice.as_ptr() as *mut u8)) }
+    }
+
+    /// Construct a validator around a pointer.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that the pointer points to an initialized slice of
+    /// size `T`.
     #[inline]
-    pub(crate) fn new(data: *const u8) -> Self {
+    pub(crate) unsafe fn new(data: NonNull<u8>) -> Self {
         Self {
             data,
             _marker: PhantomData,
@@ -84,7 +98,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
         unsafe {
             self.align_with(align_of::<F>());
             F::validate(&mut Validator::new(self.data))?;
-            let output = &*self.data.cast::<F>();
+            let output = self.data.cast::<F>().as_ref();
             self.advance::<F>();
             Ok(output)
         }
@@ -99,8 +113,8 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// walk out of bounds.
     #[inline]
     pub unsafe fn byte(&mut self) -> u8 {
-        let b = ptr::read(self.data);
-        self.data = self.data.wrapping_add(1);
+        let b = ptr::read(self.data.as_ptr());
+        self.data = NonNull::new_unchecked(self.data.as_ptr().add(1));
         b
     }
 
@@ -120,7 +134,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
         // sized
         // appropriately above.
         unsafe {
-            let output = ptr::read_unaligned(self.data.cast::<F>());
+            let output = ptr::read_unaligned(self.data.cast::<F>().as_ptr());
             self.advance::<F>();
             Ok(output)
         }
@@ -248,20 +262,20 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// Align the current pointer by `F`.
     #[inline]
     pub(crate) unsafe fn align_with(&mut self, align: usize) {
-        let offset = self.data.align_offset(align);
-        self.data = self.data.wrapping_add(offset);
+        let offset = self.data.as_ptr().align_offset(align);
+        self.data = NonNull::new_unchecked(self.data.as_ptr().add(offset));
     }
 
     /// Advance the current pointer by `F`.
     #[inline]
     pub(crate) unsafe fn advance<F>(&mut self) {
-        self.data = self.data.wrapping_add(size_of::<F>());
+        self.data = NonNull::new_unchecked(self.data.as_ptr().add(size_of::<F>()));
     }
 
     /// Return the address range associated with a just read `F` for diagnostics.
     #[inline]
     pub(crate) fn range<F>(&self) -> Range<usize> {
-        let end = self.data as usize;
+        let end = self.data.as_ptr() as usize;
         let start = end.wrapping_sub(size_of::<F>());
         start..end
     }

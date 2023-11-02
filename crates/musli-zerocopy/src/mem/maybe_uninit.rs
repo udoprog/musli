@@ -1,7 +1,9 @@
 use core::fmt;
 use core::mem::{size_of, ManuallyDrop};
+use core::ptr::NonNull;
 use core::slice;
 
+use crate::buf;
 use crate::pointer::Pointee;
 use crate::traits::ZeroCopy;
 
@@ -94,9 +96,9 @@ impl<T> MaybeUninit<T> {
         T: ZeroCopy,
     {
         unsafe {
-            let ptr = self as *mut Self as *mut u8;
-            crate::buf::store_unaligned(ptr, value);
-            slice::from_raw_parts_mut(ptr, size_of::<T>())
+            let ptr = NonNull::new_unchecked(self as *mut Self as *mut u8);
+            buf::store_unaligned(ptr, value);
+            slice::from_raw_parts_mut(ptr.as_ptr(), size_of::<T>())
         }
     }
 }

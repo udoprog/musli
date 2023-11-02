@@ -6,8 +6,9 @@
 use core::convert::{identity as likely, identity as unlikely};
 use core::marker::PhantomData;
 use core::mem::size_of;
+use core::ptr::NonNull;
 
-use crate::buf::{Buf, StoreBuf};
+use crate::buf::{self, Buf, StoreBuf};
 use crate::error::{Error, ErrorKind};
 use crate::swiss::raw::{h2, is_full, probe_seq, special_is_empty, Group, ProbeSeq};
 use crate::traits::ZeroCopy;
@@ -144,7 +145,7 @@ where
             panic!("Start `{index}` out of bounds");
         };
 
-        let end = start.wrapping_add(size_of::<T>());
+        let end = start + size_of::<T>();
 
         let Some(slice) = self.buf.get_mut(start..end) else {
             panic!("Missing bucket at range {start}..{end}");
@@ -344,7 +345,7 @@ where
     fn ctrl_mut(&mut self, index: usize) -> &mut u8 {
         debug_assert!(index < self.num_ctrl_bytes());
 
-        let offset = self.ctrl_ptr.wrapping_add(index);
+        let offset = self.ctrl_ptr + index;
 
         let Some(ctrl) = self.buf.get_mut(offset) else {
             panic!("Missing control byte at {offset}");
@@ -357,7 +358,7 @@ where
     fn ctrl(&self, index: usize) -> &u8 {
         debug_assert!(index < self.num_ctrl_bytes());
 
-        let offset = self.ctrl_ptr.wrapping_add(index);
+        let offset = self.ctrl_ptr + index;
 
         let Some(ctrl) = self.buf.get(offset) else {
             panic!("Missing control byte at {offset}");
@@ -370,8 +371,8 @@ where
     fn ctrl_group(&self, index: usize) -> &[u8] {
         debug_assert!(index < self.num_ctrl_bytes());
 
-        let start = self.ctrl_ptr.wrapping_add(index);
-        let end = start.wrapping_add(Group::WIDTH);
+        let start = self.ctrl_ptr + index;
+        let end = start + Group::WIDTH;
 
         let Some(ctrl) = self.buf.get(start..end) else {
             panic!("Missing control byte at range {start}..{end}");
@@ -392,7 +393,7 @@ where
 /// is a ZST, then we instead track the index of the element in the table so
 /// that `erase` works properly.
 pub struct Bucket<'a, T> {
-    data: *mut u8,
+    data: NonNull<u8>,
     _marker: PhantomData<&'a mut T>,
 }
 
@@ -407,7 +408,7 @@ impl<'a, T> Bucket<'a, T> {
         debug_assert!(data.len() == size_of::<T>());
 
         Self {
-            data: data.as_mut_ptr(),
+            data: NonNull::new_unchecked(data.as_mut_ptr()),
             _marker: PhantomData,
         }
     }
@@ -421,7 +422,7 @@ impl<'a, T> Bucket<'a, T> {
     {
         // SAFETY: During bucket construction we've asserted that a buffer of
         // the appropriate size (that is not guaranteed to be aligned) is used.
-        unsafe { crate::buf::store_unaligned(self.data, value) }
+        unsafe { buf::store_unaligned(self.data, value) }
     }
 }
 

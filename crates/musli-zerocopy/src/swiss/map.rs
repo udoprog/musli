@@ -425,7 +425,7 @@ impl<'a, T> RawTable<'a, T> {
         let mut probe_seq = probe_seq(self.bucket_mask, hash);
 
         loop {
-            let range = probe_seq.pos..probe_seq.pos.wrapping_add(size_of::<Group>());
+            let range = probe_seq.pos..probe_seq.pos + size_of::<Group>();
 
             let Some(bytes) = self.ctrl.get(range.clone()) else {
                 return Err(Error::new(ErrorKind::ControlRangeOutOfBounds {
@@ -547,7 +547,7 @@ where
         let ctrl = buf.load(self.ctrl)?;
 
         loop {
-            let range = probe_seq.pos..probe_seq.pos.wrapping_add(size_of::<Group>());
+            let range = probe_seq.pos..probe_seq.pos + size_of::<Group>();
 
             let Some(bytes) = ctrl.get(range.clone()) else {
                 return Err(Error::new(ErrorKind::ControlRangeOutOfBounds {
