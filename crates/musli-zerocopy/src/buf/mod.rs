@@ -119,12 +119,12 @@ mod owned_buf;
 pub use self::slice_mut::SliceMut;
 mod slice_mut;
 
-use core::mem::{align_of, size_of};
+use core::mem::size_of;
+use core::ptr::NonNull;
 
 #[cfg(feature = "alloc")]
 use alloc::borrow::Cow;
 
-use crate::error::Error;
 use crate::traits::ZeroCopy;
 
 /// The type used to calculate default alignment for [`OwnedBuf`].
@@ -215,29 +215,6 @@ pub(crate) fn is_aligned_with(ptr: *const u8, align: usize) -> bool {
     (ptr as usize) & (align - 1) == 0
 }
 
-#[inline]
-pub(crate) unsafe fn validate_array<S, T>(
-    validator: &mut Validator<'_, S>,
-    len: usize,
-) -> Result<(), Error>
-where
-    S: ?Sized,
-    T: ZeroCopy,
-{
-    validator.align_with(align_of::<T>());
-
-    if !T::ANY_BITS {
-        for _ in 0..len {
-            // SAFETY: The passed in buffer is required to be aligned per the
-            // requirements of this trait, so any size_of::<T>() chunks are
-            // aligned too.
-            validator.validate_only::<T>()?;
-        }
-    }
-
-    Ok(())
-}
-
 /// Calculate padding with the assumption that alignment is a power of two.
 #[inline(always)]
 pub(crate) fn padding_to(len: usize, align: usize) -> usize {
@@ -257,14 +234,15 @@ pub(crate) fn padding_to(len: usize, align: usize) -> usize {
 ///
 /// Also see the [type level safety documentation][#safety]
 #[inline]
-pub(crate) unsafe fn store_unaligned<T>(ptr: *mut u8, value: *const T)
+pub(crate) unsafe fn store_unaligned<T>(data: NonNull<u8>, value: *const T)
 where
     T: ZeroCopy,
 {
-    ptr.copy_from_nonoverlapping(value.cast(), size_of::<T>());
+    data.as_ptr()
+        .copy_from_nonoverlapping(value.cast(), size_of::<T>());
 
     if T::PADDED {
-        let mut padder = Padder::new(ptr);
+        let mut padder = Padder::new(data);
         T::pad(&mut padder);
         padder.remaining();
     }

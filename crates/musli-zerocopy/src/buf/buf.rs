@@ -2,7 +2,7 @@ use core::alloc::Layout;
 use core::fmt;
 use core::mem::{align_of, size_of, MaybeUninit};
 use core::ops::{Index, IndexMut, Range};
-use core::ptr::read_unaligned;
+use core::ptr::{read_unaligned, NonNull};
 use core::slice::SliceIndex;
 
 #[cfg(feature = "alloc")]
@@ -10,7 +10,7 @@ use alloc::borrow::{Cow, ToOwned};
 
 #[cfg(feature = "alloc")]
 use crate::buf::OwnedBuf;
-use crate::buf::{Bindable, Load, LoadMut, Validator};
+use crate::buf::{self, Bindable, Load, LoadMut, Validator};
 use crate::endian::ByteOrder;
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Pointee, Ref, Size};
@@ -565,14 +565,14 @@ impl Buf {
         T: ZeroCopy,
     {
         self.ensure_compatible_with::<T>()?;
-        Ok(Validator::new(self.data.as_ptr()))
+        Ok(Validator::from_slice(&self.data))
     }
 
     pub(crate) unsafe fn get_range_from(
         &self,
         start: usize,
         align: usize,
-    ) -> Result<(*const u8, usize), Error> {
+    ) -> Result<(NonNull<u8>, usize), Error> {
         if self.data.len() < start {
             return Err(Error::new(ErrorKind::OutOfRangeFromBounds {
                 range: start..,
@@ -580,10 +580,10 @@ impl Buf {
             }));
         };
 
-        let ptr = self.data.as_ptr().wrapping_add(start);
+        let ptr = NonNull::new_unchecked(self.data.as_ptr().add(start) as *mut _);
         let remaining = self.data.len() - start;
 
-        if !crate::buf::is_aligned_with(ptr, align) {
+        if !buf::is_aligned_with(ptr.as_ptr(), align) {
             return Err(Error::new(ErrorKind::AlignmentRangeFromMismatch {
                 range: start..,
                 align,
@@ -597,7 +597,7 @@ impl Buf {
         &mut self,
         start: usize,
         align: usize,
-    ) -> Result<(*mut u8, usize), Error> {
+    ) -> Result<(NonNull<u8>, usize), Error> {
         if self.data.len() < start {
             return Err(Error::new(ErrorKind::OutOfRangeFromBounds {
                 range: start..,
@@ -605,10 +605,10 @@ impl Buf {
             }));
         };
 
-        let ptr = self.data.as_mut_ptr().wrapping_add(start);
+        let ptr = NonNull::new_unchecked(self.data.as_mut_ptr().add(start));
         let remaining = self.data.len() - start;
 
-        if !crate::buf::is_aligned_with(ptr, align) {
+        if !buf::is_aligned_with(ptr.as_ptr(), align) {
             return Err(Error::new(ErrorKind::AlignmentRangeFromMismatch {
                 range: start..,
                 align,
@@ -629,10 +629,10 @@ impl Buf {
         start: usize,
         end: usize,
         align: usize,
-    ) -> Result<&Buf, Error> {
+    ) -> Result<&[u8], Error> {
         let buf = self.inner_get_unaligned(start, end)?;
 
-        if !crate::buf::is_aligned_with(buf.as_ptr(), align) {
+        if !buf::is_aligned_with(buf.as_ptr(), align) {
             return Err(Error::new(ErrorKind::AlignmentRangeMismatch {
                 addr: buf.as_ptr() as usize,
                 range: start..end,
@@ -640,7 +640,7 @@ impl Buf {
             }));
         }
 
-        Ok(Buf::new(buf))
+        Ok(buf)
     }
 
     /// Get the given range mutably while checking its required alignment.
@@ -654,10 +654,10 @@ impl Buf {
         start: usize,
         end: usize,
         align: usize,
-    ) -> Result<&mut Buf, Error> {
+    ) -> Result<&mut [u8], Error> {
         let buf = self.inner_get_mut_unaligned(start, end)?;
 
-        if !crate::buf::is_aligned_with(buf.as_ptr(), align) {
+        if !buf::is_aligned_with(buf.as_ptr(), align) {
             return Err(Error::new(ErrorKind::AlignmentRangeMismatch {
                 addr: buf.as_ptr() as usize,
                 range: start..end,
@@ -665,7 +665,7 @@ impl Buf {
             }));
         }
 
-        Ok(Buf::new_mut(buf))
+        Ok(buf)
     }
 
     /// Get the given range without checking that it corresponds to any given
@@ -718,7 +718,7 @@ impl Buf {
         unsafe {
             let (buf, remaining) = self.get_range_from(start, P::ALIGN)?;
             let metadata = P::validate_unsized::<E>(buf, remaining, metadata)?;
-            Ok(&*P::ptr_with_metadata(buf, metadata))
+            Ok(&*P::with_metadata(buf, metadata))
         }
     }
 
@@ -739,7 +739,7 @@ impl Buf {
         unsafe {
             let (buf, remaining) = self.get_mut_range_from(start, P::ALIGN)?;
             let metadata = P::validate_unsized::<E>(buf, remaining, metadata)?;
-            Ok(&mut *P::ptr_with_metadata_mut(buf, metadata))
+            Ok(&mut *P::with_metadata_mut(buf, metadata))
         }
     }
 
@@ -749,9 +749,9 @@ impl Buf {
     where
         T: ZeroCopy,
     {
-        let end = offset.wrapping_add(size_of::<T>());
-
         unsafe {
+            let end = offset + size_of::<T>();
+
             // SAFETY: align_of::<T>() is always a power of two.
             let buf = self.inner_get(offset, end, align_of::<T>())?;
 
@@ -759,12 +759,12 @@ impl Buf {
                 // SAFETY: We've checked the size and alignment of the buffer above.
                 // The remaining safety requirements depend on the implementation of
                 // validate.
-                T::validate(&mut Validator::new(buf.as_ptr()))?;
+                T::validate(&mut Validator::from_slice(buf))?;
             }
 
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
             // type being coerced into can really inhabit any bit pattern.
-            Ok(buf.cast())
+            Ok(&*buf.as_ptr().cast())
         }
     }
 
@@ -842,7 +842,7 @@ impl Buf {
         }
 
         let start = a.max(b);
-        let end = start.wrapping_add(size_of::<P>());
+        let end = start + size_of::<P>();
 
         if end > self.data.len() {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
@@ -876,7 +876,7 @@ impl Buf {
     where
         T: ZeroCopy,
     {
-        let end = offset.wrapping_add(size_of::<T>());
+        let end = offset + size_of::<T>();
 
         unsafe {
             // SAFETY: align_of::<T>() is always a power of two.
@@ -886,12 +886,12 @@ impl Buf {
                 // SAFETY: We've checked the size and alignment of the buffer above.
                 // The remaining safety requirements depend on the implementation of
                 // validate.
-                T::validate(&mut Validator::new(buf.as_ptr()))?;
+                T::validate(&mut Validator::from_slice(buf))?;
             }
 
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
             // type being coerced into can really inhabit any bit pattern.
-            Ok(buf.cast_mut())
+            Ok(&mut *buf.as_mut_ptr().cast())
         }
     }
 
@@ -901,7 +901,7 @@ impl Buf {
     where
         T: ZeroCopy,
     {
-        let end = start.wrapping_add(size_of::<T>());
+        let end = start + size_of::<T>();
 
         unsafe {
             // SAFETY: align_of::<T>() is always a power of two.
@@ -911,7 +911,7 @@ impl Buf {
                 // SAFETY: We've checked the size and alignment of the buffer above.
                 // The remaining safety requirements depend on the implementation of
                 // validate.
-                T::validate(&mut Validator::new(buf.as_ptr()))?;
+                T::validate(&mut Validator::from_slice(buf))?;
             }
 
             // SAFETY: Implementing ANY_BITS is unsafe, and requires that the
@@ -959,7 +959,7 @@ impl Buf {
     /// ```
     #[inline]
     pub fn is_aligned<T>(&self) -> bool {
-        crate::buf::is_aligned_with(self.as_ptr(), align_of::<T>())
+        buf::is_aligned_with(self.as_ptr(), align_of::<T>())
     }
 
     /// Test if the current allocation uses the specified alignment.
@@ -987,12 +987,12 @@ impl Buf {
     pub fn is_aligned_with(&self, align: usize) -> bool {
         assert!(align.is_power_of_two(), "Alignment is not a power of two");
         // SAFETY: align is a power of two.
-        crate::buf::is_aligned_with(self.as_ptr(), align)
+        buf::is_aligned_with(self.as_ptr(), align)
     }
 
     #[inline]
     pub(crate) unsafe fn is_aligned_with_unchecked(&self, align: usize) -> bool {
-        crate::buf::is_aligned_with(self.as_ptr(), align)
+        buf::is_aligned_with(self.as_ptr(), align)
     }
 }
 

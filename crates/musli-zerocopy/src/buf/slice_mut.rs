@@ -8,7 +8,7 @@ use core::slice::{self, SliceIndex};
 #[cfg(feature = "alloc")]
 use alloc::borrow::Cow;
 
-use crate::buf::{Buf, DefaultAlignment, Padder, StoreBuf};
+use crate::buf::{self, Buf, DefaultAlignment, Padder, StoreBuf};
 use crate::endian::{ByteOrder, Native};
 use crate::error::Error;
 use crate::mem::MaybeUninit;
@@ -586,7 +586,8 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     {
         let offset = self.len;
 
-        crate::buf::store_unaligned(self.data.as_ptr().wrapping_add(offset), value);
+        let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
+        buf::store_unaligned(ptr, value);
         self.len += size_of::<P>();
         Ref::new(offset)
     }
@@ -647,8 +648,8 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
             let size = size_of_val(value);
             self.next_offset_with_and_reserve(P::ALIGN, size);
             let offset = self.len;
-            let ptr = self.data.as_ptr().wrapping_add(offset);
-            ptr.copy_from_nonoverlapping(value.as_ptr(), size);
+            let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
+            ptr.as_ptr().copy_from_nonoverlapping(value.as_ptr(), size);
 
             if P::PADDED {
                 let mut padder = Padder::new(ptr);
@@ -748,10 +749,9 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     pub(crate) fn fill(&mut self, byte: u8, len: usize) {
         self.reserve(len);
 
-        let base = self.data.as_ptr().wrapping_add(self.len);
-
         unsafe {
-            base.write_bytes(byte, len);
+            let ptr = self.data.as_ptr().add(self.len);
+            ptr.write_bytes(byte, len);
             self.len += len;
         }
     }
@@ -768,7 +768,7 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     where
         T: ZeroCopy,
     {
-        let dst = self.as_ptr_mut().wrapping_add(self.len);
+        let dst = self.as_ptr_mut().add(self.len);
         dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
         self.len += size_of_val(values);
     }
@@ -821,7 +821,7 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// needs to be allocated.
     #[inline]
     fn ensure_aligned_and_reserve(&mut self, align: usize, reserve: usize) {
-        let extra = crate::buf::padding_to(self.len, align);
+        let extra = buf::padding_to(self.len, align);
         self.reserve(extra + reserve);
 
         // SAFETY: The length is ensures to be within the address space.
@@ -1011,7 +1011,7 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     #[inline]
     fn align_in_place(&mut self) {
         // SAFETY: self.requested is guaranteed to be a power of two.
-        if !crate::buf::is_aligned_with(self.as_ptr(), self.requested) {
+        if !buf::is_aligned_with(self.as_ptr(), self.requested) {
             panic!("Slice is not aligned by {}", self.requested);
         }
     }

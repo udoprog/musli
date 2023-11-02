@@ -20,6 +20,7 @@ use core::array;
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of, transmute};
 use core::num::Wrapping;
+use core::ptr::NonNull;
 use core::slice;
 use core::str;
 
@@ -89,7 +90,7 @@ where
     /// Validate the buffer with the given capacity and return the decoded
     /// metadata.
     unsafe fn validate_unsized<E: ByteOrder>(
-        ptr: *const u8,
+        data: NonNull<u8>,
         len: usize,
         metadata: P::Packed,
     ) -> Result<P::Metadata, Error>;
@@ -104,7 +105,7 @@ where
     /// passed a call to [`validate_unsized()`].
     ///
     /// [`validate_unsized()`]: Self::validate_unsized
-    unsafe fn ptr_with_metadata(ptr: *const u8, metadata: P::Metadata) -> *const Self;
+    unsafe fn with_metadata(data: NonNull<u8>, metadata: P::Metadata) -> *const Self;
 
     /// Construct a wide mutable pointer from a pointer and its associated
     /// metadata.
@@ -117,7 +118,7 @@ where
     /// passed a call to [`validate_unsized()`].
     ///
     /// [`validate_unsized()`]: Self::validate_unsized
-    unsafe fn ptr_with_metadata_mut(ptr: *mut u8, metadata: P::Metadata) -> *mut Self;
+    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: P::Metadata) -> *mut Self;
 }
 
 /// This is a marker trait that must be implemented for a type in order to use
@@ -450,7 +451,7 @@ pub unsafe trait ZeroCopy: Sized {
     /// [type level documentation]: Self
     fn initialize_padding(&mut self) {
         unsafe {
-            let ptr = (self as *mut Self).cast::<u8>();
+            let ptr = NonNull::new_unchecked((self as *mut Self).cast::<u8>());
 
             if Self::PADDED {
                 let mut padder = Padder::new(ptr);
@@ -648,7 +649,7 @@ where
 
     #[inline]
     unsafe fn validate_unsized<E: ByteOrder>(
-        ptr: *const u8,
+        data: NonNull<u8>,
         len: usize,
         metadata: P::Packed,
     ) -> Result<P::Metadata, Error> {
@@ -661,20 +662,20 @@ where
             }));
         };
 
-        let buf = slice::from_raw_parts(ptr, metadata);
+        let buf = slice::from_raw_parts(data.as_ptr(), metadata);
         str::from_utf8(buf).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))?;
         Ok(metadata)
     }
 
     #[inline]
-    unsafe fn ptr_with_metadata(ptr: *const u8, metadata: P::Metadata) -> *const Self {
-        let slice = slice::from_raw_parts(ptr, metadata);
+    unsafe fn with_metadata(data: NonNull<u8>, metadata: P::Metadata) -> *const Self {
+        let slice = slice::from_raw_parts(data.as_ptr(), metadata);
         str::from_utf8_unchecked(slice)
     }
 
     #[inline]
-    unsafe fn ptr_with_metadata_mut(ptr: *mut u8, metadata: P::Metadata) -> *mut Self {
-        let slice = slice::from_raw_parts_mut(ptr, metadata);
+    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: P::Metadata) -> *mut Self {
+        let slice = slice::from_raw_parts_mut(data.as_ptr(), metadata);
         str::from_utf8_unchecked_mut(slice)
     }
 }
@@ -707,7 +708,7 @@ where
 
     #[inline]
     unsafe fn validate_unsized<E: ByteOrder>(
-        buf: *const u8,
+        data: NonNull<u8>,
         len: usize,
         metadata: P::Packed,
     ) -> Result<P::Metadata, Error> {
@@ -728,20 +729,24 @@ where
         };
 
         if !T::ANY_BITS {
-            crate::buf::validate_array::<[T], T>(&mut Validator::new(buf), metadata)?;
+            let mut validator = Validator::<[T]>::new(data);
+
+            for _ in 0..metadata {
+                validator.validate_only::<T>()?;
+            }
         }
 
         Ok(metadata)
     }
 
     #[inline]
-    unsafe fn ptr_with_metadata(buf: *const u8, metadata: P::Metadata) -> *const Self {
-        slice::from_raw_parts(buf.cast(), metadata)
+    unsafe fn with_metadata(data: NonNull<u8>, metadata: P::Metadata) -> *const Self {
+        slice::from_raw_parts(data.cast().as_ptr(), metadata)
     }
 
     #[inline]
-    unsafe fn ptr_with_metadata_mut(buf: *mut u8, metadata: P::Metadata) -> *mut Self {
-        slice::from_raw_parts_mut(buf.cast(), metadata)
+    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: P::Metadata) -> *mut Self {
+        slice::from_raw_parts_mut(data.cast().as_ptr(), metadata)
     }
 }
 
@@ -872,7 +877,6 @@ unsafe impl ZeroCopy for char {
     #[inline]
     unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
-    #[allow(clippy::missing_safety_doc)]
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
         let repr = validator.load_unaligned::<u32>()?;
@@ -910,7 +914,6 @@ unsafe impl ZeroCopy for bool {
     #[inline]
     unsafe fn pad(_: &mut Padder<'_, Self>) {}
 
-    #[allow(clippy::missing_safety_doc)]
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
         match validator.byte() {
@@ -1197,10 +1200,12 @@ where
         }
     }
 
-    #[allow(clippy::missing_safety_doc)]
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
-        crate::buf::validate_array::<_, T>(validator, N)?;
+        for _ in 0..N {
+            validator.validate_only::<T>()?;
+        }
+
         Ok(())
     }
 

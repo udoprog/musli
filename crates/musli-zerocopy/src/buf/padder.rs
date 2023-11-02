@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of, size_of_val, transmute};
-use core::ptr;
+use core::ptr::NonNull;
 
+use crate::buf;
 use crate::traits::ZeroCopy;
 
 /// A struct padder as provided to the [`ZeroCopy::pad`] method.
@@ -10,16 +11,16 @@ use crate::traits::ZeroCopy;
 /// and provides a builder-like API to doing so.
 #[must_use = "For the writer to have an effect on `OwnedBuf` you must call `Padder::remaining` / `Padder::remaining_unsized`"]
 pub struct Padder<'a, T: ?Sized> {
-    ptr: *mut u8,
+    data: NonNull<u8>,
     offset: usize,
     _marker: PhantomData<&'a mut T>,
 }
 
 impl<'a, T: ?Sized> Padder<'a, T> {
     #[inline]
-    pub(crate) fn new(ptr: *mut u8) -> Self {
+    pub(crate) fn new(data: NonNull<u8>) -> Self {
         Self {
-            ptr,
+            data,
             offset: 0,
             _marker: PhantomData,
         }
@@ -79,18 +80,19 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     where
         F: ZeroCopy,
     {
-        let count = crate::buf::padding_to(self.offset, align);
+        let count = buf::padding_to(self.offset, align);
         // zero out padding.
-        ptr::write_bytes(self.ptr.add(self.offset), 0, count);
-        self.offset = self.offset.wrapping_add(count);
+        self.data.as_ptr().add(self.offset).write_bytes(0, count);
+        self.offset += count;
 
         if F::PADDED {
-            let mut padder = Padder::new(self.ptr.wrapping_add(self.offset));
+            let ptr = NonNull::new_unchecked(self.data.as_ptr().add(self.offset));
+            let mut padder = Padder::new(ptr);
             F::pad(&mut padder);
             padder.remaining();
         }
 
-        self.offset = self.offset.wrapping_add(size_of::<F>());
+        self.offset += size_of::<F>();
     }
 
     /// Specific method to both pad for a discriminant and load it
@@ -106,12 +108,12 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     where
         D: ZeroCopy,
     {
-        let count = crate::buf::padding_to(self.offset, align_of::<D>());
+        let count = buf::padding_to(self.offset, align_of::<D>());
         // zero out padding.
-        ptr::write_bytes(self.ptr.add(self.offset), 0, count);
-        let at = self.offset.wrapping_add(count);
-        let value = self.ptr.add(at).cast::<D>().read_unaligned();
-        self.offset = at.wrapping_add(size_of::<D>());
+        self.data.as_ptr().add(self.offset).write_bytes(0, count);
+        let at = self.offset + count;
+        let value = self.data.as_ptr().add(at).cast::<D>().read_unaligned();
+        self.offset = at + size_of::<D>();
         value
     }
 
@@ -140,14 +142,14 @@ impl<'a, T: ?Sized> Padder<'a, T> {
         T: Sized,
     {
         let count = size_of::<T>() - self.offset;
-        ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
+        self.data.as_ptr().add(self.offset).write_bytes(0, count);
     }
 
     /// Finalize remaining padding based on the size of an unsized value.
     #[inline]
     pub(crate) unsafe fn remaining_unsized(self, value: &T) {
         let count = size_of_val(value) - self.offset;
-        ptr::write_bytes(self.ptr.wrapping_add(self.offset), 0, count);
+        self.data.as_ptr().add(self.offset).write_bytes(0, count);
     }
 }
 
@@ -157,7 +159,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::{OwnedBuf, ZeroCopy};
+    use crate::{buf, OwnedBuf, ZeroCopy};
 
     #[test]
     fn ensure_padding() -> Result<()> {
@@ -181,7 +183,7 @@ mod tests {
         // SAFETY: We do not pad beyond known fields and are making sure to
         // initialize all of the buffer.
         unsafe {
-            crate::buf::store_unaligned(buf.as_ptr_mut(), &padded);
+            buf::store_unaligned(buf.as_nonnull(), &padded);
             buf.advance(size_of::<ZeroPadded>());
         }
 
