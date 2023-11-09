@@ -540,6 +540,10 @@ pub mod buf;
 
 pub mod mem;
 
+pub mod slice;
+
+pub mod trie;
+
 #[doc(inline)]
 pub use self::error::Error;
 mod error;

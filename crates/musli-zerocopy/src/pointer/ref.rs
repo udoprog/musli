@@ -278,6 +278,37 @@ where
         Some(Ref::new(offset))
     }
 
+    /// Get an unchecked reference directly out of the slice without validation.
+    ///
+    /// This avoids having to validate every element in a slice in order to
+    /// address them.
+    ///
+    /// In contrast to [`get()`], this does not check that the index is within
+    /// the bounds of the current slice, all though it's not unsafe since it
+    /// cannot lead to anything inherently unsafe. Only garbled data.
+    ///
+    /// [`get()`]: Ref::get
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    ///
+    /// let two = slice.get_unchecked(2);
+    /// assert_eq!(buf.load(two)?, &3);
+    ///
+    /// let oob = slice.get_unchecked(4);
+    /// assert!(buf.load(oob).is_err());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn get_unchecked(&self, index: usize) -> Ref<P, E, O> {
+        let offset = self.offset.as_usize::<E>() + size_of::<P>() * index;
+        Ref::new(offset)
+    }
+
     /// Perform an fetch like `get` which panics with diagnostics in case the
     /// index is out-of-bounds.
     #[inline]
