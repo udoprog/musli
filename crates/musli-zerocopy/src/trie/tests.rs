@@ -1,6 +1,8 @@
+use alloc::vec::Vec;
+
 use crate::{Error, OwnedBuf};
 
-use super::Builder;
+use super::{store, Builder};
 
 #[test]
 fn regular_trie() -> Result<(), Error> {
@@ -71,5 +73,40 @@ fn trie_problem() -> Result<(), Error> {
 
     assert_eq!(trie.get(&buf, "食べなかった")?, Some(&[1][..]));
     assert_eq!(trie.get(&buf, "食べない")?, Some(&[2][..]));
+    Ok(())
+}
+
+#[test]
+fn trie_prefix() -> Result<(), Error> {
+    let mut buf = OwnedBuf::new();
+
+    let values = [
+        (buf.store_unsized("work"), 1),
+        (buf.store_unsized("worker"), 2),
+        (buf.store_unsized("workers"), 3),
+        (buf.store_unsized("working"), 4),
+        (buf.store_unsized("working"), 5),
+        (buf.store_unsized("working man"), 6),
+        (buf.store_unsized("run"), 7),
+        (buf.store_unsized("running"), 8),
+    ];
+
+    let trie = store(&mut buf, values)?;
+
+    let mut values = Vec::new();
+
+    trie.prefix(&buf, "workin", |n| {
+        values.push(*n);
+    })?;
+
+    assert_eq!(&values[..], &[4, 5, 6][..]);
+
+    let mut values = Vec::new();
+
+    trie.prefix(&buf, "wor", |n| {
+        values.push(*n);
+    })?;
+
+    assert_eq!(&values[..], &[1, 2, 3, 4, 5, 6][..]);
     Ok(())
 }

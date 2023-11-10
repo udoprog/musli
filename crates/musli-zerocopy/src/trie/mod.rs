@@ -10,7 +10,6 @@ use core::mem::replace;
 use alloc::vec::Vec;
 
 use crate::endian::Native;
-use crate::error::ErrorKind;
 use crate::slice::{self, BinarySearch};
 use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
 
@@ -334,13 +333,7 @@ where
 
             match search {
                 BinarySearch::Found(n) => {
-                    let Some(child) = this.children.get(n) else {
-                        return Err(Error::new(ErrorKind::IndexOutOfBounds {
-                            index: n,
-                            len: this.children.len(),
-                        }));
-                    };
-
+                    let child = this.children.get_unchecked(n);
                     let child = buf.load(child)?;
                     let values = buf.load(child.links.values)?;
                     return Ok(Some(values));
@@ -349,15 +342,7 @@ where
                     return Ok(None);
                 }
                 BinarySearch::Missing(n) => {
-                    let index = n - 1;
-
-                    let Some(child) = this.children.get(index) else {
-                        return Err(Error::new(ErrorKind::IndexOutOfBounds {
-                            index,
-                            len: this.children.len(),
-                        }));
-                    };
-
+                    let child = this.children.get_unchecked(n - 1);
                     let child = buf.load(child)?;
 
                     // Find common prefix and split nodes if necessary.
@@ -372,6 +357,80 @@ where
                 }
             };
         }
+    }
+
+    /// Construct an iterator over all matching string prefixes in the trie.
+    pub fn prefix<'buf, F>(&self, buf: &'buf Buf, mut string: &str, mut f: F) -> Result<(), Error>
+    where
+        F: FnMut(&T),
+    {
+        let mut this = &self.links;
+
+        let links = 'outer: loop {
+            let search = slice::binary_search_by(buf, this.children, |c| {
+                Ok(buf.load(c.string)?.cmp(string))
+            })?;
+
+            match search {
+                BinarySearch::Found(n) => {
+                    break &buf.load(this.children.get_unchecked(n))?.links;
+                }
+                BinarySearch::Missing(n) => {
+                    let iter = n
+                        .checked_sub(1)
+                        .into_iter()
+                        .chain((n < this.children.len()).then_some(n));
+
+                    for n in iter {
+                        let child = buf.load(this.children.get_unchecked(n))?;
+
+                        // Find common prefix and split nodes if necessary.
+                        let prefix = prefix(buf.load(child.string)?, string);
+
+                        if prefix == 0 {
+                            continue;
+                        }
+
+                        if prefix == string.len() {
+                            break 'outer &child.links;
+                        }
+
+                        string = &string[prefix..];
+                        this = &child.links;
+                        continue 'outer;
+                    }
+                }
+            };
+        };
+
+        let mut stack = Vec::new();
+
+        for value in buf.load(links.values)? {
+            f(value);
+        }
+
+        stack.push((links, 0..links.children.len()));
+
+        loop {
+            let Some(&mut (links, ref mut range)) = stack.last_mut() else {
+                break;
+            };
+
+            let Some(n) = range.next() else {
+                stack.pop();
+                continue;
+            };
+
+            let node = buf.load(links.children.get_unchecked(n))?;
+
+            for value in buf.load(node.links.values)? {
+                f(value);
+            }
+
+            stack.push((&node.links, 0..node.links.children.len()));
+        }
+
+        Ok(())
     }
 }
 
