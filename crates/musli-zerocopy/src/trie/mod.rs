@@ -6,10 +6,13 @@ mod tests;
 use core::cmp::Ordering;
 use core::fmt;
 use core::mem::replace;
+use core::slice::Iter;
+use core::str;
 
 use alloc::vec::Vec;
 
 use crate::endian::Native;
+use crate::pointer::Pointee;
 use crate::slice::{self, BinarySearch};
 use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
 
@@ -28,6 +31,7 @@ use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
 ///
 /// ```
 /// use musli_zerocopy::{trie, OwnedBuf};
+///
 /// let mut buf = OwnedBuf::new();
 ///
 /// let values = [
@@ -46,13 +50,14 @@ use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
 /// assert_eq!(trie.get(&buf, "working")?, Some(&[4, 5][..]));
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store<E: ByteOrder, O: Size, I, T>(
+pub fn store<S, E: ByteOrder, O: Size, I, T>(
     buf: &mut OwnedBuf<E, O>,
     it: I,
 ) -> Result<TrieRef<T, E, O>, Error>
 where
-    I: IntoIterator<Item = (Ref<str, E, O>, T)>,
+    I: IntoIterator<Item = (Ref<S, E, O>, T)>,
     T: ZeroCopy,
+    S: ?Sized + Pointee<O, Packed = <[u8] as Pointee<O>>::Packed>,
 {
     // First step is to construct the trie in-memory.
     let mut trie = Builder::new();
@@ -85,6 +90,7 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
     ///
     /// ```rust
     /// use musli_zerocopy::{trie, OwnedBuf};
+    ///
     /// let mut buf = OwnedBuf::new();
     ///
     /// let mut trie = trie::Builder::new();
@@ -109,7 +115,11 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
     /// assert_eq!(trie.get(&buf, "working")?, Some(&[4, 5][..]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert(&mut self, buf: &Buf, mut string: Ref<str, E, O>, value: T) -> Result<(), Error> {
+    pub fn insert<S>(&mut self, buf: &Buf, string: Ref<S, E, O>, value: T) -> Result<(), Error>
+    where
+        S: ?Sized + Pointee<O, Packed = <[u8] as Pointee<O>>::Packed>,
+    {
+        let mut string = string.cast();
         let mut current = buf.load(string)?;
         let mut this = &mut self.links;
 
@@ -189,6 +199,7 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
     ///
     /// ```rust
     /// use musli_zerocopy::{trie, OwnedBuf};
+    ///
     /// let mut buf = OwnedBuf::new();
     ///
     /// let mut trie = trie::Builder::new();
@@ -253,12 +264,12 @@ impl<T, E: ByteOrder, O: Size> Links<T, E, O> {
 }
 
 struct Node<T, E: ByteOrder = Native, O: Size = DefaultSize> {
-    string: Ref<str, E, O>,
+    string: Ref<[u8], E, O>,
     links: Links<T, E, O>,
 }
 
 impl<T, E: ByteOrder, O: Size> Node<T, E, O> {
-    const fn new(string: Ref<str, E, O>) -> Self {
+    const fn new(string: Ref<[u8], E, O>) -> Self {
         Self {
             string,
             links: Links::empty(),
@@ -292,7 +303,29 @@ where
     T: ZeroCopy,
 {
     /// Debug print the current trie.
-    pub fn debug<'a>(&'a self, buf: &'a Buf) -> Debug<'a, T, E, O>
+    ///
+    /// This treats the keys as strings, with illegal unicode sequences being
+    /// replaced with the `U+FFFD` escape sequence.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{trie, OwnedBuf};
+    ///
+    /// let mut buf = OwnedBuf::new();
+    /// let a = buf.store(b"\xe2\x28\xa1").array_into_slice();
+    /// let b = buf.store_unsized("食べない");
+    ///
+    /// let mut trie = trie::Builder::new();
+    ///
+    /// trie.insert(&buf, b, 2)?;
+    /// trie.insert(&buf, a, 1)?;
+    ///
+    /// let trie = trie.build(&mut buf)?;
+    /// assert_eq!(format!("{:?}", trie.debug(&buf)), "{\"�(�\": [1], \"食べない\": [2]}");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn debug<'a, 'buf>(&'a self, buf: &'buf Buf) -> Debug<'a, 'buf, T, E, O>
     where
         T: fmt::Debug,
     {
@@ -305,6 +338,7 @@ where
     ///
     /// ```
     /// use musli_zerocopy::{trie, OwnedBuf};
+    ///
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
@@ -323,8 +357,12 @@ where
     /// assert_eq!(trie.get(&buf, "working")?, Some(&[4, 5][..]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn get<'buf>(&self, buf: &'buf Buf, mut string: &str) -> Result<Option<&'buf [T]>, Error> {
+    pub fn get<'buf, S>(&self, buf: &'buf Buf, string: &S) -> Result<Option<&'buf [T]>, Error>
+    where
+        S: ?Sized + AsRef<[u8]>,
+    {
         let mut this = &self.links;
+        let mut string = string.as_ref();
 
         loop {
             let search = slice::binary_search_by(buf, this.children, |c| {
@@ -360,101 +398,219 @@ where
     }
 
     /// Construct an iterator over all matching string prefixes in the trie.
-    pub fn prefix<'buf, F>(&self, buf: &'buf Buf, mut string: &str, mut f: F) -> Result<(), Error>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{trie, OwnedBuf};
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let values = [
+    ///     (buf.store_unsized("work"), 1),
+    ///     (buf.store_unsized("worker"), 2),
+    ///     (buf.store_unsized("workers"), 3),
+    ///     (buf.store_unsized("working"), 4),
+    ///     (buf.store_unsized("working"), 5),
+    ///     (buf.store_unsized("working man"), 6),
+    ///     (buf.store_unsized("run"), 7),
+    ///     (buf.store_unsized("running"), 8),
+    /// ];
+    ///
+    /// let trie = trie::store(&mut buf, values)?;
+    ///
+    /// let values = trie.prefix(&buf, "workin").collect::<Result<Vec<_>, _>>()?;
+    /// assert!(values.into_iter().copied().eq([4, 5, 6]));
+    ///
+    /// let values = trie.prefix(&buf, "wor").collect::<Result<Vec<_>, _>>()?;
+    /// assert!(values.into_iter().copied().eq([1, 2, 3, 4, 5, 6]));
+    ///
+    /// let values = trie.prefix(&buf, "runn").collect::<Result<Vec<_>, _>>()?;
+    /// assert!(values.into_iter().copied().eq([8]));
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn prefix<'a, 'buf, S>(&self, buf: &'buf Buf, string: &'a S) -> Prefix<'a, 'buf, T, E, O>
     where
-        F: FnMut(&T),
+        S: ?Sized + AsRef<[u8]>,
     {
-        let mut this = &self.links;
-
-        let links = 'outer: loop {
-            let search = slice::binary_search_by(buf, this.children, |c| {
-                Ok(buf.load(c.string)?.cmp(string))
-            })?;
-
-            match search {
-                BinarySearch::Found(n) => {
-                    break &buf.load(this.children.get_unchecked(n))?.links;
-                }
-                BinarySearch::Missing(n) => {
-                    let iter = n
-                        .checked_sub(1)
-                        .into_iter()
-                        .chain((n < this.children.len()).then_some(n));
-
-                    for n in iter {
-                        let child = buf.load(this.children.get_unchecked(n))?;
-
-                        // Find common prefix and split nodes if necessary.
-                        let prefix = prefix(buf.load(child.string)?, string);
-
-                        if prefix == 0 {
-                            continue;
-                        }
-
-                        if prefix == string.len() {
-                            break 'outer &child.links;
-                        }
-
-                        string = &string[prefix..];
-                        this = &child.links;
-                        continue 'outer;
-                    }
-                }
-            };
-        };
-
-        let mut stack = Vec::new();
-
-        for value in buf.load(links.values)? {
-            f(value);
+        Prefix {
+            buf,
+            state: PrefixState::Initial(self.links, string.as_ref()),
+            stack: Vec::new(),
         }
+    }
+}
 
-        stack.push((links, 0..links.children.len()));
+enum PrefixState<'a, 'buf, T, E: ByteOrder, O: Size>
+where
+    T: ZeroCopy,
+{
+    Initial(LinksRef<T, E, O>, &'a [u8]),
+    Iter(Iter<'buf, T>),
+    Stack,
+}
 
-        loop {
-            let Some(&mut (links, ref mut range)) = stack.last_mut() else {
-                break;
-            };
+/// A prefix iterator over a trie.
+pub struct Prefix<'a, 'buf, T, E: ByteOrder, O: Size>
+where
+    T: ZeroCopy,
+{
+    buf: &'buf Buf,
+    state: PrefixState<'a, 'buf, T, E, O>,
+    stack: Vec<(&'buf LinksRef<T, E, O>, usize)>,
+}
 
-            let Some(n) = range.next() else {
-                stack.pop();
-                continue;
-            };
+impl<'a, 'buf, T, E: ByteOrder, O: Size> Prefix<'a, 'buf, T, E, O>
+where
+    T: ZeroCopy,
+{
+    fn poll(&mut self) -> Result<Option<&'buf T>, Error> {
+        'outer: loop {
+            match &mut self.state {
+                PrefixState::Initial(mut this, mut string) => {
+                    let links = 'links: loop {
+                        let search = slice::binary_search_by(self.buf, this.children, |c| {
+                            Ok(self.buf.load(c.string)?.cmp(string))
+                        })?;
 
-            let node = buf.load(links.children.get_unchecked(n))?;
+                        match search {
+                            BinarySearch::Found(n) => {
+                                break &self.buf.load(this.children.get_unchecked(n))?.links;
+                            }
+                            BinarySearch::Missing(n) => {
+                                let iter = n
+                                    .checked_sub(1)
+                                    .into_iter()
+                                    .chain((n < this.children.len()).then_some(n));
 
-            for value in buf.load(node.links.values)? {
-                f(value);
+                                for n in iter {
+                                    let child = self.buf.load(this.children.get_unchecked(n))?;
+
+                                    // Find common prefix and split nodes if necessary.
+                                    let prefix = prefix(self.buf.load(child.string)?, string);
+
+                                    if prefix == 0 {
+                                        continue;
+                                    }
+
+                                    if prefix == string.len() {
+                                        break 'links &child.links;
+                                    }
+
+                                    string = &string[prefix..];
+                                    this = child.links;
+                                    continue 'links;
+                                }
+                            }
+                        };
+                    };
+
+                    self.stack.push((links, 0));
+                    self.state = PrefixState::Iter(self.buf.load(links.values)?.iter());
+                }
+                PrefixState::Iter(values) => {
+                    let Some(value) = values.next() else {
+                        self.state = PrefixState::Stack;
+                        continue;
+                    };
+
+                    return Ok(Some(value));
+                }
+                PrefixState::Stack => loop {
+                    let Some((links, index)) = self.stack.pop() else {
+                        break 'outer;
+                    };
+
+                    let Some(node) = links.children.get(index) else {
+                        continue;
+                    };
+
+                    let node = self.buf.load(node)?;
+                    self.state = PrefixState::Iter(self.buf.load(node.links.values)?.iter());
+                    self.stack.push((links, index + 1));
+                    self.stack.push((&node.links, 0));
+                    continue 'outer;
+                },
             }
-
-            stack.push((&node.links, 0..node.links.children.len()));
         }
 
-        Ok(())
+        Ok(None)
+    }
+}
+
+impl<'a, 'buf, T, E: ByteOrder, O: Size> Iterator for Prefix<'a, 'buf, T, E, O>
+where
+    T: ZeroCopy,
+{
+    type Item = Result<&'buf T, Error>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.poll().transpose()
     }
 }
 
 /// Debug printing of a trie.
 ///
 /// See [`TrieRef::debug`].
-pub struct Debug<'a, T, E: ByteOrder, O: Size>
+pub struct Debug<'a, 'buf, T, E: ByteOrder, O: Size>
 where
     T: ZeroCopy,
 {
     trie: &'a TrieRef<T, E, O>,
-    buf: &'a Buf,
+    buf: &'buf Buf,
 }
 
-impl<'a, T, E: ByteOrder, O: Size> fmt::Debug for Debug<'a, T, E, O>
+impl<'a, 'buf, T, E: ByteOrder, O: Size> fmt::Debug for Debug<'a, 'buf, T, E, O>
 where
     T: fmt::Debug + ZeroCopy,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use alloc::string::String;
+        struct LossyStr<'a>(&'a [u8]);
+
+        impl fmt::Debug for LossyStr<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let mut bytes = self.0;
+
+                write!(f, "\"")?;
+
+                loop {
+                    let (string, replacement) = match str::from_utf8(bytes) {
+                        Ok(s) => (s, false),
+                        Err(e) => {
+                            let (valid, invalid) = bytes.split_at(e.valid_up_to());
+                            bytes = invalid.get(1..).unwrap_or_default();
+                            (unsafe { str::from_utf8_unchecked(valid) }, true)
+                        }
+                    };
+
+                    for c in string.chars() {
+                        match c {
+                            '\0' => write!(f, "\\0")?,
+                            '\x01'..='\x08' | '\x0b' | '\x0c' | '\x0e'..='\x19' | '\x7f' => {
+                                write!(f, "\\x{:02x}", c as u32)?;
+                            }
+                            _ => {
+                                write!(f, "{}", c.escape_debug())?;
+                            }
+                        }
+                    }
+
+                    if !replacement {
+                        break;
+                    }
+
+                    write!(f, "\u{FFFD}")?;
+                }
+
+                write!(f, "\"")?;
+                Ok(())
+            }
+        }
 
         fn walk<T, E: ByteOrder, O: Size>(
             buf: &Buf,
-            s: &mut String,
+            s: &mut Vec<u8>,
             f: &mut fmt::DebugMap<'_, '_>,
             links: &LinksRef<T, E, O>,
         ) -> fmt::Result
@@ -467,11 +623,11 @@ where
                 let string = buf.load(child.string).map_err(|_| fmt::Error)?;
 
                 let len = s.len();
-                s.push_str(string);
+                s.extend(string);
 
                 if !child.links.values.is_empty() {
                     let values = buf.load(child.links.values).map_err(|_| fmt::Error)?;
-                    f.entry(&s.as_str(), &values);
+                    f.entry(&LossyStr(s), &values);
                 }
 
                 walk(buf, s, f, &child.links)?;
@@ -481,7 +637,7 @@ where
             Ok(())
         }
 
-        let mut s = String::new();
+        let mut s = Vec::new();
         let mut f = f.debug_map();
         walk(self.buf, &mut s, &mut f, &self.trie.links)?;
         f.finish()
@@ -530,17 +686,13 @@ struct NodeRef<T, E: ByteOrder = Native, O: Size = DefaultSize>
 where
     T: ZeroCopy,
 {
-    string: Ref<str, E, O>,
+    string: Ref<[u8], E, O>,
     links: LinksRef<T, E, O>,
 }
 
 /// Calculate the common prefix between two strings.
-fn prefix(a: &str, b: &str) -> usize {
-    a.chars()
-        .zip(b.chars())
-        .take_while(|(a, b)| a == b)
-        .map(|(c, _)| c.len_utf8())
-        .sum()
+fn prefix(a: &[u8], b: &[u8]) -> usize {
+    a.iter().zip(b.iter()).take_while(|(a, b)| a == b).count()
 }
 
 /// Helper function to perform a binary search over a loaded slice.
