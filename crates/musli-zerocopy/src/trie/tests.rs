@@ -102,5 +102,8 @@ fn trie_prefix() -> Result<(), Error> {
 
     let values = trie.prefix(&buf, "runn").collect::<Result<Vec<_>, _>>()?;
     assert!(values.into_iter().copied().eq([8]));
+
+    let values = trie.prefix(&buf, "asdf").collect::<Result<Vec<_>, _>>()?;
+    assert!(values.into_iter().copied().eq([]));
     Ok(())
 }

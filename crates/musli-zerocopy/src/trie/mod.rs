@@ -478,6 +478,10 @@ where
                                 break &self.buf.load(this.children.get_unchecked(n))?.links;
                             }
                             BinarySearch::Missing(n) => {
+                                // For missing nodes, we need to find any
+                                // neighbor for which the current string is a
+                                // prefix. So unless `n` is out of bounds we
+                                // look at the prior or current index `n`.
                                 let iter = n
                                     .checked_sub(1)
                                     .into_iter()
@@ -501,6 +505,13 @@ where
                                     this = child.links;
                                     continue 'links;
                                 }
+
+                                // Falling through here indicates that we have
+                                // not found anything. Assigning the stack state
+                                // with an empty stack will cause the iterator
+                                // to continuously return `None`.
+                                self.state = PrefixState::Stack;
+                                continue 'outer;
                             }
                         };
                     };
