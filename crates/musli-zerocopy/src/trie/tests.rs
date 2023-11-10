@@ -73,6 +73,7 @@ fn trie_problem() -> Result<(), Error> {
 
     assert_eq!(trie.get(&buf, "食べなかった")?, Some(&[1][..]));
     assert_eq!(trie.get(&buf, "食べない")?, Some(&[2][..]));
+    std::dbg!(trie.debug(&buf));
     Ok(())
 }
 
@@ -93,20 +94,13 @@ fn trie_prefix() -> Result<(), Error> {
 
     let trie = store(&mut buf, values)?;
 
-    let mut values = Vec::new();
+    let values = trie.prefix(&buf, "workin").collect::<Result<Vec<_>, _>>()?;
+    assert!(values.into_iter().copied().eq([4, 5, 6]));
 
-    trie.prefix(&buf, "workin", |n| {
-        values.push(*n);
-    })?;
+    let values = trie.prefix(&buf, "wor").collect::<Result<Vec<_>, _>>()?;
+    assert!(values.into_iter().copied().eq([1, 2, 3, 4, 5, 6]));
 
-    assert_eq!(&values[..], &[4, 5, 6][..]);
-
-    let mut values = Vec::new();
-
-    trie.prefix(&buf, "wor", |n| {
-        values.push(*n);
-    })?;
-
-    assert_eq!(&values[..], &[1, 2, 3, 4, 5, 6][..]);
+    let values = trie.prefix(&buf, "runn").collect::<Result<Vec<_>, _>>()?;
+    assert!(values.into_iter().copied().eq([8]));
     Ok(())
 }
