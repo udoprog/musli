@@ -4,6 +4,7 @@ use crate::buf::{Buf, Visit};
 use crate::endian::ByteOrder;
 use crate::error::Error;
 use crate::pointer::{Ref, Size};
+use crate::slice::Slice;
 use crate::traits::ZeroCopy;
 
 /// The result of a [`binary_search()`].
@@ -100,13 +101,10 @@ where
 /// assert!(match r { BinarySearch::Found(1..=4) => true, _ => false, });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn binary_search_by<T, E: ByteOrder, O: Size, F>(
-    buf: &Buf,
-    slice: Ref<[T], E, O>,
-    mut f: F,
-) -> Result<BinarySearch, Error>
+pub fn binary_search_by<S, T, F>(buf: &Buf, slice: S, mut f: F) -> Result<BinarySearch, Error>
 where
     T: ZeroCopy,
+    S: Slice<T>,
     F: FnMut(&T) -> Result<Ordering, Error>,
 {
     // INVARIANTS:
