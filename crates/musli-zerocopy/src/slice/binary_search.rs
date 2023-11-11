@@ -1,9 +1,7 @@
 use core::cmp::Ordering;
 
 use crate::buf::{Buf, Visit};
-use crate::endian::ByteOrder;
 use crate::error::Error;
-use crate::pointer::{Ref, Size};
 use crate::slice::Slice;
 use crate::traits::ZeroCopy;
 
@@ -49,15 +47,11 @@ pub enum BinarySearch {
 /// assert!(match r { BinarySearch::Found(1..=4) => true, _ => false, });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn binary_search<T, E: ByteOrder, O: Size, Q>(
-    buf: &Buf,
-    slice: Ref<[T], E, O>,
-    x: &Q,
-) -> Result<BinarySearch, Error>
+pub fn binary_search<S, Q>(buf: &Buf, slice: S, x: &Q) -> Result<BinarySearch, Error>
 where
-    T: ZeroCopy,
-    T: Ord,
-    Q: Visit<Target = T>,
+    S: Slice,
+    S::Item: ZeroCopy + Ord,
+    Q: Visit<Target = S::Item>,
 {
     binary_search_by(buf, slice, |value| x.visit(buf, |x| value.cmp(x)))
 }
@@ -101,11 +95,11 @@ where
 /// assert!(match r { BinarySearch::Found(1..=4) => true, _ => false, });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn binary_search_by<S, T, F>(buf: &Buf, slice: S, mut f: F) -> Result<BinarySearch, Error>
+pub fn binary_search_by<S, F>(buf: &Buf, slice: S, mut f: F) -> Result<BinarySearch, Error>
 where
-    T: ZeroCopy,
-    S: Slice<[T]>,
-    F: FnMut(&T) -> Result<Ordering, Error>,
+    S: Slice,
+    S::Item: ZeroCopy,
+    F: FnMut(&S::Item) -> Result<Ordering, Error>,
 {
     // INVARIANTS:
     // - 0 <= left <= left + size = right <= slice.len()

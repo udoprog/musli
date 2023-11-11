@@ -41,12 +41,13 @@ pub struct Packed<T: ?Sized, O: Size = DefaultSize, L: Size = DefaultSize, E: By
     _marker: PhantomData<(E, T)>,
 }
 
-impl<T, O: Size, L: Size, E: ByteOrder> Slice<[T]> for Packed<[T], O, L, E>
+impl<T, O: Size, L: Size, E: ByteOrder> Slice for Packed<[T], O, L, E>
 where
     T: ZeroCopy,
     O: TryFrom<usize>,
     L: TryFrom<usize>,
 {
+    type Item = T;
     type ItemRef = Ref<T, E, usize>;
 
     #[inline]
@@ -199,7 +200,7 @@ where
     /// the bounds of the current slice, all though it's not unsafe since it
     /// cannot lead to anything inherently unsafe. Only garbled data.
     ///
-    /// [`get()`]: Ref::get
+    /// [`get()`]: Packed::get
     ///
     /// # Examples
     ///
