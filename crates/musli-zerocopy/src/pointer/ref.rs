@@ -227,7 +227,7 @@ where
     /// assert_eq!(slice.len(), 2);
     /// ```
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(self) -> usize {
         self.metadata.as_usize::<E>()
     }
 
@@ -245,7 +245,7 @@ where
     /// assert!(!slice.is_empty());
     /// ```
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.metadata.is_zero()
     }
 
@@ -269,7 +269,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn get(&self, index: usize) -> Option<Ref<P, E, O>> {
+    pub fn get(self, index: usize) -> Option<Ref<P, E, O>> {
         if index >= self.len() {
             return None;
         }
@@ -304,7 +304,7 @@ where
     /// assert!(buf.load(oob).is_err());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn get_unchecked(&self, index: usize) -> Ref<P, E, O> {
+    pub fn get_unchecked(self, index: usize) -> Ref<P, E, O> {
         let offset = self.offset.as_usize::<E>() + size_of::<P>() * index;
         Ref::new(offset)
     }
@@ -335,7 +335,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn split_at(&self, at: usize) -> (Self, Self) {
+    pub fn split_at(self, at: usize) -> (Self, Self) {
         let offset = self.offset();
         let len = self.len();
         assert!(at <= len, "Split point {at} is out of bounds 0..={len}");
@@ -347,7 +347,7 @@ where
     /// Perform an fetch like `get` which panics with diagnostics in case the
     /// index is out-of-bounds.
     #[inline]
-    pub(crate) fn at(&self, index: usize) -> Ref<P, E, O> {
+    pub(crate) fn at(self, index: usize) -> Ref<P, E, O> {
         let Some(r) = self.get(index) else {
             panic!("Index {index} out of bounds 0-{}", self.len());
         };
@@ -383,7 +383,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn iter(&self) -> Iter<'_, P, E, O> {
+    pub fn iter(self) -> Iter<P, E, O> {
         let start = self.offset.as_usize::<E>();
         let end = start + self.metadata.as_usize::<E>() * size_of::<P>();
 
@@ -407,7 +407,7 @@ impl<O: Size, E: ByteOrder> Ref<str, E, O> {
     /// assert_eq!(slice.len(), 2);
     /// ```
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(self) -> usize {
         self.metadata.as_usize::<E>()
     }
 
@@ -425,7 +425,7 @@ impl<O: Size, E: ByteOrder> Ref<str, E, O> {
     /// assert!(!slice.is_empty());
     /// ```
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.metadata.is_zero()
     }
 }
@@ -433,13 +433,13 @@ impl<O: Size, E: ByteOrder> Ref<str, E, O> {
 /// An iterator over a `Ref<[P]>` which produces `Ref<P>` values.
 ///
 /// See [Ref::<[P]>::iter].
-pub struct Iter<'a, P, E, O> {
+pub struct Iter<P, E, O> {
     start: usize,
     end: usize,
-    _marker: PhantomData<(&'a (), P, E, O)>,
+    _marker: PhantomData<(P, E, O)>,
 }
 
-impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<'a, P, E, O> {
+impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<P, E, O> {
     type Item = Ref<P, E, O>;
 
     #[inline]
@@ -454,7 +454,7 @@ impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<'a, P, E, O> {
     }
 }
 
-impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<'a, P, E, O> {
+impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<P, E, O> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.start == self.end {
@@ -481,7 +481,7 @@ where
     /// assert_eq!(slice.metadata(), 10);
     /// ```
     #[inline]
-    pub fn metadata(&self) -> P::Packed {
+    pub fn metadata(self) -> P::Packed {
         self.metadata
     }
 }
@@ -567,7 +567,7 @@ where
     /// assert_eq!(reference.offset(), 42);
     /// ```
     #[inline]
-    pub fn offset(&self) -> usize {
+    pub fn offset(self) -> usize {
         self.offset.as_usize::<E>()
     }
 

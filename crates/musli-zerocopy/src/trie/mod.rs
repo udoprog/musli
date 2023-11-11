@@ -409,7 +409,7 @@ where
     where
         S: ?Sized + AsRef<[u8]>,
     {
-        let mut this = &self.links;
+        let mut this = self.links;
         let mut string = string.as_ref();
 
         loop {
@@ -439,7 +439,7 @@ where
                     }
 
                     string = &string[prefix..];
-                    this = &child.links;
+                    this = child.links;
                 }
             };
         }
@@ -505,7 +505,7 @@ where
 {
     buf: &'buf Buf,
     state: PrefixState<'a, 'buf, T, F>,
-    stack: Vec<(&'buf LinksRef<T, F>, usize)>,
+    stack: Vec<(LinksRef<T, F>, usize)>,
 }
 
 impl<'a, 'buf, T, F: Flavor> Prefix<'a, 'buf, T, F>
@@ -523,7 +523,7 @@ where
 
                         match search {
                             BinarySearch::Found(n) => {
-                                break &self.buf.load(this.children.get_unchecked(n))?.links;
+                                break self.buf.load(this.children.get_unchecked(n))?.links;
                             }
                             BinarySearch::Missing(n) => {
                                 // For missing nodes, we need to find any
@@ -546,7 +546,7 @@ where
                                     }
 
                                     if prefix == string.len() {
-                                        break 'links &child.links;
+                                        break 'links child.links;
                                     }
 
                                     string = &string[prefix..];
@@ -587,7 +587,7 @@ where
                     let node = self.buf.load(node)?;
                     self.state = PrefixState::Iter(self.buf.load(node.links.values)?.iter());
                     self.stack.push((links, index + 1));
-                    self.stack.push((&node.links, 0));
+                    self.stack.push((node.links, 0));
                     continue 'outer;
                 },
             }
@@ -671,7 +671,7 @@ where
             buf: &Buf,
             s: &mut Vec<u8>,
             f: &mut fmt::DebugMap<'_, '_>,
-            links: &LinksRef<T, F>,
+            links: LinksRef<T, F>,
         ) -> fmt::Result
         where
             T: fmt::Debug + ZeroCopy,
@@ -689,7 +689,7 @@ where
                     f.entry(&LossyStr(s), &values);
                 }
 
-                walk(buf, s, f, &child.links)?;
+                walk(buf, s, f, child.links)?;
                 s.truncate(len);
             }
 
@@ -698,7 +698,7 @@ where
 
         let mut s = Vec::new();
         let mut f = f.debug_map();
-        walk(self.buf, &mut s, &mut f, &self.trie.links)?;
+        walk(self.buf, &mut s, &mut f, self.trie.links)?;
         f.finish()
     }
 }
@@ -727,7 +727,7 @@ where
 
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
-#[repr(C)]
+#[repr(C, packed)]
 struct LinksRef<T, F: Flavor>
 where
     T: ZeroCopy,
@@ -739,15 +739,12 @@ where
 impl<T, F: Flavor> Clone for LinksRef<T, F>
 where
     T: ZeroCopy,
-    F::Values<T>: Clone,
-    F::Children<NodeRef<T, F>>: Clone,
+    F::Values<T>: Copy,
+    F::Children<NodeRef<T, F>>: Copy,
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            values: self.values.clone(),
-            children: self.children.clone(),
-        }
+        *self
     }
 }
 
@@ -761,7 +758,7 @@ where
 
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
-#[repr(C)]
+#[repr(C, packed)]
 struct NodeRef<T, F: Flavor>
 where
     T: ZeroCopy,
