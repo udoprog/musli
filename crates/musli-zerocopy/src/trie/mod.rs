@@ -20,17 +20,65 @@ use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
 /// for example use a more compact representation than the one provided by
 /// default in case there is a known upper bound on the number of elements or
 /// values.
+///
+/// # Examples
+///
+/// ```
+/// use musli_zerocopy::{trie, Error, OwnedBuf, ZeroCopy};
+/// use musli_zerocopy::slice::Packed;
+///
+/// struct PackedTrie;
+///
+/// impl trie::Flavor for PackedTrie {
+///     // The maximum length of a string slice stored in the trie is `u8::MAX`.
+///     type String = Packed<[u8], u32, u8>;
+///     // The max number of values stored in a single node is `u16::MAX`.
+///     type Values<T> = Packed<[T], u32, u16> where T: ZeroCopy;
+///     // The maximum number of children for a single node is `u8::MAX`.
+///     type Children<T> = Packed<[T], u32, u8> where T: ZeroCopy;
+/// }
+///
+/// fn populate<F>(buf: &mut OwnedBuf, mut trie: trie::Builder<u32, F>) -> Result<trie::TrieRef<u32, F>, Error>
+/// where
+///     F: trie::Flavor
+/// {
+///     let a = buf.store_unsized("hello");
+///     let b = buf.store_unsized("hello world");
+///     trie.insert(buf, a, 1)?;
+///     trie.insert(buf, b, 2)?;
+///     trie.build(buf)
+/// }
+///
+/// let mut b1 = OwnedBuf::new();
+///
+/// let mut trie = trie::Builder::<u32, PackedTrie>::with_flavor();
+/// let trie = populate(&mut b1, trie)?;
+///
+/// assert_eq!(trie.get(&b1, "hello")?, Some(&[1][..]));
+/// assert_eq!(trie.get(&b1, "hello world")?, Some(&[2][..]));
+///
+/// let mut b2 = OwnedBuf::new();
+///
+/// let mut trie = trie::Builder::new();
+/// let trie = populate(&mut b2, trie)?;
+///
+/// assert_eq!(trie.get(&b2, "hello")?, Some(&[1][..]));
+/// assert_eq!(trie.get(&b2, "hello world")?, Some(&[2][..]));
+///
+/// assert!(b1.len() < b2.len());
+/// # Ok::<_, musli_zerocopy::Error>(())
+/// ```
 pub trait Flavor {
     /// The type representing a string in the trie.
-    type String: Copy + Slice<u8>;
+    type String: Copy + Slice<[u8]>;
 
     /// The type representing a collection of values in the trie.
-    type Values<T>: Copy + Slice<T>
+    type Values<T>: Copy + Slice<[T]>
     where
         T: ZeroCopy;
 
     /// The type representing a collection of children in the trie.
-    type Children<T>: Copy + Slice<T>
+    type Children<T>: Copy + Slice<[T]>
     where
         T: ZeroCopy;
 }
@@ -339,7 +387,7 @@ impl<T, F: Flavor> Node<T, F> {
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-pub struct TrieRef<T, F: Flavor>
+pub struct TrieRef<T, F: Flavor = DefaultFlavor>
 where
     T: ZeroCopy,
 {
@@ -711,9 +759,7 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            links: self.links.clone(),
-        }
+        *self
     }
 }
 
