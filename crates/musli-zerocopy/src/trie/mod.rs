@@ -13,8 +13,39 @@ use alloc::vec::Vec;
 
 use crate::endian::Native;
 use crate::pointer::Pointee;
-use crate::slice::{self, BinarySearch};
+use crate::slice::{self, BinarySearch, Slice};
 use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
+
+/// The flavor of a trie. Allows for customization of implementation details to
+/// for example use a more compact representation than the one provided by
+/// default in case there is a known upper bound on the number of elements or
+/// values.
+pub trait Flavor {
+    /// The type representing a string in the trie.
+    type String: Copy + Slice<u8>;
+
+    /// The type representing a collection of values in the trie.
+    type Values<T>: Copy + Slice<T>
+    where
+        T: ZeroCopy;
+
+    /// The type representing a collection of children in the trie.
+    type Children<T>: Copy + Slice<T>
+    where
+        T: ZeroCopy;
+}
+
+/// Marker type indicating the default trie [`Flavor`] to use for a given
+/// [`ByteOrder`] and [`Size`].
+pub struct DefaultFlavor<E: ByteOrder = Native, O: Size = DefaultSize>(
+    core::marker::PhantomData<(E, O)>,
+);
+
+impl<E: ByteOrder, O: Size> Flavor for DefaultFlavor<E, O> {
+    type String = Ref<[u8], E, O>;
+    type Values<T> = Ref<[T], E, O> where T: ZeroCopy;
+    type Children<T> = Ref<[T], E, O> where T: ZeroCopy;
+}
 
 /// Store the given collection in a trie.
 ///
@@ -53,14 +84,14 @@ use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
 pub fn store<S, E: ByteOrder, O: Size, I, T>(
     buf: &mut OwnedBuf<E, O>,
     it: I,
-) -> Result<TrieRef<T, E, O>, Error>
+) -> Result<TrieRef<T, DefaultFlavor<E, O>>, Error>
 where
     I: IntoIterator<Item = (Ref<S, E, O>, T)>,
     T: ZeroCopy,
     S: ?Sized + Pointee<O, Packed = <[u8] as Pointee<O>>::Packed>,
 {
     // First step is to construct the trie in-memory.
-    let mut trie = Builder::new();
+    let mut trie = Builder::with_flavor();
 
     for (string, value) in it {
         trie.insert(buf, string, value)?;
@@ -72,13 +103,20 @@ where
 /// An in-memory trie structure as it's being constructed.
 ///
 /// This can be used over [`store()`] to provide more control.
-pub struct Builder<T, E: ByteOrder = Native, O: Size = DefaultSize> {
-    links: Links<T, E, O>,
+pub struct Builder<T, F: Flavor> {
+    links: Links<T, F>,
 }
 
-impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
+impl<T> Builder<T, DefaultFlavor> {
     /// Construct a new empty trie builder.
     pub const fn new() -> Self {
+        Self::with_flavor()
+    }
+}
+
+impl<T, F: Flavor> Builder<T, F> {
+    /// Construct a new empty trie builder with a custom [`Flavor`].
+    pub const fn with_flavor() -> Self {
         Self {
             links: Links::empty(),
         }
@@ -115,11 +153,16 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
     /// assert_eq!(trie.get(&buf, "working")?, Some(&[4, 5][..]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert<S>(&mut self, buf: &Buf, string: Ref<S, E, O>, value: T) -> Result<(), Error>
+    pub fn insert<S, E: ByteOrder, O: Size>(
+        &mut self,
+        buf: &Buf,
+        string: Ref<S, E, O>,
+        value: T,
+    ) -> Result<(), Error>
     where
         S: ?Sized + Pointee<O, Packed = <[u8] as Pointee<O>>::Packed>,
     {
-        let mut string = string.cast();
+        let mut string = string.cast::<[u8]>();
         let mut current = buf.load(string)?;
         let mut this = &mut self.links;
 
@@ -136,7 +179,7 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
                     this.children.insert(
                         0,
                         Node {
-                            string,
+                            string: F::String::from_ref(string),
                             links: Links::new(value),
                         },
                     );
@@ -153,7 +196,7 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
                         this.children.insert(
                             n,
                             Node {
-                                string,
+                                string: F::String::from_ref(string),
                                 links: Links::new(value),
                             },
                         );
@@ -174,19 +217,15 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
                     // "work" => { "ing" => { values = [1, 2, 3] } }
                     // ```
                     if prefix != child.string.len() {
-                        let new_node = Node::new(Ref::with_metadata(child.string.offset(), prefix));
+                        let (prefix, suffix) = child.string.split_at(prefix);
+                        let new_node = Node::new(prefix);
                         let mut replaced = replace(child, new_node);
-
-                        replaced.string = Ref::with_metadata(
-                            replaced.string.offset() + prefix,
-                            replaced.string.len() - prefix,
-                        );
-
+                        replaced.string = suffix;
                         child.links.children.push(replaced);
                     }
 
                     current = &current[prefix..];
-                    string = Ref::with_metadata(string.offset() + prefix, string.len() - prefix);
+                    string = string.split_at(prefix).1;
                     this = &mut child.links;
                 }
             }
@@ -216,7 +255,10 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
     /// assert_eq!(trie.get(&buf, "working")?, Some(&[4][..]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn build(self, buf: &mut OwnedBuf<E, O>) -> Result<TrieRef<T, E, O>, Error>
+    pub fn build<E: ByteOrder, O: Size>(
+        self,
+        buf: &mut OwnedBuf<E, O>,
+    ) -> Result<TrieRef<T, F>, Error>
     where
         T: ZeroCopy,
     {
@@ -226,12 +268,12 @@ impl<T, E: ByteOrder, O: Size> Builder<T, E, O> {
     }
 }
 
-struct Links<T, E: ByteOrder = Native, O: Size = DefaultSize> {
+struct Links<T, F: Flavor> {
     values: Vec<T>,
-    children: Vec<Node<T, E, O>>,
+    children: Vec<Node<T, F>>,
 }
 
-impl<T, E: ByteOrder, O: Size> Links<T, E, O> {
+impl<T, F: Flavor> Links<T, F> {
     const fn empty() -> Self {
         Self {
             values: Vec::new(),
@@ -246,11 +288,14 @@ impl<T, E: ByteOrder, O: Size> Links<T, E, O> {
         }
     }
 
-    fn into_ref(self, buf: &mut OwnedBuf<E, O>) -> Result<LinksRef<T, E, O>, Error>
+    fn into_ref<E: ByteOrder, O: Size>(
+        self,
+        buf: &mut OwnedBuf<E, O>,
+    ) -> Result<LinksRef<T, F>, Error>
     where
         T: ZeroCopy,
     {
-        let values = buf.store_slice(&self.values);
+        let values = F::Values::from_ref(buf.store_slice(&self.values));
 
         let mut children = Vec::with_capacity(self.children.len());
 
@@ -258,25 +303,28 @@ impl<T, E: ByteOrder, O: Size> Links<T, E, O> {
             children.push(node.into_ref(buf)?);
         }
 
-        let children = buf.store_slice(&children);
+        let children = F::Children::from_ref(buf.store_slice(&children));
         Ok(LinksRef { values, children })
     }
 }
 
-struct Node<T, E: ByteOrder = Native, O: Size = DefaultSize> {
-    string: Ref<[u8], E, O>,
-    links: Links<T, E, O>,
+struct Node<T, F: Flavor> {
+    string: F::String,
+    links: Links<T, F>,
 }
 
-impl<T, E: ByteOrder, O: Size> Node<T, E, O> {
-    const fn new(string: Ref<[u8], E, O>) -> Self {
+impl<T, F: Flavor> Node<T, F> {
+    const fn new(string: F::String) -> Self {
         Self {
             string,
             links: Links::empty(),
         }
     }
 
-    fn into_ref(self, buf: &mut OwnedBuf<E, O>) -> Result<NodeRef<T, E, O>, Error>
+    fn into_ref<E: ByteOrder, O: Size>(
+        self,
+        buf: &mut OwnedBuf<E, O>,
+    ) -> Result<NodeRef<T, F>, Error>
     where
         T: ZeroCopy,
     {
@@ -291,14 +339,14 @@ impl<T, E: ByteOrder, O: Size> Node<T, E, O> {
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-pub struct TrieRef<T, E: ByteOrder = Native, O: Size = DefaultSize>
+pub struct TrieRef<T, F: Flavor>
 where
     T: ZeroCopy,
 {
-    links: LinksRef<T, E, O>,
+    links: LinksRef<T, F>,
 }
 
-impl<T, E: ByteOrder, O: Size> TrieRef<T, E, O>
+impl<T, F: Flavor> TrieRef<T, F>
 where
     T: ZeroCopy,
 {
@@ -325,7 +373,7 @@ where
     /// assert_eq!(format!("{:?}", trie.debug(&buf)), "{\"�(�\": [1], \"食べない\": [2]}");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn debug<'a, 'buf>(&'a self, buf: &'buf Buf) -> Debug<'a, 'buf, T, E, O>
+    pub fn debug<'a, 'buf>(&'a self, buf: &'buf Buf) -> Debug<'a, 'buf, T, F>
     where
         T: fmt::Debug,
     {
@@ -429,7 +477,7 @@ where
     /// assert!(values.into_iter().copied().eq([8]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn prefix<'a, 'buf, S>(&self, buf: &'buf Buf, string: &'a S) -> Prefix<'a, 'buf, T, E, O>
+    pub fn prefix<'a, 'buf, S>(&self, buf: &'buf Buf, string: &'a S) -> Prefix<'a, 'buf, T, F>
     where
         S: ?Sized + AsRef<[u8]>,
     {
@@ -441,26 +489,26 @@ where
     }
 }
 
-enum PrefixState<'a, 'buf, T, E: ByteOrder, O: Size>
+enum PrefixState<'a, 'buf, T, F: Flavor>
 where
     T: ZeroCopy,
 {
-    Initial(LinksRef<T, E, O>, &'a [u8]),
+    Initial(LinksRef<T, F>, &'a [u8]),
     Iter(Iter<'buf, T>),
     Stack,
 }
 
 /// A prefix iterator over a trie.
-pub struct Prefix<'a, 'buf, T, E: ByteOrder, O: Size>
+pub struct Prefix<'a, 'buf, T, F: Flavor>
 where
     T: ZeroCopy,
 {
     buf: &'buf Buf,
-    state: PrefixState<'a, 'buf, T, E, O>,
-    stack: Vec<(&'buf LinksRef<T, E, O>, usize)>,
+    state: PrefixState<'a, 'buf, T, F>,
+    stack: Vec<(&'buf LinksRef<T, F>, usize)>,
 }
 
-impl<'a, 'buf, T, E: ByteOrder, O: Size> Prefix<'a, 'buf, T, E, O>
+impl<'a, 'buf, T, F: Flavor> Prefix<'a, 'buf, T, F>
 where
     T: ZeroCopy,
 {
@@ -549,7 +597,7 @@ where
     }
 }
 
-impl<'a, 'buf, T, E: ByteOrder, O: Size> Iterator for Prefix<'a, 'buf, T, E, O>
+impl<'a, 'buf, T, F: Flavor> Iterator for Prefix<'a, 'buf, T, F>
 where
     T: ZeroCopy,
 {
@@ -564,15 +612,15 @@ where
 /// Debug printing of a trie.
 ///
 /// See [`TrieRef::debug`].
-pub struct Debug<'a, 'buf, T, E: ByteOrder, O: Size>
+pub struct Debug<'a, 'buf, T, F: Flavor>
 where
     T: ZeroCopy,
 {
-    trie: &'a TrieRef<T, E, O>,
+    trie: &'a TrieRef<T, F>,
     buf: &'buf Buf,
 }
 
-impl<'a, 'buf, T, E: ByteOrder, O: Size> fmt::Debug for Debug<'a, 'buf, T, E, O>
+impl<'a, 'buf, T, F: Flavor> fmt::Debug for Debug<'a, 'buf, T, F>
 where
     T: fmt::Debug + ZeroCopy,
 {
@@ -619,11 +667,11 @@ where
             }
         }
 
-        fn walk<T, E: ByteOrder, O: Size>(
+        fn walk<T, F: Flavor>(
             buf: &Buf,
             s: &mut Vec<u8>,
             f: &mut fmt::DebugMap<'_, '_>,
-            links: &LinksRef<T, E, O>,
+            links: &LinksRef<T, F>,
         ) -> fmt::Result
         where
             T: fmt::Debug + ZeroCopy,
@@ -655,50 +703,71 @@ where
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Clone for TrieRef<T, E, O>
+impl<T, F: Flavor> Clone for TrieRef<T, F>
 where
     T: ZeroCopy,
+    F::Values<T>: Clone,
+    F::Children<NodeRef<T, F>>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
-        *self
+        Self {
+            links: self.links.clone(),
+        }
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Copy for TrieRef<T, E, O> where T: ZeroCopy {}
+impl<T, F: Flavor> Copy for TrieRef<T, F>
+where
+    T: ZeroCopy,
+    F::Values<T>: Copy,
+    F::Children<NodeRef<T, F>>: Copy,
+{
+}
 
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-struct LinksRef<T, E: ByteOrder = Native, O: Size = DefaultSize>
+struct LinksRef<T, F: Flavor>
 where
     T: ZeroCopy,
 {
-    values: Ref<[T], E, O>,
-    children: Ref<[NodeRef<T, E, O>], E, O>,
+    values: F::Values<T>,
+    children: F::Children<NodeRef<T, F>>,
 }
 
-impl<T, E: ByteOrder, O: Size> Clone for LinksRef<T, E, O>
+impl<T, F: Flavor> Clone for LinksRef<T, F>
 where
     T: ZeroCopy,
+    F::Values<T>: Clone,
+    F::Children<NodeRef<T, F>>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
-        *self
+        Self {
+            values: self.values.clone(),
+            children: self.children.clone(),
+        }
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Copy for LinksRef<T, E, O> where T: ZeroCopy {}
+impl<T, F: Flavor> Copy for LinksRef<T, F>
+where
+    T: ZeroCopy,
+    F::Values<T>: Copy,
+    F::Children<NodeRef<T, F>>: Copy,
+{
+}
 
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-struct NodeRef<T, E: ByteOrder = Native, O: Size = DefaultSize>
+struct NodeRef<T, F: Flavor>
 where
     T: ZeroCopy,
 {
-    string: Ref<[u8], E, O>,
-    links: LinksRef<T, E, O>,
+    string: F::String,
+    links: LinksRef<T, F>,
 }
 
 /// Calculate the common prefix between two strings.

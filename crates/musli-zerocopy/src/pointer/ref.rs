@@ -309,6 +309,41 @@ where
         Ref::new(offset)
     }
 
+    /// Split the slice reference at the given position `at`.
+    ///
+    /// # Panics
+    ///
+    /// This panics if the given range is out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::OwnedBuf;
+    ///
+    /// let mut buf = OwnedBuf::new();
+    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    ///
+    /// buf.align_in_place();
+    ///
+    /// let (a, b) = slice.split_at(3);
+    /// let (c, d) = slice.split_at(4);
+    ///
+    /// assert_eq!(buf.load(a)?, &[1, 2, 3]);
+    /// assert_eq!(buf.load(b)?, &[4]);
+    /// assert_eq!(buf.load(c)?, &[1, 2, 3, 4]);
+    /// assert_eq!(buf.load(d)?, &[]);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn split_at(&self, at: usize) -> (Self, Self) {
+        let offset = self.offset();
+        let len = self.len();
+        assert!(at <= len, "Split point {at} is out of bounds 0..={len}");
+        let a = Self::with_metadata(offset, at);
+        let b = Self::with_metadata(offset + at * size_of::<P>(), len - at);
+        (a, b)
+    }
+
     /// Perform an fetch like `get` which panics with diagnostics in case the
     /// index is out-of-bounds.
     #[inline]
