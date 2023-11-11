@@ -70,15 +70,15 @@ use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
 /// ```
 pub trait Flavor {
     /// The type representing a string in the trie.
-    type String: Copy + Slice<[u8]>;
+    type String: Slice<[u8]>;
 
     /// The type representing a collection of values in the trie.
-    type Values<T>: Copy + Slice<[T]>
+    type Values<T>: Slice<[T]>
     where
         T: ZeroCopy;
 
     /// The type representing a collection of children in the trie.
-    type Children<T>: Copy + Slice<[T]>
+    type Children<T>: Slice<[T]>
     where
         T: ZeroCopy;
 }
