@@ -553,7 +553,7 @@ where
 {
     buf: &'buf Buf,
     state: PrefixState<'a, 'buf, T, F>,
-    stack: Vec<(LinksRef<T, F>, usize)>,
+    stack: Vec<(&'buf LinksRef<T, F>, usize)>,
 }
 
 impl<'a, 'buf, T, F: Flavor> Prefix<'a, 'buf, T, F>
@@ -571,7 +571,7 @@ where
 
                         match search {
                             BinarySearch::Found(n) => {
-                                break self.buf.load(this.children.get_unchecked(n))?.links;
+                                break &self.buf.load(this.children.get_unchecked(n))?.links;
                             }
                             BinarySearch::Missing(n) => {
                                 // For missing nodes, we need to find any
@@ -594,7 +594,7 @@ where
                                     }
 
                                     if prefix == string.len() {
-                                        break 'links child.links;
+                                        break 'links &child.links;
                                     }
 
                                     string = &string[prefix..];
@@ -635,7 +635,7 @@ where
                     let node = self.buf.load(node)?;
                     self.state = PrefixState::Iter(self.buf.load(node.links.values)?.iter());
                     self.stack.push((links, index + 1));
-                    self.stack.push((node.links, 0));
+                    self.stack.push((&node.links, 0));
                     continue 'outer;
                 },
             }
@@ -773,7 +773,7 @@ where
 
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
-#[repr(C, packed)]
+#[repr(C)]
 struct LinksRef<T, F: Flavor>
 where
     T: ZeroCopy,
@@ -804,7 +804,7 @@ where
 
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
-#[repr(C, packed)]
+#[repr(C)]
 struct NodeRef<T, F: Flavor>
 where
     T: ZeroCopy,
