@@ -24,7 +24,7 @@ pub trait Slice<T: ?Sized + self::sealed::UnsizedSlice>:
     Copy + ZeroCopy + Load<Target = T>
 {
     /// An item inside of the slice.
-    type Item: Load<Target = T::Item>;
+    type ItemRef: Load<Target = T::Item>;
 
     /// Construct a slice from a [`Ref<[T]>`].
     fn from_ref<E: ByteOrder, O: Size>(slice: Ref<[T::Item], E, O>) -> Self
@@ -35,7 +35,7 @@ pub trait Slice<T: ?Sized + self::sealed::UnsizedSlice>:
     fn with_metadata(offset: usize, len: usize) -> Self;
 
     /// Access an item in the slice.
-    fn get(self, index: usize) -> Option<Self::Item>;
+    fn get(self, index: usize) -> Option<Self::ItemRef>;
 
     /// Split the slice at the given position.
     ///
@@ -45,7 +45,7 @@ pub trait Slice<T: ?Sized + self::sealed::UnsizedSlice>:
     fn split_at(self, at: usize) -> (Self, Self);
 
     /// Access an item in the slice in an unchecked manner.
-    fn get_unchecked(self, index: usize) -> Self::Item;
+    fn get_unchecked(self, index: usize) -> Self::ItemRef;
 
     /// The length of a slice.
     fn len(self) -> usize;
@@ -58,7 +58,7 @@ impl<T, A: ByteOrder, B: Size> Slice<[T]> for Ref<[T], A, B>
 where
     T: ZeroCopy,
 {
-    type Item = Ref<T, A, B>;
+    type ItemRef = Ref<T, A, B>;
 
     #[inline]
     fn from_ref<E: ByteOrder, O: Size>(slice: Ref<[T], E, O>) -> Self
@@ -77,7 +77,7 @@ where
     }
 
     #[inline]
-    fn get(self, index: usize) -> Option<Self::Item> {
+    fn get(self, index: usize) -> Option<Self::ItemRef> {
         Ref::get(self, index)
     }
 
@@ -87,7 +87,7 @@ where
     }
 
     #[inline]
-    fn get_unchecked(self, index: usize) -> Self::Item {
+    fn get_unchecked(self, index: usize) -> Self::ItemRef {
         Ref::get_unchecked(self, index)
     }
 

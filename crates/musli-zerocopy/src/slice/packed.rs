@@ -47,7 +47,7 @@ where
     O: TryFrom<usize>,
     L: TryFrom<usize>,
 {
-    type Item = Ref<T, E, usize>;
+    type ItemRef = Ref<T, E, usize>;
 
     #[inline]
     fn from_ref<A: ByteOrder, B: Size>(slice: Ref<[T], A, B>) -> Self
@@ -63,7 +63,7 @@ where
     }
 
     #[inline]
-    fn get(self, index: usize) -> Option<Self::Item> {
+    fn get(self, index: usize) -> Option<Self::ItemRef> {
         Packed::get(self, index)
     }
 
@@ -73,7 +73,7 @@ where
     }
 
     #[inline]
-    fn get_unchecked(self, index: usize) -> Self::Item {
+    fn get_unchecked(self, index: usize) -> Self::ItemRef {
         Packed::get_unchecked(self, index)
     }
 
