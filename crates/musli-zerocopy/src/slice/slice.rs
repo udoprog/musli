@@ -4,7 +4,7 @@ use crate::pointer::{Ref, Size};
 use crate::traits::ZeroCopy;
 
 /// A trait implemented by slice-like types.
-pub trait Slice<T>: ZeroCopy + Load<Target = [T]>
+pub trait Slice<T>: Copy + ZeroCopy + Load<Target = [T]>
 where
     T: ZeroCopy,
 {
@@ -18,23 +18,23 @@ where
     fn with_metadata(offset: usize, len: usize) -> Self;
 
     /// Access an item in the slice.
-    fn get(&self, index: usize) -> Option<Self::Item>;
+    fn get(self, index: usize) -> Option<Self::Item>;
 
     /// Split the slice at the given position.
     ///
     /// # Panics
     ///
     /// This panics if the given range is out of bounds.
-    fn split_at(&self, at: usize) -> (Self, Self);
+    fn split_at(self, at: usize) -> (Self, Self);
 
     /// Access an item in the slice in an unchecked manner.
-    fn get_unchecked(&self, index: usize) -> Self::Item;
+    fn get_unchecked(self, index: usize) -> Self::Item;
 
     /// The length of a slice.
-    fn len(&self) -> usize;
+    fn len(self) -> usize;
 
     /// Test if the slice is empty.
-    fn is_empty(&self) -> bool;
+    fn is_empty(self) -> bool;
 }
 
 impl<T, A: ByteOrder, B: Size> Slice<T> for Ref<[T], A, B>
@@ -57,27 +57,27 @@ where
     }
 
     #[inline]
-    fn get(&self, index: usize) -> Option<Self::Item> {
-        (*self).get(index)
+    fn get(self, index: usize) -> Option<Self::Item> {
+        Ref::get(self, index)
     }
 
     #[inline]
-    fn split_at(&self, at: usize) -> (Self, Self) {
-        (*self).split_at(at)
+    fn split_at(self, at: usize) -> (Self, Self) {
+        Ref::split_at(self, at)
     }
 
     #[inline]
-    fn get_unchecked(&self, index: usize) -> Self::Item {
-        (*self).get_unchecked(index)
+    fn get_unchecked(self, index: usize) -> Self::Item {
+        Ref::get_unchecked(self, index)
     }
 
     #[inline]
-    fn len(&self) -> usize {
-        (*self).len()
+    fn len(self) -> usize {
+        Ref::<[T], _, _>::len(self)
     }
 
     #[inline]
-    fn is_empty(&self) -> bool {
-        (*self).is_empty()
+    fn is_empty(self) -> bool {
+        Ref::<[T], _, _>::is_empty(self)
     }
 }
