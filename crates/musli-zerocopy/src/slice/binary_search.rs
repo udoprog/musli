@@ -104,7 +104,7 @@ where
 pub fn binary_search_by<S, T, F>(buf: &Buf, slice: S, mut f: F) -> Result<BinarySearch, Error>
 where
     T: ZeroCopy,
-    S: Slice<T>,
+    S: Slice<[T]>,
     F: FnMut(&T) -> Result<Ordering, Error>,
 {
     // INVARIANTS:

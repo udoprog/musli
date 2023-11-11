@@ -5,3 +5,6 @@ mod binary_search;
 
 pub use self::slice::Slice;
 mod slice;
+
+pub use self::packed::Packed;
+mod packed;

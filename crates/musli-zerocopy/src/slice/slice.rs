@@ -3,16 +3,33 @@ use crate::endian::ByteOrder;
 use crate::pointer::{Ref, Size};
 use crate::traits::ZeroCopy;
 
+mod sealed {
+    pub trait Sealed {}
+    impl<T> Sealed for [T] {}
+
+    /// Helper trait to differentiate between the unsized slice `[T]` type and the
+    /// item it contains.
+    pub trait UnsizedSlice: Sealed {
+        /// The item in an unsized slice, or the `T` in `[T]`.
+        type Item;
+    }
+
+    impl<T> UnsizedSlice for [T] {
+        type Item = T;
+    }
+}
+
 /// A trait implemented by slice-like types.
-pub trait Slice<T>: Copy + ZeroCopy + Load<Target = [T]>
-where
-    T: ZeroCopy,
+pub trait Slice<T: ?Sized + self::sealed::UnsizedSlice>:
+    Copy + ZeroCopy + Load<Target = T>
 {
     /// An item inside of the slice.
-    type Item: Load<Target = T>;
+    type Item: Load<Target = T::Item>;
 
     /// Construct a slice from a [`Ref<[T]>`].
-    fn from_ref<E: ByteOrder, O: Size>(slice: Ref<[T], E, O>) -> Self;
+    fn from_ref<E: ByteOrder, O: Size>(slice: Ref<[T::Item], E, O>) -> Self
+    where
+        T::Item: ZeroCopy;
 
     /// Construct a slice from its metadata.
     fn with_metadata(offset: usize, len: usize) -> Self;
@@ -37,14 +54,17 @@ where
     fn is_empty(self) -> bool;
 }
 
-impl<T, A: ByteOrder, B: Size> Slice<T> for Ref<[T], A, B>
+impl<T, A: ByteOrder, B: Size> Slice<[T]> for Ref<[T], A, B>
 where
     T: ZeroCopy,
 {
     type Item = Ref<T, A, B>;
 
     #[inline]
-    fn from_ref<E: ByteOrder, O: Size>(slice: Ref<[T], E, O>) -> Self {
+    fn from_ref<E: ByteOrder, O: Size>(slice: Ref<[T], E, O>) -> Self
+    where
+        T: ZeroCopy,
+    {
         Self::with_metadata(slice.offset(), slice.len())
     }
 

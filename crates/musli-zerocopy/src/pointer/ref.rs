@@ -439,7 +439,7 @@ pub struct Iter<P, E, O> {
     _marker: PhantomData<(P, E, O)>,
 }
 
-impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<P, E, O> {
+impl<P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<P, E, O> {
     type Item = Ref<P, E, O>;
 
     #[inline]
@@ -454,7 +454,7 @@ impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<P, E, O> {
     }
 }
 
-impl<'a, P: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<P, E, O> {
+impl<P: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<P, E, O> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.start == self.end {
