@@ -5,6 +5,7 @@ mod tests;
 
 use core::cmp::Ordering;
 use core::fmt;
+use core::marker::PhantomData;
 use core::mem::replace;
 use core::slice::Iter;
 use core::str;
@@ -151,12 +152,14 @@ where
 /// An in-memory trie structure as it's being constructed.
 ///
 /// This can be used over [`store()`] to provide more control.
-pub struct Builder<T, F: Flavor> {
-    links: Links<T, F>,
+pub struct Builder<T, F: Flavor = DefaultFlavor> {
+    links: Links<T>,
+    _marker: PhantomData<F>,
 }
 
-impl<T> Builder<T, DefaultFlavor> {
-    /// Construct a new empty trie builder.
+impl<T> Builder<T> {
+    /// Construct a new empty trie builder with the default [`DefaultFlavor`].
+    #[inline]
     pub const fn new() -> Self {
         Self::with_flavor()
     }
@@ -167,6 +170,7 @@ impl<T, F: Flavor> Builder<T, F> {
     pub const fn with_flavor() -> Self {
         Self {
             links: Links::empty(),
+            _marker: PhantomData,
         }
     }
 
@@ -227,7 +231,7 @@ impl<T, F: Flavor> Builder<T, F> {
                     this.children.insert(
                         0,
                         Node {
-                            string: F::String::from_ref(string),
+                            string: Ref::with_metadata(string.offset(), string.len()),
                             links: Links::new(value),
                         },
                     );
@@ -244,7 +248,7 @@ impl<T, F: Flavor> Builder<T, F> {
                         this.children.insert(
                             n,
                             Node {
-                                string: F::String::from_ref(string),
+                                string: Ref::with_metadata(string.offset(), string.len()),
                                 links: Links::new(value),
                             },
                         );
@@ -316,12 +320,12 @@ impl<T, F: Flavor> Builder<T, F> {
     }
 }
 
-struct Links<T, F: Flavor> {
+struct Links<T> {
     values: Vec<T>,
-    children: Vec<Node<T, F>>,
+    children: Vec<Node<T>>,
 }
 
-impl<T, F: Flavor> Links<T, F> {
+impl<T> Links<T> {
     const fn empty() -> Self {
         Self {
             values: Vec::new(),
@@ -336,7 +340,7 @@ impl<T, F: Flavor> Links<T, F> {
         }
     }
 
-    fn into_ref<E: ByteOrder, O: Size>(
+    fn into_ref<E: ByteOrder, O: Size, F: Flavor>(
         self,
         buf: &mut OwnedBuf<E, O>,
     ) -> Result<LinksRef<T, F>, Error>
@@ -356,20 +360,20 @@ impl<T, F: Flavor> Links<T, F> {
     }
 }
 
-struct Node<T, F: Flavor> {
-    string: F::String,
-    links: Links<T, F>,
+struct Node<T> {
+    string: Ref<[u8], Native, usize>,
+    links: Links<T>,
 }
 
-impl<T, F: Flavor> Node<T, F> {
-    const fn new(string: F::String) -> Self {
+impl<T> Node<T> {
+    const fn new(string: Ref<[u8], Native, usize>) -> Self {
         Self {
             string,
             links: Links::empty(),
         }
     }
 
-    fn into_ref<E: ByteOrder, O: Size>(
+    fn into_ref<E: ByteOrder, O: Size, F: Flavor>(
         self,
         buf: &mut OwnedBuf<E, O>,
     ) -> Result<NodeRef<T, F>, Error>
@@ -377,7 +381,7 @@ impl<T, F: Flavor> Node<T, F> {
         T: ZeroCopy,
     {
         Ok(NodeRef {
-            string: self.string,
+            string: F::String::from_ref(self.string),
             links: self.links.into_ref(buf)?,
         })
     }
