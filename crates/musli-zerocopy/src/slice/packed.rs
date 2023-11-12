@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use crate::buf::{Buf, Load};
 use crate::endian::{ByteOrder, Native};
-use crate::error::Error;
+use crate::error::{Error, ErrorKind, IntoRepr};
 use crate::pointer::{Pointee, Ref, Size};
 use crate::slice::Slice;
 use crate::{DefaultSize, ZeroCopy};
@@ -59,8 +59,21 @@ where
     }
 
     #[inline]
+    fn try_from_ref<A: ByteOrder, B: Size>(slice: Ref<[T], A, B>) -> Result<Self, Error>
+    where
+        T: ZeroCopy,
+    {
+        Self::try_with_metadata(slice.offset(), slice.len())
+    }
+
+    #[inline]
     fn with_metadata(offset: usize, len: usize) -> Self {
         Packed::from_raw_parts(offset, len)
+    }
+
+    #[inline]
+    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, Error> {
+        Packed::try_from_raw_parts(offset, len)
     }
 
     #[inline]
@@ -76,6 +89,11 @@ where
     #[inline]
     fn get_unchecked(self, index: usize) -> Self::ItemRef {
         Packed::get_unchecked(self, index)
+    }
+
+    #[inline]
+    fn offset(self) -> usize {
+        Packed::offset(self)
     }
 
     #[inline]
@@ -103,6 +121,10 @@ where
     }
 
     /// Construct a packed slice from its raw parts.
+    ///
+    /// # Panics
+    ///
+    /// This panics in case any components in the path overflow its representation.
     #[inline]
     pub fn from_raw_parts(offset: usize, len: usize) -> Self
     where
@@ -122,6 +144,50 @@ where
             len: L::swap_bytes::<E>(len),
             _marker: PhantomData,
         }
+    }
+
+    /// Try to construct a packed slice from its raw parts.
+    ///
+    /// # Errors
+    ///
+    /// This errors in case any components in the path overflow its representation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::slice::Packed;
+    ///
+    /// let slice = Packed::<[u32], u32, u8>::try_from_raw_parts(42, 2)?;
+    /// assert_eq!(slice.offset(), 42);
+    ///
+    /// assert!(Packed::<[u32], u32, u8>::try_from_raw_parts(42, usize::MAX).is_err());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    pub fn try_from_raw_parts(offset: usize, len: usize) -> Result<Self, Error>
+    where
+        O: TryFrom<usize> + IntoRepr,
+        L: TryFrom<usize> + IntoRepr,
+    {
+        let Some(offset) = O::try_from(offset).ok() else {
+            return Err(Error::new(ErrorKind::InvalidOffsetRange {
+                offset: usize::into_repr(offset),
+                max: O::into_repr(O::MAX),
+            }));
+        };
+
+        let Some(len) = L::try_from(len).ok() else {
+            return Err(Error::new(ErrorKind::InvalidMetadataRange {
+                metadata: usize::into_repr(len),
+                max: L::into_repr(L::MAX),
+            }));
+        };
+
+        Ok(Self {
+            offset: O::swap_bytes::<E>(offset),
+            len: L::swap_bytes::<E>(len),
+            _marker: PhantomData,
+        })
     }
 
     /// Try to get a reference directly out of the slice without validation.
@@ -223,6 +289,20 @@ where
     pub fn get_unchecked(self, index: usize) -> Ref<T, E, usize> {
         let offset = self.offset.as_usize::<E>() + size_of::<T>() * index;
         Ref::new(offset)
+    }
+
+    /// Get the offset the packed slice points to.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::slice::Packed;
+    ///
+    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(42, 2);
+    /// assert_eq!(slice.offset(), 42);
+    /// ```
+    pub fn offset(self) -> usize {
+        self.offset.as_usize::<E>()
     }
 
     /// Return the number of elements in the packed slice.

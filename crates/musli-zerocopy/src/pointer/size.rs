@@ -1,6 +1,7 @@
 use core::fmt;
 
 use crate::endian::ByteOrder;
+use crate::error::IntoRepr;
 use crate::traits::ZeroCopy;
 
 /// The default [`Size`] in use by this crate.
@@ -18,6 +19,7 @@ mod sealed {
     impl Sealed for u8 {}
     impl Sealed for u16 {}
     impl Sealed for u32 {}
+    #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
     impl Sealed for u64 {}
     impl Sealed for usize {}
 }
@@ -41,6 +43,7 @@ pub trait Size:
     + fmt::Display
     + fmt::Debug
     + ZeroCopy
+    + IntoRepr
     + self::sealed::Sealed
 {
     /// The default zero pointer.
@@ -96,5 +99,6 @@ macro_rules! impl_size {
 impl_size!(u8, core::convert::identity);
 impl_size!(u16, E::swap_u16);
 impl_size!(u32, E::swap_u32);
+#[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
 impl_size!(u64, E::swap_u64);
 impl_size!(usize, core::convert::identity);

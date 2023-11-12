@@ -5,6 +5,7 @@ use core::mem::size_of;
 use core::{any, fmt};
 
 use crate::endian::{Big, ByteOrder, Little, Native};
+use crate::error::{Error, ErrorKind, IntoRepr};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Size};
 use crate::ZeroCopy;
@@ -209,6 +210,74 @@ where
             metadata: P::Packed::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         }
+    }
+
+    /// Fallibly try to construct a reference with metadata.
+    ///
+    /// # Errors
+    ///
+    /// This will error if either:
+    /// * The `offset` or `metadata` can't be byte swapped as per
+    ///   [`ZeroCopy::CAN_SWAP_BYTES`].
+    /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
+    /// * Packed [`metadata()`] cannot be constructed from `P::Metadata` (reason
+    ///   depends on the exact metadata).
+    ///
+    /// To guarantee that this constructor will never panic, [`Ref<T, usize,
+    /// E>`] can be used.
+    ///
+    /// [`offset()`]: Ref::offset
+    /// [`metadata()`]: Ref::metadata
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    ///
+    /// let reference = Ref::<[u64]>::try_with_metadata(42, 10)?;
+    /// assert_eq!(reference.offset(), 42);
+    /// assert_eq!(reference.len(), 10);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn try_with_metadata<U, M>(offset: U, metadata: M) -> Result<Self, Error>
+    where
+        U: Copy + IntoRepr + fmt::Debug,
+        M: Copy + IntoRepr + fmt::Debug,
+        O: TryFrom<U>,
+        P::Packed: TryFrom<M>,
+    {
+        if !O::CAN_SWAP_BYTES {
+            return Err(Error::new(ErrorKind::InvalidOffset {
+                ty: any::type_name::<O>(),
+            }));
+        }
+
+        if !P::Packed::CAN_SWAP_BYTES {
+            return Err(Error::new(ErrorKind::InvalidMetadata {
+                ty: any::type_name::<P::Metadata>(),
+                packed: any::type_name::<P::Packed>(),
+            }));
+        }
+
+        let Some(offset) = O::try_from(offset).ok() else {
+            return Err(Error::new(ErrorKind::InvalidOffsetRange {
+                offset: U::into_repr(offset),
+                max: O::into_repr(O::MAX),
+            }));
+        };
+
+        let Some(metadata) = P::Packed::try_from(metadata).ok() else {
+            return Err(Error::new(ErrorKind::InvalidMetadataRange {
+                metadata: M::into_repr(metadata),
+                max: O::into_repr(O::MAX),
+            }));
+        };
+
+        Ok(Self {
+            offset: O::swap_bytes::<E>(offset),
+            metadata: P::Packed::swap_bytes::<E>(metadata),
+            _marker: PhantomData,
+        })
     }
 }
 

@@ -7,14 +7,15 @@ use core::cmp::Ordering;
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem::replace;
-use core::slice::Iter;
-use core::str;
+use core::slice;
 
 use alloc::vec::Vec;
 
 use crate::endian::Native;
+use crate::error::ErrorKind;
+use crate::lossy_str::LossyStr;
 use crate::pointer::Pointee;
-use crate::slice::{self, BinarySearch, Slice};
+use crate::slice::{binary_search_by, BinarySearch, Slice};
 use crate::{Buf, ByteOrder, DefaultSize, Error, OwnedBuf, Ref, Size, ZeroCopy};
 
 /// The flavor of a trie. Allows for customization of implementation details to
@@ -231,7 +232,7 @@ impl<T, F: Flavor> Builder<T, F> {
                     this.children.insert(
                         0,
                         Node {
-                            string: Ref::with_metadata(string.offset(), string.len()),
+                            string: Ref::try_with_metadata(string.offset(), string.len())?,
                             links: Links::new(value),
                         },
                     );
@@ -248,7 +249,7 @@ impl<T, F: Flavor> Builder<T, F> {
                         this.children.insert(
                             n,
                             Node {
-                                string: Ref::with_metadata(string.offset(), string.len()),
+                                string: Ref::try_with_metadata(string.offset(), string.len())?,
                                 links: Links::new(value),
                             },
                         );
@@ -285,6 +286,11 @@ impl<T, F: Flavor> Builder<T, F> {
     }
 
     /// Construct a [`TrieRef`] out of the current [`Builder`].
+    ///
+    /// # Errors
+    ///
+    /// Trie construction will error in case an interior node overflows its
+    /// representation as per its [`Flavor`] defined by `F`.
     ///
     /// # Examples
     ///
@@ -347,7 +353,7 @@ impl<T> Links<T> {
     where
         T: ZeroCopy,
     {
-        let values = F::Values::from_ref(buf.store_slice(&self.values));
+        let values = F::Values::try_from_ref(buf.store_slice(&self.values))?;
 
         let mut children = Vec::with_capacity(self.children.len());
 
@@ -355,7 +361,7 @@ impl<T> Links<T> {
             children.push(node.into_ref(buf)?);
         }
 
-        let children = F::Children::from_ref(buf.store_slice(&children));
+        let children = F::Children::try_from_ref(buf.store_slice(&children))?;
         Ok(LinksRef { values, children })
     }
 }
@@ -381,7 +387,7 @@ impl<T> Node<T> {
         T: ZeroCopy,
     {
         Ok(NodeRef {
-            string: F::String::from_ref(self.string),
+            string: F::String::try_from_ref(self.string)?,
             links: self.links.into_ref(buf)?,
         })
     }
@@ -422,7 +428,7 @@ where
     /// trie.insert(&buf, a, 1)?;
     ///
     /// let trie = trie.build(&mut buf)?;
-    /// assert_eq!(format!("{:?}", trie.debug(&buf)), "{\"�(�\": [1], \"食べない\": [2]}");
+    /// assert_eq!(format!("{:?}", trie.debug(&buf)), "{\"�(�\": 1, \"食べない\": 2}");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn debug<'a, 'buf>(&'a self, buf: &'buf Buf) -> Debug<'a, 'buf, T, F>
@@ -465,9 +471,8 @@ where
         let mut string = string.as_ref();
 
         loop {
-            let search = slice::binary_search_by(buf, this.children, |c| {
-                Ok(buf.load(c.string)?.cmp(string))
-            })?;
+            let search =
+                binary_search_by(buf, this.children, |c| Ok(buf.load(c.string)?.cmp(string)))?;
 
             match search {
                 BinarySearch::Found(n) => {
@@ -497,7 +502,10 @@ where
         }
     }
 
-    /// Construct an iterator over all matching string prefixes in the trie.
+    /// Construct an iterator over all values in the trie.
+    ///
+    /// Note that the iteration order is unspecified and might change in future
+    /// versions.
     ///
     /// # Examples
     ///
@@ -519,69 +527,289 @@ where
     ///
     /// let trie = trie::store(&mut buf, values)?;
     ///
-    /// let values = trie.prefix(&buf, "workin").collect::<Result<Vec<_>, _>>()?;
+    /// let values = trie.values_in(&buf, "workin").collect::<Result<Vec<_>, _>>()?;
     /// assert!(values.into_iter().copied().eq([4, 5, 6]));
     ///
-    /// let values = trie.prefix(&buf, "wor").collect::<Result<Vec<_>, _>>()?;
+    /// let values = trie.values_in(&buf, "wor").collect::<Result<Vec<_>, _>>()?;
     /// assert!(values.into_iter().copied().eq([1, 2, 3, 4, 5, 6]));
     ///
-    /// let values = trie.prefix(&buf, "runn").collect::<Result<Vec<_>, _>>()?;
+    /// let values = trie.values_in(&buf, "runn").collect::<Result<Vec<_>, _>>()?;
     /// assert!(values.into_iter().copied().eq([8]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn prefix<'a, 'buf, S>(&self, buf: &'buf Buf, string: &'a S) -> Prefix<'a, 'buf, T, F>
+    pub fn values<'buf>(&self, buf: &'buf Buf) -> Values<'buf, T, F> {
+        let iter = Walk {
+            buf,
+            state: WalkState::Find(self.links, &[]),
+            stack: Vec::new(),
+        };
+
+        Values { iter }
+    }
+
+    /// Construct an iterator over values that are inside of the specified
+    /// `prefix` in the trie.
+    ///
+    /// Note that the iteration order is unspecified and might change in future
+    /// versions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{trie, OwnedBuf};
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let values = [
+    ///     (buf.store_unsized("work"), 1),
+    ///     (buf.store_unsized("worker"), 2),
+    ///     (buf.store_unsized("workers"), 3),
+    ///     (buf.store_unsized("working"), 4),
+    ///     (buf.store_unsized("working"), 5),
+    ///     (buf.store_unsized("working man"), 6),
+    ///     (buf.store_unsized("run"), 7),
+    ///     (buf.store_unsized("running"), 8),
+    /// ];
+    ///
+    /// let trie = trie::store(&mut buf, values)?;
+    ///
+    /// let values = trie.values_in(&buf, "workin").collect::<Result<Vec<_>, _>>()?;
+    /// assert!(values.into_iter().copied().eq([4, 5, 6]));
+    ///
+    /// let values = trie.values_in(&buf, "wor").collect::<Result<Vec<_>, _>>()?;
+    /// assert!(values.into_iter().copied().eq([1, 2, 3, 4, 5, 6]));
+    ///
+    /// let values = trie.values_in(&buf, "runn").collect::<Result<Vec<_>, _>>()?;
+    /// assert!(values.into_iter().copied().eq([8]));
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn values_in<'a, 'buf, S>(&self, buf: &'buf Buf, prefix: &'a S) -> ValuesIn<'a, 'buf, T, F>
     where
         S: ?Sized + AsRef<[u8]>,
     {
-        Prefix {
+        let iter = Walk {
             buf,
-            state: PrefixState::Initial(self.links, string.as_ref()),
+            state: WalkState::Find(self.links, prefix.as_ref()),
             stack: Vec::new(),
-        }
+        };
+
+        ValuesIn { iter }
+    }
+
+    /// Construct an iterator over all entries in the trie.
+    ///
+    /// Note that the iteration order is unspecified and might change in future
+    /// versions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::from_utf8;
+    ///
+    /// use anyhow::Result;
+    /// use musli_zerocopy::{trie, OwnedBuf};
+    ///
+    /// // Helper to convert output to utf-8.
+    /// fn to_utf8<'buf, E>(result: Result<(&'buf [u8], &'buf i32), E>) -> Result<(&'buf str, i32)>
+    /// where
+    ///     anyhow::Error: From<E>
+    /// {
+    ///     let (k, v) = result?;
+    ///     Ok((from_utf8(k)?, *v))
+    /// }
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let values = [
+    ///     (buf.store_unsized("work"), 1),
+    ///     (buf.store_unsized("worker"), 2),
+    ///     (buf.store_unsized("workers"), 3),
+    ///     (buf.store_unsized("working"), 4),
+    ///     (buf.store_unsized("working"), 5),
+    ///     (buf.store_unsized("working man"), 6),
+    ///     (buf.store_unsized("run"), 7),
+    ///     (buf.store_unsized("running"), 8),
+    /// ];
+    ///
+    /// let trie = trie::store(&mut buf, values)?;
+    ///
+    /// let mut values = trie.iter(&buf)
+    ///     .map(to_utf8)
+    ///     .collect::<Result<Vec<_>>>()?;
+    /// values.sort();
+    ///
+    /// assert_eq! {
+    ///     values,
+    ///     [
+    ///         ("run", 7),
+    ///         ("running", 8),
+    ///         ("work", 1),
+    ///         ("worker", 2),
+    ///         ("workers", 3),
+    ///         ("working", 4),
+    ///         ("working", 5),
+    ///         ("working man", 6),
+    ///     ]
+    /// };
+    /// # Ok::<_, anyhow::Error>(())
+    /// ```
+    pub fn iter<'buf>(&self, buf: &'buf Buf) -> Iter<'buf, T, F> {
+        let iter = Walk {
+            buf,
+            state: WalkState::Find(self.links, b""),
+            stack: Vec::new(),
+        };
+
+        Iter { iter }
+    }
+
+    /// Construct an iterator over all matching string prefixes in the trie
+    /// which also returns the string of the entries.
+    ///
+    /// Note that the iteration order is unspecified and might change in future
+    /// versions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::from_utf8;
+    ///
+    /// use anyhow::Result;
+    /// use musli_zerocopy::{trie, OwnedBuf};
+    ///
+    /// // Helper to convert output to utf-8.
+    /// fn to_utf8<'buf, E>(result: Result<(&'buf [u8], &'buf i32), E>) -> Result<(&'buf str, i32)>
+    /// where
+    ///     anyhow::Error: From<E>
+    /// {
+    ///     let (k, v) = result?;
+    ///     Ok((from_utf8(k)?, *v))
+    /// }
+    ///
+    /// let mut buf = OwnedBuf::new();
+    ///
+    /// let values = [
+    ///     (buf.store_unsized("work"), 1),
+    ///     (buf.store_unsized("worker"), 2),
+    ///     (buf.store_unsized("workers"), 3),
+    ///     (buf.store_unsized("working"), 4),
+    ///     (buf.store_unsized("working"), 5),
+    ///     (buf.store_unsized("working man"), 6),
+    ///     (buf.store_unsized("run"), 7),
+    ///     (buf.store_unsized("running"), 8),
+    /// ];
+    ///
+    /// let trie = trie::store(&mut buf, values)?;
+    ///
+    /// let mut values = trie
+    ///     .iter_in(&buf, "workin")
+    ///     .map(to_utf8)
+    ///     .collect::<Result<Vec<_>>>()?;
+    /// values.sort();
+    ///
+    /// assert_eq!(values, [("working", 4), ("working", 5), ("working man", 6)]);
+    ///
+    /// let mut values = trie
+    ///     .iter_in(&buf, "wor")
+    ///     .map(to_utf8)
+    ///     .collect::<Result<Vec<_>>>()?;
+    /// values.sort();
+    ///
+    /// assert_eq! {
+    ///     values,
+    ///     [
+    ///         ("work", 1),
+    ///         ("worker", 2),
+    ///         ("workers", 3),
+    ///         ("working", 4),
+    ///         ("working", 5),
+    ///         ("working man", 6),
+    ///     ]
+    /// };
+    ///
+    /// let mut values = trie
+    ///     .iter_in(&buf, "runn")
+    ///     .map(to_utf8)
+    ///     .collect::<Result<Vec<_>>>()?;
+    /// values.sort();
+    ///
+    /// assert_eq!(values, [("running", 8)]);
+    /// # Ok::<_, anyhow::Error>(())
+    /// ```
+    pub fn iter_in<'a, 'buf, S>(&self, buf: &'buf Buf, string: &'a S) -> IterIn<'a, 'buf, T, F>
+    where
+        S: ?Sized + AsRef<[u8]>,
+    {
+        let iter = Walk {
+            buf,
+            state: WalkState::Find(self.links, string.as_ref()),
+            stack: Vec::new(),
+        };
+
+        IterIn { iter }
     }
 }
 
-enum PrefixState<'a, 'buf, T, F: Flavor>
+enum WalkState<'a, 'buf, T, F: Flavor>
 where
     T: ZeroCopy,
 {
-    Initial(LinksRef<T, F>, &'a [u8]),
-    Iter(Iter<'buf, T>),
+    // Initial state where we need to lookup the specified prefix in the trie.
+    Find(LinksRef<T, F>, &'a [u8]),
+    // Values are being yielded.
+    Values(&'buf [u8], slice::Iter<'buf, T>),
+    // Stack traversal.
     Stack,
 }
 
-/// A prefix iterator over a trie.
-pub struct Prefix<'a, 'buf, T, F: Flavor>
+struct Walk<'a, 'buf, T, F: Flavor>
 where
     T: ZeroCopy,
 {
+    // Buffer being walked.
     buf: &'buf Buf,
-    state: PrefixState<'a, 'buf, T, F>,
-    stack: Vec<(&'buf LinksRef<T, F>, usize)>,
+    // State of the current walker.
+    state: WalkState<'a, 'buf, T, F>,
+    // A stack which indicates the links who's children we should visit next,
+    // and an index corresponding to the child to visit.
+    stack: Vec<(LinksRef<T, F>, usize, &'buf [u8])>,
 }
 
-impl<'a, 'buf, T, F: Flavor> Prefix<'a, 'buf, T, F>
+impl<'a, 'buf, T, F: Flavor> Walk<'a, 'buf, T, F>
 where
     T: ZeroCopy,
 {
-    fn poll(&mut self) -> Result<Option<&'buf T>, Error> {
+    fn poll(&mut self) -> Result<Option<(&'buf [u8], &'buf T)>, Error> {
         'outer: loop {
-            match &mut self.state {
-                PrefixState::Initial(mut this, mut string) => {
-                    let links = 'links: loop {
-                        let search = slice::binary_search_by(self.buf, this.children, |c| {
+            match self.state {
+                WalkState::Find(this, &[]) => {
+                    let iter = self.buf.load(this.values)?.iter();
+                    self.stack.push((this, 0, &[]));
+                    self.state = WalkState::Values(&[], iter);
+                    continue;
+                }
+                WalkState::Find(this, string) => {
+                    let mut this = this;
+                    let mut string = string;
+                    let mut len = 0;
+
+                    let node = 'node: loop {
+                        let search = binary_search_by(self.buf, this.children, |c| {
                             Ok(self.buf.load(c.string)?.cmp(string))
                         })?;
 
                         match search {
                             BinarySearch::Found(n) => {
-                                break &self.buf.load(this.children.get_unchecked(n))?.links;
+                                break 'node self.buf.load(this.children.get_unchecked(n))?;
                             }
                             BinarySearch::Missing(n) => {
                                 // For missing nodes, we need to find any
                                 // neighbor for which the current string is a
                                 // prefix. So unless `n` is out of bounds we
                                 // look at the prior or current index `n`.
+                                //
+                                // Note that thanks to structural invariants,
+                                // only one node may be a matching prefix.
                                 let iter = n
                                     .checked_sub(1)
                                     .into_iter()
@@ -597,38 +825,43 @@ where
                                         continue;
                                     }
 
-                                    if prefix == string.len() {
-                                        break 'links &child.links;
+                                    if prefix != string.len() {
+                                        len += prefix;
+                                        string = &string[prefix..];
+                                        this = child.links;
+                                        continue 'node;
                                     }
 
-                                    string = &string[prefix..];
-                                    this = child.links;
-                                    continue 'links;
+                                    break 'node child;
                                 }
 
                                 // Falling through here indicates that we have
                                 // not found anything. Assigning the stack state
                                 // with an empty stack will cause the iterator
                                 // to continuously return `None`.
-                                self.state = PrefixState::Stack;
+                                self.state = WalkState::Stack;
                                 continue 'outer;
                             }
                         };
                     };
 
-                    self.stack.push((links, 0));
-                    self.state = PrefixState::Iter(self.buf.load(links.values)?.iter());
+                    let prefix = prefix_string(node.string, len)?;
+                    let prefix = self.buf.load(prefix)?;
+
+                    self.stack.push((node.links, 0, prefix));
+                    self.state =
+                        WalkState::Values(prefix, self.buf.load(node.links.values)?.iter());
                 }
-                PrefixState::Iter(values) => {
+                WalkState::Values(prefix, ref mut values) => {
                     let Some(value) = values.next() else {
-                        self.state = PrefixState::Stack;
+                        self.state = WalkState::Stack;
                         continue;
                     };
 
-                    return Ok(Some(value));
+                    return Ok(Some((prefix, value)));
                 }
-                PrefixState::Stack => loop {
-                    let Some((links, index)) = self.stack.pop() else {
+                WalkState::Stack => loop {
+                    let Some((links, index, prefix)) = self.stack.pop() else {
                         break 'outer;
                     };
 
@@ -637,9 +870,14 @@ where
                     };
 
                     let node = self.buf.load(node)?;
-                    self.state = PrefixState::Iter(self.buf.load(node.links.values)?.iter());
-                    self.stack.push((links, index + 1));
-                    self.stack.push((&node.links, 0));
+
+                    let new_prefix = prefix_string(node.string, prefix.len())?;
+                    let new_prefix = self.buf.load(new_prefix)?;
+
+                    self.state =
+                        WalkState::Values(new_prefix, self.buf.load(node.links.values)?.iter());
+                    self.stack.push((links, index + 1, prefix));
+                    self.stack.push((node.links, 0, new_prefix));
                     continue 'outer;
                 },
             }
@@ -649,7 +887,49 @@ where
     }
 }
 
-impl<'a, 'buf, T, F: Flavor> Iterator for Prefix<'a, 'buf, T, F>
+/// Calculate a prefix string based on an existing string in the trie.
+///
+/// We use the fact that during construction the trie must have been provided a
+/// complete string reference, so any substring that we constructed must be
+/// prefixed with its complete counterpart.
+fn prefix_string<S>(string: S, prefix_len: usize) -> Result<Ref<[u8], Native, usize>, Error>
+where
+    S: Slice<Item = u8>,
+{
+    // NB: All of these operations have to be checked, since they are preformed
+    // over untrusted data and we'd like to avoid a panic.
+
+    let string_offset = string.offset();
+    let string_len = string.len();
+
+    let Some(real_start) = string_offset.checked_sub(prefix_len) else {
+        return Err(Error::new(ErrorKind::Underflow {
+            at: string_offset,
+            len: prefix_len,
+        }));
+    };
+
+    let Some(real_end) = string_offset.checked_add(string_len) else {
+        return Err(Error::new(ErrorKind::Overflow {
+            at: string_offset,
+            len: string_len,
+        }));
+    };
+
+    Ref::try_with_metadata(real_start, real_end - real_start)
+}
+
+/// An iterator over values matching a `prefix` in a [`TrieRef`].
+///
+/// See [`TrieRef::values_in`].
+pub struct ValuesIn<'a, 'buf, T, F: Flavor>
+where
+    T: ZeroCopy,
+{
+    iter: Walk<'a, 'buf, T, F>,
+}
+
+impl<'a, 'buf, T, F: Flavor> Iterator for ValuesIn<'a, 'buf, T, F>
 where
     T: ZeroCopy,
 {
@@ -657,7 +937,83 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.poll().transpose()
+        let (_, value) = match self.iter.poll() {
+            Ok(entry) => entry?,
+            Err(error) => return Some(Err(error)),
+        };
+
+        Some(Ok(value))
+    }
+}
+
+/// An iterator over all values in a [`TrieRef`].
+///
+/// See [`TrieRef::values`].
+pub struct Values<'buf, T, F: Flavor>
+where
+    T: ZeroCopy,
+{
+    iter: Walk<'static, 'buf, T, F>,
+}
+
+impl<'buf, T, F: Flavor> Iterator for Values<'buf, T, F>
+where
+    T: ZeroCopy,
+{
+    type Item = Result<&'buf T, Error>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (_, value) = match self.iter.poll() {
+            Ok(entry) => entry?,
+            Err(error) => return Some(Err(error)),
+        };
+
+        Some(Ok(value))
+    }
+}
+
+/// An iterator over all entries in a [`TrieRef`].
+///
+/// See [`TrieRef::iter`].
+pub struct Iter<'buf, T, F: Flavor>
+where
+    T: ZeroCopy,
+{
+    iter: Walk<'static, 'buf, T, F>,
+}
+
+impl<'buf, T, F: Flavor> Iterator for Iter<'buf, T, F>
+where
+    T: ZeroCopy,
+{
+    type Item = Result<(&'buf [u8], &'buf T), Error>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.poll().transpose()
+    }
+}
+
+/// An iterator over all entries inside of a `prefix` in a [`TrieRef`].
+///
+/// See [`TrieRef::iter_in`].
+pub struct IterIn<'a, 'buf, T, F: Flavor>
+where
+    T: ZeroCopy,
+{
+    iter: Walk<'a, 'buf, T, F>,
+}
+
+impl<'a, 'buf, T, F: Flavor> Iterator for IterIn<'a, 'buf, T, F>
+where
+    T: ZeroCopy,
+{
+    type Item = Result<(&'buf [u8], &'buf T), Error>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.poll().transpose()
     }
 }
 
@@ -677,80 +1033,13 @@ where
     T: fmt::Debug + ZeroCopy,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct LossyStr<'a>(&'a [u8]);
-
-        impl fmt::Debug for LossyStr<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let mut bytes = self.0;
-
-                write!(f, "\"")?;
-
-                loop {
-                    let (string, replacement) = match str::from_utf8(bytes) {
-                        Ok(s) => (s, false),
-                        Err(e) => {
-                            let (valid, invalid) = bytes.split_at(e.valid_up_to());
-                            bytes = invalid.get(1..).unwrap_or_default();
-                            (unsafe { str::from_utf8_unchecked(valid) }, true)
-                        }
-                    };
-
-                    for c in string.chars() {
-                        match c {
-                            '\0' => write!(f, "\\0")?,
-                            '\x01'..='\x08' | '\x0b' | '\x0c' | '\x0e'..='\x19' | '\x7f' => {
-                                write!(f, "\\x{:02x}", c as u32)?;
-                            }
-                            _ => {
-                                write!(f, "{}", c.escape_debug())?;
-                            }
-                        }
-                    }
-
-                    if !replacement {
-                        break;
-                    }
-
-                    write!(f, "\u{FFFD}")?;
-                }
-
-                write!(f, "\"")?;
-                Ok(())
-            }
-        }
-
-        fn walk<T, F: Flavor>(
-            buf: &Buf,
-            s: &mut Vec<u8>,
-            f: &mut fmt::DebugMap<'_, '_>,
-            links: LinksRef<T, F>,
-        ) -> fmt::Result
-        where
-            T: fmt::Debug + ZeroCopy,
-        {
-            let children = buf.load(links.children).map_err(|_| fmt::Error)?;
-
-            for child in children {
-                let string = buf.load(child.string).map_err(|_| fmt::Error)?;
-
-                let len = s.len();
-                s.extend(string);
-
-                if !child.links.values.is_empty() {
-                    let values = buf.load(child.links.values).map_err(|_| fmt::Error)?;
-                    f.entry(&LossyStr(s), &values);
-                }
-
-                walk(buf, s, f, child.links)?;
-                s.truncate(len);
-            }
-
-            Ok(())
-        }
-
-        let mut s = Vec::new();
         let mut f = f.debug_map();
-        walk(self.buf, &mut s, &mut f, self.trie.links)?;
+
+        for result in self.trie.iter(self.buf) {
+            let (key, value) = result.map_err(|_| fmt::Error)?;
+            f.entry(&LossyStr::new(key), value);
+        }
+
         f.finish()
     }
 }
