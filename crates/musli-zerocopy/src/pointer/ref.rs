@@ -416,6 +416,7 @@ where
     /// Perform an fetch like `get` which panics with diagnostics in case the
     /// index is out-of-bounds.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub(crate) fn at(self, index: usize) -> Ref<P, E, O> {
         let Some(r) = self.get(index) else {
             panic!("Index {index} out of bounds 0-{}", self.len());

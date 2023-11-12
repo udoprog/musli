@@ -230,6 +230,9 @@ pub(crate) enum ErrorKind {
         at: usize,
         len: usize,
     },
+    StackOverflow {
+        capacity: usize,
+    },
     #[cfg(feature = "alloc")]
     CapacityError,
     #[cfg(feature = "alloc")]
@@ -313,6 +316,9 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::Overflow { at, len } => {
                 write!(f, "Arithmetic overflow calculating {at} + {len}")
+            }
+            ErrorKind::StackOverflow { capacity } => {
+                write!(f, "Stack with capacity {capacity} overflowed")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
             #[cfg(feature = "alloc")]
