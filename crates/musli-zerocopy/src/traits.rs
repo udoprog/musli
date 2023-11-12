@@ -67,10 +67,7 @@ mod sealed {
 /// assert_eq!(buf.load(bytes)?, b"Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub unsafe trait UnsizedZeroCopy<T: ?Sized, O: Size>: self::sealed::Sealed
-where
-    T: Pointee,
-{
+pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed + Pointee {
     /// Alignment of the pointed-to data
     const ALIGN: usize;
 
@@ -82,18 +79,18 @@ where
 
     /// Metadata associated with the unsized value that is embedded in the
     /// pointer.
-    fn metadata(&self) -> T::Metadata;
+    fn metadata(&self) -> Self::Metadata;
 
     /// Apply padding as per the pointed-to value.
     unsafe fn pad(&self, pad: &mut Padder<'_, Self>);
 
     /// Validate the buffer with the given capacity and return the decoded
     /// metadata.
-    unsafe fn validate_unsized<E: ByteOrder>(
+    unsafe fn validate_unsized<E: ByteOrder, O: Size>(
         data: NonNull<u8>,
         len: usize,
-        metadata: <T::Metadata as Packable>::Packed<O>,
-    ) -> Result<T::Metadata, Error>;
+        metadata: <Self::Metadata as Packable>::Packed<O>,
+    ) -> Result<Self::Metadata, Error>;
 
     /// Construct a wide pointer from a pointer and its associated metadata.
     ///
@@ -105,7 +102,7 @@ where
     /// passed a call to [`validate_unsized()`].
     ///
     /// [`validate_unsized()`]: Self::validate_unsized
-    unsafe fn with_metadata(data: NonNull<u8>, metadata: T::Metadata) -> *const Self;
+    unsafe fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self;
 
     /// Construct a wide mutable pointer from a pointer and its associated
     /// metadata.
@@ -118,7 +115,7 @@ where
     /// passed a call to [`validate_unsized()`].
     ///
     /// [`validate_unsized()`]: Self::validate_unsized
-    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: T::Metadata) -> *mut Self;
+    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self;
 }
 
 /// This is a marker trait that must be implemented for a type in order to use
@@ -626,11 +623,7 @@ pub unsafe trait ZeroCopy: Sized {
     }
 }
 
-unsafe impl<T: ?Sized, O> UnsizedZeroCopy<T, O> for str
-where
-    T: Pointee<Metadata = usize>,
-    O: Size,
-{
+unsafe impl UnsizedZeroCopy for str {
     const ALIGN: usize = align_of::<u8>();
     const PADDED: bool = false;
 
@@ -640,7 +633,7 @@ where
     }
 
     #[inline]
-    fn metadata(&self) -> T::Metadata {
+    fn metadata(&self) -> Self::Metadata {
         str::len(self)
     }
 
@@ -648,11 +641,11 @@ where
     unsafe fn pad(&self, _: &mut Padder<'_, Self>) {}
 
     #[inline]
-    unsafe fn validate_unsized<E: ByteOrder>(
+    unsafe fn validate_unsized<E: ByteOrder, O: Size>(
         data: NonNull<u8>,
         len: usize,
-        metadata: <T::Metadata as Packable>::Packed<O>,
-    ) -> Result<T::Metadata, Error> {
+        metadata: <Self::Metadata as Packable>::Packed<O>,
+    ) -> Result<Self::Metadata, Error> {
         let metadata = metadata.as_usize::<E>();
 
         if metadata > len {
@@ -668,36 +661,34 @@ where
     }
 
     #[inline]
-    unsafe fn with_metadata(data: NonNull<u8>, metadata: T::Metadata) -> *const Self {
+    unsafe fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self {
         let slice = slice::from_raw_parts(data.as_ptr(), metadata);
         str::from_utf8_unchecked(slice)
     }
 
     #[inline]
-    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: T::Metadata) -> *mut Self {
+    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self {
         let slice = slice::from_raw_parts_mut(data.as_ptr(), metadata);
         str::from_utf8_unchecked_mut(slice)
     }
 }
 
-unsafe impl<U, T: ?Sized, O> UnsizedZeroCopy<T, O> for [U]
+unsafe impl<T> UnsizedZeroCopy for [T]
 where
-    U: ZeroCopy,
-    T: Pointee<Metadata = usize>,
-    O: Size,
+    T: ZeroCopy,
 {
-    const ALIGN: usize = align_of::<U>();
-    const PADDED: bool = U::PADDED;
+    const ALIGN: usize = align_of::<T>();
+    const PADDED: bool = T::PADDED;
 
     #[inline]
     fn as_ptr(&self) -> *const u8 {
-        <[U]>::as_ptr(self).cast()
+        <[T]>::as_ptr(self).cast()
     }
 
     #[inline]
     unsafe fn pad(&self, padder: &mut Padder<'_, Self>) {
         for _ in 0..self.len() {
-            padder.pad::<U>();
+            padder.pad::<T>();
         }
     }
 
@@ -707,17 +698,17 @@ where
     }
 
     #[inline]
-    unsafe fn validate_unsized<E: ByteOrder>(
+    unsafe fn validate_unsized<E: ByteOrder, O: Size>(
         data: NonNull<u8>,
         len: usize,
-        metadata: <T::Metadata as Packable>::Packed<O>,
-    ) -> Result<T::Metadata, Error> {
+        metadata: <Self::Metadata as Packable>::Packed<O>,
+    ) -> Result<Self::Metadata, Error> {
         let metadata = metadata.as_usize::<E>();
 
-        let Some(size) = metadata.checked_mul(size_of::<U>()) else {
+        let Some(size) = metadata.checked_mul(size_of::<T>()) else {
             return Err(Error::new(ErrorKind::LengthOverflow {
                 len: metadata,
-                size: size_of::<U>(),
+                size: size_of::<T>(),
             }));
         };
 
@@ -728,11 +719,11 @@ where
             }));
         };
 
-        if !U::ANY_BITS {
-            let mut validator = Validator::<[U]>::new(data);
+        if !T::ANY_BITS {
+            let mut validator = Validator::<[T]>::new(data);
 
             for _ in 0..metadata {
-                validator.validate_only::<U>()?;
+                validator.validate_only::<T>()?;
             }
         }
 
@@ -740,12 +731,12 @@ where
     }
 
     #[inline]
-    unsafe fn with_metadata(data: NonNull<u8>, metadata: T::Metadata) -> *const Self {
+    unsafe fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self {
         slice::from_raw_parts(data.cast().as_ptr(), metadata)
     }
 
     #[inline]
-    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: T::Metadata) -> *mut Self {
+    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self {
         slice::from_raw_parts_mut(data.cast().as_ptr(), metadata)
     }
 }

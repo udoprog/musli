@@ -12,7 +12,7 @@ use crate::buf::{self, Buf, DefaultAlignment, Padder, StoreBuf};
 use crate::endian::{ByteOrder, Native};
 use crate::error::Error;
 use crate::mem::MaybeUninit;
-use crate::pointer::{DefaultSize, Pointee, Ref, Size};
+use crate::pointer::{DefaultSize, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
 /// A fixed buffer wrapping a `&mut [u8]` with a dynamic alignment.
@@ -639,19 +639,18 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, E, O>
+    pub fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, E, O>
     where
-        P: Pointee<Metadata = usize>,
-        P: UnsizedZeroCopy<P, O>,
+        T: UnsizedZeroCopy<Metadata = usize>,
     {
         unsafe {
             let size = size_of_val(value);
-            self.next_offset_with_and_reserve(P::ALIGN, size);
+            self.next_offset_with_and_reserve(T::ALIGN, size);
             let offset = self.len;
             let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
             ptr.as_ptr().copy_from_nonoverlapping(value.as_ptr(), size);
 
-            if P::PADDED {
+            if T::PADDED {
                 let mut padder = Padder::new(ptr);
                 value.pad(&mut padder);
                 padder.remaining_unsized(value);
@@ -979,10 +978,9 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     }
 
     #[inline]
-    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
+    fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
     where
-        P: Pointee<Metadata = usize>,
-        P: UnsizedZeroCopy<P, Self::Size>,
+        T: UnsizedZeroCopy<Metadata = usize>,
     {
         SliceMut::store_unsized(self, value)
     }
