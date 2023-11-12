@@ -569,6 +569,7 @@ pub use self::endian::{ByteOrder, Endian};
 pub mod endian;
 
 mod lossy_str;
+mod stack;
 
 /// Macro to derive a simple [`Visit`] implementation.
 pub use musli_zerocopy_macros::Visit;
