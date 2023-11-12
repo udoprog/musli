@@ -1,6 +1,5 @@
 use core::slice::SliceIndex;
 
-use crate::pointer::Pointee;
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 use crate::{Buf, ByteOrder, Error, Ref, Size};
 
@@ -37,10 +36,9 @@ pub trait StoreBuf: self::sealed::Sealed {
 
     /// Store an unsigned value.
     #[doc(hidden)]
-    fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
+    fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
     where
-        P: Pointee<Metadata = usize>,
-        P: UnsizedZeroCopy<P, Self::Size>;
+        T: UnsizedZeroCopy<Metadata = usize>;
 
     /// Store a [`ZeroCopy`] value.
     #[doc(hidden)]

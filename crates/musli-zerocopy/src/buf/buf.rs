@@ -13,7 +13,7 @@ use crate::buf::OwnedBuf;
 use crate::buf::{self, Bindable, Load, LoadMut, Validator};
 use crate::endian::ByteOrder;
 use crate::error::{Error, ErrorKind};
-use crate::pointer::{Pointee, Ref, Size};
+use crate::pointer::{Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
 /// A buffer wrapping a slice of bytes.
@@ -703,12 +703,12 @@ impl Buf {
 
     /// Load an unsized reference.
     #[inline]
-    pub(crate) fn load_unsized<P: ?Sized, O: Size, E: ByteOrder>(
+    pub(crate) fn load_unsized<T: ?Sized, O: Size, E: ByteOrder>(
         &self,
-        unsize: Ref<P, E, O>,
-    ) -> Result<&P, Error>
+        unsize: Ref<T, E, O>,
+    ) -> Result<&T, Error>
     where
-        P: Pointee + UnsizedZeroCopy<P, O>,
+        T: UnsizedZeroCopy,
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();
@@ -716,20 +716,20 @@ impl Buf {
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
         unsafe {
-            let (buf, remaining) = self.get_range_from(start, P::ALIGN)?;
-            let metadata = P::validate_unsized::<E>(buf, remaining, metadata)?;
-            Ok(&*P::with_metadata(buf, metadata))
+            let (buf, remaining) = self.get_range_from(start, T::ALIGN)?;
+            let metadata = T::validate_unsized::<E, O>(buf, remaining, metadata)?;
+            Ok(&*T::with_metadata(buf, metadata))
         }
     }
 
     /// Load an unsized mutable reference.
     #[inline]
-    pub(crate) fn load_unsized_mut<P: ?Sized, O: Size, E: ByteOrder>(
+    pub(crate) fn load_unsized_mut<T: ?Sized, O: Size, E: ByteOrder>(
         &mut self,
-        unsize: Ref<P, E, O>,
-    ) -> Result<&mut P, Error>
+        unsize: Ref<T, E, O>,
+    ) -> Result<&mut T, Error>
     where
-        P: Pointee + UnsizedZeroCopy<P, O>,
+        T: UnsizedZeroCopy,
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();
@@ -737,9 +737,9 @@ impl Buf {
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
         unsafe {
-            let (buf, remaining) = self.get_mut_range_from(start, P::ALIGN)?;
-            let metadata = P::validate_unsized::<E>(buf, remaining, metadata)?;
-            Ok(&mut *P::with_metadata_mut(buf, metadata))
+            let (buf, remaining) = self.get_mut_range_from(start, T::ALIGN)?;
+            let metadata = T::validate_unsized::<E, O>(buf, remaining, metadata)?;
+            Ok(&mut *T::with_metadata_mut(buf, metadata))
         }
     }
 

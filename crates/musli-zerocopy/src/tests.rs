@@ -509,12 +509,6 @@ fn validate_packed() -> Result<()> {
 
 #[cfg(test)]
 mod primitive_slices {
-    /// Macro to implement `UnsizedZeroCopy`.
-    ///
-    /// Its requirements are the following:
-    /// * Can only be implemented for types which can inhabit any bit-pattern.
-    /// * Must only be implemented for types which are not padded (as per
-    ///   [`ZeroCopy::PADDED`]).
     macro_rules! test_case {
         ({$($param:ident)?}, $ty:ident, $example:expr) => {
             #[test]
