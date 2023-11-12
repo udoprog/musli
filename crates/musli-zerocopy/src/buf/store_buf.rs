@@ -42,19 +42,19 @@ pub trait StoreBuf: self::sealed::Sealed {
 
     /// Store a [`ZeroCopy`] value.
     #[doc(hidden)]
-    fn store<P>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
+    fn store<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
     where
-        P: ZeroCopy;
+        T: ZeroCopy;
 
     /// Swap the location of two references.
     #[doc(hidden)]
-    fn swap<P>(
+    fn swap<T>(
         &mut self,
-        a: Ref<P, Self::ByteOrder, Self::Size>,
-        b: Ref<P, Self::ByteOrder, Self::Size>,
+        a: Ref<T, Self::ByteOrder, Self::Size>,
+        b: Ref<T, Self::ByteOrder, Self::Size>,
     ) -> Result<(), Error>
     where
-        P: ZeroCopy;
+        T: ZeroCopy;
 
     /// Ensure that the store buffer is aligned.
     ///

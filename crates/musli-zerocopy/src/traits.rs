@@ -5,14 +5,14 @@
 //! Please see their corresponding safety documentation or use the
 //! [`ZeroCopy`][derive@crate::ZeroCopy] derive.
 //!
-//! * [`ZeroCopy`] for types which can safely be coerced from a [`Ref<P>`] to
+//! * [`ZeroCopy`] for types which can safely be coerced from a [`Ref<T>`] to
 //!   `&T` or `&mut T`.
 //! * [`UnsizedZeroCopy`] for types which can safely be coerced from an
-//!   [`Ref<P>`] where `T: ?Sized` to `&T` or `&mut T`.
+//!   [`Ref<T>`] where `T: ?Sized` to `&T` or `&mut T`.
 //! * [`ZeroSized`] for types which can be ignored when deriving
 //!   [`ZeroCopy`][derive@crate::ZeroCopy] using `#[zero_copy(ignore)]`.
 //!
-//! [`Ref<P>`]: crate::pointer::Ref
+//! [`Ref<T>`]: crate::pointer::Ref
 
 #![allow(clippy::missing_safety_doc)]
 
@@ -37,14 +37,14 @@ mod sealed {
     impl<T> Sealed for [T] where T: ZeroCopy {}
 }
 
-/// Trait governing which `P` in [`Ref<P>`] where `P: ?Sized` the wrapper can
+/// Trait governing which `P` in [`Ref<T>`] where `P: ?Sized` the wrapper can
 /// handle.
 ///
 /// We only support slice-like, unaligned unsized types, such as `str` and
 /// `[u8]`. We can't support types such as `dyn Debug` because metadata is a
 /// vtable which can't be serialized.
 ///
-/// [`Ref<P>`]: crate::pointer::Ref
+/// [`Ref<T>`]: crate::pointer::Ref
 ///
 /// # Safety
 ///

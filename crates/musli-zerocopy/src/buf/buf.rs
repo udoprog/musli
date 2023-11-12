@@ -826,13 +826,13 @@ impl Buf {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn swap<P, E: ByteOrder, O: Size>(
+    pub fn swap<T, E: ByteOrder, O: Size>(
         &mut self,
-        a: Ref<P, E, O>,
-        b: Ref<P, E, O>,
+        a: Ref<T, E, O>,
+        b: Ref<T, E, O>,
     ) -> Result<(), Error>
     where
-        P: ZeroCopy,
+        T: ZeroCopy,
     {
         let a = a.offset();
         let b = b.offset();
@@ -842,7 +842,7 @@ impl Buf {
         }
 
         let start = a.max(b);
-        let end = start + size_of::<P>();
+        let end = start + size_of::<T>();
 
         if end > self.data.len() {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
@@ -855,16 +855,16 @@ impl Buf {
         // ensuring to utilize the appropriate copy primitive depending on
         // whether two values may or may not overlap.
         unsafe {
-            let mut tmp = MaybeUninit::<P>::uninit();
+            let mut tmp = MaybeUninit::<T>::uninit();
             let base = self.data.as_mut_ptr();
 
             let tmp = tmp.as_mut_ptr().cast::<u8>();
             let a = base.add(a);
             let b = base.add(b);
 
-            tmp.copy_from_nonoverlapping(a, size_of::<P>());
-            a.copy_from(b, size_of::<P>());
-            b.copy_from_nonoverlapping(tmp, size_of::<P>());
+            tmp.copy_from_nonoverlapping(a, size_of::<T>());
+            a.copy_from(b, size_of::<T>());
+            b.copy_from_nonoverlapping(tmp, size_of::<T>());
         }
 
         Ok(())
