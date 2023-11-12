@@ -4,7 +4,7 @@ use core::mem::size_of;
 use crate::buf::{Buf, Load};
 use crate::endian::{ByteOrder, Native};
 use crate::error::{Error, ErrorKind, IntoRepr};
-use crate::pointer::{Pointee, Ref, Size};
+use crate::pointer::{Ref, Size};
 use crate::slice::Slice;
 use crate::{DefaultSize, ZeroCopy};
 
@@ -115,7 +115,7 @@ where
     #[inline]
     pub fn from_ref<A: ByteOrder, B: Size>(slice: Ref<[T], A, B>) -> Self
     where
-        T: Pointee<B>,
+        T: ZeroCopy,
     {
         Self::from_raw_parts(slice.offset(), slice.len())
     }

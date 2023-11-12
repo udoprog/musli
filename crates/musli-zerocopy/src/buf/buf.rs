@@ -708,7 +708,7 @@ impl Buf {
         unsize: Ref<P, E, O>,
     ) -> Result<&P, Error>
     where
-        P: Pointee<O, Packed = O> + UnsizedZeroCopy<P, O>,
+        P: Pointee + UnsizedZeroCopy<P, O>,
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();
@@ -729,7 +729,7 @@ impl Buf {
         unsize: Ref<P, E, O>,
     ) -> Result<&mut P, Error>
     where
-        P: Pointee<O, Packed = O> + UnsizedZeroCopy<P, O>,
+        P: Pointee + UnsizedZeroCopy<P, O>,
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();
