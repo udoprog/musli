@@ -1,5 +1,21 @@
 use crate::ZeroCopy;
 
+/// A type that can inhabit a packed representation.
+pub trait Packable: Sized {
+    /// The packed representation of the item.
+    type Packed<O>: Copy + ZeroCopy
+    where
+        O: Copy + ZeroCopy;
+}
+
+impl Packable for () {
+    type Packed<O> = () where O: Copy + ZeroCopy;
+}
+
+impl Packable for usize {
+    type Packed<O> = O where O: Copy + ZeroCopy;
+}
+
 /// The trait for a value that can be pointed to by a [`Ref<P>`].
 ///
 /// This ultimately determines the layout of [`Ref<P>`] as for unsized types it
@@ -15,35 +31,25 @@ use crate::ZeroCopy;
 /// ```
 ///
 /// [`Ref<P>`]: crate::Ref
-pub trait Pointee<O: ?Sized> {
+pub trait Pointee {
     /// Metadata associated with the pointee.
-    type Metadata: Copy;
-
-    /// The packed representation of the pointer metadata.
-    type Packed: Copy;
+    type Metadata: Packable;
 }
 
-impl<T, O> Pointee<O> for T
+impl<T> Pointee for T
 where
     T: ZeroCopy,
 {
     type Metadata = ();
-    type Packed = ();
 }
 
-impl<T, O> Pointee<O> for [T]
+impl<T> Pointee for [T]
 where
     T: ZeroCopy,
-    O: Copy,
 {
     type Metadata = usize;
-    type Packed = O;
 }
 
-impl<O> Pointee<O> for str
-where
-    O: Copy,
-{
+impl Pointee for str {
     type Metadata = usize;
-    type Packed = O;
 }

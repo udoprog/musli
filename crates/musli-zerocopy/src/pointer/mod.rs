@@ -24,5 +24,5 @@ mod size;
 pub use self::r#ref::Ref;
 mod r#ref;
 
-pub use self::pointee::Pointee;
+pub use self::pointee::{Packable, Pointee};
 mod pointee;

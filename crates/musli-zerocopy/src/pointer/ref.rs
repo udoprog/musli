@@ -7,7 +7,7 @@ use core::{any, fmt};
 use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::error::{Error, ErrorKind, IntoRepr};
 use crate::mem::MaybeUninit;
-use crate::pointer::{DefaultSize, Pointee, Size};
+use crate::pointer::{DefaultSize, Packable, Pointee, Size};
 use crate::ZeroCopy;
 
 /// A stored reference to a type `T`.
@@ -41,21 +41,20 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, swap_bytes, bounds = {T::Packed: ZeroCopy})]
+#[zero_copy(crate, swap_bytes, bounds = {<T::Metadata as Packable>::Packed<O>: ZeroCopy})]
 pub struct Ref<T: ?Sized, E: ByteOrder = Native, O: Size = DefaultSize>
 where
-    T: Pointee<O>,
+    T: Pointee,
 {
     offset: O,
-    metadata: T::Packed,
+    metadata: <T::Metadata as Packable>::Packed<O>,
     #[zero_copy(ignore)]
     _marker: PhantomData<(E, T)>,
 }
 
 impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    T: Pointee<O>,
-    T::Packed: ZeroCopy,
+    T: Pointee,
 {
     /// Convert this reference into a [`Big`]-endian [`ByteOrder`].
     ///
@@ -148,8 +147,7 @@ where
 
 impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    T: Pointee<O>,
-    T::Packed: ZeroCopy,
+    T: Pointee,
 {
     /// Construct a reference with custom metadata.
     ///
@@ -183,7 +181,7 @@ where
         U: Copy + fmt::Debug,
         M: Copy + fmt::Debug,
         O: TryFrom<U>,
-        T::Packed: TryFrom<M>,
+        <T::Metadata as Packable>::Packed<O>: TryFrom<M>,
     {
         assert!(
             O::CAN_SWAP_BYTES,
@@ -192,7 +190,7 @@ where
         );
 
         assert!(
-            T::Packed::CAN_SWAP_BYTES,
+            <T::Metadata as Packable>::Packed::<O>::CAN_SWAP_BYTES,
             "Packed metadata `{}` cannot be byte-ordered since it would not inhabit valid types",
             any::type_name::<T::Metadata>()
         );
@@ -201,13 +199,13 @@ where
             panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
         };
 
-        let Some(metadata) = T::Packed::try_from(metadata).ok() else {
+        let Some(metadata) = <T::Metadata as Packable>::Packed::<O>::try_from(metadata).ok() else {
             panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
         };
 
         Self {
             offset: O::swap_bytes::<E>(offset),
-            metadata: T::Packed::swap_bytes::<E>(metadata),
+            metadata: <T::Metadata as Packable>::Packed::<O>::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         }
     }
@@ -244,7 +242,7 @@ where
         U: Copy + IntoRepr + fmt::Debug,
         M: Copy + IntoRepr + fmt::Debug,
         O: TryFrom<U>,
-        T::Packed: TryFrom<M>,
+        <T::Metadata as Packable>::Packed<O>: TryFrom<M>,
     {
         if !O::CAN_SWAP_BYTES {
             return Err(Error::new(ErrorKind::InvalidOffset {
@@ -252,10 +250,10 @@ where
             }));
         }
 
-        if !T::Packed::CAN_SWAP_BYTES {
+        if !<T::Metadata as Packable>::Packed::<O>::CAN_SWAP_BYTES {
             return Err(Error::new(ErrorKind::InvalidMetadata {
                 ty: any::type_name::<T::Metadata>(),
-                packed: any::type_name::<T::Packed>(),
+                packed: any::type_name::<<T::Metadata as Packable>::Packed<O>>(),
             }));
         }
 
@@ -266,7 +264,7 @@ where
             }));
         };
 
-        let Some(metadata) = T::Packed::try_from(metadata).ok() else {
+        let Some(metadata) = <T::Metadata as Packable>::Packed::<O>::try_from(metadata).ok() else {
             return Err(Error::new(ErrorKind::InvalidMetadataRange {
                 metadata: M::into_repr(metadata),
                 max: O::into_repr(O::MAX),
@@ -275,7 +273,7 @@ where
 
         Ok(Self {
             offset: O::swap_bytes::<E>(offset),
-            metadata: T::Packed::swap_bytes::<E>(metadata),
+            metadata: <T::Metadata as Packable>::Packed::<O>::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         })
     }
@@ -538,7 +536,7 @@ impl<T: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<T, E, O> {
 
 impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    T: Pointee<O>,
+    T: Pointee,
 {
     /// The number of elements in the slice.
     ///
@@ -551,14 +549,14 @@ where
     /// assert_eq!(slice.metadata(), 10);
     /// ```
     #[inline]
-    pub fn metadata(self) -> T::Packed {
+    pub fn metadata(self) -> <T::Metadata as Packable>::Packed<O> {
         self.metadata
     }
 }
 
 impl<T, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    T: Pointee<O, Packed = ()>,
+    T: Pointee<Metadata = ()>,
 {
     /// Construct a reference at the given offset.
     ///
@@ -624,7 +622,7 @@ where
 
 impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    T: Pointee<O>,
+    T: Pointee,
 {
     /// Get the offset the reference points to.
     ///
@@ -665,7 +663,7 @@ where
     /// ```
     pub fn cast<U: ?Sized>(self) -> Ref<U, E, O>
     where
-        U: Pointee<O, Packed = T::Packed>,
+        U: Pointee<Metadata = T::Metadata>,
     {
         Ref {
             offset: self.offset,
@@ -702,7 +700,7 @@ where
 
 impl<T, E: ByteOrder, O: Size> Ref<MaybeUninit<T>, E, O>
 where
-    T: Pointee<O>,
+    T: Pointee,
 {
     /// Assume that the reference is initialized.
     ///
@@ -720,8 +718,8 @@ where
 
 impl<T: ?Sized, E: ByteOrder, O: Size> fmt::Debug for Ref<T, E, O>
 where
-    T: Pointee<O>,
-    T::Packed: fmt::Debug,
+    T: Pointee,
+    <T::Metadata as Packable>::Packed<O>: fmt::Debug,
     O: fmt::Debug,
 {
     #[inline]
@@ -738,7 +736,7 @@ where
 
 impl<T: ?Sized, E: ByteOrder, O: Size> Clone for Ref<T, E, O>
 where
-    T: Pointee<O>,
+    T: Pointee,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -746,13 +744,13 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Copy for Ref<T, E, O> where T: Pointee<O> {}
+impl<T: ?Sized, E: ByteOrder, O: Size> Copy for Ref<T, E, O> where T: Pointee {}
 
 impl<T: ?Sized, E: ByteOrder, O: Size> PartialEq for Ref<T, E, O>
 where
-    T: Pointee<O>,
-    T::Packed: PartialEq,
+    T: Pointee,
     O: PartialEq,
+    <T::Metadata as Packable>::Packed<O>: PartialEq,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -762,17 +760,17 @@ where
 
 impl<T: ?Sized, E: ByteOrder, O: Size> Eq for Ref<T, E, O>
 where
-    T: Pointee<O>,
-    T::Packed: Eq,
+    T: Pointee,
     O: Eq,
+    <T::Metadata as Packable>::Packed<O>: Eq,
 {
 }
 
 impl<T: ?Sized, E: ByteOrder, O: Size> PartialOrd for Ref<T, E, O>
 where
-    T: Pointee<O>,
-    T::Packed: PartialOrd,
+    T: Pointee,
     O: Ord,
+    <T::Metadata as Packable>::Packed<O>: PartialOrd,
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -787,9 +785,9 @@ where
 
 impl<T: ?Sized, E: ByteOrder, O: Size> Ord for Ref<T, E, O>
 where
-    T: Pointee<O>,
-    T::Packed: Ord,
+    T: Pointee,
     O: Ord,
+    <T::Metadata as Packable>::Packed<O>: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
@@ -804,9 +802,9 @@ where
 
 impl<T: ?Sized, E: ByteOrder, O: Size> Hash for Ref<T, E, O>
 where
-    T: Pointee<O>,
-    T::Packed: Hash,
+    T: Pointee,
     O: Hash,
+    <T::Metadata as Packable>::Packed<O>: Hash,
 {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {

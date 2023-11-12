@@ -39,7 +39,7 @@ pub trait StoreBuf: self::sealed::Sealed {
     #[doc(hidden)]
     fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
-        P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
+        P: Pointee<Metadata = usize>,
         P: UnsizedZeroCopy<P, Self::Size>;
 
     /// Store a [`ZeroCopy`] value.

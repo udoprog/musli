@@ -1,7 +1,7 @@
 use crate::buf::Buf;
 use crate::endian::ByteOrder;
 use crate::error::Error;
-use crate::pointer::{Pointee, Ref, Size};
+use crate::pointer::{Ref, Size};
 use crate::traits::ZeroCopy;
 
 /// Trait used for loading any kind of reference through [`Buf::load`].
@@ -47,7 +47,6 @@ where
 
 impl<T, E: ByteOrder, O: Size> Load for Ref<[T], E, O>
 where
-    [T]: Pointee<O, Packed = O, Metadata = usize>,
     T: ZeroCopy,
 {
     type Target = [T];
@@ -79,7 +78,6 @@ where
 
 impl<T, E: ByteOrder, O: Size> LoadMut for Ref<[T], E, O>
 where
-    [T]: Pointee<O, Packed = O, Metadata = usize>,
     T: ZeroCopy,
 {
     #[inline]

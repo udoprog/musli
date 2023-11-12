@@ -54,7 +54,7 @@ pub fn store<S, E: ByteOrder, O: Size, I, T>(
 where
     I: IntoIterator<Item = (Ref<S, E, O>, T)>,
     T: ZeroCopy,
-    S: ?Sized + Pointee<O, Packed = <[u8] as Pointee<O>>::Packed>,
+    S: ?Sized + Pointee<Metadata = <[u8] as Pointee>::Metadata>,
 {
     // First step is to construct the trie in-memory.
     let mut trie = Builder::with_flavor();
@@ -132,7 +132,7 @@ impl<T, F: Flavor> Builder<T, F> {
         value: T,
     ) -> Result<(), Error>
     where
-        S: ?Sized + Pointee<O, Packed = <[u8] as Pointee<O>>::Packed>,
+        S: ?Sized + Pointee<Metadata = <[u8] as Pointee>::Metadata>,
     {
         let mut string = string.cast::<[u8]>();
         let mut current = buf.load(string)?;

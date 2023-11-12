@@ -705,7 +705,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     #[inline]
     pub fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, E, O>
     where
-        P: Pointee<O, Packed = O, Metadata = usize>,
+        P: Pointee<Metadata = usize>,
         P: UnsizedZeroCopy<P, O>,
     {
         unsafe {
@@ -756,7 +756,6 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     #[inline(always)]
     pub fn store_slice<T>(&mut self, values: &[T]) -> Ref<[T], E, O>
     where
-        [T]: Pointee<O, Packed = O, Metadata = usize>,
         T: ZeroCopy,
     {
         self.store_unsized(values)
@@ -1277,7 +1276,7 @@ impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
     #[inline]
     fn store_unsized<P: ?Sized>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
     where
-        P: Pointee<Self::Size, Packed = Self::Size, Metadata = usize>,
+        P: Pointee<Metadata = usize>,
         P: UnsizedZeroCopy<P, Self::Size>,
     {
         OwnedBuf::store_unsized(self, value)
