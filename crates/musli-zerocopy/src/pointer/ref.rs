@@ -10,7 +10,7 @@ use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Pointee, Size};
 use crate::ZeroCopy;
 
-/// A stored reference to a type `P`.
+/// A stored reference to a type `T`.
 ///
 /// A reference is made up of two components:
 /// * An [`offset()`] indicating the absolute offset into a [`Buf`] where the
@@ -41,21 +41,21 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, swap_bytes, bounds = {P::Packed: ZeroCopy})]
-pub struct Ref<P: ?Sized, E: ByteOrder = Native, O: Size = DefaultSize>
+#[zero_copy(crate, swap_bytes, bounds = {T::Packed: ZeroCopy})]
+pub struct Ref<T: ?Sized, E: ByteOrder = Native, O: Size = DefaultSize>
 where
-    P: Pointee<O>,
+    T: Pointee<O>,
 {
     offset: O,
-    metadata: P::Packed,
+    metadata: T::Packed,
     #[zero_copy(ignore)]
-    _marker: PhantomData<(E, P)>,
+    _marker: PhantomData<(E, T)>,
 }
 
-impl<P: ?Sized, E: ByteOrder, O: Size> Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    P: Pointee<O>,
-    P::Packed: ZeroCopy,
+    T: Pointee<O>,
+    T::Packed: ZeroCopy,
 {
     /// Convert this reference into a [`Big`]-endian [`ByteOrder`].
     ///
@@ -74,7 +74,7 @@ where
     /// assert_eq!(r.offset(), 10);
     /// ```
     #[inline]
-    pub fn to_be(self) -> Ref<P, Big, O> {
+    pub fn to_be(self) -> Ref<T, Big, O> {
         self.to_endian()
     }
 
@@ -95,7 +95,7 @@ where
     /// assert_eq!(r.offset(), 10);
     /// ```
     #[inline]
-    pub fn to_le(self) -> Ref<P, Little, O> {
+    pub fn to_le(self) -> Ref<T, Little, O> {
         self.to_endian()
     }
 
@@ -116,7 +116,7 @@ where
     /// assert_eq!(r.offset(), 10);
     /// ```
     #[inline]
-    pub fn to_ne(self) -> Ref<P, Native, O> {
+    pub fn to_ne(self) -> Ref<T, Native, O> {
         self.to_endian()
     }
 
@@ -137,7 +137,7 @@ where
     /// assert_eq!(r.offset(), 10);
     /// ```
     #[inline]
-    pub fn to_endian<U: ByteOrder>(self) -> Ref<P, U, O> {
+    pub fn to_endian<U: ByteOrder>(self) -> Ref<T, U, O> {
         Ref {
             offset: self.offset.transpose_bytes::<E, U>(),
             metadata: self.metadata.transpose_bytes::<E, U>(),
@@ -146,10 +146,10 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    P: Pointee<O>,
-    P::Packed: ZeroCopy,
+    T: Pointee<O>,
+    T::Packed: ZeroCopy,
 {
     /// Construct a reference with custom metadata.
     ///
@@ -159,11 +159,11 @@ where
     /// * The `offset` or `metadata` can't be byte swapped as per
     ///   [`ZeroCopy::CAN_SWAP_BYTES`].
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
-    /// * Packed [`metadata()`] cannot be constructed from `P::Metadata` (reason
+    /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
     ///
-    /// To guarantee that this constructor will never panic, [`Ref<T, usize,
-    /// E>`] can be used.
+    /// To guarantee that this constructor will never panic, [`Ref<T, E,
+    /// usize>`] can be used. This also ensures that construction is a no-op.
     ///
     /// [`offset()`]: Ref::offset
     /// [`metadata()`]: Ref::metadata
@@ -183,7 +183,7 @@ where
         U: Copy + fmt::Debug,
         M: Copy + fmt::Debug,
         O: TryFrom<U>,
-        P::Packed: TryFrom<M>,
+        T::Packed: TryFrom<M>,
     {
         assert!(
             O::CAN_SWAP_BYTES,
@@ -192,22 +192,22 @@ where
         );
 
         assert!(
-            P::Packed::CAN_SWAP_BYTES,
+            T::Packed::CAN_SWAP_BYTES,
             "Packed metadata `{}` cannot be byte-ordered since it would not inhabit valid types",
-            any::type_name::<P::Metadata>()
+            any::type_name::<T::Metadata>()
         );
 
         let Some(offset) = O::try_from(offset).ok() else {
             panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
         };
 
-        let Some(metadata) = P::Packed::try_from(metadata).ok() else {
+        let Some(metadata) = T::Packed::try_from(metadata).ok() else {
             panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
         };
 
         Self {
             offset: O::swap_bytes::<E>(offset),
-            metadata: P::Packed::swap_bytes::<E>(metadata),
+            metadata: T::Packed::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         }
     }
@@ -220,11 +220,11 @@ where
     /// * The `offset` or `metadata` can't be byte swapped as per
     ///   [`ZeroCopy::CAN_SWAP_BYTES`].
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
-    /// * Packed [`metadata()`] cannot be constructed from `P::Metadata` (reason
+    /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
     ///
-    /// To guarantee that this constructor will never panic, [`Ref<T, usize,
-    /// E>`] can be used.
+    /// To guarantee that this constructor will never error, [`Ref<T, Native,
+    /// usize>`] can be used. This also ensures that construction is a no-op.
     ///
     /// [`offset()`]: Ref::offset
     /// [`metadata()`]: Ref::metadata
@@ -244,7 +244,7 @@ where
         U: Copy + IntoRepr + fmt::Debug,
         M: Copy + IntoRepr + fmt::Debug,
         O: TryFrom<U>,
-        P::Packed: TryFrom<M>,
+        T::Packed: TryFrom<M>,
     {
         if !O::CAN_SWAP_BYTES {
             return Err(Error::new(ErrorKind::InvalidOffset {
@@ -252,10 +252,10 @@ where
             }));
         }
 
-        if !P::Packed::CAN_SWAP_BYTES {
+        if !T::Packed::CAN_SWAP_BYTES {
             return Err(Error::new(ErrorKind::InvalidMetadata {
-                ty: any::type_name::<P::Metadata>(),
-                packed: any::type_name::<P::Packed>(),
+                ty: any::type_name::<T::Metadata>(),
+                packed: any::type_name::<T::Packed>(),
             }));
         }
 
@@ -266,7 +266,7 @@ where
             }));
         };
 
-        let Some(metadata) = P::Packed::try_from(metadata).ok() else {
+        let Some(metadata) = T::Packed::try_from(metadata).ok() else {
             return Err(Error::new(ErrorKind::InvalidMetadataRange {
                 metadata: M::into_repr(metadata),
                 max: O::into_repr(O::MAX),
@@ -275,17 +275,17 @@ where
 
         Ok(Self {
             offset: O::swap_bytes::<E>(offset),
-            metadata: P::Packed::swap_bytes::<E>(metadata),
+            metadata: T::Packed::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         })
     }
 }
 
-impl<P, O: Size, E: ByteOrder> Ref<[P], E, O>
+impl<T, E: ByteOrder, O: Size> Ref<[T], E, O>
 where
-    P: ZeroCopy,
+    T: ZeroCopy,
 {
-    /// Return the number of elements in the slice `[P]`.
+    /// Return the number of elements in the slice `[T]`.
     ///
     /// # Examples
     ///
@@ -300,7 +300,7 @@ where
         self.metadata.as_usize::<E>()
     }
 
-    /// Test if the slice `[P]` is empty.
+    /// Test if the slice `[T]` is empty.
     ///
     /// # Examples
     ///
@@ -338,12 +338,12 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn get(self, index: usize) -> Option<Ref<P, E, O>> {
+    pub fn get(self, index: usize) -> Option<Ref<T, E, O>> {
         if index >= self.len() {
             return None;
         }
 
-        let offset = self.offset.as_usize::<E>() + size_of::<P>() * index;
+        let offset = self.offset.as_usize::<E>() + size_of::<T>() * index;
         Some(Ref::new(offset))
     }
 
@@ -373,8 +373,8 @@ where
     /// assert!(buf.load(oob).is_err());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn get_unchecked(self, index: usize) -> Ref<P, E, O> {
-        let offset = self.offset.as_usize::<E>() + size_of::<P>() * index;
+    pub fn get_unchecked(self, index: usize) -> Ref<T, E, O> {
+        let offset = self.offset.as_usize::<E>() + size_of::<T>() * index;
         Ref::new(offset)
     }
 
@@ -409,7 +409,7 @@ where
         let len = self.len();
         assert!(at <= len, "Split point {at} is out of bounds 0..={len}");
         let a = Self::with_metadata(offset, at);
-        let b = Self::with_metadata(offset + at * size_of::<P>(), len - at);
+        let b = Self::with_metadata(offset + at * size_of::<T>(), len - at);
         (a, b)
     }
 
@@ -417,7 +417,7 @@ where
     /// index is out-of-bounds.
     #[inline]
     #[cfg(feature = "alloc")]
-    pub(crate) fn at(self, index: usize) -> Ref<P, E, O> {
+    pub(crate) fn at(self, index: usize) -> Ref<T, E, O> {
         let Some(r) = self.get(index) else {
             panic!("Index {index} out of bounds 0-{}", self.len());
         };
@@ -453,9 +453,9 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn iter(self) -> Iter<P, E, O> {
+    pub fn iter(self) -> Iter<T, E, O> {
         let start = self.offset.as_usize::<E>();
-        let end = start + self.metadata.as_usize::<E>() * size_of::<P>();
+        let end = start + self.metadata.as_usize::<E>() * size_of::<T>();
 
         Iter {
             start,
@@ -465,7 +465,7 @@ where
     }
 }
 
-impl<O: Size, E: ByteOrder> Ref<str, E, O> {
+impl<E: ByteOrder, O: Size> Ref<str, E, O> {
     /// Return the length of the string.
     ///
     /// # Examples
@@ -481,7 +481,7 @@ impl<O: Size, E: ByteOrder> Ref<str, E, O> {
         self.metadata.as_usize::<E>()
     }
 
-    /// Test if the slice `[P]` is empty.
+    /// Test if the slice `[T]` is empty.
     ///
     /// # Examples
     ///
@@ -500,17 +500,17 @@ impl<O: Size, E: ByteOrder> Ref<str, E, O> {
     }
 }
 
-/// An iterator over a `Ref<[P]>` which produces `Ref<P>` values.
+/// An iterator over a `Ref<[T]>` which produces `Ref<T>` values.
 ///
-/// See [Ref::<[P]>::iter].
-pub struct Iter<P, E, O> {
+/// See [Ref::<[T]>::iter].
+pub struct Iter<T, E, O> {
     start: usize,
     end: usize,
-    _marker: PhantomData<(P, E, O)>,
+    _marker: PhantomData<(T, E, O)>,
 }
 
-impl<P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<P, E, O> {
-    type Item = Ref<P, E, O>;
+impl<T: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<T, E, O> {
+    type Item = Ref<T, E, O>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -519,26 +519,26 @@ impl<P: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<P, E, O> {
         }
 
         let start = self.start;
-        self.start += size_of::<P>();
+        self.start += size_of::<T>();
         Some(Ref::new(start))
     }
 }
 
-impl<P: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<P, E, O> {
+impl<T: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<T, E, O> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.start == self.end {
             return None;
         }
 
-        self.end -= size_of::<P>();
+        self.end -= size_of::<T>();
         Some(Ref::new(self.end))
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    P: Pointee<O>,
+    T: Pointee<O>,
 {
     /// The number of elements in the slice.
     ///
@@ -551,14 +551,14 @@ where
     /// assert_eq!(slice.metadata(), 10);
     /// ```
     #[inline]
-    pub fn metadata(self) -> P::Packed {
+    pub fn metadata(self) -> T::Packed {
         self.metadata
     }
 }
 
-impl<P, O: Size, E: ByteOrder> Ref<P, E, O>
+impl<T, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    P: Pointee<O, Packed = ()>,
+    T: Pointee<O, Packed = ()>,
 {
     /// Construct a reference at the given offset.
     ///
@@ -622,9 +622,9 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
 where
-    P: Pointee<O>,
+    T: Pointee<O>,
 {
     /// Get the offset the reference points to.
     ///
@@ -645,7 +645,7 @@ where
     ///
     /// This statically checks that the metadata for the pointers are the same
     /// to prevent casts over completely different references. For now this only
-    /// prevents `Ref<P>` to `Ref<[U]>` casts:
+    /// prevents `Ref<T>` to `Ref<[U]>` casts:
     ///
     /// ```compile_fail
     /// use musli_zerocopy::Ref;
@@ -665,7 +665,7 @@ where
     /// ```
     pub fn cast<U: ?Sized>(self) -> Ref<U, E, O>
     where
-        U: Pointee<O, Packed = P::Packed>,
+        U: Pointee<O, Packed = T::Packed>,
     {
         Ref {
             offset: self.offset,
@@ -675,9 +675,9 @@ where
     }
 }
 
-impl<P, const N: usize, O: Size, E: ByteOrder> Ref<[P; N], E, O>
+impl<T, const N: usize, E: ByteOrder, O: Size> Ref<[T; N], E, O>
 where
-    P: ZeroCopy,
+    T: ZeroCopy,
 {
     /// Coerce a reference to an array into a slice.
     ///
@@ -695,21 +695,21 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn array_into_slice(self) -> Ref<[P], E, O> {
+    pub fn array_into_slice(self) -> Ref<[T], E, O> {
         Ref::with_metadata(self.offset, N)
     }
 }
 
-impl<P, O: Size, E: ByteOrder> Ref<MaybeUninit<P>, E, O>
+impl<T, E: ByteOrder, O: Size> Ref<MaybeUninit<T>, E, O>
 where
-    P: Pointee<O>,
+    T: Pointee<O>,
 {
     /// Assume that the reference is initialized.
     ///
     /// Unlike the counterpart in Rust, this isn't actually unsafe. Because in
     /// order to load the reference again we'd have to validate it anyways.
     #[inline]
-    pub const fn assume_init(self) -> Ref<P, E, O> {
+    pub const fn assume_init(self) -> Ref<T, E, O> {
         Ref {
             offset: self.offset,
             metadata: self.metadata,
@@ -718,10 +718,10 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> fmt::Debug for Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> fmt::Debug for Ref<T, E, O>
 where
-    P: Pointee<O>,
-    P::Packed: fmt::Debug,
+    T: Pointee<O>,
+    T::Packed: fmt::Debug,
     O: fmt::Debug,
 {
     #[inline]
@@ -729,16 +729,16 @@ where
         write!(
             f,
             "Ref<{}> {{ offset: {:?}, metadata: {:?} }}",
-            core::any::type_name::<P>(),
+            core::any::type_name::<T>(),
             self.offset,
             self.metadata,
         )
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Clone for Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> Clone for Ref<T, E, O>
 where
-    P: Pointee<O>,
+    T: Pointee<O>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -746,12 +746,12 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Copy for Ref<P, E, O> where P: Pointee<O> {}
+impl<T: ?Sized, E: ByteOrder, O: Size> Copy for Ref<T, E, O> where T: Pointee<O> {}
 
-impl<P: ?Sized, O: Size, E: ByteOrder> PartialEq for Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> PartialEq for Ref<T, E, O>
 where
-    P: Pointee<O>,
-    P::Packed: PartialEq,
+    T: Pointee<O>,
+    T::Packed: PartialEq,
     O: PartialEq,
 {
     #[inline]
@@ -760,18 +760,18 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Eq for Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> Eq for Ref<T, E, O>
 where
-    P: Pointee<O>,
-    P::Packed: Eq,
+    T: Pointee<O>,
+    T::Packed: Eq,
     O: Eq,
 {
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> PartialOrd for Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> PartialOrd for Ref<T, E, O>
 where
-    P: Pointee<O>,
-    P::Packed: PartialOrd,
+    T: Pointee<O>,
+    T::Packed: PartialOrd,
     O: Ord,
 {
     #[inline]
@@ -785,10 +785,10 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Ord for Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> Ord for Ref<T, E, O>
 where
-    P: Pointee<O>,
-    P::Packed: Ord,
+    T: Pointee<O>,
+    T::Packed: Ord,
     O: Ord,
 {
     #[inline]
@@ -802,10 +802,10 @@ where
     }
 }
 
-impl<P: ?Sized, O: Size, E: ByteOrder> Hash for Ref<P, E, O>
+impl<T: ?Sized, E: ByteOrder, O: Size> Hash for Ref<T, E, O>
 where
-    P: Pointee<O>,
-    P::Packed: Hash,
+    T: Pointee<O>,
+    T::Packed: Hash,
     O: Hash,
 {
     #[inline]
