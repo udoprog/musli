@@ -4,11 +4,51 @@ use core::fmt;
 use core::ops::{Range, RangeFrom};
 use core::str::Utf8Error;
 
-/// Indicates the representation that was tried to coerce into an enum.
+mod sealed {
+    pub trait Sealed {}
+}
+
+/// Helper trait to convert any type into a type-erased [`Repr`] used for diagnostics.
+pub trait IntoRepr: self::sealed::Sealed {
+    #[doc(hidden)]
+    fn into_repr(self) -> Repr;
+}
+
+macro_rules! impl_into_repr {
+    ($($ty:ty, $repr:ident),* $(,)?) => {
+        $(
+        impl self::sealed::Sealed for $ty {
+        }
+
+        impl IntoRepr for $ty {
+            fn into_repr(self) -> Repr {
+                Repr {
+                    kind: ReprKind::$repr(self),
+                }
+            }
+        }
+        )*
+    }
+}
+
+impl_into_repr! {
+    u8, U8,
+    u16, U16,
+    u32, U32,
+    u64, U64,
+    u128, U128,
+    usize, Usize,
+    i8, I8,
+    i16, I16,
+    i32, I32,
+    i64, I64,
+    i128, I128,
+    isize, Isize,
+}
+
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
-#[non_exhaustive]
-pub(crate) enum EnumRepr {
+enum ReprKind {
     U8(u8),
     U16(u16),
     U32(u32),
@@ -23,21 +63,29 @@ pub(crate) enum EnumRepr {
     Isize(isize),
 }
 
-impl fmt::Display for EnumRepr {
+/// Indicates the representation that was tried to coerce into an enum.
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+#[non_exhaustive]
+pub struct Repr {
+    kind: ReprKind,
+}
+
+impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EnumRepr::U8(value) => write!(f, "{value}u8"),
-            EnumRepr::U16(value) => write!(f, "{value}u16"),
-            EnumRepr::U32(value) => write!(f, "{value}u32"),
-            EnumRepr::U64(value) => write!(f, "{value}u64"),
-            EnumRepr::U128(value) => write!(f, "{value}u128"),
-            EnumRepr::I8(value) => write!(f, "{value}i8"),
-            EnumRepr::I16(value) => write!(f, "{value}i16"),
-            EnumRepr::I32(value) => write!(f, "{value}i32"),
-            EnumRepr::I64(value) => write!(f, "{value}i64"),
-            EnumRepr::I128(value) => write!(f, "{value}i128"),
-            EnumRepr::Usize(value) => write!(f, "{value}usize"),
-            EnumRepr::Isize(value) => write!(f, "{value}isize"),
+        match &self.kind {
+            ReprKind::U8(value) => write!(f, "{value}u8"),
+            ReprKind::U16(value) => write!(f, "{value}u16"),
+            ReprKind::U32(value) => write!(f, "{value}u32"),
+            ReprKind::U64(value) => write!(f, "{value}u64"),
+            ReprKind::U128(value) => write!(f, "{value}u128"),
+            ReprKind::I8(value) => write!(f, "{value}i8"),
+            ReprKind::I16(value) => write!(f, "{value}i16"),
+            ReprKind::I32(value) => write!(f, "{value}i32"),
+            ReprKind::I64(value) => write!(f, "{value}i64"),
+            ReprKind::I128(value) => write!(f, "{value}i128"),
+            ReprKind::Usize(value) => write!(f, "{value}usize"),
+            ReprKind::Isize(value) => write!(f, "{value}isize"),
         }
     }
 }
@@ -48,9 +96,11 @@ macro_rules! illegal_enum {
         /// representation has been encountered.
         #[doc(hidden)]
         pub fn $name<T>(repr: $ty) -> Self {
-            Self::new(ErrorKind::IllegalEnumRepr {
+            Self::new(ErrorKind::IllegalRepr {
                 name: type_name::<T>(),
-                repr: EnumRepr::$repr(repr),
+                repr: Repr {
+                    kind: ReprKind::$repr(repr),
+                },
             })
         }
     };
@@ -104,6 +154,21 @@ impl std::error::Error for Error {
 #[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]
 pub(crate) enum ErrorKind {
+    InvalidOffset {
+        ty: &'static str,
+    },
+    InvalidOffsetRange {
+        offset: Repr,
+        max: Repr,
+    },
+    InvalidMetadata {
+        ty: &'static str,
+        packed: &'static str,
+    },
+    InvalidMetadataRange {
+        metadata: Repr,
+        max: Repr,
+    },
     LengthOverflow {
         len: usize,
         size: usize,
@@ -144,9 +209,9 @@ pub(crate) enum ErrorKind {
         index: usize,
         len: usize,
     },
-    IllegalEnumRepr {
+    IllegalRepr {
         name: &'static str,
-        repr: EnumRepr,
+        repr: Repr,
     },
     IllegalChar {
         repr: u32,
@@ -157,6 +222,14 @@ pub(crate) enum ErrorKind {
     Utf8Error {
         error: Utf8Error,
     },
+    Underflow {
+        at: usize,
+        len: usize,
+    },
+    Overflow {
+        at: usize,
+        len: usize,
+    },
     #[cfg(feature = "alloc")]
     CapacityError,
     #[cfg(feature = "alloc")]
@@ -166,6 +239,24 @@ pub(crate) enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ErrorKind::InvalidOffset { ty } => {
+                write!(
+                    f,
+                    "Offset `{ty}` cannot be byte-ordered since it would not inhabit valid types",
+                )
+            }
+            ErrorKind::InvalidOffsetRange { offset, max } => {
+                write!(f, "Offset {offset} not in legal range 0-{max}",)
+            }
+            ErrorKind::InvalidMetadata { ty, packed } => {
+                write!(
+                    f,
+                    "Metadata `{ty}` once packed as `{packed}` cannot be byte-ordered since it would not inhabit valid types",
+                )
+            }
+            ErrorKind::InvalidMetadataRange { metadata, max } => {
+                write!(f, "Metadata {metadata} not in legal range 0-{max}")
+            }
             ErrorKind::LengthOverflow { len, size } => {
                 write!(
                     f,
@@ -208,7 +299,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::StrideOutOfBounds { index, len } => {
                 write!(f, "Stride at index {index} out of bound 0-{len}")
             }
-            ErrorKind::IllegalEnumRepr { name, repr } => {
+            ErrorKind::IllegalRepr { name, repr } => {
                 write!(f, "Illegal enum representation {repr} for enum {name}")
             }
             ErrorKind::IllegalChar { repr } => {
@@ -216,6 +307,12 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::IllegalBool { repr } => {
                 write!(f, "Illegal bool representation {repr}")
+            }
+            ErrorKind::Underflow { at, len } => {
+                write!(f, "Arithmetic underflow calculating {at} - {len}")
+            }
+            ErrorKind::Overflow { at, len } => {
+                write!(f, "Arithmetic overflow calculating {at} + {len}")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
             #[cfg(feature = "alloc")]

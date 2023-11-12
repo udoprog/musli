@@ -1,5 +1,6 @@
 use crate::buf::Load;
 use crate::endian::ByteOrder;
+use crate::error::Error;
 use crate::pointer::{Ref, Size};
 use crate::traits::ZeroCopy;
 
@@ -45,6 +46,27 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     where
         Self::Item: ZeroCopy;
 
+    /// Try to construct a slice from a [`Ref<[Self::Item]>`].
+    ///
+    /// # Errors
+    ///
+    /// This method errors if construction of the slice would overflow any of
+    /// its parameters.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{Error, Ref, ZeroCopy};
+    /// use musli_zerocopy::slice::Slice;
+    ///
+    /// fn generic<S>(r: Ref<[S::Item]>) -> Result<S, Error> where S: Slice, S::Item: ZeroCopy {
+    ///     S::try_from_ref(r)
+    /// }
+    /// ```
+    fn try_from_ref<E: ByteOrder, O: Size>(slice: Ref<[Self::Item], E, O>) -> Result<Self, Error>
+    where
+        Self::Item: ZeroCopy;
+
     /// Construct a slice from its `offset` and `len`.
     ///
     /// # Panics
@@ -63,6 +85,25 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     /// }
     /// ```
     fn with_metadata(offset: usize, len: usize) -> Self;
+
+    /// Construct a slice from its `offset` and `len`.
+    ///
+    /// # Errors
+    ///
+    /// This method errors if construction of the slice would overflow any of
+    /// its parameters.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    /// use musli_zerocopy::slice::Slice;
+    ///
+    /// fn generic<S>() -> S where S: Slice {
+    ///     S::with_metadata(0, 10)
+    /// }
+    /// ```
+    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, Error>;
 
     /// Try to get a reference directly out of the slice without validation.
     ///
@@ -168,6 +209,24 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     /// ```
     fn get_unchecked(self, index: usize) -> Self::ItemRef;
 
+    /// Get the offset the slice points to.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    /// use musli_zerocopy::slice::Slice;
+    ///
+    /// // A method generic over a specific slice implementation.
+    /// fn generic<S>(slice: S) where S: Slice {
+    ///     assert_eq!(slice.offset(), 42);
+    /// }
+    ///
+    /// let slice = Ref::<[i32]>::with_metadata(42, 2);
+    /// generic(slice);
+    /// ```
+    fn offset(self) -> usize;
+
     /// Return the number of elements in the slice.
     ///
     /// # Examples
@@ -219,15 +278,25 @@ where
     where
         T: ZeroCopy,
     {
-        Self::with_metadata(slice.offset(), slice.len())
+        Ref::with_metadata(slice.offset(), slice.len())
     }
 
     #[inline]
-    fn with_metadata(offset: usize, len: usize) -> Self
+    fn try_from_ref<E: ByteOrder, O: Size>(slice: Ref<[T], E, O>) -> Result<Self, Error>
     where
         T: ZeroCopy,
     {
-        Self::with_metadata(offset, len)
+        Ref::try_with_metadata(slice.offset(), slice.len())
+    }
+
+    #[inline]
+    fn with_metadata(offset: usize, len: usize) -> Self {
+        Ref::with_metadata(offset, len)
+    }
+
+    #[inline]
+    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, Error> {
+        Ref::try_with_metadata(offset, len)
     }
 
     #[inline]
@@ -243,6 +312,11 @@ where
     #[inline]
     fn get_unchecked(self, index: usize) -> Self::ItemRef {
         Ref::get_unchecked(self, index)
+    }
+
+    #[inline]
+    fn offset(self) -> usize {
+        Ref::<[T], _, _>::offset(self)
     }
 
     #[inline]
