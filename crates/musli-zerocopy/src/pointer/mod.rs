@@ -4,11 +4,11 @@
 //! in combination with methods such as [`Buf::load`] to load the pointer into a
 //! reference.
 //!
-//! * [`Ref<P>`] is a simple pointer to a typed reference, where `T` implements
+//! * [`Ref<T>`] is a simple pointer to a typed reference, where `T` implements
 //!   [`ZeroCopy`]. It loads into `&T`.
 //! * [`Ref<[T]>`] is a wide pointer encoding both a plain pointer and a length
 //!   where `T` implements [`ZeroCopy`]. It loads into `&[T]`.
-//! * [`Ref<P>`] where `T: ?Sized` is a wide pointer encoding both a plain
+//! * [`Ref<T>`] where `T: ?Sized` is a wide pointer encoding both a plain
 //!   pointer and a size to a typed reference where `T` implements
 //!   [`UnsizedZeroCopy`]. It loads into `&T` and is implemented by types such
 //!   as `str` and `[u8]`.`
@@ -24,5 +24,8 @@ mod size;
 pub use self::r#ref::Ref;
 mod r#ref;
 
-pub use self::pointee::{Packable, Pointee};
+pub use self::pointee::Pointee;
 mod pointee;
+
+pub use self::packable::Packable;
+mod packable;

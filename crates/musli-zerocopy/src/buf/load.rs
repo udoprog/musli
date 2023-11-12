@@ -33,15 +33,15 @@ pub trait LoadMut: Load {
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error>;
 }
 
-impl<P, E: ByteOrder, O: Size> Load for Ref<P, E, O>
+impl<T, E: ByteOrder, O: Size> Load for Ref<T, E, O>
 where
-    P: ZeroCopy,
+    T: ZeroCopy,
 {
-    type Target = P;
+    type Target = T;
 
     #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        buf.load_sized::<P>(self.offset())
+        buf.load_sized::<T>(self.offset())
     }
 }
 
@@ -66,13 +66,13 @@ impl<E: ByteOrder, O: Size> Load for Ref<str, E, O> {
     }
 }
 
-impl<P, E: ByteOrder, O: Size> LoadMut for Ref<P, E, O>
+impl<T, E: ByteOrder, O: Size> LoadMut for Ref<T, E, O>
 where
-    P: ZeroCopy,
+    T: ZeroCopy,
 {
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
-        buf.load_sized_mut::<P>(self.offset())
+        buf.load_sized_mut::<T>(self.offset())
     }
 }
 

@@ -515,11 +515,11 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store<P>(&mut self, value: &P) -> Ref<P, E, O>
+    pub fn store<T>(&mut self, value: &T) -> Ref<T, E, O>
     where
-        P: ZeroCopy,
+        T: ZeroCopy,
     {
-        self.next_offset_with_and_reserve(align_of::<P>(), size_of::<P>());
+        self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
 
         // SAFETY: We're ensuring to both align the internal buffer and store
         // the value.
@@ -580,15 +580,15 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn store_unchecked<P>(&mut self, value: &P) -> Ref<P, E, O>
+    pub unsafe fn store_unchecked<T>(&mut self, value: &T) -> Ref<T, E, O>
     where
-        P: ZeroCopy,
+        T: ZeroCopy,
     {
         let offset = self.len;
 
         let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
         buf::store_unaligned(ptr, value);
-        self.len += size_of::<P>();
+        self.len += size_of::<T>();
         Ref::new(offset)
     }
 
@@ -986,21 +986,21 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     }
 
     #[inline]
-    fn store<P>(&mut self, value: &P) -> Ref<P, Self::ByteOrder, Self::Size>
+    fn store<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
     where
-        P: ZeroCopy,
+        T: ZeroCopy,
     {
         SliceMut::store(self, value)
     }
 
     #[inline]
-    fn swap<P>(
+    fn swap<T>(
         &mut self,
-        a: Ref<P, Self::ByteOrder, Self::Size>,
-        b: Ref<P, Self::ByteOrder, Self::Size>,
+        a: Ref<T, Self::ByteOrder, Self::Size>,
+        b: Ref<T, Self::ByteOrder, Self::Size>,
     ) -> Result<(), Error>
     where
-        P: ZeroCopy,
+        T: ZeroCopy,
     {
         Buf::swap(self, a, b)
     }

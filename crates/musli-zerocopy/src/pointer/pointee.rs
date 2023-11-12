@@ -1,18 +1,22 @@
+use crate::pointer::Packable;
 use crate::traits::ZeroCopy;
 
 mod sealed {
+    use crate::mem::MaybeUninit;
+    use crate::pointer::Pointee;
     use crate::traits::ZeroCopy;
 
     pub trait Sealed {}
 
+    impl<T> Sealed for MaybeUninit<T> where T: Pointee {}
     impl<T> Sealed for T where T: ZeroCopy {}
     impl<T> Sealed for [T] where T: ZeroCopy {}
     impl Sealed for str {}
 }
 
-/// The trait for a value that can be pointed to by a [`Ref<P>`].
+/// The trait for a value that can be pointed to by a [`Ref<T>`].
 ///
-/// This ultimately determines the layout of [`Ref<P>`] as for unsized types it
+/// This ultimately determines the layout of [`Ref<T>`] as for unsized types it
 /// needs to accommodate the size of the pointed-to type as well.
 ///
 /// ```
@@ -24,9 +28,9 @@ mod sealed {
 /// assert_eq!(size_of::<Ref::<[u32]>>(), 8);
 /// ```
 ///
-/// [`Ref<P>`]: crate::Ref
+/// [`Ref<T>`]: crate::Ref
 pub trait Pointee: self::sealed::Sealed {
-    /// Metadata associated with the pointee.
+    /// Metadata associated with a pointee.
     type Metadata: Packable;
 }
 
@@ -46,20 +50,4 @@ where
 
 impl Pointee for str {
     type Metadata = usize;
-}
-
-/// A type that can inhabit a packed representation.
-pub trait Packable: Sized {
-    /// The packed representation of the item.
-    type Packed<O>: Copy + ZeroCopy
-    where
-        O: Copy + ZeroCopy;
-}
-
-impl Packable for () {
-    type Packed<O> = () where O: Copy + ZeroCopy;
-}
-
-impl Packable for usize {
-    type Packed<O> = O where O: Copy + ZeroCopy;
 }
