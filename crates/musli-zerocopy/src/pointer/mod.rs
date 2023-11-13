@@ -18,14 +18,18 @@
 //! [`Buf`]: crate::buf::Buf
 //! [`Buf::load`]: crate::buf::Buf::load
 
+#[doc(inline)]
 pub use self::size::{DefaultSize, Size};
 mod size;
 
+#[doc(inline)]
 pub use self::r#ref::Ref;
 mod r#ref;
 
+#[doc(inline)]
 pub use self::pointee::Pointee;
 mod pointee;
 
+#[doc(inline)]
 pub use self::packable::Packable;
 mod packable;

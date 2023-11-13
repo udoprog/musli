@@ -552,8 +552,8 @@ mod error;
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[doc(inline)]
-pub use self::traits::ZeroCopy;
-pub mod traits;
+pub use self::traits::{UnsizedZeroCopy, ZeroCopy, ZeroSized};
+mod traits;
 
 pub(crate) mod sip;
 
@@ -841,6 +841,7 @@ pub mod __private {
 
     pub use crate::buf::{Buf, Visit};
     pub use crate::endian::ByteOrder;
+    pub use crate::traits::{ZeroCopy, ZeroSized};
 
     #[inline(always)]
     pub fn unknown_discriminant<D>(discriminant: D)

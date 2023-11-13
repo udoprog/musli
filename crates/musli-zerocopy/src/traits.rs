@@ -133,8 +133,7 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed + Pointee {
 /// [`ZeroSized`]:
 ///
 /// ```
-/// use musli_zerocopy::ZeroCopy;
-/// use musli_zerocopy::traits::ZeroSized;
+/// use musli_zerocopy::{ZeroCopy, ZeroSized};
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(transparent)]
@@ -150,8 +149,8 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed + Pointee {
 /// ```
 /// use std::marker::PhantomData;
 /// use std::mem::size_of;
-/// use musli_zerocopy::ZeroCopy;
-/// use musli_zerocopy::traits::ZeroSized;
+///
+/// use musli_zerocopy::{ZeroCopy, ZeroSized};
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(transparent)]
@@ -693,7 +692,7 @@ where
     }
 
     #[inline]
-    fn metadata(&self) -> usize {
+    fn metadata(&self) -> Self::Metadata {
         self.len()
     }
 

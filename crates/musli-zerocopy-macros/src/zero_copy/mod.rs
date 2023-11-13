@@ -117,8 +117,8 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
     let unknown_discriminant: syn::Path =
         syn::parse_quote!(#krate::__private::unknown_discriminant);
     let validator: syn::Path = syn::parse_quote!(#krate::buf::Validator);
-    let zero_copy: syn::Path = syn::parse_quote!(#krate::traits::ZeroCopy);
-    let zero_sized: syn::Path = syn::parse_quote!(#krate::traits::ZeroSized);
+    let zero_copy: syn::Path = syn::parse_quote!(#krate::__private::ZeroCopy);
+    let zero_sized: syn::Path = syn::parse_quote!(#krate::__private::ZeroSized);
     let byte_order: syn::Path = syn::parse_quote!(#krate::__private::ByteOrder);
 
     let endianness = quote::format_ident!("__E");
