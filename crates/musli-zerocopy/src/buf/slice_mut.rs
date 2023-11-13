@@ -641,7 +641,7 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     #[inline]
     pub fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, E, O>
     where
-        T: UnsizedZeroCopy<Metadata = usize>,
+        T: UnsizedZeroCopy,
     {
         unsafe {
             let size = size_of_val(value);
@@ -980,7 +980,7 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     #[inline]
     fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
     where
-        T: UnsizedZeroCopy<Metadata = usize>,
+        T: UnsizedZeroCopy,
     {
         SliceMut::store_unsized(self, value)
     }

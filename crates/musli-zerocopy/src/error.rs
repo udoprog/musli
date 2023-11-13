@@ -6,12 +6,21 @@ use core::str::Utf8Error;
 
 mod sealed {
     pub trait Sealed {}
+    impl Sealed for () {}
 }
 
 /// Helper trait to convert any type into a type-erased [`Repr`] used for diagnostics.
 pub trait IntoRepr: self::sealed::Sealed {
     #[doc(hidden)]
     fn into_repr(self) -> Repr;
+}
+
+impl IntoRepr for () {
+    fn into_repr(self) -> Repr {
+        Repr {
+            kind: ReprKind::Unit,
+        }
+    }
 }
 
 macro_rules! impl_into_repr {
@@ -49,6 +58,7 @@ impl_into_repr! {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 enum ReprKind {
+    Unit,
     U8(u8),
     U16(u16),
     U32(u32),
@@ -74,6 +84,7 @@ pub struct Repr {
 impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ReprKind::Unit => write!(f, "()"),
             ReprKind::U8(value) => write!(f, "{value}u8"),
             ReprKind::U16(value) => write!(f, "{value}u16"),
             ReprKind::U32(value) => write!(f, "{value}u32"),

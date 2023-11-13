@@ -1,3 +1,6 @@
+use core::fmt;
+
+use crate::error::IntoRepr;
 use crate::pointer::Packable;
 use crate::traits::ZeroCopy;
 
@@ -31,7 +34,7 @@ mod sealed {
 /// [`Ref<T>`]: crate::Ref
 pub trait Pointee: self::sealed::Sealed {
     /// Metadata associated with a pointee.
-    type Metadata: Packable;
+    type Metadata: Copy + fmt::Debug + Packable + IntoRepr;
 }
 
 impl<T> Pointee for T
