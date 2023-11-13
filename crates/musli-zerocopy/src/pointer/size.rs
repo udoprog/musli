@@ -54,6 +54,29 @@ pub trait Size:
     #[doc(hidden)]
     const MAX: Self;
 
+    #[doc(hidden)]
+    const ONE: Self;
+
+    #[doc(hidden)]
+    const N2: Self;
+
+    #[doc(hidden)]
+    const N4: Self;
+
+    #[doc(hidden)]
+    const N8: Self;
+
+    #[doc(hidden)]
+    const N16: Self;
+
+    #[doc(hidden)]
+    /// Perform wrapping multiplication over the type.
+    fn wrapping_mul(self, other: Self) -> Self;
+
+    #[doc(hidden)]
+    /// Perform checked multiplication over the type.
+    fn checked_mul(self, other: Self) -> Option<Self>;
+
     /// Try to construct this value from usize.
     fn try_from_usize(value: usize) -> Option<Self>;
 
@@ -81,6 +104,21 @@ macro_rules! impl_size {
         impl Size for $ty {
             const ZERO: Self = 0;
             const MAX: Self = <$ty>::MAX;
+            const ONE: Self = 1;
+            const N2: Self = 2;
+            const N4: Self = 4;
+            const N8: Self = 8;
+            const N16: Self = 16;
+
+            #[inline(always)]
+            fn wrapping_mul(self, other: Self) -> Self {
+                self.wrapping_mul(other)
+            }
+
+            #[inline(always)]
+            fn checked_mul(self, other: Self) -> Option<Self> {
+                self.checked_mul(other)
+            }
 
             #[inline]
             fn try_from_usize(value: usize) -> Option<Self> {
