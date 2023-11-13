@@ -54,6 +54,9 @@ pub trait Size:
     #[doc(hidden)]
     const MAX: Self;
 
+    /// Try to construct this value from usize.
+    fn try_from_usize(value: usize) -> Option<Self>;
+
     /// Convert the pointer to a usize.
     #[doc(hidden)]
     fn as_usize<E: ByteOrder>(self) -> usize;
@@ -78,6 +81,15 @@ macro_rules! impl_size {
         impl Size for $ty {
             const ZERO: Self = 0;
             const MAX: Self = <$ty>::MAX;
+
+            #[inline]
+            fn try_from_usize(value: usize) -> Option<Self> {
+                if value > <$ty>::MAX as usize {
+                    None
+                } else {
+                    Some(value as $ty)
+                }
+            }
 
             #[inline]
             fn as_usize<E: ByteOrder>(self) -> usize {

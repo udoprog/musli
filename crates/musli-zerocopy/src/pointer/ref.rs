@@ -176,12 +176,10 @@ where
     /// assert_eq!(reference.len(), 10);
     /// ```
     #[inline]
-    pub fn with_metadata<U, M>(offset: U, metadata: M) -> Self
+    pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
     where
         U: Copy + fmt::Debug,
-        M: Copy + fmt::Debug,
         O: TryFrom<U>,
-        <T::Metadata as Packable>::Packed<O>: TryFrom<M>,
     {
         assert!(
             O::CAN_SWAP_BYTES,
@@ -189,17 +187,11 @@ where
             any::type_name::<O>()
         );
 
-        assert!(
-            <T::Metadata as Packable>::Packed::<O>::CAN_SWAP_BYTES,
-            "Packed metadata `{}` cannot be byte-ordered since it would not inhabit valid types",
-            any::type_name::<T::Metadata>()
-        );
-
         let Some(offset) = O::try_from(offset).ok() else {
             panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
         };
 
-        let Some(metadata) = <T::Metadata as Packable>::Packed::<O>::try_from(metadata).ok() else {
+        let Some(metadata) = <T::Metadata as Packable>::try_from_metadata(metadata) else {
             panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
         };
 
@@ -237,12 +229,10 @@ where
     /// assert_eq!(reference.len(), 10);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn try_with_metadata<U, M>(offset: U, metadata: M) -> Result<Self, Error>
+    pub fn try_with_metadata<U>(offset: U, metadata: T::Metadata) -> Result<Self, Error>
     where
         U: Copy + IntoRepr + fmt::Debug,
-        M: Copy + IntoRepr + fmt::Debug,
         O: TryFrom<U>,
-        <T::Metadata as Packable>::Packed<O>: TryFrom<M>,
     {
         if !O::CAN_SWAP_BYTES {
             return Err(Error::new(ErrorKind::InvalidOffset {
@@ -264,9 +254,9 @@ where
             }));
         };
 
-        let Some(metadata) = <T::Metadata as Packable>::Packed::<O>::try_from(metadata).ok() else {
+        let Some(metadata) = <T::Metadata as Packable>::try_from_metadata(metadata) else {
             return Err(Error::new(ErrorKind::InvalidMetadataRange {
-                metadata: M::into_repr(metadata),
+                metadata: T::Metadata::into_repr(metadata),
                 max: O::into_repr(O::MAX),
             }));
         };
