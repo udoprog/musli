@@ -7,6 +7,7 @@ use core::{any, fmt};
 use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::error::{Error, ErrorKind, IntoRepr};
 use crate::mem::MaybeUninit;
+use crate::pointer::Coerce;
 use crate::pointer::{DefaultSize, Packable, Pointee, Size};
 use crate::ZeroCopy;
 
@@ -629,29 +630,107 @@ where
         self.offset.as_usize::<E>()
     }
 
-    /// Cast from one kind of reference to another.
+    /// Coerce from one kind of reference to another ensuring that the
+    /// destination type `U` is size-compatible.
     ///
-    /// This statically checks that the metadata for the pointers are the same
-    /// to prevent casts over completely different references. For now this only
-    /// prevents `Ref<T>` to `Ref<[U]>` casts:
+    /// This performs metadata conversion if the destination metadata for `U`
+    /// differs from `T`, such as for `[u32]` to `[u8]` it would multiply the
+    /// length by 4 to ensure that the slice points to an appropriately sized
+    /// region.
+    ///
+    /// If the metadata conversion would overflow, this will wrap around the
+    /// numerical bounds or panic for debug builds.
+    ///
+    /// See [`try_coerce()`] for more documentation, which is also a checked
+    /// variant of this method.
+    ///
+    /// [`try_coerce()`]: Self::try_coerce
+    pub fn coerce<U: ?Sized>(self) -> Ref<U, E, O>
+    where
+        T: Coerce<U>,
+        U: Pointee,
+    {
+        Ref {
+            offset: self.offset,
+            metadata: T::coerce_metadata(self.metadata),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Try to coerce from one kind of reference to another ensuring that the
+    /// destination type `U` is size-compatible.
+    ///
+    /// This performs metadata conversion if the destination metadata for `U`
+    /// differs from `T`, such as for `[u32]` to `[u8]` it would multiply the
+    /// length by 4 to ensure that the slice points to an appropriately sized
+    /// region.
+    ///
+    /// This returns `None` in case metadata would overflow due to the
+    /// conversion.
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    ///
+    /// let reference: Ref<u64> = Ref::zero();
+    /// let reference2 = reference.coerce::<[u32]>();
+    /// assert_eq!(reference2.len(), 2);
+    /// ```
+    ///
+    /// This method ensures that coercions across inappropriate types are
+    /// prohibited, such as coercing from a reference to a slice which is too
+    /// large.
     ///
     /// ```compile_fail
     /// use musli_zerocopy::Ref;
     ///
     /// let reference: Ref<u32> = Ref::zero();
-    /// let reference2 = reference.cast::<[u32]>();
+    /// let reference2 = reference.coerce::<[u64]>();
     /// ```
     ///
-    /// The correct way to do the above would be to explicitly deconstruct the
-    /// reference:
+    /// If metadata needs to be adjusted for the destination type such as for
+    /// slices, it will be:
     ///
     /// ```
     /// use musli_zerocopy::Ref;
     ///
-    /// let reference: Ref<u32> = Ref::zero();
-    /// let reference2: Ref<[u32]> = Ref::with_metadata(reference.offset(), 1);
+    /// let reference: Ref<[u32]> = Ref::with_metadata(0, 1);
+    /// let reference2 = reference.try_coerce::<[u8]>().ok_or("bad coercion")?;
+    /// assert_eq!(reference2.len(), 4);
+    ///
+    /// let reference: Ref<str> = Ref::with_metadata(0, 12);
+    /// let reference2 = reference.try_coerce::<[u8]>().ok_or("bad coercion")?;
+    /// assert_eq!(reference2.len(), 12);
+    /// # Ok::<_, &'static str>(())
     /// ```
-    pub fn cast<U: ?Sized>(self) -> Ref<U, E, O>
+    ///
+    /// This does mean that numerical overflow might occur if the packed
+    /// metadata is too small:
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    /// use musli_zerocopy::endian::Native;
+    ///
+    /// let reference = Ref::<[u32], Native, u8>::with_metadata(0, 64);
+    /// let reference2 = reference.try_coerce::<[u8]>();
+    /// assert!(reference2.is_none()); // 64 * 4 would overflow u8 packed metadata.
+    /// ```
+    ///
+    /// Coercion of non-zero types are supported, but do not guarantee that the
+    /// destination data is valid.
+    pub fn try_coerce<U: ?Sized>(self) -> Option<Ref<U, E, O>>
+    where
+        T: Coerce<U>,
+        U: Pointee,
+    {
+        Some(Ref {
+            offset: self.offset,
+            metadata: T::try_coerce_metadata(self.metadata)?,
+            _marker: PhantomData,
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn cast<U: ?Sized>(self) -> Ref<U, E, O>
     where
         U: Pointee<Metadata = T::Metadata>,
     {

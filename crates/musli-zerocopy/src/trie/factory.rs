@@ -6,7 +6,7 @@ use core::mem::replace;
 use alloc::vec::Vec;
 
 use crate::endian::Native;
-use crate::pointer::Pointee;
+use crate::pointer::{Coerce, Pointee};
 use crate::slice::{BinarySearch, Slice};
 use crate::{Buf, ByteOrder, Error, OwnedBuf, Ref, Size, ZeroCopy};
 
@@ -54,7 +54,7 @@ pub fn store<S, E: ByteOrder, O: Size, I, T>(
 where
     I: IntoIterator<Item = (Ref<S, E, O>, T)>,
     T: ZeroCopy,
-    S: ?Sized + Pointee<Metadata = <[u8] as Pointee>::Metadata>,
+    S: ?Sized + Pointee + Coerce<[u8]>,
 {
     // First step is to construct the trie in-memory.
     let mut trie = Builder::with_flavor();
@@ -132,9 +132,9 @@ impl<T, F: Flavor> Builder<T, F> {
         value: T,
     ) -> Result<(), Error>
     where
-        S: ?Sized + Pointee<Metadata = <[u8] as Pointee>::Metadata>,
+        S: ?Sized + Pointee + Coerce<[u8]>,
     {
-        let mut string = string.cast::<[u8]>();
+        let mut string = string.coerce::<[u8]>();
         let mut current = buf.load(string)?;
         let mut this = &mut self.links;
 

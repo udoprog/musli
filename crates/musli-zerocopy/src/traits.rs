@@ -209,7 +209,7 @@ unsafe impl<T> ZeroSized for Wrapping<T> where T: ZeroSized {}
 
 unsafe impl<T> ZeroCopy for Wrapping<T>
 where
-    T: Copy + ZeroCopy,
+    T: ZeroCopy,
 {
     const ANY_BITS: bool = T::ANY_BITS;
     const PADDED: bool = T::PADDED;

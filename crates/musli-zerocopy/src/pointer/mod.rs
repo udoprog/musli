@@ -33,3 +33,9 @@ mod pointee;
 #[doc(inline)]
 pub use self::packable::Packable;
 mod packable;
+
+pub use self::coerce::Coerce;
+mod coerce;
+
+pub use self::coerce_slice::CoerceSlice;
+mod coerce_slice;
