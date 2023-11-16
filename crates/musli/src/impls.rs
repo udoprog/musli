@@ -10,9 +10,11 @@ use core::num::{
     NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, Wrapping,
 };
 use core::sync::atomic::{
-    AtomicBool, AtomicI16, AtomicI32, AtomicI64, AtomicI8, AtomicIsize, AtomicU16, AtomicU32,
-    AtomicU64, AtomicU8, AtomicUsize,
+    AtomicBool, AtomicI16, AtomicI32, AtomicI8, AtomicIsize, AtomicU16, AtomicU32, AtomicU8,
+    AtomicUsize,
 };
+#[cfg(target_has_atomic = "64")]
+use core::sync::atomic::{AtomicI64, AtomicU64};
 use core::{fmt, marker};
 
 use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
@@ -96,11 +98,13 @@ macro_rules! atomic_impl {
 atomic_impl!(AtomicBool);
 atomic_impl!(AtomicI16);
 atomic_impl!(AtomicI32);
+#[cfg(target_has_atomic = "64")]
 atomic_impl!(AtomicI64);
 atomic_impl!(AtomicI8);
 atomic_impl!(AtomicIsize);
 atomic_impl!(AtomicU16);
 atomic_impl!(AtomicU32);
+#[cfg(target_has_atomic = "64")]
 atomic_impl!(AtomicU64);
 atomic_impl!(AtomicU8);
 atomic_impl!(AtomicUsize);
