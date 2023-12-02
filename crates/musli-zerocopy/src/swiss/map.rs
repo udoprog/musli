@@ -376,6 +376,23 @@ where
     }
 }
 
+impl<K, V, E: ByteOrder, O: Size> Clone for MapRef<K, V, E, O>
+where
+    K: ZeroCopy,
+    V: ZeroCopy,
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<K, V, E: ByteOrder, O: Size> Copy for MapRef<K, V, E, O>
+where
+    K: ZeroCopy,
+    V: ZeroCopy,
+{
+}
+
 pub(crate) struct RawTable<'a, T> {
     ctrl: &'a [u8],
     entries: &'a [T],
@@ -499,12 +516,7 @@ where
             len: self.len.to_ne(),
         })
     }
-}
 
-impl<T, E: ByteOrder, O: Size> RawTableRef<T, E, O>
-where
-    T: ZeroCopy,
-{
     /// Searches for an element in the table.
     #[inline]
     pub(crate) fn find<'buf>(
@@ -576,3 +588,14 @@ where
         }
     }
 }
+
+impl<T, E: ByteOrder, O: Size> Clone for RawTableRef<T, E, O>
+where
+    T: ZeroCopy,
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T, E: ByteOrder, O: Size> Copy for RawTableRef<T, E, O> where T: ZeroCopy {}
