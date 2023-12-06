@@ -9,10 +9,6 @@ use core::num::{
     NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize, NonZeroU128,
     NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, Wrapping,
 };
-use core::sync::atomic::{
-    AtomicBool, AtomicI16, AtomicI32, AtomicI64, AtomicI8, AtomicIsize, AtomicU16, AtomicU32,
-    AtomicU64, AtomicU8, AtomicUsize,
-};
 use core::{fmt, marker};
 
 use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
@@ -77,33 +73,30 @@ where
 }
 
 macro_rules! atomic_impl {
-    ($ty:ty) => {
-        impl<'de, M> Decode<'de, M> for $ty
-        where
-            M: Mode,
-        {
-            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    ($size:literal $(, $ty:ident)*) => {
+        $(
+            #[cfg(target_has_atomic = $size)]
+            impl<'de, M> Decode<'de, M> for core::sync::atomic::$ty
             where
-                C: Context<Input = D::Error>,
-                D: Decoder<'de>,
+                M: Mode,
             {
-                Decode::<M>::decode(cx, decoder).map(Self::new)
+                fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+                where
+                    C: Context<Input = D::Error>,
+                    D: Decoder<'de>,
+                {
+                    Decode::<M>::decode(cx, decoder).map(Self::new)
+                }
             }
-        }
+        )*
     };
 }
 
-atomic_impl!(AtomicBool);
-atomic_impl!(AtomicI16);
-atomic_impl!(AtomicI32);
-atomic_impl!(AtomicI64);
-atomic_impl!(AtomicI8);
-atomic_impl!(AtomicIsize);
-atomic_impl!(AtomicU16);
-atomic_impl!(AtomicU32);
-atomic_impl!(AtomicU64);
-atomic_impl!(AtomicU8);
-atomic_impl!(AtomicUsize);
+atomic_impl!("8", AtomicBool, AtomicI8, AtomicU8);
+atomic_impl!("16", AtomicI16, AtomicU16);
+atomic_impl!("32", AtomicI32, AtomicU32);
+atomic_impl!("64", AtomicI64, AtomicU64);
+atomic_impl!("ptr", AtomicIsize, AtomicUsize);
 
 macro_rules! non_zero {
     ($ty:ty) => {
