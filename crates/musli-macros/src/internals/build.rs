@@ -466,7 +466,7 @@ fn setup_field<'a>(
     };
 
     let var = match &member {
-        syn::Member::Named(ident) => ident.clone(),
+        syn::Member::Named(ident) => e.cx.escaped_ident(ident),
         syn::Member::Unnamed(index) => quote::format_ident!("_{}", index.index),
     };
 
