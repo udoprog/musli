@@ -65,4 +65,10 @@ impl Ctxt {
         let name = format!("__{name}");
         syn::Ident::new(&name, Span::call_site())
     }
+
+    /// Escape an ident so it's harder to conflict with, preserving idents span
+    pub(crate) fn escaped_ident(&self, ident: &syn::Ident) -> syn::Ident {
+        let name = format!("__{ident}");
+        syn::Ident::new(&name, ident.span())
+    }
 }
