@@ -94,7 +94,6 @@ where
     R: Reader<'de>,
     Error: From<R::Error>,
     T: Signed,
-    T::Unsigned: Unsigned<Signed = T>,
 {
     let value: T::Unsigned = decode_typed(cx, reader, Kind::Number)?;
     Ok(zig::decode(value))

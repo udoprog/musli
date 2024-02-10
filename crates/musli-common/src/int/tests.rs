@@ -78,7 +78,7 @@ fn test_zigzag() {
     fn rt<T>(value: T, expected: T::Unsigned)
     where
         T: fmt::Debug + Signed + PartialEq,
-        T::Unsigned: Unsigned<Signed = T> + fmt::Debug + PartialEq,
+        T::Unsigned: fmt::Debug + PartialEq,
     {
         assert_eq!(zig::encode(value), expected);
         assert_eq!(zig::decode(expected), value);

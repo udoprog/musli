@@ -1,6 +1,3 @@
-use core::fmt::Debug;
-use core::hash::Hash;
-
 mod private {
     pub trait Sealed {}
     impl Sealed for super::LittleEndian {}
@@ -8,9 +5,7 @@ mod private {
 }
 
 /// Trait governing byte orders.
-pub trait ByteOrder:
-    Clone + Copy + Debug + Eq + Hash + Ord + PartialEq + PartialOrd + private::Sealed
-{
+pub trait ByteOrder: private::Sealed {
     /// Read a 8-bit unsigned integer.
     fn read_u8(bytes: [u8; 1]) -> u8;
 
@@ -43,7 +38,6 @@ pub trait ByteOrder:
 }
 
 /// Defines little-endian serialization.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum LittleEndian {}
 
 impl ByteOrder for LittleEndian {
@@ -99,7 +93,6 @@ impl ByteOrder for LittleEndian {
 }
 
 /// Defines big-endian serialization.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum BigEndian {}
 
 impl ByteOrder for BigEndian {

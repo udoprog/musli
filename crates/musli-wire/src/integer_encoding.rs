@@ -2,7 +2,7 @@ use musli::Context;
 
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
-use crate::int::{BigEndian, ByteOrderIo, LittleEndian, Signed, Unsigned};
+use crate::int::{BigEndian, LittleEndian, Signed, Unsigned, UnsignedOps};
 use crate::options::Options;
 use crate::reader::Reader;
 use crate::tag::{Kind, Tag, DATA_MASK};
@@ -137,7 +137,7 @@ pub(crate) fn encode_typed_unsigned<C, W, T, const F: Options>(
 where
     C: Context<Input = W::Error>,
     W: Writer,
-    T: ByteOrderIo,
+    T: UnsignedOps,
 {
     macro_rules! fixed {
         ($ty:ty, $bo:ty) => {{
@@ -176,7 +176,7 @@ pub(crate) fn decode_typed_unsigned<'de, C, R, T, const F: Options>(
 where
     C: Context<Input = R::Error>,
     R: Reader<'de>,
-    T: ByteOrderIo,
+    T: UnsignedOps,
 {
     macro_rules! fixed {
         ($ty:ty, $bo:ty) => {{
@@ -184,7 +184,7 @@ where
                 return Err(cx.message("Expected fixed integer"));
             }
 
-            <$ty as ByteOrderIo>::read_bytes_unsigned::<_, _, $bo>(cx, reader)
+            <$ty as UnsignedOps>::read_bytes_unsigned::<_, _, $bo>(cx, reader)
         }};
     }
 
@@ -225,7 +225,7 @@ where
     C: Context<Input = W::Error>,
     W: Writer,
     T: Signed,
-    T::Unsigned: ByteOrderIo,
+    T::Unsigned: UnsignedOps,
 {
     let value = zig::encode(value);
     encode_typed_unsigned::<_, _, _, F>(cx, writer, value)
@@ -241,7 +241,7 @@ where
     C: Context<Input = R::Error>,
     R: Reader<'de>,
     T: Signed,
-    T::Unsigned: Unsigned<Signed = T> + ByteOrderIo,
+    T::Unsigned: UnsignedOps,
 {
     let value: T::Unsigned = decode_typed_unsigned::<_, _, _, F>(cx, reader)?;
     Ok(zig::decode(value))

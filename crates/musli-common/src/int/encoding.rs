@@ -2,7 +2,7 @@ use musli::Context;
 
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
-use crate::int::{ByteOrderIo, Signed, Unsigned};
+use crate::int::{Signed, Unsigned, UnsignedOps};
 use crate::options::Options;
 use crate::reader::Reader;
 use crate::writer::Writer;
@@ -19,7 +19,7 @@ pub fn encode_unsigned<C, W, T, const F: Options>(
 where
     C: Context<Input = W::Error>,
     W: Writer,
-    T: Unsigned + ByteOrderIo,
+    T: Unsigned + UnsignedOps,
 {
     match (
         crate::options::integer::<F>(),
@@ -38,7 +38,7 @@ where
 /// Decode an unsigned value from the specified reader using the configuration
 /// passed in through `F`.
 #[inline]
-pub fn decode_unsigned<'de, C, R, T: ByteOrderIo, const F: Options>(
+pub fn decode_unsigned<'de, C, R, T: UnsignedOps, const F: Options>(
     cx: &mut C,
     reader: R,
 ) -> Result<T, C::Error>
@@ -72,7 +72,7 @@ where
     C: Context<Input = W::Error>,
     W: Writer,
     T: Signed,
-    T::Unsigned: ByteOrderIo<Signed = T>,
+    T::Unsigned: UnsignedOps,
 {
     match (
         crate::options::integer::<F>(),
@@ -95,7 +95,7 @@ where
     C: Context<Input = R::Error>,
     R: Reader<'de>,
     T: Signed,
-    T::Unsigned: Unsigned<Signed = T> + ByteOrderIo<Signed = T>,
+    T::Unsigned: UnsignedOps,
 {
     match (
         crate::options::integer::<F>(),
@@ -150,7 +150,7 @@ where
                 return Err(cx.message("Size type out of bounds for value type"));
             };
 
-            <$ty as ByteOrderIo>::write_bytes::<_, _, $bo>(value, cx, writer)
+            <$ty as UnsignedOps>::write_bytes::<_, _, $bo>(value, cx, writer)
         }};
     }
 
@@ -178,7 +178,7 @@ where
     macro_rules! fixed {
         ($ty:ty, $bo:ty) => {{
             let Ok(value) = usize::try_from(
-                <$ty as ByteOrderIo>::read_bytes_unsigned::<_, _, $bo>(cx, reader)?,
+                <$ty as UnsignedOps>::read_bytes_unsigned::<_, _, $bo>(cx, reader)?,
             ) else {
                 return Err(cx.message("Value type out of bounds for usize"));
             };

@@ -21,7 +21,7 @@ pub use self::encoding::{
     decode_signed, decode_unsigned, decode_usize, encode_signed, encode_unsigned, encode_usize,
 };
 #[doc(hidden)]
-pub use self::traits::{ByteOrderIo, Signed, Unsigned};
+pub use self::traits::{Signed, Unsigned, UnsignedOps};
 
 #[cfg(test)]
 mod tests;

@@ -8,13 +8,11 @@ use crate::writer::Writer;
 
 /// Trait that encodes common behaviors of unsigned numbers.
 pub trait Unsigned:
-    Sized
-    + Copy
+    Copy
     + Shr<u32, Output = Self>
     + Shl<u32, Output = Self>
-    + BitXor<Self, Output = Self>
-    + BitAnd<Self, Output = Self>
-    + PartialOrd<Self>
+    + BitXor<Output = Self>
+    + BitAnd<Output = Self>
     + Ord
 {
     /// The number `1` as represented by the current unsigned number.
@@ -27,7 +25,7 @@ pub trait Unsigned:
     const BITS: u32;
 
     /// The signed representation of this unsigned number.
-    type Signed: Signed;
+    type Signed: Signed<Unsigned = Self>;
 
     /// Coerce this number bitwise into its signed representation.
     fn signed(self) -> Self::Signed;
@@ -61,7 +59,7 @@ pub trait Unsigned:
 }
 
 /// Helper trait for performing I/O over [Unsigned] types.
-pub trait ByteOrderIo: Unsigned {
+pub trait UnsignedOps: Unsigned {
     /// Write the current byte array to the given writer in little-endian
     /// encoding.
     fn write_bytes<C, W, B>(self, cx: &mut C, writer: W) -> Result<(), C::Error>
@@ -80,18 +78,17 @@ pub trait ByteOrderIo: Unsigned {
 
 /// Trait that encodes common behaviors of signed numbers.
 pub trait Signed:
-    Sized
-    + Copy
+    Copy
     + Neg<Output = Self>
     + Shr<u32, Output = Self>
     + Shl<u32, Output = Self>
-    + BitXor<Self, Output = Self>
+    + BitXor<Output = Self>
 {
     /// The number of bits in this signed number.
     const BITS: u32;
 
     /// The unsigned representation of this number.
-    type Unsigned: Unsigned;
+    type Unsigned: Unsigned<Signed = Self>;
 
     /// Coerce this number bitwise into its unsigned representation.
     fn unsigned(self) -> Self::Unsigned;
@@ -169,11 +166,11 @@ macro_rules! implement {
     };
 }
 
-macro_rules! implement_io {
+macro_rules! implement_ops {
     ($signed:ty, $unsigned:ty, $read:ident, $write:ident) => {
         implement!($signed, $unsigned);
 
-        impl ByteOrderIo for $unsigned {
+        impl UnsignedOps for $unsigned {
             #[inline]
             fn write_bytes<C, W, B>(self, cx: &mut C, mut writer: W) -> Result<(), C::Error>
             where
@@ -202,9 +199,9 @@ macro_rules! implement_io {
     };
 }
 
-implement_io!(i8, u8, read_u8, write_u8);
-implement_io!(i16, u16, read_u16, write_u16);
-implement_io!(i32, u32, read_u32, write_u32);
-implement_io!(i64, u64, read_u64, write_u64);
-implement_io!(i128, u128, read_u128, write_u128);
+implement_ops!(i8, u8, read_u8, write_u8);
+implement_ops!(i16, u16, read_u16, write_u16);
+implement_ops!(i32, u32, read_u32, write_u32);
+implement_ops!(i64, u64, read_u64, write_u64);
+implement_ops!(i128, u128, read_u128, write_u128);
 implement!(isize, usize);
