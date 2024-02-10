@@ -521,6 +521,7 @@
 
 #![no_std]
 #![allow(clippy::module_inception)]
+#![allow(clippy::enum_variant_names)]
 #![deny(missing_docs)]
 #![cfg_attr(all(feature = "nightly", test), feature(repr128))]
 #![cfg_attr(all(feature = "nightly", test), allow(incomplete_features))]

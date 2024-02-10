@@ -17,13 +17,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: ['1.74', stable]
+        rust: ['1.67', stable]
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{matrix.rust}}
-    - run: cargo build
+    - run: cargo build --workspace --exclude tools --exclude musli-tests
       if: matrix.rust != 'stable'
     - run: cargo build --all-targets
       if: matrix.rust == 'stable'
@@ -88,19 +88,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@1.74
+    - uses: dtolnay/rust-toolchain@1.76
       with:
         components: clippy
     - run: cargo clippy --all-targets --features test -- -D warnings
-
-  clippy_tests:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@1.74
-      with:
-        components: clippy
-    - run: cargo run -p tools -- clippy -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest

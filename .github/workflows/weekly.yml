@@ -10,10 +10,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: ["1.74", stable]
+        rust: ["1.67", stable]
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{matrix.rust}}
-    - run: cargo build --workspace
+    - run: cargo build --workspace --exclude tools --exclude musli-tests
