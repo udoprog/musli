@@ -74,21 +74,17 @@ help: if you don't care about this missing field, you can explicitly ignore it
 40 |         field, .. },
    |              ~~~~~~
 
-error[E0027]: pattern does not mention field `sneaky_field`
+error: pattern requires `..` due to inaccessible fields
   --> tests/ui/deny_sneaky_field_error.rs:35:10
    |
 35 | #[derive(ZeroCopy)]
-   |          ^^^^^^^^ missing field `sneaky_field`
+   |          ^^^^^^^^
    |
    = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: include the missing field in the pattern
+help: ignore the inaccessible and unused fields
    |
-35 | #[derive(ZeroCopy, sneaky_field }: u32,
-   |                  ~~~~~~~~~~~~~~~~
-help: if you don't care about this missing field, you can explicitly ignore it
-   |
-35 | #[derive(ZeroCopy, .. }: u32,
-   |                  ~~~~~~
+40 |         field, ..: u32,
+   |              ++++
 
 error[E0063]: missing field `sneaky_field` in initializer of `SneakyEnumNamed`
   --> tests/ui/deny_sneaky_field_error.rs:35:10
@@ -124,21 +120,17 @@ help: use `..` to ignore all fields
 44 | #[derive(..)]
    |          ~~
 
-error[E0027]: pattern does not mention field `1`
+error: pattern requires `..` due to inaccessible fields
   --> tests/ui/deny_sneaky_field_error.rs:44:10
    |
 44 | #[derive(ZeroCopy)]
-   |          ^^^^^^^^ missing field `1`
+   |          ^^^^^^^^
    |
    = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: include the missing field in the pattern
+help: ignore the inaccessible and unused fields
    |
-44 | #[derive(ZeroCopy, 1: _ })]
-   |                  ++++++++
-help: if you don't care about this missing field, you can explicitly ignore it
-   |
-44 | #[derive(ZeroCopy, .. })]
-   |                  ++++++
+44 | #[derive(ZeroCopy, ..)]
+   |                  ++++
 
 error[E0063]: missing field `1` in initializer of `SneakyEnumUnnamed`
   --> tests/ui/deny_sneaky_field_error.rs:44:10
@@ -156,18 +148,14 @@ error[E0533]: expected unit struct, unit variant or constant, found struct varia
 55 | |     Unit
    | |________^ not a unit struct, unit variant or constant
 
-error[E0027]: pattern does not mention field `sneaky_field`
+error: pattern requires `..` due to inaccessible fields
   --> tests/ui/deny_sneaky_field_error.rs:51:10
    |
 51 | #[derive(ZeroCopy)]
-   |          ^^^^^^^^ missing field `sneaky_field`
+   |          ^^^^^^^^
    |
    = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: include the missing field in the pattern
-   |
-51 | #[derive(ZeroCopy { sneaky_field })]
-   |                   ++++++++++++++++
-help: if you don't care about this missing field, you can explicitly ignore it
+help: ignore the inaccessible and unused fields
    |
 51 | #[derive(ZeroCopy { .. })]
    |                   ++++++
