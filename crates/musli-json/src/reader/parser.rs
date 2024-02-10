@@ -241,11 +241,12 @@ where
 {
     type Mut<'this> = P::Mut<'this> where Self: 'this;
 
+    #[inline(always)]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         (**self).borrow_mut()
     }
 
-    #[inline]
+    #[inline(always)]
     fn parse_string<'scratch, C, S>(
         &mut self,
         cx: &mut C,
@@ -259,7 +260,7 @@ where
         (**self).parse_string(cx, validate, scratch)
     }
 
-    #[inline]
+    #[inline(always)]
     fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
     where
         C: Context<Input = Error>,
@@ -267,7 +268,7 @@ where
         (**self).read_byte(cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn peek<C>(&mut self, cx: &mut C) -> Result<Token, C::Error>
     where
         C: Context<Input = Error>,
@@ -275,12 +276,12 @@ where
         (**self).peek(cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn pos(&self) -> u32 {
         (**self).pos()
     }
 
-    #[inline]
+    #[inline(always)]
     fn skip_whitespace<C>(&mut self, cx: &mut C) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
@@ -288,7 +289,7 @@ where
         (**self).skip_whitespace(cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn peek_byte<C>(&mut self, cx: &mut C) -> Result<Option<u8>, C::Error>
     where
         C: Context<Input = Error>,
@@ -296,7 +297,7 @@ where
         (**self).peek_byte(cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
@@ -304,7 +305,7 @@ where
         (**self).skip(cx, n)
     }
 
-    #[inline]
+    #[inline(always)]
     fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
@@ -312,7 +313,7 @@ where
         (**self).read(cx, buf)
     }
 
-    #[inline]
+    #[inline(always)]
     fn parse_f32<C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
     where
         C: Context<Input = Error>,
@@ -320,7 +321,7 @@ where
         (**self).parse_f32(cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn parse_f64<C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
     where
         C: Context<Input = Error>,

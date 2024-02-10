@@ -4,6 +4,10 @@ use musli::Context;
 use crate::error::{Error, ErrorKind};
 use crate::reader::{Parser, StringReference, Token};
 
+use lexical::parse_float_options::JSON;
+
+const FORMAT: u128 = lexical::format::STANDARD;
+
 /// An efficient [Reader] wrapper around a slice.
 pub struct SliceParser<'de> {
     pub(crate) slice: &'de [u8],
@@ -122,14 +126,10 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         Ok(self.slice.get(self.index).copied())
     }
 
-    #[inline]
     fn parse_f32<C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
     where
         C: Context<Input = Error>,
     {
-        use lexical::parse_float_options::JSON;
-        const FORMAT: u128 = lexical::format::STANDARD;
-
         let (value, read) = match lexical::parse_partial_with_options::<f32, _, FORMAT>(
             &self.slice[self.index..],
             &JSON,
@@ -145,14 +145,10 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         Ok(value)
     }
 
-    #[inline]
     fn parse_f64<C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
     where
         C: Context<Input = Error>,
     {
-        use lexical::parse_float_options::JSON;
-        const FORMAT: u128 = lexical::format::STANDARD;
-
         let (value, read) = match lexical::parse_partial_with_options::<f64, _, FORMAT>(
             &self.slice[self.index..],
             &JSON,
