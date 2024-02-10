@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: ['1.73', stable]
+        rust: ['1.74', stable]
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@master
@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@1.73
+    - uses: dtolnay/rust-toolchain@1.74
       with:
         components: clippy
     - run: cargo clippy --all-targets --features test -- -D warnings
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@1.73
+    - uses: dtolnay/rust-toolchain@1.74
       with:
         components: clippy
     - run: cargo run -p tools -- clippy -- -D warnings

@@ -4,6 +4,7 @@ mod error;
 
 use core::fmt;
 use core::marker;
+use core::ptr::NonNull;
 
 #[doc(inline)]
 pub use self::error::Error;
@@ -67,7 +68,7 @@ pub trait Buffer {
     /// * A base pointer.
     /// * A base pointer offset where the data is located.
     /// * A length.
-    fn raw_parts(&self) -> (*const u8, usize, usize);
+    fn raw_parts(&self) -> (NonNull<u8>, usize, usize);
 
     /// Get the buffer as its initialized slice.
     ///
@@ -103,8 +104,10 @@ impl Buffer for [u8] {
     }
 
     #[inline(always)]
-    fn raw_parts(&self) -> (*const u8, usize, usize) {
-        (self.as_ptr(), 0, self.len())
+    fn raw_parts(&self) -> (NonNull<u8>, usize, usize) {
+        // SAFETY: The slice is always a valid non-null pointer.
+        let ptr = unsafe { NonNull::new_unchecked(self.as_ptr().cast_mut()) };
+        (ptr, 0, self.len())
     }
 
     #[inline(always)]

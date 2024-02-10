@@ -31,7 +31,7 @@ fn trace_no_std() {
     let encoding = musli_json::Encoding::new();
 
     let Ok(bytes) = encoding.to_vec_with(&mut cx, &from) else {
-        for error in cx.iter() {
+        if let Some(error) = cx.iter().next() {
             panic!("{error}");
         }
 
