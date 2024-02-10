@@ -26,10 +26,10 @@ where
         crate::options::byteorder::<F>(),
     ) {
         (crate::options::Integer::Fixed, crate::options::ByteOrder::BigEndian) => {
-            value.write_bytes_unsigned::<_, _, BigEndian>(cx, writer)
+            value.write_bytes::<_, _, BigEndian>(cx, writer)
         }
         (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            value.write_bytes_unsigned::<_, _, LittleEndian>(cx, writer)
+            value.write_bytes::<_, _, LittleEndian>(cx, writer)
         }
         (crate::options::Integer::Variable, _) => c::encode(cx, writer, value),
     }
@@ -79,13 +79,11 @@ where
         crate::options::byteorder::<F>(),
     ) {
         (crate::options::Integer::Fixed, crate::options::ByteOrder::BigEndian) => {
-            value
-                .unsigned()
-                .write_bytes_unsigned::<_, _, BigEndian>(cx, writer)
+            value.unsigned().write_bytes::<_, _, BigEndian>(cx, writer)
         }
         (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => value
             .unsigned()
-            .write_bytes_unsigned::<_, _, LittleEndian>(cx, writer),
+            .write_bytes::<_, _, LittleEndian>(cx, writer),
         (crate::options::Integer::Variable, _) => c::encode(cx, writer, zig::encode(value)),
     }
 }
@@ -117,19 +115,19 @@ where
 }
 
 macro_rules! fixed_arm {
-    ($b:ty, $f:ty, $macro:path) => {
+    ($bo:ty, $f:ty, $macro:path) => {
         match crate::options::usize_width::<$f>() {
             crate::options::Width::U8 => {
-                $macro!(u8, $b)
+                $macro!(u8, $bo)
             }
             crate::options::Width::U16 => {
-                $macro!(u16, $b)
+                $macro!(u16, $bo)
             }
             crate::options::Width::U32 => {
-                $macro!(u32, $b)
+                $macro!(u32, $bo)
             }
             crate::options::Width::U64 => {
-                $macro!(u64, $b)
+                $macro!(u64, $bo)
             }
         }
     };
@@ -147,12 +145,12 @@ where
     W: Writer,
 {
     macro_rules! fixed {
-        ($ty:ty, $b:ty) => {{
+        ($ty:ty, $bo:ty) => {{
             let Ok(value) = <$ty>::try_from(value) else {
                 return Err(cx.message("Size type out of bounds for value type"));
             };
 
-            <$ty as ByteOrderIo>::write_bytes_unsigned::<_, _, $b>(value, cx, writer)
+            <$ty as ByteOrderIo>::write_bytes::<_, _, $bo>(value, cx, writer)
         }};
     }
 
@@ -178,10 +176,10 @@ where
     R: Reader<'de>,
 {
     macro_rules! fixed {
-        ($ty:ty, $b:ty) => {{
-            let Ok(value) = usize::try_from(<$ty as ByteOrderIo>::read_bytes_unsigned::<_, _, $b>(
-                cx, reader,
-            )?) else {
+        ($ty:ty, $bo:ty) => {{
+            let Ok(value) = usize::try_from(
+                <$ty as ByteOrderIo>::read_bytes_unsigned::<_, _, $bo>(cx, reader)?,
+            ) else {
                 return Err(cx.message("Value type out of bounds for usize"));
             };
 

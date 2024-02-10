@@ -9,19 +9,19 @@ use crate::tag::{Kind, Tag, DATA_MASK};
 use crate::writer::Writer;
 
 macro_rules! fixed_arm {
-    ($b:ty, $what:ident::<$f:ty>, $macro:path) => {
+    ($bo:ty, $what:ident::<$f:ty>, $macro:path) => {
         match crate::options::$what::<$f>() {
             crate::options::Width::U8 => {
-                $macro!(u8, $b)
+                $macro!(u8, $bo)
             }
             crate::options::Width::U16 => {
-                $macro!(u16, $b)
+                $macro!(u16, $bo)
             }
             crate::options::Width::U32 => {
-                $macro!(u32, $b)
+                $macro!(u32, $bo)
             }
             _ => {
-                $macro!(u64, $b)
+                $macro!(u64, $bo)
             }
         }
     };
@@ -46,7 +46,7 @@ where
                 return Err(cx.message("Usize out of bounds for value type"));
             };
 
-            value.write_bytes_unsigned::<_, _, $bo>(cx, writer)
+            value.write_bytes::<_, _, $bo>(cx, writer)
         }};
     }
 
@@ -142,7 +142,7 @@ where
     macro_rules! fixed {
         ($ty:ty, $bo:ty) => {{
             writer.write_byte(cx, Tag::new(Kind::Prefix, <$ty>::BYTES).byte())?;
-            value.write_bytes_unsigned::<_, _, $bo>(cx, writer)
+            value.write_bytes::<_, _, $bo>(cx, writer)
         }};
     }
 
