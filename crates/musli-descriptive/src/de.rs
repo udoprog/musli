@@ -8,20 +8,21 @@ use musli::de::{
     SizeHint, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::Context;
-use musli_common::int::{continuation as c, UsizeEncoding, Variable};
-use musli_common::reader::{Limit, Reader};
 use musli_storage::de::StorageDecoder;
 
 use crate::error::Error;
+use crate::int::continuation as c;
 use crate::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
+use crate::options::Options;
+use crate::reader::{Limit, Reader};
 use crate::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
 
 /// A very simple decoder.
-pub struct SelfDecoder<R> {
+pub struct SelfDecoder<R, const F: Options> {
     reader: R,
 }
 
-impl<R> SelfDecoder<R> {
+impl<R, const F: Options> SelfDecoder<R, F> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(reader: R) -> Self {
@@ -29,18 +30,18 @@ impl<R> SelfDecoder<R> {
     }
 }
 
-pub struct SelfTupleDecoder<R> {
+pub struct SelfTupleDecoder<R, const F: Options> {
     reader: R,
 }
 
-impl<R> SelfTupleDecoder<R> {
+impl<R, const F: Options> SelfTupleDecoder<R, F> {
     #[inline]
     pub(crate) fn new(reader: R) -> Self {
         Self { reader }
     }
 }
 
-impl<'de, R> SelfDecoder<R>
+impl<'de, R, const F: Options> SelfDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
@@ -68,7 +69,7 @@ where
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    Variable::decode_usize(cx.adapt(), self.reader.borrow_mut())?
+                    crate::int::decode_usize::<_, _, F>(cx.adapt(), self.reader.borrow_mut())?
                 };
 
                 self.reader.skip(cx.adapt(), len)?;
@@ -81,7 +82,7 @@ where
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    Variable::decode_usize(cx.adapt(), self.reader.borrow_mut())?
+                    crate::int::decode_usize::<_, _, F>(cx.adapt(), self.reader.borrow_mut())?
                 };
 
                 for _ in 0..len {
@@ -92,7 +93,7 @@ where
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    Variable::decode_usize(cx.adapt(), self.reader.borrow_mut())?
+                    crate::int::decode_usize::<_, _, F>(cx.adapt(), self.reader.borrow_mut())?
                 };
 
                 for _ in 0..len {
@@ -110,7 +111,7 @@ where
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_map<C>(mut self, cx: &mut C) -> Result<RemainingSelfDecoder<R>, C::Error>
+    fn shared_decode_map<C>(mut self, cx: &mut C) -> Result<RemainingSelfDecoder<R, F>, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -121,7 +122,10 @@ where
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_sequence<C>(mut self, cx: &mut C) -> Result<RemainingSelfDecoder<R>, C::Error>
+    fn shared_decode_sequence<C>(
+        mut self,
+        cx: &mut C,
+    ) -> Result<RemainingSelfDecoder<R, F>, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -151,7 +155,7 @@ where
         Ok(if let Some(len) = tag.data() {
             len as usize
         } else {
-            Variable::decode_usize(cx.adapt(), self.reader.borrow_mut())?
+            crate::int::decode_usize::<_, _, F>(cx.adapt(), self.reader.borrow_mut())?
         })
     }
 
@@ -167,7 +171,7 @@ where
             Kind::Bytes => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                Variable::decode_usize(cx.adapt(), self.reader.borrow_mut())?
+                crate::int::decode_usize::<_, _, F>(cx.adapt(), self.reader.borrow_mut())?
             }),
             Kind::Pack => {
                 let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
@@ -186,24 +190,24 @@ where
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct RemainingSelfDecoder<R> {
+pub struct RemainingSelfDecoder<R, const F: Options> {
     remaining: usize,
-    decoder: SelfDecoder<R>,
+    decoder: SelfDecoder<R, F>,
 }
 
 #[musli::decoder]
-impl<'de, R> Decoder<'de> for SelfDecoder<R>
+impl<'de, R, const F: Options> Decoder<'de> for SelfDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
-    type Pack = SelfDecoder<Limit<R>>;
+    type Pack = SelfDecoder<Limit<R>, F>;
     type Some = Self;
-    type Sequence = RemainingSelfDecoder<R>;
-    type Tuple = SelfTupleDecoder<R>;
-    type Map = RemainingSelfDecoder<R>;
-    type Struct = RemainingSelfDecoder<R>;
+    type Sequence = RemainingSelfDecoder<R, F>;
+    type Tuple = SelfTupleDecoder<R, F>;
+    type Map = RemainingSelfDecoder<R, F>;
+    type Struct = RemainingSelfDecoder<R, F>;
     type Variant = Self;
 
     #[inline]
@@ -802,13 +806,13 @@ where
     }
 }
 
-impl<'de, R> PackDecoder<'de> for SelfDecoder<Limit<R>>
+impl<'de, R, const F: Options> PackDecoder<'de> for SelfDecoder<Limit<R>, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
-    type Decoder<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, Variable, Variable, Error> where Self: 'this;
+    type Decoder<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F, Error> where Self: 'this;
 
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
@@ -831,13 +835,13 @@ where
     }
 }
 
-impl<'de, R> PackDecoder<'de> for SelfTupleDecoder<R>
+impl<'de, R, const F: Options> PackDecoder<'de> for SelfTupleDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
-    type Decoder<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
+    type Decoder<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
@@ -856,24 +860,24 @@ where
     }
 }
 
-impl<'de, R> RemainingSelfDecoder<R>
+impl<'de, R, const F: Options> RemainingSelfDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     #[inline]
-    fn new(remaining: usize, decoder: SelfDecoder<R>) -> Self {
+    fn new(remaining: usize, decoder: SelfDecoder<R, F>) -> Self {
         Self { remaining, decoder }
     }
 }
 
-impl<'de, R> SequenceDecoder<'de> for RemainingSelfDecoder<R>
+impl<'de, R, const F: Options> SequenceDecoder<'de> for RemainingSelfDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
-    type Decoder<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
+    type Decoder<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -907,13 +911,13 @@ where
     }
 }
 
-impl<'de, R> PairDecoder<'de> for SelfDecoder<R>
+impl<'de, R, const F: Options> PairDecoder<'de> for SelfDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
-    type First<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
+    type First<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
     type Second = Self;
 
     #[inline]
@@ -942,14 +946,14 @@ where
     }
 }
 
-impl<'de, R> VariantDecoder<'de> for SelfDecoder<R>
+impl<'de, R, const F: Options> VariantDecoder<'de> for SelfDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
-    type Tag<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
-    type Variant<'this> = SelfDecoder<R::Mut<'this>> where Self: 'this;
+    type Tag<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Variant<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
     fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
@@ -985,14 +989,14 @@ where
     }
 }
 
-impl<'de, R> PairsDecoder<'de> for RemainingSelfDecoder<R>
+impl<'de, R, const F: Options> PairsDecoder<'de> for RemainingSelfDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
 
-    type Decoder<'this> = SelfDecoder<R::Mut<'this>>
+    type Decoder<'this> = SelfDecoder<R::Mut<'this>, F>
     where
         Self: 'this;
 

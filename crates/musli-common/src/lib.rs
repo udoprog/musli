@@ -29,6 +29,7 @@ pub mod context;
 mod fixed;
 pub mod fixed_bytes;
 pub mod int;
+pub mod options;
 pub mod reader;
 pub mod str;
 pub mod wrap;

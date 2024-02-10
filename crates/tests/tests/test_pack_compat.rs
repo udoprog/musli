@@ -4,8 +4,6 @@
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 #[cfg(feature = "test")]
-use musli_wire::int::Variable;
-#[cfg(feature = "test")]
 use musli_wire::tag::MAX_INLINE_LEN;
 #[cfg(feature = "test")]
 use musli_wire::Encoding;
@@ -63,7 +61,7 @@ struct IgnoreBoth {
 #[test]
 #[cfg(feature = "test")]
 fn test_packed_compat() {
-    const ENCODING: Encoding<DefaultMode, Variable, Variable> = Encoding::new();
+    const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
     let data = ENCODING
         .to_vec(&SmallPackCompat {

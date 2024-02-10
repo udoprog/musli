@@ -10,21 +10,21 @@ use musli::de::{
 };
 use musli::mode::Mode;
 use musli::Context;
-use musli_common::reader::{SliceReader, SliceUnderflow};
 use musli_storage::de::StorageDecoder;
-use musli_storage::int::Variable;
+use musli_storage::options::Options;
+use musli_storage::reader::{SliceReader, SliceUnderflow};
 
 use crate::error::ErrorKind;
 use crate::value::{Number, Value};
 use crate::AsValueDecoder;
 
 /// Encoder for a single value.
-pub struct ValueDecoder<'de, E> {
+pub struct ValueDecoder<'de, const F: Options, E> {
     value: &'de Value,
     _marker: marker::PhantomData<E>,
 }
 
-impl<'de, E> ValueDecoder<'de, E> {
+impl<'de, const F: Options, E> ValueDecoder<'de, F, E> {
     #[inline]
     pub(crate) const fn new(value: &'de Value) -> Self {
         Self {
@@ -47,19 +47,19 @@ macro_rules! ensure {
 }
 
 #[musli::decoder]
-impl<'de, E> Decoder<'de> for ValueDecoder<'de, E>
+impl<'de, const F: Options, E> Decoder<'de> for ValueDecoder<'de, F, E>
 where
     E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
-    type Buffer = AsValueDecoder<E>;
+    type Buffer = AsValueDecoder<F, E>;
     type Some = Self;
-    type Pack = StorageDecoder<SliceReader<'de>, Variable, Variable, E>;
-    type Sequence = IterValueDecoder<'de, E>;
-    type Tuple = IterValueDecoder<'de, E>;
-    type Map = IterValuePairsDecoder<'de, E>;
-    type Struct = IterValuePairsDecoder<'de, E>;
-    type Variant = IterValueVariantDecoder<'de, E>;
+    type Pack = StorageDecoder<SliceReader<'de>, F, E>;
+    type Sequence = IterValueDecoder<'de, F, E>;
+    type Tuple = IterValueDecoder<'de, F, E>;
+    type Map = IterValuePairsDecoder<'de, F, E>;
+    type Struct = IterValuePairsDecoder<'de, F, E>;
+    type Variant = IterValueVariantDecoder<'de, F, E>;
 
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "cannot be decoded from value")
@@ -391,27 +391,32 @@ where
                 visitor.visit_borrowed(cx, string)
             }
             #[cfg(feature = "alloc")]
-            Value::Sequence(values) => visitor.visit_sequence(cx, IterValueDecoder::new(values)),
+            Value::Sequence(values) => {
+                visitor.visit_sequence(cx, IterValueDecoder::<F, _>::new(values))
+            }
             #[cfg(feature = "alloc")]
-            Value::Map(values) => visitor.visit_map(cx, IterValuePairsDecoder::new(values)),
+            Value::Map(values) => visitor.visit_map(cx, IterValuePairsDecoder::<F, _>::new(values)),
             #[cfg(feature = "alloc")]
             Value::Variant(variant) => {
-                visitor.visit_variant(cx, IterValueVariantDecoder::new(variant))
+                visitor.visit_variant(cx, IterValueVariantDecoder::<F, _>::new(variant))
             }
             #[cfg(feature = "alloc")]
-            Value::Option(option) => {
-                visitor.visit_option(cx, option.as_ref().map(|value| ValueDecoder::new(value)))
-            }
+            Value::Option(option) => visitor.visit_option(
+                cx,
+                option
+                    .as_ref()
+                    .map(|value| ValueDecoder::<F, _>::new(value)),
+            ),
         }
     }
 }
 
-impl<'a, E> AsDecoder for ValueDecoder<'a, E>
+impl<'a, const F: Options, E> AsDecoder for ValueDecoder<'a, F, E>
 where
     E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
-    type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;
+    type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;
 
     #[inline]
     fn as_decoder<C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
@@ -424,12 +429,12 @@ where
 
 /// A decoder over a simple value iterator.
 
-pub struct IterValueDecoder<'de, E> {
+pub struct IterValueDecoder<'de, const F: Options, E> {
     iter: slice::Iter<'de, Value>,
     _marker: marker::PhantomData<E>,
 }
 
-impl<'de, E> IterValueDecoder<'de, E> {
+impl<'de, const F: Options, E> IterValueDecoder<'de, F, E> {
     #[cfg(feature = "alloc")]
     #[inline]
     fn new(values: &'de [Value]) -> Self {
@@ -440,13 +445,13 @@ impl<'de, E> IterValueDecoder<'de, E> {
     }
 }
 
-impl<'de, E> PackDecoder<'de> for IterValueDecoder<'de, E>
+impl<'de, const F: Options, E> PackDecoder<'de> for IterValueDecoder<'de, F, E>
 where
     E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
-    type Decoder<'this> = ValueDecoder<'de, E>
+    type Decoder<'this> = ValueDecoder<'de, F, E>
     where
         Self: 'this;
 
@@ -470,13 +475,13 @@ where
     }
 }
 
-impl<'de, E> SequenceDecoder<'de> for IterValueDecoder<'de, E>
+impl<'de, const F: Options, E> SequenceDecoder<'de> for IterValueDecoder<'de, F, E>
 where
     E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
-    type Decoder<'this> = ValueDecoder<'de, E>
+    type Decoder<'this> = ValueDecoder<'de, F, E>
     where
         Self: 'this;
 
@@ -506,12 +511,12 @@ where
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairsDecoder<'de, E> {
+pub struct IterValuePairsDecoder<'de, const F: Options, E> {
     iter: slice::Iter<'de, (Value, Value)>,
     _marker: marker::PhantomData<E>,
 }
 
-impl<'de, E> IterValuePairsDecoder<'de, E> {
+impl<'de, const F: Options, E> IterValuePairsDecoder<'de, F, E> {
     #[cfg(feature = "alloc")]
     #[inline]
     fn new(values: &'de [(Value, Value)]) -> Self {
@@ -522,13 +527,13 @@ impl<'de, E> IterValuePairsDecoder<'de, E> {
     }
 }
 
-impl<'de, E> PairsDecoder<'de> for IterValuePairsDecoder<'de, E>
+impl<'de, const F: Options, E> PairsDecoder<'de> for IterValuePairsDecoder<'de, F, E>
 where
     E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
-    type Decoder<'this> = IterValuePairDecoder<'de, E>
+    type Decoder<'this> = IterValuePairDecoder<'de, F, E>
     where
         Self: 'this;
 
@@ -555,12 +560,12 @@ where
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairDecoder<'de, E> {
+pub struct IterValuePairDecoder<'de, const F: Options, E> {
     pair: &'de (Value, Value),
     _marker: marker::PhantomData<E>,
 }
 
-impl<'de, E> IterValuePairDecoder<'de, E> {
+impl<'de, const F: Options, E> IterValuePairDecoder<'de, F, E> {
     #[inline]
     const fn new(pair: &'de (Value, Value)) -> Self {
         Self {
@@ -570,17 +575,17 @@ impl<'de, E> IterValuePairDecoder<'de, E> {
     }
 }
 
-impl<'de, E> PairDecoder<'de> for IterValuePairDecoder<'de, E>
+impl<'de, const F: Options, E> PairDecoder<'de> for IterValuePairDecoder<'de, F, E>
 where
     E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
-    type First<'this> = ValueDecoder<'de, E>
+    type First<'this> = ValueDecoder<'de, F, E>
     where
         Self: 'this;
 
-    type Second = ValueDecoder<'de, E>;
+    type Second = ValueDecoder<'de, F, E>;
 
     #[inline]
     fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
@@ -608,12 +613,12 @@ where
 }
 
 /// A decoder over a simple value pair as a variant.
-pub struct IterValueVariantDecoder<'de, E> {
+pub struct IterValueVariantDecoder<'de, const F: Options, E> {
     pair: &'de (Value, Value),
     _marker: marker::PhantomData<E>,
 }
 
-impl<'de, E> IterValueVariantDecoder<'de, E> {
+impl<'de, const F: Options, E> IterValueVariantDecoder<'de, F, E> {
     #[cfg(feature = "alloc")]
     #[inline]
     const fn new(pair: &'de (Value, Value)) -> Self {
@@ -624,17 +629,17 @@ impl<'de, E> IterValueVariantDecoder<'de, E> {
     }
 }
 
-impl<'de, E> VariantDecoder<'de> for IterValueVariantDecoder<'de, E>
+impl<'de, const F: Options, E> VariantDecoder<'de> for IterValueVariantDecoder<'de, F, E>
 where
     E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
-    type Tag<'this> = ValueDecoder<'de, E>
+    type Tag<'this> = ValueDecoder<'de, F, E>
     where
         Self: 'this;
 
-    type Variant<'this> = ValueDecoder<'de, E>
+    type Variant<'this> = ValueDecoder<'de, F, E>
     where
         Self: 'this;
 

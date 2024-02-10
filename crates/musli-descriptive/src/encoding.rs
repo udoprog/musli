@@ -16,8 +16,12 @@ use crate::de::SelfDecoder;
 use crate::en::SelfEncoder;
 use crate::error::Error;
 use crate::fixed_bytes::FixedBytes;
+use crate::options::{self, Options};
 use crate::reader::{Reader, SliceReader};
 use crate::writer::Writer;
+
+/// The default flavor used by the [DEFAULT] configuration.
+pub const DEFAULT_OPTIONS: options::Options = options::new().build();
 
 /// The default configuration.
 ///
@@ -97,7 +101,7 @@ where
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = DefaultMode> {
+pub struct Encoding<M = DefaultMode, const F: Options = DEFAULT_OPTIONS> {
     _marker: marker::PhantomData<M>,
 }
 
@@ -138,7 +142,7 @@ impl Encoding<DefaultMode> {
     }
 }
 
-impl<M> Encoding<M>
+impl<M, const F: Options> Encoding<M, F>
 where
     M: Mode,
 {
@@ -152,8 +156,8 @@ where
         }
     }
 
-    musli_common::encoding_impls!(SelfEncoder::new, SelfDecoder::new);
-    musli_common::encoding_from_slice_impls!(SelfDecoder::new);
+    musli_common::encoding_impls!(SelfEncoder::<_, F>::new, SelfDecoder::<_, F>::new);
+    musli_common::encoding_from_slice_impls!(SelfDecoder::<_, F>::new);
 }
 
 impl<M> Clone for Encoding<M>

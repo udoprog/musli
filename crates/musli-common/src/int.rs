@@ -7,15 +7,20 @@
 //! are based on these.
 
 mod byteorder;
+#[doc(hidden)]
 pub mod continuation;
 mod encoding;
-mod formats;
 mod traits;
+#[doc(hidden)]
 pub mod zigzag;
 
+#[doc(hidden)]
 pub use self::byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, NetworkEndian};
-pub use self::encoding::{IntegerEncoding, UsizeEncoding};
-pub use self::formats::{Fixed, FixedUsize, Variable};
+#[doc(hidden)]
+pub use self::encoding::{
+    decode_signed, decode_unsigned, decode_usize, encode_signed, encode_unsigned, encode_usize,
+};
+#[doc(hidden)]
 pub use self::traits::{ByteOrderIo, Signed, Unsigned};
 
 #[cfg(test)]
