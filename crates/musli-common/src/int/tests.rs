@@ -7,6 +7,11 @@ use crate::int::continuation as c;
 use crate::int::zigzag as zig;
 use crate::int::{Signed, Unsigned};
 
+#[cfg(not(miri))]
+const ITER: usize = 10000;
+#[cfg(miri)]
+const ITER: usize = 100;
+
 #[test]
 fn test_continuation_encoding() {
     use rand::prelude::*;
@@ -52,7 +57,7 @@ fn test_continuation_encoding() {
 
             let mut rng = StdRng::seed_from_u64(0xfd80fd80fd80fd80);
 
-            for _ in 0..10000 {
+            for _ in 0..ITER {
                 let value = rng.gen::<usize>();
                 rt(value);
             }

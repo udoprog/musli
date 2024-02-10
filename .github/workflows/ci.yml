@@ -62,7 +62,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: miri
-    - run: cargo miri test --workspace --exclude no-std-examples --exclude musli-common --features test
+    - run: cargo miri test --workspace --exclude no-std-examples --features test
     - run: cargo miri run -p tests --features test --bin fuzz
     - run: cargo miri run -p tests --features test --bin fuzz -- --random
 
