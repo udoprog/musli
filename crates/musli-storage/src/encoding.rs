@@ -237,15 +237,11 @@ where
         }
     }
 
-    musli_common::encoding_impls! {
-        StorageEncoder::<_, I, L, Error>::new,
-        StorageDecoder::<_, I, L, Error>::new
-    }
-
-    musli_common::encoding_from_slice_impls! {
-        StorageEncoder::<_, I, L, Error>::new,
-        StorageDecoder::<_, I, L, Error>::new
-    }
+    musli_common::encoding_impls!(
+        StorageEncoder::<_, I, L, _>::new,
+        StorageDecoder::<_, I, L, _>::new
+    );
+    musli_common::encoding_from_slice_impls!(StorageDecoder::<_, I, L, _>::new);
 }
 
 impl<M, I, L> Clone for Encoding<M, I, L>

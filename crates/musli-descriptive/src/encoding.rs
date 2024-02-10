@@ -152,23 +152,8 @@ where
         }
     }
 
-    musli_common::encoding_impls! {
-        SelfEncoder::<_>::new,
-        SelfDecoder::new
-    }
-
-    /// Decode the given type `T` from the given slice using the current
-    /// configuration.
-    #[inline]
-    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
-    where
-        T: Decode<'de, M>,
-    {
-        let alloc = musli_common::allocator::Default::default();
-        let mut cx = musli_common::context::Same::new(&alloc);
-        let mut reader = SliceReader::new(bytes);
-        T::decode(&mut cx, SelfDecoder::<_>::new(&mut reader))
-    }
+    musli_common::encoding_impls!(SelfEncoder::new, SelfDecoder::new);
+    musli_common::encoding_from_slice_impls!(SelfDecoder::new);
 }
 
 impl<M> Clone for Encoding<M>

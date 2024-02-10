@@ -94,7 +94,7 @@ macro_rules! encode_with_extensions {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! encoding_from_slice_impls {
-    ($encoder_new:path, $decoder_new:path) => {
+    ($decoder_new:path) => {
         /// Decode the given type `T` from the given slice using the current
         /// configuration.
         #[inline]
