@@ -1,6 +1,6 @@
 use core::cell::UnsafeCell;
 use core::mem;
-use core::ptr;
+use core::ptr::{self, NonNull};
 use core::slice;
 
 use alloc::vec::Vec;
@@ -100,7 +100,7 @@ impl<'a> Buffer for Buf<'a> {
 
         unsafe {
             let data = &mut *self.data.get();
-            let same = ptr::eq(ptr, data.as_ptr());
+            let same = ptr::eq(ptr.as_ptr(), data.as_ptr());
             let to = self.base.wrapping_add(self.len);
 
             data.reserve(len);
@@ -117,7 +117,7 @@ impl<'a> Buffer for Buf<'a> {
                 // underlying allocator data when dropped.
                 mem::forget(other);
             } else {
-                let from = ptr.wrapping_add(from);
+                let from = ptr.as_ptr().wrapping_add(from);
                 let to = data.as_mut_ptr().wrapping_add(to);
                 ptr::copy_nonoverlapping(from, to, len);
             }
@@ -134,10 +134,11 @@ impl<'a> Buffer for Buf<'a> {
     }
 
     #[inline(always)]
-    fn raw_parts(&self) -> (*const u8, usize, usize) {
+    fn raw_parts(&self) -> (NonNull<u8>, usize, usize) {
         unsafe {
             let data = &*self.data.get();
-            (data.as_ptr(), self.base, self.len)
+            let ptr = NonNull::new_unchecked(data.as_ptr().cast_mut());
+            (ptr, self.base, self.len)
         }
     }
 
