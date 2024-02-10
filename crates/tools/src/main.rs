@@ -911,7 +911,6 @@ fn build_bench(report: &Report) -> Result<Build> {
         bail!("Command failed: {}", build.status.success());
     }
 
-    dbg!(&build.all);
     let fuzz = build.bin("bin", "fuzz").context("missing fuzz")?;
     let comparison = build
         .bin("bench", "comparison")

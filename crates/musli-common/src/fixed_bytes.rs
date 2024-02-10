@@ -207,27 +207,4 @@ impl<const N: usize> Writer for FixedBytes<N> {
         cx.advance(bytes.len());
         Ok(())
     }
-
-    #[inline(always)]
-    fn write_array<C, const U: usize>(&mut self, cx: &mut C, array: [u8; U]) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        if U > N.saturating_sub(self.init) {
-            return Err(cx.report(FixedBytesOverflow {
-                at: self.init,
-                additional: U,
-                capacity: N,
-            }));
-        }
-
-        unsafe {
-            let dst = self.data.as_mut_ptr().cast::<u8>().add(self.init);
-            ptr::copy_nonoverlapping(array.as_ptr(), dst, U);
-        }
-
-        self.init = self.init.wrapping_add(U);
-        cx.advance(U);
-        Ok(())
-    }
 }

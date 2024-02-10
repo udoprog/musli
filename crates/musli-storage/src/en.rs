@@ -4,27 +4,21 @@ use core::marker;
 use musli::context::Buffer;
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::Context;
-use musli_common::int::{IntegerEncoding, UsizeEncoding, Variable};
+use musli_common::options::{self, Options};
 use musli_common::writer::Writer;
 
+const DEFAULT_OPTIONS: options::Options = options::new().build();
+
 /// The alias for a [StorageEncoder] that is used for packs.
-pub type PackEncoder<W, E> = StorageEncoder<W, Variable, Variable, E>;
+pub type PackEncoder<W, E> = StorageEncoder<W, DEFAULT_OPTIONS, E>;
 
 /// A vaery simple encoder suitable for storage encoding.
-pub struct StorageEncoder<W, I, L, E>
-where
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
+pub struct StorageEncoder<W, const F: Options, E> {
     writer: W,
-    _marker: marker::PhantomData<(I, L, E)>,
+    _marker: marker::PhantomData<E>,
 }
 
-impl<W, I, L, E> StorageEncoder<W, I, L, E>
-where
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
+impl<W, const F: Options, E> StorageEncoder<W, F, E> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub fn new(writer: W) -> Self {
@@ -36,11 +30,9 @@ where
 }
 
 #[musli::encoder]
-impl<W, I, L, E> Encoder for StorageEncoder<W, I, L, E>
+impl<W, const F: Options, E> Encoder for StorageEncoder<W, F, E>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
     E: From<W::Error>,
     E: musli::error::Error,
 {
@@ -85,7 +77,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_array(cx.adapt(), array)
+        self.writer.write_bytes(cx.adapt(), &array)
     }
 
     #[inline(always)]
@@ -93,7 +85,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        L::encode_usize(cx.adapt(), self.writer.borrow_mut(), bytes.len())?;
+        musli_common::int::encode_usize::<_, _, F>(
+            cx.adapt(),
+            self.writer.borrow_mut(),
+            bytes.len(),
+        )?;
         self.writer.write_bytes(cx.adapt(), bytes)?;
         Ok(())
     }
@@ -108,7 +104,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let len = vectors.iter().map(|v| v.len()).sum();
-        L::encode_usize(cx.adapt(), self.writer.borrow_mut(), len)?;
+        musli_common::int::encode_usize::<_, _, F>(cx.adapt(), self.writer.borrow_mut(), len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(cx.adapt(), bytes)?;
@@ -122,7 +118,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        L::encode_usize(cx.adapt(), self.writer.borrow_mut(), string.len())?;
+        musli_common::int::encode_usize::<_, _, F>(
+            cx.adapt(),
+            self.writer.borrow_mut(),
+            string.len(),
+        )?;
         self.writer.write_bytes(cx.adapt(), string.as_bytes())?;
         Ok(())
     }
@@ -132,7 +132,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        L::encode_usize(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_usize::<_, _, F>(cx.adapt(), self.writer.borrow_mut(), value)
     }
 
     #[inline(always)]
@@ -173,7 +173,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        I::encode_unsigned(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_unsigned::<_, _, _, F>(
+            cx.adapt(),
+            self.writer.borrow_mut(),
+            value,
+        )
     }
 
     #[inline(always)]
@@ -181,7 +185,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        I::encode_unsigned(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_unsigned::<_, _, _, F>(
+            cx.adapt(),
+            self.writer.borrow_mut(),
+            value,
+        )
     }
 
     #[inline(always)]
@@ -189,7 +197,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        I::encode_unsigned(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_unsigned::<_, _, _, F>(
+            cx.adapt(),
+            self.writer.borrow_mut(),
+            value,
+        )
     }
 
     #[inline(always)]
@@ -197,7 +209,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        I::encode_unsigned(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_unsigned::<_, _, _, F>(
+            cx.adapt(),
+            self.writer.borrow_mut(),
+            value,
+        )
     }
 
     #[inline(always)]
@@ -213,7 +229,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        I::encode_signed(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_signed::<_, _, _, F>(cx.adapt(), self.writer.borrow_mut(), value)
     }
 
     #[inline(always)]
@@ -221,7 +237,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        I::encode_signed(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_signed::<_, _, _, F>(cx.adapt(), self.writer.borrow_mut(), value)
     }
 
     #[inline(always)]
@@ -229,7 +245,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        I::encode_signed(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_signed::<_, _, _, F>(cx.adapt(), self.writer.borrow_mut(), value)
     }
 
     #[inline(always)]
@@ -237,7 +253,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        I::encode_signed(cx.adapt(), self.writer.borrow_mut(), value)
+        musli_common::int::encode_signed::<_, _, _, F>(cx.adapt(), self.writer.borrow_mut(), value)
     }
 
     #[inline(always)]
@@ -279,7 +295,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        L::encode_usize(cx.adapt(), self.writer.borrow_mut(), len)?;
+        musli_common::int::encode_usize::<_, _, F>(cx.adapt(), self.writer.borrow_mut(), len)?;
         Ok(self)
     }
 
@@ -297,7 +313,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        L::encode_usize(cx.adapt(), self.writer.borrow_mut(), len)?;
+        musli_common::int::encode_usize::<_, _, F>(cx.adapt(), self.writer.borrow_mut(), len)?;
         Ok(self)
     }
 
@@ -306,7 +322,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        L::encode_usize(cx.adapt(), self.writer.borrow_mut(), len)?;
+        musli_common::int::encode_usize::<_, _, F>(cx.adapt(), self.writer.borrow_mut(), len)?;
         Ok(self)
     }
 
@@ -319,17 +335,15 @@ where
     }
 }
 
-impl<W, I, L, E> SequenceEncoder for StorageEncoder<W, I, L, E>
+impl<W, const F: Options, E> SequenceEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
     E: From<W::Error>,
     E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
-    type Encoder<'this> = StorageEncoder<W::Mut<'this>, I, L, E> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
 
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
@@ -348,17 +362,15 @@ where
     }
 }
 
-impl<W, I, L, E> PairsEncoder for StorageEncoder<W, I, L, E>
+impl<W, const F: Options, E> PairsEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
     E: From<W::Error>,
     E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
-    type Encoder<'this> = StorageEncoder<W::Mut<'this>, I, L, E> where Self: 'this;
+    type Encoder<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
 
     #[inline]
     fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
@@ -377,18 +389,16 @@ where
     }
 }
 
-impl<W, I, L, E> PairEncoder for StorageEncoder<W, I, L, E>
+impl<W, const F: Options, E> PairEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
     E: From<W::Error>,
     E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
-    type First<'this> = StorageEncoder<W::Mut<'this>, I, L, E> where Self: 'this;
-    type Second<'this> = StorageEncoder<W::Mut<'this>, I, L, E> where Self: 'this;
+    type First<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+    type Second<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
 
     #[inline]
     fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
@@ -415,18 +425,16 @@ where
     }
 }
 
-impl<W, I, L, E> VariantEncoder for StorageEncoder<W, I, L, E>
+impl<W, const F: Options, E> VariantEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
     E: From<W::Error>,
     E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
-    type Tag<'this> = StorageEncoder<W::Mut<'this>, I, L, E> where Self: 'this;
-    type Variant<'this> = StorageEncoder<W::Mut<'this>, I, L, E> where Self: 'this;
+    type Tag<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+    type Variant<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
 
     #[inline]
     fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>

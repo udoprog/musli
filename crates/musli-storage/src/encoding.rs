@@ -16,12 +16,12 @@ use crate::de::StorageDecoder;
 use crate::en::StorageEncoder;
 use crate::error::Error;
 use crate::fixed_bytes::FixedBytes;
-use crate::int::{
-    BigEndian, ByteOrder, Fixed, FixedUsize, IntegerEncoding, LittleEndian, NetworkEndian,
-    UsizeEncoding, Variable,
-};
+use crate::int::ByteOrder;
+use crate::options::{self, Options};
 use crate::reader::{Reader, SliceReader};
 use crate::writer::Writer;
+
+const DEFAULT_OPTIONS: Options = options::new().build();
 
 /// The default configuration.
 ///
@@ -32,7 +32,7 @@ use crate::writer::Writer;
 ///
 /// [zigzag]: musli_common::int::zigzag
 /// [continuation]: musli_common::int::continuation
-pub const DEFAULT: Encoding<DefaultMode, Variable, Variable> = Encoding::new();
+pub const DEFAULT: Encoding<DefaultMode> = Encoding::new();
 
 /// Encode the given value to the given [`Writer`] using the [DEFAULT]
 /// configuration.
@@ -101,29 +101,27 @@ where
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = DefaultMode, I = Variable, L = Variable>
+pub struct Encoding<M = DefaultMode, const F: Options = DEFAULT_OPTIONS>
 where
     M: Mode,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
 {
-    _marker: marker::PhantomData<(M, I, L)>,
+    _marker: marker::PhantomData<M>,
 }
 
-impl Encoding<DefaultMode, Variable, Variable> {
+impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
     /// Construct a new [Encoding] instance which uses [Variable] integer
     /// encoding.
     ///
-    /// You can modify this using the available factory methods:
+    /// You can modify this behavior by using a custom [Options] instance:
     ///
     /// ```rust
     /// use musli_storage::Encoding;
-    /// use musli_storage::int::{Fixed, Variable};
+    /// use musli_storage::options::{self, Options, Integer};
     /// use musli::mode::DefaultMode;
     /// use musli::{Encode, Decode};
     ///
-    /// const CONFIG: Encoding<DefaultMode, Fixed, Variable> = Encoding::new()
-    ///     .with_fixed_integers();
+    /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+    /// const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
     /// struct Struct<'a> {
@@ -152,14 +150,12 @@ impl Encoding<DefaultMode, Variable, Variable> {
     }
 }
 
-impl<M, I, L> Encoding<M, I, L>
+impl<M, const F: Options> Encoding<M, F>
 where
     M: Mode,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
 {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T, I, L>
+    pub const fn with_mode<T>(self) -> Encoding<T, F>
     where
         T: Mode,
     {
@@ -168,15 +164,35 @@ where
         }
     }
 
+    /// Modify the flavor of the current encoding into `U`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use musli_storage::Encoding;
+    /// use musli_storage::options::{self, Options, Integer};
+    /// use musli::mode::DefaultMode;
+    ///
+    /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+    /// const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
+    /// ```
+    pub const fn with_options<const U: Options>(self) -> Encoding<M, U> {
+        Encoding {
+            _marker: marker::PhantomData,
+        }
+    }
+
     /// Configure the encoding to use variable integer encoding.
-    pub const fn with_variable_integers(self) -> Encoding<M, Variable, L> {
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_variable_integers(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     /// Configure the encoding to use fixed integer encoding.
-    pub const fn with_fixed_integers(self) -> Encoding<M, Fixed, L> {
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_fixed_integers(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -184,28 +200,32 @@ where
 
     /// Configure the encoding to use fixed integer network-endian encoding
     /// (Default).
-    pub const fn with_fixed_integers_ne(self) -> Encoding<M, Fixed<NetworkEndian>, L> {
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_fixed_integers_ne(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     /// Configure the encoding to use fixed integer little-endian encoding.
-    pub const fn with_fixed_integers_le(self) -> Encoding<M, Fixed<LittleEndian>, L> {
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_fixed_integers_le(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     /// Configure the encoding to use fixed integer big-endian encoding.
-    pub const fn with_fixed_integers_be(self) -> Encoding<M, Fixed<BigEndian>, L> {
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_fixed_integers_be(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     /// Configure the encoding to use fixed integer custom endian encoding.
-    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, Fixed<E>, L>
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, F>
     where
         E: ByteOrder,
     {
@@ -215,7 +235,8 @@ where
     }
 
     /// Configure the encoding to use variable length encoding.
-    pub const fn with_variable_lengths(self) -> Encoding<M, I, Variable> {
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_variable_lengths(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -223,7 +244,8 @@ where
 
     /// Configure the encoding to use fixed length 32-bit encoding when encoding
     /// lengths.
-    pub const fn with_fixed_lengths(self) -> Encoding<M, I, FixedUsize<u32>> {
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_fixed_lengths(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -231,24 +253,23 @@ where
 
     /// Configure the encoding to use fixed length 64-bit encoding when encoding
     /// lengths.
-    pub const fn with_fixed_lengths64(self) -> Encoding<M, I, FixedUsize<u64>> {
+    #[deprecated = "This does nothing, use `with_options` instead"]
+    pub const fn with_fixed_lengths64(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
     musli_common::encoding_impls!(
-        StorageEncoder::<_, I, L, _>::new,
-        StorageDecoder::<_, I, L, _>::new
+        StorageEncoder::<_, F, _>::new,
+        StorageDecoder::<_, F, _>::new
     );
-    musli_common::encoding_from_slice_impls!(StorageDecoder::<_, I, L, _>::new);
+    musli_common::encoding_from_slice_impls!(StorageDecoder::<_, F, _>::new);
 }
 
-impl<M, I, L> Clone for Encoding<M, I, L>
+impl<M, const F: Options> Clone for Encoding<M, F>
 where
     M: Mode,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -256,10 +277,4 @@ where
     }
 }
 
-impl<M, I, L> Copy for Encoding<M, I, L>
-where
-    M: Mode,
-    I: IntegerEncoding,
-    L: UsizeEncoding,
-{
-}
+impl<M, const F: Options> Copy for Encoding<M, F> where M: Mode {}

@@ -19,6 +19,7 @@ use musli::en::{Encode, Encoder};
 use musli::en::{PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::mode::Mode;
 use musli::Context;
+use musli_common::options::Options;
 use musli_common::reader::SliceUnderflow;
 
 use crate::de::ValueDecoder;
@@ -86,7 +87,7 @@ impl Value {
     /// Construct a [AsValueDecoder] implementation out of this value which
     /// emits the specified error `E`.
     #[inline]
-    pub fn into_value_decoder<E>(self) -> AsValueDecoder<E>
+    pub fn into_value_decoder<const F: Options, E>(self) -> AsValueDecoder<F, E>
     where
         E: musli::error::Error + From<ErrorKind>,
     {
@@ -95,7 +96,7 @@ impl Value {
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<E>(&self) -> ValueDecoder<'_, E>
+    pub(crate) fn decoder<const F: Options, E>(&self) -> ValueDecoder<'_, F, E>
     where
         E: musli::error::Error + From<ErrorKind>,
     {
@@ -674,12 +675,12 @@ where
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct AsValueDecoder<E> {
+pub struct AsValueDecoder<const F: Options, E> {
     value: Value,
     _marker: marker::PhantomData<E>,
 }
 
-impl<E> AsValueDecoder<E> {
+impl<const F: Options, E> AsValueDecoder<F, E> {
     /// Construct a new buffered value decoder.
     #[inline]
     pub fn new(value: Value) -> Self {
@@ -690,12 +691,12 @@ impl<E> AsValueDecoder<E> {
     }
 }
 
-impl<E> AsDecoder for AsValueDecoder<E>
+impl<const F: Options, E> AsDecoder for AsValueDecoder<F, E>
 where
     E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
-    type Decoder<'this> = ValueDecoder<'this, E> where Self: 'this;
+    type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;
 
     #[inline]
     fn as_decoder<C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>

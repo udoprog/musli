@@ -40,15 +40,16 @@ pub mod musli_json {
 pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
-    use ::musli_storage::int::{Fixed, Variable};
+    use ::musli_storage::options::{self, Integer, Options};
     use ::musli_storage::Encoding;
     use ::musli_storage::Error;
+
     use musli::{Decode, Encode};
 
     use crate::mode::Packed;
 
-    const ENCODING: Encoding<Packed, Fixed, Variable> =
-        Encoding::new().with_fixed_integers().with_mode();
+    const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+    const ENCODING: Encoding<Packed, OPTIONS> = Encoding::new().with_options().with_mode();
 
     benchmarker! {
         'buf
@@ -82,13 +83,14 @@ pub mod musli_storage_packed {
 pub mod musli_storage {
     use alloc::vec::Vec;
 
-    use ::musli_storage::int::{Fixed, Variable};
+    use ::musli_storage::options::{self, Integer, Options};
     use ::musli_storage::Encoding;
     use ::musli_storage::Error;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
-    const ENCODING: Encoding<DefaultMode, Fixed, Variable> = Encoding::new().with_fixed_integers();
+    const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+    const ENCODING: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
 
     benchmarker! {
         'buf
@@ -122,13 +124,12 @@ pub mod musli_storage {
 pub mod musli_wire {
     use alloc::vec::Vec;
 
-    use ::musli_wire::int::Variable;
     use ::musli_wire::Encoding;
     use ::musli_wire::Error;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
 
-    const ENCODING: Encoding<DefaultMode, Variable, Variable> = Encoding::new();
+    const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
     benchmarker! {
         'buf

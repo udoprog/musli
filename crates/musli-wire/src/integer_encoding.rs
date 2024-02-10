@@ -1,262 +1,248 @@
 use musli::Context;
-use musli_common::int::continuation as c;
-use musli_common::int::zigzag as zig;
-use musli_common::int::{ByteOrder, ByteOrderIo, Fixed, FixedUsize, Signed, Unsigned, Variable};
-use musli_common::reader::Reader;
-use musli_common::writer::Writer;
 
+use crate::int::continuation as c;
+use crate::int::zigzag as zig;
+use crate::int::{BigEndian, ByteOrderIo, LittleEndian, Signed, Unsigned};
+use crate::options::Options;
+use crate::reader::Reader;
 use crate::tag::{Kind, Tag, DATA_MASK};
+use crate::writer::Writer;
 
-mod private {
-    pub trait Sealed {}
-    impl<B> Sealed for musli_common::int::Fixed<B> {}
-    impl<L, B> Sealed for musli_common::int::FixedUsize<L, B> {}
-    impl Sealed for musli_common::int::Variable {}
+macro_rules! fixed_arm {
+    ($bo:ty, $what:ident::<$f:ty>, $macro:path) => {
+        match crate::options::$what::<$f>() {
+            crate::options::Width::U8 => {
+                $macro!(u8, $bo)
+            }
+            crate::options::Width::U16 => {
+                $macro!(u16, $bo)
+            }
+            crate::options::Width::U32 => {
+                $macro!(u32, $bo)
+            }
+            _ => {
+                $macro!(u64, $bo)
+            }
+        }
+    };
 }
 
-/// Trait which governs how integers are encoded in a binary format.
-///
-/// The two common implementations of this is [Variable] and [Fixed].
-pub trait WireIntegerEncoding: musli_common::int::IntegerEncoding + private::Sealed {
-    /// Governs how unsigned integers are encoded into a [Writer].
-    fn encode_typed_unsigned<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer,
-        T: ByteOrderIo;
-
-    /// Governs how unsigned integers are decoded from a [Reader].
-    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>,
-        T: ByteOrderIo;
-
-    /// Governs how signed integers are encoded into a [Writer].
-    fn encode_typed_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer,
-        T: Signed,
-        T::Unsigned: ByteOrderIo;
-
-    /// Governs how signed integers are decoded from a [Reader].
-    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>,
-        T: Signed,
-        T::Unsigned: ByteOrderIo<Signed = T>;
-}
-
-/// Encoding formats which ensure that variably sized types (like `usize`,
-/// `isize`) are encoded in a format which is platform-neutral.
-pub trait WireUsizeEncoding: musli_common::int::UsizeEncoding + private::Sealed {
-    /// Governs how usize lengths are encoded into a [Writer].
-    fn encode_typed_usize<C, W>(cx: &mut C, writer: W, value: usize) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer;
-
-    /// Governs how usize lengths are decoded from a [Reader].
-    fn decode_typed_usize<'de, C, R>(cx: &mut C, reader: R) -> Result<usize, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>;
-}
-
-impl WireIntegerEncoding for Variable {
-    #[inline]
-    fn encode_typed_unsigned<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer,
-        T: Unsigned,
-    {
-        if value.is_smaller_than(DATA_MASK) {
-            writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
-        } else {
-            writer.write_byte(cx, Tag::empty(Kind::Continuation).byte())?;
-            c::encode(cx, writer, value)
-        }
-    }
-
-    #[inline]
-    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>,
-        T: Unsigned,
-    {
-        let tag = Tag::from_byte(reader.read_byte(cx)?);
-
-        if tag.kind() != Kind::Continuation {
-            return Err(cx.message("Expected continuation"));
-        }
-
-        if let Some(data) = tag.data() {
-            Ok(T::from_byte(data))
-        } else {
-            c::decode(cx, reader)
-        }
-    }
-
-    #[inline]
-    fn encode_typed_signed<C, W, T>(cx: &mut C, writer: W, value: T) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer,
-        T: Signed,
-        T::Unsigned: ByteOrderIo,
-    {
-        Self::encode_typed_unsigned(cx, writer, zig::encode(value))
-    }
-
-    #[inline]
-    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>,
-        T: Signed,
-        T::Unsigned: Unsigned<Signed = T> + ByteOrderIo,
-    {
-        let value: T::Unsigned = Self::decode_typed_unsigned(cx, reader)?;
-        Ok(zig::decode(value))
-    }
-}
-
-impl WireUsizeEncoding for Variable {
-    #[inline]
-    fn encode_typed_usize<C, W>(cx: &mut C, mut writer: W, value: usize) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer,
-    {
-        if value.is_smaller_than(DATA_MASK) {
-            writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
-        } else {
-            writer.write_byte(cx, Tag::empty(Kind::Continuation).byte())?;
-            c::encode(cx, writer, value)
-        }
-    }
-
-    #[inline]
-    fn decode_typed_usize<'de, C, R>(cx: &mut C, mut reader: R) -> Result<usize, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>,
-    {
-        let tag = Tag::from_byte(reader.read_byte(cx)?);
-
-        if tag.kind() != Kind::Continuation {
-            return Err(cx.message("Expected continuation"));
-        }
-
-        if let Some(data) = tag.data() {
-            Ok(usize::from_byte(data))
-        } else {
-            c::decode(cx, reader)
-        }
-    }
-}
-
-impl<B> WireIntegerEncoding for Fixed<B>
+/// Governs how usize lengths are encoded into a [Writer].
+#[inline]
+pub(crate) fn encode_typed_usize<C, W, const F: Options>(
+    cx: &mut C,
+    mut writer: W,
+    value: usize,
+) -> Result<(), C::Error>
 where
-    B: ByteOrder,
+    C: Context<Input = W::Error>,
+    W: Writer,
 {
-    #[inline]
-    fn encode_typed_unsigned<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer,
-        T: ByteOrderIo,
-    {
-        writer.write_byte(cx, Tag::new(Kind::Prefix, T::BYTES).byte())?;
-        value.write_bytes_unsigned::<_, _, B>(cx, writer)
+    macro_rules! fixed {
+        ($ty:ty, $bo:ty) => {{
+            writer.write_byte(cx, Tag::new(Kind::Prefix, <$ty>::BYTES).byte())?;
+
+            let Ok(value) = <$ty>::try_from(value) else {
+                return Err(cx.message("Usize out of bounds for value type"));
+            };
+
+            value.write_bytes::<_, _, $bo>(cx, writer)
+        }};
     }
 
-    #[inline]
-    fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>,
-        T: ByteOrderIo,
-    {
-        if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::BYTES) {
-            return Err(cx.message("Expected fixed integer"));
+    match (
+        crate::options::length::<F>(),
+        crate::options::byteorder::<F>(),
+    ) {
+        (crate::options::Integer::Variable, _) => {
+            if value.is_smaller_than(DATA_MASK) {
+                writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
+            } else {
+                writer.write_byte(cx, Tag::empty(Kind::Continuation).byte())?;
+                c::encode(cx, writer, value)
+            }
         }
-
-        T::read_bytes_unsigned::<_, _, B>(cx, reader)
-    }
-
-    #[inline]
-    fn encode_typed_signed<C, W, T>(cx: &mut C, mut writer: W, value: T) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer,
-        T: Signed,
-        T::Unsigned: ByteOrderIo,
-    {
-        writer.write_byte(cx, Tag::new(Kind::Prefix, T::Unsigned::BYTES).byte())?;
-        value.unsigned().write_bytes_unsigned::<_, _, B>(cx, writer)
-    }
-
-    #[inline]
-    fn decode_typed_signed<'de, C, R, T>(cx: &mut C, mut reader: R) -> Result<T, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>,
-        T: Signed,
-        T::Unsigned: ByteOrderIo<Signed = T>,
-    {
-        if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::Unsigned::BYTES) {
-            return Err(cx.message("Expected fixed integer"));
+        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
+            fixed_arm!(LittleEndian, length_width::<F>, fixed)
         }
-
-        Ok(T::Unsigned::read_bytes_unsigned::<_, _, B>(cx, reader)?.signed())
+        _ => {
+            fixed_arm!(BigEndian, length_width::<F>, fixed)
+        }
     }
 }
 
-impl<L, B> WireUsizeEncoding for FixedUsize<L, B>
+/// Governs how usize lengths are decoded from a [Reader].
+#[inline]
+pub(crate) fn decode_typed_usize<'de, C, R, const F: Options>(
+    cx: &mut C,
+    mut reader: R,
+) -> Result<usize, C::Error>
 where
-    B: ByteOrder,
-    usize: TryFrom<L>,
-    L: ByteOrderIo + TryFrom<usize>,
+    C: Context<Input = R::Error>,
+    R: Reader<'de>,
 {
-    #[inline]
-    fn encode_typed_usize<C, W>(cx: &mut C, mut writer: W, value: usize) -> Result<(), C::Error>
-    where
-        C: Context<Input = W::Error>,
-        W: Writer,
-    {
-        writer.write_byte(cx, Tag::new(Kind::Prefix, L::BYTES).byte())?;
+    macro_rules! fixed {
+        ($ty:ty, $bo:ty) => {{
+            let tag = Tag::from_byte(reader.read_byte(cx)?);
 
-        let Ok(value) = L::try_from(value) else {
-            return Err(cx.message("Usize out of bounds for value type"));
-        };
+            if tag != Tag::new(Kind::Prefix, <$ty>::BYTES) {
+                return Err(cx.message(format_args!(
+                    "Expected fixed {} bytes prefix tag, but got {tag:?}",
+                    <$ty>::BYTES
+                )));
+            }
 
-        value.write_bytes_unsigned::<_, _, B>(cx, writer)
+            let Ok(value) = usize::try_from(<$ty>::read_bytes_unsigned::<_, _, $bo>(cx, reader)?)
+            else {
+                return Err(cx.message("Value type out of bounds for usize"));
+            };
+
+            Ok(value)
+        }};
     }
 
-    #[inline]
-    fn decode_typed_usize<'de, C, R>(cx: &mut C, mut reader: R) -> Result<usize, C::Error>
-    where
-        C: Context<Input = R::Error>,
-        R: Reader<'de>,
-    {
-        let tag = Tag::from_byte(reader.read_byte(cx)?);
+    match (
+        crate::options::length::<F>(),
+        crate::options::byteorder::<F>(),
+    ) {
+        (crate::options::Integer::Variable, _) => {
+            let tag = Tag::from_byte(reader.read_byte(cx)?);
 
-        if tag != Tag::new(Kind::Prefix, L::BYTES) {
-            return Err(cx.message(format_args!(
-                "Expected fixed {} bytes prefix tag, but got {tag:?}",
-                L::BYTES
-            )));
+            if tag.kind() != Kind::Continuation {
+                return Err(cx.message("Expected continuation"));
+            }
+
+            if let Some(data) = tag.data() {
+                Ok(usize::from_byte(data))
+            } else {
+                c::decode(cx, reader)
+            }
         }
-
-        let Ok(value) = usize::try_from(L::read_bytes_unsigned::<_, _, B>(cx, reader)?) else {
-            return Err(cx.message("Value type out of bounds for usize"));
-        };
-
-        Ok(value)
+        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
+            fixed_arm!(LittleEndian, length_width::<F>, fixed)
+        }
+        _ => {
+            fixed_arm!(BigEndian, length_width::<F>, fixed)
+        }
     }
+}
+
+/// Governs how unsigned integers are encoded into a [Writer].
+#[inline]
+pub(crate) fn encode_typed_unsigned<C, W, T, const F: Options>(
+    cx: &mut C,
+    mut writer: W,
+    value: T,
+) -> Result<(), C::Error>
+where
+    C: Context<Input = W::Error>,
+    W: Writer,
+    T: ByteOrderIo,
+{
+    macro_rules! fixed {
+        ($ty:ty, $bo:ty) => {{
+            writer.write_byte(cx, Tag::new(Kind::Prefix, <$ty>::BYTES).byte())?;
+            value.write_bytes::<_, _, $bo>(cx, writer)
+        }};
+    }
+
+    match (
+        crate::options::integer::<F>(),
+        crate::options::byteorder::<F>(),
+    ) {
+        (crate::options::Integer::Variable, _) => {
+            if value.is_smaller_than(DATA_MASK) {
+                writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
+            } else {
+                writer.write_byte(cx, Tag::empty(Kind::Continuation).byte())?;
+                c::encode(cx, writer, value)
+            }
+        }
+        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
+            fixed!(T, LittleEndian)
+        }
+        _ => {
+            fixed!(T, BigEndian)
+        }
+    }
+}
+
+/// Governs how unsigned integers are decoded from a [Reader].
+#[inline]
+pub(crate) fn decode_typed_unsigned<'de, C, R, T, const F: Options>(
+    cx: &mut C,
+    mut reader: R,
+) -> Result<T, C::Error>
+where
+    C: Context<Input = R::Error>,
+    R: Reader<'de>,
+    T: ByteOrderIo,
+{
+    macro_rules! fixed {
+        ($ty:ty, $bo:ty) => {{
+            if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, <$ty>::BYTES) {
+                return Err(cx.message("Expected fixed integer"));
+            }
+
+            <$ty as ByteOrderIo>::read_bytes_unsigned::<_, _, $bo>(cx, reader)
+        }};
+    }
+
+    match (
+        crate::options::integer::<F>(),
+        crate::options::byteorder::<F>(),
+    ) {
+        (crate::options::Integer::Variable, _) => {
+            let tag = Tag::from_byte(reader.read_byte(cx)?);
+
+            if tag.kind() != Kind::Continuation {
+                return Err(cx.message("Expected continuation"));
+            }
+
+            if let Some(data) = tag.data() {
+                Ok(T::from_byte(data))
+            } else {
+                c::decode(cx, reader)
+            }
+        }
+        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
+            fixed!(T, LittleEndian)
+        }
+        _ => {
+            fixed!(T, BigEndian)
+        }
+    }
+}
+
+/// Governs how signed integers are encoded into a [Writer].
+#[inline]
+pub(crate) fn encode_typed_signed<C, W, T, const F: Options>(
+    cx: &mut C,
+    writer: W,
+    value: T,
+) -> Result<(), C::Error>
+where
+    C: Context<Input = W::Error>,
+    W: Writer,
+    T: Signed,
+    T::Unsigned: ByteOrderIo,
+{
+    let value = zig::encode(value);
+    encode_typed_unsigned::<_, _, _, F>(cx, writer, value)
+}
+
+/// Governs how signed integers are decoded from a [Reader].
+#[inline]
+pub(crate) fn decode_typed_signed<'de, C, R, T, const F: Options>(
+    cx: &mut C,
+    reader: R,
+) -> Result<T, C::Error>
+where
+    C: Context<Input = R::Error>,
+    R: Reader<'de>,
+    T: Signed,
+    T::Unsigned: Unsigned<Signed = T> + ByteOrderIo,
+{
+    let value: T::Unsigned = decode_typed_unsigned::<_, _, _, F>(cx, reader)?;
+    Ok(zig::decode(value))
 }

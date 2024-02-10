@@ -53,12 +53,12 @@
 //!
 //! ```rust
 //! use musli_wire::Encoding;
-//! use musli_wire::int::{Fixed, Variable};
+//! use musli_storage::options::{self, Options, Integer};
 //! use musli::{Encode, Decode};
 //! use musli::mode::DefaultMode;
 //!
-//! const CONFIG: Encoding<DefaultMode, Fixed, Variable> = Encoding::new()
-//!     .with_fixed_integers();
+//! const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+//! const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Struct<'a> {

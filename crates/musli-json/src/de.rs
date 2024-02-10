@@ -27,6 +27,10 @@ use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
 use crate::reader::{integer, string, Parser, StringReference, Token};
 
+use musli_common::options;
+
+const BUFFER_OPTIONS: options::Options = options::new().build();
+
 /// A JSON decoder for Müsli.
 pub struct JsonDecoder<P> {
     parser: P,
@@ -118,7 +122,7 @@ where
 {
     type Error = Error;
     #[cfg(feature = "musli-value")]
-    type Buffer = musli_value::AsValueDecoder<Self::Error>;
+    type Buffer = musli_value::AsValueDecoder<BUFFER_OPTIONS, Self::Error>;
     type Pack = JsonSequenceDecoder<P>;
     type Sequence = JsonSequenceDecoder<P>;
     type Tuple = JsonSequenceDecoder<P>;

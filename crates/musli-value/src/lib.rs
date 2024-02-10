@@ -29,6 +29,9 @@ pub use error::{Error, ErrorKind};
 
 use en::ValueEncoder;
 use musli::{Decode, Encode};
+use musli_storage::options;
+
+const DEFAULT_OPTIONS: options::Options = options::new().build();
 
 /// Encode something that implements [Encode] into a [Value].
 pub fn encode<T>(value: T) -> Result<Value, Error>
@@ -49,5 +52,5 @@ where
 {
     let alloc = musli_common::allocator::Default::default();
     let mut cx = musli_common::context::Same::new(&alloc);
-    T::decode(&mut cx, value.decoder())
+    T::decode(&mut cx, value.decoder::<DEFAULT_OPTIONS, _>())
 }

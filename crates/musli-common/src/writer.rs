@@ -76,15 +76,6 @@ pub trait Writer {
     {
         self.write_bytes(cx, &[b])
     }
-
-    /// Write an array to the current writer.
-    #[inline]
-    fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        self.write_bytes(cx, &array)
-    }
 }
 
 impl<W> Writer for &mut W
@@ -122,14 +113,6 @@ where
         C: Context<Input = Self::Error>,
     {
         (*self).write_byte(cx, b)
-    }
-
-    #[inline]
-    fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        (*self).write_array(cx, array)
     }
 }
 
@@ -170,16 +153,6 @@ impl Writer for Vec<u8> {
     {
         self.push(b);
         cx.advance(1);
-        Ok(())
-    }
-
-    #[inline]
-    fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        self.extend_from_slice(&array[..]);
-        cx.advance(N);
         Ok(())
     }
 }
@@ -236,26 +209,6 @@ impl Writer for &mut [u8] {
 
         self[0] = b;
         *self = &mut take(self)[1..];
-        Ok(())
-    }
-
-    #[inline]
-    fn write_array<C, const N: usize>(&mut self, cx: &mut C, array: [u8; N]) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        if self.len() < N {
-            return Err(cx.message(format_args!(
-                "Buffer overflow, remaining is {} while tried to write {}",
-                self.len(),
-                N
-            )));
-        }
-
-        let next = take(self);
-        let (this, next) = next.split_at_mut(N);
-        this.copy_from_slice(&array[..]);
-        *self = next;
         Ok(())
     }
 }

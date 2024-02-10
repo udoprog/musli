@@ -80,10 +80,14 @@
 //! # use musli::{Decode, Encode};
 //! # use musli::mode::DefaultMode;
 //! # use musli_storage::encoding::Encoding;
-//! # use musli_storage::int::{Fixed, NativeEndian, Variable};
+//! # use musli_storage::options::{self, Options, Integer, ByteOrder};
 //! # type Result<T, E = musli_storage::Error> = core::result::Result<T, E>;
-//! const ENCODING: Encoding<DefaultMode, Fixed<NativeEndian>, Variable> =
-//!     Encoding::new().with_fixed_integers_endian();
+//! const OPTIONS: Options = options::new()
+//!     .with_integer(Integer::Fixed)
+//!     .with_byte_order(ByteOrder::NATIVE)
+//!     .build();
+//!
+//! const ENCODING: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(packed)]

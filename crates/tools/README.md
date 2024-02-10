@@ -6,5 +6,5 @@ This obviously takes a long time, but will walk through all feature
 combinations:
 
 ```
-cargo run -- --bench
+cargo run -- report
 ```
