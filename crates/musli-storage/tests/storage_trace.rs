@@ -44,7 +44,7 @@ fn storage_trace() {
     let encoding = musli_storage::Encoding::new();
 
     let Ok(bytes) = encoding.to_vec_with(&mut cx, &from) else {
-        for error in cx.iter() {
+        if let Some(error) = cx.iter().next() {
             panic!("{error}");
         }
 
