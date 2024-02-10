@@ -357,8 +357,8 @@
 //!   `simdutf8` feature (enabled by default) removes the use of this unsafe.
 //!
 //! To ensure this library is correctly implemented with regards to memory
-//! safety, extensive testing is performed using `miri`. For more information on
-//! this, see [`tests`] for more information on this.
+//! safety, extensive testing is performed using `miri`. See [`tests`] for more
+//! information on this.
 //!
 //! <br>
 //!
