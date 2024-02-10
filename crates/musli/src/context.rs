@@ -506,7 +506,7 @@ where
     context: C,
 }
 
-impl<E, C> Context for Adapt<C, E>
+impl<C, E> Context for Adapt<C, E>
 where
     C: Context,
     C::Input: From<E>,
