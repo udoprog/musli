@@ -35,8 +35,8 @@ Add the following to your `Cargo.toml` using the [format](#formats) you want
 to use:
 
 ```toml
-musli = "0.0.94"
-musli-wire = "0.0.94"
+musli = "0.0.95"
+musli-wire = "0.0.95"
 ```
 
 <br>
@@ -80,8 +80,12 @@ As an example of this, these two functions both produce the same assembly on
 my machine (built with `--release`):
 
 ```rust
-const ENCODING: Encoding<DefaultMode, Fixed<NativeEndian>, Variable> =
-    Encoding::new().with_fixed_integers_endian();
+const OPTIONS: Options = options::new()
+    .with_integer(Integer::Fixed)
+    .with_byte_order(ByteOrder::NATIVE)
+    .build();
+
+const ENCODING: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
 
 #[derive(Encode, Decode)]
 #[musli(packed)]
