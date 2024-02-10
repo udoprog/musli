@@ -83,8 +83,8 @@ pub const fn usize_width<const F: Options>() -> Width {
 #[doc(hidden)]
 pub const fn byteorder<const F: Options>() -> ByteOrder {
     match (F >> BYTEORDER_BIT) & 1 {
-        0 => ByteOrder::LittleEndian,
-        _ => ByteOrder::BigEndian,
+        0 => ByteOrder::NATIVE,
+        _ => ByteOrder::NON_NATIVE,
     }
 }
 
@@ -117,6 +117,13 @@ impl ByteOrder {
     } else {
         Self::BigEndian
     };
+    
+    /// The non-native byte order.
+    const NON_NATIVE: Self = if cfg!(target_endian = "little") {
+        Self::BigEndian
+    } else {
+        Self::LittleEndian
+    };
 
     /// The network byte order.
     pub const NETWORK: Self = Self::BigEndian;
@@ -139,9 +146,15 @@ pub enum Width {
 
 #[test]
 fn test_flavor() {
-    const F1: Options = self::new().with_integer(Integer::Fixed).build();
-    assert_eq!(integer::<F1>(), Integer::Fixed);
+    const O1: Options = self::new().with_integer(Integer::Fixed).build();
+    assert_eq!(integer::<O1>(), Integer::Fixed);
 
-    const F2: Options = self::new().build();
-    assert_eq!(integer::<F2>(), Integer::Variable);
+    const O2: Options = self::new().build();
+    assert_eq!(integer::<O2>(), Integer::Variable);
+
+    const O3: Options = self::new().with_byte_order(ByteOrder::BigEndian).build();
+    assert_eq!(byteorder::<O3>(), ByteOrder::BigEndian);
+    
+    const O4: Options = self::new().with_byte_order(ByteOrder::LittleEndian).build();
+    assert_eq!(byteorder::<O4>(), Integer::Variable);
 }
