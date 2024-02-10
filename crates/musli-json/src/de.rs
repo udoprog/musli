@@ -58,6 +58,8 @@ where
                     pair.first(cx)?.skip_any(cx)?;
                     pair.skip_second(cx)?;
                 }
+
+                Ok(())
             }
             Token::OpenBracket => {
                 let mut seq = JsonSequenceDecoder::new(cx, None, self.parser)?;
@@ -65,28 +67,20 @@ where
                 while let Some(item) = SequenceDecoder::next(&mut seq, cx)? {
                     item.skip_any(cx)?;
                 }
-            }
-            Token::Null => {
-                return self.parse_null(cx);
-            }
-            Token::True => {
-                return self.parse_true(cx);
-            }
-            Token::False => {
-                return self.parse_false(cx);
-            }
-            Token::Number => {
-                return integer::skip_number(cx, &mut self.parser);
-            }
-            Token::String => {
-                return string::skip_string(cx, &mut self.parser, true);
-            }
-            actual => {
-                return Err(cx.marked_report(start, Error::new(ErrorKind::ExpectedValue(actual))));
-            }
-        }
 
-        todo!()
+                Ok(())
+            }
+            Token::Null => self.parse_null(cx),
+            Token::True => self.parse_true(cx),
+            Token::False => self.parse_false(cx),
+            Token::Number => integer::skip_number(cx, &mut self.parser),
+            Token::String => {
+                // Skip over opening quote.
+                self.parser.skip(cx, 1)?;
+                string::skip_string(cx, &mut self.parser, true)
+            }
+            actual => Err(cx.marked_report(start, Error::new(ErrorKind::ExpectedValue(actual)))),
+        }
     }
 
     #[inline]
@@ -814,7 +808,7 @@ where
                 }
                 token => {
                     return Err(cx.message(format_args!(
-                        "Expected value, or closing brace `}}` {token:?}"
+                        "Expected value, or closing brace `}}` but found {token:?}"
                     )));
                 }
             }

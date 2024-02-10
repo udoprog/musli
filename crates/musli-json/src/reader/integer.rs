@@ -218,6 +218,8 @@ where
     C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,
 {
+    p.skip_whitespace(cx)?;
+
     let start = cx.mark();
 
     if p.peek_byte(cx)? == Some(b'-') {
@@ -267,6 +269,8 @@ where
     C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,
 {
+    p.skip_whitespace(cx)?;
+
     let start = cx.mark();
     decode_unsigned_base::<T, _, _>(cx, p, start)
 }
@@ -280,6 +284,8 @@ where
     C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,
 {
+    p.skip_whitespace(cx)?;
+
     let start = cx.mark();
 
     match decode_unsigned_full(cx, p, start)?.compute() {
@@ -323,6 +329,8 @@ where
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
+    p.skip_whitespace(cx)?;
+
     decode_signed_full_inner(cx, p)
 }
 
@@ -363,6 +371,8 @@ where
     C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,
 {
+    p.skip_whitespace(cx)?;
+
     let start = cx.mark();
 
     match decode_signed_base(cx, p)?.compute() {
@@ -380,6 +390,8 @@ where
     C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,
 {
+    p.skip_whitespace(cx)?;
+
     let start = cx.mark();
 
     match decode_signed_full_inner(cx, p)?.compute() {
