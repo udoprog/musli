@@ -77,7 +77,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_array(cx.adapt(), array)
+        self.writer.write_bytes(cx.adapt(), &array)
     }
 
     #[inline(always)]

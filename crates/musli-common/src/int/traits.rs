@@ -185,7 +185,8 @@ macro_rules! implement_io {
                 W: Writer,
                 B: ByteOrder,
             {
-                writer.write_array(cx, B::$write(self))
+                let bytes = B::$write(self);
+                writer.write_bytes(cx, &bytes)
             }
 
             #[inline]
