@@ -91,7 +91,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@1.76
       with:
         components: clippy
-    - run: cargo clippy --all-targets --features test -- -D warnings
+    - run: cargo clippy --workspace --exclude no-std-examples --all-targets --features test -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest

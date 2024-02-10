@@ -11,11 +11,11 @@ use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
-const REPO: &'static str = "https://raw.githubusercontent.com/udoprog/musli";
+const REPO: &str = "https://raw.githubusercontent.com/udoprog/musli";
 
-const COMMON: &'static [&'static str] = &["no-rt", "std", "alloc"];
+const COMMON: &[&str] = &["no-rt", "std", "alloc"];
 
-const REPORTS: &'static [Report] = &[
+const REPORTS: &[Report] = &[
     Report {
         id: "full",
         title: "Full features",
@@ -111,7 +111,7 @@ const REPORTS: &'static [Report] = &[
     },
 ];
 
-const LINKS: &'static [Link] = &[
+const LINKS: &[Link] = &[
     Link {
         title: "`rkyv`",
         href: "https://docs.rs/rkyv",
@@ -126,10 +126,9 @@ const LINKS: &'static [Link] = &[
     },
 ];
 
-const KINDS: &'static [(&'static str, &'static str)] =
-    &[("dec", "Decode a type"), ("enc", "Encode a type")];
+const KINDS: &[(&str, &str)] = &[("dec", "Decode a type"), ("enc", "Encode a type")];
 
-const GROUPS: &'static [Group] = &[
+const GROUPS: &[Group] = &[
     Group {
         id: "primitives",
         description: "which is a small object containing one of each primitive type and a string and a byte array.",
@@ -339,7 +338,7 @@ fn main() -> Result<()> {
                     writeln!(o)?;
                 }
 
-                for line in report.description.iter().copied() {
+                for &line in report.description.iter() {
                     writeln!(o, "{line}")?;
                 }
 
@@ -645,7 +644,7 @@ where
 
             write!(o, "| {framework}{footnote} |")?;
 
-            for suite in columns.iter().copied() {
+            for &suite in columns.iter() {
                 let Some(mut set) = index
                     .remove(&(suite.to_owned(), framework.clone()))
                     .filter(|s| !s.samples.is_empty())
@@ -701,14 +700,14 @@ fn copy_svg(from: &Path, to: &Path) -> Result<()> {
 
     for (index, line) in from.lines().enumerate() {
         if index == 1 {
-            write!(
+            writeln!(
                 to,
-                "<rect width=\"100%\" height=\"100%\" fill=\"white\"></rect>\n"
+                "<rect width=\"100%\" height=\"100%\" fill=\"white\"></rect>"
             )?;
         }
 
         let line = line?;
-        write!(to, "{}\n", line.trim())?;
+        writeln!(to, "{}", line.trim())?;
     }
 
     Ok(())
@@ -854,18 +853,15 @@ where
                     bad_features.push((a.target.name.clone(), Features::Unexpected(unexpected)));
                 }
 
-                match (
+                if let (Some(kind), Some(executable)) = (
                     a.target.kind.first().map(|s| s.as_str()),
                     a.executable.as_deref(),
                 ) {
-                    (Some(kind), Some(executable)) => {
-                        if kind == "bin" && a.profile.test {
-                            continue;
-                        }
-
-                        all.push((kind.to_owned(), a.target.name, PathBuf::from(executable)));
+                    if kind == "bin" && a.profile.test {
+                        continue;
                     }
-                    _ => {}
+
+                    all.push((kind.to_owned(), a.target.name, PathBuf::from(executable)));
                 }
             }
             _ => {}
