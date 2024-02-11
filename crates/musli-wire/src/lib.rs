@@ -113,8 +113,8 @@ mod de;
 mod en;
 pub mod encoding;
 mod error;
-mod integer_encoding;
 pub mod tag;
+mod wire_int;
 
 #[cfg(feature = "test")]
 #[macro_use]

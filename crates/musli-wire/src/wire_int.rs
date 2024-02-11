@@ -10,7 +10,7 @@ use crate::writer::Writer;
 
 /// Governs how usize lengths are encoded into a [Writer].
 #[inline]
-pub(crate) fn encode_typed_usize<C, W, const F: Options>(
+pub(crate) fn encode_length<C, W, const F: Options>(
     cx: &mut C,
     mut writer: W,
     value: usize,
@@ -51,7 +51,7 @@ where
 
 /// Governs how usize lengths are decoded from a [Reader].
 #[inline]
-pub(crate) fn decode_typed_usize<'de, C, R, const F: Options>(
+pub(crate) fn decode_length<'de, C, R, const F: Options>(
     cx: &mut C,
     mut reader: R,
 ) -> Result<usize, C::Error>
@@ -104,7 +104,7 @@ where
 
 /// Governs how unsigned integers are encoded into a [Writer].
 #[inline]
-pub(crate) fn encode_typed_unsigned<C, W, T, const F: Options>(
+pub(crate) fn encode_unsigned<C, W, T, const F: Options>(
     cx: &mut C,
     mut writer: W,
     value: T,
@@ -133,7 +133,7 @@ where
 
 /// Governs how unsigned integers are decoded from a [Reader].
 #[inline]
-pub(crate) fn decode_typed_unsigned<'de, C, R, T, const F: Options>(
+pub(crate) fn decode_unsigned<'de, C, R, T, const F: Options>(
     cx: &mut C,
     mut reader: R,
 ) -> Result<T, C::Error>
@@ -170,7 +170,7 @@ where
 
 /// Governs how signed integers are encoded into a [Writer].
 #[inline]
-pub(crate) fn encode_typed_signed<C, W, T, const F: Options>(
+pub(crate) fn encode_signed<C, W, T, const F: Options>(
     cx: &mut C,
     writer: W,
     value: T,
@@ -182,12 +182,12 @@ where
     T::Unsigned: UnsignedOps,
 {
     let value = zig::encode(value);
-    encode_typed_unsigned::<_, _, _, F>(cx, writer, value)
+    encode_unsigned::<C, W, T::Unsigned, F>(cx, writer, value)
 }
 
 /// Governs how signed integers are decoded from a [Reader].
 #[inline]
-pub(crate) fn decode_typed_signed<'de, C, R, T, const F: Options>(
+pub(crate) fn decode_signed<'de, C, R, T, const F: Options>(
     cx: &mut C,
     reader: R,
 ) -> Result<T, C::Error>
@@ -197,6 +197,6 @@ where
     T: Signed,
     T::Unsigned: UnsignedOps,
 {
-    let value: T::Unsigned = decode_typed_unsigned::<_, _, _, F>(cx, reader)?;
+    let value = decode_unsigned::<C, R, T::Unsigned, F>(cx, reader)?;
     Ok(zig::decode(value))
 }

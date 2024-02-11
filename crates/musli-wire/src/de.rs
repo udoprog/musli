@@ -309,7 +309,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -317,7 +317,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -325,7 +325,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -333,7 +333,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -341,7 +341,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -357,7 +357,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_signed::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_signed::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -365,7 +365,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_signed::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_signed::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -373,7 +373,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_signed::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_signed::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -381,7 +381,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_signed::<_, _, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_signed::<_, _, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
@@ -389,7 +389,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::decode_typed_usize::<_, _, F>(cx.adapt(), self.reader)
+        crate::wire_int::decode_length::<_, _, F>(cx.adapt(), self.reader)
     }
 
     #[inline(always)]
