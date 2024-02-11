@@ -7,8 +7,6 @@ use crate::options::Options;
 use crate::reader::Reader;
 use crate::writer::Writer;
 
-use super::{BigEndian, LittleEndian};
-
 /// Governs how unsigned integers are encoded into a [Writer].
 #[inline]
 pub fn encode_unsigned<C, W, T, const F: Options>(
@@ -25,13 +23,8 @@ where
         crate::options::integer::<F>(),
         crate::options::byteorder::<F>(),
     ) {
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::BigEndian) => {
-            value.write_bytes::<_, _, BigEndian>(cx, writer)
-        }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            value.write_bytes::<_, _, LittleEndian>(cx, writer)
-        }
         (crate::options::Integer::Variable, _) => c::encode(cx, writer, value),
+        (_, bo) => value.write_bytes(cx, writer, bo),
     }
 }
 
@@ -51,13 +44,8 @@ where
         crate::options::integer::<F>(),
         crate::options::byteorder::<F>(),
     ) {
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::BigEndian) => {
-            T::read_bytes_unsigned::<_, _, BigEndian>(cx, reader)
-        }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            T::read_bytes_unsigned::<_, _, LittleEndian>(cx, reader)
-        }
         (crate::options::Integer::Variable, _) => c::decode(cx, reader),
+        (_, bo) => T::read_bytes(cx, reader, bo),
     }
 }
 
@@ -78,13 +66,8 @@ where
         crate::options::integer::<F>(),
         crate::options::byteorder::<F>(),
     ) {
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::BigEndian) => {
-            value.unsigned().write_bytes::<_, _, BigEndian>(cx, writer)
-        }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => value
-            .unsigned()
-            .write_bytes::<_, _, LittleEndian>(cx, writer),
         (crate::options::Integer::Variable, _) => c::encode(cx, writer, zig::encode(value)),
+        (_, bo) => value.unsigned().write_bytes(cx, writer, bo),
     }
 }
 
@@ -101,21 +84,16 @@ where
         crate::options::integer::<F>(),
         crate::options::byteorder::<F>(),
     ) {
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::BigEndian) => {
-            Ok(T::Unsigned::read_bytes_unsigned::<_, _, BigEndian>(cx, reader)?.signed())
-        }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            Ok(T::Unsigned::read_bytes_unsigned::<_, _, LittleEndian>(cx, reader)?.signed())
-        }
         (crate::options::Integer::Variable, _) => {
             let value: T::Unsigned = c::decode(cx, reader)?;
             Ok(zig::decode(value))
         }
+        (_, bo) => Ok(T::Unsigned::read_bytes(cx, reader, bo)?.signed()),
     }
 }
 
 macro_rules! fixed_arm {
-    ($bo:ty, $f:ty, $macro:path) => {
+    ($f:ty, $macro:path, $bo:expr) => {
         match crate::options::length_width::<$f>() {
             crate::options::Width::U8 => {
                 $macro!(u8, $bo)
@@ -145,12 +123,12 @@ where
     W: Writer,
 {
     macro_rules! fixed {
-        ($ty:ty, $bo:ty) => {{
+        ($ty:ty, $bo:expr) => {{
             let Ok(value) = <$ty>::try_from(value) else {
                 return Err(cx.message("Size type out of bounds for value type"));
             };
 
-            <$ty as UnsignedOps>::write_bytes::<_, _, $bo>(value, cx, writer)
+            <$ty as UnsignedOps>::write_bytes(value, cx, writer, $bo)
         }};
     }
 
@@ -159,11 +137,8 @@ where
         crate::options::byteorder::<F>(),
     ) {
         (crate::options::Integer::Variable, _) => c::encode(cx, writer, value),
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            fixed_arm!(LittleEndian, F, fixed)
-        }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::BigEndian) => {
-            fixed_arm!(BigEndian, F, fixed)
+        (_, bo) => {
+            fixed_arm!(F, fixed, bo)
         }
     }
 }
@@ -176,10 +151,9 @@ where
     R: Reader<'de>,
 {
     macro_rules! fixed {
-        ($ty:ty, $bo:ty) => {{
-            let Ok(value) = usize::try_from(
-                <$ty as UnsignedOps>::read_bytes_unsigned::<_, _, $bo>(cx, reader)?,
-            ) else {
+        ($ty:ty, $bo:expr) => {{
+            let Ok(value) = usize::try_from(<$ty as UnsignedOps>::read_bytes(cx, reader, $bo)?)
+            else {
                 return Err(cx.message("Value type out of bounds for usize"));
             };
 
@@ -192,11 +166,8 @@ where
         crate::options::byteorder::<F>(),
     ) {
         (crate::options::Integer::Variable, _) => c::decode(cx, reader),
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            fixed_arm!(LittleEndian, F, fixed)
-        }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::BigEndian) => {
-            fixed_arm!(BigEndian, F, fixed)
+        (_, bo) => {
+            fixed_arm!(F, fixed, bo)
         }
     }
 }

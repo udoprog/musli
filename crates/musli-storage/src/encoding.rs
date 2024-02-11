@@ -16,7 +16,6 @@ use crate::de::StorageDecoder;
 use crate::en::StorageEncoder;
 use crate::error::Error;
 use crate::fixed_bytes::FixedBytes;
-use crate::int::ByteOrder;
 use crate::options::{self, Options};
 use crate::reader::{Reader, SliceReader};
 use crate::writer::Writer;
@@ -225,10 +224,7 @@ where
 
     /// Configure the encoding to use fixed integer custom endian encoding.
     #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, F>
-    where
-        E: ByteOrder,
-    {
+    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, F> {
         Encoding {
             _marker: marker::PhantomData,
         }

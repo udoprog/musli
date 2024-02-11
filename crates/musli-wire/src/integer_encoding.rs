@@ -2,14 +2,14 @@ use musli::Context;
 
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
-use crate::int::{BigEndian, LittleEndian, Signed, Unsigned, UnsignedOps};
+use crate::int::{Signed, Unsigned, UnsignedOps};
 use crate::options::Options;
 use crate::reader::Reader;
 use crate::tag::{Kind, Tag, DATA_MASK};
 use crate::writer::Writer;
 
 macro_rules! fixed_arm {
-    ($bo:ty, $what:ident::<$f:ty>, $macro:path) => {
+    ($what:ident::<$f:ty>, $macro:path, $bo:expr) => {
         match crate::options::$what::<$f>() {
             crate::options::Width::U8 => {
                 $macro!(u8, $bo)
@@ -39,14 +39,14 @@ where
     W: Writer,
 {
     macro_rules! fixed {
-        ($ty:ty, $bo:ty) => {{
+        ($ty:ty, $bo:expr) => {{
             writer.write_byte(cx, Tag::new(Kind::Prefix, <$ty>::BYTES).byte())?;
 
             let Ok(value) = <$ty>::try_from(value) else {
                 return Err(cx.message("Usize out of bounds for value type"));
             };
 
-            value.write_bytes::<_, _, $bo>(cx, writer)
+            value.write_bytes(cx, writer, $bo)
         }};
     }
 
@@ -62,11 +62,8 @@ where
                 c::encode(cx, writer, value)
             }
         }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            fixed_arm!(LittleEndian, length_width::<F>, fixed)
-        }
-        _ => {
-            fixed_arm!(BigEndian, length_width::<F>, fixed)
+        (_, bo) => {
+            fixed_arm!(length_width::<F>, fixed, bo)
         }
     }
 }
@@ -82,7 +79,7 @@ where
     R: Reader<'de>,
 {
     macro_rules! fixed {
-        ($ty:ty, $bo:ty) => {{
+        ($ty:ty, $bo:expr) => {{
             let tag = Tag::from_byte(reader.read_byte(cx)?);
 
             if tag != Tag::new(Kind::Prefix, <$ty>::BYTES) {
@@ -92,8 +89,7 @@ where
                 )));
             }
 
-            let Ok(value) = usize::try_from(<$ty>::read_bytes_unsigned::<_, _, $bo>(cx, reader)?)
-            else {
+            let Ok(value) = usize::try_from(<$ty>::read_bytes(cx, reader, $bo)?) else {
                 return Err(cx.message("Value type out of bounds for usize"));
             };
 
@@ -118,11 +114,8 @@ where
                 c::decode(cx, reader)
             }
         }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            fixed_arm!(LittleEndian, length_width::<F>, fixed)
-        }
-        _ => {
-            fixed_arm!(BigEndian, length_width::<F>, fixed)
+        (_, bo) => {
+            fixed_arm!(length_width::<F>, fixed, bo)
         }
     }
 }
@@ -140,9 +133,9 @@ where
     T: UnsignedOps,
 {
     macro_rules! fixed {
-        ($ty:ty, $bo:ty) => {{
+        ($ty:ty, $bo:expr) => {{
             writer.write_byte(cx, Tag::new(Kind::Prefix, <$ty>::BYTES).byte())?;
-            value.write_bytes::<_, _, $bo>(cx, writer)
+            value.write_bytes(cx, writer, $bo)
         }};
     }
 
@@ -158,11 +151,8 @@ where
                 c::encode(cx, writer, value)
             }
         }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            fixed!(T, LittleEndian)
-        }
-        _ => {
-            fixed!(T, BigEndian)
+        (_, bo) => {
+            fixed!(T, bo)
         }
     }
 }
@@ -179,12 +169,12 @@ where
     T: UnsignedOps,
 {
     macro_rules! fixed {
-        ($ty:ty, $bo:ty) => {{
+        ($ty:ty, $bo:expr) => {{
             if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, <$ty>::BYTES) {
                 return Err(cx.message("Expected fixed integer"));
             }
 
-            <$ty as UnsignedOps>::read_bytes_unsigned::<_, _, $bo>(cx, reader)
+            <$ty as UnsignedOps>::read_bytes(cx, reader, $bo)
         }};
     }
 
@@ -205,11 +195,8 @@ where
                 c::decode(cx, reader)
             }
         }
-        (crate::options::Integer::Fixed, crate::options::ByteOrder::LittleEndian) => {
-            fixed!(T, LittleEndian)
-        }
-        _ => {
-            fixed!(T, BigEndian)
+        (_, bo) => {
+            fixed!(T, bo)
         }
     }
 }

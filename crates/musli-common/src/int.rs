@@ -6,7 +6,6 @@
 //! We also have a 7-bit [continuation] encoding, and [zigzag] encoding which
 //! are based on these.
 
-mod byteorder;
 #[doc(hidden)]
 pub mod continuation;
 mod encoding;
@@ -14,8 +13,6 @@ mod traits;
 #[doc(hidden)]
 pub mod zigzag;
 
-#[doc(hidden)]
-pub use self::byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, NetworkEndian};
 #[doc(hidden)]
 pub use self::encoding::{
     decode_signed, decode_unsigned, decode_usize, encode_signed, encode_unsigned, encode_usize,
