@@ -19,12 +19,12 @@ where
     W: Writer,
     T: Unsigned + UnsignedOps,
 {
-    match (
-        crate::options::integer::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => c::encode(cx, writer, value),
-        (_, bo) => value.write_bytes(cx, writer, bo),
+    match crate::options::integer::<F>() {
+        crate::options::Integer::Variable => c::encode(cx, writer, value),
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+            value.write_bytes(cx, writer, bo)
+        }
     }
 }
 
@@ -40,12 +40,12 @@ where
     R: Reader<'de>,
     T: Unsigned,
 {
-    match (
-        crate::options::integer::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => c::decode(cx, reader),
-        (_, bo) => T::read_bytes(cx, reader, bo),
+    match crate::options::integer::<F>() {
+        crate::options::Integer::Variable => c::decode(cx, reader),
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+            T::read_bytes(cx, reader, bo)
+        }
     }
 }
 
@@ -62,12 +62,12 @@ where
     T: Signed,
     T::Unsigned: UnsignedOps,
 {
-    match (
-        crate::options::integer::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => c::encode(cx, writer, zig::encode(value)),
-        (_, bo) => value.unsigned().write_bytes(cx, writer, bo),
+    match crate::options::integer::<F>() {
+        crate::options::Integer::Variable => c::encode(cx, writer, zig::encode(value)),
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+            value.unsigned().write_bytes(cx, writer, bo)
+        }
     }
 }
 
@@ -80,35 +80,16 @@ where
     T: Signed,
     T::Unsigned: UnsignedOps,
 {
-    match (
-        crate::options::integer::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => {
+    match crate::options::integer::<F>() {
+        crate::options::Integer::Variable => {
             let value: T::Unsigned = c::decode(cx, reader)?;
             Ok(zig::decode(value))
         }
-        (_, bo) => Ok(T::Unsigned::read_bytes(cx, reader, bo)?.signed()),
-    }
-}
-
-macro_rules! fixed_arm {
-    ($f:ty, $macro:path, $bo:expr) => {
-        match crate::options::length_width::<$f>() {
-            crate::options::Width::U8 => {
-                $macro!(u8, $bo)
-            }
-            crate::options::Width::U16 => {
-                $macro!(u16, $bo)
-            }
-            crate::options::Width::U32 => {
-                $macro!(u32, $bo)
-            }
-            crate::options::Width::U64 => {
-                $macro!(u64, $bo)
-            }
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+            Ok(T::Unsigned::read_bytes(cx, reader, bo)?.signed())
         }
-    };
+    }
 }
 
 /// Governs how usize lengths are encoded into a [Writer].
@@ -122,23 +103,21 @@ where
     C: Context<Input = W::Error>,
     W: Writer,
 {
-    macro_rules! fixed {
-        ($ty:ty, $bo:expr) => {{
-            let Ok(value) = <$ty>::try_from(value) else {
-                return Err(cx.message("Size type out of bounds for value type"));
-            };
+    match crate::options::length::<F>() {
+        crate::options::Integer::Variable => c::encode(cx, writer, value),
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+            macro_rules! fixed {
+                ($ty:ty) => {{
+                    let Ok(value) = <$ty>::try_from(value) else {
+                        return Err(cx.message("Size type out of bounds for value type"));
+                    };
 
-            <$ty as UnsignedOps>::write_bytes(value, cx, writer, $bo)
-        }};
-    }
+                    <$ty as UnsignedOps>::write_bytes(value, cx, writer, bo)
+                }};
+            }
 
-    match (
-        crate::options::length::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => c::encode(cx, writer, value),
-        (_, bo) => {
-            fixed_arm!(F, fixed, bo)
+            crate::width_arm!(crate::options::length_width::<F>(), fixed)
         }
     }
 }
@@ -150,24 +129,24 @@ where
     C: Context<Input = R::Error>,
     R: Reader<'de>,
 {
-    macro_rules! fixed {
-        ($ty:ty, $bo:expr) => {{
-            let Ok(value) = usize::try_from(<$ty as UnsignedOps>::read_bytes(cx, reader, $bo)?)
-            else {
-                return Err(cx.message("Value type out of bounds for usize"));
-            };
+    match crate::options::length::<F>() {
+        crate::options::Integer::Variable => c::decode(cx, reader),
+        _ => {
+            let bo = crate::options::byteorder::<F>();
 
-            Ok(value)
-        }};
-    }
+            macro_rules! fixed {
+                ($ty:ty) => {{
+                    let Ok(value) =
+                        usize::try_from(<$ty as UnsignedOps>::read_bytes(cx, reader, bo)?)
+                    else {
+                        return Err(cx.message("Value type out of bounds for usize"));
+                    };
 
-    match (
-        crate::options::length::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => c::decode(cx, reader),
-        (_, bo) => {
-            fixed_arm!(F, fixed, bo)
+                    Ok(value)
+                }};
+            }
+
+            crate::width_arm!(crate::options::length_width::<F>(), fixed)
         }
     }
 }

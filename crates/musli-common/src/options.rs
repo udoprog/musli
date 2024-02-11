@@ -149,7 +149,29 @@ impl ByteOrder {
     pub const NETWORK: Self = Self::BigEndian;
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! width_arm {
+    ($width:expr, $macro:path) => {
+        match $width {
+            $crate::options::Width::U8 => {
+                $macro!(u8)
+            }
+            $crate::options::Width::U16 => {
+                $macro!(u16)
+            }
+            $crate::options::Width::U32 => {
+                $macro!(u32)
+            }
+            _ => {
+                $macro!(u64)
+            }
+        }
+    };
+}
+
 /// The width of a numerical type.
+#[derive(Clone, Copy)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[repr(u8)]
 #[non_exhaustive]

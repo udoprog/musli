@@ -8,25 +8,6 @@ use crate::reader::Reader;
 use crate::tag::{Kind, Tag, DATA_MASK};
 use crate::writer::Writer;
 
-macro_rules! fixed_arm {
-    ($what:ident::<$f:ty>, $macro:path, $bo:expr) => {
-        match crate::options::$what::<$f>() {
-            crate::options::Width::U8 => {
-                $macro!(u8, $bo)
-            }
-            crate::options::Width::U16 => {
-                $macro!(u16, $bo)
-            }
-            crate::options::Width::U32 => {
-                $macro!(u32, $bo)
-            }
-            _ => {
-                $macro!(u64, $bo)
-            }
-        }
-    };
-}
-
 /// Governs how usize lengths are encoded into a [Writer].
 #[inline]
 pub(crate) fn encode_typed_usize<C, W, const F: Options>(
@@ -38,23 +19,8 @@ where
     C: Context<Input = W::Error>,
     W: Writer,
 {
-    macro_rules! fixed {
-        ($ty:ty, $bo:expr) => {{
-            writer.write_byte(cx, Tag::new(Kind::Prefix, <$ty>::BYTES).byte())?;
-
-            let Ok(value) = <$ty>::try_from(value) else {
-                return Err(cx.message("Usize out of bounds for value type"));
-            };
-
-            value.write_bytes(cx, writer, $bo)
-        }};
-    }
-
-    match (
-        crate::options::length::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => {
+    match crate::options::length::<F>() {
+        crate::options::Integer::Variable => {
             if value.is_smaller_than(DATA_MASK) {
                 writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
             } else {
@@ -62,8 +28,23 @@ where
                 c::encode(cx, writer, value)
             }
         }
-        (_, bo) => {
-            fixed_arm!(length_width::<F>, fixed, bo)
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+            let width = crate::options::length_width::<F>();
+            let bytes = 1u8 << width as u8;
+            writer.write_byte(cx, Tag::new(Kind::Prefix, bytes).byte())?;
+
+            macro_rules! fixed {
+                ($ty:ty) => {{
+                    let Ok(value) = <$ty>::try_from(value) else {
+                        return Err(cx.message("Usize out of bounds for value type"));
+                    };
+
+                    value.write_bytes(cx, writer, bo)
+                }};
+            }
+
+            crate::width_arm!(width, fixed)
         }
     }
 }
@@ -78,30 +59,8 @@ where
     C: Context<Input = R::Error>,
     R: Reader<'de>,
 {
-    macro_rules! fixed {
-        ($ty:ty, $bo:expr) => {{
-            let tag = Tag::from_byte(reader.read_byte(cx)?);
-
-            if tag != Tag::new(Kind::Prefix, <$ty>::BYTES) {
-                return Err(cx.message(format_args!(
-                    "Expected fixed {} bytes prefix tag, but got {tag:?}",
-                    <$ty>::BYTES
-                )));
-            }
-
-            let Ok(value) = usize::try_from(<$ty>::read_bytes(cx, reader, $bo)?) else {
-                return Err(cx.message("Value type out of bounds for usize"));
-            };
-
-            Ok(value)
-        }};
-    }
-
-    match (
-        crate::options::length::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => {
+    match crate::options::length::<F>() {
+        crate::options::Integer::Variable => {
             let tag = Tag::from_byte(reader.read_byte(cx)?);
 
             if tag.kind() != Kind::Continuation {
@@ -114,8 +73,31 @@ where
                 c::decode(cx, reader)
             }
         }
-        (_, bo) => {
-            fixed_arm!(length_width::<F>, fixed, bo)
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+            let width = crate::options::length_width::<F>();
+
+            let bytes = 1u8 << width as u8;
+            let tag = Tag::from_byte(reader.read_byte(cx)?);
+
+            if tag != Tag::new(Kind::Prefix, bytes) {
+                return Err(cx.message(format_args!(
+                    "Expected fixed {} bytes prefix tag, but got {tag:?}",
+                    bytes
+                )));
+            }
+
+            macro_rules! fixed {
+                ($ty:ty) => {{
+                    let Ok(value) = usize::try_from(<$ty>::read_bytes(cx, reader, bo)?) else {
+                        return Err(cx.message("Value type out of bounds for usize"));
+                    };
+
+                    Ok(value)
+                }};
+            }
+
+            crate::width_arm!(width, fixed)
         }
     }
 }
@@ -132,18 +114,8 @@ where
     W: Writer,
     T: UnsignedOps,
 {
-    macro_rules! fixed {
-        ($ty:ty, $bo:expr) => {{
-            writer.write_byte(cx, Tag::new(Kind::Prefix, <$ty>::BYTES).byte())?;
-            value.write_bytes(cx, writer, $bo)
-        }};
-    }
-
-    match (
-        crate::options::integer::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => {
+    match crate::options::integer::<F>() {
+        crate::options::Integer::Variable => {
             if value.is_smaller_than(DATA_MASK) {
                 writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
             } else {
@@ -151,8 +123,10 @@ where
                 c::encode(cx, writer, value)
             }
         }
-        (_, bo) => {
-            fixed!(T, bo)
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+            writer.write_byte(cx, Tag::new(Kind::Prefix, T::BYTES).byte())?;
+            value.write_bytes(cx, writer, bo)
         }
     }
 }
@@ -168,21 +142,8 @@ where
     R: Reader<'de>,
     T: UnsignedOps,
 {
-    macro_rules! fixed {
-        ($ty:ty, $bo:expr) => {{
-            if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, <$ty>::BYTES) {
-                return Err(cx.message("Expected fixed integer"));
-            }
-
-            <$ty as UnsignedOps>::read_bytes(cx, reader, $bo)
-        }};
-    }
-
-    match (
-        crate::options::integer::<F>(),
-        crate::options::byteorder::<F>(),
-    ) {
-        (crate::options::Integer::Variable, _) => {
+    match crate::options::integer::<F>() {
+        crate::options::Integer::Variable => {
             let tag = Tag::from_byte(reader.read_byte(cx)?);
 
             if tag.kind() != Kind::Continuation {
@@ -195,8 +156,14 @@ where
                 c::decode(cx, reader)
             }
         }
-        (_, bo) => {
-            fixed!(T, bo)
+        _ => {
+            let bo = crate::options::byteorder::<F>();
+
+            if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::BYTES) {
+                return Err(cx.message("Expected fixed integer"));
+            }
+
+            T::read_bytes(cx, reader, bo)
         }
     }
 }

@@ -191,7 +191,7 @@ macro_rules! implement_ops {
             {
                 let bytes = match byte_order {
                     ByteOrder::NATIVE => self,
-                    _ => self.swap_bytes(),
+                    _ => <$unsigned>::swap_bytes(self),
                 };
 
                 let bytes = <$unsigned>::to_ne_bytes(bytes);
@@ -213,7 +213,7 @@ macro_rules! implement_ops {
 
                 let bytes = match byte_order {
                     ByteOrder::NATIVE => bytes,
-                    _ => bytes.swap_bytes(),
+                    _ => <$unsigned>::swap_bytes(bytes),
                 };
 
                 Ok(bytes)
