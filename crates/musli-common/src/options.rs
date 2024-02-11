@@ -126,7 +126,8 @@ pub enum Float {
 }
 
 /// Byte order.
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(PartialEq, Eq)]
+#[cfg_attr(test, derive(Debug))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum ByteOrder {
@@ -148,7 +149,29 @@ impl ByteOrder {
     pub const NETWORK: Self = Self::BigEndian;
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! width_arm {
+    ($width:expr, $macro:path) => {
+        match $width {
+            $crate::options::Width::U8 => {
+                $macro!(u8)
+            }
+            $crate::options::Width::U16 => {
+                $macro!(u16)
+            }
+            $crate::options::Width::U32 => {
+                $macro!(u32)
+            }
+            _ => {
+                $macro!(u64)
+            }
+        }
+    };
+}
+
 /// The width of a numerical type.
+#[derive(Clone, Copy)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -166,20 +189,22 @@ pub enum Width {
 #[test]
 fn test_builds() {
     macro_rules! assert_or_default {
-        ($test:expr, $default:expr, ()) => {
+        ($expr:expr, $test:expr, $default:expr, ()) => {
             assert_eq!(
                 $test,
                 $default,
-                "Expected default value for {}",
+                "{}: Expected default value for {}",
+                stringify!($expr),
                 stringify!($test)
             );
         };
 
-        ($test:expr, $_default:expr, ($expected:expr)) => {
+        ($expr:expr, $test:expr, $_default:expr, ($expected:expr)) => {
             assert_eq!(
                 $test,
                 $expected,
-                "Expected custom value for {}",
+                "{}: Expected custom value for {}",
+                stringify!($expr),
                 stringify!($test)
             );
         };
@@ -194,11 +219,11 @@ fn test_builds() {
             $(length_width = $length_width:expr,)?
         }) => {{
             const O: Options = $expr.build();
-            assert_or_default!(byteorder::<O>(), ByteOrder::NATIVE, ($($byteorder)?));
-            assert_or_default!(integer::<O>(), Integer::Variable, ($($integer)?));
-            assert_or_default!(float::<O>(), Float::Integer, ($($float)?));
-            assert_or_default!(length::<O>(), Integer::Variable, ($($length)?));
-            assert_or_default!(length_width::<O>(), Width::U8, ($($length_width)?));
+            assert_or_default!($expr, byteorder::<O>(), ByteOrder::NATIVE, ($($byteorder)?));
+            assert_or_default!($expr, integer::<O>(), Integer::Variable, ($($integer)?));
+            assert_or_default!($expr, float::<O>(), Float::Integer, ($($float)?));
+            assert_or_default!($expr, length::<O>(), Integer::Variable, ($($length)?));
+            assert_or_default!($expr, length_width::<O>(), Width::U8, ($($length_width)?));
         }}
     }
 

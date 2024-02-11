@@ -147,7 +147,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_usize::<_, _, F>(cx.adapt(), &mut self.writer, value)
+        crate::wire_int::encode_length::<_, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -155,11 +155,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_usize::<_, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value as usize,
-        )
+        crate::wire_int::encode_length::<_, _, F>(cx.adapt(), &mut self.writer, value as usize)
     }
 
     #[inline(always)]
@@ -186,11 +182,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_unsigned::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -198,11 +190,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_unsigned::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -210,11 +198,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_unsigned::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -222,11 +206,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_unsigned::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -234,11 +214,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_unsigned::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -254,11 +230,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_signed::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_signed::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -266,11 +238,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_signed::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_signed::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -278,11 +246,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_signed::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_signed::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]
@@ -290,11 +254,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        crate::integer_encoding::encode_typed_signed::<_, _, _, F>(
-            cx.adapt(),
-            &mut self.writer,
-            value,
-        )
+        crate::wire_int::encode_signed::<_, _, _, F>(cx.adapt(), &mut self.writer, value)
     }
 
     #[inline(always)]

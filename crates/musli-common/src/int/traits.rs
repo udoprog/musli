@@ -2,7 +2,7 @@ use core::ops::{BitAnd, BitXor, Neg, Shl, Shr};
 
 use musli::Context;
 
-use crate::int::ByteOrder;
+use crate::options::ByteOrder;
 use crate::reader::Reader;
 use crate::writer::Writer;
 
@@ -62,18 +62,25 @@ pub trait Unsigned:
 pub trait UnsignedOps: Unsigned {
     /// Write the current byte array to the given writer in little-endian
     /// encoding.
-    fn write_bytes<C, W, B>(self, cx: &mut C, writer: W) -> Result<(), C::Error>
+    fn write_bytes<C, W>(
+        self,
+        cx: &mut C,
+        writer: W,
+        byte_order: ByteOrder,
+    ) -> Result<(), C::Error>
     where
         C: Context<Input = W::Error>,
-        W: Writer,
-        B: ByteOrder;
+        W: Writer;
 
     /// Read the current value from the reader in little-endian encoding.
-    fn read_bytes_unsigned<'de, C, R, B>(cx: &mut C, reader: R) -> Result<Self, C::Error>
+    fn read_bytes<'de, C, R>(
+        cx: &mut C,
+        reader: R,
+        byte_order: ByteOrder,
+    ) -> Result<Self, C::Error>
     where
         C: Context<Input = R::Error>,
-        R: Reader<'de>,
-        B: ByteOrder;
+        R: Reader<'de>;
 }
 
 /// Trait that encodes common behaviors of signed numbers.
@@ -167,41 +174,57 @@ macro_rules! implement {
 }
 
 macro_rules! implement_ops {
-    ($signed:ty, $unsigned:ty, $read:ident, $write:ident) => {
+    ($signed:ty, $unsigned:ty) => {
         implement!($signed, $unsigned);
 
         impl UnsignedOps for $unsigned {
-            #[inline]
-            fn write_bytes<C, W, B>(self, cx: &mut C, mut writer: W) -> Result<(), C::Error>
+            #[inline(always)]
+            fn write_bytes<C, W>(
+                self,
+                cx: &mut C,
+                mut writer: W,
+                byte_order: ByteOrder,
+            ) -> Result<(), C::Error>
             where
                 C: Context<Input = W::Error>,
                 W: Writer,
-                B: ByteOrder,
             {
-                let bytes = B::$write(self);
+                let bytes = match byte_order {
+                    ByteOrder::NATIVE => self,
+                    _ => <$unsigned>::swap_bytes(self),
+                };
+
+                let bytes = <$unsigned>::to_ne_bytes(bytes);
                 writer.write_bytes(cx, &bytes)
             }
 
-            #[inline]
-            fn read_bytes_unsigned<'de, C, R, B>(
+            #[inline(always)]
+            fn read_bytes<'de, C, R>(
                 cx: &mut C,
                 mut reader: R,
+                byte_order: ByteOrder,
             ) -> Result<Self, C::Error>
             where
                 C: Context<Input = R::Error>,
                 R: Reader<'de>,
-                B: ByteOrder,
             {
                 let bytes = reader.read_array(cx)?;
-                Ok(B::$read(bytes))
+                let bytes = <$unsigned>::from_ne_bytes(bytes);
+
+                let bytes = match byte_order {
+                    ByteOrder::NATIVE => bytes,
+                    _ => <$unsigned>::swap_bytes(bytes),
+                };
+
+                Ok(bytes)
             }
         }
     };
 }
 
-implement_ops!(i8, u8, read_u8, write_u8);
-implement_ops!(i16, u16, read_u16, write_u16);
-implement_ops!(i32, u32, read_u32, write_u32);
-implement_ops!(i64, u64, read_u64, write_u64);
-implement_ops!(i128, u128, read_u128, write_u128);
+implement_ops!(i8, u8);
+implement_ops!(i16, u16);
+implement_ops!(i32, u32);
+implement_ops!(i64, u64);
+implement_ops!(i128, u128);
 implement!(isize, usize);
