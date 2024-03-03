@@ -1,6 +1,6 @@
 [package]
 name = "musli"
-version = "0.0.95"
+version = "0.0.96"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.67"
@@ -21,7 +21,7 @@ std = ["alloc"]
 alloc = []
 
 [dependencies]
-musli-macros = { version = "=0.0.95", path = "../musli-macros" }
+musli-macros = { version = "=0.0.96", path = "../musli-macros" }
 
 [dev-dependencies]
 musli-wire = { path = "../musli-wire", default-features = false }

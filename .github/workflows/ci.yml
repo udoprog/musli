@@ -19,7 +19,7 @@ jobs:
       matrix:
         rust: ['1.67', stable]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{matrix.rust}}
@@ -40,25 +40,25 @@ jobs:
       matrix:
         example: ['json']
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo build
       - run: cargo +nightly run -p no-std-examples --example no-std-${{matrix.example}}
 
   fuzz:
-    needs: [test, each_package]
+    needs: [test, e,ach_package]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - run: cargo run --release -p tests --features test --bin fuzz
     - run: cargo run --release -p tests --features test --bin fuzz -- --random
 
   miri:
-    needs: [test, each_package]
+    needs: [test, e,ach_package]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: miri
@@ -74,7 +74,7 @@ jobs:
       matrix:
         package: [musli, musli-common, musli-storage, musli-descriptive, musli-wire, musli-json, musli-value]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - run: cargo build -p ${{matrix.package}} --no-default-features
     - run: cargo build -p ${{matrix.package}} --no-default-features --features alloc
@@ -87,7 +87,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@1.76
       with:
         components: clippy
@@ -96,7 +96,7 @@ jobs:
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt
