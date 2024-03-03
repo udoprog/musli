@@ -46,7 +46,7 @@ jobs:
       - run: cargo +nightly run -p no-std-examples --example no-std-${{matrix.example}}
 
   fuzz:
-    needs: [test, e,ach_package]
+    needs: [test, each_package]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
     - run: cargo run --release -p tests --features test --bin fuzz -- --random
 
   miri:
-    needs: [test, e,ach_package]
+    needs: [test, each_package]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
