@@ -145,8 +145,6 @@ pub(crate) fn special_is_empty(ctrl: u8) -> bool {
 #[cfg_attr(not(target_os = "emscripten"), inline)]
 #[cfg(feature = "alloc")]
 pub(crate) fn capacity_to_buckets(cap: usize) -> Option<usize> {
-    debug_assert_ne!(cap, 0);
-
     // For small tables we require at least 1 empty bucket so that lookups are
     // guaranteed to terminate if an element doesn't exist in the table.
     if cap < 8 {
