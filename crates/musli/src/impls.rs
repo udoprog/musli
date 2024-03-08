@@ -2,6 +2,7 @@
 mod alloc;
 #[cfg(feature = "std")]
 mod net;
+mod range;
 mod tuples;
 
 use core::ffi::CStr;
