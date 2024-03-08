@@ -7,11 +7,17 @@ use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BinaryHeap, VecDeque};
 use alloc::ffi::CString;
+use alloc::rc::Rc;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
+#[cfg(feature = "std")]
+use std::ffi::{OsStr, OsString};
+#[cfg(feature = "std")]
+use std::path::{Path, PathBuf};
 
 use crate::de::{
     Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, TraceDecode, ValueVisitor,
@@ -472,5 +478,199 @@ where
         }
 
         decoder.decode_bytes(cx, Visitor)
+    }
+}
+
+macro_rules! smart_pointer {
+    ($ty:ident) => {
+        impl<M, T> Encode<M> for $ty<T>
+        where
+            M: Mode,
+            T: Encode<M>,
+        {
+            #[inline]
+            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            where
+                C: Context<Input = E::Error>,
+                E: Encoder,
+            {
+                Encode::<M>::encode(&**self, cx, encoder)
+            }
+        }
+
+        impl<'de, M, T> Decode<'de, M> for $ty<T>
+        where
+            M: Mode,
+            T: Decode<'de, M>,
+        {
+            #[inline]
+            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            where
+                C: Context<Input = D::Error>,
+                D: Decoder<'de>,
+            {
+                Ok($ty::new(Decode::<M>::decode(cx, decoder)?))
+            }
+        }
+    };
+}
+
+smart_pointer!(Arc);
+smart_pointer!(Rc);
+
+#[cfg(feature = "std")]
+#[derive(Encode, Decode)]
+#[musli(crate = crate)]
+enum Tag {
+    Unix,
+    Windows,
+}
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+impl<M> Encode<M> for OsStr
+where
+    M: Mode,
+{
+    #[cfg(unix)]
+    #[inline]
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: Context<Input = E::Error>,
+        E: Encoder,
+    {
+        use std::os::unix::ffi::OsStrExt;
+
+        use crate::en::VariantEncoder;
+
+        let mut variant = encoder.encode_variant(cx)?;
+        let tag = variant.tag(cx)?;
+        Encode::<M>::encode(&Tag::Unix, cx, tag)?;
+        let value = variant.variant(cx)?;
+        Encode::<M>::encode(self.as_bytes(), cx, value)?;
+        variant.end(cx)
+    }
+
+    #[cfg(windows)]
+    #[inline]
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: Context<Input = E::Error>,
+        E: Encoder,
+    {
+        use std::os::windows::ffi::OsStrExt;
+
+        use crate::en::VariantEncoder;
+
+        let mut variant = encoder.encode_variant(cx)?;
+        Encode::<M>::encode(&Tag::Windows, cx, variant.tag(cx)?)?;
+        Encode::<M>::encode(self.as_bytes(), cx, variant.variant(cx)?)?;
+        variant.end(cx)
+    }
+}
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+impl<M> Encode<M> for OsString
+where
+    M: Mode,
+{
+    #[inline]
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: Context<Input = E::Error>,
+        E: Encoder,
+    {
+        Encode::<M>::encode(self.as_os_str(), cx, encoder)
+    }
+}
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+impl<'de, M> Decode<'de, M> for OsString
+where
+    M: Mode,
+{
+    #[inline]
+    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    where
+        C: Context<Input = D::Error>,
+        D: Decoder<'de>,
+    {
+        use crate::de::VariantDecoder;
+
+        let mut variant = decoder.decode_variant(cx)?;
+
+        let tag = variant.tag(cx)?;
+        let tag = Decode::<M>::decode(cx, tag)?;
+
+        match tag {
+            #[cfg(not(unix))]
+            Tag::Unix => {
+                return Err(cx.message("Unsupported OsString::Unix variant"));
+            }
+            #[cfg(unix)]
+            Tag::Unix => {
+                use std::os::unix::ffi::OsStringExt;
+                let value = variant.variant(cx)?;
+                let bytes = Decode::<M>::decode(cx, value)?;
+                variant.end(cx)?;
+                Ok(OsString::from_vec(bytes))
+            }
+            #[cfg(not(windows))]
+            Tag::Windows => {
+                return Err(cx.message("Unsupported OsString::Windows variant"));
+            }
+            #[cfg(windows)]
+            Tag::Windows => {
+                use std::os::windows::ffi::OsStringExt;
+                let value = variant.variant(cx)?;
+                let bytes = Decode::<M>::decode(cx, value)?;
+                variant.end(cx)?;
+                Ok(OsString::from_wide(bytes))
+            }
+        }
+    }
+}
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+impl<M> Encode<M> for PathBuf
+where
+    M: Mode,
+{
+    #[inline]
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: Context<Input = E::Error>,
+        E: Encoder,
+    {
+        Encode::<M>::encode(self.as_path(), cx, encoder)
+    }
+}
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+impl<M> Encode<M> for Path
+where
+    M: Mode,
+{
+    #[inline]
+    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: Context<Input = E::Error>,
+        E: Encoder,
+    {
+        Encode::<M>::encode(self.as_os_str(), cx, encoder)
+    }
+}
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+impl<'de, M> Decode<'de, M> for PathBuf
+where
+    M: Mode,
+{
+    #[inline]
+    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    where
+        C: Context<Input = D::Error>,
+        D: Decoder<'de>,
+    {
+        Ok(PathBuf::from(<OsString as Decode<M>>::decode(cx, decoder)?))
     }
 }
