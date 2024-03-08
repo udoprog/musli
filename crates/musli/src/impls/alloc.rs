@@ -1,7 +1,7 @@
 use core::ffi::CStr;
-use core::fmt;
 #[cfg(feature = "std")]
 use core::hash::{BuildHasher, Hash};
+use core::{fmt, slice};
 
 use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
@@ -557,13 +557,25 @@ where
         C: Context<Input = E::Error>,
         E: Encoder,
     {
+        use crate::context::Buffer;
+        use crate::en::VariantEncoder;
         use std::os::windows::ffi::OsStrExt;
 
-        use crate::en::VariantEncoder;
-
         let mut variant = encoder.encode_variant(cx)?;
-        Encode::<M>::encode(&Tag::Windows, cx, variant.tag(cx)?)?;
-        Encode::<M>::encode(self.as_bytes(), cx, variant.variant(cx)?)?;
+        let tag = variant.tag(cx)?;
+
+        Encode::<M>::encode(&Tag::Windows, cx, tag)?;
+
+        let mut buf = cx.alloc();
+
+        for w in self.encode_wide() {
+            if !buf.write(&w.to_le_bytes()) {
+                return Err(cx.message("Failed to write to buffer"));
+            }
+        }
+
+        let mut value = variant.variant(cx)?;
+        Encode::<M>::encode(unsafe { buf.as_slice() }, cx, value)?;
         variant.end(cx)
     }
 }
@@ -621,10 +633,53 @@ where
             #[cfg(windows)]
             Tag::Windows => {
                 use std::os::windows::ffi::OsStringExt;
+
+                struct Visitor;
+
+                impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+                where
+                    C: Context,
+                {
+                    type Ok = OsString;
+
+                    #[inline]
+                    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                        write!(f, "a literal byte reference")
+                    }
+
+                    #[inline]
+                    fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+                        use crate::context::Buffer;
+
+                        let mut buf = cx.alloc();
+
+                        for pair in bytes.chunks_exact(2) {
+                            let &[a, b] = pair else {
+                                continue;
+                            };
+
+                            let a = u16::from_le_bytes([a, b]);
+
+                            if !buf.write(&a.to_ne_bytes()) {
+                                return Err(cx.message("Failed to write to buffer"));
+                            }
+                        }
+
+                        unsafe {
+                            let slice = buf.as_slice();
+                            let bytes = slice::from_raw_parts(
+                                slice.as_ptr().cast::<u16>(),
+                                slice.len() / 2,
+                            );
+                            Ok(OsString::from_wide(bytes))
+                        }
+                    }
+                }
+
                 let value = variant.variant(cx)?;
-                let bytes = Decode::<M>::decode(cx, value)?;
+                let os_string = value.decode_bytes(cx, Visitor)?;
                 variant.end(cx)?;
-                Ok(OsString::from_wide(bytes))
+                Ok(os_string)
             }
         }
     }
