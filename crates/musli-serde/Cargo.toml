@@ -1,0 +1,17 @@
+[package]
+name = "musli-serde"
+version = "0.0.96"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = ["alloc", "musli/std", "serde/std"]
+alloc = ["musli/alloc", "serde/alloc"]
+
+[dependencies]
+musli = { path = "../musli", version = "0.0.96", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.96", default-features = false }
+serde = { version = "1.0.197", default-features = false }
+
+[dev-dependencies]
+serde_derive = "1.0.197"

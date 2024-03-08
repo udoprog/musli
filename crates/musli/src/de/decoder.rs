@@ -91,7 +91,7 @@ pub trait PairsDecoder<'de> {
 
     /// Decode the next key. This returns `Ok(None)` where there are no more
     /// elements to decode.
-    #[must_use = "decoders must be consumed"]
+    #[must_use = "Decoders must be consumed"]
     fn next<C>(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>;
@@ -137,6 +137,104 @@ pub trait PairDecoder<'de> {
     ///
     /// The boolean returned indicates if the value was skipped or not.
     fn skip_second<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to decode a sequence of map pairs.
+///
+/// This trait exists so that decoders can implement a mode that is compatible
+/// with serde deserialization.
+///
+/// If you do not intend to implement this, then serde compatibility for your
+/// format might be degraded.
+pub trait MapPairsDecoder<'de> {
+    /// Error type.
+    type Error: Error;
+
+    /// The decoder to use for a tuple field index.
+    type Key<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The decoder to use for a tuple field value.
+    type Value<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Try to return the decoder for the first value in the pair.
+    ///
+    /// If this is a map the first value would be the key of the map, if this is
+    /// a struct the first value would be the field of the struct.
+    #[must_use = "decoders must be consumed"]
+    fn key<C>(&mut self, cx: &C) -> Result<Option<Self::Key<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Decode the value in the map.
+    #[must_use = "decoders must be consumed"]
+    fn value<C>(&mut self, cx: &C) -> Result<Self::Value<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Indicate that the value should be skipped.
+    ///
+    /// The boolean returned indicates if the value was skipped or not.
+    fn skip_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// End pair decoding.
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to decode a sequence of struct pairs.
+///
+/// This trait exists so that decoders can implement a mode that is compatible
+/// with serde deserialization.
+///
+/// If you do not intend to implement this, then serde compatibility for your
+/// format might be degraded.
+pub trait StructPairsDecoder<'de> {
+    /// Error type.
+    type Error: Error;
+
+    /// The decoder to use for a tuple field index.
+    type Field<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The decoder to use for a tuple field value.
+    type Value<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Try to return the decoder for the first value in the pair.
+    ///
+    /// If this is a map the first value would be the key of the map, if this is
+    /// a struct the first value would be the field of the struct.
+    #[must_use = "decoders must be consumed"]
+    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Decode the second value in the pair..
+    #[must_use = "decoders must be consumed"]
+    fn value<C>(&mut self, cx: &C) -> Result<Self::Value<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Indicate that the second value should be skipped.
+    ///
+    /// The boolean returned indicates if the value was skipped or not.
+    fn skip_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// End pair decoding.
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>;
 }
@@ -200,16 +298,16 @@ pub trait Decoder<'de>: Sized {
     type Tuple: PackDecoder<'de, Error = Self::Error>;
     /// Map decoder implementation.
     type Map: PairsDecoder<'de, Error = Self::Error>;
+    /// Decoder for map pairs.
+    type MapPairs: MapPairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a struct.
     ///
     /// The caller receives a [PairsDecoder] which when advanced with
     /// [PairsDecoder::next] indicates the fields of the structure.
     type Struct: PairsDecoder<'de, Error = Self::Error>;
+    /// Decoder for struct pairs.
+    type StructPairs: StructPairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a variant.
-    ///
-    /// The caller receives a [PairDecoder] which when advanced with
-    /// [PairDecoder::first] indicates which variant is being decoded and
-    /// [PairDecoder::second] is the content of the variant.
     type Variant: VariantDecoder<'de, Error = Self::Error>;
 
     /// This is a type argument used to hint to any future implementor that they
@@ -249,6 +347,17 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
+    /// Skip over the current value.
+    fn skip<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message(format_args!(
+            "Skipping is not supported, expected {}",
+            ExpectingWrapper(self).format()
+        )))
+    }
 
     /// Return a [TypeHint] indicating which type is being produced by the
     /// [Decoder].
@@ -1314,6 +1423,21 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
+    /// Simplified decoding a map of unknown length.
+    ///
+    /// The length of the map must somehow be determined from the underlying
+    /// format.
+    #[inline]
+    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message(expecting::invalid_type(
+            &expecting::Map,
+            &ExpectingWrapper(self),
+        )))
+    }
+
     /// Decode a struct which has an expected `len` number of elements.
     ///
     /// The `len` indicates how many fields the decoder is *expecting* depending
@@ -1373,6 +1497,25 @@ pub trait Decoder<'de>: Sized {
     /// ```
     #[inline]
     fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message(expecting::invalid_type(
+            &expecting::Struct,
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Simplified decoding of a struct which has an expected `len` number of
+    /// elements.
+    ///
+    /// The `len` indicates how many fields the decoder is *expecting* depending
+    /// on how many fields are present in the underlying struct being decoded,
+    /// butit should only be considered advisory.
+    ///
+    /// The size of a struct might therefore change from one session to another.
+    #[inline]
+    fn decode_struct_pairs<C>(self, cx: &C, _: usize) -> Result<Self::StructPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

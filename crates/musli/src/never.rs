@@ -13,8 +13,8 @@ use core::marker;
 use crate::no_std::ToOwned;
 
 use crate::de::{
-    AsDecoder, Decoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
-    SizeHint, ValueVisitor, VariantDecoder,
+    AsDecoder, Decoder, MapPairsDecoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
+    SequenceDecoder, SizeHint, StructPairsDecoder, ValueVisitor, VariantDecoder,
 };
 use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use crate::error::Error;
@@ -92,8 +92,10 @@ where
     type Sequence = Self;
     type Tuple = Self;
     type Map = Self;
+    type MapPairs = Self;
     type Some = Self;
     type Struct = Self;
+    type StructPairs = Self;
     type Variant = Self;
     type __UseMusliDecoderAttributeMacro = ();
 
@@ -152,6 +154,96 @@ where
 
     #[inline]
     fn skip_second<C>(self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+}
+
+impl<'de, E> MapPairsDecoder<'de> for Never<E>
+where
+    E: Error,
+{
+    type Error = E;
+
+    type Key<'this> = Self
+    where
+        Self: 'this;
+
+    type Value<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn key<C>(&mut self, _: &C) -> Result<Option<Self::Key<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn value<C>(&mut self, _: &C) -> Result<Self::Value<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn skip_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+}
+
+impl<'de, E> StructPairsDecoder<'de> for Never<E>
+where
+    E: Error,
+{
+    type Error = E;
+
+    type Field<'this> = Self
+    where
+        Self: 'this;
+
+    type Value<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn field<C>(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn value<C>(&mut self, _: &C) -> Result<Self::Value<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn skip_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -306,8 +398,11 @@ where
     type Sequence = Self;
     type Tuple = Self;
     type Map = Self;
+    type MapPairs = Self;
     type Struct = Self;
     type Variant = Self;
+    type TupleVariant = Self;
+    type StructVariant = Self;
     type __UseMusliEncoderAttributeMacro = ();
 
     #[inline]

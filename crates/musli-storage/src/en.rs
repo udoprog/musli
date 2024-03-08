@@ -1,8 +1,8 @@
 use core::fmt;
 use core::marker;
 
-use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
-use musli::Context;
+use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli::{Context, Mode};
 use musli_common::options::{self, Options};
 use musli_common::writer::Writer;
 
@@ -43,8 +43,11 @@ where
     type Sequence = Self;
     type Tuple = Self;
     type Map = Self;
+    type MapPairs = Self;
     type Struct = Self;
     type Variant = Self;
+    type TupleVariant = Self;
+    type StructVariant = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -313,6 +316,15 @@ where
     }
 
     #[inline(always)]
+    fn encode_map_pairs<C>(mut self, cx: &C, len: usize) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        musli_common::int::encode_usize::<_, _, F>(cx.adapt(), self.writer.borrow_mut(), len)?;
+        Ok(self)
+    }
+
+    #[inline(always)]
     fn encode_struct<C>(mut self, cx: &C, len: usize) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -326,6 +338,40 @@ where
     where
         C: Context<Input = Self::Error>,
     {
+        Ok(self)
+    }
+
+    #[inline(always)]
+    fn encode_tuple_variant<M, C, T>(
+        mut self,
+        cx: &C,
+        tag: &T,
+        _: usize,
+    ) -> Result<Self::TupleVariant, C::Error>
+    where
+        M: Mode,
+        C: Context<Input = Self::Error>,
+        T: Encode<M>,
+    {
+        let encoder = StorageEncoder::<_, F, E>::new(self.writer.borrow_mut());
+        Encode::<M>::encode(tag, cx, encoder)?;
+        Ok(self)
+    }
+
+    #[inline(always)]
+    fn encode_struct_variant<M, C, T>(
+        mut self,
+        cx: &C,
+        tag: &T,
+        _: usize,
+    ) -> Result<Self::StructVariant, C::Error>
+    where
+        M: Mode,
+        C: Context<Input = Self::Error>,
+        T: Encode<M>,
+    {
+        let encoder = StorageEncoder::<_, F, E>::new(self.writer.borrow_mut());
+        Encode::<M>::encode(tag, cx, encoder)?;
         Ok(self)
     }
 }

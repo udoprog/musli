@@ -201,10 +201,16 @@ pub trait Encoder: Sized {
     type Tuple: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a map encoder.
     type Map: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
+    /// Streaming encoder for map pairs.
+    type MapPairs: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a struct.
     type Struct: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a struct variant.
     type Variant: VariantEncoder<Ok = Self::Ok, Error = Self::Error>;
+    /// Specialized encoder for a tuple variant.
+    type TupleVariant: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
+    /// Specialized encoder for a struct variant.
+    type StructVariant: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::encoder]`][crate::encoder] attribute
@@ -1109,10 +1115,24 @@ pub trait Encoder: Sized {
     }
 
     /// Encode a map with a known length `len`.
-    ///
-    ///
     #[inline]
     fn encode_map<C>(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Map, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message(expecting::invalid_type(
+            &expecting::Map,
+            &ExpectingWrapper::new(self),
+        )))
+    }
+
+    /// Encode a map through pairs with a known length `len`.
+    #[inline]
+    fn encode_map_pairs<C>(
+        self,
+        cx: &C,
+        #[allow(unused)] len: usize,
+    ) -> Result<Self::MapPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -1160,7 +1180,7 @@ pub trait Encoder: Sized {
         )))
     }
 
-    /// Encode an struct enum variant.
+    /// Encode a variant.
     ///
     /// # Examples
     ///
@@ -1211,6 +1231,188 @@ pub trait Encoder: Sized {
     fn encode_variant<C>(self, cx: &C) -> Result<Self::Variant, C::Error>
     where
         C: Context<Input = Self::Error>,
+    {
+        Err(cx.message(expecting::invalid_type(
+            &expecting::Variant,
+            &ExpectingWrapper::new(self),
+        )))
+    }
+
+    /// Simplified encoding for a unit variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder, SequenceEncoder};
+    /// use musli::mode::Mode;
+    ///
+    /// enum Enum {
+    ///     UnitVariant,
+    ///     TupleVariant(String),
+    ///     Variant {
+    ///         data: String,
+    ///         age: u32,
+    ///     }
+    /// }
+    ///
+    /// impl<M> Encode<M> for Enum where M: Mode {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: Context<Input = E::Error>,
+    ///         E: Encoder
+    ///     {
+    ///         match self {
+    ///             Enum::UnitVariant => {
+    ///                 encoder.encode_unit_variant::<M, _, _>(cx, &"variant1")
+    ///             }
+    ///             Enum::TupleVariant(data) => {
+    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant2", 1)?;
+    ///                 variant.push::<M, _, _>(cx, data)?;
+    ///                 variant.end(cx)
+    ///             }
+    ///             Enum::Variant { data, age } => {
+    ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
+    ///                 variant.insert::<M, _, _, _>(cx, "data", data)?;
+    ///                 variant.insert::<M, _, _, _>(cx, "age", age)?;
+    ///                 variant.end(cx)
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_unit_variant<M, C, T>(self, cx: &C, tag: &T) -> Result<Self::Ok, C::Error>
+    where
+        M: Mode,
+        C: Context<Input = Self::Error>,
+        T: Encode<M>,
+    {
+        let mut variant = self.encode_variant(cx)?;
+        let t = variant.tag(cx)?;
+        Encode::<M>::encode(tag, cx, t)?;
+        let v = variant.variant(cx)?;
+        v.encode_unit(cx)?;
+        variant.end(cx)
+    }
+
+    /// Simplified encoding for a tuple variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder, SequenceEncoder};
+    /// use musli::mode::Mode;
+    ///
+    /// enum Enum {
+    ///     UnitVariant,
+    ///     TupleVariant(String),
+    ///     Variant {
+    ///         data: String,
+    ///         age: u32,
+    ///     }
+    /// }
+    ///
+    /// impl<M> Encode<M> for Enum where M: Mode {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: Context<Input = E::Error>,
+    ///         E: Encoder
+    ///     {
+    ///         match self {
+    ///             Enum::UnitVariant => {
+    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant1", 0)?;
+    ///                 variant.end(cx)
+    ///             }
+    ///             Enum::TupleVariant(data) => {
+    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant2", 1)?;
+    ///                 variant.push::<M, _, _>(cx, data)?;
+    ///                 variant.end(cx)
+    ///             }
+    ///             Enum::Variant { data, age } => {
+    ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
+    ///                 variant.insert::<M, _, _, _>(cx, "data", data)?;
+    ///                 variant.insert::<M, _, _, _>(cx, "age", age)?;
+    ///                 variant.end(cx)
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_tuple_variant<M, C, T>(
+        self,
+        cx: &C,
+        _: &T,
+        _: usize,
+    ) -> Result<Self::TupleVariant, C::Error>
+    where
+        M: Mode,
+        C: Context<Input = Self::Error>,
+        T: Encode<M>,
+    {
+        Err(cx.message(expecting::invalid_type(
+            &expecting::Variant,
+            &ExpectingWrapper::new(self),
+        )))
+    }
+
+    /// Simplified encoding for a struct variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder, SequenceEncoder};
+    /// use musli::mode::Mode;
+    ///
+    /// enum Enum {
+    ///     UnitVariant,
+    ///     TupleVariant(String),
+    ///     Variant {
+    ///         data: String,
+    ///         age: u32,
+    ///     }
+    /// }
+    ///
+    /// impl<M> Encode<M> for Enum where M: Mode {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: Context<Input = E::Error>,
+    ///         E: Encoder
+    ///     {
+    ///         match self {
+    ///             Enum::UnitVariant => {
+    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant1", 0)?;
+    ///                 variant.end(cx)
+    ///             }
+    ///             Enum::TupleVariant(data) => {
+    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant2", 1)?;
+    ///                 variant.push::<M, _, _>(cx, data)?;
+    ///                 variant.end(cx)
+    ///             }
+    ///             Enum::Variant { data, age } => {
+    ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
+    ///                 variant.insert::<M, _, _, _>(cx, "data", data)?;
+    ///                 variant.insert::<M, _, _, _>(cx, "age", age)?;
+    ///                 variant.end(cx)
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_struct_variant<M, C, T>(
+        self,
+        cx: &C,
+        _: &T,
+        _: usize,
+    ) -> Result<Self::StructVariant, C::Error>
+    where
+        M: Mode,
+        C: Context<Input = Self::Error>,
+        T: Encode<M>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Variant,

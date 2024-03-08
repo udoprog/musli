@@ -78,7 +78,7 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     match input.expand(
         "decoder",
-        &types::DECODER_TYPES,
+        types::DECODER_TYPES,
         ["Error"],
         "__UseMusliDecoderAttributeMacro",
     ) {
@@ -101,7 +101,7 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     match input.expand(
         "encoder",
-        &types::ENCODER_TYPES,
+        types::ENCODER_TYPES,
         ["Ok", "Error"],
         "__UseMusliEncoderAttributeMacro",
     ) {
@@ -124,7 +124,7 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     match input.expand(
         "visitor",
-        &types::VISITOR_TYPES,
+        types::VISITOR_TYPES,
         ["Ok"],
         "__UseMusliVisitorAttributeMacro",
     ) {

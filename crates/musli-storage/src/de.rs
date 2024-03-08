@@ -5,8 +5,8 @@ use core::marker;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, SizeHint, ValueVisitor,
-    VariantDecoder,
+    Decoder, MapPairsDecoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, SizeHint,
+    StructPairsDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::Context;
 use musli_common::options::Options;
@@ -52,7 +52,9 @@ where
     type Sequence = LimitedStorageDecoder<R, F, E>;
     type Tuple = Self;
     type Map = LimitedStorageDecoder<R, F, E>;
+    type MapPairs = LimitedStorageDecoder<R, F, E>;
     type Struct = LimitedStorageDecoder<R, F, E>;
+    type StructPairs = LimitedStorageDecoder<R, F, E>;
     type Variant = Self;
 
     #[inline]
@@ -329,7 +331,23 @@ where
     }
 
     #[inline]
+    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        LimitedStorageDecoder::new(cx, self)
+    }
+
+    #[inline]
     fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        LimitedStorageDecoder::new(cx, self)
+    }
+
+    #[inline]
+    fn decode_struct_pairs<C>(self, cx: &C, _: usize) -> Result<Self::StructPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -495,6 +513,102 @@ where
         C: Context<Input = Self::Error>,
     {
         Ok(false)
+    }
+}
+
+impl<'de, R, const F: Options, E> MapPairsDecoder<'de> for LimitedStorageDecoder<R, F, E>
+where
+    R: Reader<'de>,
+    E: From<R::Error>,
+    E: musli::error::Error,
+{
+    type Error = E;
+    type Key<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type Value<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+
+    #[inline]
+    fn key<C>(&mut self, _: &C) -> Result<Option<Self::Key<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if self.remaining == 0 {
+            return Ok(None);
+        }
+
+        self.remaining -= 1;
+        Ok(Some(StorageDecoder::new(self.decoder.reader.borrow_mut())))
+    }
+
+    #[inline]
+    fn value<C>(&mut self, _: &C) -> Result<Self::Value<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(StorageDecoder::new(self.decoder.reader.borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(false)
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<'de, R, const F: Options, E> StructPairsDecoder<'de> for LimitedStorageDecoder<R, F, E>
+where
+    R: Reader<'de>,
+    E: From<R::Error>,
+    E: musli::error::Error,
+{
+    type Error = E;
+    type Field<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type Value<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if self.remaining == 0 {
+            return Err(cx.message("Ran out of struct fields to decode"));
+        }
+
+        self.remaining -= 1;
+        Ok(StorageDecoder::new(self.decoder.reader.borrow_mut()))
+    }
+
+    #[inline]
+    fn value<C>(&mut self, _: &C) -> Result<Self::Value<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(StorageDecoder::new(self.decoder.reader.borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(false)
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
     }
 }
 

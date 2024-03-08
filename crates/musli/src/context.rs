@@ -77,6 +77,14 @@ pub trait Context {
         unsafe { &*(self as *const _ as *const _) }
     }
 
+    /// Generate a map function which maps an error using the `report` function.
+    fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
+    where
+        Self::Input: From<T>,
+    {
+        move |error| self.report(error)
+    }
+
     /// Report the given context error.
     fn report<T>(&self, error: T) -> Self::Error
     where
