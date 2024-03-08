@@ -1,4 +1,4 @@
-//! # The [`Encode`] and [`Decode`] derives
+//! # Documentation for deriving [`Encode`] and [`Decode`]
 //!
 //! The [`Encode`] and [`Decode`] derives allows for automatically implementing
 //! [`Encode`] and [`Decode`].
@@ -382,7 +382,7 @@
 //! See [enum representations](#enum-representations) for details on this
 //! representation.
 //!
-//! ```rust
+//! ```
 //! # use musli::{Encode, Decode};
 //! # #[derive(Encode, Decode)] struct Params;
 //! # #[derive(Encode, Decode)] struct Value;
@@ -577,43 +577,89 @@
 //! This specifies the path to a module to use instead of the fields default
 //! [`Encode`] or [`Decode`] implementations.
 //!
-//! It expects the following functions to be defined, assuming the type of the
-//! field is `Field`.
-//!
-//! `encode` for encoding the field, which should match the following signature:
-//!
-//! ```rust,ignore
-//! fn encode<M, E>(field: &Field, encoder: E) -> Result<E::Ok, E::Error>
-//! where
-//!     M: Mode,
-//!     E: Encoder;
-//! ```
-//!
-//! `encode` for decoding the field, which should match the following signature:
-//!
-//! ```rust,ignore
-//! fn decode<'de, M, D>(decoder: D) -> Result<Field, D::Error>
-//! where
-//!     M: Mode,
-//!     D: Decoder<'de>;
-//! ```
-//!
-//! Finally this can receive generic arguments like `#[musli(with =
-//! crate::path::<_>)]`, in case the receiving decode and encode functions
-//! receive *extra* generic arguments (beyond `M` and `D`), such as:
-//!
-//! ```rust,ignore
-//! fn decode<'de, M, D, T>(decoder: D) -> Result<Set<T>, D::Error>
-//! where
-//!     M: Mode,
-//!     D: Decoder<'de>,
-//!     T: Decode<'de>;
-//! ```
-//!
-//! Full example:
+//! It expects `encode` and `decode` and decodee function to be defined in the path being specified, like this:
 //!
 //! ```
-//! # mod types {
+//! # mod example {
+//! use musli::{Decode, Encode};
+//!
+//! #[derive(Decode, Encode)]
+//! struct Container {
+//!     #[musli(with = self::module)]
+//!     field: Field,
+//! }
+//!
+//! struct Field {
+//!     /* internal */
+//! }
+//!
+//! mod module {
+//!     use musli::{Context, Decoder, Encoder, Mode};
+//!
+//!     use super::Field;
+//!
+//!     pub fn encode<M, C, E>(field: &Field, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+//!     where
+//!         M: Mode,
+//!         C: Context<Input = E::Error>,
+//!         E: Encoder
+//! # { todo!() }
+//!
+//!     pub fn decode<'de, M, C, D>(cx: &mut C, decoder: D) -> Result<Field, C::Error>
+//!     where
+//!         M: Mode,
+//!         C: Context<Input = D::Error>,
+//!         D: Decoder<'de>
+//! # { todo!() }
+//! }
+//! # }
+//! ```
+//!
+//! This can receive generic arguments like `#[musli(with =
+//! self::musli::<u32>)]`, in case the receiving decode and encode functions
+//! need *extra* generic arguments beyond `M`, `C`, and `D` below, such as:
+//!
+//! ```
+//! # mod example {
+//! use musli::{Decode, Encode};
+//!
+//! #[derive(Decode, Encode)]
+//! struct Container {
+//!     #[musli(with = self::module::<_>)]
+//!     field: Field<u32>,
+//! }
+//!
+//! struct Field<T> {
+//!     /* internal */
+//! #   value: T,
+//! }
+//!
+//! mod module {
+//!     use musli::{Context, Decoder, Encoder, Mode};
+//!
+//!     use super::Field;
+//!
+//!     pub fn encode<M, C, E, T>(field: &Field<T>, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+//!     where
+//!         M: Mode,
+//!         C: Context<Input = E::Error>,
+//!         E: Encoder
+//! # { todo!() }
+//!
+//!     pub fn decode<'de, M, C, D, T>(cx: &mut C, decoder: D) -> Result<Field<T>, C::Error>
+//!     where
+//!         M: Mode,
+//!         C: Context<Input = D::Error>,
+//!         D: Decoder<'de>
+//! # { todo!() }
+//! }
+//! # }
+//! ```
+//!
+//! More complete example:
+//!
+//! ```
+//! # mod example {
 //! use std::collections::HashSet;
 //! use musli::{Encode, Decode};
 //!
@@ -628,10 +674,7 @@
 //! }
 //!
 //! mod custom_uuid {
-//!     use musli::Context;
-//!     use musli::en::{Encode, Encoder};
-//!     use musli::de::{Decode, Decoder};
-//!     use musli::mode::Mode;
+//!     use musli::{Context, Mode, Decode, Decoder, Encode, Encoder};
 //!
 //!     use super::CustomUuid;
 //!
@@ -658,10 +701,7 @@
 //!     use std::collections::HashSet;
 //!     use std::hash::Hash;
 //!
-//!     use musli::Context;
-//!     use musli::en::{Encode, Encoder};
-//!     use musli::de::{Decode, Decoder};
-//!     use musli::mode::Mode;
+//!     use musli::{Context, Mode, Decode, Decoder, Encode, Encoder};
 //!
 //!     pub fn encode<M, C, E, T>(set: &HashSet<T>, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
@@ -770,7 +810,7 @@
 //!
 //! ## Externally tagged
 //!
-//! ```rust
+//! ```
 //! # use musli::{Encode, Decode};
 //! # #[derive(Encode, Decode)] struct Params;
 //! # #[derive(Encode, Decode)] struct Value;
@@ -799,7 +839,7 @@
 //!
 //! ## Internally tagged
 //!
-//! ```rust
+//! ```
 //! # use musli::{Encode, Decode};
 //! # #[derive(Encode, Decode)] struct Params;
 //! # #[derive(Encode, Decode)] struct Value;
