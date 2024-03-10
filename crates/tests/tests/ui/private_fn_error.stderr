@@ -7,7 +7,7 @@ error[E0603]: function `decode` is private
 note: the function `decode` is defined here
   --> tests/ui/private_fn_error.rs:23:5
    |
-23 | /     fn decode<'de, M, C, D, T, const N: usize>(cx: &mut C, decoder: D) -> Result<[T; N], C::Error>
+23 | /     fn decode<'de, M, C, D, T, const N: usize>(cx: &C, decoder: D) -> Result<[T; N], C::Error>
 24 | |     where
 25 | |         M: Mode,
 26 | |         C: Context<Input = D::Error>,

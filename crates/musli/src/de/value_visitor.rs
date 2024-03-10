@@ -38,20 +38,20 @@ where
 
     /// Visit an owned value.
     #[inline]
-    fn visit_owned(self, cx: &mut C, value: T::Owned) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, cx: &C, value: T::Owned) -> Result<Self::Ok, C::Error> {
         self.visit_ref(cx, value.borrow())
     }
 
     /// Visit a string that is borrowed directly from the source data.
     #[inline]
-    fn visit_borrowed(self, cx: &mut C, value: &'de T) -> Result<Self::Ok, C::Error> {
+    fn visit_borrowed(self, cx: &C, value: &'de T) -> Result<Self::Ok, C::Error> {
         self.visit_ref(cx, value)
     }
 
     /// Visit a value reference that is provided from the decoder in any manner
     /// possible. Which might require additional decoding work.
     #[inline]
-    fn visit_ref(self, cx: &mut C, _: &T) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: &C, _: &T) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
             &ExpectingWrapper::new(self),
@@ -61,7 +61,7 @@ where
     /// Fallback used when the type is either not implemented for this visitor
     /// or the underlying format doesn't know which type to decode.
     #[inline]
-    fn visit_any<D>(self, cx: &mut C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
+    fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
         D: Decoder<'de, Error = C::Input>,
     {

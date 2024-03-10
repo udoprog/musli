@@ -38,3 +38,7 @@ pub mod writer;
 
 #[macro_use]
 mod macros;
+
+#[cfg_attr(feature = "std", path = "system/std.rs")]
+#[cfg_attr(not(feature = "std"), path = "system/nostd.rs")]
+mod system;

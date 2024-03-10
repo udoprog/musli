@@ -33,7 +33,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     #[inline]
     fn parse_string<'scratch, C, S>(
         &mut self,
-        cx: &mut C,
+        cx: &C,
         validate: bool,
         scratch: &'scratch mut S,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
@@ -55,7 +55,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn read_byte<C>(&mut self, cx: &mut C) -> Result<u8, C::Error>
+    fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -65,7 +65,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn skip<C>(&mut self, cx: &mut C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -81,7 +81,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn read<C>(&mut self, cx: &mut C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -98,7 +98,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn skip_whitespace<C>(&mut self, cx: &mut C) -> Result<(), C::Error>
+    fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -119,14 +119,14 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
-    fn peek_byte<C>(&mut self, _: &mut C) -> Result<Option<u8>, C::Error>
+    fn peek_byte<C>(&mut self, _: &C) -> Result<Option<u8>, C::Error>
     where
         C: Context<Input = Error>,
     {
         Ok(self.slice.get(self.index).copied())
     }
 
-    fn parse_f32<C>(&mut self, cx: &mut C) -> Result<f32, C::Error>
+    fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -145,7 +145,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         Ok(value)
     }
 
-    fn parse_f64<C>(&mut self, cx: &mut C) -> Result<f64, C::Error>
+    fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
     where
         C: Context<Input = Error>,
     {

@@ -49,7 +49,7 @@ macro_rules! encode_with_extensions {
         /// configurable [`Context`].
         #[cfg(feature = "alloc")]
         #[inline]
-        pub fn to_vec_with<C, T>(self, cx: &mut C, value: &T) -> Result<Vec<u8>, C::Error>
+        pub fn to_vec_with<C, T>(self, cx: &C, value: &T) -> Result<Vec<u8>, C::Error>
         where
             C: Context<Input = Error>,
             T: ?Sized + Encode<M>,
@@ -76,7 +76,7 @@ macro_rules! encode_with_extensions {
         #[inline]
         pub fn to_fixed_bytes_with<C, const N: usize, T>(
             self,
-            cx: &mut C,
+            cx: &C,
             value: &T,
         ) -> Result<FixedBytes<N>, C::Error>
         where
@@ -114,7 +114,7 @@ macro_rules! encoding_from_slice_impls {
         /// This is the same as [`Encoding::from_slice`], but allows for using a
         /// configurable [`Context`].
         #[inline]
-        pub fn from_slice_with<'de, C, T>(self, cx: &mut C, bytes: &'de [u8]) -> Result<T, C::Error>
+        pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
             C: Context<Input = Error>,
             T: Decode<'de, M>,
@@ -136,7 +136,7 @@ macro_rules! encoding_impls {
         /// This is the same as [`Encoding::encode`] but allows for using a
         /// configurable [`Context`].
         #[inline]
-        pub fn encode_with<C, W, T>(self, cx: &mut C, writer: W, value: &T) -> Result<(), C::Error>
+        pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
         where
             C: Context<Input = Error>,
             W: Writer,
@@ -152,7 +152,7 @@ macro_rules! encoding_impls {
         /// This is the same as [`Encoding::decode`] but allows for using a
         /// configurable [`Context`].
         #[inline]
-        pub fn decode_with<'de, C, R, T>(self, cx: &mut C, reader: R) -> Result<T, C::Error>
+        pub fn decode_with<'de, C, R, T>(self, cx: &C, reader: R) -> Result<T, C::Error>
         where
             C: Context<Input = Error>,
             R: Reader<'de>,

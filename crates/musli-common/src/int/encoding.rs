@@ -10,7 +10,7 @@ use crate::writer::Writer;
 /// Governs how unsigned integers are encoded into a [Writer].
 #[inline]
 pub fn encode_unsigned<C, W, T, const F: Options>(
-    cx: &mut C,
+    cx: &C,
     writer: W,
     value: T,
 ) -> Result<(), C::Error>
@@ -32,7 +32,7 @@ where
 /// passed in through `F`.
 #[inline]
 pub fn decode_unsigned<'de, C, R, T: UnsignedOps, const F: Options>(
-    cx: &mut C,
+    cx: &C,
     reader: R,
 ) -> Result<T, C::Error>
 where
@@ -51,11 +51,7 @@ where
 
 /// Governs how signed integers are encoded into a [Writer].
 #[inline]
-pub fn encode_signed<C, W, T, const F: Options>(
-    cx: &mut C,
-    writer: W,
-    value: T,
-) -> Result<(), C::Error>
+pub fn encode_signed<C, W, T, const F: Options>(cx: &C, writer: W, value: T) -> Result<(), C::Error>
 where
     C: Context<Input = W::Error>,
     W: Writer,
@@ -73,7 +69,7 @@ where
 
 /// Governs how signed integers are decoded from a [Reader].
 #[inline]
-pub fn decode_signed<'de, C, R, T, const F: Options>(cx: &mut C, reader: R) -> Result<T, C::Error>
+pub fn decode_signed<'de, C, R, T, const F: Options>(cx: &C, reader: R) -> Result<T, C::Error>
 where
     C: Context<Input = R::Error>,
     R: Reader<'de>,
@@ -94,11 +90,7 @@ where
 
 /// Governs how usize lengths are encoded into a [Writer].
 #[inline]
-pub fn encode_usize<C, W, const F: Options>(
-    cx: &mut C,
-    writer: W,
-    value: usize,
-) -> Result<(), C::Error>
+pub fn encode_usize<C, W, const F: Options>(cx: &C, writer: W, value: usize) -> Result<(), C::Error>
 where
     C: Context<Input = W::Error>,
     W: Writer,
@@ -124,7 +116,7 @@ where
 
 /// Governs how usize lengths are decoded from a [Reader].
 #[inline]
-pub fn decode_usize<'de, C, R, const F: Options>(cx: &mut C, reader: R) -> Result<usize, C::Error>
+pub fn decode_usize<'de, C, R, const F: Options>(cx: &C, reader: R) -> Result<usize, C::Error>
 where
     C: Context<Input = R::Error>,
     R: Reader<'de>,

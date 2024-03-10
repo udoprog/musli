@@ -44,7 +44,7 @@ macro_rules! declare {
     (($ty0:ident, $ident0:ident) $(, ($ty:ident, $ident:ident))* $(,)?) => {
         impl<M, $ty0 $(, $ty)*> Encode<M> for ($ty0, $($ty),*) where M: Mode, $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
-            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
                 C: Context<Input = E::Error>,
                 E: Encoder,
@@ -63,7 +63,7 @@ macro_rules! declare {
 
         impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*) where M: Mode, $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
-            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
                 C: Context<Input = D::Error>,
                 D: Decoder<'de>
@@ -78,7 +78,7 @@ macro_rules! declare {
 
         impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)> where M: Mode, $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
-            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
                 C: Context<Input = E::Error>,
                 E: Encoder,
@@ -97,7 +97,7 @@ macro_rules! declare {
 
         impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)> where M: Mode, $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
-            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
                 C: Context<Input = D::Error>,
                 D: Decoder<'de>

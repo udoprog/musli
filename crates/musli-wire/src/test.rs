@@ -31,7 +31,7 @@ where
     M: Mode,
     T: Decode<'de, M>,
 {
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,

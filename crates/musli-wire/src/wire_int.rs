@@ -11,7 +11,7 @@ use crate::writer::Writer;
 /// Governs how usize lengths are encoded into a [Writer].
 #[inline]
 pub(crate) fn encode_length<C, W, const F: Options>(
-    cx: &mut C,
+    cx: &C,
     mut writer: W,
     value: usize,
 ) -> Result<(), C::Error>
@@ -52,7 +52,7 @@ where
 /// Governs how usize lengths are decoded from a [Reader].
 #[inline]
 pub(crate) fn decode_length<'de, C, R, const F: Options>(
-    cx: &mut C,
+    cx: &C,
     mut reader: R,
 ) -> Result<usize, C::Error>
 where
@@ -105,7 +105,7 @@ where
 /// Governs how unsigned integers are encoded into a [Writer].
 #[inline]
 pub(crate) fn encode_unsigned<C, W, T, const F: Options>(
-    cx: &mut C,
+    cx: &C,
     mut writer: W,
     value: T,
 ) -> Result<(), C::Error>
@@ -134,7 +134,7 @@ where
 /// Governs how unsigned integers are decoded from a [Reader].
 #[inline]
 pub(crate) fn decode_unsigned<'de, C, R, T, const F: Options>(
-    cx: &mut C,
+    cx: &C,
     mut reader: R,
 ) -> Result<T, C::Error>
 where
@@ -171,7 +171,7 @@ where
 /// Governs how signed integers are encoded into a [Writer].
 #[inline]
 pub(crate) fn encode_signed<C, W, T, const F: Options>(
-    cx: &mut C,
+    cx: &C,
     writer: W,
     value: T,
 ) -> Result<(), C::Error>
@@ -188,7 +188,7 @@ where
 /// Governs how signed integers are decoded from a [Reader].
 #[inline]
 pub(crate) fn decode_signed<'de, C, R, T, const F: Options>(
-    cx: &mut C,
+    cx: &C,
     reader: R,
 ) -> Result<T, C::Error>
 where

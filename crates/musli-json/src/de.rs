@@ -47,7 +47,7 @@ where
     }
 
     /// Skip over any values.
-    pub(crate) fn skip_any<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    pub(crate) fn skip_any<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -88,7 +88,7 @@ where
     }
 
     #[inline]
-    fn parse_true<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn parse_true<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -97,7 +97,7 @@ where
     }
 
     #[inline]
-    fn parse_false<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn parse_false<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -106,7 +106,7 @@ where
     }
 
     #[inline]
-    fn parse_null<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn parse_null<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -137,7 +137,7 @@ where
     }
 
     #[inline]
-    fn type_hint<C>(&mut self, cx: &mut C) -> Result<TypeHint, C::Error>
+    fn type_hint<C>(&mut self, cx: &C) -> Result<TypeHint, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -155,7 +155,7 @@ where
 
     #[cfg(feature = "musli-value")]
     #[inline]
-    fn decode_buffer<M, C>(self, cx: &mut C) -> Result<Self::Buffer, C::Error>
+    fn decode_buffer<M, C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
     where
         M: Mode,
         C: Context<Input = Self::Error>,
@@ -166,7 +166,7 @@ where
     }
 
     #[inline]
-    fn decode_unit<C>(self, cx: &mut C) -> Result<(), C::Error>
+    fn decode_unit<C>(self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -174,7 +174,7 @@ where
     }
 
     #[inline]
-    fn decode_bool<C>(mut self, cx: &mut C) -> Result<bool, C::Error>
+    fn decode_bool<C>(mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -192,7 +192,7 @@ where
     }
 
     #[inline]
-    fn decode_char<C>(mut self, cx: &mut C) -> Result<char, C::Error>
+    fn decode_char<C>(mut self, cx: &C) -> Result<char, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -214,7 +214,7 @@ where
     }
 
     #[inline]
-    fn decode_u8<C>(mut self, cx: &mut C) -> Result<u8, C::Error>
+    fn decode_u8<C>(mut self, cx: &C) -> Result<u8, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -222,7 +222,7 @@ where
     }
 
     #[inline]
-    fn decode_u16<C>(mut self, cx: &mut C) -> Result<u16, C::Error>
+    fn decode_u16<C>(mut self, cx: &C) -> Result<u16, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -230,7 +230,7 @@ where
     }
 
     #[inline]
-    fn decode_u32<C>(mut self, cx: &mut C) -> Result<u32, C::Error>
+    fn decode_u32<C>(mut self, cx: &C) -> Result<u32, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -238,7 +238,7 @@ where
     }
 
     #[inline]
-    fn decode_u64<C>(mut self, cx: &mut C) -> Result<u64, C::Error>
+    fn decode_u64<C>(mut self, cx: &C) -> Result<u64, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -246,7 +246,7 @@ where
     }
 
     #[inline]
-    fn decode_u128<C>(mut self, cx: &mut C) -> Result<u128, C::Error>
+    fn decode_u128<C>(mut self, cx: &C) -> Result<u128, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -254,7 +254,7 @@ where
     }
 
     #[inline]
-    fn decode_i8<C>(mut self, cx: &mut C) -> Result<i8, C::Error>
+    fn decode_i8<C>(mut self, cx: &C) -> Result<i8, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -262,7 +262,7 @@ where
     }
 
     #[inline]
-    fn decode_i16<C>(mut self, cx: &mut C) -> Result<i16, C::Error>
+    fn decode_i16<C>(mut self, cx: &C) -> Result<i16, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -270,7 +270,7 @@ where
     }
 
     #[inline]
-    fn decode_i32<C>(mut self, cx: &mut C) -> Result<i32, C::Error>
+    fn decode_i32<C>(mut self, cx: &C) -> Result<i32, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -278,7 +278,7 @@ where
     }
 
     #[inline]
-    fn decode_i64<C>(mut self, cx: &mut C) -> Result<i64, C::Error>
+    fn decode_i64<C>(mut self, cx: &C) -> Result<i64, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -286,7 +286,7 @@ where
     }
 
     #[inline]
-    fn decode_i128<C>(mut self, cx: &mut C) -> Result<i128, C::Error>
+    fn decode_i128<C>(mut self, cx: &C) -> Result<i128, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -294,7 +294,7 @@ where
     }
 
     #[inline]
-    fn decode_usize<C>(mut self, cx: &mut C) -> Result<usize, C::Error>
+    fn decode_usize<C>(mut self, cx: &C) -> Result<usize, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -302,7 +302,7 @@ where
     }
 
     #[inline]
-    fn decode_isize<C>(mut self, cx: &mut C) -> Result<isize, C::Error>
+    fn decode_isize<C>(mut self, cx: &C) -> Result<isize, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -310,7 +310,7 @@ where
     }
 
     #[inline]
-    fn decode_f32<C>(mut self, cx: &mut C) -> Result<f32, C::Error>
+    fn decode_f32<C>(mut self, cx: &C) -> Result<f32, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -318,7 +318,7 @@ where
     }
 
     #[inline]
-    fn decode_f64<C>(mut self, cx: &mut C) -> Result<f64, C::Error>
+    fn decode_f64<C>(mut self, cx: &C) -> Result<f64, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -326,7 +326,7 @@ where
     }
 
     #[inline]
-    fn decode_array<C, const N: usize>(self, cx: &mut C) -> Result<[u8; N], C::Error>
+    fn decode_array<C, const N: usize>(self, cx: &C) -> Result<[u8; N], C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -349,7 +349,7 @@ where
     }
 
     #[inline]
-    fn decode_number<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_number<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         V: NumberVisitor<'de, C>,
@@ -359,7 +359,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_bytes<C, V>(self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_bytes<C, V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, [u8]>,
@@ -375,7 +375,7 @@ where
     }
 
     #[inline]
-    fn decode_string<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_string<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, str>,
@@ -389,7 +389,7 @@ where
     }
 
     #[inline]
-    fn decode_option<C>(mut self, cx: &mut C) -> Result<Option<Self::Some>, C::Error>
+    fn decode_option<C>(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -402,7 +402,7 @@ where
     }
 
     #[inline]
-    fn decode_pack<C>(self, cx: &mut C) -> Result<Self::Pack, C::Error>
+    fn decode_pack<C>(self, cx: &C) -> Result<Self::Pack, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -410,7 +410,7 @@ where
     }
 
     #[inline]
-    fn decode_sequence<C>(self, cx: &mut C) -> Result<Self::Sequence, C::Error>
+    fn decode_sequence<C>(self, cx: &C) -> Result<Self::Sequence, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -418,7 +418,7 @@ where
     }
 
     #[inline]
-    fn decode_tuple<C>(self, cx: &mut C, len: usize) -> Result<Self::Tuple, C::Error>
+    fn decode_tuple<C>(self, cx: &C, len: usize) -> Result<Self::Tuple, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -426,7 +426,7 @@ where
     }
 
     #[inline]
-    fn decode_map<C>(self, cx: &mut C) -> Result<Self::Map, C::Error>
+    fn decode_map<C>(self, cx: &C) -> Result<Self::Map, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -434,7 +434,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<C>(self, cx: &mut C, len: usize) -> Result<Self::Struct, C::Error>
+    fn decode_struct<C>(self, cx: &C, len: usize) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -442,7 +442,7 @@ where
     }
 
     #[inline]
-    fn decode_variant<C>(self, cx: &mut C) -> Result<Self::Variant, C::Error>
+    fn decode_variant<C>(self, cx: &C) -> Result<Self::Variant, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -450,7 +450,7 @@ where
     }
 
     #[inline]
-    fn decode_any<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_any<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Error>,
         V: Visitor<'de, Error = Self::Error>,
@@ -501,7 +501,7 @@ where
     P: Parser<'de>,
 {
     #[inline]
-    fn skip_any<C>(self, cx: &mut C) -> Result<(), C::Error>
+    fn skip_any<C>(self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -520,7 +520,7 @@ where
     }
 
     #[inline]
-    fn decode_escaped_bytes<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_escaped_bytes<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Error>,
         V: ValueVisitor<'de, C, [u8]>,
@@ -559,7 +559,7 @@ where
     }
 
     #[inline]
-    fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         parse_unsigned(cx, &mut SliceParser::new(bytes))
     }
 }
@@ -589,7 +589,7 @@ where
     }
 
     #[inline]
-    fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         parse_signed(cx, &mut SliceParser::new(bytes))
     }
 }
@@ -608,7 +608,7 @@ where
     }
 
     #[inline]
-    fn type_hint<C>(&mut self, cx: &mut C) -> Result<TypeHint, C::Error>
+    fn type_hint<C>(&mut self, cx: &C) -> Result<TypeHint, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -616,7 +616,7 @@ where
     }
 
     #[inline]
-    fn decode_u8<C>(self, cx: &mut C) -> Result<u8, C::Error>
+    fn decode_u8<C>(self, cx: &C) -> Result<u8, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -624,7 +624,7 @@ where
     }
 
     #[inline]
-    fn decode_u16<C>(self, cx: &mut C) -> Result<u16, C::Error>
+    fn decode_u16<C>(self, cx: &C) -> Result<u16, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -632,7 +632,7 @@ where
     }
 
     #[inline]
-    fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
+    fn decode_u32<C>(self, cx: &C) -> Result<u32, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -640,7 +640,7 @@ where
     }
 
     #[inline]
-    fn decode_u64<C>(self, cx: &mut C) -> Result<u64, C::Error>
+    fn decode_u64<C>(self, cx: &C) -> Result<u64, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -648,7 +648,7 @@ where
     }
 
     #[inline]
-    fn decode_u128<C>(self, cx: &mut C) -> Result<u128, C::Error>
+    fn decode_u128<C>(self, cx: &C) -> Result<u128, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -656,7 +656,7 @@ where
     }
 
     #[inline]
-    fn decode_i8<C>(self, cx: &mut C) -> Result<i8, C::Error>
+    fn decode_i8<C>(self, cx: &C) -> Result<i8, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -664,7 +664,7 @@ where
     }
 
     #[inline]
-    fn decode_i16<C>(self, cx: &mut C) -> Result<i16, C::Error>
+    fn decode_i16<C>(self, cx: &C) -> Result<i16, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -672,7 +672,7 @@ where
     }
 
     #[inline]
-    fn decode_i32<C>(self, cx: &mut C) -> Result<i32, C::Error>
+    fn decode_i32<C>(self, cx: &C) -> Result<i32, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -680,7 +680,7 @@ where
     }
 
     #[inline]
-    fn decode_i64<C>(self, cx: &mut C) -> Result<i64, C::Error>
+    fn decode_i64<C>(self, cx: &C) -> Result<i64, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -688,7 +688,7 @@ where
     }
 
     #[inline]
-    fn decode_i128<C>(self, cx: &mut C) -> Result<i128, C::Error>
+    fn decode_i128<C>(self, cx: &C) -> Result<i128, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -696,7 +696,7 @@ where
     }
 
     #[inline]
-    fn decode_usize<C>(self, cx: &mut C) -> Result<usize, C::Error>
+    fn decode_usize<C>(self, cx: &C) -> Result<usize, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -704,7 +704,7 @@ where
     }
 
     #[inline]
-    fn decode_isize<C>(self, cx: &mut C) -> Result<isize, C::Error>
+    fn decode_isize<C>(self, cx: &C) -> Result<isize, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -712,7 +712,7 @@ where
     }
 
     #[inline]
-    fn decode_string<C, V>(self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_string<C, V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: ValueVisitor<'de, C, str>,
         C: Context<Input = Self::Error>,
@@ -721,7 +721,7 @@ where
     }
 
     #[inline]
-    fn decode_any<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_any<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = V::Error>,
         V: Visitor<'de, Error = Self::Error>,
@@ -751,7 +751,7 @@ where
     P: Parser<'de>,
 {
     #[inline]
-    pub fn new<C>(cx: &mut C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
+    pub fn new<C>(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -789,7 +789,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, cx: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn next<C>(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -820,7 +820,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -852,7 +852,7 @@ where
     type Second = JsonDecoder<P>;
 
     #[inline]
-    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -860,7 +860,7 @@ where
     }
 
     #[inline]
-    fn second<C>(mut self, cx: &mut C) -> Result<Self::Second, C::Error>
+    fn second<C>(mut self, cx: &C) -> Result<Self::Second, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -875,7 +875,7 @@ where
     }
 
     #[inline]
-    fn skip_second<C>(mut self, cx: &mut C) -> Result<bool, C::Error>
+    fn skip_second<C>(mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -903,7 +903,7 @@ where
     P: Parser<'de>,
 {
     #[inline]
-    pub fn new<C>(cx: &mut C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
+    pub fn new<C>(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -940,7 +940,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, cx: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn next<C>(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -972,7 +972,7 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -1002,7 +1002,7 @@ where
         Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, cx: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn next<C>(&mut self, cx: &C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -1037,7 +1037,7 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -1065,7 +1065,7 @@ where
     P: Parser<'de>,
 {
     #[inline]
-    pub fn new<C>(cx: &mut C, mut parser: P) -> Result<Self, C::Error>
+    pub fn new<C>(cx: &C, mut parser: P) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -1095,7 +1095,7 @@ where
     type Variant<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    fn tag<C>(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -1103,7 +1103,7 @@ where
     }
 
     #[inline]
-    fn variant<C>(&mut self, cx: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    fn variant<C>(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -1118,7 +1118,7 @@ where
     }
 
     #[inline]
-    fn skip_variant<C>(&mut self, cx: &mut C) -> Result<bool, C::Error>
+    fn skip_variant<C>(&mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -1128,7 +1128,7 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {

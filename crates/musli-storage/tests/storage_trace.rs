@@ -44,7 +44,7 @@ fn storage_trace() {
     let encoding = musli_storage::Encoding::new();
 
     let Ok(bytes) = encoding.to_vec_with(&mut cx, &from) else {
-        if let Some(error) = cx.iter().next() {
+        if let Some(error) = cx.errors().next() {
             panic!("{error}");
         }
 
@@ -52,7 +52,7 @@ fn storage_trace() {
     };
 
     let Ok(..) = encoding.from_slice_with::<_, To>(&mut cx, &bytes) else {
-        if let Some(error) = cx.iter().next() {
+        if let Some(error) = cx.errors().next() {
             assert_eq!(error.to_string(), ".field = Variant2 { .vector[0] }: Tried to read 42 bytes from slice, with 0 byte remaining (at byte 33)");
             return;
         }
