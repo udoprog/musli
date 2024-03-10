@@ -70,7 +70,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_unit<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn encode_unit<C>(mut self, cx: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -80,7 +80,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_pack<C>(self, cx: &mut C) -> Result<Self::Pack<C::Buf>, C::Error>
+    fn encode_pack<C>(self, cx: &C) -> Result<Self::Pack<C::Buf>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -94,11 +94,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_array<C, const N: usize>(
-        self,
-        cx: &mut C,
-        array: [u8; N],
-    ) -> Result<Self::Ok, C::Error>
+    fn encode_array<C, const N: usize>(self, cx: &C, array: [u8; N]) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -106,7 +102,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_bytes<C>(mut self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error>
+    fn encode_bytes<C>(mut self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -116,11 +112,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_bytes_vectored<C>(
-        mut self,
-        cx: &mut C,
-        vectors: &[&[u8]],
-    ) -> Result<Self::Ok, C::Error>
+    fn encode_bytes_vectored<C>(mut self, cx: &C, vectors: &[&[u8]]) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -135,7 +127,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_string<C>(self, cx: &mut C, string: &str) -> Result<Self::Ok, C::Error>
+    fn encode_string<C>(self, cx: &C, string: &str) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -143,7 +135,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_usize<C>(mut self, cx: &mut C, value: usize) -> Result<Self::Ok, C::Error>
+    fn encode_usize<C>(mut self, cx: &C, value: usize) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -151,7 +143,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_isize<C>(mut self, cx: &mut C, value: isize) -> Result<Self::Ok, C::Error>
+    fn encode_isize<C>(mut self, cx: &C, value: isize) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -159,7 +151,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_bool<C>(mut self, cx: &mut C, value: bool) -> Result<Self::Ok, C::Error>
+    fn encode_bool<C>(mut self, cx: &C, value: bool) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -170,7 +162,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_char<C>(self, cx: &mut C, value: char) -> Result<Self::Ok, C::Error>
+    fn encode_char<C>(self, cx: &C, value: char) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -178,7 +170,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_u8<C>(mut self, cx: &mut C, value: u8) -> Result<Self::Ok, C::Error>
+    fn encode_u8<C>(mut self, cx: &C, value: u8) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -186,7 +178,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_u16<C>(mut self, cx: &mut C, value: u16) -> Result<Self::Ok, C::Error>
+    fn encode_u16<C>(mut self, cx: &C, value: u16) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -194,7 +186,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_u32<C>(mut self, cx: &mut C, value: u32) -> Result<Self::Ok, C::Error>
+    fn encode_u32<C>(mut self, cx: &C, value: u32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -202,7 +194,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_u64<C>(mut self, cx: &mut C, value: u64) -> Result<Self::Ok, C::Error>
+    fn encode_u64<C>(mut self, cx: &C, value: u64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -210,7 +202,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_u128<C>(mut self, cx: &mut C, value: u128) -> Result<Self::Ok, C::Error>
+    fn encode_u128<C>(mut self, cx: &C, value: u128) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -218,7 +210,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_i8<C>(self, cx: &mut C, value: i8) -> Result<Self::Ok, C::Error>
+    fn encode_i8<C>(self, cx: &C, value: i8) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -226,7 +218,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_i16<C>(mut self, cx: &mut C, value: i16) -> Result<Self::Ok, C::Error>
+    fn encode_i16<C>(mut self, cx: &C, value: i16) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -234,7 +226,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_i32<C>(mut self, cx: &mut C, value: i32) -> Result<Self::Ok, C::Error>
+    fn encode_i32<C>(mut self, cx: &C, value: i32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -242,7 +234,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_i64<C>(mut self, cx: &mut C, value: i64) -> Result<Self::Ok, C::Error>
+    fn encode_i64<C>(mut self, cx: &C, value: i64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -250,7 +242,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_i128<C>(mut self, cx: &mut C, value: i128) -> Result<Self::Ok, C::Error>
+    fn encode_i128<C>(mut self, cx: &C, value: i128) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -258,7 +250,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_f32<C>(self, cx: &mut C, value: f32) -> Result<Self::Ok, C::Error>
+    fn encode_f32<C>(self, cx: &C, value: f32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -266,7 +258,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_f64<C>(self, cx: &mut C, value: f64) -> Result<Self::Ok, C::Error>
+    fn encode_f64<C>(self, cx: &C, value: f64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -274,7 +266,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_some<C>(mut self, cx: &mut C) -> Result<Self::Some, C::Error>
+    fn encode_some<C>(mut self, cx: &C) -> Result<Self::Some, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -284,7 +276,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_none<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn encode_none<C>(mut self, cx: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -294,7 +286,7 @@ where
     }
 
     #[inline]
-    fn encode_sequence<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Sequence, C::Error>
+    fn encode_sequence<C>(mut self, cx: &C, len: usize) -> Result<Self::Sequence, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -309,7 +301,7 @@ where
     }
 
     #[inline]
-    fn encode_tuple<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Tuple, C::Error>
+    fn encode_tuple<C>(mut self, cx: &C, len: usize) -> Result<Self::Tuple, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -324,7 +316,7 @@ where
     }
 
     #[inline]
-    fn encode_map<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Map, C::Error>
+    fn encode_map<C>(mut self, cx: &C, len: usize) -> Result<Self::Map, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -343,7 +335,7 @@ where
     }
 
     #[inline]
-    fn encode_struct<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Struct, C::Error>
+    fn encode_struct<C>(mut self, cx: &C, len: usize) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -362,7 +354,7 @@ where
     }
 
     #[inline]
-    fn encode_variant<C>(mut self, cx: &mut C) -> Result<Self::Variant, C::Error>
+    fn encode_variant<C>(mut self, cx: &C) -> Result<Self::Variant, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -383,7 +375,7 @@ where
     type Encoder<'this> = StorageEncoder<&'this mut BufferWriter<B, W::Error>, F, Error> where Self: 'this, B: Buffer;
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -391,7 +383,7 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(mut self, cx: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -443,7 +435,7 @@ where
     type Encoder<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -451,7 +443,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -469,7 +461,7 @@ where
     type Encoder<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -477,7 +469,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -496,7 +488,7 @@ where
     type Second<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -504,7 +496,7 @@ where
     }
 
     #[inline]
-    fn second<C>(&mut self, _: &mut C) -> Result<Self::Second<'_>, C::Error>
+    fn second<C>(&mut self, _: &C) -> Result<Self::Second<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -512,7 +504,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -531,7 +523,7 @@ where
     type Variant<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    fn tag<C>(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -539,7 +531,7 @@ where
     }
 
     #[inline]
-    fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    fn variant<C>(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -547,7 +539,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -557,11 +549,7 @@ where
 
 /// Encode a length prefix.
 #[inline]
-fn encode_prefix<C, W, const F: Options>(
-    cx: &mut C,
-    writer: &mut W,
-    len: usize,
-) -> Result<(), C::Error>
+fn encode_prefix<C, W, const F: Options>(cx: &C, writer: &mut W, len: usize) -> Result<(), C::Error>
 where
     C: Context<Input = W::Error>,
     W: Writer,

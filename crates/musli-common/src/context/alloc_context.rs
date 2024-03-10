@@ -1,3 +1,4 @@
+use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::ops::Range;
 
@@ -8,15 +9,19 @@ use musli::context::Error;
 use musli::Context;
 
 use crate::allocator::Allocator;
+use crate::context::access;
 use crate::context::rich_error::{RichError, Step};
+
+use super::access::Access;
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
 pub struct AllocContext<E, A> {
-    mark: usize,
+    access: Access,
+    mark: Cell<usize>,
     alloc: A,
-    errors: Vec<(Vec<Step<String>>, Range<usize>, E)>,
-    path: Vec<Step<String>>,
+    errors: UnsafeCell<Vec<(Vec<Step<String>>, Range<usize>, E)>>,
+    path: UnsafeCell<Vec<Step<String>>>,
     include_type: bool,
 }
 
@@ -27,10 +32,11 @@ impl<E, A> AllocContext<E, A> {
     /// Or at least until we run out of memory.
     pub fn new(alloc: A) -> Self {
         Self {
-            mark: 0,
+            access: Access::new(),
+            mark: Cell::new(0),
             alloc,
-            errors: Vec::new(),
-            path: Vec::new(),
+            errors: UnsafeCell::new(Vec::new()),
+            path: UnsafeCell::new(Vec::new()),
             include_type: false,
         }
     }
@@ -43,10 +49,49 @@ impl<E, A> AllocContext<E, A> {
     }
 
     /// Iterate over all collected errors.
-    pub fn iter(&self) -> impl Iterator<Item = RichError<'_, String, E>> {
-        self.errors
-            .iter()
-            .map(|(path, range, error)| RichError::new(path, 0, range.clone(), error))
+    pub fn errors(&self) -> Errors<'_, E> {
+        let access = self.access.shared();
+
+        // SAFETY: We've checked above that we have shared access.
+        Errors {
+            errors: unsafe { &*self.errors.get() },
+            index: 0,
+            _access: access,
+        }
+    }
+}
+
+impl<E, A> AllocContext<E, A>
+where
+    E: musli::error::Error,
+    A: Allocator,
+{
+    fn push_error(&self, range: Range<usize>, message: E) {
+        let _access = self.access.exclusive();
+
+        // SAFETY: We've restricted access to the context, so this is safe.
+        let path = unsafe { (*self.path.get()).clone() };
+        let errors = unsafe { &mut (*self.errors.get()) };
+
+        errors.push((path, range, message));
+    }
+
+    fn push_path(&self, step: Step<String>) {
+        let _access = self.access.exclusive();
+
+        // SAFETY: We've checked that we have exclusive access just above.
+        let path = unsafe { &mut (*self.path.get()) };
+
+        path.push(step);
+    }
+
+    fn pop_path(&self) {
+        let _access = self.access.exclusive();
+
+        // SAFETY: We've checked that we have exclusive access just above.
+        let path = unsafe { &mut (*self.path.get()) };
+
+        path.pop();
     }
 }
 
@@ -61,149 +106,162 @@ where
     type Buf = A::Buf;
 
     #[inline(always)]
-    fn alloc(&mut self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf {
         self.alloc.alloc()
     }
 
     #[inline(always)]
-    fn report<T>(&mut self, error: T) -> Self::Error
+    fn report<T>(&self, error: T) -> Self::Error
     where
         E: From<T>,
     {
-        self.errors
-            .push((self.path.clone(), self.mark..self.mark, E::from(error)));
+        self.push_error(self.mark.get()..self.mark.get(), E::from(error));
         Error
     }
 
     #[inline]
-    fn marked_report<T>(&mut self, mark: Self::Mark, message: T) -> Self::Error
+    fn marked_report<T>(&self, mark: Self::Mark, message: T) -> Self::Error
     where
         E: From<T>,
     {
-        self.errors
-            .push((self.path.clone(), mark..self.mark, E::from(message)));
+        self.push_error(mark..self.mark.get(), E::from(message));
         Error
     }
 
     #[inline(always)]
-    fn custom<T>(&mut self, message: T) -> Self::Error
+    fn custom<T>(&self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.errors
-            .push((self.path.clone(), self.mark..self.mark, E::custom(message)));
+        self.push_error(self.mark.get()..self.mark.get(), E::custom(message));
         Error
     }
 
     #[inline(always)]
-    fn message<T>(&mut self, message: T) -> Self::Error
+    fn message<T>(&self, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
-        self.errors
-            .push((self.path.clone(), self.mark..self.mark, E::message(message)));
+        self.push_error(self.mark.get()..self.mark.get(), E::message(message));
         Error
     }
 
     #[inline]
-    fn marked_message<T>(&mut self, mark: Self::Mark, message: T) -> Self::Error
+    fn marked_message<T>(&self, mark: Self::Mark, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
-        self.errors
-            .push((self.path.clone(), mark..self.mark, E::message(message)));
+        self.push_error(mark..self.mark.get(), E::message(message));
         Error
     }
 
     #[inline]
-    fn mark(&mut self) -> Self::Mark {
-        self.mark
+    fn mark(&self) -> Self::Mark {
+        self.mark.get()
     }
 
     #[inline]
-    fn advance(&mut self, n: usize) {
-        self.mark = self.mark.wrapping_add(n);
+    fn advance(&self, n: usize) {
+        self.mark.set(self.mark.get().wrapping_add(n));
     }
 
     #[inline]
-    fn enter_named_field<T>(&mut self, name: &'static str, _: T)
+    fn enter_named_field<T>(&self, name: &'static str, _: T)
     where
         T: fmt::Display,
     {
-        self.path.push(Step::Named(name));
+        self.push_path(Step::Named(name));
     }
 
     #[inline]
-    fn enter_unnamed_field<T>(&mut self, index: u32, _: T)
+    fn enter_unnamed_field<T>(&self, index: u32, _: T)
     where
         T: fmt::Display,
     {
-        self.path.push(Step::Unnamed(index));
+        self.push_path(Step::Unnamed(index));
     }
 
     #[inline]
-    fn leave_field(&mut self) {
-        self.path.pop();
+    fn leave_field(&self) {
+        self.pop_path();
     }
 
     #[inline]
-    fn enter_struct(&mut self, name: &'static str) {
+    fn enter_struct(&self, name: &'static str) {
         if self.include_type {
-            self.path.push(Step::Struct(name));
+            self.push_path(Step::Struct(name));
         }
     }
 
     #[inline]
-    fn leave_struct(&mut self) {
+    fn leave_struct(&self) {
         if self.include_type {
-            self.path.pop();
+            self.pop_path();
         }
     }
 
     #[inline]
-    fn enter_enum(&mut self, name: &'static str) {
+    fn enter_enum(&self, name: &'static str) {
         if self.include_type {
-            self.path.push(Step::Enum(name));
+            self.push_path(Step::Enum(name));
         }
     }
 
     #[inline]
-    fn leave_enum(&mut self) {
+    fn leave_enum(&self) {
         if self.include_type {
-            self.path.pop();
+            self.pop_path();
         }
     }
 
     #[inline]
-    fn enter_variant<T>(&mut self, name: &'static str, _: T) {
-        self.path.push(Step::Variant(name));
+    fn enter_variant<T>(&self, name: &'static str, _: T) {
+        self.push_path(Step::Variant(name));
     }
 
     #[inline]
-    fn leave_variant(&mut self) {
-        self.path.pop();
+    fn leave_variant(&self) {
+        self.pop_path();
     }
 
     #[inline]
-    fn enter_sequence_index(&mut self, index: usize) {
-        self.path.push(Step::Index(index));
+    fn enter_sequence_index(&self, index: usize) {
+        self.push_path(Step::Index(index));
     }
 
     #[inline]
-    fn leave_sequence_index(&mut self) {
-        self.path.pop();
+    fn leave_sequence_index(&self) {
+        self.pop_path();
     }
 
     #[inline]
-    fn enter_map_key<T>(&mut self, field: T)
+    fn enter_map_key<T>(&self, field: T)
     where
         T: fmt::Display,
     {
-        self.path.push(Step::Key(field.to_string()));
+        self.push_path(Step::Key(field.to_string()));
     }
 
     #[inline]
-    fn leave_map_key(&mut self) {
-        self.path.pop();
+    fn leave_map_key(&self) {
+        self.pop_path();
+    }
+}
+
+/// An iterator over collected errors.
+pub struct Errors<'a, E> {
+    errors: &'a [(Vec<Step<String>>, Range<usize>, E)],
+    index: usize,
+    // NB: Drop order is significant, drop the shared access last.
+    _access: access::Shared<'a>,
+}
+
+impl<'a, E> Iterator for Errors<'a, E> {
+    type Item = RichError<'a, String, E>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (path, range, error) = self.errors.get(self.index)?;
+        self.index += 1;
+        Some(RichError::new(path, 0, range.clone(), error))
     }
 }

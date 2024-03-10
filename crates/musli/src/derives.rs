@@ -598,14 +598,14 @@
 //!
 //!     use super::Field;
 //!
-//!     pub fn encode<M, C, E>(field: &Field, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+//!     pub fn encode<M, C, E>(field: &Field, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
 //!         C: Context<Input = E::Error>,
 //!         E: Encoder
 //! # { todo!() }
 //!
-//!     pub fn decode<'de, M, C, D>(cx: &mut C, decoder: D) -> Result<Field, C::Error>
+//!     pub fn decode<'de, M, C, D>(cx: &C, decoder: D) -> Result<Field, C::Error>
 //!     where
 //!         M: Mode,
 //!         C: Context<Input = D::Error>,
@@ -639,14 +639,14 @@
 //!
 //!     use super::Field;
 //!
-//!     pub fn encode<M, C, E, T>(field: &Field<T>, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+//!     pub fn encode<M, C, E, T>(field: &Field<T>, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
 //!         C: Context<Input = E::Error>,
 //!         E: Encoder
 //! # { todo!() }
 //!
-//!     pub fn decode<'de, M, C, D, T>(cx: &mut C, decoder: D) -> Result<Field<T>, C::Error>
+//!     pub fn decode<'de, M, C, D, T>(cx: &C, decoder: D) -> Result<Field<T>, C::Error>
 //!     where
 //!         M: Mode,
 //!         C: Context<Input = D::Error>,
@@ -678,7 +678,7 @@
 //!
 //!     use super::CustomUuid;
 //!
-//!     pub fn encode<M, C, E>(uuid: &CustomUuid, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+//!     pub fn encode<M, C, E>(uuid: &CustomUuid, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
 //!         C: Context<Input = E::Error>,
@@ -687,7 +687,7 @@
 //!         Encode::<M>::encode(&uuid.0, cx, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, M, C, D>(cx: &mut C, decoder: D) -> Result<CustomUuid, C::Error>
+//!     pub fn decode<'de, M, C, D>(cx: &C, decoder: D) -> Result<CustomUuid, C::Error>
 //!     where
 //!         M: Mode,
 //!         C: Context<Input = D::Error>,
@@ -703,7 +703,7 @@
 //!
 //!     use musli::{Context, Mode, Decode, Decoder, Encode, Encoder};
 //!
-//!     pub fn encode<M, C, E, T>(set: &HashSet<T>, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+//!     pub fn encode<M, C, E, T>(set: &HashSet<T>, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
 //!         M: Mode,
 //!         C: Context<Input = E::Error>,
@@ -713,7 +713,7 @@
 //!         HashSet::<T>::encode(set, cx, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, M, C, D, T>(cx: &mut C, decoder: D) -> Result<HashSet<T>, C::Error>
+//!     pub fn decode<'de, M, C, D, T>(cx: &C, decoder: D) -> Result<HashSet<T>, C::Error>
 //!     where
 //!         M: Mode,
 //!         C: Context<Input = D::Error>,

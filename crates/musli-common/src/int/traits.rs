@@ -62,22 +62,13 @@ pub trait Unsigned:
 pub trait UnsignedOps: Unsigned {
     /// Write the current byte array to the given writer in little-endian
     /// encoding.
-    fn write_bytes<C, W>(
-        self,
-        cx: &mut C,
-        writer: W,
-        byte_order: ByteOrder,
-    ) -> Result<(), C::Error>
+    fn write_bytes<C, W>(self, cx: &C, writer: W, byte_order: ByteOrder) -> Result<(), C::Error>
     where
         C: Context<Input = W::Error>,
         W: Writer;
 
     /// Read the current value from the reader in little-endian encoding.
-    fn read_bytes<'de, C, R>(
-        cx: &mut C,
-        reader: R,
-        byte_order: ByteOrder,
-    ) -> Result<Self, C::Error>
+    fn read_bytes<'de, C, R>(cx: &C, reader: R, byte_order: ByteOrder) -> Result<Self, C::Error>
     where
         C: Context<Input = R::Error>,
         R: Reader<'de>;
@@ -181,7 +172,7 @@ macro_rules! implement_ops {
             #[inline(always)]
             fn write_bytes<C, W>(
                 self,
-                cx: &mut C,
+                cx: &C,
                 mut writer: W,
                 byte_order: ByteOrder,
             ) -> Result<(), C::Error>
@@ -200,7 +191,7 @@ macro_rules! implement_ops {
 
             #[inline(always)]
             fn read_bytes<'de, C, R>(
-                cx: &mut C,
+                cx: &C,
                 mut reader: R,
                 byte_order: ByteOrder,
             ) -> Result<Self, C::Error>

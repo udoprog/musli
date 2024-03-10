@@ -22,7 +22,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -36,7 +36,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -50,7 +50,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -63,7 +63,7 @@ impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T>
 where
     M: Mode,
 {
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -81,7 +81,7 @@ macro_rules! atomic_impl {
             where
                 M: Mode,
             {
-                fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+                fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
                 where
                     C: Context<Input = D::Error>,
                     D: Decoder<'de>,
@@ -106,7 +106,7 @@ macro_rules! non_zero {
             M: Mode,
         {
             #[inline]
-            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
                 C: Context<Input = E::Error>,
                 E: Encoder,
@@ -119,7 +119,7 @@ macro_rules! non_zero {
         where
             M: Mode,
         {
-            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
                 C: Context<Input = D::Error>,
                 D: Decoder<'de>,
@@ -174,7 +174,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -188,7 +188,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -204,7 +204,7 @@ macro_rules! impl_number {
             M: Mode,
         {
             #[inline]
-            fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
                 C: Context<Input = E::Error>,
                 E: Encoder,
@@ -218,7 +218,7 @@ macro_rules! impl_number {
             M: Mode,
         {
             #[inline]
-            fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
                 C: Context<Input = D::Error>,
                 D: Decoder<'de>,
@@ -234,7 +234,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -248,7 +248,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -262,7 +262,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -276,7 +276,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -305,7 +305,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -319,7 +319,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -338,7 +338,7 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, _: &mut C, string: &'de str) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: &C, string: &'de str) -> Result<Self::Ok, C::Error> {
                 Ok(string)
             }
         }
@@ -351,7 +351,7 @@ impl<M> Encode<M> for [u8]
 where
     M: Mode,
 {
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -365,7 +365,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -384,7 +384,7 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, _: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes)
             }
         }
@@ -399,7 +399,7 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -419,7 +419,7 @@ where
     T: Decode<'de, M>,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -439,7 +439,7 @@ where
     U: Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -460,7 +460,7 @@ where
     U: Decode<'de, M>,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -487,7 +487,7 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -502,7 +502,7 @@ where
     T: Decode<'de, M>,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -516,7 +516,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -530,7 +530,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,

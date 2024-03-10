@@ -45,7 +45,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Fallback used when the type is either not implemented for this visitor
     /// or the underlying format doesn't know which type to decode.
-    fn visit_any<C, D>(self, cx: &mut C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
+    fn visit_any<C, D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: Decoder<'de, Error = Self::Error>,
@@ -55,7 +55,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `unit`.
     #[inline]
-    fn visit_unit<C>(self, cx: &mut C) -> Result<Self::Ok, C::Error>
+    fn visit_unit<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -67,7 +67,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `bool`.
     #[inline]
-    fn visit_bool<C>(self, cx: &mut C, _: bool) -> Result<Self::Ok, C::Error>
+    fn visit_bool<C>(self, cx: &C, _: bool) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -79,7 +79,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `char`.
     #[inline]
-    fn visit_char<C>(self, cx: &mut C, _: char) -> Result<Self::Ok, C::Error>
+    fn visit_char<C>(self, cx: &C, _: char) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -91,7 +91,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `u8`.
     #[inline]
-    fn visit_u8<C>(self, cx: &mut C, _: u8) -> Result<Self::Ok, C::Error>
+    fn visit_u8<C>(self, cx: &C, _: u8) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -103,7 +103,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `u16`.
     #[inline]
-    fn visit_u16<C>(self, cx: &mut C, _: u16) -> Result<Self::Ok, C::Error>
+    fn visit_u16<C>(self, cx: &C, _: u16) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -115,7 +115,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `u32`.
     #[inline]
-    fn visit_u32<C>(self, cx: &mut C, _: u32) -> Result<Self::Ok, C::Error>
+    fn visit_u32<C>(self, cx: &C, _: u32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -127,7 +127,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `u64`.
     #[inline]
-    fn visit_u64<C>(self, cx: &mut C, _: u64) -> Result<Self::Ok, C::Error>
+    fn visit_u64<C>(self, cx: &C, _: u64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -139,7 +139,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `u128`.
     #[inline]
-    fn visit_u128<C>(self, cx: &mut C, _: u128) -> Result<Self::Ok, C::Error>
+    fn visit_u128<C>(self, cx: &C, _: u128) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -151,7 +151,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `i8`.
     #[inline]
-    fn visit_i8<C>(self, cx: &mut C, _: i8) -> Result<Self::Ok, C::Error>
+    fn visit_i8<C>(self, cx: &C, _: i8) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -163,7 +163,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `i16`.
     #[inline]
-    fn visit_i16<C>(self, cx: &mut C, _: i16) -> Result<Self::Ok, C::Error>
+    fn visit_i16<C>(self, cx: &C, _: i16) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -175,7 +175,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `i32`.
     #[inline]
-    fn visit_i32<C>(self, cx: &mut C, _: i32) -> Result<Self::Ok, C::Error>
+    fn visit_i32<C>(self, cx: &C, _: i32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -187,7 +187,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `i64`.
     #[inline]
-    fn visit_i64<C>(self, cx: &mut C, _: i64) -> Result<Self::Ok, C::Error>
+    fn visit_i64<C>(self, cx: &C, _: i64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -199,7 +199,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `i128`.
     #[inline]
-    fn visit_i128<C>(self, cx: &mut C, _: i128) -> Result<Self::Ok, C::Error>
+    fn visit_i128<C>(self, cx: &C, _: i128) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -211,7 +211,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `usize`.
     #[inline]
-    fn visit_usize<C>(self, cx: &mut C, _: usize) -> Result<Self::Ok, C::Error>
+    fn visit_usize<C>(self, cx: &C, _: usize) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -223,7 +223,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `isize`.
     #[inline]
-    fn visit_isize<C>(self, cx: &mut C, _: isize) -> Result<Self::Ok, C::Error>
+    fn visit_isize<C>(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -235,7 +235,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `f32`.
     #[inline]
-    fn visit_f32<C>(self, cx: &mut C, _: f32) -> Result<Self::Ok, C::Error>
+    fn visit_f32<C>(self, cx: &C, _: f32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -247,7 +247,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a `f64`.
     #[inline]
-    fn visit_f64<C>(self, cx: &mut C, _: f64) -> Result<Self::Ok, C::Error>
+    fn visit_f64<C>(self, cx: &C, _: f64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -259,7 +259,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is an optional type.
     #[inline]
-    fn visit_option<C, D>(self, cx: &mut C, _: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<C, D>(self, cx: &C, _: Option<D>) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: Decoder<'de, Error = Self::Error>,
@@ -272,7 +272,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a sequence.
     #[inline]
-    fn visit_sequence<C, D>(self, cx: &mut C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: SequenceDecoder<'de, Error = Self::Error>,
@@ -285,7 +285,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a map.
     #[inline]
-    fn visit_map<C, D>(self, cx: &mut C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: PairsDecoder<'de, Error = Self::Error>,
@@ -298,7 +298,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is `string`.
     #[inline]
-    fn visit_string<C>(self, cx: &mut C, hint: SizeHint) -> Result<Self::String<C>, C::Error>
+    fn visit_string<C>(self, cx: &C, hint: SizeHint) -> Result<Self::String<C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -310,7 +310,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is `bytes`.
     #[inline]
-    fn visit_bytes<C>(self, cx: &mut C, hint: SizeHint) -> Result<Self::Bytes<C>, C::Error>
+    fn visit_bytes<C>(self, cx: &C, hint: SizeHint) -> Result<Self::Bytes<C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -322,7 +322,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a number.
     #[inline]
-    fn visit_number<C>(self, cx: &mut C, hint: NumberHint) -> Result<Self::Number<C>, C::Error>
+    fn visit_number<C>(self, cx: &C, hint: NumberHint) -> Result<Self::Number<C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -334,7 +334,7 @@ pub trait Visitor<'de>: Sized {
 
     /// Indicates that the visited type is a variant.
     #[inline]
-    fn visit_variant<C, D>(self, cx: &mut C, _: D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<C, D>(self, cx: &C, _: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: VariantDecoder<'de, Error = Self::Error>,

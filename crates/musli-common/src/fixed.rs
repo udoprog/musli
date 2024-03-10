@@ -148,7 +148,7 @@ impl<T, const N: usize> Drop for FixedVec<T, N> {
 }
 
 /// A fixed capacity string.
-pub(crate) struct FixedString<const N: usize> {
+pub struct FixedString<const N: usize> {
     data: FixedVec<u8, N>,
 }
 

@@ -31,7 +31,7 @@ fn trace_collection() {
     let encoding = musli_json::Encoding::new();
 
     let Ok(bytes) = encoding.to_vec_with(&mut cx, &from) else {
-        if let Some(error) = cx.iter().next() {
+        if let Some(error) = cx.errors().next() {
             panic!("{error}");
         }
 
@@ -41,7 +41,7 @@ fn trace_collection() {
     let mut cx = AllocContext::new(&alloc);
 
     let Ok(..) = encoding.from_slice_with::<_, Collection>(&mut cx, &bytes) else {
-        if let Some(error) = cx.iter().next() {
+        if let Some(error) = cx.errors().next() {
             assert_eq!(
                 error.to_string(),
                 ".values[Hello]: Invalid numeric (at bytes 15-16)"

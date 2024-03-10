@@ -183,7 +183,7 @@ where
     /// This is the same as [`Encoding::encode`] but allows for using a
     /// configurable [`Context`].
     #[inline]
-    pub fn encode_with<C, W, T>(self, cx: &mut C, writer: W, value: &T) -> Result<(), C::Error>
+    pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
         W: Writer,
@@ -211,7 +211,7 @@ where
     /// configurable [`Context`].
     #[cfg(feature = "alloc")]
     #[inline]
-    pub fn to_string_with<T, C>(self, cx: &mut C, value: &T) -> Result<String, C::Error>
+    pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>
     where
         C: Context<Input = Error>,
         T: ?Sized + Encode<M>,
@@ -241,7 +241,7 @@ where
     /// This is the same as [`Encoding::decode`] but allows for using a
     /// configurable [`Context`].
     #[inline]
-    pub fn decode_with<'de, C, P, T>(self, cx: &mut C, parser: P) -> Result<T, C::Error>
+    pub fn decode_with<'de, C, P, T>(self, cx: &C, parser: P) -> Result<T, C::Error>
     where
         C: Context<Input = Error>,
         P: Parser<'de>,
@@ -266,7 +266,7 @@ where
     /// This is the same as [`Encoding::from_str`] but allows for using a
     /// configurable [`Context`].
     #[inline]
-    pub fn from_str_with<'de, C, T>(self, cx: &mut C, string: &'de str) -> Result<T, C::Error>
+    pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
     where
         C: Context<Input = Error>,
         T: Decode<'de, M>,
@@ -292,7 +292,7 @@ where
     /// This is the same as [`Encoding::from_slice`] but allows for using a
     /// configurable [`Context`].
     #[inline]
-    pub fn from_slice_with<'de, C, T>(self, cx: &mut C, bytes: &'de [u8]) -> Result<T, C::Error>
+    pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
     where
         C: Context<Input = Error>,
         T: Decode<'de, M>,

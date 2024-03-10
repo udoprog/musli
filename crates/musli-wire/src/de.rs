@@ -36,7 +36,7 @@ where
     Error: From<R::Error>,
 {
     /// Skip over any sequences of values.
-    pub(crate) fn skip_any<C>(&mut self, cx: &mut C) -> Result<(), C::Error>
+    pub(crate) fn skip_any<C>(&mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -78,7 +78,7 @@ where
     }
 
     #[inline]
-    fn decode_sequence_len<C>(&mut self, cx: &mut C) -> Result<usize, C::Error>
+    fn decode_sequence_len<C>(&mut self, cx: &C) -> Result<usize, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -101,7 +101,7 @@ where
     #[inline]
     fn shared_decode_pair_sequence<C>(
         mut self,
-        cx: &mut C,
+        cx: &C,
     ) -> Result<RemainingWireDecoder<R, F>, C::Error>
     where
         C: Context<Input = Error>,
@@ -112,10 +112,7 @@ where
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_sequence<C>(
-        mut self,
-        cx: &mut C,
-    ) -> Result<RemainingWireDecoder<R, F>, C::Error>
+    fn shared_decode_sequence<C>(mut self, cx: &C) -> Result<RemainingWireDecoder<R, F>, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -125,7 +122,7 @@ where
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_len<C>(&mut self, cx: &mut C, start: C::Mark) -> Result<usize, C::Error>
+    fn decode_len<C>(&mut self, cx: &C, start: C::Mark) -> Result<usize, C::Error>
     where
         C: Context<Input = Error>,
     {
@@ -180,7 +177,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_unit<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn decode_unit<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -189,7 +186,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_pack<C>(mut self, cx: &mut C) -> Result<Self::Pack, C::Error>
+    fn decode_pack<C>(mut self, cx: &C) -> Result<Self::Pack, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -199,7 +196,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_array<C, const N: usize>(mut self, cx: &mut C) -> Result<[u8; N], C::Error>
+    fn decode_array<C, const N: usize>(mut self, cx: &C) -> Result<[u8; N], C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -220,7 +217,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_bytes<C, V>(mut self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_bytes<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, [u8]>,
@@ -231,7 +228,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_string<C, V>(self, cx: &mut C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_string<C, V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, str>,
@@ -252,20 +249,20 @@ where
 
             #[cfg(feature = "alloc")]
             #[inline(always)]
-            fn visit_owned(self, cx: &mut C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 let string =
                     musli_common::str::from_utf8_owned(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline(always)]
-            fn visit_borrowed(self, cx: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 let string = musli_common::str::from_utf8(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline(always)]
-            fn visit_ref(self, cx: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 let string = musli_common::str::from_utf8(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_ref(cx, string)
             }
@@ -275,7 +272,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_bool<C>(mut self, cx: &mut C) -> Result<bool, C::Error>
+    fn decode_bool<C>(mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -292,7 +289,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_char<C>(self, cx: &mut C) -> Result<char, C::Error>
+    fn decode_char<C>(self, cx: &C) -> Result<char, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -305,7 +302,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_u8<C>(self, cx: &mut C) -> Result<u8, C::Error>
+    fn decode_u8<C>(self, cx: &C) -> Result<u8, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -313,7 +310,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_u16<C>(self, cx: &mut C) -> Result<u16, C::Error>
+    fn decode_u16<C>(self, cx: &C) -> Result<u16, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -321,7 +318,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
+    fn decode_u32<C>(self, cx: &C) -> Result<u32, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -329,7 +326,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_u64<C>(self, cx: &mut C) -> Result<u64, C::Error>
+    fn decode_u64<C>(self, cx: &C) -> Result<u64, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -337,7 +334,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_u128<C>(self, cx: &mut C) -> Result<u128, C::Error>
+    fn decode_u128<C>(self, cx: &C) -> Result<u128, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -345,7 +342,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_i8<C>(self, cx: &mut C) -> Result<i8, C::Error>
+    fn decode_i8<C>(self, cx: &C) -> Result<i8, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -353,7 +350,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_i16<C>(self, cx: &mut C) -> Result<i16, C::Error>
+    fn decode_i16<C>(self, cx: &C) -> Result<i16, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -361,7 +358,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_i32<C>(self, cx: &mut C) -> Result<i32, C::Error>
+    fn decode_i32<C>(self, cx: &C) -> Result<i32, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -369,7 +366,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_i64<C>(self, cx: &mut C) -> Result<i64, C::Error>
+    fn decode_i64<C>(self, cx: &C) -> Result<i64, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -377,7 +374,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_i128<C>(self, cx: &mut C) -> Result<i128, C::Error>
+    fn decode_i128<C>(self, cx: &C) -> Result<i128, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -385,7 +382,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_usize<C>(self, cx: &mut C) -> Result<usize, C::Error>
+    fn decode_usize<C>(self, cx: &C) -> Result<usize, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -393,7 +390,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_isize<C>(self, cx: &mut C) -> Result<isize, C::Error>
+    fn decode_isize<C>(self, cx: &C) -> Result<isize, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -403,7 +400,7 @@ where
     /// Decode a 32-bit floating point value by reading the 32-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
     #[inline(always)]
-    fn decode_f32<C>(self, cx: &mut C) -> Result<f32, C::Error>
+    fn decode_f32<C>(self, cx: &C) -> Result<f32, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -414,7 +411,7 @@ where
     /// Decode a 64-bit floating point value by reading the 64-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
     #[inline(always)]
-    fn decode_f64<C>(self, cx: &mut C) -> Result<f64, C::Error>
+    fn decode_f64<C>(self, cx: &C) -> Result<f64, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -423,7 +420,7 @@ where
     }
 
     #[inline(always)]
-    fn decode_option<C>(mut self, cx: &mut C) -> Result<Option<Self::Some>, C::Error>
+    fn decode_option<C>(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -441,7 +438,7 @@ where
     }
 
     #[inline]
-    fn decode_sequence<C>(self, cx: &mut C) -> Result<Self::Sequence, C::Error>
+    fn decode_sequence<C>(self, cx: &C) -> Result<Self::Sequence, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -449,7 +446,7 @@ where
     }
 
     #[inline]
-    fn decode_tuple<C>(mut self, cx: &mut C, len: usize) -> Result<Self::Tuple, C::Error>
+    fn decode_tuple<C>(mut self, cx: &C, len: usize) -> Result<Self::Tuple, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -465,7 +462,7 @@ where
     }
 
     #[inline]
-    fn decode_map<C>(self, cx: &mut C) -> Result<Self::Map, C::Error>
+    fn decode_map<C>(self, cx: &C) -> Result<Self::Map, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -473,7 +470,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<C>(self, cx: &mut C, _: usize) -> Result<Self::Struct, C::Error>
+    fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -481,7 +478,7 @@ where
     }
 
     #[inline]
-    fn decode_variant<C>(mut self, cx: &mut C) -> Result<Self::Variant, C::Error>
+    fn decode_variant<C>(mut self, cx: &C) -> Result<Self::Variant, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -507,7 +504,7 @@ where
     type Decoder<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F, Error> where Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -515,7 +512,7 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -552,7 +549,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -565,7 +562,7 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -588,7 +585,7 @@ where
     type Second = Self;
 
     #[inline]
-    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -596,7 +593,7 @@ where
     }
 
     #[inline]
-    fn second<C>(self, _: &mut C) -> Result<Self::Second, C::Error>
+    fn second<C>(self, _: &C) -> Result<Self::Second, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -604,7 +601,7 @@ where
     }
 
     #[inline]
-    fn skip_second<C>(mut self, cx: &mut C) -> Result<bool, C::Error>
+    fn skip_second<C>(mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -623,7 +620,7 @@ where
     type Variant<'this> = WireDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    fn tag<C>(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -631,7 +628,7 @@ where
     }
 
     #[inline]
-    fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    fn variant<C>(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -639,7 +636,7 @@ where
     }
 
     #[inline]
-    fn skip_variant<C>(&mut self, cx: &mut C) -> Result<bool, C::Error>
+    fn skip_variant<C>(&mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -648,7 +645,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -673,7 +670,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -686,7 +683,7 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -779,7 +776,7 @@ where
     type Decoder<'this> = WireDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, cx: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn next<C>(&mut self, cx: &C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -792,7 +789,7 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {

@@ -17,7 +17,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -31,7 +31,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -50,12 +50,12 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, _: &mut C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
 
             #[inline]
-            fn visit_ref(self, _: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
         }
@@ -69,7 +69,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -84,7 +84,7 @@ where
     M: Mode,
 {
     #[inline]
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,

@@ -156,7 +156,7 @@ impl<const N: usize> FixedBytes<N> {
 
     /// Try and extend from the given slice.
     #[inline]
-    pub fn write_bytes<C>(&mut self, cx: &mut C, source: &[u8]) -> Result<(), C::Error>
+    pub fn write_bytes<C>(&mut self, cx: &C, source: &[u8]) -> Result<(), C::Error>
     where
         C: Context<Input = FixedBytesOverflow>,
     {
@@ -189,7 +189,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
         B: Buffer,
@@ -199,7 +199,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {

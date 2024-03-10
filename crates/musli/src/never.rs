@@ -83,7 +83,7 @@ pub enum NeverMarker {}
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32<C>(self, cx: &mut C) -> Result<u32, C::Error>
+///     fn decode_u32<C>(self, cx: &C) -> Result<u32, C::Error>
 ///     where
 ///         C: Context<Input = Self::Error>
 ///     {
@@ -133,7 +133,7 @@ where
         Self: 'this;
 
     #[inline]
-    fn as_decoder<C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn as_decoder<C>(&self, _: &C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -154,7 +154,7 @@ where
     type Second = Self;
 
     #[inline]
-    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -162,7 +162,7 @@ where
     }
 
     #[inline]
-    fn second<C>(self, _: &mut C) -> Result<Self::Second, C::Error>
+    fn second<C>(self, _: &C) -> Result<Self::Second, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -170,7 +170,7 @@ where
     }
 
     #[inline]
-    fn skip_second<C>(self, _: &mut C) -> Result<bool, C::Error>
+    fn skip_second<C>(self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -191,7 +191,7 @@ where
     type Variant<'this> = Self where Self: 'this;
 
     #[inline]
-    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    fn tag<C>(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -199,7 +199,7 @@ where
     }
 
     #[inline]
-    fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    fn variant<C>(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -207,7 +207,7 @@ where
     }
 
     #[inline]
-    fn skip_variant<C>(&mut self, _: &mut C) -> Result<bool, C::Error>
+    fn skip_variant<C>(&mut self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -215,7 +215,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -239,7 +239,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -247,7 +247,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -271,7 +271,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -279,7 +279,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -298,7 +298,7 @@ where
         Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -306,7 +306,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<(), C::Error>
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -370,7 +370,7 @@ where
         Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
     where
         C: Context<Input = E>,
     {
@@ -378,7 +378,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = E>,
     {
@@ -395,14 +395,14 @@ where
     type Encoder<'this> = Self where Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &mut C) -> Result<Self::Encoder<'_>, C::Error>
+    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
         match self._never {}
     }
 
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -422,7 +422,7 @@ where
     type Second<'this> = Self where Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, _: &mut C) -> Result<Self::First<'_>, C::Error>
+    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -430,7 +430,7 @@ where
     }
 
     #[inline]
-    fn second<C>(&mut self, _: &mut C) -> Result<Self::Second<'_>, C::Error>
+    fn second<C>(&mut self, _: &C) -> Result<Self::Second<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -438,7 +438,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -458,7 +458,7 @@ where
     type Variant<'this> = Self where Self: 'this;
 
     #[inline]
-    fn tag<C>(&mut self, _: &mut C) -> Result<Self::Tag<'_>, C::Error>
+    fn tag<C>(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -466,7 +466,7 @@ where
     }
 
     #[inline]
-    fn variant<C>(&mut self, _: &mut C) -> Result<Self::Variant<'_>, C::Error>
+    fn variant<C>(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -474,7 +474,7 @@ where
     }
 
     #[inline]
-    fn end<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

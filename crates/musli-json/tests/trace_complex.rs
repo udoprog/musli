@@ -51,7 +51,7 @@ fn trace_complex() {
     let encoding = musli_json::Encoding::new();
 
     let Ok(bytes) = encoding.to_vec_with(&mut cx, &from) else {
-        if let Some(error) = cx.iter().next() {
+        if let Some(error) = cx.errors().next() {
             panic!("{error}");
         }
 
@@ -61,7 +61,7 @@ fn trace_complex() {
     let mut cx = AllocContext::new(&alloc);
 
     let Ok(..) = encoding.from_slice_with::<_, To>(&mut cx, &bytes) else {
-        if let Some(error) = cx.iter().next() {
+        if let Some(error) = cx.errors().next() {
             assert_eq!(error.to_string(), ".field[hello] = Variant2 { .vector[0] }: Expected string, found <number> (at byte 36)");
             return;
         }

@@ -58,19 +58,19 @@ pub trait Writer {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
-    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
         B: Buffer;
 
     /// Write bytes to the current writer.
-    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Write a single byte.
     #[inline]
-    fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
+    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -91,7 +91,7 @@ where
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
         B: Buffer,
@@ -100,7 +100,7 @@ where
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -108,7 +108,7 @@ where
     }
 
     #[inline]
-    fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
+    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -127,7 +127,7 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
         B: Buffer,
@@ -137,7 +137,7 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -147,7 +147,7 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
+    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -167,7 +167,7 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
         B: Buffer,
@@ -177,7 +177,7 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -196,7 +196,7 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn write_byte<C>(&mut self, cx: &mut C, b: u8) -> Result<(), C::Error>
+    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -250,7 +250,7 @@ where
     }
 
     #[inline(always)]
-    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
         B: Buffer,
@@ -263,7 +263,7 @@ where
     }
 
     #[inline(always)]
-    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {

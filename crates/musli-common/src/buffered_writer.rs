@@ -29,7 +29,7 @@ where
     }
 
     /// Finish writing.
-    pub fn finish<C>(mut self, cx: &mut C) -> Result<(), C::Error>
+    pub fn finish<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = W::Error>,
     {
@@ -55,7 +55,7 @@ where
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &mut C, buffer: B) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
         B: Buffer,
@@ -65,7 +65,7 @@ where
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &mut C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
     {

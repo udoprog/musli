@@ -48,7 +48,7 @@ pub enum StringReference<'de, 'scratch> {
 
 /// Specialized reader implementation from a slice.
 pub(crate) fn parse_string_slice_reader<'de, 'scratch, C, S>(
-    cx: &mut C,
+    cx: &C,
     reader: &mut SliceParser<'de>,
     validate: bool,
     start: C::Mark,
@@ -134,7 +134,7 @@ where
 
 /// Check that the given slice is valid UTF-8.
 #[inline]
-fn check_utf8<C>(cx: &mut C, bytes: &[u8], start: C::Mark) -> Result<(), C::Error>
+fn check_utf8<C>(cx: &C, bytes: &[u8], start: C::Mark) -> Result<(), C::Error>
 where
     C: Context<Input = Error>,
 {
@@ -148,7 +148,7 @@ where
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
 fn parse_escape<C, B>(
-    cx: &mut C,
+    cx: &C,
     parser: &mut SliceParser<'_>,
     validate: bool,
     scratch: &mut B,
@@ -295,7 +295,7 @@ pub(crate) fn decode_hex_val(val: u8) -> Option<u16> {
 }
 
 /// Specialized reader implementation from a slice.
-pub(crate) fn skip_string<'de, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
+pub(crate) fn skip_string<'de, C, P>(cx: &C, p: &mut P, validate: bool) -> Result<(), C::Error>
 where
     C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,
@@ -329,7 +329,7 @@ where
 
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
-fn skip_escape<'de, C, P>(cx: &mut C, p: &mut P, validate: bool) -> Result<(), C::Error>
+fn skip_escape<'de, C, P>(cx: &C, p: &mut P, validate: bool) -> Result<(), C::Error>
 where
     C: Context<Input = Error>,
     P: ?Sized + Parser<'de>,

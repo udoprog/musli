@@ -11,7 +11,7 @@ use crate::tag::{Kind, Tag};
 
 #[inline]
 pub(crate) fn encode_typed_unsigned<C, W, T>(
-    cx: &mut C,
+    cx: &C,
     writer: W,
     bits: u8,
     value: T,
@@ -26,7 +26,7 @@ where
 }
 
 #[inline]
-pub(crate) fn decode_typed_unsigned<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
+pub(crate) fn decode_typed_unsigned<'de, C, R, T>(cx: &C, reader: R) -> Result<T, C::Error>
 where
     C: Context<Input = Error>,
     R: Reader<'de>,
@@ -38,7 +38,7 @@ where
 
 #[inline]
 fn encode_typed<C, W, T>(
-    cx: &mut C,
+    cx: &C,
     mut writer: W,
     kind: Kind,
     bits: u8,
@@ -55,7 +55,7 @@ where
 }
 
 #[inline]
-fn decode_typed<'de, C, R, T>(cx: &mut C, mut reader: R, kind: Kind) -> Result<T, C::Error>
+fn decode_typed<'de, C, R, T>(cx: &C, mut reader: R, kind: Kind) -> Result<T, C::Error>
 where
     C: Context<Input = Error>,
     R: Reader<'de>,
@@ -73,7 +73,7 @@ where
 
 #[inline]
 pub(crate) fn encode_typed_signed<C, W, T>(
-    cx: &mut C,
+    cx: &C,
     writer: W,
     bits: u8,
     value: T,
@@ -88,7 +88,7 @@ where
 }
 
 #[inline]
-pub(crate) fn decode_typed_signed<'de, C, R, T>(cx: &mut C, reader: R) -> Result<T, C::Error>
+pub(crate) fn decode_typed_signed<'de, C, R, T>(cx: &C, reader: R) -> Result<T, C::Error>
 where
     C: Context<Input = Error>,
     R: Reader<'de>,

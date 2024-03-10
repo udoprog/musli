@@ -166,7 +166,7 @@ impl<M> Encode<M> for Number
 where
     M: Mode,
 {
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -236,7 +236,7 @@ where
     }
 
     #[inline]
-    fn visit_unit<C>(self, _: &mut C) -> Result<Self::Ok, C::Error>
+    fn visit_unit<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -244,7 +244,7 @@ where
     }
 
     #[inline]
-    fn visit_bool<C>(self, _: &mut C, value: bool) -> Result<Self::Ok, C::Error>
+    fn visit_bool<C>(self, _: &C, value: bool) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -252,7 +252,7 @@ where
     }
 
     #[inline]
-    fn visit_char<C>(self, _: &mut C, value: char) -> Result<Self::Ok, C::Error>
+    fn visit_char<C>(self, _: &C, value: char) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -260,7 +260,7 @@ where
     }
 
     #[inline]
-    fn visit_u8<C>(self, _: &mut C, value: u8) -> Result<Self::Ok, C::Error>
+    fn visit_u8<C>(self, _: &C, value: u8) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -268,7 +268,7 @@ where
     }
 
     #[inline]
-    fn visit_u16<C>(self, _: &mut C, value: u16) -> Result<Self::Ok, C::Error>
+    fn visit_u16<C>(self, _: &C, value: u16) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -276,7 +276,7 @@ where
     }
 
     #[inline]
-    fn visit_u32<C>(self, _: &mut C, value: u32) -> Result<Self::Ok, C::Error>
+    fn visit_u32<C>(self, _: &C, value: u32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -284,7 +284,7 @@ where
     }
 
     #[inline]
-    fn visit_u64<C>(self, _: &mut C, value: u64) -> Result<Self::Ok, C::Error>
+    fn visit_u64<C>(self, _: &C, value: u64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -292,7 +292,7 @@ where
     }
 
     #[inline]
-    fn visit_u128<C>(self, _: &mut C, value: u128) -> Result<Self::Ok, C::Error>
+    fn visit_u128<C>(self, _: &C, value: u128) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -300,7 +300,7 @@ where
     }
 
     #[inline]
-    fn visit_i8<C>(self, _: &mut C, value: i8) -> Result<Self::Ok, C::Error>
+    fn visit_i8<C>(self, _: &C, value: i8) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -308,7 +308,7 @@ where
     }
 
     #[inline]
-    fn visit_i16<C>(self, _: &mut C, value: i16) -> Result<Self::Ok, C::Error>
+    fn visit_i16<C>(self, _: &C, value: i16) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -316,7 +316,7 @@ where
     }
 
     #[inline]
-    fn visit_i32<C>(self, _: &mut C, value: i32) -> Result<Self::Ok, C::Error>
+    fn visit_i32<C>(self, _: &C, value: i32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -324,7 +324,7 @@ where
     }
 
     #[inline]
-    fn visit_i64<C>(self, _: &mut C, value: i64) -> Result<Self::Ok, C::Error>
+    fn visit_i64<C>(self, _: &C, value: i64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -332,7 +332,7 @@ where
     }
 
     #[inline]
-    fn visit_i128<C>(self, _: &mut C, value: i128) -> Result<Self::Ok, C::Error>
+    fn visit_i128<C>(self, _: &C, value: i128) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -340,7 +340,7 @@ where
     }
 
     #[inline]
-    fn visit_usize<C>(self, _: &mut C, value: usize) -> Result<Self::Ok, C::Error>
+    fn visit_usize<C>(self, _: &C, value: usize) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -348,7 +348,7 @@ where
     }
 
     #[inline]
-    fn visit_isize<C>(self, _: &mut C, value: isize) -> Result<Self::Ok, C::Error>
+    fn visit_isize<C>(self, _: &C, value: isize) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -356,7 +356,7 @@ where
     }
 
     #[inline]
-    fn visit_f32<C>(self, _: &mut C, value: f32) -> Result<Self::Ok, C::Error>
+    fn visit_f32<C>(self, _: &C, value: f32) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -364,7 +364,7 @@ where
     }
 
     #[inline]
-    fn visit_f64<C>(self, _: &mut C, value: f64) -> Result<Self::Ok, C::Error>
+    fn visit_f64<C>(self, _: &C, value: f64) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -373,7 +373,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_option<C, D>(self, cx: &mut C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<C, D>(self, cx: &C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: Decoder<'de, Error = Self::Error>,
@@ -388,7 +388,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_sequence<C, D>(self, cx: &mut C, mut seq: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<C, D>(self, cx: &C, mut seq: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: SequenceDecoder<'de, Error = Self::Error>,
@@ -405,7 +405,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_map<C, D>(self, cx: &mut C, mut map: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<C, D>(self, cx: &C, mut map: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: PairsDecoder<'de, Error = Self::Error>,
@@ -426,7 +426,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_bytes<C>(self, _: &mut C, _: SizeHint) -> Result<Self::Bytes<C>, C::Error>
+    fn visit_bytes<C>(self, _: &C, _: SizeHint) -> Result<Self::Bytes<C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -435,7 +435,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_string<C>(self, _: &mut C, _: SizeHint) -> Result<Self::String<C>, C::Error>
+    fn visit_string<C>(self, _: &C, _: SizeHint) -> Result<Self::String<C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -444,7 +444,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_number<C>(self, _: &mut C, _: NumberHint) -> Result<Self::Number<C>, C::Error>
+    fn visit_number<C>(self, _: &C, _: NumberHint) -> Result<Self::Number<C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -453,7 +453,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_variant<C, D>(self, cx: &mut C, mut variant: D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<C, D>(self, cx: &C, mut variant: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
         D: VariantDecoder<'de, Error = Self::Error>,
@@ -471,7 +471,7 @@ impl<'de, M> Decode<'de, M> for Value
 where
     M: Mode,
 {
-    fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Input = D::Error>,
         D: Decoder<'de>,
@@ -497,12 +497,12 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_owned(self, _: &mut C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, _: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
         Ok(Value::Bytes(bytes))
     }
 
     #[inline]
-    fn visit_ref(self, _: &mut C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         Ok(Value::Bytes(bytes.to_vec()))
     }
 }
@@ -523,12 +523,12 @@ where
     }
 
     #[inline]
-    fn visit_owned(self, _: &mut C, string: String) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, _: &C, string: String) -> Result<Self::Ok, C::Error> {
         Ok(Value::String(string))
     }
 
     #[inline]
-    fn visit_ref(self, _: &mut C, string: &str) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, _: &C, string: &str) -> Result<Self::Ok, C::Error> {
         Ok(Value::String(string.to_owned()))
     }
 }
@@ -547,72 +547,72 @@ where
     }
 
     #[inline]
-    fn visit_u8(self, _: &mut C, value: u8) -> Result<Self::Ok, C::Error> {
+    fn visit_u8(self, _: &C, value: u8) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U8(value)))
     }
 
     #[inline]
-    fn visit_u16(self, _: &mut C, value: u16) -> Result<Self::Ok, C::Error> {
+    fn visit_u16(self, _: &C, value: u16) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U16(value)))
     }
 
     #[inline]
-    fn visit_u32(self, _: &mut C, value: u32) -> Result<Self::Ok, C::Error> {
+    fn visit_u32(self, _: &C, value: u32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U32(value)))
     }
 
     #[inline]
-    fn visit_u64(self, _: &mut C, value: u64) -> Result<Self::Ok, C::Error> {
+    fn visit_u64(self, _: &C, value: u64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U64(value)))
     }
 
     #[inline]
-    fn visit_u128(self, _: &mut C, value: u128) -> Result<Self::Ok, C::Error> {
+    fn visit_u128(self, _: &C, value: u128) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U128(value)))
     }
 
     #[inline]
-    fn visit_i8(self, _: &mut C, value: i8) -> Result<Self::Ok, C::Error> {
+    fn visit_i8(self, _: &C, value: i8) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I8(value)))
     }
 
     #[inline]
-    fn visit_i16(self, _: &mut C, value: i16) -> Result<Self::Ok, C::Error> {
+    fn visit_i16(self, _: &C, value: i16) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I16(value)))
     }
 
     #[inline]
-    fn visit_i32(self, _: &mut C, value: i32) -> Result<Self::Ok, C::Error> {
+    fn visit_i32(self, _: &C, value: i32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I32(value)))
     }
 
     #[inline]
-    fn visit_i64(self, _: &mut C, value: i64) -> Result<Self::Ok, C::Error> {
+    fn visit_i64(self, _: &C, value: i64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I64(value)))
     }
 
     #[inline]
-    fn visit_i128(self, _: &mut C, value: i128) -> Result<Self::Ok, C::Error> {
+    fn visit_i128(self, _: &C, value: i128) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I128(value)))
     }
 
     #[inline]
-    fn visit_f32(self, _: &mut C, value: f32) -> Result<Self::Ok, C::Error> {
+    fn visit_f32(self, _: &C, value: f32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::F32(value)))
     }
 
     #[inline]
-    fn visit_f64(self, _: &mut C, value: f64) -> Result<Self::Ok, C::Error> {
+    fn visit_f64(self, _: &C, value: f64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::F64(value)))
     }
 
     #[inline]
-    fn visit_usize(self, _: &mut C, value: usize) -> Result<Self::Ok, C::Error> {
+    fn visit_usize(self, _: &C, value: usize) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::Usize(value)))
     }
 
     #[inline]
-    fn visit_isize(self, _: &mut C, value: isize) -> Result<Self::Ok, C::Error> {
+    fn visit_isize(self, _: &C, value: isize) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::Isize(value)))
     }
 }
@@ -621,7 +621,7 @@ impl<M> Encode<M> for Value
 where
     M: Mode,
 {
-    fn encode<C, E>(&self, cx: &mut C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
         E: Encoder,
@@ -699,7 +699,7 @@ where
     type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;
 
     #[inline]
-    fn as_decoder<C>(&self, _: &mut C) -> Result<Self::Decoder<'_>, C::Error>
+    fn as_decoder<C>(&self, _: &C) -> Result<Self::Decoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

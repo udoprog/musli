@@ -24,12 +24,12 @@ use crate::Context;
 /// where
 ///     M: Mode,
 /// {
-///     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 ///     where
 ///         C: Context<Input = D::Error>,
 ///         D: Decoder<'de>,
 ///     {
-///         decoder.decode_string(cx, musli::utils::visit_owned_fn("A string variant for Enum", |cx: &mut C, variant: &str| {
+///         decoder.decode_string(cx, musli::utils::visit_owned_fn("A string variant for Enum", |cx: &C, variant: &str| {
 ///             match variant {
 ///                 "A" => Ok(Enum::A),
 ///                 "B" => Ok(Enum::A),
@@ -50,7 +50,7 @@ pub fn visit_owned_fn<'de, E, U, C, T, O>(
 ) -> impl ValueVisitor<'de, C, T, Ok = O>
 where
     E: fmt::Display,
-    U: FnOnce(&mut C, &T) -> Result<O, C::Error>,
+    U: FnOnce(&C, &T) -> Result<O, C::Error>,
     C: Context,
     T: ?Sized + ToOwned,
 {
@@ -65,7 +65,7 @@ struct FromFn<E, U> {
 impl<'de, W, U, C, T, O> ValueVisitor<'de, C, T> for FromFn<W, U>
 where
     W: fmt::Display,
-    U: FnOnce(&mut C, &T) -> Result<O, C::Error>,
+    U: FnOnce(&C, &T) -> Result<O, C::Error>,
     T: ?Sized + ToOwned,
     C: Context,
 {
@@ -77,7 +77,7 @@ where
     }
 
     #[inline]
-    fn visit_ref(self, cx: &mut C, string: &T) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: &C, string: &T) -> Result<Self::Ok, C::Error> {
         (self.function)(cx, string)
     }
 }

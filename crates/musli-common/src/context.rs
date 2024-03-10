@@ -1,10 +1,12 @@
 //! Helper types to set up a basic Müsli [`Context`].
 
+mod access;
 #[cfg(feature = "alloc")]
 mod alloc_context;
 mod no_std_context;
 mod rich_error;
 
+use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -64,12 +66,12 @@ where
     type Buf = A::Buf;
 
     #[inline(always)]
-    fn alloc(&mut self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf {
         self.alloc.alloc()
     }
 
     #[inline(always)]
-    fn report<T>(&mut self, error: T) -> Self::Error
+    fn report<T>(&self, error: T) -> Self::Error
     where
         E: From<T>,
     {
@@ -77,7 +79,7 @@ where
     }
 
     #[inline(always)]
-    fn custom<T>(&mut self, message: T) -> Self::Error
+    fn custom<T>(&self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -85,7 +87,7 @@ where
     }
 
     #[inline(always)]
-    fn message<T>(&mut self, message: T) -> Self::Error
+    fn message<T>(&self, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
@@ -97,7 +99,7 @@ where
 /// loses all information about it (except that it happened).
 pub struct Ignore<A, E> {
     alloc: A,
-    error: bool,
+    error: Cell<bool>,
     _marker: PhantomData<E>,
 }
 
@@ -109,7 +111,7 @@ where
     fn default() -> Self {
         Self {
             alloc: A::default(),
-            error: false,
+            error: Cell::new(false),
             _marker: PhantomData,
         }
     }
@@ -123,7 +125,7 @@ where
     pub fn new(alloc: A) -> Self {
         Self {
             alloc,
-            error: false,
+            error: Cell::new(false),
             _marker: PhantomData,
         }
     }
@@ -136,7 +138,7 @@ where
 {
     /// Construct an error or panic.
     pub fn unwrap(self) -> E {
-        if self.error {
+        if self.error.get() {
             return E::custom("error");
         }
 
@@ -154,34 +156,34 @@ where
     type Buf = A::Buf;
 
     #[inline(always)]
-    fn alloc(&mut self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf {
         self.alloc.alloc()
     }
 
     #[inline(always)]
-    fn report<T>(&mut self, _: T) -> Error
+    fn report<T>(&self, _: T) -> Error
     where
         E: From<T>,
     {
-        self.error = true;
+        self.error.set(true);
         Error
     }
 
     #[inline(always)]
-    fn custom<T>(&mut self, _: T) -> Error
+    fn custom<T>(&self, _: T) -> Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.error = true;
+        self.error.set(true);
         Error
     }
 
     #[inline(always)]
-    fn message<T>(&mut self, _: T) -> Error
+    fn message<T>(&self, _: T) -> Error
     where
         T: fmt::Display,
     {
-        self.error = true;
+        self.error.set(true);
         Error
     }
 }
@@ -189,7 +191,7 @@ where
 /// A simple non-diagnostical capturing context.
 pub struct Capture<A, E> {
     alloc: A,
-    error: Option<E>,
+    error: UnsafeCell<Option<E>>,
 }
 
 impl<A, E> Capture<A, E>
@@ -198,12 +200,15 @@ where
 {
     /// Construct a new capturing allocator.
     pub fn new(alloc: A) -> Self {
-        Self { alloc, error: None }
+        Self {
+            alloc,
+            error: UnsafeCell::new(None),
+        }
     }
 
     /// Construct an error or panic.
     pub fn unwrap(self) -> E {
-        if let Some(error) = self.error {
+        if let Some(error) = self.error.into_inner() {
             return error;
         }
 
@@ -222,34 +227,48 @@ where
     type Buf = A::Buf;
 
     #[inline(always)]
-    fn alloc(&mut self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf {
         self.alloc.alloc()
     }
 
     #[inline(always)]
-    fn report<T>(&mut self, error: T) -> Error
+    fn report<T>(&self, error: T) -> Error
     where
         E: From<T>,
     {
-        self.error = Some(E::from(error));
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            self.error.get().replace(Some(E::from(error)));
+        }
+
         Error
     }
 
     #[inline(always)]
-    fn custom<T>(&mut self, error: T) -> Error
+    fn custom<T>(&self, error: T) -> Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.error = Some(E::custom(error));
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            self.error.get().replace(Some(E::custom(error)));
+        }
         Error
     }
 
     #[inline(always)]
-    fn message<T>(&mut self, message: T) -> Error
+    fn message<T>(&self, message: T) -> Error
     where
         T: fmt::Display,
     {
-        self.error = Some(E::message(message));
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            self.error.get().replace(Some(E::message(message)));
+        }
+
         Error
     }
 }
@@ -262,7 +281,7 @@ where
     fn default() -> Self {
         Self {
             alloc: A::default(),
-            error: None,
+            error: UnsafeCell::new(None),
         }
     }
 }

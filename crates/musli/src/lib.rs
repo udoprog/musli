@@ -129,7 +129,7 @@
 //! }
 //!
 //! impl<'de, M> Decode<'de, M> for MyType where M: Mode {
-//!     fn decode<C, D>(cx: &mut C, decoder: D) -> Result<Self, C::Error>
+//!     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 //!     where
 //!         C: Context<Input = D::Error>,
 //!         D: Decoder<'de>,
@@ -453,7 +453,7 @@ pub use self::mode::Mode;
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn encode_u32<C>(self, cx: &mut C, value: u32) -> Result<(), C::Error>
+///     fn encode_u32<C>(self, cx: &C, value: u32) -> Result<(), C::Error>
 ///     where
 ///         C: Context<Input = Self::Error>
 ///     {
@@ -493,7 +493,7 @@ pub use musli_macros::encoder;
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32<C>(self, _: &mut C) -> Result<u32, C::Error>
+///     fn decode_u32<C>(self, _: &C) -> Result<u32, C::Error>
 ///     where
 ///         C: Context<Input = Self::Error>
 ///     {

@@ -20,7 +20,7 @@ where
 
     /// Visit `u8`.
     #[inline]
-    fn visit_u8(self, cx: &mut C, _: u8) -> Result<Self::Ok, C::Error> {
+    fn visit_u8(self, cx: &C, _: u8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned8,
             &ExpectingWrapper::new(self),
@@ -29,7 +29,7 @@ where
 
     /// Visit `u16`.
     #[inline]
-    fn visit_u16(self, cx: &mut C, _: u16) -> Result<Self::Ok, C::Error> {
+    fn visit_u16(self, cx: &C, _: u16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned16,
             &ExpectingWrapper::new(self),
@@ -38,7 +38,7 @@ where
 
     /// Visit `u32`.
     #[inline]
-    fn visit_u32(self, cx: &mut C, _: u32) -> Result<Self::Ok, C::Error> {
+    fn visit_u32(self, cx: &C, _: u32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned32,
             &ExpectingWrapper::new(self),
@@ -47,7 +47,7 @@ where
 
     /// Visit `u64`.
     #[inline]
-    fn visit_u64(self, cx: &mut C, _: u64) -> Result<Self::Ok, C::Error> {
+    fn visit_u64(self, cx: &C, _: u64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned64,
             &ExpectingWrapper::new(self),
@@ -56,7 +56,7 @@ where
 
     /// Visit `u128`.
     #[inline]
-    fn visit_u128(self, cx: &mut C, _: u128) -> Result<Self::Ok, C::Error> {
+    fn visit_u128(self, cx: &C, _: u128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned128,
             &ExpectingWrapper::new(self),
@@ -65,7 +65,7 @@ where
 
     /// Visit `i8`.
     #[inline]
-    fn visit_i8(self, cx: &mut C, _: i8) -> Result<Self::Ok, C::Error> {
+    fn visit_i8(self, cx: &C, _: i8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed8,
             &ExpectingWrapper::new(self),
@@ -74,7 +74,7 @@ where
 
     /// Visit `i16`.
     #[inline]
-    fn visit_i16(self, cx: &mut C, _: i16) -> Result<Self::Ok, C::Error> {
+    fn visit_i16(self, cx: &C, _: i16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed16,
             &ExpectingWrapper::new(self),
@@ -83,7 +83,7 @@ where
 
     /// Visit `i32`.
     #[inline]
-    fn visit_i32(self, cx: &mut C, _: i32) -> Result<Self::Ok, C::Error> {
+    fn visit_i32(self, cx: &C, _: i32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed32,
             &ExpectingWrapper::new(self),
@@ -92,7 +92,7 @@ where
 
     /// Visit `i64`.
     #[inline]
-    fn visit_i64(self, cx: &mut C, _: i64) -> Result<Self::Ok, C::Error> {
+    fn visit_i64(self, cx: &C, _: i64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed64,
             &ExpectingWrapper::new(self),
@@ -101,7 +101,7 @@ where
 
     /// Visit `i128`.
     #[inline]
-    fn visit_i128(self, cx: &mut C, _: i128) -> Result<Self::Ok, C::Error> {
+    fn visit_i128(self, cx: &C, _: i128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed128,
             &ExpectingWrapper::new(self),
@@ -110,7 +110,7 @@ where
 
     /// Visit `f32`.
     #[inline]
-    fn visit_f32(self, cx: &mut C, _: f32) -> Result<Self::Ok, C::Error> {
+    fn visit_f32(self, cx: &C, _: f32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Float32,
             &ExpectingWrapper::new(self),
@@ -119,7 +119,7 @@ where
 
     /// Visit `f64`.
     #[inline]
-    fn visit_f64(self, cx: &mut C, _: f64) -> Result<Self::Ok, C::Error> {
+    fn visit_f64(self, cx: &C, _: f64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Float64,
             &ExpectingWrapper::new(self),
@@ -128,7 +128,7 @@ where
 
     /// Visit `usize`.
     #[inline]
-    fn visit_usize(self, cx: &mut C, _: usize) -> Result<Self::Ok, C::Error> {
+    fn visit_usize(self, cx: &C, _: usize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Usize,
             &ExpectingWrapper::new(self),
@@ -137,7 +137,7 @@ where
 
     /// Visit `isize`.
     #[inline]
-    fn visit_isize(self, cx: &mut C, _: isize) -> Result<Self::Ok, C::Error> {
+    fn visit_isize(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Isize,
             &ExpectingWrapper::new(self),
@@ -146,7 +146,7 @@ where
 
     /// Visit bytes constituting a raw number.
     #[inline]
-    fn visit_bytes(self, cx: &mut C, _: &'de [u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_bytes(self, cx: &C, _: &'de [u8]) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Number,
             &ExpectingWrapper::new(self),
@@ -156,7 +156,7 @@ where
     /// Fallback used when the type is either not implemented for this visitor
     /// or the underlying format doesn't know which type to decode.
     #[inline]
-    fn visit_any<D>(self, cx: &mut C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
+    fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
         D: Decoder<'de, Error = C::Input>,
     {
