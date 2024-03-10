@@ -1,5 +1,3 @@
-use core::ptr::NonNull;
-
 use musli::context::Buffer;
 
 use crate::allocator::Allocator;
@@ -32,12 +30,7 @@ impl Buffer for EmptyBuf {
     }
 
     #[inline(always)]
-    fn raw_parts(&self) -> (NonNull<u8>, usize, usize) {
-        (NonNull::dangling(), 0, 0)
-    }
-
-    #[inline(always)]
-    unsafe fn as_slice(&self) -> &[u8] {
+    fn as_slice(&self) -> &[u8] {
         &[]
     }
 }
@@ -64,10 +57,10 @@ impl Default for Disabled {
 }
 
 impl Allocator for Disabled {
-    type Buf = EmptyBuf;
+    type Buf<'this> = EmptyBuf;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf<'_> {
         EmptyBuf
     }
 }

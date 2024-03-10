@@ -9,7 +9,6 @@
 
 use core::fmt;
 use core::marker;
-use core::ptr::NonNull;
 
 use crate::no_std::ToOwned;
 
@@ -49,12 +48,8 @@ impl Buffer for NeverBuffer {
         0
     }
 
-    fn raw_parts(&self) -> (NonNull<u8>, usize, usize) {
-        (NonNull::dangling(), 0, 0)
-    }
-
     #[inline(always)]
-    unsafe fn as_slice(&self) -> &[u8] {
+    fn as_slice(&self) -> &[u8] {
         &[]
     }
 }

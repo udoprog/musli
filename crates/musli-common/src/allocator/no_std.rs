@@ -1,12 +1,12 @@
 use core::cell::UnsafeCell;
-use core::mem;
-use core::ptr::{self, NonNull};
 use core::slice;
 
 use musli::context::Buffer;
 
 use crate::allocator::Allocator;
 use crate::fixed::FixedVec;
+
+// TODO: rewrite into a proper allocator.
 
 /// Buffer used in combination with a `Context`.
 ///
@@ -36,11 +36,11 @@ impl<const C: usize> Default for NoStd<C> {
     }
 }
 
-impl<'a, const C: usize> Allocator for &'a NoStd<C> {
-    type Buf = Buf<'a, C>;
+impl<const C: usize> Allocator for NoStd<C> {
+    type Buf<'this> = Buf<'this, C>;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf<'_> {
         unsafe {
             let n = (*self.scratch.get()).len();
 
@@ -95,61 +95,21 @@ impl<'a, const C: usize> Buffer for Buf<'a, C> {
         }
     }
 
-    #[inline]
-    fn copy_back<B>(&mut self, other: B) -> bool
-    where
-        B: Buffer,
-    {
-        let (ptr, from, len) = other.raw_parts();
-
-        unsafe {
-            let data = &mut *self.data.get();
-            let same = ptr::eq(ptr.as_ptr(), data.as_ptr());
-            let to = self.base.wrapping_add(self.len);
-
-            if to.wrapping_add(len) > data.capacity() {
-                return false;
-            }
-
-            if same {
-                if from != to {
-                    assert!(from.wrapping_add(len) <= data.len());
-                    let from = data.as_ptr().wrapping_add(from);
-                    let to = data.as_mut_ptr().wrapping_add(to);
-                    ptr::copy(from, to, len);
-                }
-
-                // We forget the other buffer, so that it doesn't clobber the
-                // underlying allocator data when dropped.
-                mem::forget(other);
-            } else {
-                let from = ptr.as_ptr().wrapping_add(from);
-                let to = data.as_mut_ptr().wrapping_add(to);
-                ptr::copy_nonoverlapping(from, to, len);
-            }
-
-            self.len = self.len.wrapping_add(len);
-            data.set_len(to.wrapping_add(len));
-            true
-        }
-    }
-
     #[inline(always)]
     fn len(&self) -> usize {
         self.len
     }
 
-    #[inline(always)]
-    fn raw_parts(&self) -> (NonNull<u8>, usize, usize) {
-        unsafe {
-            let data = &*self.data.get();
-            let ptr = NonNull::new_unchecked(data.as_ptr().cast_mut());
-            (ptr, self.base, self.len)
-        }
+    #[inline]
+    fn copy_back<B>(&mut self, other: B) -> bool
+    where
+        B: Buffer,
+    {
+        self.write(other.as_slice())
     }
 
     #[inline(always)]
-    unsafe fn as_slice(&self) -> &[u8] {
+    fn as_slice(&self) -> &[u8] {
         unsafe {
             let data = &*self.data.get();
             slice::from_raw_parts(data.as_ptr().wrapping_add(self.base), self.len)

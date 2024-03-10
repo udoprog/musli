@@ -4,7 +4,6 @@ mod error;
 
 use core::fmt;
 use core::marker;
-use core::ptr::NonNull;
 
 #[doc(inline)]
 pub use self::error::Error;
@@ -47,9 +46,13 @@ pub trait Buffer {
     /// Calling `copy_back` multiple times does not lead to any unsafety, but if
     /// both the source and target buffer come from the same allocator the
     /// resulting content might become garbled.
+    #[inline]
     fn copy_back<B>(&mut self, other: B) -> bool
     where
-        B: Buffer;
+        B: Buffer,
+    {
+        self.write(other.as_slice())
+    }
 
     /// Get the length of the buffer in bytes.
     fn len(&self) -> usize;
@@ -59,24 +62,8 @@ pub trait Buffer {
         self.len() == 0
     }
 
-    /// Return the buffer pair in terms of a base pointer and length.
-    ///
-    /// Users of this function must take care not to construct a reference which
-    /// lives for "too long", as per the documentation in `as_slice`.
-    ///
-    /// The triple is consists of:
-    /// * A base pointer.
-    /// * A base pointer offset where the data is located.
-    /// * A length.
-    fn raw_parts(&self) -> (NonNull<u8>, usize, usize);
-
     /// Get the buffer as its initialized slice.
-    ///
-    /// # Safety
-    ///
-    /// This is unsafe, because holding onto a slice for "too long" could lead
-    /// to undefined behavior.
-    unsafe fn as_slice(&self) -> &[u8];
+    fn as_slice(&self) -> &[u8];
 }
 
 impl Buffer for [u8] {
@@ -104,14 +91,7 @@ impl Buffer for [u8] {
     }
 
     #[inline(always)]
-    fn raw_parts(&self) -> (NonNull<u8>, usize, usize) {
-        // SAFETY: The slice is always a valid non-null pointer.
-        let ptr = unsafe { NonNull::new_unchecked(self.as_ptr().cast_mut()) };
-        (ptr, 0, self.len())
-    }
-
-    #[inline(always)]
-    unsafe fn as_slice(&self) -> &[u8] {
+    fn as_slice(&self) -> &[u8] {
         self
     }
 }
@@ -123,14 +103,16 @@ pub trait Context {
     /// The error type which is collected by the context.
     type Input;
     /// Error produced by context.
-    type Error;
+    type Error: 'static;
     /// A mark during processing.
     type Mark: Copy + Default;
     /// A growable buffer.
-    type Buf: Buffer;
+    type Buf<'this>: Buffer
+    where
+        Self: 'this;
 
     /// Allocate a buffer.
-    fn alloc(&self) -> Self::Buf;
+    fn alloc(&self) -> Self::Buf<'_>;
 
     /// Adapt the current context so that it can convert an error from a
     /// different type convertible to the current input
@@ -278,9 +260,9 @@ pub trait Context {
 
     /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_string_tag(&self, _: &'static str, field: Self::Buf) -> Self::Error {
+    fn invalid_field_string_tag(&self, _: &'static str, field: Self::Buf<'_>) -> Self::Error {
         // SAFETY: Getting the slice does not overlap any interleaving operations.
-        let bytes = unsafe { field.as_slice() };
+        let bytes = field.as_slice();
 
         if let Ok(string) = core::str::from_utf8(bytes) {
             self.message(format_args!("Invalid field tag: {string}"))
@@ -505,14 +487,15 @@ impl<C, E> Context for Adapt<C, E>
 where
     C: Context,
     C::Input: From<E>,
+    E: 'static,
 {
     type Input = E;
     type Error = C::Error;
     type Mark = C::Mark;
-    type Buf = C::Buf;
+    type Buf<'this> = C::Buf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf<'_> {
         self.context.alloc()
     }
 
@@ -596,7 +579,7 @@ where
     }
 
     #[inline(always)]
-    fn invalid_field_string_tag(&self, name: &'static str, field: Self::Buf) -> Self::Error {
+    fn invalid_field_string_tag(&self, name: &'static str, field: Self::Buf<'_>) -> Self::Error {
         self.context.invalid_field_string_tag(name, field)
     }
 

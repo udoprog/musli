@@ -80,7 +80,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_pack<C>(self, cx: &C) -> Result<Self::Pack<C::Buf>, C::Error>
+    fn encode_pack<'a, C>(self, cx: &'a C) -> Result<Self::Pack<C::Buf<'a>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

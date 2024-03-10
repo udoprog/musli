@@ -38,7 +38,7 @@ impl fmt::Display for SliceUnderflow {
 /// byte source through [Reader::read_bytes].
 pub trait Reader<'de> {
     /// Error type raised by the current reader.
-    type Error;
+    type Error: 'static;
 
     /// Type borrowed from self.
     ///
