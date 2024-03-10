@@ -72,7 +72,7 @@ pub trait Context {
         Self: 'this;
 
     /// Allocate a buffer.
-    fn alloc(&self) -> Self::Buf<'_>;
+    fn alloc(&self) -> Option<Self::Buf<'_>>;
 
     /// Adapt the current context so that it can convert an error from a
     /// different type convertible to the current input
@@ -259,6 +259,13 @@ pub trait Context {
         self.message(format_args!(
             "invalid variant field tag: variant: {variant:?}, tag: {tag:?}",
         ))
+    }
+
+    /// Missing variant field required to decode.
+    #[allow(unused_variables)]
+    #[inline(always)]
+    fn alloc_failed(&self) -> Self::Error {
+        self.message("Failed to allocate")
     }
 
     /// Indicate that we've entered a struct with the given `name`.
@@ -455,7 +462,7 @@ where
     type Buf<'this> = C::Buf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf<'_> {
+    fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.context.alloc()
     }
 

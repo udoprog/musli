@@ -93,20 +93,16 @@ impl Allocator for NoStd<'_> {
     type Buf<'this> = Buf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf<'_> {
+    fn alloc(&self) -> Option<Self::Buf<'_>> {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
-        let alloc = unsafe { (*self.internal.get()).alloc(MIN_LEN) };
+        let (region, _) = unsafe { (*self.internal.get()).alloc(MIN_LEN)? };
 
-        let Some((region, _)) = alloc else {
-            panic!("Out of memory");
-        };
-
-        Buf {
+        Some(Buf {
             region: Cell::new(region),
             len: Cell::new(0),
             internal: &self.internal,
-        }
+        })
     }
 }
 
@@ -488,15 +484,15 @@ mod tests {
         const C: Region = unsafe { Region::new_unchecked(3) };
         const D: Region = unsafe { Region::new_unchecked(4) };
 
-        let mut a = alloc.alloc();
+        let mut a = alloc.alloc().unwrap();
         a.write(&[1, 2, 3, 4]);
         assert_eq!(a.region.get(), A);
 
-        let mut b = alloc.alloc();
+        let mut b = alloc.alloc().unwrap();
         b.write(&[1, 2, 3, 4]);
         assert_eq!(b.region.get(), B);
 
-        let mut c = alloc.alloc();
+        let mut c = alloc.alloc().unwrap();
         c.write(&[1, 2, 3, 4]);
         assert_eq!(c.region.get(), C);
 
@@ -575,7 +571,7 @@ mod tests {
             };
         }
 
-        let mut d = alloc.alloc();
+        let mut d = alloc.alloc().unwrap();
         d.write(&[1, 2]);
 
         assert_eq!(d.region.get(), A);

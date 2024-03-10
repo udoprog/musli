@@ -197,7 +197,10 @@ where
         C: Context<Input = Self::Error>,
     {
         let start = cx.mark();
-        let mut scratch = cx.alloc();
+
+        let Some(mut scratch) = cx.alloc() else {
+            return Err(cx.message("Failed to allocate scratch buffer"));
+        };
 
         let string = match self.parser.parse_string(cx, true, &mut scratch)? {
             StringReference::Borrowed(string) => string,
@@ -380,7 +383,9 @@ where
         C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, str>,
     {
-        let mut scratch = cx.alloc();
+        let Some(mut scratch) = cx.alloc() else {
+            return Err(cx.message("Failed to allocate scratch buffer"));
+        };
 
         match self.parser.parse_string(cx, true, &mut scratch)? {
             StringReference::Borrowed(borrowed) => visitor.visit_borrowed(cx, borrowed),
@@ -525,7 +530,9 @@ where
         C: Context<Input = Error>,
         V: ValueVisitor<'de, C, [u8]>,
     {
-        let mut scratch = cx.alloc();
+        let Some(mut scratch) = cx.alloc() else {
+            return Err(cx.message("Failed to allocate scratch buffer"));
+        };
 
         match self.parser.parse_string(cx, true, &mut scratch)? {
             StringReference::Borrowed(string) => visitor.visit_borrowed(cx, string.as_bytes()),
