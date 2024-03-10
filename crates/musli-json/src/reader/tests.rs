@@ -6,12 +6,12 @@ use crate::reader::SliceParser;
 #[test]
 fn test_decode_exponent() {
     let alloc = musli_common::allocator::Default::default();
-    let mut cx = musli_common::context::Same::new(&alloc);
+    let cx = musli_common::context::Same::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr, $expected:expr) => {
             assert_eq!(
-                parse_unsigned_full::<$ty, _, _>(&mut cx, &mut SliceParser::new($num.as_bytes()))
+                parse_unsigned_full::<$ty, _, _>(&cx, &mut SliceParser::new($num.as_bytes()))
                     .unwrap(),
                 $expected
             );
@@ -42,13 +42,13 @@ fn test_decode_exponent() {
 #[test]
 fn test_decode_unsigned() {
     let alloc = musli_common::allocator::Default::default();
-    let mut cx = musli_common::context::Same::new(&alloc);
+    let cx = musli_common::context::Same::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
             assert_eq!(
                 parse_unsigned_full::<$ty, _, _>(
-                    &mut cx,
+                    &cx,
                     &mut SliceParser::new(format!("{}", $num).as_bytes())
                 )
                 .unwrap(),
@@ -57,7 +57,7 @@ fn test_decode_unsigned() {
 
             assert_eq!(
                 parse_unsigned_full::<$ty, _, _>(
-                    &mut cx,
+                    &cx,
                     &mut SliceParser::new(format!("{}.", $num).as_bytes())
                 )
                 .unwrap(),
@@ -66,7 +66,7 @@ fn test_decode_unsigned() {
 
             assert_eq!(
                 parse_unsigned_full::<$ty, _, _>(
-                    &mut cx,
+                    &cx,
                     &mut SliceParser::new(format!("{}.0", $num).as_bytes())
                 )
                 .unwrap(),
@@ -75,7 +75,7 @@ fn test_decode_unsigned() {
 
             assert_eq!(
                 parse_unsigned_full::<$ty, _, _>(
-                    &mut cx,
+                    &cx,
                     &mut SliceParser::new(format!("{}.00000", $num).as_bytes())
                 )
                 .unwrap(),
@@ -83,7 +83,7 @@ fn test_decode_unsigned() {
             );
 
             assert!(parse_unsigned_full::<$ty, _, _>(
-                &mut cx,
+                &cx,
                 &mut SliceParser::new(format!("{}.1", $num).as_bytes())
             )
             .is_err());
@@ -109,13 +109,13 @@ fn test_decode_unsigned() {
 #[test]
 fn test_decode_signed() {
     let alloc = musli_common::allocator::Default::default();
-    let mut cx = musli_common::context::Same::new(&alloc);
+    let cx = musli_common::context::Same::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
             assert_eq!(
                 parse_signed_full::<$ty, _, _>(
-                    &mut cx,
+                    &cx,
                     &mut SliceParser::new(format!("{}", $num).as_bytes())
                 )
                 .unwrap(),
@@ -124,7 +124,7 @@ fn test_decode_signed() {
 
             assert_eq!(
                 parse_signed_full::<$ty, _, _>(
-                    &mut cx,
+                    &cx,
                     &mut SliceParser::new(format!("{}.", $num).as_bytes())
                 )
                 .unwrap(),
@@ -133,7 +133,7 @@ fn test_decode_signed() {
 
             assert_eq!(
                 parse_signed_full::<$ty, _, _>(
-                    &mut cx,
+                    &cx,
                     &mut SliceParser::new(format!("{}.0", $num).as_bytes())
                 )
                 .unwrap(),
@@ -142,7 +142,7 @@ fn test_decode_signed() {
 
             assert_eq!(
                 parse_signed_full::<$ty, _, _>(
-                    &mut cx,
+                    &cx,
                     &mut SliceParser::new(format!("{}.00000", $num).as_bytes())
                 )
                 .unwrap(),
@@ -150,7 +150,7 @@ fn test_decode_signed() {
             );
 
             assert!(parse_signed_full::<$ty, _, _>(
-                &mut cx,
+                &cx,
                 &mut SliceParser::new(format!("{}.1", $num).as_bytes())
             )
             .is_err());

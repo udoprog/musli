@@ -40,8 +40,8 @@ where
 {
     let mut output = Value::Unit;
     let alloc = musli_common::allocator::Default::default();
-    let mut cx = musli_common::context::Same::new(&alloc);
-    value.encode(&mut cx, ValueEncoder::new(&mut output))?;
+    let cx = musli_common::context::Same::new(&alloc);
+    value.encode(&cx, ValueEncoder::new(&mut output))?;
     Ok(output)
 }
 
@@ -51,6 +51,6 @@ where
     T: Decode<'de>,
 {
     let alloc = musli_common::allocator::Default::default();
-    let mut cx = musli_common::context::Same::new(&alloc);
-    T::decode(&mut cx, value.decoder::<DEFAULT_OPTIONS, _>())
+    let cx = musli_common::context::Same::new(&alloc);
+    T::decode(&cx, value.decoder::<DEFAULT_OPTIONS, _>())
 }

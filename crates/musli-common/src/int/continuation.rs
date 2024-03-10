@@ -9,13 +9,13 @@
 //!
 //! let alloc = musli_common::allocator::Default::default();
 //!
-//! let mut cx: Ignore<_, FixedBytesOverflow> = Ignore::new(&alloc);
+//! let cx: Ignore<_, FixedBytesOverflow> = Ignore::new(&alloc);
 //! let mut bytes = FixedBytes::<8>::new();
-//! c::encode(&mut cx, &mut bytes, 5000u32).unwrap();
+//! c::encode(&cx, &mut bytes, 5000u32).unwrap();
 //! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let mut cx: Ignore<_, SliceUnderflow> = Ignore::new(&alloc);
-//! let number: u32 = c::decode(&mut cx, bytes.as_slice()).unwrap();
+//! let cx: Ignore<_, SliceUnderflow> = Ignore::new(&alloc);
+//! let number: u32 = c::decode(&cx, bytes.as_slice()).unwrap();
 //! assert_eq!(number, 5000u32);
 //! ```
 
