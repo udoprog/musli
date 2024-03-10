@@ -2,8 +2,8 @@ use crate::allocator::Allocator;
 use musli::context::Buffer;
 
 fn basic_allocations<A: Allocator>(alloc: &A) {
-    let mut a = alloc.alloc();
-    let mut b = alloc.alloc();
+    let mut a = alloc.alloc().unwrap();
+    let mut b = alloc.alloc().unwrap();
 
     b.write(b"He11o");
 
@@ -20,7 +20,7 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
     assert_eq!(a.as_slice(), b"He11o W0rld");
     assert_eq!(a.len(), 11);
 
-    let mut c = alloc.alloc();
+    let mut c = alloc.alloc().unwrap();
     c.write(b"!");
     assert_eq!(c.len(), 1);
 

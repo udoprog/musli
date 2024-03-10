@@ -84,7 +84,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        Ok(WirePackEncoder::new(self.writer, cx.alloc()))
+        let Some(buf) = cx.alloc() else {
+            return Err(cx.message("Failed to allocate pack buffer"));
+        };
+
+        Ok(WirePackEncoder::new(self.writer, buf))
     }
 
     #[inline(always)]

@@ -566,7 +566,9 @@ where
 
         Encode::<M>::encode(&Tag::Windows, cx, tag)?;
 
-        let mut buf = cx.alloc();
+        let Some(mut buf) = cx.alloc() else {
+            return Err(cx.message("Failed to allocate buffer"));
+        };
 
         for w in self.encode_wide() {
             if !buf.write(&w.to_le_bytes()) {
@@ -628,7 +630,6 @@ where
             Tag::Windows => Err(cx.message("Unsupported OsString::Windows variant")),
             #[cfg(windows)]
             Tag::Windows => {
-                use core::slice;
                 use std::os::windows::ffi::OsStringExt;
 
                 struct Visitor;
@@ -645,31 +646,18 @@ where
                     }
 
                     #[inline]
-                    fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-                        use crate::context::Buffer;
-
-                        let mut buf = cx.alloc();
+                    fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+                        let mut buf = Vec::with_capacity(bytes.len() / 2);
 
                         for pair in bytes.chunks_exact(2) {
                             let &[a, b] = pair else {
                                 continue;
                             };
 
-                            let a = u16::from_le_bytes([a, b]);
-
-                            if !buf.write(&a.to_ne_bytes()) {
-                                return Err(cx.message("Failed to write to buffer"));
-                            }
+                            buf.push(u16::from_le_bytes([a, b]));
                         }
 
-                        unsafe {
-                            let slice = buf.as_slice();
-                            let bytes = slice::from_raw_parts(
-                                slice.as_ptr().cast::<u16>(),
-                                slice.len() / 2,
-                            );
-                            Ok(OsString::from_wide(bytes))
-                        }
+                        Ok(OsString::from_wide(&buf))
                     }
                 }
 

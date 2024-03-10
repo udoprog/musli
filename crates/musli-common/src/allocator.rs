@@ -83,7 +83,7 @@ pub trait Allocator {
     /// Allocate an empty, uninitialized buffer. Just calling this function
     /// doesn't cause any allocations to occur, for that to happen the returned
     /// allocation has to be written to.
-    fn alloc(&self) -> Self::Buf<'_>;
+    fn alloc(&self) -> Option<Self::Buf<'_>>;
 }
 
 impl<A> Allocator for &A
@@ -93,7 +93,7 @@ where
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf<'_> {
+    fn alloc(&self) -> Option<Self::Buf<'_>> {
         (*self).alloc()
     }
 }

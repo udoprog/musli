@@ -180,7 +180,9 @@ fn decode_enum(
             let arms = tag_variants.iter().map(|o| o.as_arm(option_some));
 
             variant_alloc = Some(quote! {
-                let mut #variant_alloc_var = #context_t::alloc(#ctx_var);
+                let #option_some(mut #variant_alloc_var) = #context_t::alloc(#ctx_var) else {
+                    return #result_err(#context_t::alloc_failed(#ctx_var));
+                };
             });
 
             decode_tag = quote! {
@@ -188,7 +190,10 @@ fn decode_enum(
                     #result_ok(match string {
                         #(#arms,)*
                         string => {
-                            #buffer_t::write(&mut #variant_alloc_var, str::as_bytes(string));
+                            if !#buffer_t::write(&mut #variant_alloc_var, str::as_bytes(string)) {
+                                return #result_err(#context_t::alloc_failed(#ctx_var));
+                            }
+
                             #option_none
                         }
                     })
@@ -362,12 +367,15 @@ fn decode_enum(
                     outcome_enum = quote! {
                         enum Outcome {
                             Tag,
+                            AllocErr,
                             Err,
                         }
                     };
 
                     field_alloc = Some(quote! {
-                        let mut #field_alloc_var = #context_t::alloc(#ctx_var);
+                        let #option_some(mut #field_alloc_var) = #context_t::alloc(#ctx_var) else {
+                            return #result_err(#context_t::alloc_failed(#ctx_var));
+                        };
                     });
 
                     let decode_outcome = quote! {
@@ -375,8 +383,11 @@ fn decode_enum(
                             #result_ok(match string {
                                 #field_tag => Outcome::Tag,
                                 string => {
-                                    #buffer_t::write(&mut #field_alloc_var, str::as_bytes(string));
-                                    Outcome::Err
+                                    if !#buffer_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                                        Outcome::AllocErr
+                                    } else {
+                                        Outcome::Err
+                                    }
                                 }
                             })
                         }))?
@@ -386,6 +397,9 @@ fn decode_enum(
                         match #decode_outcome {
                             Outcome::Tag => {
                                 break #pair_decoder_t::second(#entry_var, #ctx_var)?;
+                            }
+                            Outcome::AllocErr => {
+                                return #result_err(#context_t::alloc_failed(#ctx_var));
                             }
                             Outcome::Err => {
                                 if !#pair_decoder_t::skip_second(#entry_var, #ctx_var)? {
@@ -511,11 +525,13 @@ fn decode_enum(
             match tag_method {
                 Some(TagMethod::String) => {
                     outcome_enum = quote! {
-                        enum Outcome { Tag, Content, Err }
+                        enum Outcome { Tag, Content, AllocErr, Err }
                     };
 
                     field_alloc = Some(quote! {
-                        let mut #field_alloc_var = #context_t::alloc(#ctx_var);
+                        let #option_some(mut #field_alloc_var) = #context_t::alloc(#ctx_var) else {
+                            return #result_err(#context_t::alloc_failed(#ctx_var));
+                        };
                     });
 
                     decode_match = quote! {
@@ -524,8 +540,11 @@ fn decode_enum(
                                 #tag => Outcome::Tag,
                                 #content => Outcome::Content,
                                 string => {
-                                    #buffer_t::write(&mut #field_alloc_var, str::as_bytes(string));
-                                    Outcome::Err
+                                    if !#buffer_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                                        Outcome::AllocErr
+                                    } else {
+                                        Outcome::Err
+                                    }
                                 }
                             })
                         }))?;
@@ -547,6 +566,9 @@ fn decode_enum(
                                     #(#patterns,)*
                                     #fallback
                                 });
+                            }
+                            Outcome::AllocErr => {
+                                return #result_err(#context_t::alloc_failed(#ctx_var));
                             }
                             Outcome::Err => {
                                 if !#pair_decoder_t::skip_second(#entry_var, #ctx_var)? {
@@ -769,7 +791,9 @@ fn decode_tagged(
             let patterns = outputs.iter().map(|o| o.as_arm(option_some));
 
             field_alloc = Some(quote! {
-                let mut #field_alloc_var = #context_t::alloc(#ctx_var);
+                let #option_some(mut #field_alloc_var) = #context_t::alloc(#ctx_var) else {
+                    return #result_err(#context_t::alloc_failed(#ctx_var));
+                };
             });
 
             decode_tag = quote! {
@@ -777,7 +801,10 @@ fn decode_tagged(
                     #result_ok(match string {
                         #(#patterns,)*
                         string => {
-                            #buffer_t::write(&mut #field_alloc_var, str::as_bytes(string));
+                            if !#buffer_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                                return #result_err(#context_t::alloc_failed(#ctx_var));
+                            }
+
                             #option_none
                         }
                     })

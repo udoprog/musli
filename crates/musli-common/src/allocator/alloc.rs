@@ -35,11 +35,11 @@ impl Allocator for Alloc {
     type Buf<'this> = Buf<'this>;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf<'_> {
-        Buf {
+    fn alloc(&self) -> Option<Self::Buf<'_>> {
+        Some(Buf {
             region: Internal::alloc(&self.internal),
             internal: &self.internal,
-        }
+        })
     }
 }
 
