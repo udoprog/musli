@@ -20,7 +20,7 @@ struct Collection {
 #[test]
 fn trace_no_std() {
     let alloc = NoStd::<1024>::new();
-    let mut cx = NoStdContext::new(&alloc);
+    let cx = NoStdContext::new(&alloc);
 
     let mut values = HashMap::new();
 
@@ -30,7 +30,7 @@ fn trace_no_std() {
 
     let encoding = musli_json::Encoding::new();
 
-    let Ok(bytes) = encoding.to_vec_with(&mut cx, &from) else {
+    let Ok(bytes) = encoding.to_vec_with(&cx, &from) else {
         if let Some(error) = cx.errors().next() {
             panic!("{error}");
         }
@@ -38,9 +38,9 @@ fn trace_no_std() {
         unreachable!()
     };
 
-    let mut cx = NoStdContext::new(&alloc);
+    let cx = NoStdContext::new(&alloc);
 
-    let Ok(..) = encoding.from_slice_with::<_, Collection>(&mut cx, &bytes) else {
+    let Ok(..) = encoding.from_slice_with::<_, Collection>(&cx, &bytes) else {
         if let Some(error) = cx.errors().next() {
             assert_eq!(
                 error.to_string(),

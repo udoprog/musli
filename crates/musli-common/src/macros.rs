@@ -13,8 +13,8 @@ macro_rules! encode_with_extensions {
             T: ?Sized + Encode<M>,
         {
             let alloc = musli_common::allocator::Default::default();
-            let mut cx = musli_common::context::Same::new(&alloc);
-            self.encode_with(&mut cx, writer, value)
+            let cx = musli_common::context::Same::new(&alloc);
+            self.encode_with(&cx, writer, value)
         }
 
         /// Encode the given value to the given [Write][io::Write] using the current
@@ -67,8 +67,8 @@ macro_rules! encode_with_extensions {
             T: ?Sized + Encode<M>,
         {
             let alloc = musli_common::allocator::Default::default();
-            let mut cx = musli_common::context::Same::new(&alloc);
-            self.to_fixed_bytes_with(&mut cx, value)
+            let cx = musli_common::context::Same::new(&alloc);
+            self.to_fixed_bytes_with(&cx, value)
         }
 
         /// Encode the given value to a fixed-size bytes using the current
@@ -103,9 +103,9 @@ macro_rules! encoding_from_slice_impls {
             T: Decode<'de, M>,
         {
             let alloc = musli_common::allocator::Default::default();
-            let mut cx = musli_common::context::Same::new(&alloc);
+            let cx = musli_common::context::Same::new(&alloc);
             let reader = SliceReader::new(bytes);
-            T::decode(&mut cx, $decoder_new(reader))
+            T::decode(&cx, $decoder_new(reader))
         }
 
         /// Decode the given type `T` from the given slice using the current
@@ -172,8 +172,8 @@ macro_rules! encoding_impls {
             T: Decode<'de, M>,
         {
             let alloc = musli_common::allocator::Default::default();
-            let mut cx = musli_common::context::Same::new(&alloc);
-            self.decode_with(&mut cx, reader)
+            let cx = musli_common::context::Same::new(&alloc);
+            self.decode_with(&cx, reader)
         }
 
         $crate::encode_with_extensions!();

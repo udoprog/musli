@@ -201,8 +201,8 @@ where
         T: ?Sized + Encode<M>,
     {
         let alloc = musli_common::allocator::Default::default();
-        let mut cx = musli_common::context::Same::new(&alloc);
-        self.to_string_with(&mut cx, value)
+        let cx = musli_common::context::Same::new(&alloc);
+        self.to_string_with(&cx, value)
     }
 
     /// Encode the given value to a [`String`] using the current configuration.
@@ -231,8 +231,8 @@ where
         T: Decode<'de, M>,
     {
         let alloc = musli_common::allocator::Default::default();
-        let mut cx = musli_common::context::Same::new(&alloc);
-        self.decode_with(&mut cx, parser)
+        let cx = musli_common::context::Same::new(&alloc);
+        self.decode_with(&cx, parser)
     }
 
     /// Decode the given type `T` from the given [Parser] using the current
@@ -282,8 +282,8 @@ where
         T: Decode<'de, M>,
     {
         let alloc = musli_common::allocator::Default::default();
-        let mut cx = musli_common::context::Same::new(&alloc);
-        self.from_slice_with(&mut cx, bytes)
+        let cx = musli_common::context::Same::new(&alloc);
+        self.from_slice_with(&cx, bytes)
     }
 
     /// Decode the given type `T` from the given slice using the current

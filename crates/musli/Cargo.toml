@@ -17,8 +17,8 @@ categories = ["encoding"]
 
 [features]
 default = ["std"]
-std = ["alloc"]
-alloc = []
+std = ["alloc", "musli-wire/std", "musli-value/std", "musli-storage/std", "musli-json/std"]
+alloc = ["musli-wire/alloc", "musli-value/alloc", "musli-storage/alloc", "musli-json/alloc"]
 
 [dependencies]
 musli-macros = { version = "=0.0.96", path = "../musli-macros" }

@@ -1,7 +1,7 @@
 use core::ffi::CStr;
+use core::fmt;
 #[cfg(feature = "std")]
 use core::hash::{BuildHasher, Hash};
-use core::{fmt, slice};
 
 use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
@@ -632,6 +632,7 @@ where
             }
             #[cfg(windows)]
             Tag::Windows => {
+                use core::slice;
                 use std::os::windows::ffi::OsStringExt;
 
                 struct Visitor;

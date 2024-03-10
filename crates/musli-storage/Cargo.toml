@@ -17,7 +17,7 @@ categories = ["encoding"]
 
 [features]
 default = ["std", "simdutf8"]
-std = ["musli/std", "musli-common/std", "alloc"]
+std = ["alloc", "musli/std", "musli-common/std"]
 alloc = ["musli/alloc", "musli-common/alloc"]
 test = []
 simdutf8 = ["musli-common/simdutf8"]

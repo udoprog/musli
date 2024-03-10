@@ -54,7 +54,7 @@ struct Value<'a> {
 #[start]
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let alloc = NoStd::<1024>::new();
-    let mut cx = NoStdContext::new(&alloc);
+    let cx = NoStdContext::new(&alloc);
 
     let encoding = musli_json::Encoding::new();
 
@@ -67,8 +67,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     let mut w = &mut buf[..];
 
-    let Ok(..) = encoding.encode_with(&mut cx, &mut w, &value) else {
-        for _error in cx.iter() {
+    let Ok(..) = encoding.encode_with(&cx, &mut w, &value) else {
+        for _error in cx.errors() {
             // report error
         }
 
@@ -77,8 +77,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     let written = 1024 - w.len();
 
-    let Ok(value): Result<Value, _> = encoding.from_slice_with(&mut cx, &buf[..written]) else {
-        for _error in cx.iter() {
+    let Ok(value): Result<Value, _> = encoding.from_slice_with(&cx, &buf[..written]) else {
+        for _error in cx.errors() {
             // report error
         }
 

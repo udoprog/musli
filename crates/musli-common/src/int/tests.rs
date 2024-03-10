@@ -22,13 +22,13 @@ fn test_continuation_encoding() {
     {
         let mut out = Vec::new();
         let alloc = Alloc::default();
-        let mut cx = crate::context::Ignore::new(&alloc);
-        c::encode(&mut cx, &mut out, expected).unwrap();
-        c::encode(&mut cx, &mut out, expected).unwrap();
+        let cx = crate::context::Ignore::new(&alloc);
+        c::encode(&cx, &mut out, expected).unwrap();
+        c::encode(&cx, &mut out, expected).unwrap();
         let mut data = out.as_slice();
-        let mut cx = context::Ignore::new(&alloc);
-        let a: T = c::decode(&mut cx, &mut data).unwrap();
-        let b: T = c::decode(&mut cx, &mut data).unwrap();
+        let cx = context::Ignore::new(&alloc);
+        let a: T = c::decode(&cx, &mut data).unwrap();
+        let b: T = c::decode(&cx, &mut data).unwrap();
         assert!(data.is_empty());
         assert_eq!(a, expected);
         assert_eq!(b, expected);
@@ -40,8 +40,8 @@ fn test_continuation_encoding() {
     {
         let mut out = Vec::new();
         let alloc = Alloc::default();
-        let mut cx = crate::context::Same::new(&alloc);
-        c::encode(&mut cx, crate::wrap::wrap(&mut out), value).unwrap();
+        let cx = crate::context::Same::new(&alloc);
+        c::encode(&cx, crate::wrap::wrap(&mut out), value).unwrap();
         out
     }
 
