@@ -1,6 +1,5 @@
 use core::fmt;
 
-use crate::context::Buffer;
 use crate::en::Encode;
 use crate::error::Error;
 use crate::expecting::{self, Expecting};
@@ -193,9 +192,9 @@ pub trait Encoder: Sized {
     /// Encoder returned when encoding an optional value which is present.
     type Some: Encoder<Ok = Self::Ok, Error = Self::Error>;
     /// A simple pack that packs a sequence of elements.
-    type Pack<B>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>
+    type Pack<'this, C>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>
     where
-        B: Buffer;
+        C: 'this + Context;
     /// The type of a sequence encoder.
     type Sequence: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a tuple encoder.
@@ -1006,7 +1005,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_pack<'a, C>(self, cx: &'a C) -> Result<Self::Pack<C::Buf<'a>>, C::Error>
+    fn encode_pack<C>(self, cx: &C) -> Result<Self::Pack<'_, C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

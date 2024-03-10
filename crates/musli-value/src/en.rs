@@ -3,7 +3,6 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use musli::context::Buffer;
 use musli::en::Encoder;
 #[cfg(feature = "alloc")]
 use musli::en::{PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
@@ -70,7 +69,7 @@ where
     #[cfg(feature = "alloc")]
     type Some = ValueEncoder<SomeValueWriter<O>>;
     #[cfg(feature = "alloc")]
-    type Pack<B> = SequenceValueEncoder<O> where B: Buffer;
+    type Pack<'this, C> = SequenceValueEncoder<O> where C: 'this + Context;
     #[cfg(feature = "alloc")]
     type Sequence = SequenceValueEncoder<O>;
     #[cfg(feature = "alloc")]
@@ -308,7 +307,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_pack<'a, C>(self, _: &'a C) -> Result<Self::Pack<C::Buf<'a>>, C::Error>
+    fn encode_pack<C>(self, _: &'_ C) -> Result<Self::Pack<'_, C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

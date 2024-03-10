@@ -12,19 +12,6 @@ impl Buffer for EmptyBuf {
     }
 
     #[inline(always)]
-    fn write_at(&mut self, _: usize, _: &[u8]) -> bool {
-        false
-    }
-
-    #[inline(always)]
-    fn copy_back<B>(&mut self, _: B) -> bool
-    where
-        B: Buffer,
-    {
-        false
-    }
-
-    #[inline(always)]
     fn len(&self) -> usize {
         0
     }

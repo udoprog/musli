@@ -255,7 +255,7 @@ where
         C: Context<Input = Self::Error>,
         B: Buffer,
     {
-        if !self.buffer.copy_back(buffer) {
+        if !self.buffer.write(buffer.as_slice()) {
             return Err(cx.message("Buffer overflow"));
         }
 

@@ -60,7 +60,7 @@ where
     type Ok = ();
     type Error = Error;
 
-    type Pack<B> = SelfPackEncoder<W, B, F> where B: Buffer;
+    type Pack<'this, C> = SelfPackEncoder<W, C::Buf<'this>, F> where C: 'this + Context;
     type Some = Self;
     type Sequence = Self;
     type Tuple = Self;
@@ -84,17 +84,11 @@ where
     }
 
     #[inline]
-    fn encode_pack<'a, C>(self, cx: &'a C) -> Result<Self::Pack<C::Buf<'a>>, C::Error>
+    fn encode_pack<C>(self, cx: &C) -> Result<Self::Pack<'_, C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
-        let mut buffer = cx.alloc();
-
-        if !buffer.write(&[0]) {
-            return Err(cx.message("Pack buffer too small"));
-        }
-
-        Ok(SelfPackEncoder::new(self.writer, buffer))
+        Ok(SelfPackEncoder::new(self.writer, cx.alloc()))
     }
 
     #[inline]
@@ -366,8 +360,8 @@ where
     {
         static PAD: [u8; 1024] = [0; 1024];
 
-        let mut buffer = self.buffer.into_inner();
-        let len = buffer.len().wrapping_sub(1);
+        let buffer = self.buffer.into_inner();
+        let len = buffer.len();
 
         let (tag, mut rem) = if len <= MAX_INLINE_LEN {
             (Tag::new(Kind::Bytes, len as u8), 0)
@@ -386,10 +380,7 @@ where
             (Tag::new(Kind::Pack, pow as u8), rem)
         };
 
-        if !buffer.write_at(0, &[tag.byte()]) {
-            return Err(cx.message("Pack buffer overflow"));
-        }
-
+        self.writer.write_bytes(cx.adapt(), &[tag.byte()])?;
         self.writer.write_buffer(cx.adapt(), buffer)?;
 
         while rem > 0 {
