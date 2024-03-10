@@ -13,6 +13,7 @@
 //! [Reader]: https://docs.rs/musli-common/latest/musli-common/reader/trait.Reader.html
 //! [Writer]: https://docs.rs/musli-common/latest/musli-common/writer/trait.Writer.html
 
+#![allow(clippy::type_complexity)]
 #![deny(missing_docs)]
 #![no_std]
 

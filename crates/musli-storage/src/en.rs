@@ -1,7 +1,6 @@
 use core::fmt;
 use core::marker;
 
-use musli::context::Buffer;
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::Context;
 use musli_common::options::{self, Options};
@@ -39,7 +38,7 @@ where
     type Ok = ();
     type Error = E;
 
-    type Pack<B> = Self where B: Buffer;
+    type Pack<'this, C> = Self where C: 'this + Context;
     type Some = Self;
     type Sequence = Self;
     type Tuple = Self;
@@ -61,7 +60,7 @@ where
     }
 
     #[inline(always)]
-    fn encode_pack<'a, C>(self, _: &'a C) -> Result<Self::Pack<C::Buf<'a>>, C::Error>
+    fn encode_pack<C>(self, _: &C) -> Result<Self::Pack<'_, C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

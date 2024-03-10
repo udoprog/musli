@@ -1,6 +1,5 @@
 use core::{fmt, marker};
 
-use musli::context::Buffer;
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::mode::Mode;
 use musli::Context;
@@ -34,7 +33,7 @@ where
 {
     type Error = Error;
     type Ok = ();
-    type Pack<B> = JsonArrayEncoder<M, W> where B: Buffer;
+    type Pack<'this, C> = JsonArrayEncoder<M, W> where C: 'this + Context;
     type Some = Self;
     type Sequence = JsonArrayEncoder<M, W>;
     type Tuple = JsonArrayEncoder<M, W>;
@@ -291,7 +290,7 @@ where
     }
 
     #[inline]
-    fn encode_pack<'a, C>(self, cx: &'a C) -> Result<Self::Pack<C::Buf<'a>>, C::Error>
+    fn encode_pack<C>(self, cx: &C) -> Result<Self::Pack<'_, C>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

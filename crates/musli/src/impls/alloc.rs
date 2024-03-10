@@ -615,9 +615,7 @@ where
 
         match tag {
             #[cfg(not(unix))]
-            Tag::Unix => {
-                return Err(cx.message("Unsupported OsString::Unix variant"));
-            }
+            Tag::Unix => Err(cx.message("Unsupported OsString::Unix variant")),
             #[cfg(unix)]
             Tag::Unix => {
                 use std::os::unix::ffi::OsStringExt;
@@ -627,9 +625,7 @@ where
                 Ok(OsString::from_vec(bytes))
             }
             #[cfg(not(windows))]
-            Tag::Windows => {
-                return Err(cx.message("Unsupported OsString::Windows variant"));
-            }
+            Tag::Windows => Err(cx.message("Unsupported OsString::Windows variant")),
             #[cfg(windows)]
             Tag::Windows => {
                 use core::slice;

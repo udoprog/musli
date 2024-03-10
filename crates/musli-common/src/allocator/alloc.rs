@@ -71,17 +71,6 @@ impl<'a> Buffer for Buf<'a> {
         true
     }
 
-    #[inline]
-    fn write_at(&mut self, at: usize, bytes: &[u8]) -> bool {
-        let Some(data) = self.region.data.get_mut(at..at.wrapping_add(bytes.len())) else {
-            // Write location is out-of-bounds of the current buffer.
-            return false;
-        };
-
-        data.copy_from_slice(bytes);
-        true
-    }
-
     #[inline(always)]
     fn len(&self) -> usize {
         self.region.data.len()
@@ -114,7 +103,11 @@ struct Internal {
 }
 
 impl Internal {
-    fn alloc(this: &UnsafeCell<Self>) -> &mut Region {
+    /// Allocate a new region.
+    ///
+    /// Note that this will return a leaked memory region, so the unbound
+    /// lifetime is intentional.
+    fn alloc<'a>(this: &UnsafeCell<Self>) -> &'a mut Region {
         // SAFETY: We take care to only access internals in a single-threaded
         // mutable fashion.
         let internal = unsafe { &mut *this.get() };

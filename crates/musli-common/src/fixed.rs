@@ -13,7 +13,7 @@ use core::str;
 #[non_exhaustive]
 pub(crate) struct CapacityError;
 
-pub(crate) struct FixedVec<T, const N: usize> {
+pub struct FixedVec<T, const N: usize> {
     data: [MaybeUninit<T>; N],
     len: usize,
 }
@@ -26,16 +26,6 @@ impl<T, const N: usize> FixedVec<T, N> {
                 len: 0,
             }
         }
-    }
-
-    #[inline]
-    pub(crate) fn len(&self) -> usize {
-        self.len
-    }
-
-    #[inline]
-    pub(crate) unsafe fn set_len(&mut self, len: usize) {
-        self.len = len;
     }
 
     #[inline]
@@ -54,8 +44,18 @@ impl<T, const N: usize> FixedVec<T, N> {
     }
 
     #[inline]
+    pub(crate) fn as_uninit_slice(&self) -> &[MaybeUninit<T>] {
+        unsafe { slice::from_raw_parts(self.data.as_ptr(), N) }
+    }
+
+    #[inline]
     pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
         unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len) }
+    }
+
+    #[inline]
+    pub(crate) fn as_mut_uninit_slice(&mut self) -> &mut [MaybeUninit<T>] {
+        unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr(), N) }
     }
 
     pub(crate) fn try_extend_from_slice(&mut self, other: &[T]) -> Result<(), CapacityError>

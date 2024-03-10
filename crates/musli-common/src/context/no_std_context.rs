@@ -286,7 +286,7 @@ impl<'a, const S: usize, E: 'a> Iterator for Errors<'a, S, E> {
         let (range, error) = self.error.take()?;
 
         Some(RichError::new(
-            &self.path,
+            self.path,
             self.path_cap,
             range.clone(),
             error,

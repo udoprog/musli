@@ -18,9 +18,6 @@ pub trait Buffer {
     /// value indicates that we are out of buffer capacity.
     fn write(&mut self, bytes: &[u8]) -> bool;
 
-    /// Write bytes at the given offset.
-    fn write_at(&mut self, at: usize, bytes: &[u8]) -> bool;
-
     /// Write a single byte.
     ///
     /// Returns `true` if the bytes could be successfully written. A `false`
@@ -28,30 +25,6 @@ pub trait Buffer {
     #[inline(always)]
     fn push(&mut self, byte: u8) -> bool {
         self.write(&[byte])
-    }
-
-    /// Copy *back* from another buffer.
-    ///
-    /// The provided argument has the following guarantees:
-    /// * It's a buffer from a completely different allocator, at which point
-    ///   `raw_parts` must return a base pointer which differs from the current
-    ///   buffer, or;
-    /// * It's a buffer from the same allocator, at which point `raw_parts`
-    ///   returns the same base pointer. The `other` argument is then located
-    ///   *after* the current buffer in memory as relative to its base pointer.
-    ///   If this does not hold, an implementor must panic.
-    ///
-    /// The latter property is guaranteed by how the allocator functions.
-    ///
-    /// Calling `copy_back` multiple times does not lead to any unsafety, but if
-    /// both the source and target buffer come from the same allocator the
-    /// resulting content might become garbled.
-    #[inline]
-    fn copy_back<B>(&mut self, other: B) -> bool
-    where
-        B: Buffer,
-    {
-        self.write(other.as_slice())
     }
 
     /// Get the length of the buffer in bytes.
@@ -69,19 +42,6 @@ pub trait Buffer {
 impl Buffer for [u8] {
     #[inline(always)]
     fn write(&mut self, _: &[u8]) -> bool {
-        false
-    }
-
-    #[inline(always)]
-    fn write_at(&mut self, _: usize, _: &[u8]) -> bool {
-        false
-    }
-
-    #[inline(always)]
-    fn copy_back<B>(&mut self, _: B) -> bool
-    where
-        B: Buffer,
-    {
         false
     }
 

@@ -18,14 +18,14 @@ pub(super) enum Ty {
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Extra {
     None,
-    Buffer,
+    Context,
     Visitor(Option<Ty>),
 }
 
 pub(super) const ENCODER_TYPES: [(&str, Extra); 8] = [
     ("Error", Extra::None),
     ("Some", Extra::None),
-    ("Pack", Extra::Buffer),
+    ("Pack", Extra::Context),
     ("Sequence", Extra::None),
     ("Tuple", Extra::None),
     ("Map", Extra::None),
@@ -140,37 +140,31 @@ impl Types {
 
         for (ident, extra) in missing {
             let generics = match extra {
-                Extra::Buffer => {
+                Extra::Context => {
+                    let c_param = syn::Ident::new("C", Span::call_site());
+                    let this_lifetime = syn::Lifetime::new("'this", Span::call_site());
+
                     let mut where_clause = syn::WhereClause {
                         where_token: <Token![where]>::default(),
                         predicates: Punctuated::default(),
                     };
 
-                    let b_param: syn::Ident = syn::Ident::new("B", Span::call_site());
-
-                    let mut predicate = syn::PredicateType {
-                        lifetimes: None,
-                        bounded_ty: syn::Type::Path(syn::TypePath {
-                            qself: None,
-                            path: ident_path(b_param.clone()),
-                        }),
-                        colon_token: <Token![:]>::default(),
-                        bounds: Punctuated::default(),
-                    };
-
-                    predicate.bounds.push(syn::TypeParamBound::Verbatim(quote!(
-                        musli::context::Buffer
-                    )));
-
-                    where_clause
-                        .predicates
-                        .push(syn::WherePredicate::Type(predicate));
+                    where_clause.predicates.push(
+                        syn::parse_quote!(#c_param: #this_lifetime + musli::context::Context),
+                    );
 
                     let mut params = Punctuated::default();
 
+                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
+                        attrs: Vec::new(),
+                        lifetime: this_lifetime,
+                        colon_token: None,
+                        bounds: Punctuated::default(),
+                    }));
+
                     params.push(syn::GenericParam::Type(syn::TypeParam {
                         attrs: Vec::new(),
-                        ident: b_param,
+                        ident: c_param,
                         colon_token: None,
                         bounds: Punctuated::default(),
                         eq_token: None,

@@ -13,7 +13,7 @@ mod disabled;
 pub use self::disabled::Disabled;
 
 mod no_std;
-pub use self::no_std::NoStd;
+pub use self::no_std::{NoStd, StackBuffer};
 
 mod default_alloc {
     #![allow(missing_docs)]
