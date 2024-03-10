@@ -63,10 +63,10 @@ where
     type Input = E;
     type Error = E;
     type Mark = ();
-    type Buf = A::Buf;
+    type Buf<'this> = A::Buf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf<'_> {
         self.alloc.alloc()
     }
 
@@ -153,10 +153,10 @@ where
     type Input = E;
     type Error = Error;
     type Mark = ();
-    type Buf = A::Buf;
+    type Buf<'this> = A::Buf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf<'_> {
         self.alloc.alloc()
     }
 
@@ -224,10 +224,10 @@ where
     type Input = E;
     type Error = Error;
     type Mark = ();
-    type Buf = A::Buf;
+    type Buf<'this> = A::Buf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf<'_> {
         self.alloc.alloc()
     }
 

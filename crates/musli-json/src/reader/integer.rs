@@ -579,8 +579,6 @@ mod traits {
 
         fn checked_add(self, other: Self) -> Option<Self>;
 
-        fn checked_mul(self, other: Self) -> Option<Self>;
-
         fn checked_pow(self, exp: u32) -> Option<Self>;
 
         fn negate(self) -> Option<Self::Signed>;
@@ -594,8 +592,6 @@ mod traits {
 
     pub(crate) trait Signed: Sized + fmt::Debug {
         type Unsigned: Unsigned<Signed = Self>;
-
-        fn negate(self) -> Option<Self::Unsigned>;
     }
 
     pub(crate) trait FromUnsigned<T> {
@@ -703,11 +699,6 @@ mod traits {
                 }
 
                 #[inline(always)]
-                fn checked_mul(self, other: Self) -> Option<Self> {
-                    <$unsigned>::checked_mul(self, other)
-                }
-
-                #[inline(always)]
                 fn checked_pow(self, exp: u32) -> Option<Self> {
                     <$unsigned>::checked_pow(self, exp)
                 }
@@ -738,15 +729,6 @@ mod traits {
 
             impl Signed for $signed {
                 type Unsigned = $unsigned;
-
-                #[inline(always)]
-                fn negate(self) -> Option<Self::Unsigned> {
-                    if self < 0 {
-                        None
-                    } else {
-                        Some(-self as $unsigned)
-                    }
-                }
             }
         };
     }

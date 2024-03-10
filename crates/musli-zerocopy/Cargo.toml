@@ -19,7 +19,6 @@ categories = ["encoding"]
 default = ["std"]
 std = ["alloc"]
 alloc = []
-nightly = []
 
 [dependencies]
 musli-zerocopy-macros = { version = "=0.0.96", path = "../musli-zerocopy-macros" }

@@ -38,7 +38,7 @@ impl fmt::Display for SliceOverflow {
 /// The trait governing how a writer works.
 pub trait Writer {
     /// The error type raised by the writer.
-    type Error;
+    type Error: 'static;
 
     /// Reborrowed type.
     ///
@@ -133,7 +133,7 @@ impl Writer for Vec<u8> {
         B: Buffer,
     {
         // SAFETY: the buffer never outlives this function call.
-        self.write_bytes(cx, unsafe { buffer.as_slice() })
+        self.write_bytes(cx, buffer.as_slice())
     }
 
     #[inline]
@@ -173,7 +173,7 @@ impl Writer for &mut [u8] {
         B: Buffer,
     {
         // SAFETY: the buffer never outlives this function call.
-        self.write_bytes(cx, unsafe { buffer.as_slice() })
+        self.write_bytes(cx, buffer.as_slice())
     }
 
     #[inline]
@@ -234,7 +234,7 @@ impl<T, E> BufferWriter<T, E> {
     }
 }
 
-impl<T, E> Writer for BufferWriter<T, E>
+impl<T, E: 'static> Writer for BufferWriter<T, E>
 where
     T: Buffer,
 {

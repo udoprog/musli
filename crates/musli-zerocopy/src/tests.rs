@@ -267,7 +267,7 @@ fn enum_boundaries() -> Result<()> {
         __illegal_enum_u64
     );
     // nightly: feature(repr128)
-    #[cfg(feature = "nightly")]
+    #[cfg(rune_nightly)]
     test_case!(
         U128,
         u128,
@@ -295,7 +295,7 @@ fn enum_boundaries() -> Result<()> {
         __illegal_enum_i64,
     );
     // nightly: feature(repr128)
-    #[cfg(feature = "nightly")]
+    #[cfg(rune_nightly)]
     test_case!(
         I128,
         i128,
@@ -347,7 +347,7 @@ fn test_signed_wraparound() -> Result<()> {
     test_case!(I32, i32, i32, __illegal_enum_i32);
     test_case!(I64, i64, i64, __illegal_enum_i64);
     // nightly: feature(repr128)
-    #[cfg(feature = "nightly")]
+    #[cfg(rune_nightly)]
     test_case!(I128, i128, i128, __illegal_enum_i128);
     Ok(())
 }
@@ -392,7 +392,7 @@ fn test_neg0() -> Result<()> {
     test_case!(I32, i32, i32, __illegal_enum_i32);
     test_case!(I64, i64, i64, __illegal_enum_i64);
     // nightly: feature(repr128)
-    #[cfg(feature = "nightly")]
+    #[cfg(rune_nightly)]
     test_case!(I128, i128, i128, __illegal_enum_i128);
     Ok(())
 }

@@ -195,7 +195,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
         B: Buffer,
     {
         // SAFETY: the buffer never outlives this function call.
-        self.write_bytes(cx, unsafe { buffer.as_slice() })
+        self.write_bytes(cx, buffer.as_slice())
     }
 
     #[inline]

@@ -575,7 +575,7 @@ where
         }
 
         let value = variant.variant(cx)?;
-        Encode::<M>::encode(unsafe { buf.as_slice() }, cx, value)?;
+        Encode::<M>::encode(buf.as_slice(), cx, value)?;
         variant.end(cx)
     }
 }

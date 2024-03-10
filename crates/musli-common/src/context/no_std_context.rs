@@ -122,10 +122,10 @@ where
     type Input = E;
     type Error = Error;
     type Mark = usize;
-    type Buf = A::Buf;
+    type Buf<'this> = A::Buf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Self::Buf {
+    fn alloc(&self) -> Self::Buf<'_> {
         self.alloc.alloc()
     }
 

@@ -34,11 +34,6 @@ impl<T, const N: usize> FixedVec<T, N> {
     }
 
     #[inline]
-    pub(crate) fn capacity(&self) -> usize {
-        N
-    }
-
-    #[inline]
     pub(crate) unsafe fn set_len(&mut self, len: usize) {
         self.len = len;
     }
