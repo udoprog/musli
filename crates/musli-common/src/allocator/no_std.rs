@@ -3,7 +3,7 @@ mod tests;
 
 use core::cell::{Cell, UnsafeCell};
 use core::marker::PhantomData;
-use core::mem::{size_of, ManuallyDrop, MaybeUninit};
+use core::mem::{forget, size_of, MaybeUninit};
 use core::num::NonZeroU8;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
@@ -100,7 +100,6 @@ impl Allocator for NoStd<'_> {
 
         Some(NoStdBuf {
             region: Cell::new(region),
-            len: Cell::new(0),
             internal: &self.internal,
         })
     }
@@ -109,7 +108,6 @@ impl Allocator for NoStd<'_> {
 /// A no-std allocated buffer.
 pub struct NoStdBuf<'a> {
     region: Cell<Region>,
-    len: Cell<usize>,
     internal: &'a UnsafeCell<Internal>,
 }
 
@@ -117,69 +115,87 @@ impl<'a> Buf for NoStdBuf<'a> {
     #[inline]
     fn write(&mut self, bytes: &[u8]) -> bool {
         unsafe {
-            let len = self.len.get();
-
             let i = &mut *self.internal.get();
 
             let header_ptr = i.header_mut(self.region.get());
+            let len = (*header_ptr).len();
 
             // Region can fit the bytes available.
-            let header_ptr = if (*header_ptr).size() - len < bytes.len() {
+            let header_ptr = 'out: {
+                // Region can fit the requested bytes.
+                if (*header_ptr).cap() - len >= bytes.len() {
+                    break 'out header_ptr;
+                };
+
                 let to_len = len + bytes.len();
 
-                let Some(region) = i.realloc(self.region.get(), len, to_len) else {
+                let Some((region, header_ptr)) = i.realloc(self.region.get(), len, to_len) else {
                     return false;
                 };
 
                 self.region.set(region);
-                i.header_mut(region)
-            } else {
                 header_ptr
             };
 
             let dst = i.data.wrapping_add((*header_ptr).start() + len).cast();
             ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
-            self.len.set(len + bytes.len());
+            (*header_ptr).len += bytes.len() as u32;
             true
         }
     }
 
     #[inline]
-    fn write_buffer(&mut self, other: Self) -> bool
+    fn write_buffer<B>(&mut self, other: B) -> bool
     where
-        Self: Sized,
+        B: Buf,
     {
-        // If not pointing to the same internal allocator, fallback to default
-        // behavior.
-        if !ptr::eq(self.internal, other.internal) {
-            return self.write(other.as_slice());
-        }
+        let range = self.as_slice().as_ptr_range();
 
-        // Prevent the other buffer from being dropped.
-        let other = ManuallyDrop::new(other);
-
-        unsafe {
-            let i = &mut *self.internal.get();
-
-            let this_ptr = &mut *i.header_mut(self.region.get());
-            let other_region = other.region.get();
-            let other_ptr = i.header_mut(other_region);
-
+        'out: {
             // If this region immediately follows the other region, we can
             // optimize the write by simply growing the current region and
             // de-allocating the second since they share the same data.
-            if this_ptr.start + this_ptr.size == (*other_ptr).start {
-                this_ptr.size += (*other_ptr).size;
-                self.len.set(self.len.get() + other.len.get());
+            if !ptr::eq(range.end, other.as_slice().as_ptr()) {
+                break 'out;
+            }
 
-                other_ptr.write(Header {
+            let this = self.region.get();
+
+            unsafe {
+                let i = &mut *self.internal.get();
+                let this_ptr = &mut *i.header_mut(this);
+
+                let Some(other_region) = this_ptr.next else {
+                    break 'out;
+                };
+
+                // Prevent the other buffer from being dropped.
+                forget(other);
+
+                let other_ptr = &mut *i.header_mut(other_region);
+
+                let next = other_ptr.next.take();
+
+                this_ptr.cap += other_ptr.cap;
+                this_ptr.len += other_ptr.len;
+                this_ptr.next = next;
+
+                if let Some(next) = next {
+                    let next_ptr = &mut *i.header_mut(next);
+                    next_ptr.prev = Some(this);
+                } else {
+                    i.tail = Some(this);
+                }
+
+                *other_ptr = Header {
                     start: 0,
-                    size: 0,
+                    len: 0,
+                    cap: 0,
                     state: State::Free,
                     next_free: i.free.replace(other_region),
                     prev: None,
                     next: None,
-                });
+                };
 
                 return true;
             }
@@ -189,22 +205,25 @@ impl<'a> Buf for NoStdBuf<'a> {
         // are adjacent, but this would require a copy. Which I am currently too
         // lazy to do, so just fall back to the default behavior.
 
-        let other = ManuallyDrop::into_inner(other);
         self.write(other.as_slice())
     }
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.len.get()
+        unsafe {
+            let i = &*self.internal.get();
+            i.header(self.region.get()).len()
+        }
     }
 
     #[inline(always)]
     fn as_slice(&self) -> &[u8] {
         unsafe {
             let i = &*self.internal.get();
-            let start = i.header(self.region.get()).start();
-            let data = i.data.wrapping_add(start).cast();
-            slice::from_raw_parts(data, self.len.get())
+            let header = i.header(self.region.get());
+            let start = header.start();
+            let ptr = i.data.wrapping_add(start).cast();
+            slice::from_raw_parts(ptr, header.len())
         }
     }
 }
@@ -292,7 +311,7 @@ impl Internal {
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: usize) -> Option<(Region, *mut Header)> {
         if let Some((region, header_ptr)) =
-            self.find_region(|h| h.state == State::Occupy && h.size() >= requested)
+            self.find_region(|h| h.state == State::Occupy && h.cap() >= requested)
         {
             (*header_ptr).state = State::Used;
             // TODO: Should we split the allocated region if possible?
@@ -324,11 +343,12 @@ impl Internal {
         };
 
         let start = u32::try_from(self.bytes).ok()?;
-        let size = u32::try_from(requested).ok()?;
+        let cap = u32::try_from(requested).ok()?;
 
         header_ptr.write(Header {
             start,
-            size,
+            len: 0,
+            cap,
             state: State::Used,
             next_free: None,
             prev: None,
@@ -367,12 +387,13 @@ impl Internal {
             let mut prev = (*current_ptr).prev.take();
 
             loop {
-                total += (*current_ptr).size();
+                total += (*current_ptr).cap();
 
                 (*current_ptr).next_free = self.free.replace(at);
                 (*current_ptr).state = State::Free;
                 (*current_ptr).start = 0;
-                (*current_ptr).size = 0;
+                (*current_ptr).len = 0;
+                (*current_ptr).cap = 0;
 
                 let Some(next) = prev else {
                     self.head = None;
@@ -398,29 +419,27 @@ impl Internal {
 
         let Some(prev) = (*header_ptr).prev else {
             (*header_ptr).state = State::Occupy;
+            (*header_ptr).len = 0;
             return;
         };
 
         let prev_ptr = &mut *self.header_mut(prev);
-
-        if prev_ptr.state != State::Occupy {
-            (*header_ptr).state = State::Occupy;
-            return;
-        }
+        debug_assert!(matches!(prev_ptr.state, State::Occupy | State::Used));
 
         // Move allocation to the previous region.
         let Header {
-            size, next, prev, ..
+            cap, next, prev, ..
         } = header_ptr.replace(Header {
             start: 0,
-            size: 0,
+            len: 0,
+            cap: 0,
             state: State::Free,
             next_free: self.free.replace(at),
             prev: None,
             next: None,
         });
 
-        prev_ptr.size += size;
+        prev_ptr.cap += cap;
         prev_ptr.next = next;
 
         if let Some(next) = next {
@@ -432,39 +451,81 @@ impl Internal {
         }
     }
 
-    unsafe fn realloc(&mut self, from: Region, len: usize, requested: usize) -> Option<Region> {
-        let from_header = self.header_mut(from);
-
-        if requested <= (*from_header).size() {
-            return Some(from);
-        }
+    unsafe fn realloc(
+        &mut self,
+        from: Region,
+        len: usize,
+        requested: usize,
+    ) -> Option<(Region, *mut Header)> {
+        let from_ptr = self.header_mut(from);
 
         // This is the last region in the slab, so we can just expand it.
-        if (*from_header).next.is_none() {
-            let additional = requested - (*from_header).size();
+        if (*from_ptr).next.is_none() {
+            let additional = requested - (*from_ptr).cap();
 
             if self.bytes + additional > self.size {
                 return None;
             }
 
-            (*from_header).size += additional as u32;
+            (*from_ptr).cap += additional as u32;
             self.bytes += additional;
-            return Some(from);
+            return Some((from, from_ptr));
+        }
+
+        if (*from_ptr).cap == 0 {
+            if self.bytes + requested > self.size {
+                return None;
+            }
+
+            let start = u32::try_from(self.bytes).ok()?;
+            let cap = u32::try_from(requested).ok()?;
+
+            let prev = (*from_ptr).prev.take();
+            let next = (*from_ptr).next.take();
+
+            (*from_ptr).start = start;
+            (*from_ptr).cap = cap;
+
+            if let Some(prev) = prev {
+                let prev_ptr = self.header_mut(prev);
+                (*prev_ptr).next = next;
+            }
+
+            if let Some(next) = next {
+                let next_ptr = self.header_mut(next);
+                (*next_ptr).prev = prev;
+            }
+
+            if let Some(tail) = self.tail {
+                let tail_ptr = self.header_mut(tail);
+                (*tail_ptr).next = Some(from);
+                (*from_ptr).prev = Some(tail);
+            }
+
+            if self.head == Some(from) {
+                self.head = next;
+            }
+
+            self.tail = Some(from);
+            self.bytes += requested;
+            return Some((from, from_ptr));
         }
 
         let (to, to_header) = self.alloc(requested)?;
 
         let from_data = self
             .data
-            .wrapping_add((*from_header).start())
+            .wrapping_add((*from_ptr).start())
             .cast::<u8>()
             .cast_const();
 
         let to_data = self.data.wrapping_add((*to_header).start()).cast::<u8>();
 
         ptr::copy_nonoverlapping(from_data, to_data, len);
+        (*to_header).len = len as u32;
+
         self.free(from);
-        Some(to)
+        Some((to, to_header))
     }
 
     unsafe fn find_region<T>(&mut self, mut condition: T) -> Option<(Region, *mut Header)>
@@ -535,8 +596,10 @@ enum State {
 struct Header {
     // Start of the allocated region as a multiple of 8.
     start: u32,
-    // Size of the region.
-    size: u32,
+    // The length of the region.
+    len: u32,
+    // The capacity of the region.
+    cap: u32,
     // The state of the region.
     state: State,
     // Link to the next free region.
@@ -554,9 +617,15 @@ impl Header {
         self.start as usize
     }
 
-    /// Get the size.
+    /// Get the length of the allocation.
     #[inline]
-    fn size(&self) -> usize {
-        self.size as usize
+    fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    /// Get the capacity of the allocation.
+    #[inline]
+    fn cap(&self) -> usize {
+        self.cap as usize
     }
 }

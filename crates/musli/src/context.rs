@@ -22,9 +22,9 @@ pub trait Buf {
     ///
     /// This allows allocators to provide more efficient means of extending the
     /// current buffer with one provided from the same allocator.
-    fn write_buffer(&mut self, other: Self) -> bool
+    fn write_buffer<B>(&mut self, other: B) -> bool
     where
-        Self: Sized,
+        B: Buf,
     {
         self.write(other.as_slice())
     }
