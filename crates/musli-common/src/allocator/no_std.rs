@@ -3,7 +3,7 @@ mod tests;
 
 use core::cell::{Cell, UnsafeCell};
 use core::marker::PhantomData;
-use core::mem::{replace, size_of, ManuallyDrop, MaybeUninit};
+use core::mem::{size_of, ManuallyDrop, MaybeUninit};
 use core::num::NonZeroU8;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
@@ -76,8 +76,7 @@ impl<'a> NoStd<'a> {
     pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
         Self {
             internal: UnsafeCell::new(Internal {
-                freed: None,
-                occupied: None,
+                free: None,
                 head: None,
                 tail: None,
                 bytes: 0,
@@ -177,7 +176,7 @@ impl<'a> Buf for NoStdBuf<'a> {
                     start: 0,
                     size: 0,
                     state: State::Free,
-                    link: i.freed.replace(other_region),
+                    next_free: i.free.replace(other_region),
                     prev: None,
                     next: None,
                 });
@@ -244,9 +243,7 @@ impl Region {
 
 struct Internal {
     // The first free region.
-    freed: Option<Region>,
-    // The first occupied region.
-    occupied: Option<Region>,
+    free: Option<Region>,
     // Pointer to the head region.
     head: Option<Region>,
     // Pointer to the tail region.
@@ -294,32 +291,16 @@ impl Internal {
     ///
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: usize) -> Option<(Region, *mut Header)> {
-        if let Some((region, header_ptr, prev)) =
-            self.find_in(self.occupied, |h| h.size() >= requested)
+        if let Some((region, header_ptr)) =
+            self.find_region(|h| h.state == State::Occupy && h.size() >= requested)
         {
-            let link = (*header_ptr).link.take();
-
-            if let Some(prev) = prev {
-                (*self.header_mut(prev)).link = link;
-            } else {
-                self.occupied = link;
-            }
-
             (*header_ptr).state = State::Used;
-            // TODO: Should we split the allocated region?
+            // TODO: Should we split the allocated region if possible?
             return Some((region, header_ptr));
         }
 
         let (region, header_ptr, bytes, regions) = 'out: {
-            if let Some((region, header_ptr, prev)) = self.find_in(self.freed, |_| true) {
-                let link = (*header_ptr).link.take();
-
-                if let Some(prev) = prev {
-                    (*self.header_mut(prev)).link = link;
-                } else {
-                    self.freed = link;
-                }
-
+            if let Some((region, header_ptr)) = self.pop_free() {
                 let bytes = self.bytes.checked_add(requested)?;
 
                 if self.regions.checked_add(bytes)? > self.size {
@@ -349,7 +330,7 @@ impl Internal {
             start,
             size,
             state: State::Used,
-            link: None,
+            next_free: None,
             prev: None,
             next: None,
         });
@@ -374,7 +355,7 @@ impl Internal {
         let header_ptr = self.header_mut(at);
 
         debug_assert_eq!((*header_ptr).state, State::Used);
-        debug_assert_eq!((*header_ptr).link, None);
+        debug_assert_eq!((*header_ptr).next_free, None);
 
         // Just free up the last region in the slab.
         if (*header_ptr).next.is_none() {
@@ -388,25 +369,15 @@ impl Internal {
             loop {
                 total += (*current_ptr).size();
 
-                let link = replace(&mut (*current_ptr).link, self.freed.replace(at));
-
+                (*current_ptr).next_free = self.free.replace(at);
                 (*current_ptr).state = State::Free;
                 (*current_ptr).start = 0;
                 (*current_ptr).size = 0;
 
                 let Some(next) = prev else {
                     self.head = None;
-                    // NB: The occupied set is *definitely* pointing to the
-                    // wrong thing at this stage.
-                    self.occupied = None;
                     break;
                 };
-
-                // If we hit the region that the occupied list points at, we
-                // should redirect it to what we are linked with.
-                if self.occupied == Some(at) {
-                    self.occupied = link;
-                }
 
                 current_ptr = self.header_mut(next);
                 at = next;
@@ -426,7 +397,6 @@ impl Internal {
         }
 
         let Some(prev) = (*header_ptr).prev else {
-            (*header_ptr).link = self.occupied.replace(at);
             (*header_ptr).state = State::Occupy;
             return;
         };
@@ -434,7 +404,6 @@ impl Internal {
         let prev_ptr = &mut *self.header_mut(prev);
 
         if prev_ptr.state != State::Occupy {
-            (*header_ptr).link = self.occupied.replace(at);
             (*header_ptr).state = State::Occupy;
             return;
         }
@@ -446,7 +415,7 @@ impl Internal {
             start: 0,
             size: 0,
             state: State::Free,
-            link: self.freed.replace(at),
+            next_free: self.free.replace(at),
             prev: None,
             next: None,
         });
@@ -498,30 +467,30 @@ impl Internal {
         Some(to)
     }
 
-    unsafe fn find_in<T>(
-        &mut self,
-        mut current: Option<Region>,
-        mut condition: T,
-    ) -> Option<(Region, *mut Header, Option<Region>)>
+    unsafe fn find_region<T>(&mut self, mut condition: T) -> Option<(Region, *mut Header)>
     where
         T: FnMut(&Header) -> bool,
     {
-        // First iterate over existing regions to try and find a different one
-        // which is suitable.
-        let mut prev = None;
+        let mut current = self.head;
 
         while let Some(to) = current {
             let header_ptr = self.header_mut(to);
 
             if condition(&*header_ptr) {
-                return Some((to, header_ptr, prev));
+                return Some((to, header_ptr));
             }
 
-            prev = Some(to);
-            current = (*header_ptr).link;
+            current = (*header_ptr).next;
         }
 
         None
+    }
+
+    unsafe fn pop_free(&mut self) -> Option<(Region, *mut Header)> {
+        let region = self.free.take()?;
+        let header_ptr = self.header_mut(region);
+        self.free = (*header_ptr).next_free.take();
+        Some((region, header_ptr))
     }
 
     #[inline]
@@ -554,7 +523,7 @@ enum State {
     ///
     /// - The range must point to a non-zero slice of memory.,
     /// - The region must be linked.
-    /// - The region must be in the free list.
+    /// - The region must be in the occupied list.
     Occupy,
     /// The region is used by an active allocation.
     Used,
@@ -570,11 +539,8 @@ struct Header {
     size: u32,
     // The state of the region.
     state: State,
-    // The internally linked region.
-    //
-    // Depending on state, this either points to the next element in the free or
-    // occupied list.
-    link: Option<Region>,
+    // Link to the next free region.
+    next_free: Option<Region>,
     // The previous neighbouring region.
     prev: Option<Region>,
     // The next neighbouring region.
