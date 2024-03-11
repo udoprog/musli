@@ -1,6 +1,9 @@
+#[cfg(test)]
+mod tests;
+
 use core::cell::{Cell, UnsafeCell};
 use core::marker::PhantomData;
-use core::mem::{size_of, MaybeUninit};
+use core::mem::{replace, size_of, ManuallyDrop, MaybeUninit};
 use core::num::NonZeroU8;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
@@ -48,9 +51,6 @@ impl<const C: usize> DerefMut for StackBuffer<C> {
     }
 }
 
-/// Minimum length of a region as its being written to.
-const MIN_LEN: usize = 8;
-
 /// TODO: Make sure allocator passes miri.
 ///
 /// It currently cannot, since projecting from a pointer through a reference
@@ -76,7 +76,8 @@ impl<'a> NoStd<'a> {
     pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
         Self {
             internal: UnsafeCell::new(Internal {
-                free: None,
+                freed: None,
+                occupied: None,
                 head: None,
                 tail: None,
                 bytes: 0,
@@ -96,7 +97,7 @@ impl Allocator for NoStd<'_> {
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
-        let (region, _) = unsafe { (*self.internal.get()).alloc(MIN_LEN)? };
+        let (region, _) = unsafe { (*self.internal.get()).alloc(0)? };
 
         Some(NoStdBuf {
             region: Cell::new(region),
@@ -125,7 +126,7 @@ impl<'a> Buf for NoStdBuf<'a> {
 
             // Region can fit the bytes available.
             let header_ptr = if (*header_ptr).size() - len < bytes.len() {
-                let to_len = align_requested(len + bytes.len());
+                let to_len = len + bytes.len();
 
                 let Some(region) = i.realloc(self.region.get(), len, to_len) else {
                     return false;
@@ -138,11 +139,59 @@ impl<'a> Buf for NoStdBuf<'a> {
             };
 
             let dst = i.data.wrapping_add((*header_ptr).start() + len).cast();
-
             ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
             self.len.set(len + bytes.len());
             true
         }
+    }
+
+    #[inline]
+    fn write_buffer(&mut self, other: Self) -> bool
+    where
+        Self: Sized,
+    {
+        // If not pointing to the same internal allocator, fallback to default
+        // behavior.
+        if !ptr::eq(self.internal, other.internal) {
+            return self.write(other.as_slice());
+        }
+
+        // Prevent the other buffer from being dropped.
+        let other = ManuallyDrop::new(other);
+
+        unsafe {
+            let i = &mut *self.internal.get();
+
+            let this_ptr = &mut *i.header_mut(self.region.get());
+            let other_region = other.region.get();
+            let other_ptr = i.header_mut(other_region);
+
+            // If this region immediately follows the other region, we can
+            // optimize the write by simply growing the current region and
+            // de-allocating the second since they share the same data.
+            if this_ptr.start + this_ptr.size == (*other_ptr).start {
+                this_ptr.size += (*other_ptr).size;
+                self.len.set(self.len.get() + other.len.get());
+
+                other_ptr.write(Header {
+                    start: 0,
+                    size: 0,
+                    state: State::Free,
+                    link: i.freed.replace(other_region),
+                    prev: None,
+                    next: None,
+                });
+
+                return true;
+            }
+        }
+
+        // NB: Another optimization would be to merge the two regions if they
+        // are adjacent, but this would require a copy. Which I am currently too
+        // lazy to do, so just fall back to the default behavior.
+
+        let other = ManuallyDrop::into_inner(other);
+        self.write(other.as_slice())
     }
 
     #[inline(always)]
@@ -194,8 +243,10 @@ impl Region {
 }
 
 struct Internal {
-    // The first region to allocate if it's been freed.
-    free: Option<Region>,
+    // The first free region.
+    freed: Option<Region>,
+    // The first occupied region.
+    occupied: Option<Region>,
     // Pointer to the head region.
     head: Option<Region>,
     // Pointer to the tail region.
@@ -243,44 +294,62 @@ impl Internal {
     ///
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: usize) -> Option<(Region, *mut Header)> {
-        if let Some((region, header_ptr, prev)) = self.find_free(|h| h.size() >= requested) {
-            let free = (*header_ptr).free.take();
+        if let Some((region, header_ptr, prev)) =
+            self.find_in(self.occupied, |h| h.size() >= requested)
+        {
+            let link = (*header_ptr).link.take();
 
             if let Some(prev) = prev {
-                (*self.header_mut(prev)).free = free;
+                (*self.header_mut(prev)).link = link;
             } else {
-                self.free = free;
+                self.occupied = link;
             }
 
             (*header_ptr).state = State::Used;
-
             // TODO: Should we split the allocated region?
             return Some((region, header_ptr));
         }
 
-        let requested = align_requested(requested);
+        let (region, header_ptr, bytes, regions) = 'out: {
+            if let Some((region, header_ptr, prev)) = self.find_in(self.freed, |_| true) {
+                let link = (*header_ptr).link.take();
+
+                if let Some(prev) = prev {
+                    (*self.header_mut(prev)).link = link;
+                } else {
+                    self.freed = link;
+                }
+
+                let bytes = self.bytes.checked_add(requested)?;
+
+                if self.regions.checked_add(bytes)? > self.size {
+                    return None;
+                }
+
+                break 'out (region, header_ptr, bytes, self.regions);
+            }
+
+            let regions = self.regions.checked_add(size_of::<Header>())?;
+            let bytes = self.bytes.checked_add(requested)?;
+
+            if regions.checked_add(bytes)? > self.size {
+                return None;
+            }
+
+            let addr = self.size - regions;
+            let region = self.addr_to_region(addr);
+            let header_ptr = self.data.wrapping_add(addr).cast::<Header>();
+            (region, header_ptr, bytes, regions)
+        };
+
         let start = u32::try_from(self.bytes).ok()?;
         let size = u32::try_from(requested).ok()?;
-
-        let bytes = self.bytes.checked_add(requested)?;
-        let regions = self.regions.checked_add(size_of::<Header>())?;
-        let total = bytes.checked_add(regions)?;
-
-        if total > self.size {
-            return None;
-        }
-
-        let addr = self.size - regions;
-        let region = self.addr_to_region(addr);
-        let header_ptr = self.data.wrapping_add(addr).cast::<Header>();
-        self.regions = regions;
-        self.bytes = bytes;
 
         header_ptr.write(Header {
             start,
             size,
             state: State::Used,
-            free: None,
+            link: None,
             prev: None,
             next: None,
         });
@@ -295,31 +364,78 @@ impl Internal {
             (*tail_ptr).next = Some(region);
         }
 
+        self.regions = regions;
+        self.bytes = bytes;
+
         Some((region, header_ptr))
     }
 
     unsafe fn free(&mut self, at: Region) {
         let header_ptr = self.header_mut(at);
 
-        (*header_ptr).state = State::Free;
-        (*header_ptr).free = self.free.replace(at);
+        debug_assert_eq!((*header_ptr).state, State::Used);
+        debug_assert_eq!((*header_ptr).link, None);
 
+        // Just free up the last region in the slab.
         if (*header_ptr).next.is_none() {
-            self.bytes += (*header_ptr).size();
-            self.tail = (*header_ptr).prev.take();
-            (*header_ptr).start = 0;
-            (*header_ptr).size = 0;
-            (*header_ptr).next = None;
+            debug_assert_eq!(self.tail, Some(at));
+
+            let mut at = at;
+            let mut current_ptr = header_ptr;
+            let mut total = 0;
+            let mut prev = (*current_ptr).prev.take();
+
+            loop {
+                total += (*current_ptr).size();
+
+                let link = replace(&mut (*current_ptr).link, self.freed.replace(at));
+
+                (*current_ptr).state = State::Free;
+                (*current_ptr).start = 0;
+                (*current_ptr).size = 0;
+
+                let Some(next) = prev else {
+                    self.head = None;
+                    // NB: The occupied set is *definitely* pointing to the
+                    // wrong thing at this stage.
+                    self.occupied = None;
+                    break;
+                };
+
+                // If we hit the region that the occupied list points at, we
+                // should redirect it to what we are linked with.
+                if self.occupied == Some(at) {
+                    self.occupied = link;
+                }
+
+                current_ptr = self.header_mut(next);
+                at = next;
+
+                (*current_ptr).next = None;
+
+                if (*current_ptr).state != State::Occupy {
+                    break;
+                }
+
+                prev = (*current_ptr).prev.take();
+            }
+
+            self.tail = prev;
+            self.bytes -= total;
             return;
         }
 
         let Some(prev) = (*header_ptr).prev else {
+            (*header_ptr).link = self.occupied.replace(at);
+            (*header_ptr).state = State::Occupy;
             return;
         };
 
         let prev_ptr = &mut *self.header_mut(prev);
 
-        if prev_ptr.state != State::Free {
+        if prev_ptr.state != State::Occupy {
+            (*header_ptr).link = self.occupied.replace(at);
+            (*header_ptr).state = State::Occupy;
             return;
         }
 
@@ -330,7 +446,7 @@ impl Internal {
             start: 0,
             size: 0,
             state: State::Free,
-            free: (*header_ptr).free,
+            link: self.freed.replace(at),
             prev: None,
             next: None,
         });
@@ -356,7 +472,6 @@ impl Internal {
 
         // This is the last region in the slab, so we can just expand it.
         if (*from_header).next.is_none() {
-            let requested = align_requested(requested);
             let additional = requested - (*from_header).size();
 
             if self.bytes + additional > self.size {
@@ -383,8 +498,9 @@ impl Internal {
         Some(to)
     }
 
-    unsafe fn find_free<T>(
+    unsafe fn find_in<T>(
         &mut self,
+        mut current: Option<Region>,
         mut condition: T,
     ) -> Option<(Region, *mut Header, Option<Region>)>
     where
@@ -392,7 +508,6 @@ impl Internal {
     {
         // First iterate over existing regions to try and find a different one
         // which is suitable.
-        let mut current = self.free;
         let mut prev = None;
 
         while let Some(to) = current {
@@ -403,7 +518,7 @@ impl Internal {
             }
 
             prev = Some(to);
-            current = (*header_ptr).free;
+            current = (*header_ptr).link;
         }
 
         None
@@ -425,7 +540,23 @@ impl Internal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 enum State {
+    /// The region is fully free and doesn't occupy any memory.
+    ///
+    /// # Requirements
+    ///
+    /// - The range must be zero-sized at offset 0.
+    /// - The region must not be linked.
+    /// - The region must be in the free list.
     Free = 0,
+    /// The region is occupied.
+    ///
+    /// # Requirements
+    ///
+    /// - The range must point to a non-zero slice of memory.,
+    /// - The region must be linked.
+    /// - The region must be in the free list.
+    Occupy,
+    /// The region is used by an active allocation.
     Used,
 }
 
@@ -439,8 +570,11 @@ struct Header {
     size: u32,
     // The state of the region.
     state: State,
-    // The next freed region to be allocated.
-    free: Option<Region>,
+    // The internally linked region.
+    //
+    // Depending on state, this either points to the next element in the free or
+    // occupied list.
+    link: Option<Region>,
     // The previous neighbouring region.
     prev: Option<Region>,
     // The next neighbouring region.
@@ -458,247 +592,5 @@ impl Header {
     #[inline]
     fn size(&self) -> usize {
         self.size as usize
-    }
-}
-
-fn align_requested(requested: usize) -> usize {
-    if requested < MIN_LEN {
-        return MIN_LEN;
-    }
-
-    requested.next_multiple_of(MIN_LEN)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::allocator::{Allocator, Buf};
-
-    use super::{Header, NoStd, Region, State};
-
-    macro_rules! assert_regions {
-        (
-            $list:expr,
-            $($region:expr => {
-                $start:expr,
-                $size:expr,
-                $state:expr,
-                free: $free:expr,
-                prev: $prev:expr,
-                next: $next:expr $(,)?
-            },)* $(,)?
-        ) => {{
-            let i = unsafe { &*$list.internal.get() };
-
-            $(
-                assert_eq! {
-                    *i.header($region),
-                    Header {
-                        start: $start,
-                        size: $size,
-                        state: $state,
-                        free: $free,
-                        prev: $prev,
-                        next: $next,
-                    },
-                    "Comparing region {}", stringify!($region)
-                };
-            )*
-        }};
-    }
-
-    macro_rules! assert_free {
-        (
-            $list:expr $(, $head:expr $(, $rest:expr)*)? $(,)?
-        ) => {{
-            $(
-                let i = unsafe { &*$list.internal.get() };
-                assert_eq!(i.free, Some($head), "Expected head region");
-                let free = i.header($head).free;
-
-                $(
-                    let Some(free) = free else {
-                        panic!("Expected another region before {}", stringify!($rest));
-                    };
-
-                    let free = i.header(free).free;
-                )*
-
-                assert_eq!(free, None);
-            )*
-        }};
-    }
-
-    const A: Region = unsafe { Region::new_unchecked(1) };
-    const B: Region = unsafe { Region::new_unchecked(2) };
-    const C: Region = unsafe { Region::new_unchecked(3) };
-    const D: Region = unsafe { Region::new_unchecked(4) };
-
-    fn grow_last(alloc: &NoStd<'_>) {
-        let a = alloc.alloc().unwrap();
-
-        let mut b = alloc.alloc().unwrap();
-        b.write(&[1, 2, 3, 4, 5, 6]);
-        b.write(&[7, 8]);
-
-        {
-            let i = unsafe { &*alloc.internal.get() };
-
-            assert_eq!(i.free, None);
-            assert_eq!(i.head, Some(A));
-            assert_eq!(i.tail, Some(B));
-
-            assert_regions! {
-                alloc,
-                A => { 0, 8, State::Used, free: None, prev: None, next: Some(B) },
-                B => { 8, 8, State::Used, free: None, prev: Some(A), next: None },
-            };
-
-            assert_free!(alloc);
-        }
-
-        b.write(&[9, 10]);
-
-        {
-            let i = unsafe { &*alloc.internal.get() };
-
-            assert_eq!(i.free, None);
-            assert_eq!(i.head, Some(A));
-            assert_eq!(i.tail, Some(B));
-
-            assert_regions! {
-                alloc,
-                A => { 0, 8, State::Used, free: None, prev: None, next: Some(B) },
-                B => { 8, 16, State::Used, free: None, prev: Some(A), next: None },
-            };
-
-            assert_free!(alloc);
-        }
-
-        drop(a);
-        drop(b);
-
-        {
-            let i = unsafe { &*alloc.internal.get() };
-
-            assert_eq!(i.head, Some(A));
-            assert_eq!(i.tail, Some(A));
-
-            // TODO: Since all regions have been freed, the allocator should be
-            // uninitialized again.
-            assert_regions! {
-                alloc,
-                A => { 0, 8, State::Free, free: None, prev: None, next: Some(B) },
-                B => { 0, 0, State::Free, free: Some(A), prev: None, next: None },
-            };
-
-            assert_free!(alloc, B, A);
-        }
-    }
-
-    #[test]
-    fn nostd_grow_last() {
-        let mut buf = crate::allocator::StackBuffer::<4096>::new();
-        let alloc = crate::allocator::NoStd::new(&mut buf);
-        grow_last(&alloc);
-    }
-
-    fn realloc(alloc: &NoStd<'_>) {
-        let mut a = alloc.alloc().unwrap();
-        a.write(&[1, 2, 3, 4]);
-        assert_eq!(a.region.get(), A);
-
-        let mut b = alloc.alloc().unwrap();
-        b.write(&[1, 2, 3, 4]);
-        assert_eq!(b.region.get(), B);
-
-        let mut c = alloc.alloc().unwrap();
-        c.write(&[1, 2, 3, 4]);
-        assert_eq!(c.region.get(), C);
-
-        assert_eq!(a.region.get(), A);
-        assert_eq!(b.region.get(), B);
-        assert_eq!(c.region.get(), C);
-
-        {
-            let i = unsafe { &*alloc.internal.get() };
-
-            assert_eq!(i.free, None);
-            assert_eq!(i.head, Some(A));
-            assert_eq!(i.tail, Some(C));
-
-            assert_regions! {
-                alloc,
-                A => { 0, 8, State::Used, free: None, prev: None, next: Some(B) },
-                B => { 8, 8, State::Used, free: None, prev: Some(A), next: Some(C) },
-                C => { 16, 8, State::Used, free: None, prev: Some(B), next: None },
-            };
-        }
-
-        drop(a);
-
-        {
-            let i = unsafe { &*alloc.internal.get() };
-            assert_eq!(i.free, Some(A));
-            assert_eq!(i.head, Some(A));
-            assert_eq!(i.tail, Some(C));
-
-            assert_regions! {
-                alloc,
-                A => { 0, 8, State::Free, free: None, prev: None, next: Some(B) },
-                B => { 8, 8, State::Used, free: None, prev: Some(A), next: Some(C) },
-                C => { 16, 8, State::Used, free: None, prev: Some(B), next: None },
-            };
-        }
-
-        drop(b);
-
-        {
-            let i = unsafe { &*alloc.internal.get() };
-            assert_eq!(i.free, Some(B));
-            assert_eq!(i.head, Some(A));
-            assert_eq!(i.tail, Some(C));
-        }
-
-        assert_regions! {
-            alloc,
-            A => { 0, 16, State::Free, free: None, prev: None, next: Some(C) },
-            B => { 0, 0, State::Free, free: Some(A), prev: None, next: None },
-            C => { 16, 8, State::Used, free: None, prev: Some(A), next: None },
-        };
-
-        let mut d = alloc.alloc().unwrap();
-        d.write(&[1, 2]);
-
-        assert_eq!(d.region.get(), A);
-
-        assert_regions! {
-            alloc,
-            A => { 0, 16, State::Used, free: None, prev: None, next: Some(C) },
-            B => { 0, 0, State::Free, free: None, prev: None, next: None },
-            C => { 16, 8, State::Used, free: None, prev: Some(A), next: None },
-        };
-
-        assert_free!(alloc, B);
-
-        d.write(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-
-        assert_eq!(d.region.get(), D);
-
-        assert_regions! {
-            alloc,
-            A => { 0, 16, State::Free, free: Some(B), prev: None, next: Some(C) },
-            B => { 0, 0, State::Free, free: None, prev: None, next: None },
-            C => { 16, 8, State::Used, free: None, prev: Some(A), next: Some(D) },
-            D => { 24, 24, State::Used, free: None, prev: Some(C), next: None },
-        };
-
-        assert_free!(alloc, A, B);
-    }
-
-    #[test]
-    fn nostd_realloc() {
-        let mut buf = crate::allocator::StackBuffer::<4096>::new();
-        let alloc = crate::allocator::NoStd::new(&mut buf);
-        realloc(&alloc);
     }
 }

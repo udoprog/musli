@@ -18,6 +18,17 @@ pub trait Buf {
     /// value indicates that we are out of buffer capacity.
     fn write(&mut self, bytes: &[u8]) -> bool;
 
+    /// Write a buffer of the same type onto the current buffer.
+    ///
+    /// This allows allocators to provide more efficient means of extending the
+    /// current buffer with one provided from the same allocator.
+    fn write_buffer(&mut self, other: Self) -> bool
+    where
+        Self: Sized,
+    {
+        self.write(other.as_slice())
+    }
+
     /// Write a single byte.
     ///
     /// Returns `true` if the bytes could be successfully written. A `false`
