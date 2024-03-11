@@ -12,7 +12,8 @@ macro_rules! encode_with_extensions {
             Error: From<W::Error>,
             T: ?Sized + Encode<M>,
         {
-            let alloc = musli_common::allocator::Default::default();
+            let mut buf = musli_common::allocator::buffer();
+            let alloc = musli_common::allocator::new(&mut buf);
             let cx = musli_common::context::Same::new(&alloc);
             self.encode_with(&cx, writer, value)
         }
@@ -66,7 +67,8 @@ macro_rules! encode_with_extensions {
         where
             T: ?Sized + Encode<M>,
         {
-            let alloc = musli_common::allocator::Default::default();
+            let mut buf = musli_common::allocator::buffer();
+            let alloc = musli_common::allocator::new(&mut buf);
             let cx = musli_common::context::Same::new(&alloc);
             self.to_fixed_bytes_with(&cx, value)
         }
@@ -102,7 +104,8 @@ macro_rules! encoding_from_slice_impls {
         where
             T: Decode<'de, M>,
         {
-            let alloc = musli_common::allocator::Default::default();
+            let mut buf = musli_common::allocator::buffer();
+            let alloc = musli_common::allocator::new(&mut buf);
             let cx = musli_common::context::Same::new(&alloc);
             let reader = SliceReader::new(bytes);
             T::decode(&cx, $decoder_new(reader))
@@ -171,7 +174,8 @@ macro_rules! encoding_impls {
             Error: From<R::Error>,
             T: Decode<'de, M>,
         {
-            let alloc = musli_common::allocator::Default::default();
+            let mut buf = musli_common::allocator::buffer();
+            let alloc = musli_common::allocator::new(&mut buf);
             let cx = musli_common::context::Same::new(&alloc);
             self.decode_with(&cx, reader)
         }

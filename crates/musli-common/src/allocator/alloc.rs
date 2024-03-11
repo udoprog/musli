@@ -8,44 +8,53 @@ use musli::context::Buffer;
 
 use crate::allocator::Allocator;
 
-/// Buffer used in combination with an [`Allocator`].
-///
-/// This can be safely re-used.
-pub struct Alloc {
+/// A dynamic buffer allocated on the heap.
+pub struct HeapBuffer {
     internal: UnsafeCell<Internal>,
 }
 
-impl Alloc {
-    /// Construct a new allocator.
-    pub const fn new() -> Self {
+impl HeapBuffer {
+    /// Construct a new heap buffer.
+    pub fn new() -> Self {
         Self {
             internal: UnsafeCell::new(Internal { head: None }),
         }
     }
 }
 
-impl Default for Alloc {
-    #[inline]
+impl Default for HeapBuffer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Allocator for Alloc {
-    type Buf<'this> = Buf<'this>;
+/// Buffer used in combination with an [`Allocator`].
+pub struct Alloc<'a> {
+    buf: &'a mut HeapBuffer,
+}
+
+impl<'a> Alloc<'a> {
+    /// Construct a new allocator.
+    pub fn new(buf: &'a mut HeapBuffer) -> Self {
+        Self { buf }
+    }
+}
+
+impl<'a> Allocator for Alloc<'a> {
+    type Buf<'this> = Buf<'this> where Self: 'this;
 
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         Some(Buf {
-            region: Internal::alloc(&self.internal),
-            internal: &self.internal,
+            region: Internal::alloc(&self.buf.internal),
+            internal: &self.buf.internal,
         })
     }
 }
 
-impl Drop for Alloc {
+impl<'a> Drop for Alloc<'a> {
     fn drop(&mut self) {
-        let internal = unsafe { &mut *self.internal.get() };
+        let internal = unsafe { &mut *self.buf.internal.get() };
 
         while let Some(mut head) = internal.head.take() {
             // SAFETY: This collection has exclusive access to any heads it

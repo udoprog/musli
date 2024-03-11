@@ -39,7 +39,8 @@ where
     T: Encode,
 {
     let mut output = Value::Unit;
-    let alloc = musli_common::allocator::Default::default();
+    let mut buf = musli_common::allocator::buffer();
+    let alloc = musli_common::allocator::new(&mut buf);
     let cx = musli_common::context::Same::new(&alloc);
     value.encode(&cx, ValueEncoder::new(&mut output))?;
     Ok(output)
@@ -50,7 +51,8 @@ pub fn decode<'de, T>(value: &'de Value) -> Result<T, Error>
 where
     T: Decode<'de>,
 {
-    let alloc = musli_common::allocator::Default::default();
+    let mut buf = musli_common::allocator::buffer();
+    let alloc = musli_common::allocator::new(&mut buf);
     let cx = musli_common::context::Same::new(&alloc);
     T::decode(&cx, value.decoder::<DEFAULT_OPTIONS, _>())
 }

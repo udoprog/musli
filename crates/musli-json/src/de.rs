@@ -27,9 +27,8 @@ use crate::reader::integer::{Signed, Unsigned};
 use crate::reader::SliceParser;
 use crate::reader::{integer, string, Parser, StringReference, Token};
 
-use musli_common::options;
-
-const BUFFER_OPTIONS: options::Options = options::new().build();
+#[cfg(feature = "musli-value")]
+const BUFFER_OPTIONS: musli_common::options::Options = musli_common::options::new().build();
 
 /// A JSON decoder for Müsli.
 pub struct JsonDecoder<P> {

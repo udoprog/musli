@@ -200,7 +200,8 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        let alloc = musli_common::allocator::Default::default();
+        let mut buf = musli_common::allocator::buffer();
+        let alloc = musli_common::allocator::new(&mut buf);
         let cx = musli_common::context::Same::new(&alloc);
         self.to_string_with(&cx, value)
     }
@@ -230,7 +231,8 @@ where
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
-        let alloc = musli_common::allocator::Default::default();
+        let mut buf = musli_common::allocator::buffer();
+        let alloc = musli_common::allocator::new(&mut buf);
         let cx = musli_common::context::Same::new(&alloc);
         self.decode_with(&cx, parser)
     }
@@ -281,7 +283,8 @@ where
     where
         T: Decode<'de, M>,
     {
-        let alloc = musli_common::allocator::Default::default();
+        let mut buf = musli_common::allocator::buffer();
+        let alloc = musli_common::allocator::new(&mut buf);
         let cx = musli_common::context::Same::new(&alloc);
         self.from_slice_with(&cx, bytes)
     }
