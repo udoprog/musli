@@ -4,7 +4,7 @@ use core::ptr::NonNull;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use musli::context::Buffer;
+use musli::context::Buf;
 
 use crate::allocator::Allocator;
 
@@ -41,11 +41,11 @@ impl<'a> Alloc<'a> {
 }
 
 impl<'a> Allocator for Alloc<'a> {
-    type Buf<'this> = Buf<'this> where Self: 'this;
+    type Buf<'this> = AllocBuf<'this> where Self: 'this;
 
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
-        Some(Buf {
+        Some(AllocBuf {
             region: Internal::alloc(&self.buf.internal),
             internal: &self.buf.internal,
         })
@@ -68,12 +68,12 @@ impl<'a> Drop for Alloc<'a> {
 }
 
 /// A vector-backed allocation.
-pub struct Buf<'a> {
+pub struct AllocBuf<'a> {
     region: &'a mut Region,
     internal: &'a UnsafeCell<Internal>,
 }
 
-impl<'a> Buffer for Buf<'a> {
+impl<'a> Buf for AllocBuf<'a> {
     #[inline]
     fn write(&mut self, bytes: &[u8]) -> bool {
         self.region.data.extend_from_slice(bytes);
@@ -91,7 +91,7 @@ impl<'a> Buffer for Buf<'a> {
     }
 }
 
-impl<'a> Drop for Buf<'a> {
+impl<'a> Drop for AllocBuf<'a> {
     fn drop(&mut self) {
         Internal::free(self.internal, self.region);
     }

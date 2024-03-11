@@ -3,7 +3,7 @@ use syn::Token;
 
 pub(crate) struct Tokens {
     pub(crate) as_decoder_t: syn::Path,
-    pub(crate) buffer_t: syn::Path,
+    pub(crate) buf_t: syn::Path,
     pub(crate) context_t: syn::Path,
     pub(crate) core_result: syn::Path,
     pub(crate) decode_t: syn::Path,
@@ -36,7 +36,7 @@ impl Tokens {
     pub(crate) fn new(span: Span, prefix: &syn::Path) -> Self {
         Self {
             as_decoder_t: path(span, prefix, ["de", "AsDecoder"]),
-            buffer_t: path(span, prefix, ["context", "Buffer"]),
+            buf_t: path(span, prefix, ["context", "Buf"]),
             context_t: path(span, prefix, ["Context"]),
             core_result: core(span, ["result", "Result"]),
             decode_t: path(span, prefix, ["de", "Decode"]),

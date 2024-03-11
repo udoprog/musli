@@ -1,4 +1,4 @@
-use musli::context::Buffer;
+use musli::context::Buf;
 use musli::de::NumberVisitor;
 use musli::Context;
 
@@ -41,7 +41,7 @@ pub trait Parser<'de>: private::Sealed {
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: Context<Input = Error>,
-        S: ?Sized + Buffer;
+        S: ?Sized + Buf;
 
     #[doc(hidden)]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
@@ -255,7 +255,7 @@ where
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: Context<Input = Error>,
-        S: ?Sized + Buffer,
+        S: ?Sized + Buf,
     {
         (**self).parse_string(cx, validate, scratch)
     }

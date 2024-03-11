@@ -12,9 +12,9 @@ use musli::Context;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-use musli::context::Buffer;
+use musli::context::Buf;
 
-/// Maximum size used by a fixed length [Buffer].
+/// Maximum size used by a fixed length [`Buf`].
 pub const MAX_FIXED_BYTES_LEN: usize = 128;
 
 /// Overflow when trying to write to a slice.
@@ -61,7 +61,7 @@ pub trait Writer {
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
-        B: Buffer;
+        B: Buf;
 
     /// Write bytes to the current writer.
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
@@ -94,7 +94,7 @@ where
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
-        B: Buffer,
+        B: Buf,
     {
         (*self).write_buffer(cx, buffer)
     }
@@ -130,7 +130,7 @@ impl Writer for Vec<u8> {
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
-        B: Buffer,
+        B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
@@ -170,7 +170,7 @@ impl Writer for &mut [u8] {
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
-        B: Buffer,
+        B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
@@ -213,30 +213,30 @@ impl Writer for &mut [u8] {
     }
 }
 
-/// A writer that writes against an underlying [`Buffer`].
-pub struct BufferWriter<T, E> {
-    buffer: T,
+/// A writer that writes against an underlying [`Buf`].
+pub struct BufWriter<T, E> {
+    buf: T,
     _marker: marker::PhantomData<E>,
 }
 
-impl<T, E> BufferWriter<T, E> {
+impl<T, E> BufWriter<T, E> {
     /// Construct a new buffer writer.
-    pub fn new(buffer: T) -> Self {
+    pub fn new(buf: T) -> Self {
         Self {
-            buffer,
+            buf,
             _marker: marker::PhantomData,
         }
     }
 
     /// Coerce into inner buffer.
     pub fn into_inner(self) -> T {
-        self.buffer
+        self.buf
     }
 }
 
-impl<T, E: 'static> Writer for BufferWriter<T, E>
+impl<T, E: 'static> Writer for BufWriter<T, E>
 where
-    T: Buffer,
+    T: Buf,
 {
     type Error = E;
 
@@ -253,9 +253,9 @@ where
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
-        B: Buffer,
+        B: Buf,
     {
-        if !self.buffer.write(buffer.as_slice()) {
+        if !self.buf.write(buffer.as_slice()) {
             return Err(cx.message("Buffer overflow"));
         }
 
@@ -267,7 +267,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        if !self.buffer.write(bytes) {
+        if !self.buf.write(bytes) {
             return Err(cx.message("Buffer overflow"));
         }
 

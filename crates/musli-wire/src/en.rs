@@ -1,6 +1,6 @@
 use core::fmt;
 
-use musli::context::Buffer;
+use musli::context::Buf;
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use musli::Context;
 use musli_storage::en::StorageEncoder;
@@ -8,7 +8,7 @@ use musli_storage::en::StorageEncoder;
 use crate::error::Error;
 use crate::options::Options;
 use crate::tag::{Kind, Tag, MAX_INLINE_LEN};
-use crate::writer::{BufferWriter, Writer};
+use crate::writer::{BufWriter, Writer};
 
 /// A very simple encoder.
 pub struct WireEncoder<W, const F: Options> {
@@ -29,7 +29,7 @@ where
     Error: From<W::Error>,
 {
     writer: W,
-    buffer: BufferWriter<B, W::Error>,
+    buffer: BufWriter<B, W::Error>,
 }
 
 impl<W, B, const F: Options> WirePackEncoder<W, B, F>
@@ -42,7 +42,7 @@ where
     pub(crate) fn new(writer: W, buffer: B) -> Self {
         Self {
             writer,
-            buffer: BufferWriter::new(buffer),
+            buffer: BufWriter::new(buffer),
         }
     }
 }
@@ -365,12 +365,12 @@ where
 impl<W, B, const F: Options> SequenceEncoder for WirePackEncoder<W, B, F>
 where
     W: Writer,
-    B: Buffer,
+    B: Buf,
     Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
-    type Encoder<'this> = StorageEncoder<&'this mut BufferWriter<B, W::Error>, F, Error> where Self: 'this, B: Buffer;
+    type Encoder<'this> = StorageEncoder<&'this mut BufWriter<B, W::Error>, F, Error> where Self: 'this, B: Buf;
 
     #[inline]
     fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>

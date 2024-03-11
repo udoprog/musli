@@ -1,11 +1,11 @@
-use musli::context::Buffer;
+use musli::context::Buf;
 
 use crate::allocator::Allocator;
 
 /// An empty buffer.
 pub struct EmptyBuf;
 
-impl Buffer for EmptyBuf {
+impl Buf for EmptyBuf {
     #[inline(always)]
     fn write(&mut self, _: &[u8]) -> bool {
         false

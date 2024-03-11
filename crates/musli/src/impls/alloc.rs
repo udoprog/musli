@@ -557,7 +557,7 @@ where
         C: Context<Input = E::Error>,
         E: Encoder,
     {
-        use crate::context::Buffer;
+        use crate::context::Buf;
         use crate::en::VariantEncoder;
         use std::os::windows::ffi::OsStrExt;
 

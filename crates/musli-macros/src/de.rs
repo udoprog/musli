@@ -109,7 +109,7 @@ fn decode_enum(
     }
 
     let as_decoder_t = &e.tokens.as_decoder_t;
-    let buffer_t = &e.tokens.buffer_t;
+    let buf_t = &e.tokens.buf_t;
     let context_t = &e.tokens.context_t;
     let decoder_t = &e.tokens.decoder_t;
     let fmt = &e.tokens.fmt;
@@ -190,7 +190,7 @@ fn decode_enum(
                     #result_ok(match string {
                         #(#arms,)*
                         string => {
-                            if !#buffer_t::write(&mut #variant_alloc_var, str::as_bytes(string)) {
+                            if !#buf_t::write(&mut #variant_alloc_var, str::as_bytes(string)) {
                                 return #result_err(#context_t::alloc_failed(#ctx_var));
                             }
 
@@ -383,7 +383,7 @@ fn decode_enum(
                             #result_ok(match string {
                                 #field_tag => Outcome::Tag,
                                 string => {
-                                    if !#buffer_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                                    if !#buf_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
                                         Outcome::AllocErr
                                     } else {
                                         Outcome::Err
@@ -540,7 +540,7 @@ fn decode_enum(
                                 #tag => Outcome::Tag,
                                 #content => Outcome::Content,
                                 string => {
-                                    if !#buffer_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                                    if !#buf_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
                                         Outcome::AllocErr
                                     } else {
                                         Outcome::Err
@@ -691,7 +691,7 @@ fn decode_tagged(
     let field_alloc_var = e.cx.ident("field_alloc");
 
     let context_t = &e.tokens.context_t;
-    let buffer_t = &e.tokens.buffer_t;
+    let buf_t = &e.tokens.buf_t;
     let decoder_t = &e.tokens.decoder_t;
     let default_function = &e.tokens.default_function;
     let fmt = &e.tokens.fmt;
@@ -801,7 +801,7 @@ fn decode_tagged(
                     #result_ok(match string {
                         #(#patterns,)*
                         string => {
-                            if !#buffer_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                            if !#buf_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
                                 return #result_err(#context_t::alloc_failed(#ctx_var));
                             }
 

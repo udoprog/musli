@@ -11,7 +11,7 @@ pub use self::error::Error;
 /// A buffer allocated from a context.
 ///
 /// Buffers are allocated from a context through [`Context::alloc`].
-pub trait Buffer {
+pub trait Buf {
     /// Write the given number of bytes.
     ///
     /// Returns `true` if the bytes could be successfully written. A `false`
@@ -39,7 +39,7 @@ pub trait Buffer {
     fn as_slice(&self) -> &[u8];
 }
 
-impl Buffer for [u8] {
+impl Buf for [u8] {
     #[inline(always)]
     fn write(&mut self, _: &[u8]) -> bool {
         false
@@ -67,7 +67,7 @@ pub trait Context {
     /// A mark during processing.
     type Mark: Copy + Default;
     /// A growable buffer.
-    type Buf<'this>: Buffer
+    type Buf<'this>: Buf
     where
         Self: 'this;
 
