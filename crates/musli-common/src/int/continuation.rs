@@ -7,7 +7,8 @@
 //! use musli_common::int::continuation as c;
 //! use musli_common::reader::SliceUnderflow;
 //!
-//! let alloc = musli_common::allocator::Default::default();
+//! let mut buf = musli_common::allocator::buffer();
+//! let alloc = musli_common::allocator::new(&mut buf);
 //!
 //! let cx: Ignore<_, FixedBytesOverflow> = Ignore::new(&alloc);
 //! let mut bytes = FixedBytes::<8>::new();

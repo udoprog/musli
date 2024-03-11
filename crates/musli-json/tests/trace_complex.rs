@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use musli::{Decode, Encode};
-use musli_common::allocator::Alloc;
+use musli_common::allocator::{Alloc, HeapBuffer};
 use musli_common::context::AllocContext;
 
 #[derive(Encode)]
@@ -33,7 +33,8 @@ struct To {
 
 #[test]
 fn trace_complex() {
-    let mut alloc = Alloc::default();
+    let mut buf = HeapBuffer::new();
+    let alloc = Alloc::new(&mut buf);
     let cx = AllocContext::new(&alloc);
 
     let mut field = HashMap::new();

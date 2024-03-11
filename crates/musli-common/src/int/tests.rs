@@ -1,7 +1,7 @@
 use std::fmt;
 use std::vec::Vec;
 
-use crate::allocator::Alloc;
+use crate::allocator;
 use crate::context;
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
@@ -21,7 +21,8 @@ fn test_continuation_encoding() {
         T: PartialEq<T> + fmt::Debug + Unsigned,
     {
         let mut out = Vec::new();
-        let alloc = Alloc::default();
+        let mut buf = allocator::buffer();
+        let alloc = allocator::new(&mut buf);
         let cx = crate::context::Ignore::new(&alloc);
         c::encode(&cx, &mut out, expected).unwrap();
         c::encode(&cx, &mut out, expected).unwrap();
@@ -39,7 +40,8 @@ fn test_continuation_encoding() {
         T: Unsigned,
     {
         let mut out = Vec::new();
-        let alloc = Alloc::default();
+        let mut buf = allocator::buffer();
+        let alloc = allocator::new(&mut buf);
         let cx = crate::context::Same::new(&alloc);
         c::encode(&cx, crate::wrap::wrap(&mut out), value).unwrap();
         out

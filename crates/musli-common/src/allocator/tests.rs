@@ -31,7 +31,8 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
 
 #[test]
 fn alloc_basic() {
-    let alloc = crate::allocator::Default::default();
+    let mut buf = crate::allocator::HeapBuffer::new();
+    let alloc = crate::allocator::Alloc::new(&mut buf);
     basic_allocations(&alloc);
 }
 
