@@ -347,10 +347,28 @@ impl Internal {
         }
     }
 
-    unsafe fn realloc(&mut self, from: Region, len: usize, to_len: usize) -> Option<Region> {
+    unsafe fn realloc(&mut self, from: Region, len: usize, requested: usize) -> Option<Region> {
         let from_header = self.header_mut(from);
 
-        let (to, to_header) = self.alloc(to_len)?;
+        if requested <= (*from_header).size() {
+            return Some(from);
+        }
+
+        // This is the last region in the slab, so we can just expand it.
+        if (*from_header).next.is_none() {
+            let requested = align_requested(requested);
+            let additional = requested - (*from_header).size();
+
+            if self.bytes + additional > self.size {
+                return None;
+            }
+
+            (*from_header).size += additional as u32;
+            self.bytes += additional;
+            return Some(from);
+        }
+
+        let (to, to_header) = self.alloc(requested)?;
 
         let from_data = self
             .data
@@ -460,7 +478,7 @@ mod tests {
     macro_rules! assert_regions {
         (
             $list:expr,
-            $($header:expr => {
+            $($region:expr => {
                 $start:expr,
                 $size:expr,
                 $state:expr,
@@ -473,7 +491,7 @@ mod tests {
 
             $(
                 assert_eq! {
-                    *i.header($header),
+                    *i.header($region),
                     Header {
                         start: $start,
                         size: $size,
@@ -481,7 +499,8 @@ mod tests {
                         free: $free,
                         prev: $prev,
                         next: $next,
-                    }
+                    },
+                    "Comparing region {}", stringify!($region)
                 };
             )*
         }};
@@ -489,12 +508,10 @@ mod tests {
 
     macro_rules! assert_free {
         (
-            $list:expr,
-            $($head:expr $(, $rest:expr)*)? $(,)?
+            $list:expr $(, $head:expr $(, $rest:expr)*)? $(,)?
         ) => {{
-            let i = unsafe { &*$list.internal.get() };
-
             $(
+                let i = unsafe { &*$list.internal.get() };
                 assert_eq!(i.free, Some($head), "Expected head region");
                 let free = i.header($head).free;
 
@@ -511,12 +528,81 @@ mod tests {
         }};
     }
 
-    fn realloc(alloc: &NoStd<'_>) {
-        const A: Region = unsafe { Region::new_unchecked(1) };
-        const B: Region = unsafe { Region::new_unchecked(2) };
-        const C: Region = unsafe { Region::new_unchecked(3) };
-        const D: Region = unsafe { Region::new_unchecked(4) };
+    const A: Region = unsafe { Region::new_unchecked(1) };
+    const B: Region = unsafe { Region::new_unchecked(2) };
+    const C: Region = unsafe { Region::new_unchecked(3) };
+    const D: Region = unsafe { Region::new_unchecked(4) };
 
+    fn grow_last(alloc: &NoStd<'_>) {
+        let a = alloc.alloc().unwrap();
+
+        let mut b = alloc.alloc().unwrap();
+        b.write(&[1, 2, 3, 4, 5, 6]);
+        b.write(&[7, 8]);
+
+        {
+            let i = unsafe { &*alloc.internal.get() };
+
+            assert_eq!(i.free, None);
+            assert_eq!(i.head, Some(A));
+            assert_eq!(i.tail, Some(B));
+
+            assert_regions! {
+                alloc,
+                A => { 0, 8, State::Used, free: None, prev: None, next: Some(B) },
+                B => { 8, 8, State::Used, free: None, prev: Some(A), next: None },
+            };
+
+            assert_free!(alloc);
+        }
+
+        b.write(&[9, 10]);
+
+        {
+            let i = unsafe { &*alloc.internal.get() };
+
+            assert_eq!(i.free, None);
+            assert_eq!(i.head, Some(A));
+            assert_eq!(i.tail, Some(B));
+
+            assert_regions! {
+                alloc,
+                A => { 0, 8, State::Used, free: None, prev: None, next: Some(B) },
+                B => { 8, 16, State::Used, free: None, prev: Some(A), next: None },
+            };
+
+            assert_free!(alloc);
+        }
+
+        drop(a);
+        drop(b);
+
+        {
+            let i = unsafe { &*alloc.internal.get() };
+
+            assert_eq!(i.head, Some(A));
+            assert_eq!(i.tail, Some(A));
+
+            // TODO: Since all regions have been freed, the allocator should be
+            // uninitialized again.
+            assert_regions! {
+                alloc,
+                A => { 0, 8, State::Free, free: None, prev: None, next: Some(B) },
+                B => { 0, 0, State::Free, free: Some(A), prev: None, next: None },
+            };
+
+            assert_free!(alloc, B, A);
+        }
+    }
+
+    #[test]
+    fn nostd_grow_last() {
+        let mut buf = crate::allocator::StackBuffer::<4096>::new();
+        let alloc = crate::allocator::NoStd::new(&mut buf);
+        grow_last(&alloc);
+    }
+
+    fn realloc(alloc: &NoStd<'_>) {
         let mut a = alloc.alloc().unwrap();
         a.write(&[1, 2, 3, 4]);
         assert_eq!(a.region.get(), A);
