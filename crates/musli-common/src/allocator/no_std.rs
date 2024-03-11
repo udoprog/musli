@@ -125,7 +125,7 @@ impl<'a> Buffer for Buf<'a> {
 
             // Region can fit the bytes available.
             let header_ptr = if (*header_ptr).size() - len < bytes.len() {
-                let to_len = (len + bytes.len()).next_power_of_two().max(MIN_LEN);
+                let to_len = align_requested(len + bytes.len());
 
                 let Some(region) = i.realloc(self.region.get(), len, to_len) else {
                     return false;
@@ -243,8 +243,6 @@ impl Internal {
     ///
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: usize) -> Option<(Region, *mut Header)> {
-        debug_assert!(requested.is_power_of_two());
-
         if let Some((region, header_ptr, prev)) = self.find_free(|h| h.size() >= requested) {
             let free = (*header_ptr).free.take();
 
@@ -260,6 +258,7 @@ impl Internal {
             return Some((region, header_ptr));
         }
 
+        let requested = align_requested(requested);
         let start = u32::try_from(self.bytes).ok()?;
         let size = u32::try_from(requested).ok()?;
 
@@ -349,8 +348,6 @@ impl Internal {
     }
 
     unsafe fn realloc(&mut self, from: Region, len: usize, to_len: usize) -> Option<Region> {
-        debug_assert!(to_len.is_power_of_two());
-
         let from_header = self.header_mut(from);
 
         let (to, to_header) = self.alloc(to_len)?;
@@ -446,36 +443,72 @@ impl Header {
     }
 }
 
+fn align_requested(requested: usize) -> usize {
+    if requested < MIN_LEN {
+        return MIN_LEN;
+    }
+
+    requested.next_multiple_of(MIN_LEN)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::allocator::{Allocator, Buffer};
 
     use super::{Header, NoStd, Region, State};
 
-    macro_rules! assert_header {
+    macro_rules! assert_regions {
         (
-            $header:expr,
-            {
+            $list:expr,
+            $($header:expr => {
                 $start:expr,
                 $size:expr,
                 $state:expr,
                 free: $free:expr,
                 prev: $prev:expr,
                 next: $next:expr $(,)?
-            } $(,)?
-        ) => {
-            assert_eq! {
-                $header,
-                Header {
-                    start: $start,
-                    size: $size,
-                    state: $state,
-                    free: $free,
-                    prev: $prev,
-                    next: $next,
-                }
-            };
-        };
+            },)* $(,)?
+        ) => {{
+            let i = unsafe { &*$list.internal.get() };
+
+            $(
+                assert_eq! {
+                    *i.header($header),
+                    Header {
+                        start: $start,
+                        size: $size,
+                        state: $state,
+                        free: $free,
+                        prev: $prev,
+                        next: $next,
+                    }
+                };
+            )*
+        }};
+    }
+
+    macro_rules! assert_free {
+        (
+            $list:expr,
+            $($head:expr $(, $rest:expr)*)? $(,)?
+        ) => {{
+            let i = unsafe { &*$list.internal.get() };
+
+            $(
+                assert_eq!(i.free, Some($head), "Expected head region");
+                let free = i.header($head).free;
+
+                $(
+                    let Some(free) = free else {
+                        panic!("Expected another region before {}", stringify!($rest));
+                    };
+
+                    let free = i.header(free).free;
+                )*
+
+                assert_eq!(free, None);
+            )*
+        }};
     }
 
     fn realloc(alloc: &NoStd<'_>) {
@@ -507,19 +540,11 @@ mod tests {
             assert_eq!(i.head, Some(A));
             assert_eq!(i.tail, Some(C));
 
-            assert_header! {
-                *i.header(A),
-                { 0, 8, State::Used, free: None, prev: None, next: Some(B) },
-            };
-
-            assert_header! {
-                *i.header(B),
-                { 8, 8, State::Used, free: None, prev: Some(A), next: Some(C) }
-            };
-
-            assert_header! {
-                *i.header(C),
-                { 16, 8, State::Used, free: None, prev: Some(B), next: None }
+            assert_regions! {
+                alloc,
+                A => { 0, 8, State::Used, free: None, prev: None, next: Some(B) },
+                B => { 8, 8, State::Used, free: None, prev: Some(A), next: Some(C) },
+                C => { 16, 8, State::Used, free: None, prev: Some(B), next: None },
             };
         }
 
@@ -531,19 +556,11 @@ mod tests {
             assert_eq!(i.head, Some(A));
             assert_eq!(i.tail, Some(C));
 
-            assert_header! {
-                *i.header(A),
-                { 0, 8, State::Free, free: None, prev: None, next: Some(B) }
-            };
-
-            assert_header! {
-                *i.header(B),
-                { 8, 8, State::Used, free: None, prev: Some(A), next: Some(C) }
-            };
-
-            assert_header! {
-                *i.header(C),
-                { 16, 8, State::Used, free: None, prev: Some(B), next: None }
+            assert_regions! {
+                alloc,
+                A => { 0, 8, State::Free, free: None, prev: None, next: Some(B) },
+                B => { 8, 8, State::Used, free: None, prev: Some(A), next: Some(C) },
+                C => { 16, 8, State::Used, free: None, prev: Some(B), next: None },
             };
         }
 
@@ -554,80 +571,42 @@ mod tests {
             assert_eq!(i.free, Some(B));
             assert_eq!(i.head, Some(A));
             assert_eq!(i.tail, Some(C));
-
-            assert_header! {
-                *i.header(A),
-                { 0, 16, State::Free, free: None, prev: None, next: Some(C) }
-            };
-
-            assert_header! {
-                *i.header(B),
-                { 0, 0, State::Free, free: Some(A), prev: None, next: None }
-            };
-
-            assert_header! {
-                *i.header(C),
-                { 16, 8, State::Used, free: None, prev: Some(A), next: None }
-            };
         }
+
+        assert_regions! {
+            alloc,
+            A => { 0, 16, State::Free, free: None, prev: None, next: Some(C) },
+            B => { 0, 0, State::Free, free: Some(A), prev: None, next: None },
+            C => { 16, 8, State::Used, free: None, prev: Some(A), next: None },
+        };
 
         let mut d = alloc.alloc().unwrap();
         d.write(&[1, 2]);
 
         assert_eq!(d.region.get(), A);
 
-        {
-            let i = unsafe { &*alloc.internal.get() };
-            assert_eq!(i.free, Some(B));
-            assert_eq!(i.head, Some(A));
-            assert_eq!(i.tail, Some(C));
+        assert_regions! {
+            alloc,
+            A => { 0, 16, State::Used, free: None, prev: None, next: Some(C) },
+            B => { 0, 0, State::Free, free: None, prev: None, next: None },
+            C => { 16, 8, State::Used, free: None, prev: Some(A), next: None },
+        };
 
-            assert_header! {
-                *i.header(A),
-                { 0, 16, State::Used, free: None, prev: None, next: Some(C) }
-            };
-
-            assert_header! {
-                *i.header(B),
-                { 0, 0, State::Free, free: None, prev: None, next: None }
-            };
-
-            assert_header! {
-                *i.header(C),
-                { 16, 8, State::Used, free: None, prev: Some(A), next: None }
-            };
-        }
+        assert_free!(alloc, B);
 
         d.write(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
 
         assert_eq!(d.region.get(), D);
 
-        {
-            let i = unsafe { &*alloc.internal.get() };
-            assert_eq!(i.free, Some(A));
-            assert_eq!(i.head, Some(A));
-            assert_eq!(i.tail, Some(D));
+        assert_regions! {
+            alloc,
+            A => { 0, 16, State::Free, free: Some(B), prev: None, next: Some(C) },
+            B => { 0, 0, State::Free, free: None, prev: None, next: None },
+            C => { 16, 8, State::Used, free: None, prev: Some(A), next: Some(D) },
+            D => { 24, 24, State::Used, free: None, prev: Some(C), next: None },
+        };
 
-            assert_header! {
-                *i.header(A),
-                { 0, 16, State::Free, free: Some(B), prev: None, next: Some(C) }
-            };
-
-            assert_header! {
-                *i.header(B),
-                { 0, 0, State::Free, free: None, prev: None, next: None }
-            };
-
-            assert_header! {
-                *i.header(C),
-                { 16, 8, State::Used, free: None, prev: Some(A), next: Some(D) }
-            };
-
-            assert_header! {
-                *i.header(D),
-                { 24, 32, State::Used, free: None, prev: Some(C), next: None }
-            };
-        }
+        assert_free!(alloc, A, B);
     }
 
     #[test]

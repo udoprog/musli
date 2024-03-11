@@ -115,11 +115,11 @@ use musli::context::Buffer;
 /// let mut buf = allocator::buffer();
 /// let alloc = allocator::new(&mut buf);
 ///
-/// let mut a = alloc.alloc();
-/// let mut b = alloc.alloc();
+/// let mut a = alloc.alloc().expect("allocation a failed");
+/// let mut b = alloc.alloc().expect("allocation b failed");
 ///
 /// b.write(b"He11o");
-/// a.copy_back(b);
+/// a.write(b.as_slice());
 ///
 /// assert_eq!(a.as_slice(), b"He11o");
 /// assert_eq!(a.len(), 5);
@@ -129,18 +129,11 @@ use musli::context::Buffer;
 /// assert_eq!(a.as_slice(), b"He11o W0rld");
 /// assert_eq!(a.len(), 11);
 ///
-/// let mut c = alloc.alloc();
+/// let mut c = alloc.alloc().expect("allocation c failed");
 /// c.write(b"!");
-/// assert!(a.write_at(7, b"o"));
-/// assert!(!a.write_at(11, b"!"));
-/// a.copy_back(c);
+/// a.write(c.as_slice());
 ///
-/// assert_eq!(a.as_slice(), b"He11o World!");
-/// assert_eq!(a.len(), 12);
-///
-/// assert!(a.write_at(2, b"ll"));
-///
-/// assert_eq!(a.as_slice(), b"Hello World!");
+/// assert_eq!(a.as_slice(), b"He11o W0rld!");
 /// assert_eq!(a.len(), 12);
 /// ```
 pub trait Allocator {
