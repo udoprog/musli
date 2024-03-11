@@ -2,9 +2,9 @@ use crate::allocator::{Allocator, Buf};
 
 use super::{Header, NoStd, Region, State};
 
-macro_rules! assert_linked {
+macro_rules! assert_free {
     (
-        $i:expr $(, $kind:ident [$($link:expr),* $(,)?])* $(,)?
+        $i:expr $(, $kind:ident [$($free:expr),* $(,)?])* $(,)?
     ) => {{
         $(
             let mut free = alloc::vec::Vec::<Region>::new();
@@ -12,19 +12,19 @@ macro_rules! assert_linked {
 
             while let Some(c) = current.take() {
                 free.push(c);
-                current = $i.header(c).link;
+                current = $i.header(c).next_free;
             }
 
-            assert_eq!(free, [$($link),*], "Expected `{}`", stringify!($kind));
+            assert_eq!(free, [$($free),*], "Expected `{}`", stringify!($kind));
         )*
     }};
 }
 
 macro_rules! assert_list {
     (
-        $i:expr, $($link:expr),* $(,)?
+        $i:expr, $($free:expr),* $(,)?
     ) => {
-        let mut expected = [$($link),*];
+        let mut expected = [$($free),*];
 
         {
             let mut list = alloc::vec::Vec::<Region>::new();
@@ -56,14 +56,13 @@ macro_rules! assert_list {
 macro_rules! assert_structure {
     (
         $list:expr,
-        freed [$($freed:expr),* $(,)?],
-        occupied [$($occupied:expr),* $(,)?],
+        free [$($free:expr),* $(,)?],
         list [$($node:expr),* $(,)?],
         $($region:expr => {
             $start:expr,
             $size:expr,
             $state:expr,
-            link: $link:expr,
+            next_free: $next_free:expr,
             prev: $prev:expr,
             next: $next:expr $(,)?
         },)* $(,)?
@@ -77,7 +76,7 @@ macro_rules! assert_structure {
                     start: $start,
                     size: $size,
                     state: $state,
-                    link: $link,
+                    next_free: $next_free,
                     prev: $prev,
                     next: $next,
                 },
@@ -85,7 +84,7 @@ macro_rules! assert_structure {
             };
         )*
 
-        assert_linked!(i, freed[$($freed),*], occupied[$($occupied),*]);
+        assert_free!(i, free[$($free),*]);
         assert_list!(i, $($node),*);
     }};
 }
@@ -103,18 +102,18 @@ fn grow_last(alloc: &NoStd<'_>) {
 
     assert_structure! {
         alloc,
-        freed[], occupied[], list[A, B],
-        A => { 0, 0, State::Used, link: None, prev: None, next: Some(B) },
-        B => { 0, 8, State::Used, link: None, prev: Some(A), next: None },
+        free[], list[A, B],
+        A => { 0, 0, State::Used, next_free: None, prev: None, next: Some(B) },
+        B => { 0, 8, State::Used, next_free: None, prev: Some(A), next: None },
     };
 
     b.write(&[9, 10]);
 
     assert_structure! {
         alloc,
-        freed[], occupied[], list[A, B],
-        A => { 0, 0, State::Used, link: None, prev: None, next: Some(B) },
-        B => { 0, 10, State::Used, link: None, prev: Some(A), next: None },
+        free[], list[A, B],
+        A => { 0, 0, State::Used, next_free: None, prev: None, next: Some(B) },
+        B => { 0, 10, State::Used, next_free: None, prev: Some(A), next: None },
     };
 
     drop(a);
@@ -122,9 +121,9 @@ fn grow_last(alloc: &NoStd<'_>) {
 
     assert_structure! {
         alloc,
-        freed[A, B], occupied[], list[],
-        A => { 0, 0, State::Free, link: Some(B), prev: None, next: None },
-        B => { 0, 0, State::Free, link: None, prev: None, next: None },
+        free[A, B], list[],
+        A => { 0, 0, State::Free, next_free: Some(B), prev: None, next: None },
+        B => { 0, 0, State::Free, next_free: None, prev: None, next: None },
     };
 }
 
@@ -154,40 +153,40 @@ fn realloc(alloc: &NoStd<'_>) {
 
     assert_structure! {
         alloc,
-        freed[], occupied[], list[A, B, C],
-        A => { 0, 4, State::Used, link: None, prev: None, next: Some(B) },
-        B => { 4, 4, State::Used, link: None, prev: Some(A), next: Some(C) },
-        C => { 8, 4, State::Used, link: None, prev: Some(B), next: None },
+        free[], list[A, B, C],
+        A => { 0, 4, State::Used, next_free: None, prev: None, next: Some(B) },
+        B => { 4, 4, State::Used, next_free: None, prev: Some(A), next: Some(C) },
+        C => { 8, 4, State::Used, next_free: None, prev: Some(B), next: None },
     };
 
     drop(a);
 
     assert_structure! {
         alloc,
-        freed[], occupied[A], list[A, B, C],
-        A => { 0, 4, State::Occupy, link: None, prev: None, next: Some(B) },
-        B => { 4, 4, State::Used, link: None, prev: Some(A), next: Some(C) },
-        C => { 8, 4, State::Used, link: None, prev: Some(B), next: None },
+        free[], list[A, B, C],
+        A => { 0, 4, State::Occupy, next_free: None, prev: None, next: Some(B) },
+        B => { 4, 4, State::Used, next_free: None, prev: Some(A), next: Some(C) },
+        C => { 8, 4, State::Used, next_free: None, prev: Some(B), next: None },
     };
 
     drop(b);
 
     assert_structure! {
         alloc,
-        freed[B], occupied[A], list[A, C],
-        A => { 0, 8, State::Occupy, link: None, prev: None, next: Some(C) },
-        B => { 0, 0, State::Free, link: None, prev: None, next: None },
-        C => { 8, 4, State::Used, link: None, prev: Some(A), next: None },
+        free[B], list[A, C],
+        A => { 0, 8, State::Occupy, next_free: None, prev: None, next: Some(C) },
+        B => { 0, 0, State::Free, next_free: None, prev: None, next: None },
+        C => { 8, 4, State::Used, next_free: None, prev: Some(A), next: None },
     };
 
     let mut d = alloc.alloc().unwrap();
 
     assert_structure! {
         alloc,
-        freed[B], occupied[], list[A, C],
-        A => { 0, 8, State::Used, link: None, prev: None, next: Some(C) },
-        B => { 0, 0, State::Free, link: None, prev: None, next: None },
-        C => { 8, 4, State::Used, link: None, prev: Some(A), next: None },
+        free[B], list[A, C],
+        A => { 0, 8, State::Used, next_free: None, prev: None, next: Some(C) },
+        B => { 0, 0, State::Free, next_free: None, prev: None, next: None },
+        C => { 8, 4, State::Used, next_free: None, prev: Some(A), next: None },
     };
 
     d.write(&[1, 2]);
@@ -195,10 +194,10 @@ fn realloc(alloc: &NoStd<'_>) {
 
     assert_structure! {
         alloc,
-        freed[B], occupied[], list[A, C],
-        A => { 0, 8, State::Used, link: None, prev: None, next: Some(C) },
-        B => { 0, 0, State::Free, link: None, prev: None, next: None },
-        C => { 8, 4, State::Used, link: None, prev: Some(A), next: None },
+        free[B], list[A, C],
+        A => { 0, 8, State::Used, next_free: None, prev: None, next: Some(C) },
+        B => { 0, 0, State::Free, next_free: None, prev: None, next: None },
+        C => { 8, 4, State::Used, next_free: None, prev: Some(A), next: None },
     };
 
     d.write(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
@@ -206,10 +205,10 @@ fn realloc(alloc: &NoStd<'_>) {
 
     assert_structure! {
         alloc,
-        freed[], occupied[A], list[A, C, B],
-        A => { 0, 8, State::Occupy, link: None, prev: None, next: Some(C) },
-        B => { 12, 18, State::Used, link: None, prev: Some(C), next: None },
-        C => { 8, 4, State::Used, link: None, prev: Some(A), next: Some(B) },
+        free[], list[A, C, B],
+        A => { 0, 8, State::Occupy, next_free: None, prev: None, next: Some(C) },
+        B => { 12, 18, State::Used, next_free: None, prev: Some(C), next: None },
+        C => { 8, 4, State::Used, next_free: None, prev: Some(A), next: Some(B) },
     };
 }
 
