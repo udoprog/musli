@@ -6,7 +6,7 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use musli::context::Buffer;
+use musli::context::Buf;
 
 use crate::allocator::Allocator;
 use crate::fixed::FixedVec;
@@ -65,7 +65,7 @@ pub struct NoStd<'a> {
     // This must be an unsafe cell, since it's mutably accessed through an
     // immutable pointers. We simply make sure that those accesses do not
     // clobber each other, which we can do since the API is restricted through
-    // the `Buffer` trait.
+    // the `Buf` trait.
     internal: UnsafeCell<Internal>,
     // The underlying vector being borrowed.
     _marker: PhantomData<&'a mut [MaybeUninit<u8>]>,
@@ -90,7 +90,7 @@ impl<'a> NoStd<'a> {
 }
 
 impl Allocator for NoStd<'_> {
-    type Buf<'this> = Buf<'this> where Self: 'this;
+    type Buf<'this> = NoStdBuf<'this> where Self: 'this;
 
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
@@ -98,7 +98,7 @@ impl Allocator for NoStd<'_> {
         // held for the duration of this call.
         let (region, _) = unsafe { (*self.internal.get()).alloc(MIN_LEN)? };
 
-        Some(Buf {
+        Some(NoStdBuf {
             region: Cell::new(region),
             len: Cell::new(0),
             internal: &self.internal,
@@ -107,13 +107,13 @@ impl Allocator for NoStd<'_> {
 }
 
 /// A no-std allocated buffer.
-pub struct Buf<'a> {
+pub struct NoStdBuf<'a> {
     region: Cell<Region>,
     len: Cell<usize>,
     internal: &'a UnsafeCell<Internal>,
 }
 
-impl<'a> Buffer for Buf<'a> {
+impl<'a> Buf for NoStdBuf<'a> {
     #[inline]
     fn write(&mut self, bytes: &[u8]) -> bool {
         unsafe {
@@ -161,7 +161,7 @@ impl<'a> Buffer for Buf<'a> {
     }
 }
 
-impl Drop for Buf<'_> {
+impl Drop for NoStdBuf<'_> {
     fn drop(&mut self) {
         // SAFETY: We have exclusive access to the internal state.
         unsafe {
@@ -471,7 +471,7 @@ fn align_requested(requested: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::allocator::{Allocator, Buffer};
+    use crate::allocator::{Allocator, Buf};
 
     use super::{Header, NoStd, Region, State};
 

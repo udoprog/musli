@@ -102,7 +102,7 @@ pub fn new(buf: &mut DefaultBuffer) -> DefaultAllocator<'_> {
 #[doc(inline)]
 pub use self::default_alloc::{DefaultAllocator, DefaultBuffer};
 
-use musli::context::Buffer;
+use musli::context::Buf;
 
 /// An allocator that can be used in combination with a context.
 ///
@@ -110,7 +110,7 @@ use musli::context::Buffer;
 ///
 /// ```
 /// use musli_common::allocator::{self, Allocator};
-/// use musli::context::Buffer;
+/// use musli::context::Buf;
 ///
 /// let mut buf = allocator::buffer();
 /// let alloc = allocator::new(&mut buf);
@@ -137,14 +137,14 @@ use musli::context::Buffer;
 /// assert_eq!(a.len(), 12);
 /// ```
 pub trait Allocator {
-    /// An allocated buffer.
-    type Buf<'this>: Buffer
+    /// The type of an allocated buffer.
+    type Buf<'this>: Buf
     where
         Self: 'this;
 
-    /// Allocate an empty, uninitialized buffer. Just calling this function
-    /// doesn't cause any allocations to occur, for that to happen the returned
-    /// allocation has to be written to.
+    /// Allocate an empty, uninitialized buffer.
+    ///
+    /// Calling this method returns `None` if the allocation failed.
     fn alloc(&self) -> Option<Self::Buf<'_>>;
 }
 

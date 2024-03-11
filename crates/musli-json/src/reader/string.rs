@@ -1,6 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use musli::context::Buffer;
+use musli::context::Buf;
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};
@@ -56,7 +56,7 @@ pub(crate) fn parse_string_slice_reader<'de, 'scratch, C, S>(
 ) -> Result<StringReference<'de, 'scratch>, C::Error>
 where
     C: Context<Input = Error>,
-    S: ?Sized + Buffer,
+    S: ?Sized + Buf,
 {
     // Index of the first byte not yet copied into the scratch space.
     let mut open_mark = cx.mark();
@@ -155,7 +155,7 @@ fn parse_escape<C, B>(
 ) -> Result<bool, C::Error>
 where
     C: Context<Input = Error>,
-    B: ?Sized + Buffer,
+    B: ?Sized + Buf,
 {
     let start = cx.mark();
     let b = parser.read_byte(cx)?;
@@ -172,7 +172,7 @@ where
         b'u' => {
             fn encode_surrogate<B>(scratch: &mut B, n: u16) -> bool
             where
-                B: ?Sized + Buffer,
+                B: ?Sized + Buf,
             {
                 scratch.write(&[
                     (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,

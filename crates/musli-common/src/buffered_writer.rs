@@ -1,7 +1,7 @@
 //! A writer which buffers the writes before it outputs it into the backing
 //! storage.
 
-use musli::context::Buffer;
+use musli::context::Buf;
 use musli::Context;
 
 use crate::fixed_bytes::{FixedBytes, FixedBytesOverflow};
@@ -58,7 +58,7 @@ where
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
-        B: Buffer,
+        B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())

@@ -12,7 +12,7 @@ use core::marker;
 
 use crate::no_std::ToOwned;
 
-use crate::context::Buffer;
+use crate::context::Buf;
 use crate::de::{
     AsDecoder, Decoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
     SizeHint, ValueVisitor, VariantDecoder,
@@ -24,7 +24,7 @@ use crate::Context;
 /// An empty buffer.
 pub enum NeverBuffer {}
 
-impl Buffer for NeverBuffer {
+impl Buf for NeverBuffer {
     #[inline(always)]
     fn write(&mut self, _: &[u8]) -> bool {
         false

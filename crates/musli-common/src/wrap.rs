@@ -5,7 +5,7 @@
 //! an adapter around an I/O type to work with musli.
 
 #[cfg(feature = "std")]
-use musli::context::Buffer;
+use musli::context::Buf;
 #[cfg(feature = "std")]
 use musli::Context;
 
@@ -40,7 +40,7 @@ where
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
-        B: Buffer,
+        B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())

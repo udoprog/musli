@@ -5,7 +5,7 @@ use core::fmt;
 use core::mem::MaybeUninit;
 use core::ptr;
 
-use musli::context::Buffer;
+use musli::context::Buf;
 use musli::Context;
 
 use crate::writer::Writer;
@@ -192,7 +192,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>,
-        B: Buffer,
+        B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())

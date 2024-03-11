@@ -1,4 +1,4 @@
-use musli::context::Buffer;
+use musli::context::Buf;
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};
@@ -39,7 +39,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: Context<Input = Error>,
-        S: ?Sized + Buffer,
+        S: ?Sized + Buf,
     {
         let start = cx.mark();
         let actual = self.peek(cx)?;
