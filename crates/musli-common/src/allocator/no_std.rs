@@ -1,3 +1,63 @@
+//! This is a no-std allocator that can be used with the `musli` crate.
+//!
+//! It is geared towards handling few allocations, but they can be arbitrarily
+//! large. It is optimized to work best when allocations are short lived and
+//! "merged back" into one previously allocated region through
+//! `Buffer::write_buffer`.
+//!
+//! Further more its optimized to write to one allocation "at a time". So once
+//! an allocation has been grown once, it will be put in a region where it is
+//! unlikely to need to be moved again, usually the last region which has access
+//! to the remainder of the provided buffer.
+//!
+//! # Design
+//!
+//! The allocator takes a buffer of contiguous memory. This is dynamically
+//! diviced into two parts:
+//!
+//! * One part which grows upwards from the base, constituting the memory being
+//!   allocated.
+//! * Its metadata growing downward from the end of the buffer, containing
+//!   headers for all allocated region.
+//!
+//! By designing the allocator so that the memory allocated and its metadata is
+//! separate, neighbouring regions can efficiently be merged as they are written
+//! or freed.
+//!
+//! Each allocation is sparse, meaning it does not try to over-allocate memory.
+//! This ensures that subsequent regions with initialized memory can be merged
+//! efficiently, but degrades performance for many small writes performed across
+//! multiple allocations concurrently.
+//!
+//! Below is an illustration of this, where `a` and `b` are two allocations
+//! where we write one byte at a time to each. Here `x` below indicates an
+//! occupied `gap` in memory regions.
+//!
+//! ```
+//! a
+//! ab
+//! # a moved to end
+//! xbaa
+//! # b moved to 0
+//! bbaa
+//! # aa not moved
+//! bbaaa
+//! # bb moved to end
+//! xxaaabbb
+//! # aaa moved to 0
+//! aaaaxbbb
+//! # bbb not moved
+//! aaaaxbbbb
+//! # aaaa not moved
+//! aaaaabbbb
+//! # bbbbb not moved
+//! aaaaabbbbb
+//! # aaaaa moved to end
+//! xxxxxbbbbbaaaaaa
+//! # bbbbb moved to 0
+//! bbbbbbxxxxaaaaaa
+//! ```
+
 #[cfg(test)]
 mod tests;
 
@@ -80,7 +140,7 @@ impl<'a> NoStd<'a> {
                 head: None,
                 tail: None,
                 bytes: 0,
-                regions: 0,
+                headers: 0,
                 size: buffer.len(),
                 data: buffer.as_mut_ptr(),
             }),
@@ -150,6 +210,8 @@ impl<'a> Buf for NoStdBuf<'a> {
         B: Buf,
     {
         'out: {
+            // NB: Placing this here to make miri happy, since accessing the
+            // slice will mean mutably accessing the internal state.
             let other_ptr = buf.as_slice().as_ptr().cast();
 
             unsafe {
@@ -162,7 +224,8 @@ impl<'a> Buf for NoStdBuf<'a> {
 
                 // If this region immediately follows the other region, we can
                 // optimize the write by simply growing the current region and
-                // de-allocating the second since they share the same data.
+                // de-allocating the second since the only conclusion is that
+                // they share the same allocator.
                 if !ptr::eq(data_cap_ptr.cast_const(), other_ptr) {
                     break 'out;
                 }
@@ -171,14 +234,16 @@ impl<'a> Buf for NoStdBuf<'a> {
                     break 'out;
                 };
 
-                // Prevent the other buffer from being dropped.
+                // Prevent the other buffer from being dropped, since we're
+                // taking care of the allocation in here directly instead.
                 forget(buf);
 
                 let next = i.region_mut(next);
 
                 let diff = (*this.ptr).cap - (*this.ptr).len;
 
-                // Data need to be shuffle back to the end of the initialized region.
+                // Data needs to be shuffle back to the end of the initialized
+                // region.
                 if diff > 0 {
                     let to_ptr = data_cap_ptr.wrapping_sub(diff as usize);
                     ptr::copy(data_cap_ptr, to_ptr, (*next.ptr).len as usize);
@@ -257,6 +322,7 @@ impl Region {
 
 /// The identifier of a region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(test, derive(PartialOrd, Ord, Hash))]
 #[repr(transparent)]
 struct HeaderId(NonZeroU8);
 
@@ -285,10 +351,10 @@ struct Internal {
     head: Option<HeaderId>,
     // Pointer to the tail region.
     tail: Option<HeaderId>,
-    // Bytes used by regions.
-    regions: usize,
     // Bytes allocated.
     bytes: usize,
+    // Bytes used by region headers.
+    headers: usize,
     /// The size of the buffer being wrapped.
     size: usize,
     // The slab of regions and allocations.
@@ -348,14 +414,14 @@ impl Internal {
             if let Some(region) = self.pop_free() {
                 let bytes = self.bytes.checked_add(requested)?;
 
-                if self.regions.checked_add(bytes)? > self.size {
+                if self.headers.checked_add(bytes)? > self.size {
                     return None;
                 }
 
-                break 'out (region, bytes, self.regions);
+                break 'out (region, bytes, self.headers);
             }
 
-            let regions = self.regions.checked_add(size_of::<Header>())?;
+            let regions = self.headers.checked_add(size_of::<Header>())?;
             let bytes = self.bytes.checked_add(requested)?;
 
             if regions.checked_add(bytes)? > self.size {
@@ -392,7 +458,7 @@ impl Internal {
             (*self.header_mut(tail)).next = Some(region.id);
         }
 
-        self.regions = regions;
+        self.headers = regions;
         self.bytes = bytes;
 
         Some(region)
