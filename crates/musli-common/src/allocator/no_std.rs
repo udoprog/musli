@@ -33,7 +33,7 @@
 //! where we write one byte at a time to each. Here `x` below indicates an
 //! occupied `gap` in memory regions.
 //!
-//! ```
+//! ```text
 //! a
 //! ab
 //! # a moved to end
@@ -175,6 +175,12 @@ pub struct NoStdBuf<'a> {
 impl<'a> Buf for NoStdBuf<'a> {
     #[inline]
     fn write(&mut self, bytes: &[u8]) -> bool {
+        if bytes.is_empty() {
+            return true;
+        }
+
+        // SAFETY: Due to invariants in the Buffer trait we know that these
+        // cannot be used incorrectly.
         unsafe {
             let i = &mut *self.internal.get();
 
@@ -318,6 +324,11 @@ impl Region {
     unsafe fn data_cap_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
         data.wrapping_add((*self.ptr).start as usize)
             .wrapping_add((*self.ptr).cap as usize)
+    }
+
+    #[inline]
+    unsafe fn data_base_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
+        data.wrapping_add((*self.ptr).start as usize)
     }
 }
 
@@ -579,6 +590,43 @@ impl Internal {
             return Some(from);
         }
 
+        // Try to merge with a preceeding region, if the requested memory can
+        // fit in it.
+        'bail: {
+            // Check if the immediate prior region can fit the requested allocation.
+            let Some(prev) = (*from.ptr).prev else {
+                break 'bail;
+            };
+
+            let prev = self.region_mut(prev);
+
+            if (*prev.ptr).state != State::Occupy || (*prev.ptr).cap() + len < requested {
+                break 'bail;
+            }
+
+            let prev_ptr = prev.data_base_ptr(self.data);
+            let from_ptr = from.data_base_ptr(self.data);
+
+            let old = self.region_free(from);
+
+            ptr::copy(from_ptr, prev_ptr, old.len());
+
+            (*prev.ptr).state = State::Used;
+            (*prev.ptr).cap += old.cap;
+            (*prev.ptr).len = old.len;
+            (*prev.ptr).next = old.next;
+
+            if let Some(next) = old.next {
+                (*self.header_mut(next)).prev = old.prev;
+            } else {
+                self.tail = old.prev;
+            }
+
+            return Some(prev);
+        }
+
+        // There is no data allocated in the current region, so we can simply
+        // re-link it to the end of the chain of allocation.
         if (*from.ptr).cap == 0 {
             if self.bytes + requested > self.size {
                 return None;

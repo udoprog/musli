@@ -1,10 +1,27 @@
 use std::collections::{BTreeSet, HashMap};
+use std::fmt;
 use std::mem::size_of;
 use std::vec::Vec;
 
 use crate::allocator::{Allocator, Buf, NoStd, StackBuffer};
 
 use super::{Header, HeaderId, State};
+
+#[repr(transparent)]
+struct Ident(str);
+
+impl Ident {
+    const fn new(string: &str) -> &Self {
+        // SAFETY: Ident is repr transparent.
+        unsafe { &*(string as *const _ as *const Self) }
+    }
+}
+
+impl fmt::Debug for Ident {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
 
 /// Collect actual nodes and assert that they match the provided structure.
 #[track_caller]
@@ -24,13 +41,13 @@ where
     loop {
         let expected = it.next();
 
-        let expected_name = expected.map(|(n, _)| n);
+        let expected_name = expected.map(|(n, _)| Ident::new(n));
         let expected_node = expected.map(|(_, n)| n);
 
         assert_eq!(
             current,
             expected_node,
-            "Expected element #{} ({expected_name:?}) in `{what}` list",
+            "Expected element #{} {expected_name:?} in `{what}` list",
             actual.len() + 1
         );
 
@@ -143,6 +160,7 @@ macro_rules! assert_structure {
 const A: HeaderId = unsafe { HeaderId::new_unchecked(1) };
 const B: HeaderId = unsafe { HeaderId::new_unchecked(2) };
 const C: HeaderId = unsafe { HeaderId::new_unchecked(3) };
+const D: HeaderId = unsafe { HeaderId::new_unchecked(4) };
 
 #[test]
 fn grow_last() {
@@ -431,4 +449,44 @@ fn test_overlapping_slice_miri() {
 
     assert_eq!(a_slice, &[1, 2, 3, 4]);
     assert_eq!(b_slice, &[5, 6, 7, 8]);
+}
+
+/// Test when we have a prior allocation that has been freed and we can grow into it.
+#[test]
+fn grow_into_preceeding() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
+
+    let mut a = alloc.alloc().unwrap();
+    a.write(&[0]);
+
+    let mut b = alloc.alloc().unwrap();
+    b.write(&[1]);
+
+    let mut c = alloc.alloc().unwrap();
+    c.write(&[2]);
+
+    let mut d = alloc.alloc().unwrap();
+    d.write(&[3]);
+
+    drop(a);
+
+    assert_structure! {
+        alloc,
+        free[], list[A, B, C, D],
+        A => { 0, 0, 1, Occupy },
+        B => { 1, 1, 1, Used },
+        C => { 2, 1, 1, Used },
+        D => { 3, 1, 1, Used },
+    };
+
+    b.write(&[2]);
+
+    assert_structure! {
+        alloc,
+        free[B], list[A, C, D],
+        A => { 0, 2, 2, Used },
+        C => { 2, 1, 1, Used },
+        D => { 3, 1, 1, Used },
+    };
 }
