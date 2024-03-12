@@ -145,53 +145,63 @@ impl<'a> Buf for NoStdBuf<'a> {
     }
 
     #[inline]
-    fn write_buffer<B>(&mut self, other: B) -> bool
+    fn write_buffer<B>(&mut self, buf: B) -> bool
     where
         B: Buf,
     {
-        let range = self.as_slice().as_ptr_range();
-
         'out: {
-            // If this region immediately follows the other region, we can
-            // optimize the write by simply growing the current region and
-            // de-allocating the second since they share the same data.
-            if !ptr::eq(range.end, other.as_slice().as_ptr()) {
-                break 'out;
-            }
-
-            let this = self.region.get();
+            let other_ptr = buf.as_slice().as_ptr().cast();
 
             unsafe {
                 let i = &mut *self.internal.get();
-                let this = i.region_mut(this);
+                let this = i.region_mut(self.region.get());
 
-                let Some(other_next) = (*this.ptr).next else {
+                debug_assert!((*this.ptr).cap >= (*this.ptr).len);
+
+                let data_cap_ptr = this.data_cap_ptr(i.data);
+
+                // If this region immediately follows the other region, we can
+                // optimize the write by simply growing the current region and
+                // de-allocating the second since they share the same data.
+                if !ptr::eq(data_cap_ptr.cast_const(), other_ptr) {
+                    break 'out;
+                }
+
+                let Some(next) = (*this.ptr).next else {
                     break 'out;
                 };
 
                 // Prevent the other buffer from being dropped.
-                forget(other);
+                forget(buf);
 
-                let other = i.region_mut(other_next);
+                let next = i.region_mut(next);
 
-                let next = (*other.ptr).next.take();
+                let diff = (*this.ptr).cap - (*this.ptr).len;
 
-                (*this.ptr).cap += (*other.ptr).cap;
-                (*this.ptr).len += (*other.ptr).len;
-                (*this.ptr).next = next;
+                // Data need to be shuffle back to the end of the initialized region.
+                if diff > 0 {
+                    let to_ptr = data_cap_ptr.wrapping_sub(diff as usize);
+                    ptr::copy(data_cap_ptr, to_ptr, (*next.ptr).len as usize);
+                }
 
-                if let Some(next) = next {
-                    (*i.header_mut(next)).prev = Some(this.id);
+                let next_next = (*next.ptr).next.take();
+
+                (*this.ptr).cap += (*next.ptr).cap;
+                (*this.ptr).len += (*next.ptr).len;
+                (*this.ptr).next = next_next;
+
+                if let Some(next_next) = next_next {
+                    (*i.header_mut(next_next)).prev = Some(this.id);
                 } else {
                     i.tail = Some(this.id);
                 }
 
-                *other.ptr = Header {
+                *next.ptr = Header {
                     start: 0,
                     len: 0,
                     cap: 0,
                     state: State::Free,
-                    next_free: i.free.replace(other.id),
+                    next_free: i.free.replace(next.id),
                     prev: None,
                     next: None,
                 };
@@ -200,11 +210,7 @@ impl<'a> Buf for NoStdBuf<'a> {
             }
         }
 
-        // NB: Another optimization would be to merge the two regions if they
-        // are adjacent, but this would require a copy. Which I am currently too
-        // lazy to do, so just fall back to the default behavior.
-
-        self.write(other.as_slice())
+        self.write(buf.as_slice())
     }
 
     #[inline(always)]
@@ -239,6 +245,14 @@ impl Drop for NoStdBuf<'_> {
 struct Region {
     id: HeaderId,
     ptr: *mut Header,
+}
+
+impl Region {
+    #[inline]
+    unsafe fn data_cap_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
+        data.wrapping_add((*self.ptr).start as usize)
+            .wrapping_add((*self.ptr).cap as usize)
+    }
 }
 
 /// The identifier of a region.

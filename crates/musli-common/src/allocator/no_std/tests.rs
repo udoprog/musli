@@ -332,3 +332,40 @@ fn nostd_write_buffer_middle() {
         C => { 6, 4, 4, State::Used, next_free: None, prev: Some(A), next: None },
     };
 }
+
+/// Ensure that we support write buffer optimizations which allows for zero-copy
+/// merging of buffers.
+#[test]
+fn nostd_write_buffer_gap() {
+    let mut buf = crate::allocator::StackBuffer::<4096>::new();
+    let alloc = crate::allocator::NoStd::new(&mut buf);
+
+    let mut a = alloc.alloc().unwrap();
+    let mut b = alloc.alloc().unwrap();
+    let mut c = alloc.alloc().unwrap();
+
+    a.write(&[1, 2]);
+    b.write(&[7, 8, 9, 10]);
+    c.write(&[3, 4, 5, 6]);
+
+    assert_structure! {
+        alloc,
+        free[], list[A, B, C],
+        A => { 0, 2, 2, State::Used, next_free: None, prev: None, next: Some(B) },
+        B => { 2, 4, 4, State::Used, next_free: None, prev: Some(A), next: Some(C) },
+        C => { 6, 4, 4, State::Used, next_free: None, prev: Some(B), next: None },
+    };
+
+    drop(b);
+    a.write_buffer(c);
+
+    assert_structure! {
+        alloc,
+        free[C, B], list[A],
+        A => { 0, 6, 10, State::Used, next_free: None, prev: None, next: None },
+        B => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
+        C => { 0, 0, 0, State::Free, next_free: Some(B), prev: None, next: None },
+    };
+
+    assert_eq!(a.as_slice(), &[1, 2, 3, 4, 5, 6]);
+}
