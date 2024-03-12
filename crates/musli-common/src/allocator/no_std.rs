@@ -141,6 +141,7 @@ impl<'a> NoStd<'a> {
                 tail: None,
                 bytes: 0,
                 headers: 0,
+                occupied: 0,
                 size: buffer.len(),
                 data: buffer.as_mut_ptr(),
             }),
@@ -355,6 +356,8 @@ struct Internal {
     bytes: usize,
     // Bytes used by region headers.
     headers: usize,
+    /// The number of occupied regions.
+    occupied: usize,
     /// The size of the buffer being wrapped.
     size: usize,
     // The slab of regions and allocations.
@@ -397,17 +400,35 @@ impl Internal {
         }
     }
 
+    /// Free a region.
+    #[inline]
+    unsafe fn region_free(&mut self, region: Region) -> Header {
+        region.ptr.replace(Header {
+            start: 0,
+            len: 0,
+            cap: 0,
+            state: State::Free,
+            next_free: self.free.replace(region.id),
+            prev: None,
+            next: None,
+        })
+    }
+
     /// Allocate a region.
     ///
     /// # Safety
     ///
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: usize) -> Option<Region> {
-        if let Some(region) = self.find_region(|h| h.state == State::Occupy && h.cap() >= requested)
-        {
-            (*region.ptr).state = State::Used;
-            // TODO: Should we split the allocated region if possible?
-            return Some(region);
+        if self.occupied > 0 {
+            if let Some(region) =
+                self.find_region(|h| h.state == State::Occupy && h.cap() >= requested)
+            {
+                self.occupied -= 1;
+                (*region.ptr).state = State::Used;
+                // TODO: Should we split the allocated region if possible?
+                return Some(region);
+            }
         }
 
         let (region, bytes, regions) = 'out: {
@@ -472,43 +493,13 @@ impl Internal {
 
         // Just free up the last region in the slab.
         if (*region.ptr).next.is_none() {
-            debug_assert_eq!(self.tail, Some(region.id));
-
-            let mut current = region;
-            let mut total = 0;
-            let mut prev = (*current.ptr).prev.take();
-
-            loop {
-                total += (*current.ptr).cap();
-
-                (*current.ptr).state = State::Free;
-                (*current.ptr).start = 0;
-                (*current.ptr).len = 0;
-                (*current.ptr).cap = 0;
-                (*current.ptr).next_free = self.free.replace(current.id);
-
-                let Some(next) = prev else {
-                    self.head = None;
-                    break;
-                };
-
-                current = self.region_mut(next);
-
-                (*current.ptr).next = None;
-
-                if (*current.ptr).state != State::Occupy {
-                    break;
-                }
-
-                prev = (*current.ptr).prev.take();
-            }
-
-            self.tail = prev;
-            self.bytes -= total;
+            self.free_tail(region);
             return;
         }
 
+        // If there is no previous region, then mark this region as occupy.
         let Some(prev) = (*region.ptr).prev else {
+            self.occupied += 1;
             (*region.ptr).state = State::Occupy;
             (*region.ptr).len = 0;
             return;
@@ -518,15 +509,7 @@ impl Internal {
         debug_assert!(matches!((*prev.ptr).state, State::Occupy | State::Used));
 
         // Move allocation to the previous region.
-        let old = region.ptr.replace(Header {
-            start: 0,
-            len: 0,
-            cap: 0,
-            state: State::Free,
-            next_free: self.free.replace(region.id),
-            prev: None,
-            next: None,
-        });
+        let old = self.region_free(region);
 
         (*prev.ptr).cap += old.cap;
         (*prev.ptr).next = old.next;
@@ -535,9 +518,49 @@ impl Internal {
             (*self.header_mut(next)).prev = old.prev;
         } else {
             // The current header being freed is the last in the list.
-            self.bytes = (*region.ptr).start();
+            self.bytes = old.start as usize;
             self.tail = old.prev;
         }
+    }
+
+    /// Free the tail starting at the `current` region.
+    unsafe fn free_tail(&mut self, current: Region) {
+        debug_assert_eq!(self.tail, Some(current.id));
+
+        let old = self.region_free(current);
+        debug_assert_eq!(old.next, None);
+
+        let mut total = old.cap as usize;
+
+        'out: {
+            let Some(prev) = old.prev else {
+                self.head = None;
+                self.tail = None;
+                break 'out;
+            };
+
+            let prev = self.region_mut(prev);
+
+            if (*prev.ptr).state != State::Occupy {
+                (*prev.ptr).next = None;
+                self.tail = Some(prev.id);
+                break 'out;
+            }
+
+            // The prior region is occupied, so we can free that as well.
+            let prev = self.region_free(prev);
+
+            total += prev.cap as usize;
+            self.occupied -= 1;
+
+            self.tail = prev.prev;
+
+            if prev.prev.is_none() {
+                self.head = None;
+            }
+        };
+
+        self.bytes -= total;
     }
 
     unsafe fn realloc(&mut self, from: HeaderId, len: usize, requested: usize) -> Option<Region> {
