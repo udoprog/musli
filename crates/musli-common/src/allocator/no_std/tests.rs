@@ -1,74 +1,103 @@
-use crate::allocator::{Allocator, Buf};
+use std::collections::{BTreeSet, HashMap};
+use std::mem::size_of;
+use std::vec::Vec;
+
+use crate::allocator::{Allocator, Buf, NoStd, StackBuffer};
 
 use super::{Header, HeaderId, State};
 
+/// Collect actual nodes and assert that they match the provided structure.
+#[track_caller]
+fn collect<E, N>(
+    what: &'static str,
+    mut current: Option<HeaderId>,
+    expected: E,
+    mut next: N,
+) -> Vec<HeaderId>
+where
+    E: IntoIterator<Item = (&'static str, HeaderId)>,
+    N: FnMut(HeaderId) -> Option<HeaderId>,
+{
+    let mut actual = Vec::new();
+    let mut it = expected.into_iter();
+
+    loop {
+        let expected = it.next();
+
+        let expected_name = expected.map(|(n, _)| n);
+        let expected_node = expected.map(|(_, n)| n);
+
+        assert_eq!(
+            current,
+            expected_node,
+            "Expected element #{} ({expected_name:?}) in `{what}` list",
+            actual.len() + 1
+        );
+
+        let Some(c) = current.take() else {
+            break;
+        };
+
+        actual.push(c);
+        current = next(c);
+    }
+
+    actual
+}
+
 macro_rules! assert_free {
-    (
-        $i:expr $(, $kind:ident [$($free:expr),* $(,)?])* $(,)?
-    ) => {{
-        $(
-            let mut free = alloc::vec::Vec::<HeaderId>::new();
-            let mut current = $i.$kind;
+    ($i:expr $(, $free:expr)* $(,)?) => {{
+        let expected: &'static [(&str, HeaderId)] = &[$((stringify!($free), $free)),*];
+        let actual = collect("free", $i.free, expected.iter().copied(), |c| $i.header(c).next_free);
+        assert_eq!(actual, [$($free),*], "Expected `free` list");
 
-            while let Some(c) = current.take() {
-                free.push(c);
-                current = $i.header(c).next_free;
-            }
-
-            assert_eq!(free, [$($free),*], "Expected `{}`", stringify!($kind));
-        )*
+        let expected: &'static [HeaderId] = &[$($free),*];
+        expected
     }};
 }
 
 macro_rules! assert_list {
-    (
-        $i:expr, $($free:expr),* $(,)?
-    ) => {
-        let mut expected = [$($free),*];
+    ($i:expr $(, $node:expr)* $(,)?) => {{
+        let expected: &'static [(&str, HeaderId)] = &[$((stringify!($node), $node)),*];
+        let forward = collect("forward", $i.head, expected.iter().copied(), |c| $i.header(c).next);
+        let backward = collect("backward", $i.tail, expected.iter().rev().copied(), |c| $i.header(c).prev);
+        assert!(forward.iter().eq(backward.iter().rev()), "The forward and backward lists should match");
 
-        {
-            let mut list = alloc::vec::Vec::<HeaderId>::new();
-            let mut current = $i.head;
-
-            while let Some(c) = current.take() {
-                list.push(c);
-                current = $i.header(c).next;
-            }
-
-            assert_eq!(list, expected, "Expected forward list");
-        }
-
-        {
-            let mut list = alloc::vec::Vec::<HeaderId>::new();
-            let mut current = $i.tail;
-
-            while let Some(c) = current.take() {
-                list.push(c);
-                current = $i.header(c).prev;
-            }
-
-            expected.reverse();
-            assert_eq!(list, expected, "Expected reverse list");
-        }
-    };
+        let expected: &'static [HeaderId] = &[$($node),*];
+        expected
+    }};
 }
 
 macro_rules! assert_structure {
     (
         $list:expr,
         free [$($free:expr),* $(,)?],
-        list [$($node:expr),* $(,)?],
-        $($region:expr => {
-            $start:expr,
-            $len:expr,
-            $cap:expr,
-            $state:expr,
-            next_free: $next_free:expr,
-            prev: $prev:expr,
-            next: $next:expr $(,)?
-        },)* $(,)?
+        list [$($node:expr),* $(,)?]
+        $(, $region:expr => { $start:expr, $len:expr, $cap:expr, $state:ident $(,)? })* $(,)?
     ) => {{
         let i = unsafe { &*$list.internal.get() };
+
+        let free = assert_free!(i $(, $free)*);
+        let list = assert_list!(i $(, $node)*);
+
+        let expected_bytes = (0u32 $(+ (*i.header($region)).cap)*) as usize;
+
+        assert_eq!(i.bytes, expected_bytes, "The number of bytes allocated should match");
+        assert_eq!(i.headers / size_of::<Header>(), free.len() + list.len(), "The number of headers should match");
+
+        let mut free_next = HashMap::new();
+
+        for pair in free.windows(2) {
+            free_next.insert(pair[0], pair[1]);
+        }
+
+        let mut forward = HashMap::new();
+        let mut backward = HashMap::new();
+
+        for pair in list.windows(2) {
+            forward.insert(pair[0], pair[1]);
+            backward.insert(pair[1], pair[0]);
+        }
 
         $(
             assert_eq! {
@@ -77,17 +106,37 @@ macro_rules! assert_structure {
                     start: $start,
                     len: $len,
                     cap: $cap,
-                    state: $state,
-                    next_free: $next_free,
-                    prev: $prev,
-                    next: $next,
+                    state: State::$state,
+                    next_free: free_next.get(&$region).copied(),
+                    prev: backward.get(&$region).copied(),
+                    next: forward.get(&$region).copied(),
                 },
-                "Comparing region {}", stringify!($region)
+                "Comparing region `{}`", stringify!($region)
             };
         )*
 
-        assert_free!(i, free[$($free),*]);
-        assert_list!(i, $($node),*);
+        let mut unused = BTreeSet::new();
+
+        $(unused.insert($region);)*
+        $(unused.remove(&$node);)*
+
+        let _ = &mut unused;
+
+        for node in unused {
+            assert_eq! {
+                *i.header(node),
+                Header {
+                    start: 0,
+                    len: 0,
+                    cap: 0,
+                    state: State::Free,
+                    next_free: free_next.get(&node).copied(),
+                    prev: None,
+                    next: None,
+                },
+                "Expected region {:?} to be free", node
+            };
+        }
     }};
 }
 
@@ -96,9 +145,9 @@ const B: HeaderId = unsafe { HeaderId::new_unchecked(2) };
 const C: HeaderId = unsafe { HeaderId::new_unchecked(3) };
 
 #[test]
-fn nostd_grow_last() {
-    let mut buf = crate::allocator::StackBuffer::<4096>::new();
-    let alloc = crate::allocator::NoStd::new(&mut buf);
+fn grow_last() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
 
     let a = alloc.alloc().unwrap();
 
@@ -109,8 +158,8 @@ fn nostd_grow_last() {
     assert_structure! {
         alloc,
         free[], list[A, B],
-        A => { 0, 0, 0, State::Used, next_free: None, prev: None, next: Some(B) },
-        B => { 0, 8, 8, State::Used, next_free: None, prev: Some(A), next: None },
+        A => { 0, 0, 0, Used },
+        B => { 0, 8, 8, Used },
     };
 
     b.write(&[9, 10]);
@@ -118,8 +167,8 @@ fn nostd_grow_last() {
     assert_structure! {
         alloc,
         free[], list[A, B],
-        A => { 0, 0, 0, State::Used, next_free: None, prev: None, next: Some(B) },
-        B => { 0, 10, 10, State::Used, next_free: None, prev: Some(A), next: None },
+        A => { 0, 0, 0, Used },
+        B => { 0, 10, 10, Used },
     };
 
     drop(a);
@@ -127,16 +176,14 @@ fn nostd_grow_last() {
 
     assert_structure! {
         alloc,
-        free[A, B], list[],
-        A => { 0, 0, 0, State::Free, next_free: Some(B), prev: None, next: None },
-        B => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
+        free[A, B], list[]
     };
 }
 
 #[test]
-fn nostd_realloc() {
-    let mut buf = crate::allocator::StackBuffer::<4096>::new();
-    let alloc = crate::allocator::NoStd::new(&mut buf);
+fn realloc() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     a.write(&[1, 2, 3, 4]);
@@ -157,9 +204,9 @@ fn nostd_realloc() {
     assert_structure! {
         alloc,
         free[], list[A, B, C],
-        A => { 0, 4, 4, State::Used, next_free: None, prev: None, next: Some(B) },
-        B => { 4, 4, 4, State::Used, next_free: None, prev: Some(A), next: Some(C) },
-        C => { 8, 4, 4, State::Used, next_free: None, prev: Some(B), next: None },
+        A => { 0, 4, 4, Used },
+        B => { 4, 4, 4, Used },
+        C => { 8, 4, 4, Used },
     };
 
     drop(a);
@@ -167,9 +214,9 @@ fn nostd_realloc() {
     assert_structure! {
         alloc,
         free[], list[A, B, C],
-        A => { 0, 0, 4, State::Occupy, next_free: None, prev: None, next: Some(B) },
-        B => { 4, 4, 4, State::Used, next_free: None, prev: Some(A), next: Some(C) },
-        C => { 8, 4, 4, State::Used, next_free: None, prev: Some(B), next: None },
+        A => { 0, 0, 4, Occupy },
+        B => { 4, 4, 4, Used },
+        C => { 8, 4, 4, Used },
     };
 
     drop(b);
@@ -177,9 +224,8 @@ fn nostd_realloc() {
     assert_structure! {
         alloc,
         free[B], list[A, C],
-        A => { 0, 0, 8, State::Occupy, next_free: None, prev: None, next: Some(C) },
-        B => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
-        C => { 8, 4, 4, State::Used, next_free: None, prev: Some(A), next: None },
+        A => { 0, 0, 8, Occupy },
+        C => { 8, 4, 4, Used },
     };
 
     let mut d = alloc.alloc().unwrap();
@@ -188,9 +234,8 @@ fn nostd_realloc() {
     assert_structure! {
         alloc,
         free[B], list[A, C],
-        A => { 0, 0, 8, State::Used, next_free: None, prev: None, next: Some(C) },
-        B => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
-        C => { 8, 4, 4, State::Used, next_free: None, prev: Some(A), next: None },
+        A => { 0, 0, 8, Used },
+        C => { 8, 4, 4, Used },
     };
 
     d.write(&[1, 2]);
@@ -199,9 +244,8 @@ fn nostd_realloc() {
     assert_structure! {
         alloc,
         free[B], list[A, C],
-        A => { 0, 2, 8, State::Used, next_free: None, prev: None, next: Some(C) },
-        B => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
-        C => { 8, 4, 4, State::Used, next_free: None, prev: Some(A), next: None },
+        A => { 0, 2, 8, Used },
+        C => { 8, 4, 4, Used },
     };
 
     d.write(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
@@ -210,18 +254,18 @@ fn nostd_realloc() {
     assert_structure! {
         alloc,
         free[], list[A, C, B],
-        A => { 0, 0, 8, State::Occupy, next_free: None, prev: None, next: Some(C) },
-        B => { 12, 18, 18, State::Used, next_free: None, prev: Some(C), next: None },
-        C => { 8, 4, 4, State::Used, next_free: None, prev: Some(A), next: Some(B) },
+        A => { 0, 0, 8, Occupy },
+        B => { 12, 18, 18, Used },
+        C => { 8, 4, 4, Used },
     };
 }
 
 /// Empty regions will be automatically relinked to the end of the slab once
 /// they're being written to.
 #[test]
-fn nostd_grow_empty_moved() {
-    let mut buf = crate::allocator::StackBuffer::<4096>::new();
-    let alloc = crate::allocator::NoStd::new(&mut buf);
+fn grow_empty_moved() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let b = alloc.alloc().unwrap();
@@ -233,9 +277,9 @@ fn nostd_grow_empty_moved() {
     assert_structure! {
         alloc,
         free[], list[B, C, A],
-        A => { 1, 4, 4, State::Used, next_free: None, prev: Some(C), next: None },
-        B => { 0, 0, 0, State::Used, next_free: None, prev: None, next: Some(C) },
-        C => { 0, 1, 1, State::Used, next_free: None, prev: Some(B), next: Some(A) },
+        A => { 1, 4, 4, Used },
+        B => { 0, 0, 0, Used },
+        C => { 0, 1, 1, Used },
     };
 
     drop(c);
@@ -243,9 +287,9 @@ fn nostd_grow_empty_moved() {
     assert_structure! {
         alloc,
         free[C], list[B, A],
-        A => { 1, 4, 4, State::Used, next_free: None, prev: Some(B), next: None },
-        B => { 0, 0, 1, State::Used, next_free: None, prev: None, next: Some(A) },
-        C => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
+        A => { 1, 4, 4, Used },
+        B => { 0, 0, 1, Used },
+        C => { 0, 0, 0, Free },
     };
 
     drop(b);
@@ -253,9 +297,9 @@ fn nostd_grow_empty_moved() {
     assert_structure! {
         alloc,
         free[C], list[B, A],
-        A => { 1, 4, 4, State::Used, next_free: None, prev: Some(B), next: None },
-        B => { 0, 0, 1, State::Occupy, next_free: None, prev: None, next: Some(A) },
-        C => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
+        A => { 1, 4, 4, Used },
+        B => { 0, 0, 1, Occupy },
+        C => { 0, 0, 0, Free },
     };
 
     drop(a);
@@ -263,18 +307,18 @@ fn nostd_grow_empty_moved() {
     assert_structure! {
         alloc,
         free[B, A, C], list[],
-        A => { 0, 0, 0, State::Free, next_free: Some(C), prev: None, next: None },
-        B => { 0, 0, 0, State::Free, next_free: Some(A), prev: None, next: None },
-        C => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
+        A => { 0, 0, 0, Free },
+        B => { 0, 0, 0, Free },
+        C => { 0, 0, 0, Free },
     };
 }
 
 /// Ensure that we support write buffer optimizations which allows for zero-copy
 /// merging of buffers.
 #[test]
-fn nostd_write_buffer() {
-    let mut buf = crate::allocator::StackBuffer::<4096>::new();
-    let alloc = crate::allocator::NoStd::new(&mut buf);
+fn write_buffer() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let mut b = alloc.alloc().unwrap();
@@ -285,8 +329,8 @@ fn nostd_write_buffer() {
     assert_structure! {
         alloc,
         free[], list[A, B],
-        A => { 0, 2, 2, State::Used, next_free: None, prev: None, next: Some(B) },
-        B => { 2, 4, 4, State::Used, next_free: None, prev: Some(A), next: None },
+        A => { 0, 2, 2, Used },
+        B => { 2, 4, 4, Used },
     };
 
     a.write_buffer(b);
@@ -294,17 +338,17 @@ fn nostd_write_buffer() {
     assert_structure! {
         alloc,
         free[B], list[A],
-        A => { 0, 6, 6, State::Used, next_free: None, prev: None, next: None },
-        B => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
+        A => { 0, 6, 6, Used },
+        B => { 0, 0, 0, Free },
     };
 }
 
 /// Ensure that we support write buffer optimizations which allows for zero-copy
 /// merging of buffers.
 #[test]
-fn nostd_write_buffer_middle() {
-    let mut buf = crate::allocator::StackBuffer::<4096>::new();
-    let alloc = crate::allocator::NoStd::new(&mut buf);
+fn write_buffer_middle() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let mut b = alloc.alloc().unwrap();
@@ -317,9 +361,9 @@ fn nostd_write_buffer_middle() {
     assert_structure! {
         alloc,
         free[], list[A, B, C],
-        A => { 0, 2, 2, State::Used, next_free: None, prev: None, next: Some(B) },
-        B => { 2, 4, 4, State::Used, next_free: None, prev: Some(A), next: Some(C) },
-        C => { 6, 4, 4, State::Used, next_free: None, prev: Some(B), next: None },
+        A => { 0, 2, 2, Used },
+        B => { 2, 4, 4, Used },
+        C => { 6, 4, 4, Used },
     };
 
     a.write_buffer(b);
@@ -327,18 +371,18 @@ fn nostd_write_buffer_middle() {
     assert_structure! {
         alloc,
         free[B], list[A, C],
-        A => { 0, 6, 6, State::Used, next_free: None, prev: None, next: Some(C) },
-        B => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
-        C => { 6, 4, 4, State::Used, next_free: None, prev: Some(A), next: None },
+        A => { 0, 6, 6, Used },
+        B => { 0, 0, 0, Free },
+        C => { 6, 4, 4, Used },
     };
 }
 
 /// Ensure that we support write buffer optimizations which allows for zero-copy
 /// merging of buffers.
 #[test]
-fn nostd_write_buffer_gap() {
-    let mut buf = crate::allocator::StackBuffer::<4096>::new();
-    let alloc = crate::allocator::NoStd::new(&mut buf);
+fn write_buffer_gap() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let mut b = alloc.alloc().unwrap();
@@ -351,9 +395,9 @@ fn nostd_write_buffer_gap() {
     assert_structure! {
         alloc,
         free[], list[A, B, C],
-        A => { 0, 2, 2, State::Used, next_free: None, prev: None, next: Some(B) },
-        B => { 2, 4, 4, State::Used, next_free: None, prev: Some(A), next: Some(C) },
-        C => { 6, 4, 4, State::Used, next_free: None, prev: Some(B), next: None },
+        A => { 0, 2, 2, Used },
+        B => { 2, 4, 4, Used },
+        C => { 6, 4, 4, Used },
     };
 
     drop(b);
@@ -362,10 +406,29 @@ fn nostd_write_buffer_gap() {
     assert_structure! {
         alloc,
         free[C, B], list[A],
-        A => { 0, 6, 10, State::Used, next_free: None, prev: None, next: None },
-        B => { 0, 0, 0, State::Free, next_free: None, prev: None, next: None },
-        C => { 0, 0, 0, State::Free, next_free: Some(B), prev: None, next: None },
+        A => { 0, 6, 10, Used },
+        B => { 0, 0, 0, Free },
+        C => { 0, 0, 0, Free },
     };
 
     assert_eq!(a.as_slice(), &[1, 2, 3, 4, 5, 6]);
+}
+
+/// Hold onto a slice while we grow another buffer to make sure MIRI doesn't get
+/// unhappy about it.
+#[test]
+fn test_overlapping_slice_miri() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
+
+    let mut a = alloc.alloc().unwrap();
+    a.write(&[1, 2, 3, 4]);
+    let a_slice = a.as_slice();
+
+    let mut b = alloc.alloc().unwrap();
+    b.write(&[5, 6, 7, 8]);
+    let b_slice = b.as_slice();
+
+    assert_eq!(a_slice, &[1, 2, 3, 4]);
+    assert_eq!(b_slice, &[5, 6, 7, 8]);
 }
