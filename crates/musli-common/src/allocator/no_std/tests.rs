@@ -1,13 +1,13 @@
 use crate::allocator::{Allocator, Buf};
 
-use super::{Header, Region, State};
+use super::{Header, HeaderId, State};
 
 macro_rules! assert_free {
     (
         $i:expr $(, $kind:ident [$($free:expr),* $(,)?])* $(,)?
     ) => {{
         $(
-            let mut free = alloc::vec::Vec::<Region>::new();
+            let mut free = alloc::vec::Vec::<HeaderId>::new();
             let mut current = $i.$kind;
 
             while let Some(c) = current.take() {
@@ -27,7 +27,7 @@ macro_rules! assert_list {
         let mut expected = [$($free),*];
 
         {
-            let mut list = alloc::vec::Vec::<Region>::new();
+            let mut list = alloc::vec::Vec::<HeaderId>::new();
             let mut current = $i.head;
 
             while let Some(c) = current.take() {
@@ -39,7 +39,7 @@ macro_rules! assert_list {
         }
 
         {
-            let mut list = alloc::vec::Vec::<Region>::new();
+            let mut list = alloc::vec::Vec::<HeaderId>::new();
             let mut current = $i.tail;
 
             while let Some(c) = current.take() {
@@ -91,9 +91,9 @@ macro_rules! assert_structure {
     }};
 }
 
-const A: Region = unsafe { Region::new_unchecked(1) };
-const B: Region = unsafe { Region::new_unchecked(2) };
-const C: Region = unsafe { Region::new_unchecked(3) };
+const A: HeaderId = unsafe { HeaderId::new_unchecked(1) };
+const B: HeaderId = unsafe { HeaderId::new_unchecked(2) };
+const C: HeaderId = unsafe { HeaderId::new_unchecked(3) };
 
 #[test]
 fn nostd_grow_last() {
