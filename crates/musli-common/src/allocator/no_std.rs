@@ -10,6 +10,9 @@
 //! unlikely to need to be moved again, usually the last region which has access
 //! to the remainder of the provided buffer.
 //!
+//! For the moment, this allocator only supports 255 allocations to keep the
+//! metadata small.
+//!
 //! # Design
 //!
 //! The allocator takes a buffer of contiguous memory. This is dynamically

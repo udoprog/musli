@@ -87,8 +87,7 @@ macro_rules! assert_list {
 
 macro_rules! assert_structure {
     (
-        $list:expr,
-        free [$($free:expr),* $(,)?],
+        $list:expr, free [$($free:expr),* $(,)?],
         list [$($node:expr),* $(,)?]
         $(, $region:expr => { $start:expr, $len:expr, $cap:expr, $state:ident $(,)? })* $(,)?
     ) => {{
@@ -174,8 +173,7 @@ fn grow_last() {
     b.write(&[7, 8]);
 
     assert_structure! {
-        alloc,
-        free[], list[A, B],
+        alloc, free[], list[A, B],
         A => { 0, 0, 0, Used },
         B => { 0, 8, 8, Used },
     };
@@ -183,8 +181,7 @@ fn grow_last() {
     b.write(&[9, 10]);
 
     assert_structure! {
-        alloc,
-        free[], list[A, B],
+        alloc, free[], list[A, B],
         A => { 0, 0, 0, Used },
         B => { 0, 10, 10, Used },
     };
@@ -193,8 +190,7 @@ fn grow_last() {
     drop(b);
 
     assert_structure! {
-        alloc,
-        free[A, B], list[]
+        alloc, free[A, B], list[]
     };
 }
 
@@ -220,8 +216,7 @@ fn realloc() {
     assert_eq!(c.region.get(), C);
 
     assert_structure! {
-        alloc,
-        free[], list[A, B, C],
+        alloc, free[], list[A, B, C],
         A => { 0, 4, 4, Used },
         B => { 4, 4, 4, Used },
         C => { 8, 4, 4, Used },
@@ -230,8 +225,7 @@ fn realloc() {
     drop(a);
 
     assert_structure! {
-        alloc,
-        free[], list[A, B, C],
+        alloc, free[], list[A, B, C],
         A => { 0, 0, 4, Occupy },
         B => { 4, 4, 4, Used },
         C => { 8, 4, 4, Used },
@@ -240,8 +234,7 @@ fn realloc() {
     drop(b);
 
     assert_structure! {
-        alloc,
-        free[B], list[A, C],
+        alloc, free[B], list[A, C],
         A => { 0, 0, 8, Occupy },
         C => { 8, 4, 4, Used },
     };
@@ -250,8 +243,7 @@ fn realloc() {
     assert_eq!(d.region.get(), A);
 
     assert_structure! {
-        alloc,
-        free[B], list[A, C],
+        alloc, free[B], list[A, C],
         A => { 0, 0, 8, Used },
         C => { 8, 4, 4, Used },
     };
@@ -260,8 +252,7 @@ fn realloc() {
     assert_eq!(d.region.get(), A);
 
     assert_structure! {
-        alloc,
-        free[B], list[A, C],
+        alloc, free[B], list[A, C],
         A => { 0, 2, 8, Used },
         C => { 8, 4, 4, Used },
     };
@@ -270,8 +261,7 @@ fn realloc() {
     assert_eq!(d.region.get(), B);
 
     assert_structure! {
-        alloc,
-        free[], list[A, C, B],
+        alloc, free[], list[A, C, B],
         A => { 0, 0, 8, Occupy },
         B => { 12, 18, 18, Used },
         C => { 8, 4, 4, Used },
@@ -293,8 +283,7 @@ fn grow_empty_moved() {
     a.write(&[1, 2, 3, 4]);
 
     assert_structure! {
-        alloc,
-        free[], list[B, C, A],
+        alloc, free[], list[B, C, A],
         A => { 1, 4, 4, Used },
         B => { 0, 0, 0, Used },
         C => { 0, 1, 1, Used },
@@ -303,8 +292,7 @@ fn grow_empty_moved() {
     drop(c);
 
     assert_structure! {
-        alloc,
-        free[C], list[B, A],
+        alloc, free[C], list[B, A],
         A => { 1, 4, 4, Used },
         B => { 0, 0, 1, Used },
         C => { 0, 0, 0, Free },
@@ -313,8 +301,7 @@ fn grow_empty_moved() {
     drop(b);
 
     assert_structure! {
-        alloc,
-        free[C], list[B, A],
+        alloc, free[C], list[B, A],
         A => { 1, 4, 4, Used },
         B => { 0, 0, 1, Occupy },
         C => { 0, 0, 0, Free },
@@ -323,8 +310,7 @@ fn grow_empty_moved() {
     drop(a);
 
     assert_structure! {
-        alloc,
-        free[B, A, C], list[],
+        alloc, free[B, A, C], list[],
         A => { 0, 0, 0, Free },
         B => { 0, 0, 0, Free },
         C => { 0, 0, 0, Free },
@@ -345,8 +331,7 @@ fn write_buffer() {
     b.write(&[1, 2, 3, 4]);
 
     assert_structure! {
-        alloc,
-        free[], list[A, B],
+        alloc, free[], list[A, B],
         A => { 0, 2, 2, Used },
         B => { 2, 4, 4, Used },
     };
@@ -354,8 +339,7 @@ fn write_buffer() {
     a.write_buffer(b);
 
     assert_structure! {
-        alloc,
-        free[B], list[A],
+        alloc, free[B], list[A],
         A => { 0, 6, 6, Used },
         B => { 0, 0, 0, Free },
     };
@@ -377,8 +361,7 @@ fn write_buffer_middle() {
     c.write(&[1, 2, 3, 4]);
 
     assert_structure! {
-        alloc,
-        free[], list[A, B, C],
+        alloc, free[], list[A, B, C],
         A => { 0, 2, 2, Used },
         B => { 2, 4, 4, Used },
         C => { 6, 4, 4, Used },
@@ -387,8 +370,7 @@ fn write_buffer_middle() {
     a.write_buffer(b);
 
     assert_structure! {
-        alloc,
-        free[B], list[A, C],
+        alloc, free[B], list[A, C],
         A => { 0, 6, 6, Used },
         B => { 0, 0, 0, Free },
         C => { 6, 4, 4, Used },
@@ -411,8 +393,7 @@ fn write_buffer_gap() {
     c.write(&[3, 4, 5, 6]);
 
     assert_structure! {
-        alloc,
-        free[], list[A, B, C],
+        alloc, free[], list[A, B, C],
         A => { 0, 2, 2, Used },
         B => { 2, 4, 4, Used },
         C => { 6, 4, 4, Used },
@@ -422,8 +403,7 @@ fn write_buffer_gap() {
     a.write_buffer(c);
 
     assert_structure! {
-        alloc,
-        free[C, B], list[A],
+        alloc, free[C, B], list[A],
         A => { 0, 6, 10, Used },
         B => { 0, 0, 0, Free },
         C => { 0, 0, 0, Free },
@@ -472,8 +452,7 @@ fn grow_into_preceeding() {
     drop(a);
 
     assert_structure! {
-        alloc,
-        free[], list[A, B, C, D],
+        alloc, free[], list[A, B, C, D],
         A => { 0, 0, 1, Occupy },
         B => { 1, 1, 1, Used },
         C => { 2, 1, 1, Used },
@@ -483,10 +462,87 @@ fn grow_into_preceeding() {
     b.write(&[2]);
 
     assert_structure! {
-        alloc,
-        free[B], list[A, C, D],
+        alloc, free[B], list[A, C, D],
         A => { 0, 2, 2, Used },
         C => { 2, 1, 1, Used },
         D => { 3, 1, 1, Used },
     };
+}
+
+/// Test when we have a prior allocation that has been freed and we can grow into it.
+#[test]
+fn flip_flop() {
+    let mut buf = StackBuffer::<4096>::new();
+    let alloc = NoStd::new(&mut buf);
+
+    let mut a = alloc.alloc().unwrap();
+    let mut b = alloc.alloc().unwrap();
+
+    a.write(&[0]);
+    b.write(&[0]);
+
+    assert_structure! {
+        alloc, free[], list[A, B],
+        A => { 0, 1, 1, Used },
+        B => { 1, 1, 1, Used },
+    };
+
+    a.write(&[1]);
+    assert_eq!(a.region.get(), C);
+
+    assert_structure! {
+        alloc, free[], list[A, B, C],
+        A => { 0, 0, 1, Occupy },
+        B => { 1, 1, 1, Used },
+        C => { 2, 2, 2, Used },
+    };
+
+    b.write(&[1]);
+    assert_eq!(b.region.get(), A);
+
+    assert_structure! {
+        alloc, free[B], list[A, C],
+        A => { 0, 2, 2, Used },
+        C => { 2, 2, 2, Used },
+    };
+
+    a.write(&[2]);
+    assert_eq!(a.region.get(), C);
+
+    assert_structure! {
+        alloc, free[B], list[A, C],
+        A => { 0, 2, 2, Used },
+        C => { 2, 3, 3, Used },
+    };
+
+    b.write(&[2]);
+    assert_eq!(b.region.get(), B);
+
+    assert_structure! {
+        alloc, free[], list[A, C, B],
+        A => { 0, 0, 2, Occupy },
+        C => { 2, 3, 3, Used },
+        B => { 5, 3, 3, Used },
+    };
+
+    a.write(&[3]);
+    assert_eq!(a.region.get(), A);
+
+    assert_structure! {
+        alloc, free[C], list[A, B],
+        A => { 0, 4, 5, Used },
+        B => { 5, 3, 3, Used },
+    };
+
+    b.write(&[3]);
+    assert_eq!(b.region.get(), B);
+
+    assert_structure! {
+        alloc, free[C], list[A, B],
+        A => { 0, 4, 5, Used },
+        B => { 5, 4, 4, Used },
+    };
+
+    assert_eq!(a.as_slice(), &[0, 1, 2, 3]);
+    assert_eq!(b.as_slice(), &[0, 1, 2, 3]);
 }
