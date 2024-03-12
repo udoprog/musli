@@ -163,26 +163,26 @@ impl<'a> Buf for NoStdBuf<'a> {
 
             unsafe {
                 let i = &mut *self.internal.get();
-                let this_ptr = &mut *i.header_mut(this);
+                let this_ptr = i.header_mut(this);
 
-                let Some(other_region) = this_ptr.next else {
+                let Some(other_region) = (*this_ptr).next else {
                     break 'out;
                 };
 
                 // Prevent the other buffer from being dropped.
                 forget(other);
 
-                let other_ptr = &mut *i.header_mut(other_region);
+                let other_ptr = i.header_mut(other_region);
 
-                let next = other_ptr.next.take();
+                let next = (*other_ptr).next.take();
 
-                this_ptr.cap += other_ptr.cap;
-                this_ptr.len += other_ptr.len;
-                this_ptr.next = next;
+                (*this_ptr).cap += (*other_ptr).cap;
+                (*this_ptr).len += (*other_ptr).len;
+                (*this_ptr).next = next;
 
                 if let Some(next) = next {
-                    let next_ptr = &mut *i.header_mut(next);
-                    next_ptr.prev = Some(this);
+                    let next_ptr = i.header_mut(next);
+                    (*next_ptr).prev = Some(this);
                 } else {
                     i.tail = Some(this);
                 }
