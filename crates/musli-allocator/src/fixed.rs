@@ -10,16 +10,19 @@ use core::ptr;
 use core::slice;
 use core::str;
 
+/// An error raised when we are at capacity.
 #[non_exhaustive]
-pub(crate) struct CapacityError;
+pub struct CapacityError;
 
+/// A fixed capacity vector allocated on the stack.
 pub struct FixedVec<T, const N: usize> {
     data: [MaybeUninit<T>; N],
     len: usize,
 }
 
 impl<T, const N: usize> FixedVec<T, N> {
-    pub(crate) const fn new() -> FixedVec<T, N> {
+    /// Construct a new empty fixed vector.
+    pub const fn new() -> FixedVec<T, N> {
         unsafe {
             FixedVec {
                 data: MaybeUninit::uninit().assume_init(),
@@ -78,7 +81,8 @@ impl<T, const N: usize> FixedVec<T, N> {
         Ok(())
     }
 
-    pub(crate) fn try_push(&mut self, element: T) -> Result<(), CapacityError> {
+    /// Try to push an element onto the fixed vector.
+    pub fn try_push(&mut self, element: T) -> Result<(), CapacityError> {
         if self.len >= N {
             return Err(CapacityError);
         }
@@ -91,7 +95,8 @@ impl<T, const N: usize> FixedVec<T, N> {
         Ok(())
     }
 
-    pub(crate) fn pop(&mut self) -> Option<T> {
+    /// Pop the last element in the fixed vector.
+    pub fn pop(&mut self) -> Option<T> {
         if self.len == 0 {
             return None;
         }
@@ -148,7 +153,8 @@ pub struct FixedString<const N: usize> {
 }
 
 impl<const N: usize> FixedString<N> {
-    pub(crate) const fn new() -> FixedString<N> {
+    /// Construct a new fixed string.
+    pub const fn new() -> FixedString<N> {
         FixedString {
             data: FixedVec::new(),
         }

@@ -74,8 +74,7 @@ use core::slice;
 
 use musli::context::Buf;
 
-use crate::allocator::Allocator;
-use crate::fixed::FixedVec;
+use crate::{Allocator, FixedVec};
 
 const HEADER_U32: u32 = size_of::<Header>() as u32;
 // We keep max bytes to 2^31, since that ensures that addition between two
@@ -83,6 +82,8 @@ const HEADER_U32: u32 = size_of::<Header>() as u32;
 const MAX_BYTES: u32 = i32::MAX as u32;
 
 /// A buffer that can be used to store data on the stack.
+///
+/// See the [module level documentation][self] for more information.
 pub struct StackBuffer<const C: usize> {
     data: FixedVec<u8, C>,
 }
@@ -125,6 +126,8 @@ impl<const C: usize> DerefMut for StackBuffer<C> {
 /// in.
 ///
 /// To conveniently construct a buffer you can use the [`StackBuffer`] type.
+///
+/// See the [module level documentation][self] for more information.
 pub struct Stack<'a> {
     // This must be an unsafe cell, since it's mutably accessed through an
     // immutable pointers. We simply make sure that those accesses do not

@@ -24,10 +24,11 @@ extern crate std;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-pub mod allocator;
+#[doc(inline)]
+pub use musli_allocator as allocator;
+
 pub mod buffered_writer;
 pub mod context;
-mod fixed;
 pub mod fixed_bytes;
 pub mod int;
 #[macro_use]
