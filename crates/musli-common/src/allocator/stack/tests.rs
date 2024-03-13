@@ -1,10 +1,10 @@
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
-use std::mem::size_of;
 use std::vec::Vec;
 
 use crate::allocator::{Allocator, Buf, Stack, StackBuffer};
 
+use super::HEADER_U32;
 use super::{Header, HeaderId, State};
 
 #[repr(transparent)]
@@ -96,10 +96,10 @@ macro_rules! assert_structure {
         let free = assert_free!(i $(, $free)*);
         let list = assert_list!(i $(, $node)*);
 
-        let expected_bytes = (0u32 $(+ (*i.header($region)).cap)*) as usize;
+        let expected_bytes = (0u32 $(+ (*i.header($region)).cap)*) as u32;
 
         assert_eq!(i.bytes, expected_bytes, "The number of bytes allocated should match");
-        assert_eq!(i.headers / size_of::<Header>(), free.len() + list.len(), "The number of headers should match");
+        assert_eq!(i.headers / HEADER_U32, (free.len() + list.len()) as u32, "The number of headers should match");
 
         let mut free_next = HashMap::new();
 
