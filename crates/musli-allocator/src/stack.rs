@@ -74,7 +74,7 @@ use core::slice;
 
 use musli::{Allocator, Buf};
 
-use crate::FixedVec;
+use crate::{FixedVec, DEFAULT_STACK_BUFFER};
 
 const HEADER_U32: u32 = size_of::<Header>() as u32;
 // We keep max bytes to 2^31, since that ensures that addition between two
@@ -84,7 +84,7 @@ const MAX_BYTES: u32 = i32::MAX as u32;
 /// A buffer that can be used to store data on the stack.
 ///
 /// See the [module level documentation][self] for more information.
-pub struct StackBuffer<const C: usize> {
+pub struct StackBuffer<const C: usize = DEFAULT_STACK_BUFFER> {
     data: FixedVec<u8, C>,
 }
 

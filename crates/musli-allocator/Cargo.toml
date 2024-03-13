@@ -13,8 +13,8 @@ categories = ["no-std", "memory-management", "rust-patterns"]
 
 [features]
 default = ["std"]
-std = ["alloc"]
-alloc = []
+std = ["alloc", "musli/std"]
+alloc = ["musli/alloc"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.96", default-features = false }

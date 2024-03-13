@@ -36,95 +36,78 @@ mod disabled;
 pub use self::disabled::Disabled;
 
 pub mod stack;
+#[doc(inline)]
 pub use self::stack::{Stack, StackBuffer};
 
 mod fixed;
 #[doc(hidden)]
 pub use self::fixed::{FixedString, FixedVec};
 
+/// The default stack buffer size.
+pub const DEFAULT_STACK_BUFFER: usize = 4096;
+
 #[cfg(feature = "alloc")]
 mod default_alloc {
-    #![allow(missing_docs)]
-
-    use musli::Allocator;
-
-    pub struct DefaultBuffer(super::SystemBuffer);
-    pub struct Default<'a>(super::System<'a>);
+    #[doc(hidden)]
+    pub type DefaultBuffer = super::SystemBuffer;
+    #[doc(hidden)]
+    pub type Default<'a> = super::System<'a>;
 
     pub(super) fn buffer() -> DefaultBuffer {
-        DefaultBuffer(super::SystemBuffer::new())
+        DefaultBuffer::new()
     }
 
-    pub(super) fn new(DefaultBuffer(buf): &mut DefaultBuffer) -> Default<'_> {
-        Default(super::System::new(buf))
-    }
-
-    impl<'a> Allocator for Default<'a> {
-        type Buf<'this> = <super::System<'a> as Allocator>::Buf<'this>
-        where
-            Self: 'this;
-
-        #[inline(always)]
-        fn alloc(&self) -> Option<Self::Buf<'_>> {
-            self.0.alloc()
-        }
+    pub(super) fn new(buf: &mut DefaultBuffer) -> Default<'_> {
+        Default::new(buf)
     }
 }
 
 #[cfg(not(feature = "alloc"))]
 mod default_alloc {
-    #![allow(missing_docs)]
+    use super::DEFAULT_STACK_BUFFER;
 
-    use musli::Allocator;
-
-    type InnerAllocator<'a> = super::Stack<'a>;
-
-    pub struct DefaultBuffer(super::StackBuffer<4096>);
-    pub struct Default<'a>(InnerAllocator<'a>);
+    #[doc(hidden)]
+    pub type DefaultBuffer = super::StackBuffer<{ DEFAULT_STACK_BUFFER }>;
+    #[doc(hidden)]
+    pub type Default<'a> = super::Stack<'a>;
 
     pub(super) fn buffer() -> DefaultBuffer {
-        DefaultBuffer(super::StackBuffer::new())
+        DefaultBuffer::new()
     }
 
-    pub(super) fn new(DefaultBuffer(buf): &mut DefaultBuffer) -> Default<'_> {
-        Default(super::Stack::new(buf))
-    }
-
-    impl<'a> Allocator for Default<'a> {
-        type Buf<'this> = <super::Stack<'a> as super::Allocator>::Buf<'this>
-        where
-            Self: 'this;
-
-        #[inline(always)]
-        fn alloc(&self) -> Option<Self::Buf<'_>> {
-            self.0.alloc()
-        }
+    pub(super) fn new(buf: &mut DefaultBuffer) -> Default<'_> {
+        Default::new(buf)
     }
 }
 
+/// The default backing allocator buffer.
+///
+/// * If the `alloc` feature is enabled, this is [`SystemBuffer`].
+/// * Otherwise this is [`StackBuffer`] with a default size of
+///   [`DEFAULT_STACK_BUFFER`].
+#[doc(inline)]
+pub use self::default_alloc::DefaultBuffer;
+
+/// The default allocator.
+///
+/// * If the `alloc` feature is enabled, this is the [`System`] allocator.
+/// * Otherwise this is the [`Stack`] allocator.
+#[doc(inline)]
+pub use self::default_alloc::Default;
+
 /// Construct a new default buffer.
 ///
-/// Uses [`HeapBuffer`] if the `alloc` feature is enabled, otherwise
-/// `StackBuffer` is used with a default size of `4096`.
+/// * If the `alloc` feature is enabled, this is [`SystemBuffer`].
+/// * Otherwise this is [`StackBuffer`] with a default size of
+///   [`DEFAULT_STACK_BUFFER`].
 pub fn buffer() -> DefaultBuffer {
     self::default_alloc::buffer()
 }
 
 /// Construct a new default allocator.
 ///
-/// Uses the [`Alloc`] allocator if the `alloc` feature is enabled, otherwise
-/// [`Stack`].
-///
-/// Requires that [`buffer()`] is used to construct the provided buffer.
+/// * If the `alloc` feature is enabled, this is the [`System`] allocator.
+/// * Otherwise this is the [`Stack`] allocator.
 pub fn new(buf: &mut DefaultBuffer) -> Default<'_> {
     self::default_alloc::new(buf)
 }
-
-/// The default allocator.
-///
-/// The exact implementation depends on which features are enabled (first one
-/// takes preference):
-/// * If `alloc` is enabled, this is the [`Alloc`] allocator.
-/// * Otherwise this is the [`Stack`] allocator.
-#[doc(inline)]
-pub use self::default_alloc::{Default, DefaultBuffer};
