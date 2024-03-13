@@ -1,72 +1,9 @@
-//! This is a no-std allocator that can be used with the `musli` crate.
-//!
-//! It is geared towards handling few allocations, but they can be arbitrarily
-//! large. It is optimized to work best when allocations are short lived and
-//! "merged back" into one previously allocated region through
-//! `Buffer::write_buffer`.
-//!
-//! Further more its optimized to write to one allocation "at a time". So once
-//! an allocation has been grown once, it will be put in a region where it is
-//! unlikely to need to be moved again, usually the last region which has access
-//! to the remainder of the provided buffer.
-//!
-//! For the moment, this allocator only supports 255 allocations to keep the
-//! metadata small.
-//!
-//! # Design
-//!
-//! The allocator takes a buffer of contiguous memory. This is dynamically
-//! diviced into two parts:
-//!
-//! * One part which grows upwards from the base, constituting the memory being
-//!   allocated.
-//! * Its metadata growing downward from the end of the buffer, containing
-//!   headers for all allocated region.
-//!
-//! By designing the allocator so that the memory allocated and its metadata is
-//! separate, neighbouring regions can efficiently be merged as they are written
-//! or freed.
-//!
-//! Each allocation is sparse, meaning it does not try to over-allocate memory.
-//! This ensures that subsequent regions with initialized memory can be merged
-//! efficiently, but degrades performance for many small writes performed across
-//! multiple allocations concurrently.
-//!
-//! Below is an illustration of this, where `a` and `b` are two allocations
-//! where we write one byte at a time to each. Here `x` below indicates an
-//! occupied `gap` in memory regions.
-//!
-//! ```text
-//! a
-//! ab
-//! # a moved to end
-//! xbaa
-//! # b moved to 0
-//! bbaa
-//! # aa not moved
-//! bbaaa
-//! # bb moved to end
-//! xxaaabbb
-//! # aaa moved to 0
-//! aaaaxbbb
-//! # bbb not moved
-//! aaaaxbbbb
-//! # aaaa not moved
-//! aaaaabbbb
-//! # bbbbb not moved
-//! aaaaabbbbb
-//! # aaaaa moved to end
-//! xxxxxbbbbbaaaaaa
-//! # bbbbb moved to 0
-//! bbbbbbxxxxaaaaaa
-//! ```
-
 #[cfg(test)]
 mod tests;
 
 use core::cell::{Cell, UnsafeCell};
 use core::marker::PhantomData;
-use core::mem::{forget, replace, size_of, MaybeUninit};
+use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
 use core::num::NonZeroU8;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
@@ -76,10 +13,19 @@ use musli::{Allocator, Buf};
 
 use crate::{FixedVec, DEFAULT_STACK_BUFFER};
 
+/// Required alignment.
+const ALIGNMENT: usize = 8;
+/// The size of a header.
 const HEADER_U32: u32 = size_of::<Header>() as u32;
 // We keep max bytes to 2^31, since that ensures that addition between two
 // magnitutes never overflow.
 const MAX_BYTES: u32 = i32::MAX as u32;
+
+const _: () = {
+    if ALIGNMENT % align_of::<Header>() != 0 {
+        panic!("Header is not aligned by 8");
+    }
+};
 
 /// A buffer that can be used to store data on the stack.
 ///
@@ -120,14 +66,70 @@ impl<const C: usize> DerefMut for StackBuffer<C> {
     }
 }
 
-/// Stack-based buffer that can be used in combination with a `Context`.
+/// A no-std compatible fixed-memory allocator that can be used with the `musli`
+/// crate.
 ///
-/// This type of allocator has a fixed capacity specified by the slice passed
-/// in.
+/// It is geared towards handling few allocations, but they can be arbitrarily
+/// large. It is optimized to work best when allocations are short lived and
+/// "merged back" into one previously allocated region through
+/// `Buffer::write_buffer`.
 ///
-/// To conveniently construct a buffer you can use the [`StackBuffer`] type.
+/// It's also optimized to write to one allocation "at a time". So once an
+/// allocation has been grown once, it will be put in a region where it is
+/// unlikely to need to be moved again, usually the last region which has access
+/// to the remainder of the provided buffer.
 ///
-/// See the [module level documentation][self] for more information.
+/// For the moment, this allocator only supports 255 unique allocations, which
+/// is fine for use with the `musli` crate, but might be a limitation for other
+/// use-cases.
+///
+/// # Design
+///
+/// The allocator takes a buffer of contiguous memory. This is dynamically
+/// diviced into two parts:
+///
+/// * One part which grows upwards from the base, constituting the memory being
+///   allocated.
+/// * Its metadata growing downward from the end of the buffer, containing
+///   headers for all allocated region.
+///
+/// By designing the allocator so that the memory allocated and its metadata is
+/// separate, neighbouring regions can efficiently be merged as they are written
+/// or freed.
+///
+/// Each allocation is sparse, meaning it does not try to over-allocate memory.
+/// This ensures that subsequent regions with initialized memory can be merged
+/// efficiently, but degrades performance for many small writes performed across
+/// multiple allocations concurrently.
+///
+/// Below is an illustration of this, where `a` and `b` are two allocations
+/// where we write one byte at a time to each. Here `x` below indicates an
+/// occupied `gap` in memory regions.
+///
+/// ```text
+/// a
+/// ab
+/// # a moved to end
+/// xbaa
+/// # b moved to 0
+/// bbaa
+/// # aa not moved
+/// bbaaa
+/// # bb moved to end
+/// xxaaabbb
+/// # aaa moved to 0
+/// aaaaxbbb
+/// # bbb not moved
+/// aaaaxbbbb
+/// # aaaa not moved
+/// aaaaabbbb
+/// # bbbbb not moved
+/// aaaaabbbbb
+/// # aaaaa moved to end
+/// xxxxxbbbbbaaaaaa
+/// # bbbbb moved to 0
+/// bbbbbbxxxxaaaaaa
+/// ```
 pub struct Stack<'a> {
     // This must be an unsafe cell, since it's mutably accessed through an
     // immutable pointers. We simply make sure that those accesses do not
@@ -140,12 +142,35 @@ pub struct Stack<'a> {
 
 impl<'a> Stack<'a> {
     /// Build a new no-std allocator.
+    ///
+    /// The buffer must be aligned by 8 bytes, and should be a multiple of 8 bytes.
+    ///
+    /// See [type-level documentation][Stack] for more information.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called with a buffer larger than 2**31 or is
+    /// provided a buffer which is not aligned by 8.
+    ///
+    /// An easy way to align a buffer is to use [`StackBuffer`] when
+    /// constructing it.
     pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
         assert!(
             buffer.len() <= MAX_BYTES as usize,
             "Buffer too large 0-{}",
             MAX_BYTES
         );
+
+        assert!(
+            buffer.as_ptr() as usize % ALIGNMENT == 0,
+            "Provided buffer at {:08x} is not aligned by 8",
+            buffer.as_ptr() as usize
+        );
+
+        let size = buffer.len() as u32;
+
+        // Ensure the buffer is aligned for headers.
+        let size = size - size % (ALIGNMENT as u32);
 
         Self {
             internal: UnsafeCell::new(Internal {
@@ -155,7 +180,7 @@ impl<'a> Stack<'a> {
                 bytes: 0,
                 headers: 0,
                 occupied: 0,
-                size: buffer.len() as u32,
+                size,
                 data: buffer.as_mut_ptr(),
             }),
             _marker: PhantomData,
@@ -204,12 +229,12 @@ impl<'a> Buf for StackBuf<'a> {
             let i = &mut *self.internal.get();
 
             let region = i.region(self.region.get());
-            let len = (*region.ptr).len;
+            let len = region.len;
 
             // Region can fit the bytes available.
-            let region = 'out: {
+            let mut region = 'out: {
                 // Region can already fit in the requested bytes.
-                if (*region.ptr).cap - len >= bytes_len {
+                if region.cap - len >= bytes_len {
                     break 'out region;
                 };
 
@@ -223,13 +248,10 @@ impl<'a> Buf for StackBuf<'a> {
                 region
             };
 
-            let dst = i
-                .data
-                .wrapping_add(((*region.ptr).start + len) as usize)
-                .cast();
+            let dst = i.data.wrapping_add((region.start + len) as usize).cast();
 
             ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
-            (*region.ptr).len += bytes.len() as u32;
+            region.len += bytes.len() as u32;
             true
         }
     }
@@ -246,9 +268,9 @@ impl<'a> Buf for StackBuf<'a> {
 
             unsafe {
                 let i = &mut *self.internal.get();
-                let this = i.region(self.region.get());
+                let mut this = i.region(self.region.get());
 
-                debug_assert!((*this.ptr).cap >= (*this.ptr).len);
+                debug_assert!(this.cap >= this.len);
 
                 let data_cap_ptr = this.data_cap_ptr(i.data);
 
@@ -260,7 +282,7 @@ impl<'a> Buf for StackBuf<'a> {
                     break 'out;
                 }
 
-                let Some(next) = (*this.ptr).next else {
+                let Some(next) = this.next else {
                     break 'out;
                 };
 
@@ -270,18 +292,18 @@ impl<'a> Buf for StackBuf<'a> {
 
                 let next = i.region(next);
 
-                let diff = (*this.ptr).cap - (*this.ptr).len;
+                let diff = this.cap - this.len;
 
                 // Data needs to be shuffle back to the end of the initialized
                 // region.
                 if diff > 0 {
                     let to_ptr = data_cap_ptr.wrapping_sub(diff as usize);
-                    ptr::copy(data_cap_ptr, to_ptr, (*next.ptr).len as usize);
+                    ptr::copy(data_cap_ptr, to_ptr, next.len as usize);
                 }
 
                 let old = i.free_region(next);
-                (*this.ptr).cap += old.cap;
-                (*this.ptr).len += old.len;
+                this.cap += old.cap;
+                this.len += old.len;
                 return true;
             }
         }
@@ -325,12 +347,32 @@ struct Region {
 impl Region {
     #[inline]
     unsafe fn data_cap_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
-        data.wrapping_add(((*self.ptr).start + (*self.ptr).cap) as usize)
+        data.wrapping_add((self.start + self.cap) as usize)
     }
 
     #[inline]
     unsafe fn data_base_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
-        data.wrapping_add((*self.ptr).start as usize)
+        data.wrapping_add(self.start as usize)
+    }
+}
+
+impl Deref for Region {
+    type Target = Header;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        // SAFETY: Construction of the region is unsafe, so the caller must
+        // ensure that it's used correctly after that.
+        unsafe { &*self.ptr }
+    }
+}
+
+impl DerefMut for Region {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // SAFETY: Construction of the region is unsafe, so the caller must
+        // ensure that it's used correctly after that.
+        unsafe { &mut *self.ptr }
     }
 }
 
@@ -428,8 +470,8 @@ impl Internal {
     }
 
     unsafe fn replace_back(&mut self, region: &mut Region) {
-        let prev = (*region.ptr).prev.take();
-        let next = (*region.ptr).next.take();
+        let prev = region.prev.take();
+        let next = region.next.take();
 
         if let Some(prev) = prev {
             (*self.header_mut(prev)).next = next;
@@ -452,7 +494,7 @@ impl Internal {
         }
 
         if let Some(tail) = self.tail.replace(region.id) {
-            (*region.ptr).prev = Some(tail);
+            region.prev = Some(tail);
             (*self.region(tail).ptr).next = Some(region.id);
         }
     }
@@ -480,26 +522,26 @@ impl Internal {
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: u32) -> Option<Region> {
         if self.occupied > 0 {
-            if let Some(region) =
+            if let Some(mut region) =
                 self.find_region(|h| h.state == State::Occupy && h.cap >= requested)
             {
                 self.occupied -= 1;
-                (*region.ptr).state = State::Used;
+                region.state = State::Used;
                 return Some(region);
             }
         }
 
         let mut region = 'out: {
-            if let Some(region) = self.pop_free() {
+            if let Some(mut region) = self.pop_free() {
                 let bytes = self.bytes + requested;
 
                 if bytes > self.size {
                     return None;
                 }
 
-                (*region.ptr).start = self.bytes;
-                (*region.ptr).state = State::Used;
-                (*region.ptr).cap = requested;
+                region.start = self.bytes;
+                region.state = State::Used;
+                region.cap = requested;
 
                 self.bytes = bytes;
                 break 'out region;
@@ -538,32 +580,32 @@ impl Internal {
     }
 
     unsafe fn free(&mut self, region: HeaderId) {
-        let region = self.region(region);
+        let mut region = self.region(region);
 
-        debug_assert_eq!((*region.ptr).state, State::Used);
-        debug_assert_eq!((*region.ptr).next_free, None);
+        debug_assert_eq!(region.state, State::Used);
+        debug_assert_eq!(region.next_free, None);
 
         // Just free up the last region in the slab.
-        if (*region.ptr).next.is_none() {
+        if region.next.is_none() {
             self.free_tail(region);
             return;
         }
 
         // If there is no previous region, then mark this region as occupy.
-        let Some(prev) = (*region.ptr).prev else {
+        let Some(prev) = region.prev else {
             self.occupied += 1;
-            (*region.ptr).state = State::Occupy;
-            (*region.ptr).len = 0;
+            region.state = State::Occupy;
+            region.len = 0;
             return;
         };
 
-        let prev = self.region(prev);
-        debug_assert!(matches!((*prev.ptr).state, State::Occupy | State::Used));
+        let mut prev = self.region(prev);
+        debug_assert!(matches!(prev.state, State::Occupy | State::Used));
 
         // Move allocation to the previous region.
         let region = self.free_region(region);
 
-        (*prev.ptr).cap += region.cap;
+        prev.cap += region.cap;
 
         // The current header being freed is the last in the list.
         if region.next.is_none() {
@@ -586,7 +628,7 @@ impl Internal {
         let prev = self.region(prev);
 
         // The prior region is occupied, so we can free that as well.
-        if (*prev.ptr).state == State::Occupy {
+        if prev.state == State::Occupy {
             let prev = self.free_region(prev);
             self.bytes -= prev.cap;
             self.occupied -= 1;
@@ -597,14 +639,14 @@ impl Internal {
         let mut from = self.region(from);
 
         // This is the last region in the slab, so we can just expand it.
-        if (*from.ptr).next.is_none() {
-            let additional = requested - (*from.ptr).cap;
+        if from.next.is_none() {
+            let additional = requested - from.cap;
 
             if self.bytes + additional > self.size {
                 return None;
             }
 
-            (*from.ptr).cap += additional;
+            from.cap += additional;
             self.bytes += additional;
             return Some(from);
         }
@@ -613,13 +655,13 @@ impl Internal {
         // fit in it.
         'bail: {
             // Check if the immediate prior region can fit the requested allocation.
-            let Some(prev) = (*from.ptr).prev else {
+            let Some(prev) = from.prev else {
                 break 'bail;
             };
 
-            let prev = self.region(prev);
+            let mut prev = self.region(prev);
 
-            if (*prev.ptr).state != State::Occupy || (*prev.ptr).cap + len < requested {
+            if prev.state != State::Occupy || prev.cap + len < requested {
                 break 'bail;
             }
 
@@ -630,44 +672,41 @@ impl Internal {
 
             ptr::copy(from_ptr, prev_ptr, from.len as usize);
 
-            (*prev.ptr).state = State::Used;
-            (*prev.ptr).cap += from.cap;
-            (*prev.ptr).len = from.len;
+            prev.state = State::Used;
+            prev.cap += from.cap;
+            prev.len = from.len;
             return Some(prev);
         }
 
         // There is no data allocated in the current region, so we can simply
         // re-link it to the end of the chain of allocation.
-        if (*from.ptr).cap == 0 {
+        if from.cap == 0 {
             let bytes = self.bytes + requested;
 
             if bytes > self.size {
                 return None;
             }
 
-            (*from.ptr).start = self.bytes;
-            (*from.ptr).cap = requested;
+            from.start = self.bytes;
+            from.cap = requested;
 
             self.replace_back(&mut from);
             self.bytes = bytes;
             return Some(from);
         }
 
-        let to = self.alloc(requested)?;
+        let mut to = self.alloc(requested)?;
 
         let from_data = self
             .data
-            .wrapping_add((*from.ptr).start as usize)
+            .wrapping_add(from.start as usize)
             .cast::<u8>()
             .cast_const();
 
-        let to_data = self
-            .data
-            .wrapping_add((*to.ptr).start as usize)
-            .cast::<u8>();
+        let to_data = self.data.wrapping_add(to.start as usize).cast::<u8>();
 
         ptr::copy_nonoverlapping(from_data, to_data, len as usize);
-        (*to.ptr).len = len;
+        to.len = len;
         self.free(from.id);
         Some(to)
     }
@@ -735,7 +774,7 @@ enum State {
 
 /// The header of a region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(C, packed)]
+#[repr(align(8))]
 struct Header {
     // Start of the allocated region as a multiple of 8.
     start: u32,

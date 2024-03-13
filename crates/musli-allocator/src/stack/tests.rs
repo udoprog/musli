@@ -588,15 +588,15 @@ fn limits() {
     let alloc = Stack::new(&mut buf);
     assert!(alloc.alloc().is_none());
 
-    let mut buf = StackBuffer::<20>::new();
+    let mut buf = StackBuffer::<24>::new();
     let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
-    assert!(a.write(&[0, 1, 2, 3]));
+    assert!(a.write(&[0, 1, 2, 3, 4, 5, 6, 7]));
 
     assert_structure! {
         alloc, free[], list[A],
-        A => { 0, 4, 4, Used },
+        A => { 0, 8, 8, Used },
     };
 
     assert!(!a.write(&[0]));

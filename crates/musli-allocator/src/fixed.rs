@@ -15,6 +15,7 @@ use core::str;
 pub struct CapacityError;
 
 /// A fixed capacity vector allocated on the stack.
+#[repr(C, align(8))]
 pub struct FixedVec<T, const N: usize> {
     data: [MaybeUninit<T>; N],
     len: usize,

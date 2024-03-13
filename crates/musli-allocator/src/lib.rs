@@ -35,7 +35,7 @@ pub use self::system::{System, SystemBuffer};
 mod disabled;
 pub use self::disabled::Disabled;
 
-pub mod stack;
+mod stack;
 #[doc(inline)]
 pub use self::stack::{Stack, StackBuffer};
 
