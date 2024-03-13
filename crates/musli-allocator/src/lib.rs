@@ -39,10 +39,6 @@ mod stack;
 #[doc(inline)]
 pub use self::stack::{Stack, StackBuffer};
 
-mod fixed;
-#[doc(hidden)]
-pub use self::fixed::{FixedString, FixedVec};
-
 /// The default stack buffer size.
 pub const DEFAULT_STACK_BUFFER: usize = 4096;
 

@@ -11,7 +11,7 @@ use core::slice;
 
 use musli::{Allocator, Buf};
 
-use crate::{FixedVec, DEFAULT_STACK_BUFFER};
+use crate::DEFAULT_STACK_BUFFER;
 
 /// Required alignment.
 const ALIGNMENT: usize = 8;
@@ -30,15 +30,18 @@ const _: () = {
 /// A buffer that can be used to store data on the stack.
 ///
 /// See the [module level documentation][self] for more information.
-pub struct StackBuffer<const C: usize = DEFAULT_STACK_BUFFER> {
-    data: FixedVec<u8, C>,
+#[repr(align(8))]
+pub struct StackBuffer<const N: usize = DEFAULT_STACK_BUFFER> {
+    data: [MaybeUninit<u8>; N],
 }
 
 impl<const C: usize> StackBuffer<C> {
     /// Construct a new buffer.
     pub const fn new() -> Self {
         Self {
-            data: FixedVec::new(),
+            // SAFETY: This is safe to initialize, since it's just an array of
+            // contiguous uninitialized memory.
+            data: unsafe { MaybeUninit::uninit().assume_init() },
         }
     }
 }
@@ -55,14 +58,14 @@ impl<const C: usize> Deref for StackBuffer<C> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.data.as_uninit_slice()
+        &self.data
     }
 }
 
 impl<const C: usize> DerefMut for StackBuffer<C> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.data.as_mut_uninit_slice()
+        &mut self.data
     }
 }
 

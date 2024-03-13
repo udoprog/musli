@@ -15,7 +15,6 @@ use core::str;
 pub struct CapacityError;
 
 /// A fixed capacity vector allocated on the stack.
-#[repr(C, align(8))]
 pub struct FixedVec<T, const N: usize> {
     data: [MaybeUninit<T>; N],
     len: usize,
@@ -23,7 +22,7 @@ pub struct FixedVec<T, const N: usize> {
 
 impl<T, const N: usize> FixedVec<T, N> {
     /// Construct a new empty fixed vector.
-    pub const fn new() -> FixedVec<T, N> {
+    pub(crate) const fn new() -> FixedVec<T, N> {
         unsafe {
             FixedVec {
                 data: MaybeUninit::uninit().assume_init(),
@@ -48,18 +47,8 @@ impl<T, const N: usize> FixedVec<T, N> {
     }
 
     #[inline]
-    pub(crate) fn as_uninit_slice(&self) -> &[MaybeUninit<T>] {
-        unsafe { slice::from_raw_parts(self.data.as_ptr(), N) }
-    }
-
-    #[inline]
     pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
         unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len) }
-    }
-
-    #[inline]
-    pub(crate) fn as_mut_uninit_slice(&mut self) -> &mut [MaybeUninit<T>] {
-        unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr(), N) }
     }
 
     pub(crate) fn try_extend_from_slice(&mut self, other: &[T]) -> Result<(), CapacityError>
@@ -83,7 +72,7 @@ impl<T, const N: usize> FixedVec<T, N> {
     }
 
     /// Try to push an element onto the fixed vector.
-    pub fn try_push(&mut self, element: T) -> Result<(), CapacityError> {
+    pub(crate) fn try_push(&mut self, element: T) -> Result<(), CapacityError> {
         if self.len >= N {
             return Err(CapacityError);
         }
@@ -97,7 +86,7 @@ impl<T, const N: usize> FixedVec<T, N> {
     }
 
     /// Pop the last element in the fixed vector.
-    pub fn pop(&mut self) -> Option<T> {
+    pub(crate) fn pop(&mut self) -> Option<T> {
         if self.len == 0 {
             return None;
         }
@@ -155,7 +144,7 @@ pub struct FixedString<const N: usize> {
 
 impl<const N: usize> FixedString<N> {
     /// Construct a new fixed string.
-    pub const fn new() -> FixedString<N> {
+    pub(crate) const fn new() -> FixedString<N> {
         FixedString {
             data: FixedVec::new(),
         }
