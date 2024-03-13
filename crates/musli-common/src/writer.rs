@@ -8,11 +8,10 @@ use core::fmt;
 use core::marker;
 use core::mem::take;
 
-use musli::Context;
+use musli::{Buf, Context};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-use musli::context::Buf;
 
 /// Maximum size used by a fixed length [`Buf`].
 pub const MAX_FIXED_BYTES_LEN: usize = 128;

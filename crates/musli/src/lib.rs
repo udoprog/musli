@@ -400,6 +400,12 @@ extern crate std;
 pub mod context;
 pub use self::context::Context;
 
+mod allocator;
+pub use self::allocator::Allocator;
+
+mod buf;
+pub use self::buf::Buf;
+
 pub mod compat;
 pub mod de;
 pub mod derives;

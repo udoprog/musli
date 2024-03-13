@@ -6,9 +6,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use musli::context::Error;
-use musli::Context;
+use musli::{Allocator, Context};
 
-use crate::allocator::Allocator;
 use crate::context::access;
 use crate::context::rich_error::{RichError, Step};
 

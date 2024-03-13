@@ -12,14 +12,13 @@ use core::marker;
 
 use crate::no_std::ToOwned;
 
-use crate::context::Buf;
 use crate::de::{
     AsDecoder, Decoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
     SizeHint, ValueVisitor, VariantDecoder,
 };
 use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
 use crate::error::Error;
-use crate::Context;
+use crate::{Buf, Context};
 
 /// An empty buffer.
 pub enum NeverBuffer {}

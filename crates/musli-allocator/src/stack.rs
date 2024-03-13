@@ -72,9 +72,9 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use musli::context::Buf;
+use musli::{Allocator, Buf};
 
-use crate::{Allocator, FixedVec};
+use crate::FixedVec;
 
 const HEADER_U32: u32 = size_of::<Header>() as u32;
 // We keep max bytes to 2^31, since that ensures that addition between two

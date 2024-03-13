@@ -1,5 +1,4 @@
-use musli::context::Buf;
-use musli::Context;
+use musli::{Buf, Context};
 
 use crate::error::{Error, ErrorKind};
 use crate::reader::{Parser, StringReference, Token};

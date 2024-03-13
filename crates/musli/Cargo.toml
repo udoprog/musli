@@ -17,8 +17,8 @@ categories = ["no-std", "encoding"]
 
 [features]
 default = ["std"]
-std = ["alloc", "musli-wire/std", "musli-value/std", "musli-storage/std", "musli-json/std"]
-alloc = ["musli-wire/alloc", "musli-value/alloc", "musli-storage/alloc", "musli-json/alloc"]
+std = ["alloc", "musli-wire/std", "musli-value/std", "musli-storage/std", "musli-json/std", "musli-allocator/std"]
+alloc = ["musli-wire/alloc", "musli-value/alloc", "musli-storage/alloc", "musli-json/alloc", "musli-allocator/alloc"]
 
 [dependencies]
 musli-macros = { version = "=0.0.96", path = "../musli-macros" }
@@ -28,3 +28,4 @@ musli-wire = { path = "../musli-wire", default-features = false }
 musli-value = { path = "../musli-value", default-features = false }
 musli-storage = { path = "../musli-storage", default-features = false }
 musli-json = { path = "../musli-json", default-features = false, features = ["std"] }
+musli-allocator = { path = "../musli-allocator", default-features = false }

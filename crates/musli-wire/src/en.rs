@@ -1,8 +1,7 @@
 use core::fmt;
 
-use musli::context::Buf;
 use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
-use musli::Context;
+use musli::{Buf, Context};
 use musli_storage::en::StorageEncoder;
 
 use crate::error::Error;

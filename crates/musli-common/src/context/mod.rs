@@ -11,9 +11,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use musli::context::Error;
-use musli::Context;
-
-use crate::allocator::Allocator;
+use musli::{Allocator, Context};
 
 #[cfg(feature = "alloc")]
 pub use self::alloc_context::AllocContext;
