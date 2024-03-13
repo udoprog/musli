@@ -41,11 +41,11 @@ impl<'a> System<'a> {
 }
 
 impl<'a> Allocator for System<'a> {
-    type Buf<'this> = AllocBuf<'this> where Self: 'this;
+    type Buf<'this> = SystemBuf<'this> where Self: 'this;
 
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
-        Some(AllocBuf {
+        Some(SystemBuf {
             region: Internal::alloc(&self.buf.internal),
             internal: &self.buf.internal,
         })
@@ -68,12 +68,12 @@ impl<'a> Drop for System<'a> {
 }
 
 /// A vector-backed allocation.
-pub struct AllocBuf<'a> {
+pub struct SystemBuf<'a> {
     region: &'a mut Region,
     internal: &'a UnsafeCell<Internal>,
 }
 
-impl<'a> Buf for AllocBuf<'a> {
+impl<'a> Buf for SystemBuf<'a> {
     #[inline]
     fn write(&mut self, bytes: &[u8]) -> bool {
         self.region.data.extend_from_slice(bytes);
@@ -91,7 +91,7 @@ impl<'a> Buf for AllocBuf<'a> {
     }
 }
 
-impl<'a> Drop for AllocBuf<'a> {
+impl<'a> Drop for SystemBuf<'a> {
     fn drop(&mut self) {
         Internal::free(self.internal, self.region);
     }

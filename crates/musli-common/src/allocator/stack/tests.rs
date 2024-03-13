@@ -5,7 +5,6 @@ use std::vec::Vec;
 
 use crate::allocator::{Allocator, Buf, Stack, StackBuffer};
 
-use super::HEADER_U32;
 use super::{Header, HeaderId, State};
 
 const A: HeaderId = unsafe { HeaderId::new_unchecked(1) };
@@ -137,7 +136,7 @@ macro_rules! assert_structure {
         let expected_bytes = (0u32 $(+ (*i.header($region)).cap)*) as u32;
 
         assert_eq!(i.bytes, expected_bytes, "The number of bytes allocated should match");
-        assert_eq!(i.headers / HEADER_U32, (free.len() + list.len()) as u32, "The number of headers should match");
+        assert_eq!(i.headers, (free.len() + list.len()) as u8, "The number of headers should match");
 
         let mut free_next = HashMap::new();
 
@@ -578,4 +577,25 @@ fn flip_flop() {
 
     assert_eq!(a.as_slice(), &[0, 1, 2, 3]);
     assert_eq!(b.as_slice(), &[0, 1, 2, 3]);
+}
+
+/// Test when we have a prior allocation that has been freed and we can grow into it.
+#[test]
+fn limits() {
+    let mut buf = StackBuffer::<8>::new();
+    let alloc = Stack::new(&mut buf);
+    assert!(alloc.alloc().is_none());
+
+    let mut buf = StackBuffer::<20>::new();
+    let alloc = Stack::new(&mut buf);
+
+    let mut a = alloc.alloc().unwrap();
+    assert!(a.write(&[0, 1, 2, 3]));
+
+    assert_structure! {
+        alloc, free[], list[A],
+        A => { 0, 4, 4, Used },
+    };
+
+    assert!(!a.write(&[0]));
 }
