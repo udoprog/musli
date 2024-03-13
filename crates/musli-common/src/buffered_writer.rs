@@ -1,8 +1,7 @@
 //! A writer which buffers the writes before it outputs it into the backing
 //! storage.
 
-use musli::context::Buf;
-use musli::Context;
+use musli::{Buf, Context};
 
 use crate::fixed_bytes::{FixedBytes, FixedBytesOverflow};
 use crate::writer::Writer;

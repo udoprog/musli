@@ -3,9 +3,9 @@ use core::fmt;
 use core::ops::Range;
 
 use musli::context::Error;
-use musli::Context;
+use musli::{Allocator, Context};
 
-use crate::allocator::{Allocator, FixedString, FixedVec};
+use crate::allocator::{FixedString, FixedVec};
 use crate::context::rich_error::{RichError, Step};
 
 use super::access::{Access, Shared};

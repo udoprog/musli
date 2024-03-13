@@ -557,8 +557,8 @@ where
         C: Context<Input = E::Error>,
         E: Encoder,
     {
-        use crate::context::Buf;
         use crate::en::VariantEncoder;
+        use crate::Buf;
         use std::os::windows::ffi::OsStrExt;
 
         let mut variant = encoder.encode_variant(cx)?;

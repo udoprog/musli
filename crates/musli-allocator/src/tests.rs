@@ -1,5 +1,4 @@
-use crate::Allocator;
-use musli::context::Buf;
+use musli::{Allocator, Buf};
 
 fn basic_allocations<A: Allocator>(alloc: &A) {
     let mut a = alloc.alloc().unwrap();

@@ -1,7 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use musli::context::Buf;
-use musli::Context;
+use musli::{Buf, Context};
 
 use crate::error::{Error, ErrorKind};
 use crate::reader::{Parser, SliceParser};

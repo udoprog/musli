@@ -5,8 +5,7 @@ use core::fmt;
 use core::mem::MaybeUninit;
 use core::ptr;
 
-use musli::context::Buf;
-use musli::Context;
+use musli::{Buf, Context};
 
 use crate::writer::Writer;
 

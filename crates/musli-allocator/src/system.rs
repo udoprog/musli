@@ -4,9 +4,7 @@ use core::ptr::NonNull;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use musli::context::Buf;
-
-use crate::Allocator;
+use musli::{Allocator, Buf};
 
 /// A dynamic buffer allocated on the heap.
 pub struct SystemBuffer {

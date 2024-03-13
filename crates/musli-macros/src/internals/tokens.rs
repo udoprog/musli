@@ -36,7 +36,7 @@ impl Tokens {
     pub(crate) fn new(span: Span, prefix: &syn::Path) -> Self {
         Self {
             as_decoder_t: path(span, prefix, ["de", "AsDecoder"]),
-            buf_t: path(span, prefix, ["context", "Buf"]),
+            buf_t: path(span, prefix, ["Buf"]),
             context_t: path(span, prefix, ["Context"]),
             core_result: core(span, ["result", "Result"]),
             decode_t: path(span, prefix, ["de", "Decode"]),

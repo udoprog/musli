@@ -5,9 +5,7 @@
 //! an adapter around an I/O type to work with musli.
 
 #[cfg(feature = "std")]
-use musli::context::Buf;
-#[cfg(feature = "std")]
-use musli::Context;
+use musli::{Buf, Context};
 
 /// Wrapper constructed with [wrap].
 pub struct Wrap<T> {
