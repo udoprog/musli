@@ -1,4 +1,4 @@
-use crate::allocator::Allocator;
+use crate::Allocator;
 use musli::context::Buf;
 
 fn basic_allocations<A: Allocator>(alloc: &A) {
@@ -31,14 +31,14 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
 
 #[test]
 fn alloc_basic() {
-    let mut buf = crate::allocator::SystemBuffer::new();
-    let alloc = crate::allocator::System::new(&mut buf);
+    let mut buf = crate::SystemBuffer::new();
+    let alloc = crate::System::new(&mut buf);
     basic_allocations(&alloc);
 }
 
 #[test]
 fn nostd_basic() {
-    let mut buf = crate::allocator::StackBuffer::<4096>::new();
-    let alloc = crate::allocator::Stack::new(&mut buf);
+    let mut buf = crate::StackBuffer::<4096>::new();
+    let alloc = crate::Stack::new(&mut buf);
     basic_allocations(&alloc);
 }

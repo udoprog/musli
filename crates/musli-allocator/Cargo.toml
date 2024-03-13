@@ -1,28 +1,20 @@
 [package]
-name = "musli-macros"
+name = "musli-allocator"
 version = "0.0.96"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.73"
-description = """
-Macros for Müsli.
-"""
 documentation = "https://docs.rs/musli"
 readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
 keywords = ["no_std", "serialization"]
-categories = ["no-std", "encoding"]
-
-[lib]
-proc-macro = true
-path = "src/lib.rs"
+categories = ["no-std", "memory-management", "rust-patterns"]
 
 [features]
-test = []
+default = ["std"]
+std = ["alloc", "musli/std"]
+alloc = ["musli/alloc"]
 
 [dependencies]
-proc-macro2 = "1.0.69"
-quote = "1.0.33"
-syn = { version = "2.0.38", features = ["full", "extra-traits"] }
+musli = { path = "../musli", version = "0.0.96", default-features = false }

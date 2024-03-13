@@ -13,15 +13,16 @@ homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
 keywords = ["no_std", "serialization"]
-categories = ["encoding"]
+categories = ["no-std", "encoding"]
 
 [features]
 default = ["std"]
-std = ["musli/std", "simdutf8?/std"]
-alloc = []
+std = ["alloc", "musli/std", "simdutf8?/std", "musli-allocator/std"]
+alloc = ["musli-allocator/alloc"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.96", default-features = false }
+musli-allocator = { path = "../musli-allocator", version = "0.0.96", default-features = false }
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 
 [dev-dependencies]

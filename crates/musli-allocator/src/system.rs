@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 
 use musli::context::Buf;
 
-use crate::allocator::Allocator;
+use crate::Allocator;
 
 /// A dynamic buffer allocated on the heap.
 pub struct SystemBuffer {

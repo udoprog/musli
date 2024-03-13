@@ -1,6 +1,6 @@
 use musli::context::Buf;
 
-use crate::allocator::Allocator;
+use crate::Allocator;
 
 /// An empty buffer.
 pub struct EmptyBuf;

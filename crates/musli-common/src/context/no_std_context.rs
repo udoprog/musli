@@ -5,9 +5,8 @@ use core::ops::Range;
 use musli::context::Error;
 use musli::Context;
 
-use crate::allocator::Allocator;
+use crate::allocator::{Allocator, FixedString, FixedVec};
 use crate::context::rich_error::{RichError, Step};
-use crate::fixed::{FixedString, FixedVec};
 
 use super::access::{Access, Shared};
 
