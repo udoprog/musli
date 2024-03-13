@@ -77,6 +77,8 @@ use musli::context::Buf;
 use crate::allocator::Allocator;
 use crate::fixed::FixedVec;
 
+const HEADER_U32: u32 = size_of::<Header>() as u32;
+
 /// A buffer that can be used to store data on the stack.
 pub struct StackBuffer<const C: usize> {
     data: FixedVec<u8, C>,
@@ -133,6 +135,12 @@ pub struct Stack<'a> {
 impl<'a> Stack<'a> {
     /// Build a new no-std allocator.
     pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
+        assert!(
+            buffer.len() <= u32::MAX as usize,
+            "Buffer too large 0-{}",
+            u32::MAX
+        );
+
         Self {
             internal: UnsafeCell::new(Internal {
                 free: None,
@@ -141,7 +149,7 @@ impl<'a> Stack<'a> {
                 bytes: 0,
                 headers: 0,
                 occupied: 0,
-                size: buffer.len(),
+                size: buffer.len() as u32,
                 data: buffer.as_mut_ptr(),
             }),
             _marker: PhantomData,
@@ -178,22 +186,28 @@ impl<'a> Buf for NoStdBuf<'a> {
             return true;
         }
 
+        let Ok(bytes_len) = u32::try_from(bytes.len()) else {
+            return false;
+        };
+
         // SAFETY: Due to invariants in the Buffer trait we know that these
         // cannot be used incorrectly.
         unsafe {
             let i = &mut *self.internal.get();
 
             let region = i.region_mut(self.region.get());
-            let len = (*region.ptr).len();
+            let len = (*region.ptr).len;
 
             // Region can fit the bytes available.
             let region = 'out: {
                 // Region can fit the requested bytes.
-                if (*region.ptr).cap() - len >= bytes.len() {
+                if (*region.ptr).cap - len >= bytes_len {
                     break 'out region;
                 };
 
-                let to_len = len + bytes.len();
+                let Ok(to_len) = u32::try_from(len + bytes_len) else {
+                    return false;
+                };
 
                 let Some(region) = i.realloc(self.region.get(), len, to_len) else {
                     return false;
@@ -203,7 +217,11 @@ impl<'a> Buf for NoStdBuf<'a> {
                 region
             };
 
-            let dst = i.data.wrapping_add((*region.ptr).start() + len).cast();
+            let dst = i
+                .data
+                .wrapping_add((*region.ptr).start())
+                .wrapping_add(len as usize)
+                .cast();
             ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
             (*region.ptr).len += bytes.len() as u32;
             true
@@ -321,13 +339,13 @@ struct Region {
 impl Region {
     #[inline]
     unsafe fn data_cap_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
-        data.wrapping_add((*self.ptr).start as usize)
-            .wrapping_add((*self.ptr).cap as usize)
+        data.wrapping_add((*self.ptr).start())
+            .wrapping_add((*self.ptr).cap())
     }
 
     #[inline]
     unsafe fn data_base_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
-        data.wrapping_add((*self.ptr).start as usize)
+        data.wrapping_add((*self.ptr).start())
     }
 }
 
@@ -363,13 +381,13 @@ struct Internal {
     // Pointer to the tail region.
     tail: Option<HeaderId>,
     // Bytes allocated.
-    bytes: usize,
+    bytes: u32,
     // Bytes used by region headers.
-    headers: usize,
+    headers: u32,
     /// The number of occupied regions.
     occupied: usize,
     /// The size of the buffer being wrapped.
-    size: usize,
+    size: u32,
     // The slab of regions and allocations.
     //
     // Allocated memory grows from the bottom upwards, because this allows
@@ -388,7 +406,7 @@ impl Internal {
         unsafe {
             &*self
                 .data
-                .wrapping_add(self.region_to_addr(at))
+                .wrapping_add(self.region_to_addr(at) as usize)
                 .cast::<Header>()
         }
     }
@@ -397,7 +415,7 @@ impl Internal {
     #[inline]
     fn header_mut(&mut self, at: HeaderId) -> *mut Header {
         self.data
-            .wrapping_add(self.region_to_addr(at))
+            .wrapping_add(self.region_to_addr(at) as usize)
             .cast::<Header>()
     }
 
@@ -429,14 +447,13 @@ impl Internal {
     /// # Safety
     ///
     /// The caller must ensure that `this` is exclusively available.
-    unsafe fn alloc(&mut self, requested: usize) -> Option<Region> {
+    unsafe fn alloc(&mut self, requested: u32) -> Option<Region> {
         if self.occupied > 0 {
             if let Some(region) =
-                self.find_region(|h| h.state == State::Occupy && h.cap() >= requested)
+                self.find_region(|h| h.state == State::Occupy && h.cap >= requested)
             {
                 self.occupied -= 1;
                 (*region.ptr).state = State::Used;
-                // TODO: Should we split the allocated region if possible?
                 return Some(region);
             }
         }
@@ -452,19 +469,19 @@ impl Internal {
                 break 'out (region, bytes, self.headers);
             }
 
-            let regions = self.headers.checked_add(size_of::<Header>())?;
+            let headers = self.headers.checked_add(HEADER_U32)?;
             let bytes = self.bytes.checked_add(requested)?;
 
-            if regions.checked_add(bytes)? > self.size {
+            if headers.checked_add(bytes)? > self.size {
                 return None;
             }
 
-            let addr = self.size - regions;
+            let addr = self.size - headers;
             let region = Region {
                 id: self.addr_to_region(addr),
-                ptr: self.data.wrapping_add(addr).cast::<Header>(),
+                ptr: self.data.wrapping_add(addr as usize).cast::<Header>(),
             };
-            (region, bytes, regions)
+            (region, bytes, headers)
         };
 
         let start = u32::try_from(self.bytes).ok()?;
@@ -491,7 +508,6 @@ impl Internal {
 
         self.headers = regions;
         self.bytes = bytes;
-
         Some(region)
     }
 
@@ -528,7 +544,7 @@ impl Internal {
             (*self.header_mut(next)).prev = old.prev;
         } else {
             // The current header being freed is the last in the list.
-            self.bytes = old.start as usize;
+            self.bytes = old.start;
             self.tail = old.prev;
         }
     }
@@ -540,7 +556,7 @@ impl Internal {
         let old = self.region_free(current);
         debug_assert_eq!(old.next, None);
 
-        let mut total = old.cap as usize;
+        let mut total = old.cap;
 
         'out: {
             let Some(prev) = old.prev else {
@@ -560,7 +576,7 @@ impl Internal {
             // The prior region is occupied, so we can free that as well.
             let prev = self.region_free(prev);
 
-            total += prev.cap as usize;
+            total += prev.cap;
             self.occupied -= 1;
 
             self.tail = prev.prev;
@@ -573,12 +589,12 @@ impl Internal {
         self.bytes -= total;
     }
 
-    unsafe fn realloc(&mut self, from: HeaderId, len: usize, requested: usize) -> Option<Region> {
+    unsafe fn realloc(&mut self, from: HeaderId, len: u32, requested: u32) -> Option<Region> {
         let from = self.region_mut(from);
 
         // This is the last region in the slab, so we can just expand it.
         if (*from.ptr).next.is_none() {
-            let additional = requested - (*from.ptr).cap();
+            let additional = requested - (*from.ptr).cap;
 
             if self.bytes + additional > self.size {
                 return None;
@@ -599,7 +615,7 @@ impl Internal {
 
             let prev = self.region_mut(prev);
 
-            if (*prev.ptr).state != State::Occupy || (*prev.ptr).cap() + len < requested {
+            if (*prev.ptr).state != State::Occupy || (*prev.ptr).cap + len < requested {
                 break 'bail;
             }
 
@@ -673,8 +689,8 @@ impl Internal {
 
         let to_data = self.data.wrapping_add((*to.ptr).start()).cast::<u8>();
 
-        ptr::copy_nonoverlapping(from_data, to_data, len);
-        (*to.ptr).len = len as u32;
+        ptr::copy_nonoverlapping(from_data, to_data, len as usize);
+        (*to.ptr).len = len;
         self.free(from.id);
         Some(to)
     }
@@ -706,14 +722,14 @@ impl Internal {
     }
 
     #[inline]
-    fn region_to_addr(&self, at: HeaderId) -> usize {
-        self.size - (at.get() as usize) * size_of::<Header>()
+    fn region_to_addr(&self, at: HeaderId) -> u32 {
+        self.size - u32::from(at.get()) * HEADER_U32
     }
 
     #[inline]
-    unsafe fn addr_to_region(&self, addr: usize) -> HeaderId {
+    unsafe fn addr_to_region(&self, addr: u32) -> HeaderId {
         debug_assert!(addr < self.size);
-        HeaderId::new_unchecked(((self.size - addr) / size_of::<Header>()) as u8)
+        HeaderId::new_unchecked(((self.size - addr) / HEADER_U32) as u8)
     }
 }
 
