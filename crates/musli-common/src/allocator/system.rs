@@ -9,11 +9,11 @@ use musli::context::Buf;
 use crate::allocator::Allocator;
 
 /// A dynamic buffer allocated on the heap.
-pub struct HeapBuffer {
+pub struct SystemBuffer {
     internal: UnsafeCell<Internal>,
 }
 
-impl HeapBuffer {
+impl SystemBuffer {
     /// Construct a new heap buffer.
     pub fn new() -> Self {
         Self {
@@ -22,25 +22,25 @@ impl HeapBuffer {
     }
 }
 
-impl Default for HeapBuffer {
+impl Default for SystemBuffer {
     fn default() -> Self {
         Self::new()
     }
 }
 
 /// Buffer used in combination with an [`Allocator`].
-pub struct Alloc<'a> {
-    buf: &'a mut HeapBuffer,
+pub struct System<'a> {
+    buf: &'a mut SystemBuffer,
 }
 
-impl<'a> Alloc<'a> {
+impl<'a> System<'a> {
     /// Construct a new allocator.
-    pub fn new(buf: &'a mut HeapBuffer) -> Self {
+    pub fn new(buf: &'a mut SystemBuffer) -> Self {
         Self { buf }
     }
 }
 
-impl<'a> Allocator for Alloc<'a> {
+impl<'a> Allocator for System<'a> {
     type Buf<'this> = AllocBuf<'this> where Self: 'this;
 
     #[inline(always)]
@@ -52,7 +52,7 @@ impl<'a> Allocator for Alloc<'a> {
     }
 }
 
-impl<'a> Drop for Alloc<'a> {
+impl<'a> Drop for System<'a> {
     fn drop(&mut self) {
         let internal = unsafe { &mut *self.buf.internal.get() };
 

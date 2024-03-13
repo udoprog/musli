@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use musli::{Decode, Encode};
-use musli_common::allocator::{NoStd, StackBuffer};
+use musli_common::allocator::{Stack, StackBuffer};
 use musli_common::context::NoStdContext;
 
 #[derive(Encode)]
@@ -20,7 +20,7 @@ struct Collection {
 #[test]
 fn trace_no_std() {
     let mut buf = StackBuffer::<1024>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
     let cx = NoStdContext::new(&alloc);
 
     let mut values = HashMap::new();

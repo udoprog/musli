@@ -114,17 +114,13 @@ impl<const C: usize> DerefMut for StackBuffer<C> {
     }
 }
 
-/// TODO: Make sure allocator passes miri.
+/// Stack-based buffer that can be used in combination with a `Context`.
 ///
-/// It currently cannot, since projecting from a pointer through a reference
-/// inherits its provinance, which means that each reference holds onto the
-/// entirety of the slice.
-
-/// Buffer used in combination with a `Context`.
+/// This type of allocator has a fixed capacity specified by the slice passed
+/// in.
 ///
-/// This type of allocator has a fixed capacity specified by `C` and can be
-/// constructed statically.
-pub struct NoStd<'a> {
+/// To conveniently construct a buffer you can use the [`StackBuffer`] type.
+pub struct Stack<'a> {
     // This must be an unsafe cell, since it's mutably accessed through an
     // immutable pointers. We simply make sure that those accesses do not
     // clobber each other, which we can do since the API is restricted through
@@ -134,7 +130,7 @@ pub struct NoStd<'a> {
     _marker: PhantomData<&'a mut [MaybeUninit<u8>]>,
 }
 
-impl<'a> NoStd<'a> {
+impl<'a> Stack<'a> {
     /// Build a new no-std allocator.
     pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
         Self {
@@ -153,7 +149,7 @@ impl<'a> NoStd<'a> {
     }
 }
 
-impl Allocator for NoStd<'_> {
+impl Allocator for Stack<'_> {
     type Buf<'this> = NoStdBuf<'this> where Self: 'this;
 
     #[inline(always)]
