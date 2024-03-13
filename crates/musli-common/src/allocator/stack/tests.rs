@@ -1,11 +1,27 @@
 use std::collections::{BTreeSet, HashMap};
-use std::fmt;
+use std::fmt::{self, Write};
+use std::string::String;
 use std::vec::Vec;
 
 use crate::allocator::{Allocator, Buf, Stack, StackBuffer};
 
 use super::HEADER_U32;
 use super::{Header, HeaderId, State};
+
+const A: HeaderId = unsafe { HeaderId::new_unchecked(1) };
+const B: HeaderId = unsafe { HeaderId::new_unchecked(2) };
+const C: HeaderId = unsafe { HeaderId::new_unchecked(3) };
+const D: HeaderId = unsafe { HeaderId::new_unchecked(4) };
+
+fn to_ident(id: HeaderId) -> Option<&'static Ident> {
+    Some(Ident::new(match id {
+        A => "A",
+        B => "B",
+        C => "C",
+        D => "D",
+        _ => return None,
+    }))
+}
 
 #[repr(transparent)]
 struct Ident(str);
@@ -36,7 +52,11 @@ where
     N: FnMut(HeaderId) -> Option<HeaderId>,
 {
     let mut actual = Vec::new();
+    let mut actual_idents = Vec::new();
+    let mut expected_idents = Vec::new();
     let mut it = expected.into_iter();
+
+    let mut errors = Vec::new();
 
     loop {
         let expected = it.next();
@@ -44,19 +64,37 @@ where
         let expected_name = expected.map(|(n, _)| Ident::new(n));
         let expected_node = expected.map(|(_, n)| n);
 
-        assert_eq!(
-            current,
-            expected_node,
-            "Expected element #{} {expected_name:?} in `{what}` list",
-            actual.len() + 1
-        );
+        expected_idents.extend(expected_name);
+
+        if current != expected_node {
+            errors.push((expected_name, actual.len() + 1));
+        }
 
         let Some(c) = current.take() else {
             break;
         };
 
+        let Some(ident) = to_ident(c) else {
+            panic!("Got unexpected header: {c:?}");
+        };
+
         actual.push(c);
+        actual_idents.push(ident);
         current = next(c);
+    }
+
+    if !errors.is_empty() {
+        let mut s = String::new();
+
+        writeln!(s, "Error in `{what}` list").unwrap();
+
+        for (expected_name, at) in errors {
+            writeln!(s, "Expected element #{at} {expected_name:?}` list").unwrap();
+        }
+
+        writeln!(s, "Actual list: {actual_idents:?}").unwrap();
+        writeln!(s, "Expected list: {expected_idents:?}").unwrap();
+        panic!("{s}")
     }
 
     actual
@@ -155,11 +193,6 @@ macro_rules! assert_structure {
         }
     }};
 }
-
-const A: HeaderId = unsafe { HeaderId::new_unchecked(1) };
-const B: HeaderId = unsafe { HeaderId::new_unchecked(2) };
-const C: HeaderId = unsafe { HeaderId::new_unchecked(3) };
-const D: HeaderId = unsafe { HeaderId::new_unchecked(4) };
 
 #[test]
 fn grow_last() {
