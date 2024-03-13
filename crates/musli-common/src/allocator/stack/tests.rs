@@ -3,7 +3,7 @@ use std::fmt;
 use std::mem::size_of;
 use std::vec::Vec;
 
-use crate::allocator::{Allocator, Buf, NoStd, StackBuffer};
+use crate::allocator::{Allocator, Buf, Stack, StackBuffer};
 
 use super::{Header, HeaderId, State};
 
@@ -164,7 +164,7 @@ const D: HeaderId = unsafe { HeaderId::new_unchecked(4) };
 #[test]
 fn grow_last() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let a = alloc.alloc().unwrap();
 
@@ -197,7 +197,7 @@ fn grow_last() {
 #[test]
 fn realloc() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     a.write(&[1, 2, 3, 4]);
@@ -273,7 +273,7 @@ fn realloc() {
 #[test]
 fn grow_empty_moved() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let b = alloc.alloc().unwrap();
@@ -322,7 +322,7 @@ fn grow_empty_moved() {
 #[test]
 fn write_buffer() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let mut b = alloc.alloc().unwrap();
@@ -350,7 +350,7 @@ fn write_buffer() {
 #[test]
 fn write_buffer_middle() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let mut b = alloc.alloc().unwrap();
@@ -382,7 +382,7 @@ fn write_buffer_middle() {
 #[test]
 fn write_buffer_gap() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let mut b = alloc.alloc().unwrap();
@@ -417,7 +417,7 @@ fn write_buffer_gap() {
 #[test]
 fn test_overlapping_slice_miri() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     a.write(&[1, 2, 3, 4]);
@@ -435,7 +435,7 @@ fn test_overlapping_slice_miri() {
 #[test]
 fn grow_into_preceeding() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     a.write(&[0]);
@@ -473,7 +473,7 @@ fn grow_into_preceeding() {
 #[test]
 fn flip_flop() {
     let mut buf = StackBuffer::<4096>::new();
-    let alloc = NoStd::new(&mut buf);
+    let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
     let mut b = alloc.alloc().unwrap();

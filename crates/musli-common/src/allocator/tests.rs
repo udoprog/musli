@@ -31,14 +31,14 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
 
 #[test]
 fn alloc_basic() {
-    let mut buf = crate::allocator::HeapBuffer::new();
-    let alloc = crate::allocator::Alloc::new(&mut buf);
+    let mut buf = crate::allocator::SystemBuffer::new();
+    let alloc = crate::allocator::System::new(&mut buf);
     basic_allocations(&alloc);
 }
 
 #[test]
 fn nostd_basic() {
     let mut buf = crate::allocator::StackBuffer::<4096>::new();
-    let alloc = crate::allocator::NoStd::new(&mut buf);
+    let alloc = crate::allocator::Stack::new(&mut buf);
     basic_allocations(&alloc);
 }

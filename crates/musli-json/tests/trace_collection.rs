@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use musli::{Decode, Encode};
-use musli_common::allocator::{Alloc, HeapBuffer};
+use musli_common::allocator::{System, SystemBuffer};
 use musli_common::context::AllocContext;
 
 #[derive(Encode)]
@@ -19,8 +19,8 @@ struct Collection {
 
 #[test]
 fn trace_collection() {
-    let mut buf = HeapBuffer::new();
-    let alloc = Alloc::new(&mut buf);
+    let mut buf = SystemBuffer::new();
+    let alloc = System::new(&mut buf);
     let cx = AllocContext::new(&alloc);
 
     let mut values = HashMap::new();

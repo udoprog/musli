@@ -5,15 +5,15 @@
 mod tests;
 
 #[cfg(feature = "alloc")]
-mod alloc;
+mod system;
 #[cfg(feature = "alloc")]
-pub use self::alloc::{Alloc, HeapBuffer};
+pub use self::system::{System, SystemBuffer};
 
 mod disabled;
 pub use self::disabled::Disabled;
 
-mod no_std;
-pub use self::no_std::{NoStd, StackBuffer};
+mod stack;
+pub use self::stack::{Stack, StackBuffer};
 
 #[cfg(feature = "alloc")]
 mod default_alloc {
@@ -21,19 +21,19 @@ mod default_alloc {
 
     use super::Allocator;
 
-    pub struct DefaultBuffer(super::HeapBuffer);
-    pub struct DefaultAllocator<'a>(super::Alloc<'a>);
+    pub struct DefaultBuffer(super::SystemBuffer);
+    pub struct Default<'a>(super::System<'a>);
 
     pub(super) fn buffer() -> DefaultBuffer {
-        DefaultBuffer(super::HeapBuffer::new())
+        DefaultBuffer(super::SystemBuffer::new())
     }
 
-    pub(super) fn alloc(DefaultBuffer(buf): &mut DefaultBuffer) -> DefaultAllocator<'_> {
-        DefaultAllocator(super::Alloc::new(buf))
+    pub(super) fn new(DefaultBuffer(buf): &mut DefaultBuffer) -> Default<'_> {
+        Default(super::System::new(buf))
     }
 
-    impl<'a> Allocator for DefaultAllocator<'a> {
-        type Buf<'this> = <super::Alloc<'a> as super::Allocator>::Buf<'this>
+    impl<'a> Allocator for Default<'a> {
+        type Buf<'this> = <super::System<'a> as super::Allocator>::Buf<'this>
         where
             Self: 'this;
 
@@ -50,21 +50,21 @@ mod default_alloc {
 
     use super::Allocator;
 
-    type InnerAllocator<'a> = super::NoStd<'a>;
+    type InnerAllocator<'a> = super::Stack<'a>;
 
     pub struct DefaultBuffer(super::StackBuffer<4096>);
-    pub struct DefaultAllocator<'a>(InnerAllocator<'a>);
+    pub struct Default<'a>(InnerAllocator<'a>);
 
     pub(super) fn buffer() -> DefaultBuffer {
         DefaultBuffer(super::StackBuffer::new())
     }
 
-    pub(super) fn alloc(DefaultBuffer(buf): &mut DefaultBuffer) -> DefaultAllocator<'_> {
-        DefaultAllocator(super::NoStd::new(buf))
+    pub(super) fn new(DefaultBuffer(buf): &mut DefaultBuffer) -> Default<'_> {
+        Default(super::Stack::new(buf))
     }
 
-    impl<'a> Allocator for DefaultAllocator<'a> {
-        type Buf<'this> = <super::NoStd<'a> as super::Allocator>::Buf<'this>
+    impl<'a> Allocator for Default<'a> {
+        type Buf<'this> = <super::Stack<'a> as super::Allocator>::Buf<'this>
         where
             Self: 'this;
 
@@ -86,11 +86,11 @@ pub fn buffer() -> DefaultBuffer {
 /// Construct a new default allocator.
 ///
 /// Uses the [`Alloc`] allocator if the `alloc` feature is enabled, otherwise
-/// [`NoStd`].
+/// [`Stack`].
 ///
 /// Requires that [`buffer()`] is used to construct the provided buffer.
-pub fn new(buf: &mut DefaultBuffer) -> DefaultAllocator<'_> {
-    self::default_alloc::alloc(buf)
+pub fn new(buf: &mut DefaultBuffer) -> Default<'_> {
+    self::default_alloc::new(buf)
 }
 
 /// The default allocator.
@@ -98,9 +98,9 @@ pub fn new(buf: &mut DefaultBuffer) -> DefaultAllocator<'_> {
 /// The exact implementation depends on which features are enabled (first one
 /// takes preference):
 /// * If `alloc` is enabled, this is the [`Alloc`] allocator.
-/// * Otherwise this is the [`NoStd`] allocator.
+/// * Otherwise this is the [`Stack`] allocator.
 #[doc(inline)]
-pub use self::default_alloc::{DefaultAllocator, DefaultBuffer};
+pub use self::default_alloc::{Default, DefaultBuffer};
 
 use musli::context::Buf;
 
