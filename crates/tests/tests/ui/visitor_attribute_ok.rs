@@ -1,5 +1,4 @@
 use core::fmt;
-use core::marker;
 use core::convert::Infallible;
 
 use musli::de::Visitor;

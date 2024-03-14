@@ -1,8 +1,8 @@
 use core::fmt;
 
 use musli::en::{
-    Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder,
-    VariantEncoder,
+    Encode, Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    StructFieldEncoder, VariantEncoder,
 };
 use musli::{Buf, Context};
 use musli_storage::en::StorageEncoder;
@@ -17,11 +17,48 @@ pub struct WireEncoder<W, const F: Options> {
     writer: W,
 }
 
-impl<W, const F: Options> WireEncoder<W, F> {
+impl<W, const F: Options> WireEncoder<W, F>
+where
+    W: Writer,
+{
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(writer: W) -> Self {
         Self { writer }
+    }
+
+    #[inline]
+    fn encode_map_len<C>(&mut self, cx: &C, len: usize) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        let Some(len) = len.checked_mul(2) else {
+            return Err(cx.message("Map length overflow"));
+        };
+
+        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
+        self.writer.write_byte(cx, tag.byte())?;
+
+        if !embedded {
+            crate::int::encode_usize::<_, _, F>(cx, &mut self.writer, len)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn encode_tuple_len<C>(&mut self, cx: &C, len: usize) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
+        self.writer.write_byte(cx, tag.byte())?;
+
+        if !embedded {
+            crate::int::encode_usize::<_, _, F>(cx, &mut self.writer, len)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -60,8 +97,11 @@ where
     type Sequence = Self;
     type Tuple = Self;
     type Map = Self;
+    type MapPairs = Self;
     type Struct = Self;
     type Variant = Self;
+    type TupleVariant = Self;
+    type StructVariant = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -302,13 +342,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(cx, tag.byte())?;
-
-        if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, &mut self.writer, len)?;
-        }
-
+        self.encode_tuple_len(cx, len)?;
         Ok(self)
     }
 
@@ -317,18 +351,16 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        let Some(len) = len.checked_mul(2) else {
-            return Err(cx.message("Map length overflow"));
-        };
-
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(cx, tag.byte())?;
-
-        if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, &mut self.writer, len)?;
-        }
-
+        self.encode_map_len(cx, len)?;
         Ok(self)
+    }
+
+    #[inline]
+    fn encode_map_pairs<C>(self, cx: &C, len: usize) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.encode_map(cx, len)
     }
 
     #[inline]
@@ -358,6 +390,40 @@ where
         self.writer
             .write_byte(cx, Tag::new(Kind::Sequence, 2).byte())?;
         Ok(self)
+    }
+
+    #[inline]
+    fn encode_tuple_variant<C, T>(
+        mut self,
+        cx: &C,
+        tag: &T,
+        len: usize,
+    ) -> Result<Self::TupleVariant, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: Encode<C::Mode>,
+    {
+        self.writer
+            .write_byte(cx, Tag::new(Kind::Sequence, 2).byte())?;
+        tag.encode(cx, WireEncoder::<_, F>::new(self.writer.borrow_mut()))?;
+        self.encode_tuple(cx, len)
+    }
+
+    #[inline]
+    fn encode_struct_variant<C, T>(
+        mut self,
+        cx: &C,
+        tag: &T,
+        len: usize,
+    ) -> Result<Self::TupleVariant, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: Encode<C::Mode>,
+    {
+        self.writer
+            .write_byte(cx, Tag::new(Kind::Sequence, 2).byte())?;
+        tag.encode(cx, WireEncoder::<_, F>::new(self.writer.borrow_mut()))?;
+        self.encode_struct(cx, len)
     }
 }
 
@@ -453,6 +519,40 @@ where
 
     #[inline]
     fn entry<C>(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(WireEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<W, const F: Options> MapPairsEncoder for WireEncoder<W, F>
+where
+    W: Writer,
+{
+    type Ok = ();
+    type Error = Error;
+    type MapPairsKey<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type MapPairsValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Self::MapPairsKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(WireEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

@@ -1,7 +1,6 @@
 use musli::{Decode, Encode};
 
 enum Packed {}
-impl Mode for Packed {}
 
 #[derive(Encode, Decode)]
 #[musli(default_field_name = "name")]

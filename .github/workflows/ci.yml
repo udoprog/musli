@@ -25,11 +25,11 @@ jobs:
         toolchain: ${{matrix.rust}}
     - run: cargo build --workspace --exclude tools --exclude musli-tests
       if: matrix.rust != 'stable'
-    - run: cargo build --all-targets
+    - run: cargo build --workspace --exclude no-std-examples --all-targets
       if: matrix.rust == 'stable'
-    - run: cargo test --all-targets --features test
+    - run: cargo test --workspace --exclude no-std-examples --all-targets --features test
       if: matrix.rust == 'stable'
-    - run: cargo test --doc
+    - run: cargo test --workspace --exclude no-std-examples --doc
       if: matrix.rust == 'stable'
 
   no_std:

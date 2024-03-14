@@ -48,6 +48,13 @@ impl<'de, M> Decode<'de, M> for Ipv6Addr {
     }
 }
 
+#[derive(Encode, Decode)]
+#[musli(crate = crate)]
+enum IpAddrTag {
+    Ipv4,
+    Ipv6,
+}
+
 impl<M> Encode<M> for IpAddr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -58,8 +65,8 @@ impl<M> Encode<M> for IpAddr {
         let variant = encoder.encode_variant(cx)?;
 
         match self {
-            IpAddr::V4(v4) => variant.insert_variant(cx, 0usize, v4),
-            IpAddr::V6(v6) => variant.insert_variant(cx, 1usize, v6),
+            IpAddr::V4(v4) => variant.insert_variant(cx, IpAddrTag::Ipv4, v4),
+            IpAddr::V6(v6) => variant.insert_variant(cx, IpAddrTag::Ipv6, v6),
         }
     }
 }
@@ -73,12 +80,11 @@ impl<'de, M> Decode<'de, M> for IpAddr {
     {
         let mut variant = decoder.decode_variant(cx)?;
 
-        let this = match variant.tag(cx).and_then(|v| cx.decode(v))? {
-            0 => Self::V4(variant.variant(cx).and_then(|v| cx.decode(v))?),
-            1 => Self::V6(variant.variant(cx).and_then(|v| cx.decode(v))?),
-            index => {
-                return Err(cx.invalid_variant_tag("IpAddr", index));
-            }
+        let tag: IpAddrTag = variant.tag(cx).and_then(|v| cx.decode(v))?;
+
+        let this = match tag {
+            IpAddrTag::Ipv4 => Self::V4(cx.decode(variant.variant(cx)?)?),
+            IpAddrTag::Ipv6 => Self::V6(cx.decode(variant.variant(cx)?)?),
         };
 
         variant.end(cx)?;
@@ -148,6 +154,13 @@ impl<'de, M> Decode<'de, M> for SocketAddrV6 {
     }
 }
 
+#[derive(Encode, Decode)]
+#[musli(crate = crate)]
+enum SocketAddrTag {
+    V4,
+    V6,
+}
+
 impl<M> Encode<M> for SocketAddr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -158,8 +171,8 @@ impl<M> Encode<M> for SocketAddr {
         let variant = encoder.encode_variant(cx)?;
 
         match self {
-            SocketAddr::V4(v4) => variant.insert_variant(cx, 0usize, v4),
-            SocketAddr::V6(v6) => variant.insert_variant(cx, 1usize, v6),
+            SocketAddr::V4(v4) => variant.insert_variant(cx, SocketAddrTag::V4, v4),
+            SocketAddr::V6(v6) => variant.insert_variant(cx, SocketAddrTag::V6, v6),
         }
     }
 }
@@ -173,12 +186,11 @@ impl<'de, M> Decode<'de, M> for SocketAddr {
     {
         let mut variant = decoder.decode_variant(cx)?;
 
-        let this = match variant.tag(cx).and_then(|v| cx.decode(v))? {
-            0 => Self::V4(variant.variant(cx).and_then(|v| cx.decode(v))?),
-            1 => Self::V6(variant.variant(cx).and_then(|v| cx.decode(v))?),
-            index => {
-                return Err(cx.invalid_variant_tag("SocketAddr", index));
-            }
+        let tag: SocketAddrTag = cx.decode(variant.tag(cx)?)?;
+
+        let this = match tag {
+            SocketAddrTag::V4 => Self::V4(cx.decode(variant.variant(cx)?)?),
+            SocketAddrTag::V6 => Self::V6(cx.decode(variant.variant(cx)?)?),
         };
 
         variant.end(cx)?;
