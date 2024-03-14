@@ -1,10 +1,10 @@
 use core::fmt;
 
 use musli::en::{
-    Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder,
-    VariantEncoder,
+    Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    StructFieldEncoder, VariantEncoder,
 };
-use musli::{Buf, Context};
+use musli::{Buf, Context, Encode};
 use musli_storage::en::StorageEncoder;
 
 use crate::error::Error;
@@ -65,8 +65,11 @@ where
     type Sequence = Self;
     type Tuple = Self;
     type Map = Self;
+    type MapPairs = Self;
     type Struct = Self;
     type Variant = Self;
+    type TupleVariant = Self;
+    type StructVariant = Self;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -320,6 +323,15 @@ where
     }
 
     #[inline]
+    fn encode_map_pairs<C>(mut self, cx: &C, len: usize) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        encode_prefix::<_, _, F>(cx, self.writer.borrow_mut(), Kind::Map, len)?;
+        Ok(self)
+    }
+
+    #[inline]
     fn encode_struct<C>(mut self, cx: &C, len: usize) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -336,6 +348,53 @@ where
         const VARIANT: Tag = Tag::from_mark(Mark::Variant);
         self.writer.write_byte(cx, VARIANT.byte())?;
         Ok(self)
+    }
+
+    #[inline]
+    fn encode_unit_variant<C, T>(self, cx: &C, tag: &T) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: Encode<C::Mode>,
+    {
+        let mut variant = self.encode_variant(cx)?;
+        tag.encode(cx, variant.tag(cx)?)?;
+        variant.variant(cx)?.encode_unit(cx)?;
+        VariantEncoder::end(variant, cx)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn encode_tuple_variant<C, T>(
+        mut self,
+        cx: &C,
+        tag: &T,
+        len: usize,
+    ) -> Result<Self::TupleVariant, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: Encode<C::Mode>,
+    {
+        const VARIANT: Tag = Tag::from_mark(Mark::Variant);
+        self.writer.write_byte(cx, VARIANT.byte())?;
+        tag.encode(cx, SelfEncoder::<_, F>::new(self.writer.borrow_mut()))?;
+        self.encode_tuple(cx, len)
+    }
+
+    #[inline]
+    fn encode_struct_variant<C, T>(
+        mut self,
+        cx: &C,
+        tag: &T,
+        len: usize,
+    ) -> Result<Self::StructVariant, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: Encode<C::Mode>,
+    {
+        const VARIANT: Tag = Tag::from_mark(Mark::Variant);
+        self.writer.write_byte(cx, VARIANT.byte())?;
+        tag.encode(cx, SelfEncoder::<_, F>::new(self.writer.borrow_mut()))?;
+        self.encode_struct(cx, len)
     }
 }
 
@@ -465,6 +524,40 @@ where
 
     #[inline]
     fn map_value<C>(&mut self, _: &C) -> Result<Self::MapValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(SelfEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<W, const F: Options> MapPairsEncoder for SelfEncoder<W, F>
+where
+    W: Writer,
+{
+    type Ok = ();
+    type Error = Error;
+    type MapPairsKey<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+    type MapPairsValue<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Self::MapPairsKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(SelfEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
