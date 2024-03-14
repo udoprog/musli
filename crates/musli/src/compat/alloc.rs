@@ -9,13 +9,9 @@ use alloc::vec::Vec;
 use crate::compat::Bytes;
 use crate::de::{Decode, Decoder, ValueVisitor};
 use crate::en::{Encode, Encoder};
-use crate::mode::Mode;
 use crate::Context;
 
-impl<M> Encode<M> for Bytes<Vec<u8>>
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Bytes<Vec<u8>> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -26,10 +22,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for Bytes<Vec<u8>>
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Bytes<Vec<u8>> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -64,10 +57,7 @@ where
     }
 }
 
-impl<M> Encode<M> for Bytes<VecDeque<u8>>
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Bytes<VecDeque<u8>> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -79,10 +69,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for Bytes<VecDeque<u8>>
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Bytes<VecDeque<u8>> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where

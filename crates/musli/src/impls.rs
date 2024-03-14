@@ -14,13 +14,9 @@ use core::{fmt, marker};
 
 use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
 use crate::en::{Encode, Encoder, VariantEncoder};
-use crate::mode::Mode;
 use crate::Context;
 
-impl<M> Encode<M> for ()
-where
-    M: Mode,
-{
+impl<M> Encode<M> for () {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -31,10 +27,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for ()
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for () {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -45,10 +38,7 @@ where
     }
 }
 
-impl<T, M> Encode<M> for marker::PhantomData<T>
-where
-    M: Mode,
-{
+impl<T, M> Encode<M> for marker::PhantomData<T> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -59,10 +49,7 @@ where
     }
 }
 
-impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T>
-where
-    M: Mode,
-{
+impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T> {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Mode = M, Input = D::Error>,
@@ -77,10 +64,7 @@ macro_rules! atomic_impl {
     ($size:literal $(, $ty:ident)*) => {
         $(
             #[cfg(target_has_atomic = $size)]
-            impl<'de, M> Decode<'de, M> for core::sync::atomic::$ty
-            where
-                M: Mode,
-            {
+            impl<'de, M> Decode<'de, M> for core::sync::atomic::$ty {
                 fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
                 where
                     C: Context<Mode = M, Input = D::Error>,
@@ -101,10 +85,7 @@ atomic_impl!("ptr", AtomicIsize, AtomicUsize);
 
 macro_rules! non_zero {
     ($ty:ty) => {
-        impl<M> Encode<M> for $ty
-        where
-            M: Mode,
-        {
+        impl<M> Encode<M> for $ty {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
@@ -115,10 +96,7 @@ macro_rules! non_zero {
             }
         }
 
-        impl<'de, M> Decode<'de, M> for $ty
-        where
-            M: Mode,
-        {
+        impl<'de, M> Decode<'de, M> for $ty {
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
                 C: Context<Mode = M, Input = D::Error>,
@@ -169,10 +147,7 @@ where
     }
 }
 
-impl<M, const N: usize> Encode<M> for [u8; N]
-where
-    M: Mode,
-{
+impl<M, const N: usize> Encode<M> for [u8; N] {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -183,10 +158,7 @@ where
     }
 }
 
-impl<'de, M, const N: usize> Decode<'de, M> for [u8; N]
-where
-    M: Mode,
-{
+impl<'de, M, const N: usize> Decode<'de, M> for [u8; N] {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -199,10 +171,7 @@ where
 
 macro_rules! impl_number {
     ($ty:ty, $read:ident, $write:ident) => {
-        impl<M> Encode<M> for $ty
-        where
-            M: Mode,
-        {
+        impl<M> Encode<M> for $ty {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
@@ -213,10 +182,7 @@ macro_rules! impl_number {
             }
         }
 
-        impl<'de, M> Decode<'de, M> for $ty
-        where
-            M: Mode,
-        {
+        impl<'de, M> Decode<'de, M> for $ty {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
@@ -229,10 +195,7 @@ macro_rules! impl_number {
     };
 }
 
-impl<M> Encode<M> for bool
-where
-    M: Mode,
-{
+impl<M> Encode<M> for bool {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -243,10 +206,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for bool
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for bool {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -257,10 +217,7 @@ where
     }
 }
 
-impl<M> Encode<M> for char
-where
-    M: Mode,
-{
+impl<M> Encode<M> for char {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -271,10 +228,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for char
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for char {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -300,10 +254,7 @@ impl_number!(i128, decode_i128, encode_i128);
 impl_number!(f32, decode_f32, encode_f32);
 impl_number!(f64, decode_f64, encode_f64);
 
-impl<M> Encode<M> for str
-where
-    M: Mode,
-{
+impl<M> Encode<M> for str {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -314,10 +265,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for &'de str
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for &'de str {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -347,10 +295,7 @@ where
     }
 }
 
-impl<M> Encode<M> for [u8]
-where
-    M: Mode,
-{
+impl<M> Encode<M> for [u8] {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Mode = M, Input = E::Error>,
@@ -360,10 +305,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for &'de [u8]
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for &'de [u8] {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -395,7 +337,6 @@ where
 
 impl<T, M> Encode<M> for Option<T>
 where
-    M: Mode,
     T: Encode<M>,
 {
     #[inline]
@@ -415,7 +356,6 @@ where
 
 impl<'de, M, T> Decode<'de, M> for Option<T>
 where
-    M: Mode,
     T: Decode<'de, M>,
 {
     #[inline]
@@ -434,7 +374,6 @@ where
 
 impl<T, U, M> Encode<M> for Result<T, U>
 where
-    M: Mode,
     T: Encode<M>,
     U: Encode<M>,
 {
@@ -455,7 +394,6 @@ where
 
 impl<'de, M, T, U> Decode<'de, M> for Result<T, U>
 where
-    M: Mode,
     T: Decode<'de, M>,
     U: Decode<'de, M>,
 {
@@ -480,7 +418,6 @@ where
 
 impl<T, M> Encode<M> for Wrapping<T>
 where
-    M: Mode,
     T: Encode<M>,
 {
     #[inline]
@@ -495,7 +432,6 @@ where
 
 impl<'de, M, T> Decode<'de, M> for Wrapping<T>
 where
-    M: Mode,
     T: Decode<'de, M>,
 {
     #[inline]
@@ -508,10 +444,7 @@ where
     }
 }
 
-impl<M> Encode<M> for CStr
-where
-    M: Mode,
-{
+impl<M> Encode<M> for CStr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -522,10 +455,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for &'de CStr
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for &'de CStr {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where

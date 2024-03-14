@@ -1,14 +1,11 @@
 use crate::en::Encoder;
-use crate::mode::{DefaultMode, Mode};
+use crate::mode::DefaultMode;
 use crate::Context;
 
 pub use musli_macros::Encode;
 
 /// Trait governing how types are encoded.
-pub trait Encode<M = DefaultMode>
-where
-    M: Mode,
-{
+pub trait Encode<M = DefaultMode> {
     /// Encode the given output.
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -24,10 +21,7 @@ where
 ///
 /// [`HashMap<K, V>`]: std::collections::HashMap
 /// [`fmt::Display`]: std::fmt::Display
-pub trait TraceEncode<M = DefaultMode>
-where
-    M: Mode,
-{
+pub trait TraceEncode<M = DefaultMode> {
     /// Encode the given output.
     fn trace_encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -38,7 +32,6 @@ where
 impl<T, M> Encode<M> for &T
 where
     T: ?Sized + Encode<M>,
-    M: Mode,
 {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -53,7 +46,6 @@ where
 impl<T, M> Encode<M> for &mut T
 where
     T: ?Sized + Encode<M>,
-    M: Mode,
 {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>

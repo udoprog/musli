@@ -5,7 +5,6 @@
 use core::fmt;
 use core::mem;
 
-use musli::mode::Mode;
 use musli::Context;
 use musli::{Decode, Decoder};
 
@@ -145,10 +144,7 @@ impl fmt::Debug for Tag {
     }
 }
 
-impl<'de, M> Decode<'de, M> for Tag
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Tag {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where

@@ -42,30 +42,6 @@ impl<'a> Expansion<'a> {
                     .push(syn::TypeParam::from(mode_ident.clone()).into());
 
                 let path = syn::Path::from(mode_ident.clone());
-
-                let where_clause = generics.make_where_clause();
-
-                let mut bounds = syn::punctuated::Punctuated::default();
-
-                bounds.push(syn::TypeParamBound::Trait(syn::TraitBound {
-                    paren_token: Default::default(),
-                    modifier: syn::TraitBoundModifier::None,
-                    lifetimes: Default::default(),
-                    path: tokens.mode_t.clone(),
-                }));
-
-                where_clause
-                    .predicates
-                    .push(syn::WherePredicate::Type(syn::PredicateType {
-                        lifetimes: None,
-                        bounded_ty: syn::Type::Path(syn::TypePath {
-                            qself: None,
-                            path: syn::Path::from(mode_ident.clone()),
-                        }),
-                        colon_token: <syn::Token![:]>::default(),
-                        bounds,
-                    }));
-
                 (generics, path)
             }
             Expansion::Default => (generics, tokens.default_mode.clone()),

@@ -3,7 +3,7 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Range;
 
-use musli::{Allocator, Context, Mode};
+use musli::{Allocator, Context};
 
 use crate::fixed::{FixedString, FixedVec};
 
@@ -119,7 +119,6 @@ impl<const P: usize, const S: usize, A, M, E> NoStdContext<P, S, A, M, E> {
 impl<const V: usize, const S: usize, A, M, E> Context for NoStdContext<V, S, A, M, E>
 where
     A: Allocator,
-    M: Mode,
     E: Error,
 {
     type Mode = M;

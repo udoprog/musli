@@ -12,7 +12,7 @@ use crate::Context;
 /// # Examples
 ///
 /// ```
-/// use musli::{Context, Decode, Decoder, Mode};
+/// use musli::{Context, Decode, Decoder};
 ///
 /// #[derive(Debug, PartialEq)]
 /// enum Enum {
@@ -20,10 +20,7 @@ use crate::Context;
 ///     B,
 /// }
 ///
-/// impl<'de, M> Decode<'de, M> for Enum
-/// where
-///     M: Mode,
-/// {
+/// impl<'de, M> Decode<'de, M> for Enum {
 ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 ///     where
 ///         C: Context<Input = D::Error>,

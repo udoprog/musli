@@ -16,7 +16,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use musli::mode::DefaultMode;
-use musli::{Allocator, Context, Mode};
+use musli::{Allocator, Context};
 
 #[cfg(feature = "alloc")]
 pub use self::alloc_context::AllocContext;
@@ -69,7 +69,6 @@ where
 impl<A, M, E> Context for Same<A, M, E>
 where
     A: Allocator,
-    M: Mode,
     E: Error,
 {
     type Mode = M;
@@ -165,7 +164,6 @@ where
 impl<A, M, E: 'static> Context for Ignore<A, M, E>
 where
     A: Allocator,
-    M: Mode,
 {
     type Mode = M;
     type Input = E;
@@ -236,7 +234,6 @@ impl<A, M, E> Capture<A, M, E> {
 impl<A, M, E> Context for Capture<A, M, E>
 where
     A: Allocator,
-    M: Mode,
     E: Error,
 {
     type Mode = M;

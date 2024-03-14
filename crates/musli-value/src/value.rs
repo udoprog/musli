@@ -17,7 +17,6 @@ use musli::de::{
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
 use musli::en::{MapEncoder, SequenceEncoder, VariantEncoder};
-use musli::mode::Mode;
 use musli::Context;
 use musli_common::options::Options;
 
@@ -161,10 +160,7 @@ from!(isize, Isize);
 from!(f32, F32);
 from!(f64, F64);
 
-impl<M> Encode<M> for Number
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Number {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
@@ -456,10 +452,7 @@ impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
     }
 }
 
-impl<'de, M> Decode<'de, M> for Value
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Value {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Mode = M, Input = D::Error>,
@@ -606,10 +599,7 @@ where
     }
 }
 
-impl<M> Encode<M> for Value
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Value {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Mode = M, Input = E::Error>,

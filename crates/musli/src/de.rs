@@ -33,20 +33,9 @@ pub use self::type_hint::{NumberHint, SizeHint, TypeHint};
 pub use self::value_visitor::ValueVisitor;
 pub use self::visitor::Visitor;
 
-use crate::mode::Mode;
-
 /// Decode to an owned value.
 ///
 /// This is a simpler bound to use than `for<'de> Decode<'de, M>`.
-pub trait DecodeOwned<M>: for<'de> Decode<'de, M>
-where
-    M: Mode,
-{
-}
+pub trait DecodeOwned<M>: for<'de> Decode<'de, M> {}
 
-impl<M, D> DecodeOwned<M> for D
-where
-    D: for<'de> Decode<'de, M>,
-    M: Mode,
-{
-}
+impl<M, D> DecodeOwned<M> for D where D: for<'de> Decode<'de, M> {}

@@ -1,4 +1,4 @@
-use musli::{Decode, Encode, Mode};
+use musli::{Decode, Encode};
 
 enum Packed {}
 impl Mode for Packed {}

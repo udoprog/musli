@@ -6,7 +6,7 @@ use core::ops::Range;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use musli::{Allocator, Context, Mode};
+use musli::{Allocator, Context};
 
 use super::access::{self, Access};
 use super::rich_error::{RichError, Step};
@@ -64,7 +64,6 @@ impl<A, M, E> AllocContext<A, M, E> {
 impl<A, M, E> AllocContext<A, M, E>
 where
     A: Allocator,
-    M: Mode,
     E: Error,
 {
     fn push_error(&self, range: Range<usize>, message: E) {
@@ -99,7 +98,6 @@ where
 impl<A, M, E> Context for AllocContext<A, M, E>
 where
     A: Allocator,
-    M: Mode,
     E: Error,
 {
     type Mode = M;

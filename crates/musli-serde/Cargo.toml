@@ -3,11 +3,16 @@ name = "musli-serde"
 version = "0.0.96"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
+description = """
+Transparent shim to use serde types in Müsli.
+"""
 documentation = "https://docs.rs/musli"
 readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
+keywords = ["no-std::no-alloc", "no_std", "serde", "serialization"]
+categories = ["encoding", "encoding", "no-std"]
 
 [features]
 default = ["std"]

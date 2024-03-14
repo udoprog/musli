@@ -120,13 +120,12 @@ usually cleaner decode implementations, as shown here:
 ```rust
 use musli::Context;
 use musli::de::{Decode, Decoder, SequenceDecoder};
-use musli::mode::Mode;
 
 struct MyType {
     data: Vec<String>,
 }
 
-impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+impl<'de, M> Decode<'de, M> for MyType {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
         C: Context<Mode = M, Input = D::Error>,
@@ -289,12 +288,11 @@ Below is a simple example of how we can use two modes to provide two
 different kinds of serialization to a single struct.
 
 ```rust
-use musli::mode::{DefaultMode, Mode};
+use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 use musli_json::Encoding;
 
 enum Alt {}
-impl Mode for Alt {}
 
 #[derive(Decode, Encode)]
 #[musli(mode = Alt, packed)]

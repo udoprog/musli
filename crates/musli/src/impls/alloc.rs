@@ -24,13 +24,9 @@ use crate::de::{
 };
 use crate::en::{Encode, Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, TraceEncode};
 use crate::internal::size_hint;
-use crate::mode::Mode;
 use crate::Context;
 
-impl<M> Encode<M> for String
-where
-    M: Mode,
-{
+impl<M> Encode<M> for String {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -41,10 +37,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for String
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for String {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -84,10 +77,7 @@ where
     }
 }
 
-impl<M> Encode<M> for Box<str>
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Box<str> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -98,10 +88,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for Box<str>
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Box<str> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -115,10 +102,7 @@ where
 
 macro_rules! cow {
     ($ty:ty, $source:ty, $decode:ident, $cx:pat, |$owned:ident| $owned_expr:expr, |$borrowed:ident| $borrowed_expr:expr, |$reference:ident| $reference_expr:expr) => {
-        impl<M> Encode<M> for Cow<'_, $ty>
-        where
-            M: Mode,
-        {
+        impl<M> Encode<M> for Cow<'_, $ty> {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
@@ -129,10 +113,7 @@ macro_rules! cow {
             }
         }
 
-        impl<'de, M> Decode<'de, M> for Cow<'de, $ty>
-        where
-            M: Mode,
-        {
+        impl<'de, M> Decode<'de, M> for Cow<'de, $ty> {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
@@ -209,7 +190,6 @@ macro_rules! sequence {
     ) => {
         impl<M, T $(, $extra)*> Encode<M> for $ty<T $(, $extra)*>
         where
-            M: Mode,
             T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
@@ -237,7 +217,6 @@ macro_rules! sequence {
 
         impl<'de, M, T $(, $extra)*> Decode<'de, M> for $ty<T $(, $extra)*>
         where
-            M: Mode,
             T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
@@ -300,7 +279,6 @@ macro_rules! map {
     ) => {
         impl<'de, M, K, V $(, $extra)*> Encode<M> for $ty<K, V $(, $extra)*>
         where
-            M: Mode,
             K: Encode<M>,
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
@@ -326,7 +304,6 @@ macro_rules! map {
 
         impl<'de, M, K, V $(, $extra)*> TraceEncode<M> for $ty<K, V $(, $extra)*>
         where
-            M: Mode,
             K: fmt::Display + Encode<M>,
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
@@ -354,7 +331,6 @@ macro_rules! map {
 
         impl<'de, K, V, M $(, $extra)*> Decode<'de, M> for $ty<K, V $(, $extra)*>
         where
-            M: Mode,
             K: Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
@@ -381,7 +357,6 @@ macro_rules! map {
 
         impl<'de, K, V, M $(, $extra)*> TraceDecode<'de, M> for $ty<K, V $(, $extra)*>
         where
-            M: Mode,
             K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
@@ -419,10 +394,7 @@ map!(
     HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default())
 );
 
-impl<M> Encode<M> for CString
-where
-    M: Mode,
-{
+impl<M> Encode<M> for CString {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -433,10 +405,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for CString
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for CString {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -482,7 +451,6 @@ macro_rules! smart_pointer {
     ($ty:ident) => {
         impl<M, T> Encode<M> for $ty<T>
         where
-            M: Mode,
             T: Encode<M>,
         {
             #[inline]
@@ -497,7 +465,6 @@ macro_rules! smart_pointer {
 
         impl<'de, M, T> Decode<'de, M> for $ty<T>
         where
-            M: Mode,
             T: Decode<'de, M>,
         {
             #[inline]
@@ -524,10 +491,7 @@ enum Tag {
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for OsStr
-where
-    M: Mode,
-{
+impl<M> Encode<M> for OsStr {
     #[cfg(unix)]
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -577,10 +541,7 @@ where
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for OsString
-where
-    M: Mode,
-{
+impl<M> Encode<M> for OsString {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -592,10 +553,7 @@ where
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<'de, M> Decode<'de, M> for OsString
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for OsString {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -664,10 +622,7 @@ where
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for PathBuf
-where
-    M: Mode,
-{
+impl<M> Encode<M> for PathBuf {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -679,10 +634,7 @@ where
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for Path
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Path {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -694,10 +646,7 @@ where
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<'de, M> Decode<'de, M> for PathBuf
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for PathBuf {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where

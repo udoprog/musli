@@ -9,7 +9,7 @@ use std::io;
 
 use musli::de::Decode;
 use musli::en::Encode;
-use musli::mode::{DefaultMode, Mode};
+use musli::mode::DefaultMode;
 use musli::Context;
 
 use crate::de::SelfDecoder;
@@ -140,15 +140,9 @@ impl Encoding<DefaultMode> {
     }
 }
 
-impl<M, const F: Options> Encoding<M, F>
-where
-    M: Mode,
-{
+impl<M, const F: Options> Encoding<M, F> {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T>
-    where
-        T: Mode,
-    {
+    pub const fn with_mode<T>(self) -> Encoding<T> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -158,14 +152,11 @@ where
     musli_common::encoding_from_slice_impls!(M, SelfDecoder::<_, F>::new);
 }
 
-impl<M> Clone for Encoding<M>
-where
-    M: Mode,
-{
+impl<M, const F: Options> Clone for Encoding<M, F> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<M> Copy for Encoding<M> where M: Mode {}
+impl<M, const F: Options> Copy for Encoding<M, F> {}

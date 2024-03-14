@@ -3,7 +3,7 @@
 use core::fmt::Debug;
 
 use musli::de::PackDecoder;
-use musli::mode::{DefaultMode, Mode};
+use musli::mode::DefaultMode;
 use musli::Context;
 use musli::{Decode, Decoder, Encode};
 
@@ -28,7 +28,6 @@ impl<T> Typed<T> {
 
 impl<'de, M, T> Decode<'de, M> for Typed<T>
 where
-    M: Mode,
     T: Decode<'de, M>,
 {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>

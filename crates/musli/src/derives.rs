@@ -41,10 +41,9 @@
 //! done using the `#[musli(mode = ..)]` meta attribute like this:
 //!
 //! ```
-//! use musli::{Encode, Decode, Mode};
+//! use musli::{Encode, Decode};
 //!
 //! enum Json {}
-//! impl Mode for Json {}
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(default_field_name = "index")]
@@ -63,7 +62,6 @@
 //! ```
 //! # use musli::{Encode, Decode};
 //! # enum Json {}
-//! # impl musli::mode::Mode for Json {}
 //! # #[derive(Encode, Decode)]
 //! # #[musli(mode = Json, default_field_name = "name")]
 //! # struct Person<'a> { name: &'a str, age: u32 }
@@ -105,10 +103,9 @@
 //! enabled, otherwise it uses default numerical field names.
 //!
 //! ```
-//! use musli::{Encode, Decode, Mode};
+//! use musli::{Encode, Decode};
 //!
 //! enum Json {}
-//! impl Mode for Json {}
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(default_field_name = "index")]
@@ -131,10 +128,9 @@
 //!
 //! ```
 //! use musli::mode::DefaultMode;
-//! use musli::{Decode, Encode, Mode};
+//! use musli::{Decode, Encode};
 //!
 //! enum Packed {}
-//! impl Mode for Packed {}
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(mode = Packed, encode_only, packed)]

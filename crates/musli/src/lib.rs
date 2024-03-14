@@ -122,13 +122,12 @@
 //! ```
 //! use musli::Context;
 //! use musli::de::{Decode, Decoder, SequenceDecoder};
-//! use musli::mode::Mode;
 //!
 //! struct MyType {
 //!     data: Vec<String>,
 //! }
 //!
-//! impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+//! impl<'de, M> Decode<'de, M> for MyType {
 //!     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 //!     where
 //!         C: Context<Mode = M, Input = D::Error>,
@@ -299,12 +298,11 @@
 //! different kinds of serialization to a single struct.
 //!
 //! ```
-//! use musli::mode::{DefaultMode, Mode};
+//! use musli::mode::DefaultMode;
 //! use musli::{Decode, Encode};
 //! use musli_json::Encoding;
 //!
 //! enum Alt {}
-//! impl Mode for Alt {}
 //!
 //! #[derive(Decode, Encode)]
 //! #[musli(mode = Alt, packed)]
@@ -425,7 +423,6 @@ pub mod utils;
 
 pub use self::de::{Decode, Decoder};
 pub use self::en::{Encode, Encoder};
-pub use self::mode::Mode;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`Encoder`].

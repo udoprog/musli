@@ -2,13 +2,9 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV
 
 use crate::de::{Decode, Decoder, PackDecoder, VariantDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder, VariantEncoder};
-use crate::mode::Mode;
 use crate::Context;
 
-impl<M> Encode<M> for Ipv4Addr
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Ipv4Addr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -19,10 +15,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for Ipv4Addr
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Ipv4Addr {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -33,10 +26,7 @@ where
     }
 }
 
-impl<M> Encode<M> for Ipv6Addr
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Ipv6Addr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -47,10 +37,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for Ipv6Addr
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Ipv6Addr {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -61,10 +48,7 @@ where
     }
 }
 
-impl<M> Encode<M> for IpAddr
-where
-    M: Mode,
-{
+impl<M> Encode<M> for IpAddr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -80,10 +64,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for IpAddr
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for IpAddr {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -105,10 +86,7 @@ where
     }
 }
 
-impl<M> Encode<M> for SocketAddrV4
-where
-    M: Mode,
-{
+impl<M> Encode<M> for SocketAddrV4 {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -122,10 +100,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for SocketAddrV4
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for SocketAddrV4 {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -140,10 +115,7 @@ where
     }
 }
 
-impl<M> Encode<M> for SocketAddrV6
-where
-    M: Mode,
-{
+impl<M> Encode<M> for SocketAddrV6 {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -159,10 +131,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for SocketAddrV6
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for SocketAddrV6 {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
@@ -179,10 +148,7 @@ where
     }
 }
 
-impl<M> Encode<M> for SocketAddr
-where
-    M: Mode,
-{
+impl<M> Encode<M> for SocketAddr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -198,10 +164,7 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for SocketAddr
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for SocketAddr {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where

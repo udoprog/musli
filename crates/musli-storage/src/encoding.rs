@@ -9,7 +9,7 @@ use std::io;
 
 use musli::de::Decode;
 use musli::en::Encode;
-use musli::mode::{DefaultMode, Mode};
+use musli::mode::DefaultMode;
 use musli::Context;
 
 use crate::de::StorageDecoder;
@@ -98,10 +98,7 @@ where
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = DefaultMode, const F: Options = DEFAULT_OPTIONS>
-where
-    M: Mode,
-{
+pub struct Encoding<M = DefaultMode, const F: Options = DEFAULT_OPTIONS> {
     _marker: marker::PhantomData<M>,
 }
 
@@ -147,15 +144,9 @@ impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
     }
 }
 
-impl<M, const F: Options> Encoding<M, F>
-where
-    M: Mode,
-{
+impl<M, const F: Options> Encoding<M, F> {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T, F>
-    where
-        T: Mode,
-    {
+    pub const fn with_mode<T>(self) -> Encoding<T, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -187,14 +178,11 @@ where
     musli_common::encoding_from_slice_impls!(M, StorageDecoder::<_, F, _>::new);
 }
 
-impl<M, const F: Options> Clone for Encoding<M, F>
-where
-    M: Mode,
-{
+impl<M, const F: Options> Clone for Encoding<M, F> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<M, const F: Options> Copy for Encoding<M, F> where M: Mode {}
+impl<M, const F: Options> Copy for Encoding<M, F> {}

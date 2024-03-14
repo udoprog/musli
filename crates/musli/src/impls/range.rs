@@ -1,13 +1,12 @@
 use core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 
 use crate::en::SequenceEncoder;
-use crate::{Context, Decode, Decoder, Encode, Encoder, Mode};
+use crate::{Context, Decode, Decoder, Encode, Encoder};
 
 macro_rules! implement {
     ($ty:ident $(<$type:ident>)? { $($field:ident),* }, $count:expr) => {
         impl<M, $($type)*> Encode<M> for $ty $(<$type>)*
         where
-            M: Mode,
             $($type: Encode<M>,)*
         {
             #[inline]
@@ -27,7 +26,6 @@ macro_rules! implement {
 
         impl<'de, M, $($type)*> Decode<'de, M> for $ty $(<$type>)*
         where
-            M: Mode,
             $($type: Decode<'de, M>,)*
         {
             #[inline]
@@ -47,7 +45,6 @@ macro_rules! implement_new {
     ($ty:ident { $($field:ident),* }, $count:expr) => {
         impl<M, T> Encode<M> for $ty<T>
         where
-            M: Mode,
             T: Encode<M>,
         {
             #[inline]
@@ -64,7 +61,6 @@ macro_rules! implement_new {
 
         impl<'de, M, T> Decode<'de, M> for $ty<T>
         where
-            M: Mode,
             T: Decode<'de, M>,
         {
             #[inline]

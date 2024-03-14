@@ -13,7 +13,7 @@ use std::io;
 
 use musli::de::Decode;
 use musli::en::Encode;
-use musli::mode::{DefaultMode, Mode};
+use musli::mode::DefaultMode;
 use musli::Context;
 
 use crate::de::JsonDecoder;
@@ -122,16 +122,13 @@ impl Encoding<DefaultMode> {
     ///
     /// ```rust
     /// use musli_json::Encoding;
-    /// use musli::{Encode, Decode, Mode};
+    /// use musli::{Encode, Decode};
     ///
     /// const CONFIG: Encoding<Json> = Encoding::new().with_mode();
     ///
     /// // Mode marker indicating that some attributes should
     /// // only apply when we're decoding in a JSON mode.
     /// enum Json {}
-    ///
-    /// impl Mode for Json {
-    /// }
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
     /// #[musli(mode = Json, default_field_name = "name")]
@@ -161,15 +158,9 @@ impl Encoding<DefaultMode> {
     }
 }
 
-impl<M> Encoding<M>
-where
-    M: Mode,
-{
+impl<M> Encoding<M> {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T>
-    where
-        T: Mode,
-    {
+    pub const fn with_mode<T>(self) -> Encoding<T> {
         Encoding {
             _marker: marker::PhantomData,
         }

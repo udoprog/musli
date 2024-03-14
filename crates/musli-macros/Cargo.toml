@@ -12,7 +12,7 @@ readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no_std", "serialization"]
+keywords = ["no-std::no-alloc", "no_std", "serialization"]
 categories = ["encoding", "no-std"]
 
 [lib]
