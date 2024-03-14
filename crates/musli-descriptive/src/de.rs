@@ -4,8 +4,9 @@ use core::fmt;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, MapDecoder, MapEntryDecoder, NumberHint, NumberVisitor, PackDecoder, SequenceDecoder,
-    SizeHint, StructDecoder, StructFieldDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
+    Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, NumberHint, NumberVisitor, PackDecoder,
+    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructPairsDecoder, TypeHint,
+    ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::Context;
 use musli_storage::de::StorageDecoder;
@@ -202,7 +203,9 @@ where
     type Sequence = RemainingSelfDecoder<R, F>;
     type Tuple = SelfTupleDecoder<R, F>;
     type Map = RemainingSelfDecoder<R, F>;
+    type MapPairs = RemainingSelfDecoder<R, F>;
     type Struct = RemainingSelfDecoder<R, F>;
+    type StructPairs = RemainingSelfDecoder<R, F>;
     type Variant = Self;
 
     #[inline]
@@ -657,6 +660,14 @@ where
     }
 
     #[inline]
+    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.shared_decode_map(cx)
+    }
+
+    #[inline]
     fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -941,6 +952,117 @@ where
         }
 
         Ok(())
+    }
+}
+
+impl<'de, R, const F: Options> MapPairsDecoder<'de> for RemainingSelfDecoder<R, F>
+where
+    R: Reader<'de>,
+{
+    type Error = Error;
+
+    type MapPairsKey<'this> = SelfDecoder<R::Mut<'this>, F>
+    where
+        Self: 'this;
+
+    type MapPairsValue<'this> = SelfDecoder<R::Mut<'this>, F>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if self.remaining == 0 {
+            return Ok(None);
+        }
+
+        self.remaining -= 1;
+        Ok(Some(SelfDecoder::new(self.decoder.reader.borrow_mut())))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(SelfDecoder::new(self.decoder.reader.borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_map_pairs_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.map_pairs_value(cx)?.skip_any(cx)?;
+        Ok(true)
+    }
+
+    #[inline]
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        while self.remaining > 0 {
+            self.remaining -= 1;
+            SelfDecoder::<_, F>::new(self.decoder.reader.borrow_mut()).skip_any(cx)?;
+            SelfDecoder::<_, F>::new(self.decoder.reader.borrow_mut()).skip_any(cx)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'de, R, const F: Options> StructPairsDecoder<'de> for RemainingSelfDecoder<R, F>
+where
+    R: Reader<'de>,
+{
+    type Error = Error;
+
+    type FieldName<'this> = SelfDecoder<R::Mut<'this>, F>
+    where
+        Self: 'this;
+
+    type FieldValue<'this> = SelfDecoder<R::Mut<'this>, F>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if self.remaining == 0 {
+            return Err(cx.message("Ran out of fields"));
+        }
+
+        self.remaining -= 1;
+        Ok(SelfDecoder::new(self.decoder.reader.borrow_mut()))
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapPairsDecoder::map_pairs_value(self, cx)
+    }
+
+    #[inline]
+    fn skip_field_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapPairsDecoder::skip_map_pairs_value(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapPairsDecoder::end(self, cx)
     }
 }
 
