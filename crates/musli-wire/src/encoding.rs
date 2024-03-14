@@ -178,8 +178,8 @@ where
         }
     }
 
-    musli_common::encoding_impls!(WireEncoder::<_, F>::new, WireDecoder::<_, F>::new);
-    musli_common::encoding_from_slice_impls!(WireDecoder::<_, F>::new);
+    musli_common::encoding_impls!(M, WireEncoder::<_, F>::new, WireDecoder::<_, F>::new);
+    musli_common::encoding_from_slice_impls!(M, WireDecoder::<_, F>::new);
 }
 
 impl<M, const F: Options> Clone for Encoding<M, F>

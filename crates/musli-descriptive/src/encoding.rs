@@ -154,8 +154,8 @@ where
         }
     }
 
-    musli_common::encoding_impls!(SelfEncoder::<_, F>::new, SelfDecoder::<_, F>::new);
-    musli_common::encoding_from_slice_impls!(SelfDecoder::<_, F>::new);
+    musli_common::encoding_impls!(M, SelfEncoder::<_, F>::new, SelfDecoder::<_, F>::new);
+    musli_common::encoding_from_slice_impls!(M, SelfDecoder::<_, F>::new);
 }
 
 impl<M> Clone for Encoding<M>

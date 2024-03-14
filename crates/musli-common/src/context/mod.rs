@@ -15,7 +15,8 @@ use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
-use musli::{Allocator, Context};
+use musli::mode::DefaultMode;
+use musli::{Allocator, Context, Mode};
 
 #[cfg(feature = "alloc")]
 pub use self::alloc_context::AllocContext;
@@ -29,12 +30,12 @@ pub use self::rich_error::RichError;
 ///
 /// Using this should result in code which essentially just uses the emitted
 /// error type directly.
-pub struct Same<A, E> {
+pub struct Same<A, M, E> {
     alloc: A,
-    _marker: PhantomData<E>,
+    _marker: PhantomData<(M, E)>,
 }
 
-impl<A, E> Same<A, E> {
+impl<A, M, E> Same<A, M, E> {
     /// Construct a new `Same` capturing context.
     pub fn new(alloc: A) -> Self {
         Self {
@@ -44,7 +45,7 @@ impl<A, E> Same<A, E> {
     }
 }
 
-impl<A> Same<A, ErrorMarker> {
+impl<A> Same<A, DefaultMode, ErrorMarker> {
     /// Construct a new `Same` capturing context.
     #[inline]
     pub fn marker(alloc: A) -> Self {
@@ -52,7 +53,7 @@ impl<A> Same<A, ErrorMarker> {
     }
 }
 
-impl<A, E> Default for Same<A, E>
+impl<A, M, E> Default for Same<A, M, E>
 where
     A: Default,
 {
@@ -65,11 +66,13 @@ where
     }
 }
 
-impl<A, E> Context for Same<A, E>
+impl<A, M, E> Context for Same<A, M, E>
 where
     A: Allocator,
+    M: Mode,
     E: Error,
 {
+    type Mode = M;
     type Input = E;
     type Error = E;
     type Mark = ();
@@ -107,13 +110,13 @@ where
 
 /// A simple non-diagnostical capturing context which ignores the error and
 /// loses all information about it (except that it happened).
-pub struct Ignore<A, E> {
+pub struct Ignore<A, M, E> {
     alloc: A,
     error: Cell<bool>,
-    _marker: PhantomData<E>,
+    _marker: PhantomData<(M, E)>,
 }
 
-impl<A, E> Default for Ignore<A, E>
+impl<A, M, E> Default for Ignore<A, M, E>
 where
     A: Default,
 {
@@ -127,7 +130,7 @@ where
     }
 }
 
-impl<A, E> Ignore<A, E> {
+impl<A, M, E> Ignore<A, M, E> {
     /// Construct a new ignoring context.
     pub fn new(alloc: A) -> Self {
         Self {
@@ -138,16 +141,15 @@ impl<A, E> Ignore<A, E> {
     }
 }
 
-impl<A> Ignore<A, ErrorMarker> {
+impl<A> Ignore<A, DefaultMode, ErrorMarker> {
     /// Construct a new ignoring context which collects an error marker.
     pub fn marker(alloc: A) -> Self {
         Self::new(alloc)
     }
 }
 
-impl<A, E> Ignore<A, E>
+impl<A, M, E> Ignore<A, M, E>
 where
-    A: Allocator,
     E: Error,
 {
     /// Construct an error or panic.
@@ -160,10 +162,12 @@ where
     }
 }
 
-impl<A, E: 'static> Context for Ignore<A, E>
+impl<A, M, E: 'static> Context for Ignore<A, M, E>
 where
     A: Allocator,
+    M: Mode,
 {
+    type Mode = M;
     type Input = E;
     type Error = ErrorMarker;
     type Mark = ();
@@ -203,17 +207,19 @@ where
 }
 
 /// A simple non-diagnostical capturing context.
-pub struct Capture<A, E> {
+pub struct Capture<A, M, E> {
     alloc: A,
     error: UnsafeCell<Option<E>>,
+    _marker: PhantomData<M>,
 }
 
-impl<A, E> Capture<A, E> {
+impl<A, M, E> Capture<A, M, E> {
     /// Construct a new capturing allocator.
     pub fn new(alloc: A) -> Self {
         Self {
             alloc,
             error: UnsafeCell::new(None),
+            _marker: PhantomData,
         }
     }
 
@@ -227,11 +233,13 @@ impl<A, E> Capture<A, E> {
     }
 }
 
-impl<A, E> Context for Capture<A, E>
+impl<A, M, E> Context for Capture<A, M, E>
 where
     A: Allocator,
+    M: Mode,
     E: Error,
 {
+    type Mode = M;
     type Input = E;
     type Error = ErrorMarker;
     type Mark = ();
@@ -285,15 +293,12 @@ where
     }
 }
 
-impl<A, E> Default for Capture<A, E>
+impl<A, M, E> Default for Capture<A, M, E>
 where
     A: Default,
 {
     #[inline(always)]
     fn default() -> Self {
-        Self {
-            alloc: A::default(),
-            error: UnsafeCell::new(None),
-        }
+        Self::new(A::default())
     }
 }

@@ -1,8 +1,9 @@
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
+use core::marker::PhantomData;
 use core::ops::Range;
 
-use musli::{Allocator, Context};
+use musli::{Allocator, Context, Mode};
 
 use crate::fixed::{FixedString, FixedVec};
 
@@ -19,7 +20,7 @@ use super::{Error, ErrorMarker};
 ///   indicator is used instead.
 /// * The `S` parameter indicates the maximum size in bytes (UTF-8) of a stored
 ///   map key.
-pub struct NoStdContext<const P: usize, const S: usize, A, E> {
+pub struct NoStdContext<const P: usize, const S: usize, A, M, E> {
     access: Access,
     mark: Cell<usize>,
     alloc: A,
@@ -27,9 +28,10 @@ pub struct NoStdContext<const P: usize, const S: usize, A, E> {
     path: UnsafeCell<FixedVec<Step<FixedString<S>>, P>>,
     path_cap: Cell<usize>,
     include_type: bool,
+    _marker: PhantomData<M>,
 }
 
-impl<A, E> NoStdContext<16, 32, A, E> {
+impl<A, M, E> NoStdContext<16, 32, A, M, E> {
     /// Construct a new context which uses allocations to a fixed number of
     /// diagnostics.
     ///
@@ -41,7 +43,7 @@ impl<A, E> NoStdContext<16, 32, A, E> {
     }
 }
 
-impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
+impl<const P: usize, const S: usize, A, M, E> NoStdContext<P, S, A, M, E> {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
     pub fn new_with(alloc: A) -> Self {
@@ -53,6 +55,7 @@ impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
             path: UnsafeCell::new(FixedVec::new()),
             path_cap: Cell::new(0),
             include_type: false,
+            _marker: PhantomData,
         }
     }
 
@@ -113,11 +116,13 @@ impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
     }
 }
 
-impl<const V: usize, const S: usize, A, E> Context for NoStdContext<V, S, A, E>
+impl<const V: usize, const S: usize, A, M, E> Context for NoStdContext<V, S, A, M, E>
 where
     A: Allocator,
+    M: Mode,
     E: Error,
 {
+    type Mode = M;
     type Input = E;
     type Error = ErrorMarker;
     type Mark = usize;

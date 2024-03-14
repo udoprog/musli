@@ -2,12 +2,14 @@
 
 use core::fmt;
 
-use crate::Buf;
+use crate::{Buf, Mode};
 
 /// Provides ergonomic access to the serialization context.
 ///
 /// This is used to among other things report diagnostics.
 pub trait Context {
+    /// Mode of the context.
+    type Mode: Mode;
     /// The error type which is collected by the context.
     type Input: 'static;
     /// Error produced by context.

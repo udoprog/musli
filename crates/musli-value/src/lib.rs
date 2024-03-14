@@ -28,6 +28,7 @@ pub use self::value::{AsValueDecoder, Value};
 pub use error::{Error, ErrorKind};
 
 use en::ValueEncoder;
+use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 use musli_storage::options;
 
@@ -41,7 +42,7 @@ where
     let mut output = Value::Unit;
     let mut buf = musli_common::allocator::buffer();
     let alloc = musli_common::allocator::new(&mut buf);
-    let cx = musli_common::context::Same::new(&alloc);
+    let cx = musli_common::context::Same::<_, DefaultMode, Error>::new(&alloc);
     value.encode(&cx, ValueEncoder::new(&mut output))?;
     Ok(output)
 }
@@ -53,6 +54,6 @@ where
 {
     let mut buf = musli_common::allocator::buffer();
     let alloc = musli_common::allocator::new(&mut buf);
-    let cx = musli_common::context::Same::new(&alloc);
+    let cx = musli_common::context::Same::<_, DefaultMode, Error>::new(&alloc);
     T::decode(&cx, value.decoder::<DEFAULT_OPTIONS, _>())
 }

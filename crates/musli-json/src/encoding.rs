@@ -183,7 +183,7 @@ where
     #[inline]
     pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         W: Writer,
         T: ?Sized + Encode<M>,
     {
@@ -211,7 +211,7 @@ where
     #[inline]
     pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
@@ -242,7 +242,7 @@ where
     #[inline]
     pub fn decode_with<'de, C, P, T>(self, cx: &C, parser: P) -> Result<T, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
@@ -267,7 +267,7 @@ where
     #[inline]
     pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         T: Decode<'de, M>,
     {
         self.from_slice_with(cx, string.as_bytes())
@@ -282,7 +282,7 @@ where
     {
         let mut buf = musli_common::allocator::buffer();
         let alloc = musli_common::allocator::new(&mut buf);
-        let cx = musli_common::context::Same::new(&alloc);
+        let cx = musli_common::context::Same::<_, M, _>::new(&alloc);
         self.from_slice_with(&cx, bytes)
     }
 
@@ -294,14 +294,14 @@ where
     #[inline]
     pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         T: Decode<'de, M>,
     {
         let mut reader = SliceParser::new(bytes);
         T::decode(cx, JsonDecoder::new(&mut reader))
     }
 
-    musli_common::encode_with_extensions!();
+    musli_common::encode_with_extensions!(M);
 }
 
 impl<M> Clone for Encoding<M> {

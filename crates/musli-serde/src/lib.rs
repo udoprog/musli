@@ -29,6 +29,7 @@ impl<'a, C> Context for SerdeContext<'a, C>
 where
     C: Context,
 {
+    type Mode = C::Mode;
     type Input = C::Input;
     type Error = error::SerdeError;
     type Mark = C::Mark;

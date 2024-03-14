@@ -1,5 +1,7 @@
 #![cfg(feature = "std")]
 
+use musli::mode::DefaultMode;
+
 use crate::reader::integer::{parse_signed_full, parse_unsigned_full};
 use crate::reader::SliceParser;
 
@@ -7,7 +9,7 @@ use crate::reader::SliceParser;
 fn test_decode_exponent() {
     let mut buf = musli_common::allocator::buffer();
     let alloc = musli_common::allocator::new(&mut buf);
-    let cx = musli_common::context::Same::new(&alloc);
+    let cx = musli_common::context::Same::<_, DefaultMode, _>::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr, $expected:expr) => {
@@ -44,7 +46,7 @@ fn test_decode_exponent() {
 fn test_decode_unsigned() {
     let mut buf = musli_common::allocator::buffer();
     let alloc = musli_common::allocator::new(&mut buf);
-    let cx = musli_common::context::Same::new(&alloc);
+    let cx = musli_common::context::Same::<_, DefaultMode, _>::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
@@ -112,7 +114,7 @@ fn test_decode_unsigned() {
 fn test_decode_signed() {
     let mut buf = musli_common::allocator::buffer();
     let alloc = musli_common::allocator::new(&mut buf);
-    let cx = musli_common::context::Same::new(&alloc);
+    let cx = musli_common::context::Same::<_, DefaultMode, _>::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
