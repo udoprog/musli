@@ -24,6 +24,7 @@ struct DecodeSerde<T>(#[musli(with = musli_serde)] T)
 where
     T: DeserializeOwned;
 
+#[track_caller]
 fn musli_storage_serde_roundtrip<T>()
 where
     T: Eq + fmt::Debug + Generate + Encode + DecodeOwned + Serialize + DeserializeOwned,
@@ -35,10 +36,10 @@ where
     let pairs = EncodeSerde(&value1);
     let bytes2 = musli_storage::to_vec(&pairs).expect("Encode serde");
 
-    assert_eq!(&bytes, &bytes2);
-
     let value2: T = musli_storage::from_slice(&bytes2).expect("Decode musli");
     assert_eq!(value1, value2);
+
+    assert_eq!(&bytes, &bytes2);
 
     let DecodeSerde(value3) = musli_storage::from_slice(&bytes).expect("Decode serde");
     assert_eq!(value1, value3);
@@ -52,6 +53,14 @@ enum Enum {
     Struct { a: u32, b: String },
 }
 
+#[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
+#[generate(crate)]
+struct Struct {
+    a: u32,
+    b: String,
+    enum_: Enum,
+}
+
 #[test]
 fn map_pairs() {
     // Primitive numbers.
@@ -60,4 +69,6 @@ fn map_pairs() {
     musli_storage_serde_roundtrip::<HashMap<String, u32>>();
     // Test Enums.
     musli_storage_serde_roundtrip::<Enum>();
+    // Test Struct.
+    musli_storage_serde_roundtrip::<Struct>();
 }

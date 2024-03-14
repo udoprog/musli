@@ -10,10 +10,16 @@ use serde::de;
 #[cfg(feature = "alloc")]
 use alloc::string::String;
 
+enum Mode {
+    Default,
+    Field(usize, &'static str),
+    Variants(&'static [&'static str]),
+}
+
 pub struct Deserializer<'a, C, D> {
     cx: &'a C,
     decoder: D,
-    variants: Option<&'static [&'static str]>,
+    mode: Mode,
 }
 
 impl<'a, C, D> Deserializer<'a, C, D> {
@@ -22,17 +28,13 @@ impl<'a, C, D> Deserializer<'a, C, D> {
         Self {
             cx,
             decoder,
-            variants: None,
+            mode: Mode::Default,
         }
     }
 
     /// Construct a new deserializer which deserializes into a variant.
-    pub fn with_variants(cx: &'a C, decoder: D, variants: &'static [&'static str]) -> Self {
-        Self {
-            cx,
-            decoder,
-            variants: Some(variants),
-        }
+    fn with_mode(cx: &'a C, decoder: D, mode: Mode) -> Self {
+        Self { cx, decoder, mode }
     }
 }
 
@@ -185,19 +187,29 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let Some(variants) = self.variants else {
-            return self
+        match self.mode {
+            Mode::Default => self
                 .decoder
-                .decode_string(self.cx, StrVisitor::new(visitor));
-        };
+                .decode_string(self.cx, StrVisitor::new(visitor)),
+            Mode::Field(index, field) => {
+                let tag = self.decoder.decode_usize(self.cx)?;
 
-        let tag = self.decoder.decode_usize(self.cx)?;
+                if tag != index {
+                    return Err(self.cx.message("Invalid field index"));
+                }
 
-        let Some(variant) = variants.get(tag) else {
-            return Err(self.cx.message("Invalid variant index"));
-        };
+                visitor.visit_borrowed_str(field)
+            }
+            Mode::Variants(variants) => {
+                let tag = self.decoder.decode_usize(self.cx)?;
 
-        visitor.visit_borrowed_str(*variant)
+                let Some(variant) = variants.get(tag) else {
+                    return Err(self.cx.message("Invalid variant index"));
+                };
+
+                visitor.visit_borrowed_str(*variant)
+            }
+        }
     }
 
     #[inline]
@@ -385,7 +397,7 @@ where
         let mut decoder = self
             .decoder
             .decode_struct_pairs(self.cx, Some(fields.len()))?;
-        let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields.len()))?;
+        let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields))?;
         decoder.end(self.cx)?;
         Ok(output)
     }
@@ -460,7 +472,7 @@ where
             {
                 let decoder = self.decoder.variant(self.cx)?;
                 let mut st = decoder.decode_struct_pairs(self.cx, Some(fields.len()))?;
-                let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields.len()))?;
+                let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
                 st.end(self.cx)?;
                 Ok(value)
             }
@@ -481,8 +493,11 @@ where
                 V: de::DeserializeSeed<'de>,
             {
                 let tag = self.decoder.tag(self.cx)?;
-                let value =
-                    seed.deserialize(Deserializer::with_variants(self.cx, tag, self.variants))?;
+                let value = seed.deserialize(Deserializer::with_mode(
+                    self.cx,
+                    tag,
+                    Mode::Variants(self.variants),
+                ))?;
                 Ok((value, self))
             }
         }
@@ -568,14 +583,17 @@ struct StructAccess<'a, C, D> {
     cx: &'a C,
     decoder: &'a mut D,
     remaining: usize,
+    fields: &'static [&'static str],
 }
 
 impl<'a, C, D> StructAccess<'a, C, D> {
-    fn new(cx: &'a C, decoder: &'a mut D, remaining: usize) -> Self {
+    #[inline]
+    fn new(cx: &'a C, decoder: &'a mut D, fields: &'static [&'static str]) -> Self {
         StructAccess {
             cx,
             decoder,
-            remaining,
+            remaining: fields.len(),
+            fields,
         }
     }
 }
@@ -597,9 +615,17 @@ where
             return Ok(None);
         }
 
+        let Some(field) = self.fields.get(self.remaining) else {
+            return Err(self
+                .cx
+                .message(format_args!("No field at index {}", self.remaining)));
+        };
+
+        let mode = Mode::Field(self.fields.len() - self.remaining, field);
+
         self.remaining -= 1;
         let decoder = self.decoder.field_name(self.cx)?;
-        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::with_mode(self.cx, decoder, mode))?;
         Ok(Some(output))
     }
 
