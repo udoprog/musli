@@ -86,6 +86,15 @@ where
     }
 
     #[inline]
+    fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let value = self.decoder.decode_i128(self.cx)?;
+        visitor.visit_i128(value)
+    }
+
+    #[inline]
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -119,6 +128,15 @@ where
     {
         let value = self.decoder.decode_u64(self.cx)?;
         visitor.visit_u64(value)
+    }
+
+    #[inline]
+    fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let value = self.decoder.decode_u128(self.cx)?;
+        visitor.visit_u128(value)
     }
 
     #[inline]

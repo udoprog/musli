@@ -62,6 +62,11 @@ where
     }
 
     #[inline]
+    fn serialize_i128(self, v: i128) -> Result<Self::Ok, Self::Error> {
+        self.encoder.encode_i128(self.cx, v)
+    }
+
+    #[inline]
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
         self.encoder.encode_u8(self.cx, v)
     }
@@ -79,6 +84,11 @@ where
     #[inline]
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
         self.encoder.encode_u64(self.cx, v)
+    }
+
+    #[inline]
+    fn serialize_u128(self, v: u128) -> Result<Self::Ok, Self::Error> {
+        self.encoder.encode_u128(self.cx, v)
     }
 
     #[inline]
