@@ -90,7 +90,7 @@ where
         C: Context<Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"true", Error::new(ErrorKind::ExpectedTrue))
+            .parse_exact(cx, *b"true", ErrorKind::ExpectedTrue)
     }
 
     #[inline]
@@ -99,7 +99,7 @@ where
         C: Context<Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"false", Error::new(ErrorKind::ExpectedFalse))
+            .parse_exact(cx, *b"false", ErrorKind::ExpectedFalse)
     }
 
     #[inline]
@@ -108,7 +108,7 @@ where
         C: Context<Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"null", Error::new(ErrorKind::ExpectedNull))
+            .parse_exact(cx, *b"null", ErrorKind::ExpectedNull)
     }
 }
 
