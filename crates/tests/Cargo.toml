@@ -73,6 +73,9 @@ zerocopy = { version = "0.7.11", default-features = false, optional = true, feat
 
 [dev-dependencies]
 musli = { path = "../musli", version = "0.0.96", default-features = false, features = ["alloc"] }
+musli-serde = { path = "../musli-serde", version = "0.0.96", default-features = false, features = ["alloc"] }
+musli-storage = { path = "../musli-storage", version = "0.0.96", default-features = false, features = ["alloc", "test"] }
+serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 criterion = { version = "0.4.0", features = ["html_reports"] }
 trybuild = "1.0.85"
 bstr = "1.7.0"
