@@ -33,16 +33,12 @@ where
 {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
         let mut unpack = decoder.decode_pack(cx)?;
-        let tag = unpack
-            .next(cx)
-            .and_then(|v| <Tag as Decode<M>>::decode(cx, v))?;
-        let value = unpack
-            .next(cx)
-            .and_then(|v| <T as Decode<M>>::decode(cx, v))?;
+        let tag = unpack.next(cx).and_then(|v| Tag::decode(cx, v))?;
+        let value = unpack.next(cx).and_then(|v| T::decode(cx, v))?;
         unpack.end(cx)?;
         Ok(Self { tag, value })
     }

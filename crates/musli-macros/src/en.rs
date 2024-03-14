@@ -52,7 +52,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
             #[inline]
             fn encode<#c_param, #e_param>(&self, #ctx_var: &#c_param, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t>::Ok, <#c_param as #context_t>::Error>
             where
-                #c_param: #context_t<Input = <#e_param as #encoder_t>::Error>,
+                #c_param: #context_t<Mode = #mode_ident, Input = <#e_param as #encoder_t>::Error>,
                 #e_param: #encoder_t
             {
                 #body
@@ -368,13 +368,12 @@ fn encode_variant(
                     value: field_tag, ..
                 },
             } => {
-                let mode_ident = b.mode_ident.as_path();
                 let tag = &v.tag;
                 let decls = tests.iter().map(|t| &t.decl);
 
                 encode = quote! {{
                     let mut #encoder_var = #encoder_t::encode_struct(#encoder_var, #ctx_var, 0)?;
-                    #struct_encoder_t::insert_field::<#mode_ident, _, _, _>(&mut #encoder_var, #ctx_var, #field_tag, #tag)?;
+                    #struct_encoder_t::insert_field(&mut #encoder_var, #ctx_var, #field_tag, #tag)?;
                     #(#decls)*
                     #(#encoders)*
                     #struct_encoder_t::end(#encoder_var, #ctx_var)?
@@ -386,7 +385,6 @@ fn encode_variant(
                 },
                 content,
             } => {
-                let mode_ident = b.mode_ident.as_path();
                 let encode_t_encode = &b.encode_t_encode;
 
                 let tag = &v.tag;
@@ -401,7 +399,7 @@ fn encode_variant(
 
                 encode = quote! {{
                     let mut #struct_encoder = #encoder_t::encode_struct(#encoder_var, #ctx_var, 2)?;
-                    #struct_encoder_t::insert_field::<#mode_ident, _, _, _>(&mut #struct_encoder, #ctx_var, &#field_tag, #tag)?;
+                    #struct_encoder_t::insert_field(&mut #struct_encoder, #ctx_var, &#field_tag, #tag)?;
                     let mut #pair = #struct_encoder_t::field(&mut #struct_encoder, #ctx_var)?;
                     let #content_tag = #struct_field_encoder_t::field_name(&mut #pair, #ctx_var)?;
                     #encode_t_encode(&#content, #ctx_var, #content_tag)?;

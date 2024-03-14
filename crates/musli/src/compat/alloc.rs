@@ -86,10 +86,10 @@ where
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
-        <Bytes<Vec<u8>> as Decode<M>>::decode(cx, decoder)
-            .map(|Bytes(bytes)| Bytes(VecDeque::from(bytes)))
+        cx.decode(decoder)
+            .map(|Bytes(bytes): Bytes<Vec<u8>>| Bytes(VecDeque::from(bytes)))
     }
 }

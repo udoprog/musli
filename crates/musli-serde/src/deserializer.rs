@@ -1,39 +1,32 @@
 use core::fmt;
-use core::marker::PhantomData;
 
 use musli::de::{
     Decoder, MapPairsDecoder, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
     StructFieldDecoder, StructPairsDecoder, VariantDecoder,
 };
-use musli::{Context, Mode};
+use musli::Context;
 use serde::de;
 
 #[cfg(feature = "alloc")]
 use alloc::string::String;
 
-pub struct Deserializer<'a, C, D, M> {
+pub struct Deserializer<'a, C, D> {
     cx: &'a C,
     decoder: D,
-    _mode: PhantomData<M>,
 }
 
-impl<'a, C, D, M> Deserializer<'a, C, D, M> {
+impl<'a, C, D> Deserializer<'a, C, D> {
     /// Construct a new deserializer out of a decoder.
     pub fn new(cx: &'a C, decoder: D) -> Self {
-        Self {
-            cx,
-            decoder,
-            _mode: PhantomData,
-        }
+        Self { cx, decoder }
     }
 }
 
-impl<'de, 'a, C, D, M> de::Deserializer<'de> for Deserializer<'a, C, D, M>
+impl<'de, 'a, C, D> de::Deserializer<'de> for Deserializer<'a, C, D>
 where
     C: Context<Input = D::Error>,
     C::Error: de::Error,
     D: Decoder<'de>,
-    M: Mode,
 {
     type Error = C::Error;
 
@@ -256,7 +249,7 @@ where
         V: de::Visitor<'de>,
     {
         match self.decoder.decode_option(self.cx)? {
-            Some(decoder) => visitor.visit_some(Deserializer::<_, _, M>::new(self.cx, decoder)),
+            Some(decoder) => visitor.visit_some(Deserializer::new(self.cx, decoder)),
             None => visitor.visit_none(),
         }
     }
@@ -303,10 +296,8 @@ where
             return Err(self.cx.message("newtype struct missing first field"));
         }
 
-        let output = visitor.visit_newtype_struct(Deserializer::<_, _, M>::new(
-            self.cx,
-            field.field_value(self.cx)?,
-        ))?;
+        let output = visitor
+            .visit_newtype_struct(Deserializer::new(self.cx, field.field_value(self.cx)?))?;
 
         decoder.end(self.cx)?;
         Ok(output)
@@ -319,18 +310,16 @@ where
     {
         let decoder = self.decoder.decode_sequence(self.cx)?;
 
-        struct SeqAccess<'a, C, D, M> {
+        struct SeqAccess<'a, C, D> {
             cx: &'a C,
             decoder: Option<D>,
-            _mode: PhantomData<M>,
         }
 
-        impl<'de, 'a, C, D, M> de::SeqAccess<'de> for SeqAccess<'a, C, D, M>
+        impl<'de, 'a, C, D> de::SeqAccess<'de> for SeqAccess<'a, C, D>
         where
             C: Context<Input = D::Error>,
             C::Error: de::Error,
             D: SequenceDecoder<'de>,
-            M: Mode,
         {
             type Error = C::Error;
 
@@ -351,7 +340,7 @@ where
                     return Ok(None);
                 };
 
-                let output = seed.deserialize(Deserializer::<_, _, M>::new(self.cx, decoder))?;
+                let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
                 Ok(Some(output))
             }
 
@@ -369,7 +358,6 @@ where
         visitor.visit_seq(SeqAccess {
             cx: self.cx,
             decoder: Some(decoder),
-            _mode: PhantomData::<M>,
         })
     }
 
@@ -379,7 +367,7 @@ where
         V: de::Visitor<'de>,
     {
         let mut tuple = self.decoder.decode_tuple(self.cx, len)?;
-        let value = visitor.visit_seq(TupleAccess::<_, _, M>::new(self.cx, &mut tuple, len))?;
+        let value = visitor.visit_seq(TupleAccess::new(self.cx, &mut tuple, len))?;
         tuple.end(self.cx)?;
         Ok(value)
     }
@@ -402,18 +390,16 @@ where
     where
         V: de::Visitor<'de>,
     {
-        struct MapAccess<'a, C, D, M> {
+        struct MapAccess<'a, C, D> {
             cx: &'a C,
             decoder: &'a mut D,
-            _mode: PhantomData<M>,
         }
 
-        impl<'de, 'a, C, D, M> de::MapAccess<'de> for MapAccess<'a, C, D, M>
+        impl<'de, 'a, C, D> de::MapAccess<'de> for MapAccess<'a, C, D>
         where
             C: Context<Input = D::Error>,
             C::Error: de::Error,
             D: MapPairsDecoder<'de>,
-            M: Mode,
         {
             type Error = C::Error;
 
@@ -426,7 +412,7 @@ where
                     return Ok(None);
                 };
 
-                let output = seed.deserialize(Deserializer::<_, _, M>::new(self.cx, decoder))?;
+                let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
                 Ok(Some(output))
             }
 
@@ -436,7 +422,7 @@ where
                 V: de::DeserializeSeed<'de>,
             {
                 let decoder = self.decoder.map_pairs_value(self.cx)?;
-                let output = seed.deserialize(Deserializer::<_, _, M>::new(self.cx, decoder))?;
+                let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
                 Ok(output)
             }
         }
@@ -446,7 +432,6 @@ where
         let map = MapAccess {
             cx: self.cx,
             decoder: &mut decoder,
-            _mode: PhantomData::<M>,
         };
 
         let output = visitor.visit_map(map)?;
@@ -467,11 +452,7 @@ where
         let mut decoder = self
             .decoder
             .decode_struct_pairs(self.cx, Some(fields.len()))?;
-        let output = visitor.visit_map(StructAccess::<_, _, M>::new(
-            self.cx,
-            &mut decoder,
-            fields.len(),
-        ))?;
+        let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields.len()))?;
         decoder.end(self.cx)?;
         Ok(output)
     }
@@ -486,18 +467,16 @@ where
     where
         V: de::Visitor<'de>,
     {
-        struct EnumAccess<'a, C, D, M> {
+        struct EnumAccess<'a, C, D> {
             cx: &'a C,
             decoder: &'a mut D,
-            _mode: PhantomData<M>,
         }
 
-        impl<'a, 'de, C, D, M> de::EnumAccess<'de> for EnumAccess<'a, C, D, M>
+        impl<'a, 'de, C, D> de::EnumAccess<'de> for EnumAccess<'a, C, D>
         where
             C: Context<Input = D::Error>,
             C::Error: de::Error,
             D: VariantDecoder<'de>,
-            M: Mode,
         {
             type Error = C::Error;
             type Variant = Self;
@@ -508,17 +487,16 @@ where
                 V: de::DeserializeSeed<'de>,
             {
                 let t = self.decoder.tag(self.cx)?;
-                let value = seed.deserialize(Deserializer::<_, _, M>::new(self.cx, t))?;
+                let value = seed.deserialize(Deserializer::new(self.cx, t))?;
                 Ok((value, self))
             }
         }
 
-        impl<'a, 'de, C, D, M> de::VariantAccess<'de> for EnumAccess<'a, C, D, M>
+        impl<'a, 'de, C, D> de::VariantAccess<'de> for EnumAccess<'a, C, D>
         where
             C: Context<Input = D::Error>,
             C::Error: de::Error,
             D: VariantDecoder<'de>,
-            M: Mode,
         {
             type Error = C::Error;
 
@@ -538,7 +516,7 @@ where
                 let decoder = self.decoder.variant(self.cx)?;
                 let mut tuple = decoder.decode_tuple(self.cx, 1)?;
                 let field = tuple.next(self.cx)?;
-                let value = seed.deserialize(Deserializer::<_, _, M>::new(self.cx, field))?;
+                let value = seed.deserialize(Deserializer::new(self.cx, field))?;
                 tuple.end(self.cx)?;
                 Ok(value)
             }
@@ -551,8 +529,7 @@ where
                 let decoder = self.decoder.variant(self.cx)?;
                 let mut tuple = decoder.decode_tuple(self.cx, len)?;
 
-                let value =
-                    visitor.visit_seq(TupleAccess::<_, _, M>::new(self.cx, &mut tuple, len))?;
+                let value = visitor.visit_seq(TupleAccess::new(self.cx, &mut tuple, len))?;
 
                 tuple.end(self.cx)?;
                 Ok(value)
@@ -569,11 +546,7 @@ where
             {
                 let decoder = self.decoder.variant(self.cx)?;
                 let mut st = decoder.decode_struct_pairs(self.cx, Some(fields.len()))?;
-                let value = visitor.visit_map(StructAccess::<_, _, M>::new(
-                    self.cx,
-                    &mut st,
-                    fields.len(),
-                ))?;
+                let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields.len()))?;
                 st.end(self.cx)?;
                 Ok(value)
             }
@@ -584,7 +557,6 @@ where
         let enum_access = EnumAccess {
             cx: self.cx,
             decoder: &mut decoder,
-            _mode: PhantomData::<M>,
         };
 
         let value = visitor.visit_enum(enum_access)?;
@@ -610,33 +582,28 @@ where
     }
 }
 
-struct TupleAccess<'a, C, D, M> {
+struct TupleAccess<'a, C, D> {
     cx: &'a C,
     decoder: &'a mut D,
     remaining: usize,
-    _mode: PhantomData<M>,
 }
 
-impl<'a, C, D, M> TupleAccess<'a, C, D, M> {
+impl<'a, C, D> TupleAccess<'a, C, D> {
     fn new(cx: &'a C, decoder: &'a mut D, len: usize) -> Self
-    where
-        M: Mode,
-    {
+where {
         TupleAccess {
             cx,
             decoder,
             remaining: len,
-            _mode: PhantomData::<M>,
         }
     }
 }
 
-impl<'de, 'a, C, D, M> de::SeqAccess<'de> for TupleAccess<'a, C, D, M>
+impl<'de, 'a, C, D> de::SeqAccess<'de> for TupleAccess<'a, C, D>
 where
     C: Context<Input = D::Error>,
     C::Error: de::Error,
     D: PackDecoder<'de>,
-    M: Mode,
 {
     type Error = C::Error;
 
@@ -652,7 +619,7 @@ where
         self.remaining -= 1;
 
         let decoder = self.decoder.next(self.cx)?;
-        let output = seed.deserialize(Deserializer::<_, _, M>::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
     }
 
@@ -661,30 +628,27 @@ where
         Some(self.remaining)
     }
 }
-struct StructAccess<'a, C, D, M> {
+struct StructAccess<'a, C, D> {
     cx: &'a C,
     decoder: &'a mut D,
     remaining: usize,
-    _mode: PhantomData<M>,
 }
 
-impl<'a, C, D, M> StructAccess<'a, C, D, M> {
+impl<'a, C, D> StructAccess<'a, C, D> {
     fn new(cx: &'a C, decoder: &'a mut D, remaining: usize) -> Self {
         StructAccess {
             cx,
             decoder,
             remaining,
-            _mode: PhantomData,
         }
     }
 }
 
-impl<'de, 'a, C, D, M> de::MapAccess<'de> for StructAccess<'a, C, D, M>
+impl<'de, 'a, C, D> de::MapAccess<'de> for StructAccess<'a, C, D>
 where
     C: Context<Input = D::Error>,
     C::Error: de::Error,
     D: StructPairsDecoder<'de>,
-    M: Mode,
 {
     type Error = C::Error;
 
@@ -699,7 +663,7 @@ where
 
         self.remaining -= 1;
         let decoder = self.decoder.field_name(self.cx)?;
-        let output = seed.deserialize(Deserializer::<_, _, M>::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
     }
 
@@ -709,7 +673,7 @@ where
         V: de::DeserializeSeed<'de>,
     {
         let decoder = self.decoder.field_value(self.cx)?;
-        let output = seed.deserialize(Deserializer::<_, _, M>::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(output)
     }
 

@@ -2,7 +2,6 @@ use core::fmt;
 
 use crate::de::{NumberVisitor, SizeHint, TypeHint, ValueVisitor, Visitor};
 use crate::expecting::{self, Expecting};
-use crate::mode::Mode;
 use crate::Context;
 
 /// Trait that allows a type to be repeatedly coerced into a decoder.
@@ -458,10 +457,10 @@ pub trait Decoder<'de>: Sized {
     /// impl<'de, M> Decode<'de, M> for MyVariantType where M: Mode {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut buffer = decoder.decode_buffer::<M, _>(cx)?;
+    ///         let mut buffer = decoder.decode_buffer(cx)?;
     ///
     ///         let mut st = buffer.as_decoder(cx)?.decode_map(cx)?;
     ///
@@ -475,7 +474,7 @@ pub trait Decoder<'de>: Sized {
     ///             }))?;
     ///
     ///             if found {
-    ///                 break e.map_value(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
+    ///                 break e.map_value(cx).and_then(|v| cx.decode(v))?;
     ///             }
     ///         };
     ///
@@ -483,16 +482,15 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         match discriminant {
     ///             0 => Ok(MyVariantType::Variant1),
-    ///             1 => Ok(MyVariantType::Variant2(buffer.as_decoder(cx).and_then(|v| Decode::<M>::decode(cx, v))?)),
+    ///             1 => Ok(MyVariantType::Variant2(buffer.as_decoder(cx).and_then(|v| cx.decode(v))?)),
     ///             other => Err(cx.invalid_variant_tag("MyVariantType", other)),
     ///         }
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_buffer<M, C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
+    fn decode_buffer<C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
     {
         Err(cx.message(format_args!(
@@ -1272,11 +1270,11 @@ pub trait Decoder<'de>: Sized {
     /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let data = if let Some(decoder) = decoder.decode_option(cx)? {
-    ///             Some(<String as Decode<M>>::decode(cx, decoder)?)
+    ///             Some(cx.decode(decoder)?)
     ///         } else {
     ///             None
     ///         };
@@ -1319,12 +1317,12 @@ pub trait Decoder<'de>: Sized {
     ///     #[inline]
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut unpack = decoder.decode_pack(cx)?;
-    ///         let field = unpack.next(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
-    ///         let data = unpack.next(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
+    ///         let field = unpack.next(cx).and_then(|v| cx.decode(v))?;
+    ///         let data = unpack.next(cx).and_then(|v| cx.decode(v))?;
     ///         unpack.end(cx)?;
     ///
     ///         Ok(Self {
@@ -1360,14 +1358,14 @@ pub trait Decoder<'de>: Sized {
     /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut seq = decoder.decode_sequence(cx)?;
     ///         let mut data = Vec::new();
     ///
     ///         while let Some(decoder) = seq.next(cx)? {
-    ///             data.push(<String as Decode<M>>::decode(cx, decoder)?);
+    ///             data.push(cx.decode(decoder)?);
     ///         }
     ///
     ///         seq.end(cx)?;
@@ -1405,12 +1403,12 @@ pub trait Decoder<'de>: Sized {
     /// impl<'de, M> Decode<'de, M> for TupleStruct where M: Mode {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut tuple = decoder.decode_tuple(cx, 2)?;
-    ///         let string = tuple.next(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
-    ///         let integer = tuple.next(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?;
+    ///         let string = tuple.next(cx).and_then(|v| cx.decode(v))?;
+    ///         let integer = tuple.next(cx).and_then(|v| cx.decode(v))?;
     ///         tuple.end(cx)?;
     ///         Ok(Self(string, integer))
     ///     }
@@ -1447,15 +1445,15 @@ pub trait Decoder<'de>: Sized {
     /// impl<'de, M> Decode<'de, M> for MapStruct where M: Mode {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut map = decoder.decode_map(cx)?;
     ///         let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
     ///         while let Some(mut entry) = map.entry(cx)? {
-    ///             let key = entry.map_key(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
-    ///             let value = entry.map_value(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?;
+    ///             let key = entry.map_key(cx).and_then(|v| cx.decode(v))?;
+    ///             let value = entry.map_value(cx).and_then(|v| cx.decode(v))?;
     ///             data.insert(key, value);
     ///         }
     ///
@@ -1517,7 +1515,7 @@ pub trait Decoder<'de>: Sized {
     /// impl<'de, M> Decode<'de, M> for Struct where M: Mode {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut st = decoder.decode_struct(cx, None)?;
@@ -1526,14 +1524,14 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         while let Some(mut field) = st.field(cx)? {
     ///             // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///             let tag = field.field_name(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
+    ///             let tag: String = field.field_name(cx).and_then(|v| cx.decode(v))?;
     ///
     ///             match tag.as_str() {
     ///                 "string" => {
-    ///                     string = Some(field.field_value(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?);
+    ///                     string = Some(field.field_value(cx).and_then(|v| cx.decode(v))?);
     ///                 }
     ///                 "integer" => {
-    ///                     integer = Some(field.field_value(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?);
+    ///                     integer = Some(field.field_value(cx).and_then(|v| cx.decode(v))?);
     ///                 }
     ///                 tag => {
     ///                     return Err(cx.invalid_field_tag("Struct", tag))
@@ -1599,18 +1597,18 @@ pub trait Decoder<'de>: Sized {
     /// {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut variant = decoder.decode_variant(cx)?;
-    ///         let tag = variant.tag(cx).and_then(|v| <usize as Decode<M>>::decode(cx, v))?;
+    ///         let tag = variant.tag(cx).and_then(|v| cx.decode(v))?;
     ///
     ///         let this = match tag {
     ///             0 => {
-    ///                 Self::Variant1(variant.variant(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?)
+    ///                 Self::Variant1(variant.variant(cx).and_then(|v| cx.decode(v))?)
     ///             }
     ///             1 => {
-    ///                 Self::Variant2(variant.variant(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?)
+    ///                 Self::Variant2(variant.variant(cx).and_then(|v| cx.decode(v))?)
     ///             }
     ///             tag => {
     ///                 return Err(cx.invalid_variant_tag("Enum", tag));

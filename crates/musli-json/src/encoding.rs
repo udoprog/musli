@@ -187,7 +187,7 @@ where
         W: Writer,
         T: ?Sized + Encode<M>,
     {
-        T::encode(value, cx, JsonEncoder::<M, _>::new(writer))
+        T::encode(value, cx, JsonEncoder::new(writer))
     }
 
     /// Encode the given value to a [`String`] using the current configuration.
@@ -215,7 +215,7 @@ where
         T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
-        T::encode(value, cx, JsonEncoder::<M, _>::new(&mut data))?;
+        T::encode(value, cx, JsonEncoder::new(&mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }

@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use crate::{Buf, Mode};
+use crate::{Buf, Decode, Decoder, Mode};
 
 /// Provides ergonomic access to the serialization context.
 ///
@@ -20,6 +20,16 @@ pub trait Context {
     type Buf<'this>: Buf
     where
         Self: 'this;
+
+    /// Decode the given input using the associated mode.
+    fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
+    where
+        T: Decode<'de, Self::Mode>,
+        D: Decoder<'de, Error = Self::Input>,
+        Self: Sized,
+    {
+        T::decode(self, decoder)
+    }
 
     /// Allocate a buffer.
     fn alloc(&self) -> Option<Self::Buf<'_>>;

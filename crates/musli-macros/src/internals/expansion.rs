@@ -1,5 +1,5 @@
 use crate::internals::tokens::Tokens;
-use crate::internals::{Mode, ModePath, Only};
+use crate::internals::{Mode, Only};
 
 #[derive(Clone, Copy)]
 pub(crate) enum Expansion<'a> {
@@ -11,21 +11,18 @@ pub(crate) enum Expansion<'a> {
 impl<'a> Expansion<'a> {
     pub(crate) fn as_mode(&self, tokens: &'a Tokens, only: Only) -> Mode<'a> {
         match *self {
-            Expansion::Generic { mode_ident } => Mode {
+            Expansion::Generic { .. } => Mode {
                 ident: None,
-                mode_path: ModePath::Ident(mode_ident),
                 tokens,
                 only,
             },
             Expansion::Default => Mode {
                 ident: None,
-                mode_path: ModePath::Path(&tokens.default_mode),
                 tokens,
                 only,
             },
             Expansion::Moded { mode_ident } => Mode {
                 ident: Some(mode_ident),
-                mode_path: ModePath::Path(mode_ident),
                 tokens,
                 only,
             },

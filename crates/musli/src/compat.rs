@@ -41,7 +41,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
         let mut seq = encoder.encode_sequence(cx, self.0.len())?;

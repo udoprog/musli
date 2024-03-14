@@ -10,8 +10,6 @@ use musli::de::{
     Decoder, MapDecoder, MapEntryDecoder, NumberHint, NumberVisitor, PackDecoder, SequenceDecoder,
     SizeHint, StructDecoder, StructFieldDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
-#[cfg(feature = "musli-value")]
-use musli::mode::Mode;
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};
@@ -154,13 +152,12 @@ where
 
     #[cfg(feature = "musli-value")]
     #[inline]
-    fn decode_buffer<M, C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
+    fn decode_buffer<C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
     {
         use musli::de::Decode;
-        let value: musli_value::Value = Decode::<M>::decode(cx, self)?;
+        let value = musli_value::Value::decode(cx, self)?;
         Ok(value.into_value_decoder())
     }
 

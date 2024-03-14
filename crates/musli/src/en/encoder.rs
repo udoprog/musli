@@ -2,7 +2,6 @@ use core::fmt;
 
 use crate::en::Encode;
 use crate::expecting::{self, Expecting};
-use crate::mode::Mode;
 use crate::Context;
 
 /// Trait governing how to encode a sequence.
@@ -25,11 +24,10 @@ pub trait SequenceEncoder {
 
     /// Push an element into the sequence.
     #[inline]
-    fn push<M, C, T>(&mut self, cx: &C, value: T) -> Result<(), C::Error>
+    fn push<C, T>(&mut self, cx: &C, value: T) -> Result<(), C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
-        T: Encode<M>,
+        T: Encode<C::Mode>,
     {
         let encoder = self.next(cx)?;
         value.encode(cx, encoder)?;
@@ -56,13 +54,12 @@ pub trait MapEncoder {
 
     /// Insert a pair immediately.
     #[inline]
-    fn insert_entry<M, C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
+    fn insert_entry<C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
     where
         Self: Sized,
-        M: Mode,
         C: Context<Input = Self::Error>,
-        F: Encode<M>,
-        S: Encode<M>,
+        F: Encode<C::Mode>,
+        S: Encode<C::Mode>,
     {
         self.entry(cx)?.insert_entry(cx, first, second)?;
         Ok(())
@@ -98,13 +95,12 @@ pub trait MapEntryEncoder {
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert_entry<M, C, F, S>(mut self, cx: &C, key: F, value: S) -> Result<Self::Ok, C::Error>
+    fn insert_entry<C, F, S>(mut self, cx: &C, key: F, value: S) -> Result<Self::Ok, C::Error>
     where
         Self: Sized,
-        M: Mode,
         C: Context<Input = Self::Error>,
-        F: Encode<M>,
-        S: Encode<M>,
+        F: Encode<C::Mode>,
+        S: Encode<C::Mode>,
     {
         self.map_key(cx).and_then(|e| key.encode(cx, e))?;
         self.map_value(cx).and_then(|e| value.encode(cx, e))?;
@@ -154,13 +150,12 @@ pub trait MapPairsEncoder {
 
     /// Insert the pair immediately.
     #[inline]
-    fn map_pairs_insert<M, C, F, S>(&mut self, cx: &C, key: F, value: S) -> Result<(), C::Error>
+    fn map_pairs_insert<C, F, S>(&mut self, cx: &C, key: F, value: S) -> Result<(), C::Error>
     where
         Self: Sized,
-        M: Mode,
         C: Context<Input = Self::Error>,
-        F: Encode<M>,
-        S: Encode<M>,
+        F: Encode<C::Mode>,
+        S: Encode<C::Mode>,
     {
         self.map_pairs_key(cx).and_then(|e| key.encode(cx, e))?;
         self.map_pairs_value(cx).and_then(|e| value.encode(cx, e))?;
@@ -199,13 +194,12 @@ pub trait StructEncoder {
 
     /// Insert a pair immediately.
     #[inline]
-    fn insert_field<M, C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
+    fn insert_field<C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
     where
         Self: Sized,
-        M: Mode,
         C: Context<Input = Self::Error>,
-        F: Encode<M>,
-        S: Encode<M>,
+        F: Encode<C::Mode>,
+        S: Encode<C::Mode>,
     {
         self.field(cx)?.insert_field(cx, first, second)?;
         Ok(())
@@ -241,13 +235,12 @@ pub trait StructFieldEncoder {
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert_field<M, C, F, V>(mut self, cx: &C, name: F, value: V) -> Result<Self::Ok, C::Error>
+    fn insert_field<C, F, V>(mut self, cx: &C, name: F, value: V) -> Result<Self::Ok, C::Error>
     where
         Self: Sized,
-        M: Mode,
         C: Context<Input = Self::Error>,
-        F: Encode<M>,
-        V: Encode<M>,
+        F: Encode<C::Mode>,
+        V: Encode<C::Mode>,
     {
         self.field_name(cx).and_then(|e| name.encode(cx, e))?;
         self.field_value(cx).and_then(|e| value.encode(cx, e))?;
@@ -291,13 +284,12 @@ pub trait VariantEncoder {
 
     /// Insert the variant immediately.
     #[inline]
-    fn insert_variant<M, C, F, S>(mut self, cx: &C, tag: F, second: S) -> Result<Self::Ok, C::Error>
+    fn insert_variant<C, F, S>(mut self, cx: &C, tag: F, second: S) -> Result<Self::Ok, C::Error>
     where
         Self: Sized,
-        M: Mode,
         C: Context<Input = Self::Error>,
-        F: Encode<M>,
-        S: Encode<M>,
+        F: Encode<C::Mode>,
+        S: Encode<C::Mode>,
     {
         self.tag(cx).and_then(|e| tag.encode(cx, e))?;
         self.variant(cx).and_then(|e| second.encode(cx, e))?;
@@ -1056,12 +1048,12 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
+    ///         C: Context<Mode = M, Input = E::Error>,
     ///         E: Encoder
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some(cx).and_then(|e| Encode::<M>::encode(data, cx, e))
+    ///                 encoder.encode_some(cx).and_then(|e| data.encode(cx, e))
     ///             }
     ///             None => {
     ///                 encoder.encode_none(cx)
@@ -1095,12 +1087,12 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType where M: Mode {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
+    ///         C: Context<Mode = M, Input = E::Error>,
     ///         E: Encoder
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some(cx).and_then(|e| Encode::<M>::encode(data, cx, e))
+    ///                 encoder.encode_some(cx).and_then(|e| data.encode(cx, e))
     ///             }
     ///             None => {
     ///                 encoder.encode_none(cx)
@@ -1191,7 +1183,7 @@ pub trait Encoder: Sized {
     ///         let mut seq = encoder.encode_sequence(cx, self.data.len())?;
     ///
     ///         for element in &self.data {
-    ///             seq.push::<M, _, _>(cx, element)?;
+    ///             seq.push(cx, element)?;
     ///         }
     ///
     ///         seq.end(cx)
@@ -1277,8 +1269,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         let mut map = encoder.encode_map(cx, 2)?;
-    ///         map.insert_entry::<M, _, _, _>(cx, "name", &self.name)?;
-    ///         map.insert_entry::<M, _, _, _>(cx, "age", self.age)?;
+    ///         map.insert_entry(cx, "name", &self.name)?;
+    ///         map.insert_entry(cx, "age", self.age)?;
     ///         map.end(cx)
     ///     }
     /// }
@@ -1315,8 +1307,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         let mut m = encoder.encode_map_pairs(cx, 2)?;
-    ///         m.map_pairs_insert::<M, _, _, _>(cx, "name", &self.name)?;
-    ///         m.map_pairs_insert::<M, _, _, _>(cx, "age", self.age)?;
+    ///         m.map_pairs_insert(cx, "name", &self.name)?;
+    ///         m.map_pairs_insert(cx, "age", self.age)?;
     ///         m.end(cx)
     ///     }
     /// }
@@ -1357,8 +1349,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         let mut st = encoder.encode_struct(cx, 2)?;
-    ///         st.insert_field::<M, _, _, _>(cx, "name", &self.name)?;
-    ///         st.insert_field::<M, _, _, _>(cx, "age", self.age)?;
+    ///         st.insert_field(cx, "name", &self.name)?;
+    ///         st.insert_field(cx, "age", self.age)?;
     ///         st.end(cx)
     ///     }
     /// }
@@ -1402,17 +1394,17 @@ pub trait Encoder: Sized {
     ///
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 variant.insert_variant::<M, _, _, _>(cx, "variant1", ())
+    ///                 variant.insert_variant(cx, "variant1", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 variant.insert_variant::<M, _, _, _>(cx, "variant2", data)
+    ///                 variant.insert_variant(cx, "variant2", data)
     ///             }
     ///             Enum::Variant { data, age } => {
     ///                 variant.tag(cx)?.encode_string(cx, "variant3")?;
     ///
     ///                 let mut st = variant.variant(cx)?.encode_struct(cx, 2)?;
-    ///                 st.insert_field::<M, _, _, _>(cx, "data", data)?;
-    ///                 st.insert_field::<M, _, _, _>(cx, "age", age)?;
+    ///                 st.insert_field(cx, "data", data)?;
+    ///                 st.insert_field(cx, "age", age)?;
     ///                 st.end(cx)?;
     ///
     ///                 variant.end(cx)
@@ -1458,17 +1450,17 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 encoder.encode_unit_variant::<M, _, _>(cx, &"variant1")
+    ///                 encoder.encode_unit_variant(cx, &"variant1")
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant2", 1)?;
-    ///                 variant.push::<M, _, _>(cx, data)?;
+    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant2", 1)?;
+    ///                 variant.push(cx, data)?;
     ///                 variant.end(cx)
     ///             }
     ///             Enum::Variant { data, age } => {
-    ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
-    ///                 variant.insert_field::<M, _, _, _>(cx, "data", data)?;
-    ///                 variant.insert_field::<M, _, _, _>(cx, "age", age)?;
+    ///                 let mut variant = encoder.encode_struct_variant(cx, &"variant3", 2)?;
+    ///                 variant.insert_field(cx, "data", data)?;
+    ///                 variant.insert_field(cx, "age", age)?;
     ///                 variant.end(cx)
     ///             }
     ///         }
@@ -1476,15 +1468,14 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_unit_variant<M, C, T>(self, cx: &C, tag: &T) -> Result<Self::Ok, C::Error>
+    fn encode_unit_variant<C, T>(self, cx: &C, tag: &T) -> Result<Self::Ok, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
-        T: Encode<M>,
+        T: Encode<C::Mode>,
     {
         let mut variant = self.encode_variant(cx)?;
         let t = variant.tag(cx)?;
-        Encode::<M>::encode(tag, cx, t)?;
+        Encode::encode(tag, cx, t)?;
         let v = variant.variant(cx)?;
         v.encode_unit(cx)?;
         variant.end(cx)
@@ -1516,18 +1507,18 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant1", 0)?;
+    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant1", 0)?;
     ///                 variant.end(cx)
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant2", 1)?;
-    ///                 variant.push::<M, _, _>(cx, data)?;
+    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant2", 1)?;
+    ///                 variant.push(cx, data)?;
     ///                 variant.end(cx)
     ///             }
     ///             Enum::Variant { data, age } => {
-    ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
-    ///                 variant.insert_field::<M, _, _, _>(cx, "data", data)?;
-    ///                 variant.insert_field::<M, _, _, _>(cx, "age", age)?;
+    ///                 let mut variant = encoder.encode_struct_variant(cx, &"variant3", 2)?;
+    ///                 variant.insert_field(cx, "data", data)?;
+    ///                 variant.insert_field(cx, "age", age)?;
     ///                 variant.end(cx)
     ///             }
     ///         }
@@ -1535,16 +1526,15 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple_variant<M, C, T>(
+    fn encode_tuple_variant<C, T>(
         self,
         cx: &C,
         _: &T,
         _: usize,
     ) -> Result<Self::TupleVariant, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
-        T: Encode<M>,
+        T: Encode<C::Mode>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Variant,
@@ -1578,18 +1568,18 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant1", 0)?;
+    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant1", 0)?;
     ///                 variant.end(cx)
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 let mut variant = encoder.encode_tuple_variant::<M, _, _>(cx, &"variant2", 1)?;
-    ///                 variant.push::<M, _, _>(cx, data)?;
+    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant2", 1)?;
+    ///                 variant.push(cx, data)?;
     ///                 variant.end(cx)
     ///             }
     ///             Enum::Variant { data, age } => {
-    ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
-    ///                 variant.insert_field::<M, _, _, _>(cx, "data", data)?;
-    ///                 variant.insert_field::<M, _, _, _>(cx, "age", age)?;
+    ///                 let mut variant = encoder.encode_struct_variant(cx, &"variant3", 2)?;
+    ///                 variant.insert_field(cx, "data", data)?;
+    ///                 variant.insert_field(cx, "age", age)?;
     ///                 variant.end(cx)
     ///             }
     ///         }
@@ -1597,16 +1587,15 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_struct_variant<M, C, T>(
+    fn encode_struct_variant<C, T>(
         self,
         cx: &C,
         _: &T,
         _: usize,
     ) -> Result<Self::StructVariant, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
-        T: Encode<M>,
+        T: Encode<C::Mode>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Variant,

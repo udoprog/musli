@@ -1,47 +1,41 @@
-use core::{fmt, marker};
+use core::fmt;
 
 use musli::en::{
     Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder,
     VariantEncoder,
 };
-use musli::mode::Mode;
 use musli::Context;
 use musli_common::writer::Writer;
 
 use crate::error::Error;
 
 /// A JSON encoder for Müsli.
-pub struct JsonEncoder<M, W> {
+pub struct JsonEncoder<W> {
     writer: W,
-    _marker: marker::PhantomData<M>,
 }
 
-impl<M, W> JsonEncoder<M, W> {
+impl<W> JsonEncoder<W> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(writer: W) -> Self {
-        Self {
-            writer,
-            _marker: marker::PhantomData,
-        }
+        Self { writer }
     }
 }
 
 #[musli::encoder]
-impl<M, W> Encoder for JsonEncoder<M, W>
+impl<W> Encoder for JsonEncoder<W>
 where
-    M: Mode,
     W: Writer,
 {
     type Error = Error;
     type Ok = ();
-    type Pack<'this, C> = JsonArrayEncoder<M, W> where C: 'this + Context;
+    type Pack<'this, C> = JsonArrayEncoder<W> where C: 'this + Context;
     type Some = Self;
-    type Sequence = JsonArrayEncoder<M, W>;
-    type Tuple = JsonArrayEncoder<M, W>;
-    type Map = JsonObjectEncoder<M, W>;
-    type Struct = JsonObjectEncoder<M, W>;
-    type Variant = JsonVariantEncoder<M, W>;
+    type Sequence = JsonArrayEncoder<W>;
+    type Tuple = JsonArrayEncoder<W>;
+    type Map = JsonObjectEncoder<W>;
+    type Struct = JsonObjectEncoder<W>;
+    type Variant = JsonVariantEncoder<W>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -240,11 +234,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        let mut seq = JsonArrayEncoder::<M, _>::new(cx, self.writer)?;
+        let mut seq = JsonArrayEncoder::<_>::new(cx, self.writer)?;
 
         for bb in bytes {
             for b in *bb {
-                seq.push::<M, _, _>(cx, b)?;
+                seq.push(cx, b)?;
             }
         }
 
@@ -325,13 +319,12 @@ where
 }
 
 /// Encoder for a pairs sequence.
-pub struct JsonObjectEncoder<M, W> {
+pub struct JsonObjectEncoder<W> {
     len: usize,
     writer: W,
-    _marker: marker::PhantomData<M>,
 }
 
-impl<M, W> JsonObjectEncoder<M, W>
+impl<W> JsonObjectEncoder<W>
 where
     W: Writer,
 {
@@ -342,23 +335,18 @@ where
     {
         writer.write_byte(cx, b'{')?;
 
-        Ok(Self {
-            len: 0,
-            writer,
-            _marker: marker::PhantomData,
-        })
+        Ok(Self { len: 0, writer })
     }
 }
 
-impl<M, W> MapEncoder for JsonObjectEncoder<M, W>
+impl<W> MapEncoder for JsonObjectEncoder<W>
 where
-    M: Mode,
     W: Writer,
 {
     type Ok = ();
     type Error = Error;
 
-    type Entry<'this> = JsonObjectPairEncoder<M, W::Mut<'this>>
+    type Entry<'this> = JsonObjectPairEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
@@ -385,15 +373,14 @@ where
     }
 }
 
-impl<M, W> StructEncoder for JsonObjectEncoder<M, W>
+impl<W> StructEncoder for JsonObjectEncoder<W>
 where
-    M: Mode,
     W: Writer,
 {
     type Ok = ();
     type Error = Error;
 
-    type Field<'this> = JsonObjectPairEncoder<M, W::Mut<'this>>
+    type Field<'this> = JsonObjectPairEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
@@ -415,26 +402,20 @@ where
 }
 
 /// Encoder for a pair.
-pub struct JsonObjectPairEncoder<M, W> {
+pub struct JsonObjectPairEncoder<W> {
     empty: bool,
     writer: W,
-    _marker: marker::PhantomData<M>,
 }
 
-impl<M, W> JsonObjectPairEncoder<M, W> {
+impl<W> JsonObjectPairEncoder<W> {
     #[inline]
     const fn new(empty: bool, writer: W) -> Self {
-        Self {
-            empty,
-            writer,
-            _marker: marker::PhantomData,
-        }
+        Self { empty, writer }
     }
 }
 
-impl<M, W> MapEntryEncoder for JsonObjectPairEncoder<M, W>
+impl<W> MapEntryEncoder for JsonObjectPairEncoder<W>
 where
-    M: Mode,
     W: Writer,
 {
     type Ok = ();
@@ -444,7 +425,7 @@ where
     where
         Self: 'this;
 
-    type MapValue<'this> = JsonEncoder<M, W::Mut<'this>> where Self: 'this;
+    type MapValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
 
     #[inline]
     fn map_key<C>(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error>
@@ -476,9 +457,8 @@ where
     }
 }
 
-impl<M, W> StructFieldEncoder for JsonObjectPairEncoder<M, W>
+impl<W> StructFieldEncoder for JsonObjectPairEncoder<W>
 where
-    M: Mode,
     W: Writer,
 {
     type Ok = ();
@@ -488,7 +468,7 @@ where
     where
         Self: 'this;
 
-    type FieldValue<'this> = JsonEncoder<M, W::Mut<'this>> where Self: 'this;
+    type FieldValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
 
     #[inline]
     fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
@@ -516,12 +496,11 @@ where
 }
 
 /// Encoder for a pair.
-pub struct JsonVariantEncoder<M, W> {
+pub struct JsonVariantEncoder<W> {
     writer: W,
-    _marker: marker::PhantomData<M>,
 }
 
-impl<M, W> JsonVariantEncoder<M, W>
+impl<W> JsonVariantEncoder<W>
 where
     W: Writer,
 {
@@ -532,16 +511,12 @@ where
     {
         writer.write_byte(cx, b'{')?;
 
-        Ok(Self {
-            writer,
-            _marker: marker::PhantomData,
-        })
+        Ok(Self { writer })
     }
 }
 
-impl<M, W> VariantEncoder for JsonVariantEncoder<M, W>
+impl<W> VariantEncoder for JsonVariantEncoder<W>
 where
-    M: Mode,
     W: Writer,
 {
     type Ok = ();
@@ -551,7 +526,7 @@ where
     where
         Self: 'this;
 
-    type Variant<'this> = JsonEncoder<M, W::Mut<'this>>
+    type Variant<'this> = JsonEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
@@ -722,13 +697,12 @@ where
 }
 
 /// Encoder for a pairs sequence.
-pub struct JsonArrayEncoder<M, W> {
+pub struct JsonArrayEncoder<W> {
     first: bool,
     writer: W,
-    _marker: marker::PhantomData<M>,
 }
 
-impl<M, W> JsonArrayEncoder<M, W>
+impl<W> JsonArrayEncoder<W>
 where
     W: Writer,
 {
@@ -742,20 +716,18 @@ where
         Ok(Self {
             first: true,
             writer,
-            _marker: marker::PhantomData,
         })
     }
 }
 
-impl<M, W> SequenceEncoder for JsonArrayEncoder<M, W>
+impl<W> SequenceEncoder for JsonArrayEncoder<W>
 where
-    M: Mode,
     W: Writer,
 {
     type Ok = ();
     type Error = Error;
 
-    type Encoder<'this> = JsonEncoder<M, W::Mut<'this>>
+    type Encoder<'this> = JsonEncoder<W::Mut<'this>>
     where
         Self: 'this;
 

@@ -9,7 +9,7 @@ homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
 keywords = ["no_std", "serialization"]
-categories = ["no-std", "memory-management", "rust-patterns"]
+categories = ["memory-management", "no-std", "rust-patterns"]
 
 [features]
 default = ["std"]

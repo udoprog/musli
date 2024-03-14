@@ -211,13 +211,10 @@ impl Number {
     }
 }
 
-struct AnyVisitor<M, E>(marker::PhantomData<(M, E)>);
+struct AnyVisitor<E>(marker::PhantomData<E>);
 
 #[musli::visitor]
-impl<'de, M, E: 'static> Visitor<'de> for AnyVisitor<M, E>
-where
-    M: Mode,
-{
+impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
     type Ok = Value;
     type Error = E;
 
@@ -377,9 +374,7 @@ where
         D: Decoder<'de, Error = Self::Error>,
     {
         match decoder {
-            Some(decoder) => Ok(Value::Option(Some(Box::new(Decode::<M>::decode(
-                cx, decoder,
-            )?)))),
+            Some(decoder) => Ok(Value::Option(Some(Box::new(Value::decode(cx, decoder)?)))),
             None => Ok(Value::Option(None)),
         }
     }
@@ -394,7 +389,7 @@ where
         let mut out = Vec::with_capacity(seq.size_hint().or_default());
 
         while let Some(item) = seq.next(cx)? {
-            out.push(Decode::<M>::decode(cx, item)?);
+            out.push(Value::decode(cx, item)?);
         }
 
         seq.end(cx)?;
@@ -411,8 +406,8 @@ where
         let mut out = Vec::with_capacity(map.size_hint().or_default());
 
         while let Some(mut entry) = map.entry(cx)? {
-            let first = Decode::<M>::decode(cx, entry.map_key(cx)?)?;
-            let second = Decode::<M>::decode(cx, entry.map_value(cx)?)?;
+            let first = Value::decode(cx, entry.map_key(cx)?)?;
+            let second = Value::decode(cx, entry.map_value(cx)?)?;
             out.push((first, second));
         }
 
@@ -454,10 +449,8 @@ where
         C: Context<Input = Self::Error>,
         D: VariantDecoder<'de, Error = Self::Error>,
     {
-        let first = variant.tag(cx)?;
-        let first = Decode::<M>::decode(cx, first)?;
-        let second = variant.variant(cx)?;
-        let second = Decode::<M>::decode(cx, second)?;
+        let first = cx.decode(variant.tag(cx)?)?;
+        let second = cx.decode(variant.variant(cx)?)?;
         variant.end(cx)?;
         Ok(Value::Variant(Box::new((first, second))))
     }
@@ -469,10 +462,10 @@ where
 {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
-        decoder.decode_any(cx, AnyVisitor::<M, D::Error>(marker::PhantomData))
+        decoder.decode_any(cx, AnyVisitor::<D::Error>(marker::PhantomData))
     }
 }
 
@@ -619,14 +612,14 @@ where
 {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
         match self {
             Value::Unit => encoder.encode_unit(cx),
             Value::Bool(b) => encoder.encode_bool(cx, *b),
             Value::Char(c) => encoder.encode_char(cx, *c),
-            Value::Number(n) => Encode::<M>::encode(n, cx, encoder),
+            Value::Number(n) => n.encode(cx, encoder),
             #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => encoder.encode_bytes(cx, bytes),
             #[cfg(feature = "alloc")]
@@ -637,7 +630,7 @@ where
 
                 for value in values {
                     let next = sequence.next(cx)?;
-                    Encode::<M>::encode(value, cx, next)?;
+                    value.encode(cx, next)?;
                 }
 
                 sequence.end(cx)
@@ -647,7 +640,7 @@ where
                 let mut map = encoder.encode_map(cx, values.len())?;
 
                 for (first, second) in values {
-                    map.insert_entry::<M, _, _, _>(cx, first, second)?;
+                    map.insert_entry(cx, first, second)?;
                 }
 
                 map.end(cx)
@@ -656,13 +649,13 @@ where
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;
                 let encoder = encoder.encode_variant(cx)?;
-                encoder.insert_variant::<M, _, _, _>(cx, tag, variant)
+                encoder.insert_variant(cx, tag, variant)
             }
             #[cfg(feature = "alloc")]
             Value::Option(option) => match option {
                 Some(value) => {
                     let encoder = encoder.encode_some(cx)?;
-                    Encode::<M>::encode(&**value, cx, encoder)
+                    value.encode(cx, encoder)
                 }
                 None => encoder.encode_none(cx),
             },

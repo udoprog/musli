@@ -10,6 +10,6 @@ struct Serde {
 
 #[derive(Encode, Decode)]
 struct Struct {
-    #[musli(with = musli_serde::<_>)]
+    #[musli(with = musli_serde)]
     field: Serde,
 }

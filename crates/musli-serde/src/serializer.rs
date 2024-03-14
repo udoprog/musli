@@ -1,47 +1,40 @@
 use std::fmt;
-use std::marker::PhantomData;
 
 use musli::en::{
     MapPairsEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
 };
-use musli::{Context, Encode, Encoder, Mode};
+use musli::{Context, Encode, Encoder};
 
 use serde::ser::{self, Serialize};
 
-pub struct Serializer<'a, C, E, M> {
+pub struct Serializer<'a, C, E> {
     cx: &'a C,
     encoder: E,
-    mode: PhantomData<M>,
 }
 
-impl<'a, C, E, M> Serializer<'a, C, E, M> {
+impl<'a, C, E> Serializer<'a, C, E> {
     /// Construct a new deserializer out of an encoder.
     pub fn new(cx: &'a C, encoder: E) -> Self {
-        Self {
-            cx,
-            encoder,
-            mode: PhantomData,
-        }
+        Self { cx, encoder }
     }
 }
 
-impl<'a, C, E, M> ser::Serializer for Serializer<'a, C, E, M>
+impl<'a, C, E> ser::Serializer for Serializer<'a, C, E>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: Encoder,
-    M: Mode,
 {
     type Ok = E::Ok;
     type Error = C::Error;
 
-    type SerializeSeq = SerializeSeq<'a, C, E::Sequence, M>;
-    type SerializeTuple = SerializeSeq<'a, C, E::Tuple, M>;
-    type SerializeTupleStruct = SerializeTupleStruct<'a, C, E::Struct, M>;
-    type SerializeTupleVariant = SerializeSeq<'a, C, E::TupleVariant, M>;
-    type SerializeMap = SerializeMap<'a, C, E::MapPairs, M>;
-    type SerializeStruct = SerializeStruct<'a, C, E::Struct, M>;
-    type SerializeStructVariant = SerializeStructVariant<'a, C, E::StructVariant, M>;
+    type SerializeSeq = SerializeSeq<'a, C, E::Sequence>;
+    type SerializeTuple = SerializeSeq<'a, C, E::Tuple>;
+    type SerializeTupleStruct = SerializeTupleStruct<'a, C, E::Struct>;
+    type SerializeTupleVariant = SerializeSeq<'a, C, E::TupleVariant>;
+    type SerializeMap = SerializeMap<'a, C, E::MapPairs>;
+    type SerializeStruct = SerializeStruct<'a, C, E::Struct>;
+    type SerializeStructVariant = SerializeStructVariant<'a, C, E::StructVariant>;
 
     #[inline]
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
@@ -124,7 +117,7 @@ where
         T: ser::Serialize,
     {
         let encoder = self.encoder.encode_some(self.cx)?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx, encoder))
+        value.serialize(Serializer::new(self.cx, encoder))
     }
 
     #[inline]
@@ -145,7 +138,7 @@ where
         variant_index: u32,
         _: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        encode_variant::<_, _, M, _, _, _>(self.cx, self.encoder, &variant_index, |encoder| {
+        encode_variant(self.cx, self.encoder, &variant_index, |encoder| {
             encoder.encode_unit(self.cx)
         })
     }
@@ -159,7 +152,7 @@ where
     where
         T: ser::Serialize,
     {
-        encode_newtype::<_, _, M, _>(self.cx, self.encoder, value)
+        encode_newtype(self.cx, self.encoder, value)
     }
 
     #[inline]
@@ -173,8 +166,8 @@ where
     where
         T: ser::Serialize,
     {
-        encode_variant::<_, _, M, _, _, _>(self.cx, self.encoder, &variant_index, move |encoder| {
-            encode_newtype::<_, _, M, _>(self.cx, encoder, value)
+        encode_variant(self.cx, self.encoder, &variant_index, move |encoder| {
+            encode_newtype(self.cx, encoder, value)
         })
     }
 
@@ -203,7 +196,7 @@ where
         len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         let encoder = self.encoder.encode_struct(self.cx, len)?;
-        Ok(SerializeTupleStruct::<_, _, M>::new(self.cx, encoder))
+        Ok(SerializeTupleStruct::new(self.cx, encoder))
     }
 
     #[inline]
@@ -216,8 +209,8 @@ where
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         let encoder = self
             .encoder
-            .encode_tuple_variant::<M, _, _>(self.cx, &variant_index, len)?;
-        Ok(SerializeSeq::<_, _, M>::new(self.cx, encoder))
+            .encode_tuple_variant(self.cx, &variant_index, len)?;
+        Ok(SerializeSeq::new(self.cx, encoder))
     }
 
     #[inline]
@@ -250,10 +243,10 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        let encoder =
-            self.encoder
-                .encode_struct_variant::<M, _, _>(self.cx, &variant_index, len)?;
-        Ok(SerializeStructVariant::<_, _, M>::new(self.cx, encoder))
+        let encoder = self
+            .encoder
+            .encode_struct_variant(self.cx, &variant_index, len)?;
+        Ok(SerializeStructVariant::new(self.cx, encoder))
     }
 
     #[inline]
@@ -268,24 +261,18 @@ where
 }
 
 #[inline]
-fn encode_variant<C, E, M, T, F, O>(
-    cx: &C,
-    encoder: E,
-    variant_tag: &T,
-    f: F,
-) -> Result<O, C::Error>
+fn encode_variant<C, E, T, F, O>(cx: &C, encoder: E, variant_tag: &T, f: F) -> Result<O, C::Error>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: Encoder,
-    M: Mode,
     T: Serialize,
     F: FnOnce(<E::Variant as VariantEncoder>::Variant<'_>) -> Result<O, C::Error>,
 {
     let mut variant = encoder.encode_variant(cx)?;
 
     let tag = variant.tag(cx)?;
-    variant_tag.serialize(Serializer::<_, _, M>::new(cx, tag))?;
+    variant_tag.serialize(Serializer::new(cx, tag))?;
 
     let value = variant.variant(cx)?;
     let output = f(value)?;
@@ -295,12 +282,11 @@ where
 }
 
 #[inline]
-fn encode_newtype<C, E, M, T>(cx: &C, encoder: E, value: &T) -> Result<E::Ok, C::Error>
+fn encode_newtype<C, E, T>(cx: &C, encoder: E, value: &T) -> Result<E::Ok, C::Error>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: Encoder,
-    M: Mode,
     T: ?Sized + Serialize,
 {
     let mut encoder = encoder.encode_struct(cx, 1)?;
@@ -308,37 +294,31 @@ where
     let mut field = encoder.field(cx)?;
 
     let k = field.field_name(cx)?;
-    Encode::<M>::encode(&0usize, cx, k)?;
+    usize::encode(&0usize, cx, k)?;
 
     let v = field.field_value(cx)?;
-    value.serialize(Serializer::<_, _, M>::new(cx, v))?;
+    value.serialize(Serializer::new(cx, v))?;
 
     field.end(cx)?;
     encoder.end(cx)
 }
 
-pub struct SerializeSeq<'a, C, E, M> {
+pub struct SerializeSeq<'a, C, E> {
     cx: &'a C,
     encoder: E,
-    mode: PhantomData<M>,
 }
 
-impl<'a, C, E, M> SerializeSeq<'a, C, E, M> {
+impl<'a, C, E> SerializeSeq<'a, C, E> {
     fn new(cx: &'a C, encoder: E) -> Self {
-        Self {
-            cx,
-            encoder,
-            mode: PhantomData,
-        }
+        Self { cx, encoder }
     }
 }
 
-impl<'a, C, E, M> ser::SerializeSeq for SerializeSeq<'a, C, E, M>
+impl<'a, C, E> ser::SerializeSeq for SerializeSeq<'a, C, E>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: SequenceEncoder,
-    M: Mode,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -349,7 +329,7 @@ where
         T: ser::Serialize,
     {
         let encoder = self.encoder.next(self.cx)?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx, encoder))?;
+        value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
 
@@ -359,12 +339,11 @@ where
     }
 }
 
-impl<'a, C, E, M> ser::SerializeTuple for SerializeSeq<'a, C, E, M>
+impl<'a, C, E> ser::SerializeTuple for SerializeSeq<'a, C, E>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: SequenceEncoder,
-    M: Mode,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -383,12 +362,11 @@ where
     }
 }
 
-impl<'a, C, E, M> ser::SerializeTupleVariant for SerializeSeq<'a, C, E, M>
+impl<'a, C, E> ser::SerializeTupleVariant for SerializeSeq<'a, C, E>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: SequenceEncoder,
-    M: Mode,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -407,30 +385,27 @@ where
     }
 }
 
-pub struct SerializeTupleStruct<'a, C, E, M> {
+pub struct SerializeTupleStruct<'a, C, E> {
     cx: &'a C,
     encoder: E,
     field: usize,
-    mode: PhantomData<M>,
 }
 
-impl<'a, C, E, M> SerializeTupleStruct<'a, C, E, M> {
+impl<'a, C, E> SerializeTupleStruct<'a, C, E> {
     fn new(cx: &'a C, encoder: E) -> Self {
         Self {
             cx,
             encoder,
             field: 0,
-            mode: PhantomData,
         }
     }
 }
 
-impl<'a, C, E, M> ser::SerializeTupleStruct for SerializeTupleStruct<'a, C, E, M>
+impl<'a, C, E> ser::SerializeTupleStruct for SerializeTupleStruct<'a, C, E>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: StructEncoder,
-    M: Mode,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -443,10 +418,10 @@ where
         let mut field = self.encoder.field(self.cx)?;
 
         let k = field.field_name(self.cx)?;
-        Encode::<M>::encode(&self.field, self.cx, k)?;
+        self.field.encode(self.cx, k)?;
 
         let v = field.field_value(self.cx)?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx, v))?;
+        value.serialize(Serializer::new(self.cx, v))?;
 
         field.end(self.cx)?;
         Ok(())
@@ -458,28 +433,22 @@ where
     }
 }
 
-pub struct SerializeMap<'a, C, E, M> {
+pub struct SerializeMap<'a, C, E> {
     cx: &'a C,
     encoder: E,
-    mode: PhantomData<M>,
 }
 
-impl<'a, C, E, M> SerializeMap<'a, C, E, M> {
+impl<'a, C, E> SerializeMap<'a, C, E> {
     fn new(cx: &'a C, encoder: E) -> Self {
-        Self {
-            cx,
-            encoder,
-            mode: PhantomData,
-        }
+        Self { cx, encoder }
     }
 }
 
-impl<'a, C, E, M> ser::SerializeMap for SerializeMap<'a, C, E, M>
+impl<'a, C, E> ser::SerializeMap for SerializeMap<'a, C, E>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: MapPairsEncoder,
-    M: Mode,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -490,7 +459,7 @@ where
         T: ser::Serialize,
     {
         let encoder = self.encoder.map_pairs_key(self.cx)?;
-        key.serialize(Serializer::<_, _, M>::new(self.cx, encoder))?;
+        key.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
 
@@ -500,7 +469,7 @@ where
         T: ser::Serialize,
     {
         let encoder = self.encoder.map_pairs_value(self.cx)?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx, encoder))?;
+        value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
 
@@ -510,28 +479,22 @@ where
     }
 }
 
-pub struct SerializeStruct<'a, C, E, M> {
+pub struct SerializeStruct<'a, C, E> {
     cx: &'a C,
     encoder: E,
-    mode: PhantomData<M>,
 }
 
-impl<'a, C, E, M> SerializeStruct<'a, C, E, M> {
+impl<'a, C, E> SerializeStruct<'a, C, E> {
     fn new(cx: &'a C, encoder: E) -> Self {
-        Self {
-            cx,
-            encoder,
-            mode: PhantomData,
-        }
+        Self { cx, encoder }
     }
 }
 
-impl<'a, C, E, M> ser::SerializeStruct for SerializeStruct<'a, C, E, M>
+impl<'a, C, E> ser::SerializeStruct for SerializeStruct<'a, C, E>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: StructEncoder,
-    M: Mode,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -547,9 +510,9 @@ where
     {
         let mut field = self.encoder.field(self.cx)?;
         let k = field.field_name(self.cx)?;
-        Encode::<M>::encode(key, self.cx, k)?;
+        key.encode(self.cx, k)?;
         let v = field.field_value(self.cx)?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx, v))?;
+        value.serialize(Serializer::new(self.cx, v))?;
         field.end(self.cx)?;
         Ok(())
     }
@@ -560,28 +523,22 @@ where
     }
 }
 
-pub struct SerializeStructVariant<'a, C, E, M> {
+pub struct SerializeStructVariant<'a, C, E> {
     cx: &'a C,
     encoder: E,
-    _mode: PhantomData<M>,
 }
 
-impl<'a, C, E, M> SerializeStructVariant<'a, C, E, M> {
+impl<'a, C, E> SerializeStructVariant<'a, C, E> {
     fn new(cx: &'a C, encoder: E) -> Self {
-        Self {
-            cx,
-            encoder,
-            _mode: PhantomData,
-        }
+        Self { cx, encoder }
     }
 }
 
-impl<'a, C, E, M> ser::SerializeStructVariant for SerializeStructVariant<'a, C, E, M>
+impl<'a, C, E> ser::SerializeStructVariant for SerializeStructVariant<'a, C, E>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: StructEncoder,
-    M: Mode,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -597,9 +554,9 @@ where
     {
         let mut field = self.encoder.field(self.cx)?;
         let k = field.field_name(self.cx)?;
-        Encode::<M>::encode(key, self.cx, k)?;
+        key.encode(self.cx, k)?;
         let v = field.field_value(self.cx)?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx, v))?;
+        value.serialize(Serializer::new(self.cx, v))?;
         field.end(self.cx)?;
         Ok(())
     }

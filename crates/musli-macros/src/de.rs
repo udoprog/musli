@@ -70,7 +70,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
             #[inline]
             fn decode<#c_param, #d_param>(#ctx_var: &#c_param, #root_decoder_var: #d_param) -> #core_result<Self, <#c_param as #context_t>::Error>
             where
-                #c_param: #context_t<Input = <#d_param as #decoder_t<#lt>>::Error>,
+                #c_param: #context_t<Mode = #mode_ident, Input = <#d_param as #decoder_t<#lt>>::Error>,
                 #d_param: #decoder_t<#lt>
             {
                 #body
@@ -321,8 +321,6 @@ fn decode_enum(
         }});
     };
 
-    let mode_ident = e.mode_ident.as_path();
-
     match enum_tagging {
         EnumTagging::Internal {
             tag:
@@ -444,7 +442,7 @@ fn decode_enum(
                 #outcome_enum
 
                 #enter
-                let #buffer_var = #decoder_t::decode_buffer::<#mode_ident, _>(#decoder_var, #ctx_var)?;
+                let #buffer_var = #decoder_t::decode_buffer(#decoder_var, #ctx_var)?;
                 let st = #as_decoder_t::as_decoder(&#buffer_var, #ctx_var)?;
                 let mut st = #decoder_t::decode_struct(st, #ctx_var, None)?;
 

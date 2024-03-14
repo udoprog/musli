@@ -5,7 +5,7 @@ use musli::en::{
     Encode, Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
     StructFieldEncoder, VariantEncoder,
 };
-use musli::{Context, Mode};
+use musli::Context;
 use musli_common::options::{self, Options};
 use musli_common::writer::Writer;
 
@@ -318,36 +318,34 @@ where
     }
 
     #[inline(always)]
-    fn encode_tuple_variant<M, C, T>(
+    fn encode_tuple_variant<C, T>(
         mut self,
         cx: &C,
         tag: &T,
         _: usize,
     ) -> Result<Self::TupleVariant, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
-        T: Encode<M>,
+        T: Encode<C::Mode>,
     {
         let encoder = StorageEncoder::<_, F, E>::new(self.writer.borrow_mut());
-        Encode::<M>::encode(tag, cx, encoder)?;
+        tag.encode(cx, encoder)?;
         Ok(self)
     }
 
     #[inline(always)]
-    fn encode_struct_variant<M, C, T>(
+    fn encode_struct_variant<C, T>(
         mut self,
         cx: &C,
         tag: &T,
         _: usize,
     ) -> Result<Self::StructVariant, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
-        T: Encode<M>,
+        T: Encode<C::Mode>,
     {
         let encoder = StorageEncoder::<_, F, E>::new(self.writer.borrow_mut());
-        Encode::<M>::encode(tag, cx, encoder)?;
+        tag.encode(cx, encoder)?;
         Ok(self)
     }
 }

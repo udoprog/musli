@@ -13,7 +13,7 @@ homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
 keywords = ["no_std", "serialization"]
-categories = ["no-std", "encoding"]
+categories = ["encoding", "no-std"]
 
 [features]
 default = ["std", "simdutf8"]

@@ -8,7 +8,6 @@ use musli::de::{
     AsDecoder, Decoder, MapDecoder, MapEntryDecoder, NumberHint, PackDecoder, SequenceDecoder,
     SizeHint, StructDecoder, StructFieldDecoder, TypeHint, VariantDecoder, Visitor,
 };
-use musli::mode::Mode;
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_storage::options::Options;
@@ -74,10 +73,9 @@ where
     }
 
     #[inline]
-    fn decode_buffer<M, C>(self, _: &C) -> Result<Self::Buffer, C::Error>
+    fn decode_buffer<C>(self, _: &C) -> Result<Self::Buffer, C::Error>
     where
         C: Context<Input = Self::Error>,
-        M: Mode,
     {
         Ok(AsValueDecoder::new(self.value.clone()))
     }
