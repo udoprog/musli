@@ -74,8 +74,8 @@ where
         let variant = encoder.encode_variant(cx)?;
 
         match self {
-            IpAddr::V4(v4) => variant.insert::<M, _, _, _>(cx, 0usize, v4),
-            IpAddr::V6(v6) => variant.insert::<M, _, _, _>(cx, 1usize, v6),
+            IpAddr::V4(v4) => variant.insert_variant::<M, _, _, _>(cx, 0usize, v4),
+            IpAddr::V6(v6) => variant.insert_variant::<M, _, _, _>(cx, 1usize, v6),
         }
     }
 }
@@ -215,8 +215,8 @@ where
         let variant = encoder.encode_variant(cx)?;
 
         match self {
-            SocketAddr::V4(v4) => variant.insert::<M, _, _, _>(cx, 0usize, v4),
-            SocketAddr::V6(v6) => variant.insert::<M, _, _, _>(cx, 1usize, v6),
+            SocketAddr::V4(v4) => variant.insert_variant::<M, _, _, _>(cx, 0usize, v4),
+            SocketAddr::V6(v6) => variant.insert_variant::<M, _, _, _>(cx, 1usize, v6),
         }
     }
 }

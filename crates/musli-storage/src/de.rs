@@ -5,8 +5,8 @@ use core::marker;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, MapPairsDecoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, SizeHint,
-    StructPairsDecoder, ValueVisitor, VariantDecoder,
+    Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, PackDecoder, SequenceDecoder, SizeHint,
+    StructDecoder, StructFieldDecoder, StructPairsDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::Context;
 use musli_common::options::Options;
@@ -339,7 +339,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
+    fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -347,7 +347,7 @@ where
     }
 
     #[inline]
-    fn decode_struct_pairs<C>(self, cx: &C, _: usize) -> Result<Self::StructPairs, C::Error>
+    fn decode_struct_pairs<C>(self, cx: &C, _: Option<usize>) -> Result<Self::StructPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -442,7 +442,7 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> PairsDecoder<'de> for LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E> MapDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
@@ -450,7 +450,7 @@ where
 {
     type Error = E;
 
-    type Decoder<'this> = StorageDecoder<R::Mut<'this>, F, E>
+    type Entry<'this> = StorageDecoder<R::Mut<'this>, F, E>
     where
         Self: 'this;
 
@@ -460,7 +460,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Option<Self::Entry<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -481,18 +481,18 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> PairDecoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E> MapEntryDecoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
     E: musli::error::Error,
 {
     type Error = E;
-    type First<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
-    type Second = Self;
+    type MapKey<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type MapValue = Self;
 
     #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -500,7 +500,7 @@ where
     }
 
     #[inline]
-    fn second<C>(self, _: &C) -> Result<Self::Second, C::Error>
+    fn map_value<C>(self, _: &C) -> Result<Self::MapValue, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -508,11 +508,80 @@ where
     }
 
     #[inline]
-    fn skip_second<C>(self, _: &C) -> Result<bool, C::Error>
+    fn skip_map_value<C>(self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
         Ok(false)
+    }
+}
+
+impl<'de, R, const F: Options, E> StructDecoder<'de> for LimitedStorageDecoder<R, F, E>
+where
+    R: Reader<'de>,
+    E: From<R::Error>,
+    E: musli::error::Error,
+{
+    type Error = E;
+
+    type Field<'this> = StorageDecoder<R::Mut<'this>, F, E>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        MapDecoder::size_hint(self)
+    }
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::end(self, cx)
+    }
+}
+
+impl<'de, R, const F: Options, E> StructFieldDecoder<'de> for StorageDecoder<R, F, E>
+where
+    R: Reader<'de>,
+    E: From<R::Error>,
+    E: musli::error::Error,
+{
+    type Error = E;
+    type FieldName<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type FieldValue = Self;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_key(self, cx)
+    }
+
+    #[inline]
+    fn field_value<C>(self, cx: &C) -> Result<Self::FieldValue, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_value(self, cx)
+    }
+
+    #[inline]
+    fn skip_field_value<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::skip_map_value(self, cx)
     }
 }
 
@@ -523,11 +592,11 @@ where
     E: musli::error::Error,
 {
     type Error = E;
-    type Key<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
-    type Value<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type MapPairsKey<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type MapPairsValue<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
 
     #[inline]
-    fn key<C>(&mut self, _: &C) -> Result<Option<Self::Key<'_>>, C::Error>
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -540,7 +609,7 @@ where
     }
 
     #[inline]
-    fn value<C>(&mut self, _: &C) -> Result<Self::Value<'_>, C::Error>
+    fn map_pairs_value<C>(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -548,7 +617,7 @@ where
     }
 
     #[inline]
-    fn skip_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    fn skip_map_pairs_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -571,11 +640,11 @@ where
     E: musli::error::Error,
 {
     type Error = E;
-    type Field<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
-    type Value<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type FieldName<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type FieldValue<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
 
     #[inline]
-    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -588,7 +657,7 @@ where
     }
 
     #[inline]
-    fn value<C>(&mut self, _: &C) -> Result<Self::Value<'_>, C::Error>
+    fn field_value<C>(&mut self, _: &C) -> Result<Self::FieldValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -596,7 +665,7 @@ where
     }
 
     #[inline]
-    fn skip_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    fn skip_field_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

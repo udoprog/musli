@@ -447,8 +447,8 @@ where
         let variant = encoder.encode_variant(cx)?;
 
         match self {
-            Ok(ok) => variant.insert::<M, _, _, _>(cx, 0usize, ok),
-            Err(err) => variant.insert::<M, _, _, _>(cx, 1usize, err),
+            Ok(ok) => variant.insert_variant::<M, _, _, _>(cx, 0usize, ok),
+            Err(err) => variant.insert_variant::<M, _, _, _>(cx, 1usize, err),
         }
     }
 }

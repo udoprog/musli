@@ -22,7 +22,7 @@ pub trait AsDecoder {
         C: Context<Input = Self::Error>;
 }
 
-/// A pack that can construct encoders.
+/// A pack that can construct decoders.
 pub trait PackDecoder<'de> {
     /// Error type raised by this unpack.
     type Error: Error;
@@ -74,15 +74,12 @@ pub trait SequenceDecoder<'de> {
 }
 
 /// Trait governing how to decode a sequence of pairs.
-///
-/// Each invocation of [PairsDecoder::next] returns an implementation of
-/// [PairDecoder].
-pub trait PairsDecoder<'de> {
+pub trait MapDecoder<'de> {
     /// Error type.
     type Error: Error;
 
     /// The decoder to use for a key.
-    type Decoder<'this>: PairDecoder<'de, Error = Self::Error>
+    type Entry<'this>: MapEntryDecoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
@@ -92,7 +89,7 @@ pub trait PairsDecoder<'de> {
     /// Decode the next key. This returns `Ok(None)` where there are no more
     /// elements to decode.
     #[must_use = "Decoders must be consumed"]
-    fn next<C>(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn entry<C>(&mut self, cx: &C) -> Result<Option<Self::Entry<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
@@ -105,38 +102,99 @@ pub trait PairsDecoder<'de> {
         C: Context<Input = Self::Error>;
 }
 
-/// Trait governing how to decode a field.
-pub trait PairDecoder<'de> {
+/// Trait governing how to decode fields in a struct.
+pub trait StructDecoder<'de> {
+    /// Error type.
+    type Error: Error;
+
+    /// The decoder to use for a key.
+    type Field<'this>: StructFieldDecoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Get a size hint of known remaining fields.
+    fn size_hint(&self) -> SizeHint;
+
+    /// Decode the next field.
+    #[must_use = "Decoders must be consumed"]
+    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// End the pair decoder.
+    ///
+    /// If there are any remaining elements in the sequence of pairs, this
+    /// indicates that they should be flushed.
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to decode a map entry.
+pub trait MapEntryDecoder<'de> {
     /// Error type.
     type Error: Error;
 
     /// The decoder to use for a tuple field index.
-    type First<'this>: Decoder<'de, Error = Self::Error>
+    type MapKey<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
     /// The decoder to use for a tuple field value.
-    type Second: Decoder<'de, Error = Self::Error>;
+    type MapValue: Decoder<'de, Error = Self::Error>;
 
     /// Return the decoder for the first value in the pair.
     ///
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "decoders must be consumed"]
-    fn first<C>(&mut self, cx: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Decode the second value in the pair..
     #[must_use = "decoders must be consumed"]
-    fn second<C>(self, cx: &C) -> Result<Self::Second, C::Error>
+    fn map_value<C>(self, cx: &C) -> Result<Self::MapValue, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Indicate that the second value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_second<C>(self, cx: &C) -> Result<bool, C::Error>
+    fn skip_map_value<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to decode a struct field.
+pub trait StructFieldDecoder<'de> {
+    /// Error type.
+    type Error: Error;
+
+    /// The decoder to use for a tuple field index.
+    type FieldName<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The decoder to use for a tuple field value.
+    type FieldValue: Decoder<'de, Error = Self::Error>;
+
+    /// Return the decoder for the field name.
+    #[must_use = "decoders must be consumed"]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Decode the field value.
+    #[must_use = "decoders must be consumed"]
+    fn field_value<C>(self, cx: &C) -> Result<Self::FieldValue, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Indicate that the field value should be skipped.
+    ///
+    /// The boolean returned indicates if the value was skipped or not.
+    fn skip_field_value<C>(self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>;
 }
@@ -153,12 +211,12 @@ pub trait MapPairsDecoder<'de> {
     type Error: Error;
 
     /// The decoder to use for a tuple field index.
-    type Key<'this>: Decoder<'de, Error = Self::Error>
+    type MapPairsKey<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
     /// The decoder to use for a tuple field value.
-    type Value<'this>: Decoder<'de, Error = Self::Error>
+    type MapPairsValue<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
@@ -167,20 +225,20 @@ pub trait MapPairsDecoder<'de> {
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "decoders must be consumed"]
-    fn key<C>(&mut self, cx: &C) -> Result<Option<Self::Key<'_>>, C::Error>
+    fn map_pairs_key<C>(&mut self, cx: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Decode the value in the map.
     #[must_use = "decoders must be consumed"]
-    fn value<C>(&mut self, cx: &C) -> Result<Self::Value<'_>, C::Error>
+    fn map_pairs_value<C>(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Indicate that the value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    fn skip_map_pairs_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>;
 
@@ -202,12 +260,12 @@ pub trait StructPairsDecoder<'de> {
     type Error: Error;
 
     /// The decoder to use for a tuple field index.
-    type Field<'this>: Decoder<'de, Error = Self::Error>
+    type FieldName<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
     /// The decoder to use for a tuple field value.
-    type Value<'this>: Decoder<'de, Error = Self::Error>
+    type FieldValue<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
@@ -216,20 +274,20 @@ pub trait StructPairsDecoder<'de> {
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "decoders must be consumed"]
-    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Decode the second value in the pair..
     #[must_use = "decoders must be consumed"]
-    fn value<C>(&mut self, cx: &C) -> Result<Self::Value<'_>, C::Error>
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Indicate that the second value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    fn skip_field_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>;
 
@@ -296,16 +354,13 @@ pub trait Decoder<'de>: Sized {
     type Sequence: SequenceDecoder<'de, Error = Self::Error>;
     /// Tuple decoder implementation.
     type Tuple: PackDecoder<'de, Error = Self::Error>;
-    /// Map decoder implementation.
-    type Map: PairsDecoder<'de, Error = Self::Error>;
-    /// Decoder for map pairs.
+    /// Decoder for a map.
+    type Map: MapDecoder<'de, Error = Self::Error>;
+    /// Decoder for a sequence of map pairs.
     type MapPairs: MapPairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a struct.
-    ///
-    /// The caller receives a [PairsDecoder] which when advanced with
-    /// [PairsDecoder::next] indicates the fields of the structure.
-    type Struct: PairsDecoder<'de, Error = Self::Error>;
-    /// Decoder for struct pairs.
+    type Struct: StructDecoder<'de, Error = Self::Error>;
+    /// Decoder for a sequence of struct pairs.
     type StructPairs: StructPairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a variant.
     type Variant: VariantDecoder<'de, Error = Self::Error>;
@@ -387,7 +442,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder, Mode};
-    /// use musli::de::{AsDecoder, PairsDecoder, PairDecoder};
+    /// use musli::de::{AsDecoder, MapDecoder, MapEntryDecoder};
     ///
     /// #[derive(Decode)]
     /// struct Variant2 {
@@ -411,16 +466,16 @@ pub trait Decoder<'de>: Sized {
     ///         let mut st = buffer.as_decoder(cx)?.decode_map(cx)?;
     ///
     ///         let discriminant = loop {
-    ///             let Some(mut e) = st.next(cx)? else {
+    ///             let Some(mut e) = st.entry(cx)? else {
     ///                 return Err(cx.missing_variant_tag("MyVariantType"));
     ///             };
     ///
-    ///             let found = e.first(cx)?.decode_string(cx, musli::utils::visit_owned_fn("a string that is 'type'", |cx: &C, string: &str| {
+    ///             let found = e.map_key(cx)?.decode_string(cx, musli::utils::visit_owned_fn("a string that is 'type'", |cx: &C, string: &str| {
     ///                 Ok(string == "type")
     ///             }))?;
     ///
     ///             if found {
-    ///                 break e.second(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
+    ///                 break e.map_value(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
     ///             }
     ///         };
     ///
@@ -1383,7 +1438,7 @@ pub trait Decoder<'de>: Sized {
     /// use std::collections::HashMap;
     ///
     /// use musli::{Context, Mode, Decode, Decoder};
-    /// use musli::de::{PairsDecoder, PairDecoder};
+    /// use musli::de::{MapDecoder, MapEntryDecoder};
     ///
     /// struct MapStruct {
     ///     data: HashMap<String, u32>,
@@ -1398,9 +1453,9 @@ pub trait Decoder<'de>: Sized {
     ///         let mut map = decoder.decode_map(cx)?;
     ///         let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
-    ///         while let Some(mut entry) = map.next(cx)? {
-    ///             let key = entry.first(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
-    ///             let value = entry.second(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?;
+    ///         while let Some(mut entry) = map.entry(cx)? {
+    ///             let key = entry.map_key(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
+    ///             let value = entry.map_value(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?;
     ///             data.insert(key, value);
     ///         }
     ///
@@ -1452,7 +1507,7 @@ pub trait Decoder<'de>: Sized {
     /// use std::collections::HashMap;
     ///
     /// use musli::{Context, Decode, Decoder, Mode};
-    /// use musli::de::{PairsDecoder, PairDecoder};
+    /// use musli::de::{StructDecoder, StructFieldDecoder};
     ///
     /// struct Struct {
     ///     string: String,
@@ -1465,20 +1520,20 @@ pub trait Decoder<'de>: Sized {
     ///         C: Context<Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut st = decoder.decode_map(cx)?;
+    ///         let mut st = decoder.decode_struct(cx, None)?;
     ///         let mut string = None;
     ///         let mut integer = None;
     ///
-    ///         while let Some(mut entry) = st.next(cx)? {
+    ///         while let Some(mut field) = st.field(cx)? {
     ///             // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///             let tag = entry.first(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
+    ///             let tag = field.field_name(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
     ///
     ///             match tag.as_str() {
     ///                 "string" => {
-    ///                     string = Some(entry.second(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?);
+    ///                     string = Some(field.field_value(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?);
     ///                 }
     ///                 "integer" => {
-    ///                     integer = Some(entry.second(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?);
+    ///                     integer = Some(field.field_value(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?);
     ///                 }
     ///                 tag => {
     ///                     return Err(cx.invalid_field_tag("Struct", tag))
@@ -1496,7 +1551,7 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
+    fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -1515,7 +1570,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// The size of a struct might therefore change from one session to another.
     #[inline]
-    fn decode_struct_pairs<C>(self, cx: &C, _: usize) -> Result<Self::StructPairs, C::Error>
+    fn decode_struct_pairs<C>(self, cx: &C, _: Option<usize>) -> Result<Self::StructPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

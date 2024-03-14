@@ -25,8 +25,8 @@ mod visitor;
 
 pub use self::decode::{Decode, TraceDecode};
 pub use self::decoder::{
-    AsDecoder, Decoder, MapPairsDecoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
-    StructPairsDecoder, VariantDecoder,
+    AsDecoder, Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, PackDecoder, SequenceDecoder,
+    StructDecoder, StructFieldDecoder, StructPairsDecoder, VariantDecoder,
 };
 pub use self::number_visitor::NumberVisitor;
 pub use self::type_hint::{NumberHint, SizeHint, TypeHint};

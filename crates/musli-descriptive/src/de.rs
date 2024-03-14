@@ -4,8 +4,8 @@ use core::fmt;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
-    SizeHint, TypeHint, ValueVisitor, VariantDecoder, Visitor,
+    Decoder, MapDecoder, MapEntryDecoder, NumberHint, NumberVisitor, PackDecoder, SequenceDecoder,
+    SizeHint, StructDecoder, StructFieldDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::Context;
 use musli_storage::de::StorageDecoder;
@@ -659,7 +659,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
+    fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -908,17 +908,60 @@ where
     }
 }
 
-impl<'de, R, const F: Options> PairDecoder<'de> for SelfDecoder<R, F>
+impl<'de, R, const F: Options> MapDecoder<'de> for RemainingSelfDecoder<R, F>
 where
     R: Reader<'de>,
     Error: From<R::Error>,
 {
     type Error = Error;
-    type First<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
-    type Second = Self;
+
+    type Entry<'this> = SelfDecoder<R::Mut<'this>, F>
+    where
+        Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Exact(self.remaining)
+    }
+
+    #[inline]
+    fn entry<C>(&mut self, _: &C) -> Result<Option<Self::Entry<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if self.remaining == 0 {
+            return Ok(None);
+        }
+
+        self.remaining -= 1;
+        Ok(Some(SelfDecoder::new(self.decoder.reader.borrow_mut())))
+    }
+
+    #[inline]
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        // Skip remaining elements.
+        while let Some(mut item) = MapDecoder::entry(&mut self, cx)? {
+            item.skip_any(cx)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'de, R, const F: Options> MapEntryDecoder<'de> for SelfDecoder<R, F>
+where
+    R: Reader<'de>,
+    Error: From<R::Error>,
+{
+    type Error = Error;
+    type MapKey<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type MapValue = Self;
+
+    #[inline]
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -926,7 +969,7 @@ where
     }
 
     #[inline]
-    fn second<C>(self, _: &C) -> Result<Self::Second, C::Error>
+    fn map_value<C>(self, _: &C) -> Result<Self::MapValue, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -934,12 +977,79 @@ where
     }
 
     #[inline]
-    fn skip_second<C>(mut self, cx: &C) -> Result<bool, C::Error>
+    fn skip_map_value<C>(mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
         self.skip_any(cx)?;
         Ok(true)
+    }
+}
+
+impl<'de, R, const F: Options> StructDecoder<'de> for RemainingSelfDecoder<R, F>
+where
+    R: Reader<'de>,
+    Error: From<R::Error>,
+{
+    type Error = Error;
+
+    type Field<'this> = SelfDecoder<R::Mut<'this>, F>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Exact(self.remaining)
+    }
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::end(self, cx)
+    }
+}
+
+impl<'de, R, const F: Options> StructFieldDecoder<'de> for SelfDecoder<R, F>
+where
+    R: Reader<'de>,
+    Error: From<R::Error>,
+{
+    type Error = Error;
+    type FieldName<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type FieldValue = Self;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_key(self, cx)
+    }
+
+    #[inline]
+    fn field_value<C>(self, cx: &C) -> Result<Self::FieldValue, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_value(self, cx)
+    }
+
+    #[inline]
+    fn skip_field_value<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::skip_map_value(self, cx)
     }
 }
 
@@ -982,49 +1092,6 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        Ok(())
-    }
-}
-
-impl<'de, R, const F: Options> PairsDecoder<'de> for RemainingSelfDecoder<R, F>
-where
-    R: Reader<'de>,
-    Error: From<R::Error>,
-{
-    type Error = Error;
-
-    type Decoder<'this> = SelfDecoder<R::Mut<'this>, F>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
-    }
-
-    #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        if self.remaining == 0 {
-            return Ok(None);
-        }
-
-        self.remaining -= 1;
-        Ok(Some(SelfDecoder::new(self.decoder.reader.borrow_mut())))
-    }
-
-    #[inline]
-    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        // Skip remaining elements.
-        while let Some(mut item) = PairsDecoder::next(&mut self, cx)? {
-            item.skip_any(cx)?;
-        }
-
         Ok(())
     }
 }

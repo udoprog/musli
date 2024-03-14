@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::de::{
-    Decoder, NumberHint, NumberVisitor, PairsDecoder, SequenceDecoder, SizeHint, TypeHint,
+    Decoder, MapDecoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, TypeHint,
     VariantDecoder,
 };
 use crate::error::Error;
@@ -288,7 +288,7 @@ pub trait Visitor<'de>: Sized {
     fn visit_map<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
-        D: PairsDecoder<'de, Error = Self::Error>,
+        D: MapDecoder<'de, Error = Self::Error>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::MapWith(decoder.size_hint()),

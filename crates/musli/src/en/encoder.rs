@@ -43,8 +43,8 @@ pub trait SequenceEncoder {
         C: Context<Input = Self::Error>;
 }
 
-/// Encoder for a sequence of pairs.
-pub trait PairsEncoder {
+/// Encoder for a map.
+pub trait MapEncoder {
     /// Result type of the encoder.
     type Ok;
 
@@ -52,13 +52,13 @@ pub trait PairsEncoder {
     type Error: Error;
 
     /// Encode the next pair.
-    type Encoder<'this>: PairEncoder<Ok = Self::Ok, Error = Self::Error>
+    type Entry<'this>: MapEntryEncoder<Ok = Self::Ok, Error = Self::Error>
     where
         Self: 'this;
 
     /// Insert a pair immediately.
     #[inline]
-    fn insert<M, C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
+    fn insert_entry<M, C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
     where
         Self: Sized,
         M: Mode,
@@ -66,12 +66,156 @@ pub trait PairsEncoder {
         F: Encode<M>,
         S: Encode<M>,
     {
-        self.next(cx)?.insert(cx, first, second)?;
+        self.entry(cx)?.insert_entry(cx, first, second)?;
         Ok(())
     }
 
     /// Encode the next pair.
-    fn next<C>(&mut self, cx: &C) -> Result<Self::Encoder<'_>, C::Error>
+    fn entry<C>(&mut self, cx: &C) -> Result<Self::Entry<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Finish encoding pairs.
+    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to encode a map entry.
+pub trait MapEntryEncoder {
+    /// Result type of the encoder.
+    type Ok;
+    /// The error raised by a map encoder.
+    type Error: Error;
+
+    /// The encoder returned when advancing the map encoder to encode the key.
+    type MapKey<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The encoder returned when advancing the map encoder to encode the value.
+    type MapValue<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Insert the pair immediately.
+    #[inline]
+    fn insert_entry<M, C, F, S>(mut self, cx: &C, key: F, value: S) -> Result<Self::Ok, C::Error>
+    where
+        Self: Sized,
+        M: Mode,
+        C: Context<Input = Self::Error>,
+        F: Encode<M>,
+        S: Encode<M>,
+    {
+        self.map_key(cx).and_then(|e| key.encode(cx, e))?;
+        self.map_value(cx).and_then(|e| value.encode(cx, e))?;
+        self.end(cx)
+    }
+
+    /// Return the encoder for the key in the entry.
+    #[must_use = "Encoders must be consumed"]
+    fn map_key<C>(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Return encoder for value in the entry.
+    #[must_use = "Encoders must be consumed"]
+    fn map_value<C>(&mut self, cx: &C) -> Result<Self::MapValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Stop encoding this pair.
+    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to encode a map entry.
+///
+/// This trait exists so that decoders can implement a mode that is compatible
+/// with serde serialization.
+///
+/// If you do not intend to implement this, then serde compatibility for your
+/// format might be degraded.
+pub trait MapPairsEncoder {
+    /// Result type of the encoder.
+    type Ok;
+    /// The error raised by a map encoder.
+    type Error: Error;
+
+    /// The encoder returned when advancing the map encoder to encode the key.
+    type MapPairsKey<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The encoder returned when advancing the map encoder to encode the value.
+    type MapPairsValue<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Insert the pair immediately.
+    #[inline]
+    fn map_pairs_insert<M, C, F, S>(&mut self, cx: &C, key: F, value: S) -> Result<(), C::Error>
+    where
+        Self: Sized,
+        M: Mode,
+        C: Context<Input = Self::Error>,
+        F: Encode<M>,
+        S: Encode<M>,
+    {
+        self.map_pairs_key(cx).and_then(|e| key.encode(cx, e))?;
+        self.map_pairs_value(cx).and_then(|e| value.encode(cx, e))?;
+        Ok(())
+    }
+
+    /// Return the encoder for the key in the entry.
+    #[must_use = "Encoders must be consumed"]
+    fn map_pairs_key<C>(&mut self, cx: &C) -> Result<Self::MapPairsKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Return encoder for value in the entry.
+    #[must_use = "Encoders must be consumed"]
+    fn map_pairs_value<C>(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Stop encoding this pair.
+    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Encoder for a struct.
+pub trait StructEncoder {
+    /// Result type of the encoder.
+    type Ok;
+
+    /// The error raised by a map encoder.
+    type Error: Error;
+
+    /// Encoder for the next struct field.
+    type Field<'this>: StructFieldEncoder<Ok = Self::Ok, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Insert a pair immediately.
+    #[inline]
+    fn insert_field<M, C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
+    where
+        Self: Sized,
+        M: Mode,
+        C: Context<Input = Self::Error>,
+        F: Encode<M>,
+        S: Encode<M>,
+    {
+        self.field(cx)?.insert_field(cx, first, second)?;
+        Ok(())
+    }
+
+    /// Encode the next pair.
+    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
@@ -82,46 +226,46 @@ pub trait PairsEncoder {
 }
 
 /// Trait governing how to encode a sequence of pairs.
-pub trait PairEncoder {
+pub trait StructFieldEncoder {
     /// Result type of the encoder.
     type Ok;
     /// The error raised by a map encoder.
     type Error: Error;
 
     /// The encoder returned when advancing the map encoder to encode the key.
-    type First<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type FieldName<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
     where
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type Second<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type FieldValue<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
     where
         Self: 'this;
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert<M, C, F, S>(mut self, cx: &C, first: F, second: S) -> Result<Self::Ok, C::Error>
+    fn insert_field<M, C, F, V>(mut self, cx: &C, name: F, value: V) -> Result<Self::Ok, C::Error>
     where
         Self: Sized,
         M: Mode,
         C: Context<Input = Self::Error>,
         F: Encode<M>,
-        S: Encode<M>,
+        V: Encode<M>,
     {
-        self.first(cx).and_then(|e| first.encode(cx, e))?;
-        self.second(cx).and_then(|e| second.encode(cx, e))?;
+        self.field_name(cx).and_then(|e| name.encode(cx, e))?;
+        self.field_value(cx).and_then(|e| value.encode(cx, e))?;
         self.end(cx)
     }
 
-    /// Return the encoder for the first element in the pair.
-    #[must_use = "Encoder must be consumed through Encoder::encode_* methods, otherwise incomplete encoding might occur!"]
-    fn first<C>(&mut self, cx: &C) -> Result<Self::First<'_>, C::Error>
+    /// Return the encoder for the field in the struct.
+    #[must_use = "Encoders must be consumed"]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
-    /// Return encoder for the second element in the pair.
-    #[must_use = "Encoder must be consumed through Encoder::encode_* methods, otherwise incomplete encoding might occur!"]
-    fn second<C>(&mut self, cx: &C) -> Result<Self::Second<'_>, C::Error>
+    /// Return encoder for the field value in the struct.
+    #[must_use = "Encoders must be consumed"]
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
@@ -150,7 +294,7 @@ pub trait VariantEncoder {
 
     /// Insert the variant immediately.
     #[inline]
-    fn insert<M, C, F, S>(mut self, cx: &C, first: F, second: S) -> Result<Self::Ok, C::Error>
+    fn insert_variant<M, C, F, S>(mut self, cx: &C, tag: F, second: S) -> Result<Self::Ok, C::Error>
     where
         Self: Sized,
         M: Mode,
@@ -158,19 +302,19 @@ pub trait VariantEncoder {
         F: Encode<M>,
         S: Encode<M>,
     {
-        self.tag(cx).and_then(|e| first.encode(cx, e))?;
+        self.tag(cx).and_then(|e| tag.encode(cx, e))?;
         self.variant(cx).and_then(|e| second.encode(cx, e))?;
         self.end(cx)
     }
 
     /// Return the encoder for the first element in the variant.
-    #[must_use = "Encoder must be consumed through Encoder::encode_* methods, otherwise incomplete encoding might occur!"]
+    #[must_use = "Encoders must be consumed"]
     fn tag<C>(&mut self, cx: &C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Return encoder for the second element in the variant.
-    #[must_use = "Encoder must be consumed through Encoder::encode_* methods, otherwise incomplete encoding might occur!"]
+    #[must_use = "Encoders must be consumed"]
     fn variant<C>(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
@@ -200,17 +344,17 @@ pub trait Encoder: Sized {
     /// The type of a tuple encoder.
     type Tuple: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// The type of a map encoder.
-    type Map: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Map: MapEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Streaming encoder for map pairs.
-    type MapPairs: PairEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type MapPairs: MapPairsEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder that can encode a struct.
-    type Struct: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Struct: StructEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Encoder for a struct variant.
     type Variant: VariantEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Specialized encoder for a tuple variant.
     type TupleVariant: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
     /// Specialized encoder for a struct variant.
-    type StructVariant: PairsEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type StructVariant: StructEncoder<Ok = Self::Ok, Error = Self::Error>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::encoder]`][crate::encoder] attribute
@@ -1115,6 +1259,32 @@ pub trait Encoder: Sized {
     }
 
     /// Encode a map with a known length `len`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::en::{Encode, Encoder, MapEncoder};
+    /// use musli::mode::Mode;
+    ///
+    /// struct Struct {
+    ///     name: String,
+    ///     age: u32,
+    /// }
+    ///
+    /// impl<M> Encode<M> for Struct where M: Mode {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: Context<Input = E::Error>,
+    ///         E: Encoder
+    ///     {
+    ///         let mut map = encoder.encode_map(cx, 2)?;
+    ///         map.insert_entry::<M, _, _, _>(cx, "name", &self.name)?;
+    ///         map.insert_entry::<M, _, _, _>(cx, "age", self.age)?;
+    ///         map.end(cx)
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_map<C>(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Map, C::Error>
     where
@@ -1127,6 +1297,32 @@ pub trait Encoder: Sized {
     }
 
     /// Encode a map through pairs with a known length `len`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::en::{Encode, Encoder, MapPairsEncoder};
+    /// use musli::mode::Mode;
+    ///
+    /// struct Struct {
+    ///     name: String,
+    ///     age: u32,
+    /// }
+    ///
+    /// impl<M> Encode<M> for Struct where M: Mode {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: Context<Input = E::Error>,
+    ///         E: Encoder
+    ///     {
+    ///         let mut m = encoder.encode_map_pairs(cx, 2)?;
+    ///         m.map_pairs_insert::<M, _, _, _>(cx, "name", &self.name)?;
+    ///         m.map_pairs_insert::<M, _, _, _>(cx, "age", self.age)?;
+    ///         m.end(cx)
+    ///     }
+    /// }
+    /// ```
     #[inline]
     fn encode_map_pairs<C>(
         self,
@@ -1148,7 +1344,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder};
+    /// use musli::en::{Encode, Encoder, StructEncoder};
     /// use musli::mode::Mode;
     ///
     /// struct Struct {
@@ -1163,8 +1359,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder
     ///     {
     ///         let mut st = encoder.encode_struct(cx, 2)?;
-    ///         st.insert::<M, _, _, _>(cx, "name", &self.name)?;
-    ///         st.insert::<M, _, _, _>(cx, "age", self.age)?;
+    ///         st.insert_field::<M, _, _, _>(cx, "name", &self.name)?;
+    ///         st.insert_field::<M, _, _, _>(cx, "age", self.age)?;
     ///         st.end(cx)
     ///     }
     /// }
@@ -1186,7 +1382,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder};
+    /// use musli::en::{Encode, Encoder, VariantEncoder, StructEncoder};
     /// use musli::mode::Mode;
     ///
     /// enum Enum {
@@ -1208,17 +1404,17 @@ pub trait Encoder: Sized {
     ///
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 variant.insert::<M, _, _, _>(cx, "variant1", ())
+    ///                 variant.insert_variant::<M, _, _, _>(cx, "variant1", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 variant.insert::<M, _, _, _>(cx, "variant2", data)
+    ///                 variant.insert_variant::<M, _, _, _>(cx, "variant2", data)
     ///             }
     ///             Enum::Variant { data, age } => {
     ///                 variant.tag(cx)?.encode_string(cx, "variant3")?;
     ///
     ///                 let mut st = variant.variant(cx)?.encode_struct(cx, 2)?;
-    ///                 st.insert::<M, _, _, _>(cx, "data", data)?;
-    ///                 st.insert::<M, _, _, _>(cx, "age", age)?;
+    ///                 st.insert_field::<M, _, _, _>(cx, "data", data)?;
+    ///                 st.insert_field::<M, _, _, _>(cx, "age", age)?;
     ///                 st.end(cx)?;
     ///
     ///                 variant.end(cx)
@@ -1244,7 +1440,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder, SequenceEncoder};
+    /// use musli::en::{Encode, Encoder, VariantEncoder, StructEncoder, SequenceEncoder};
     /// use musli::mode::Mode;
     ///
     /// enum Enum {
@@ -1273,8 +1469,8 @@ pub trait Encoder: Sized {
     ///             }
     ///             Enum::Variant { data, age } => {
     ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
-    ///                 variant.insert::<M, _, _, _>(cx, "data", data)?;
-    ///                 variant.insert::<M, _, _, _>(cx, "age", age)?;
+    ///                 variant.insert_field::<M, _, _, _>(cx, "data", data)?;
+    ///                 variant.insert_field::<M, _, _, _>(cx, "age", age)?;
     ///                 variant.end(cx)
     ///             }
     ///         }
@@ -1302,7 +1498,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder, SequenceEncoder};
+    /// use musli::en::{Encode, Encoder, VariantEncoder, StructEncoder, SequenceEncoder};
     /// use musli::mode::Mode;
     ///
     /// enum Enum {
@@ -1332,8 +1528,8 @@ pub trait Encoder: Sized {
     ///             }
     ///             Enum::Variant { data, age } => {
     ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
-    ///                 variant.insert::<M, _, _, _>(cx, "data", data)?;
-    ///                 variant.insert::<M, _, _, _>(cx, "age", age)?;
+    ///                 variant.insert_field::<M, _, _, _>(cx, "data", data)?;
+    ///                 variant.insert_field::<M, _, _, _>(cx, "age", age)?;
     ///                 variant.end(cx)
     ///             }
     ///         }
@@ -1364,7 +1560,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, VariantEncoder, PairsEncoder, SequenceEncoder};
+    /// use musli::en::{Encode, Encoder, VariantEncoder, StructEncoder, SequenceEncoder};
     /// use musli::mode::Mode;
     ///
     /// enum Enum {
@@ -1394,8 +1590,8 @@ pub trait Encoder: Sized {
     ///             }
     ///             Enum::Variant { data, age } => {
     ///                 let mut variant = encoder.encode_struct_variant::<M, _, _>(cx, &"variant3", 2)?;
-    ///                 variant.insert::<M, _, _, _>(cx, "data", data)?;
-    ///                 variant.insert::<M, _, _, _>(cx, "age", age)?;
+    ///                 variant.insert_field::<M, _, _, _>(cx, "data", data)?;
+    ///                 variant.insert_field::<M, _, _, _>(cx, "age", age)?;
     ///                 variant.end(cx)
     ///             }
     ///         }

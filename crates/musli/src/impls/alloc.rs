@@ -20,9 +20,9 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use crate::de::{
-    Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, TraceDecode, ValueVisitor,
+    Decode, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder, TraceDecode, ValueVisitor,
 };
-use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder, TraceEncode};
+use crate::en::{Encode, Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, TraceEncode};
 use crate::internal::size_hint;
 use crate::mode::Mode;
 use crate::Context;
@@ -313,11 +313,9 @@ macro_rules! map {
                 let mut map = encoder.encode_map(cx, self.len())?;
 
                 for (k, v) in self {
-                    let mut entry = map.next(cx)?;
-                    let first = entry.first(cx)?;
-                    k.encode(cx, first)?;
-                    let second = entry.second(cx)?;
-                    v.encode(cx, second)?;
+                    let mut entry = map.entry(cx)?;
+                    k.encode(cx, entry.map_key(cx)?)?;
+                    v.encode(cx, entry.map_value(cx)?)?;
                     entry.end(cx)?;
                 }
 
@@ -342,11 +340,9 @@ macro_rules! map {
 
                 for (k, v) in self {
                     cx.enter_map_key(k);
-                    let mut entry = map.next(cx)?;
-                    let first = entry.first(cx)?;
-                    k.encode(cx, first)?;
-                    let second = entry.second(cx)?;
-                    v.encode(cx, second)?;
+                    let mut entry = map.entry(cx)?;
+                    k.encode(cx, entry.map_key(cx)?)?;
+                    v.encode(cx, entry.map_value(cx)?)?;
                     entry.end(cx)?;
                     cx.leave_map_key();
                 }
@@ -371,9 +367,9 @@ macro_rules! map {
                 let mut $access = decoder.decode_map(cx)?;
                 let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.next(cx)? {
-                    let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
-                    let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
+                while let Some(mut entry) = $access.entry(cx)? {
+                    let key = entry.map_key(cx).and_then(|key| K::decode(cx, key))?;
+                    let value = entry.map_value(cx).and_then(|value| V::decode(cx, value))?;
                     out.insert(key, value);
                 }
 
@@ -398,10 +394,10 @@ macro_rules! map {
                 let mut $access = decoder.decode_map(cx)?;
                 let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.next(cx)? {
-                    let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
+                while let Some(mut entry) = $access.entry(cx)? {
+                    let key = entry.map_key(cx).and_then(|key| K::decode(cx, key))?;
                     cx.enter_map_key(&key);
-                    let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
+                    let value = entry.map_value(cx).and_then(|value| V::decode(cx, value))?;
                     out.insert(key, value);
                     cx.leave_map_key();
                 }

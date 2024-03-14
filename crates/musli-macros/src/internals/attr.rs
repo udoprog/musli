@@ -37,6 +37,7 @@ pub(crate) struct EnumTag<'a> {
 pub(crate) enum EnumTagging<'a> {
     /// The type is internally tagged by the field given by the expression.
     Internal { tag: EnumTag<'a> },
+    /// An enumerator is adjacently tagged.
     Adjacent {
         tag: EnumTag<'a>,
         content: &'a syn::Expr,

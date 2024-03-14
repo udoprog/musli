@@ -1,6 +1,9 @@
 use core::{fmt, marker};
 
-use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{
+    Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder,
+    VariantEncoder,
+};
 use musli::mode::Mode;
 use musli::Context;
 use musli_common::writer::Writer;
@@ -365,7 +368,7 @@ where
     }
 }
 
-impl<M, W> PairsEncoder for JsonObjectEncoder<M, W>
+impl<M, W> MapEncoder for JsonObjectEncoder<M, W>
 where
     M: Mode,
     W: Writer,
@@ -374,12 +377,12 @@ where
     type Ok = ();
     type Error = Error;
 
-    type Encoder<'this> = JsonObjectPairEncoder<M, W::Mut<'this>>
+    type Entry<'this> = JsonObjectPairEncoder<M, W::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -401,6 +404,36 @@ where
     }
 }
 
+impl<M, W> StructEncoder for JsonObjectEncoder<M, W>
+where
+    M: Mode,
+    W: Writer,
+    Error: From<W::Error>,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type Field<'this> = JsonObjectPairEncoder<M, W::Mut<'this>>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEncoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEncoder::end(self, cx)
+    }
+}
+
 /// Encoder for a pair.
 pub struct JsonObjectPairEncoder<M, W> {
     empty: bool,
@@ -419,7 +452,7 @@ impl<M, W> JsonObjectPairEncoder<M, W> {
     }
 }
 
-impl<M, W> PairEncoder for JsonObjectPairEncoder<M, W>
+impl<M, W> MapEntryEncoder for JsonObjectPairEncoder<M, W>
 where
     M: Mode,
     W: Writer,
@@ -428,14 +461,14 @@ where
     type Ok = ();
     type Error = Error;
 
-    type First<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    type MapKey<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
-    type Second<'this> = JsonEncoder<M, W::Mut<'this>> where Self: 'this;
+    type MapValue<'this> = JsonEncoder<M, W::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, cx: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -447,7 +480,7 @@ where
     }
 
     #[inline]
-    fn second<C>(&mut self, cx: &C) -> Result<Self::Second<'_>, C::Error>
+    fn map_value<C>(&mut self, cx: &C) -> Result<Self::MapValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -461,6 +494,46 @@ where
         C: Context<Input = Self::Error>,
     {
         Ok(())
+    }
+}
+
+impl<M, W> StructFieldEncoder for JsonObjectPairEncoder<M, W>
+where
+    M: Mode,
+    W: Writer,
+    Error: From<W::Error>,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type FieldName<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    where
+        Self: 'this;
+
+    type FieldValue<'this> = JsonEncoder<M, W::Mut<'this>> where Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.map_key(cx)
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.map_value(cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryEncoder::end(self, cx)
     }
 }
 

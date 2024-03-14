@@ -12,11 +12,11 @@ use alloc::vec::Vec;
 use musli::de::{AsDecoder, Decode, Decoder, NumberHint, NumberVisitor, TypeHint, Visitor};
 #[cfg(feature = "alloc")]
 use musli::de::{
-    PairDecoder, PairsDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
+    MapDecoder, MapEntryDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
 };
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
-use musli::en::{PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{MapEncoder, SequenceEncoder, VariantEncoder};
 use musli::mode::Mode;
 use musli::Context;
 use musli_common::options::Options;
@@ -408,15 +408,13 @@ where
     fn visit_map<C, D>(self, cx: &C, mut map: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
-        D: PairsDecoder<'de, Error = Self::Error>,
+        D: MapDecoder<'de, Error = Self::Error>,
     {
         let mut out = Vec::with_capacity(map.size_hint().or_default());
 
-        while let Some(mut item) = map.next(cx)? {
-            let first = item.first(cx)?;
-            let first = Decode::<M>::decode(cx, first)?;
-            let second = item.second(cx)?;
-            let second = Decode::<M>::decode(cx, second)?;
+        while let Some(mut entry) = map.entry(cx)? {
+            let first = Decode::<M>::decode(cx, entry.map_key(cx)?)?;
+            let second = Decode::<M>::decode(cx, entry.map_value(cx)?)?;
             out.push((first, second));
         }
 
@@ -651,7 +649,7 @@ where
                 let mut map = encoder.encode_map(cx, values.len())?;
 
                 for (first, second) in values {
-                    map.insert::<M, _, _, _>(cx, first, second)?;
+                    map.insert_entry::<M, _, _, _>(cx, first, second)?;
                 }
 
                 map.end(cx)
@@ -660,7 +658,7 @@ where
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;
                 let encoder = encoder.encode_variant(cx)?;
-                encoder.insert::<M, _, _, _>(cx, tag, variant)
+                encoder.insert_variant::<M, _, _, _>(cx, tag, variant)
             }
             #[cfg(feature = "alloc")]
             Value::Option(option) => match option {

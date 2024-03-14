@@ -1,7 +1,10 @@
 use core::fmt;
 use core::marker;
 
-use musli::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{
+    Encode, Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    StructFieldEncoder, VariantEncoder,
+};
 use musli::{Context, Mode};
 use musli_common::options::{self, Options};
 use musli_common::writer::Writer;
@@ -403,7 +406,7 @@ where
     }
 }
 
-impl<W, const F: Options, E> PairsEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E> MapEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
@@ -411,10 +414,10 @@ where
 {
     type Ok = ();
     type Error = E;
-    type Encoder<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+    type Entry<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -430,7 +433,7 @@ where
     }
 }
 
-impl<W, const F: Options, E> PairEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E> MapEntryEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
@@ -438,11 +441,11 @@ where
 {
     type Ok = ();
     type Error = E;
-    type First<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
-    type Second<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+    type MapKey<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+    type MapValue<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -450,11 +453,110 @@ where
     }
 
     #[inline]
-    fn second<C>(&mut self, _: &C) -> Result<Self::Second<'_>, C::Error>
+    fn map_value<C>(&mut self, _: &C) -> Result<Self::MapValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
         Ok(StorageEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<W, const F: Options, E> MapPairsEncoder for StorageEncoder<W, F, E>
+where
+    W: Writer,
+    E: From<W::Error>,
+    E: musli::error::Error,
+{
+    type Ok = ();
+    type Error = E;
+    type MapPairsKey<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+    type MapPairsValue<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Self::MapPairsKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(StorageEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<W, const F: Options, E> StructEncoder for StorageEncoder<W, F, E>
+where
+    W: Writer,
+    E: From<W::Error>,
+    E: musli::error::Error,
+{
+    type Ok = ();
+    type Error = E;
+    type Field<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEncoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<W, const F: Options, E> StructFieldEncoder for StorageEncoder<W, F, E>
+where
+    W: Writer,
+    E: From<W::Error>,
+    E: musli::error::Error,
+{
+    type Ok = ();
+    type Error = E;
+    type FieldName<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+    type FieldValue<'this> = StorageEncoder<W::Mut<'this>, F, E> where Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.map_key(cx)
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.map_value(cx)
     }
 
     #[inline]

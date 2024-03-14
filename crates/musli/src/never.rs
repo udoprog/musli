@@ -13,10 +13,14 @@ use core::marker;
 use crate::no_std::ToOwned;
 
 use crate::de::{
-    AsDecoder, Decoder, MapPairsDecoder, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder,
-    SequenceDecoder, SizeHint, StructPairsDecoder, ValueVisitor, VariantDecoder,
+    AsDecoder, Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, NumberVisitor, PackDecoder,
+    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructPairsDecoder, ValueVisitor,
+    VariantDecoder,
 };
-use crate::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use crate::en::{
+    Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    StructFieldEncoder, VariantEncoder,
+};
 use crate::error::Error;
 use crate::{Buf, Context};
 
@@ -124,20 +128,20 @@ where
     }
 }
 
-impl<'de, E> PairDecoder<'de> for Never<E>
+impl<'de, E> StructFieldDecoder<'de> for Never<E>
 where
     E: Error,
 {
     type Error = E;
 
-    type First<'this> = Self
+    type FieldName<'this> = Self
     where
         Self: 'this;
 
-    type Second = Self;
+    type FieldValue = Self;
 
     #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
+    fn field_name<C>(&mut self, _: &C) -> Result<Self::FieldName<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -145,7 +149,7 @@ where
     }
 
     #[inline]
-    fn second<C>(self, _: &C) -> Result<Self::Second, C::Error>
+    fn field_value<C>(self, _: &C) -> Result<Self::FieldValue, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -153,7 +157,7 @@ where
     }
 
     #[inline]
-    fn skip_second<C>(self, _: &C) -> Result<bool, C::Error>
+    fn skip_field_value<C>(self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -167,14 +171,14 @@ where
 {
     type Error = E;
 
-    type Key<'this> = Self
+    type MapPairsKey<'this> = Self
     where
         Self: 'this;
 
-    type Value<'this> = Self where Self: 'this;
+    type MapPairsValue<'this> = Self where Self: 'this;
 
     #[inline]
-    fn key<C>(&mut self, _: &C) -> Result<Option<Self::Key<'_>>, C::Error>
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -182,7 +186,7 @@ where
     }
 
     #[inline]
-    fn value<C>(&mut self, _: &C) -> Result<Self::Value<'_>, C::Error>
+    fn map_pairs_value<C>(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -190,7 +194,39 @@ where
     }
 
     #[inline]
-    fn skip_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    fn skip_map_pairs_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+}
+
+impl<'de, E> StructDecoder<'de> for Never<E>
+where
+    E: Error,
+{
+    type Error = E;
+
+    type Field<'this> = Self
+    where
+        Self: 'this;
+
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        match self._never {}
+    }
+
+    #[inline]
+    fn field<C>(&mut self, _: &C) -> Result<Option<Self::Field<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -212,14 +248,14 @@ where
 {
     type Error = E;
 
-    type Field<'this> = Self
+    type FieldName<'this> = Self
     where
         Self: 'this;
 
-    type Value<'this> = Self where Self: 'this;
+    type FieldValue<'this> = Self where Self: 'this;
 
     #[inline]
-    fn field<C>(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error>
+    fn field_name<C>(&mut self, _: &C) -> Result<Self::FieldName<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -227,7 +263,7 @@ where
     }
 
     #[inline]
-    fn value<C>(&mut self, _: &C) -> Result<Self::Value<'_>, C::Error>
+    fn field_value<C>(&mut self, _: &C) -> Result<Self::FieldValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -235,7 +271,7 @@ where
     }
 
     #[inline]
-    fn skip_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    fn skip_field_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -296,13 +332,13 @@ where
     }
 }
 
-impl<'de, E> PairsDecoder<'de> for Never<E>
+impl<'de, E> MapDecoder<'de> for Never<E>
 where
     E: Error,
 {
     type Error = E;
 
-    type Decoder<'this> = Self
+    type Entry<'this> = Self
     where
         Self: 'this;
 
@@ -312,7 +348,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Option<Self::Entry<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -321,6 +357,43 @@ where
 
     #[inline]
     fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+}
+
+impl<'de, E> MapEntryDecoder<'de> for Never<E>
+where
+    E: Error,
+{
+    type Error = E;
+
+    type MapKey<'this> = Self
+    where
+        Self: 'this;
+
+    type MapValue = Self;
+
+    #[inline]
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn map_value<C>(self, _: &C) -> Result<Self::MapValue, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn skip_map_value<C>(self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -462,16 +535,16 @@ where
     }
 }
 
-impl<O, E> PairsEncoder for Never<O, E>
+impl<O, E> MapEncoder for Never<O, E>
 where
     E: Error,
 {
     type Ok = O;
     type Error = E;
-    type Encoder<'this> = Self where Self: 'this;
+    type Entry<'this> = Self where Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -486,19 +559,19 @@ where
     }
 }
 
-impl<O, E> PairEncoder for Never<O, E>
+impl<O, E> MapEntryEncoder for Never<O, E>
 where
     E: Error,
 {
     type Ok = O;
     type Error = E;
-    type First<'this> = Self
+    type MapKey<'this> = Self
     where
         Self: 'this;
-    type Second<'this> = Self where Self: 'this;
+    type MapValue<'this> = Self where Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -506,7 +579,103 @@ where
     }
 
     #[inline]
-    fn second<C>(&mut self, _: &C) -> Result<Self::Second<'_>, C::Error>
+    fn map_value<C>(&mut self, _: &C) -> Result<Self::MapValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+}
+
+impl<O, E> MapPairsEncoder for Never<O, E>
+where
+    E: Error,
+{
+    type Ok = O;
+    type Error = E;
+    type MapPairsKey<'this> = Self
+    where
+        Self: 'this;
+    type MapPairsValue<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Self::MapPairsKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+}
+
+impl<O, E> StructEncoder for Never<O, E>
+where
+    E: Error,
+{
+    type Ok = O;
+    type Error = E;
+    type Field<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn field<C>(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+}
+
+impl<O, E> StructFieldEncoder for Never<O, E>
+where
+    E: Error,
+{
+    type Ok = O;
+    type Error = E;
+    type FieldName<'this> = Self
+    where
+        Self: 'this;
+    type FieldValue<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, _: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, _: &C) -> Result<Self::FieldValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

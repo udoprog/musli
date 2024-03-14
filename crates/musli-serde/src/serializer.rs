@@ -1,7 +1,9 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use musli::en::{PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{
+    MapPairsEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
+};
 use musli::{Context, Encode, Encoder, Mode};
 
 use serde::ser::{self, Serialize};
@@ -303,12 +305,12 @@ where
 {
     let mut encoder = encoder.encode_struct(cx.adapt(), 1)?;
 
-    let mut field = encoder.next(cx.adapt())?;
+    let mut field = encoder.field(cx.adapt())?;
 
-    let k = field.first(cx.adapt())?;
+    let k = field.field_name(cx.adapt())?;
     Encode::<M>::encode(&0usize, cx.adapt(), k)?;
 
-    let v = field.second(cx.adapt())?;
+    let v = field.field_value(cx.adapt())?;
     value.serialize(Serializer::<_, _, M>::new(cx, v))?;
 
     field.end(cx.adapt())?;
@@ -427,7 +429,7 @@ impl<'a, C, E, M> ser::SerializeTupleStruct for SerializeTupleStruct<'a, C, E, M
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
-    E: PairsEncoder,
+    E: StructEncoder,
     M: Mode,
 {
     type Ok = E::Ok;
@@ -438,12 +440,12 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.next(self.cx.adapt())?;
+        let mut field = self.encoder.field(self.cx.adapt())?;
 
-        let k = field.first(self.cx.adapt())?;
+        let k = field.field_name(self.cx.adapt())?;
         Encode::<M>::encode(&self.field, self.cx.adapt(), k)?;
 
-        let v = field.second(self.cx.adapt())?;
+        let v = field.field_value(self.cx.adapt())?;
         value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), v))?;
 
         field.end(self.cx.adapt())?;
@@ -476,7 +478,7 @@ impl<'a, C, E, M> ser::SerializeMap for SerializeMap<'a, C, E, M>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
-    E: PairEncoder,
+    E: MapPairsEncoder,
     M: Mode,
 {
     type Ok = E::Ok;
@@ -487,7 +489,7 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.first(self.cx.adapt())?;
+        let encoder = self.encoder.map_pairs_key(self.cx.adapt())?;
         key.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), encoder))?;
         Ok(())
     }
@@ -497,7 +499,7 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.second(self.cx.adapt())?;
+        let encoder = self.encoder.map_pairs_value(self.cx.adapt())?;
         value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), encoder))?;
         Ok(())
     }
@@ -528,7 +530,7 @@ impl<'a, C, E, M> ser::SerializeStruct for SerializeStruct<'a, C, E, M>
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
-    E: PairsEncoder,
+    E: StructEncoder,
     M: Mode,
 {
     type Ok = E::Ok;
@@ -543,10 +545,10 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.next(self.cx.adapt())?;
-        let k = field.first(self.cx.adapt())?;
+        let mut field = self.encoder.field(self.cx.adapt())?;
+        let k = field.field_name(self.cx.adapt())?;
         Encode::<M>::encode(key, self.cx.adapt(), k)?;
-        let v = field.second(self.cx.adapt())?;
+        let v = field.field_value(self.cx.adapt())?;
         value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), v))?;
         field.end(self.cx.adapt())?;
         Ok(())
@@ -578,7 +580,7 @@ impl<'a, C, E, M> ser::SerializeStructVariant for SerializeStructVariant<'a, C, 
 where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
-    E: PairsEncoder,
+    E: StructEncoder,
     M: Mode,
 {
     type Ok = E::Ok;
@@ -593,10 +595,10 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.next(self.cx.adapt())?;
-        let k = field.first(self.cx.adapt())?;
+        let mut field = self.encoder.field(self.cx.adapt())?;
+        let k = field.field_name(self.cx.adapt())?;
         Encode::<M>::encode(key, self.cx.adapt(), k)?;
-        let v = field.second(self.cx.adapt())?;
+        let v = field.field_value(self.cx.adapt())?;
         value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), v))?;
         field.end(self.cx.adapt())?;
         Ok(())

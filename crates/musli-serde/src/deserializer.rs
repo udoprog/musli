@@ -2,8 +2,8 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use musli::de::{
-    Decoder, MapPairsDecoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, SizeHint,
-    StructPairsDecoder, VariantDecoder,
+    Decoder, MapPairsDecoder, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
+    StructFieldDecoder, StructPairsDecoder, VariantDecoder,
 };
 use musli::{Context, Mode};
 use serde::de;
@@ -282,7 +282,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let decoder = self.decoder.decode_struct(self.cx.adapt(), 0)?;
+        let decoder = self.decoder.decode_struct(self.cx.adapt(), Some(0))?;
         decoder.end(self.cx.adapt())?;
         visitor.visit_unit()
     }
@@ -296,21 +296,24 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_struct(self.cx.adapt(), 1)?;
+        let mut decoder = self.decoder.decode_struct(self.cx.adapt(), Some(1))?;
 
-        let Some(mut field) = decoder.next(self.cx.adapt())? else {
+        let Some(mut field) = decoder.field(self.cx.adapt())? else {
             return Err(self.cx.message("newtype struct missing first field"));
         };
 
-        let k = field.first(self.cx.adapt())?;
-
-        if k.decode_usize(self.cx.adapt())? != 0 {
+        if field
+            .field_name(self.cx.adapt())?
+            .decode_usize(self.cx.adapt())?
+            != 0
+        {
             return Err(self.cx.message("newtype struct missing first field"));
         }
 
-        let v = field.second(self.cx.adapt())?;
-        let output =
-            visitor.visit_newtype_struct(Deserializer::<_, _, M>::new(self.cx.adapt(), v))?;
+        let output = visitor.visit_newtype_struct(Deserializer::<_, _, M>::new(
+            self.cx.adapt(),
+            field.field_value(self.cx.adapt())?,
+        ))?;
 
         decoder.end(self.cx.adapt())?;
         Ok(output)
@@ -427,7 +430,7 @@ where
             where
                 K: de::DeserializeSeed<'de>,
             {
-                let Some(decoder) = self.decoder.key(self.cx.adapt())? else {
+                let Some(decoder) = self.decoder.map_pairs_key(self.cx.adapt())? else {
                     return Ok(None);
                 };
 
@@ -441,7 +444,7 @@ where
             where
                 V: de::DeserializeSeed<'de>,
             {
-                let decoder = self.decoder.value(self.cx.adapt())?;
+                let decoder = self.decoder.map_pairs_value(self.cx.adapt())?;
                 let output =
                     seed.deserialize(Deserializer::<_, _, M>::new(self.cx.adapt(), decoder))?;
                 Ok(output)
@@ -473,7 +476,7 @@ where
     {
         let mut decoder = self
             .decoder
-            .decode_struct_pairs(self.cx.adapt(), fields.len())?;
+            .decode_struct_pairs(self.cx.adapt(), Some(fields.len()))?;
         let output = visitor.visit_map(StructAccess::<_, _, M>::new(
             self.cx,
             &mut decoder,
@@ -532,7 +535,7 @@ where
             #[inline]
             fn unit_variant(self) -> Result<(), Self::Error> {
                 let decoder = self.decoder.variant(self.cx.adapt())?;
-                let st = decoder.decode_struct(self.cx.adapt(), 0)?;
+                let st = decoder.decode_struct(self.cx.adapt(), Some(0))?;
                 st.end(self.cx.adapt())?;
                 Ok(())
             }
@@ -576,7 +579,7 @@ where
                 V: de::Visitor<'de>,
             {
                 let decoder = self.decoder.variant(self.cx.adapt())?;
-                let mut st = decoder.decode_struct_pairs(self.cx.adapt(), fields.len())?;
+                let mut st = decoder.decode_struct_pairs(self.cx.adapt(), Some(fields.len()))?;
                 let value = visitor.visit_map(StructAccess::<_, _, M>::new(
                     self.cx,
                     &mut st,
@@ -706,7 +709,7 @@ where
         }
 
         self.remaining -= 1;
-        let decoder = self.decoder.field(self.cx.adapt())?;
+        let decoder = self.decoder.field_name(self.cx.adapt())?;
         let output = seed.deserialize(Deserializer::<_, _, M>::new(self.cx.adapt(), decoder))?;
         Ok(Some(output))
     }
@@ -716,7 +719,7 @@ where
     where
         V: de::DeserializeSeed<'de>,
     {
-        let decoder = self.decoder.value(self.cx.adapt())?;
+        let decoder = self.decoder.field_value(self.cx.adapt())?;
         let output = seed.deserialize(Deserializer::<_, _, M>::new(self.cx.adapt(), decoder))?;
         Ok(output)
     }
