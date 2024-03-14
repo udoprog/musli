@@ -49,7 +49,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.inner.write_all(bytes).map_err(|err| cx.report(err))?;
+        self.inner.write_all(bytes).map_err(cx.map())?;
         cx.advance(bytes.len());
         Ok(())
     }

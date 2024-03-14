@@ -112,7 +112,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => {
-            u8::from_number(n).map_err(|err| cx.report(err))
+            u8::from_number(n).map_err(cx.map())
         })
     }
 
@@ -122,7 +122,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => {
-            u16::from_number(n).map_err(|err| cx.report(err))
+            u16::from_number(n).map_err(cx.map())
         })
     }
 
@@ -132,7 +132,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => {
-            u32::from_number(n).map_err(|err| cx.report(err))
+            u32::from_number(n).map_err(cx.map())
         })
     }
 
@@ -142,7 +142,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => {
-            u64::from_number(n).map_err(|err| cx.report(err))
+            u64::from_number(n).map_err(cx.map())
         })
     }
 
@@ -152,7 +152,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => {
-            u128::from_number(n).map_err(|err| cx.report(err))
+            u128::from_number(n).map_err(cx.map())
         })
     }
 
@@ -162,7 +162,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => {
-            i8::from_number(n).map_err(|err| cx.report(err))
+            i8::from_number(n).map_err(cx.map())
         })
     }
 
@@ -172,7 +172,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => {
-            i16::from_number(n).map_err(|err| cx.report(err))
+            i16::from_number(n).map_err(cx.map())
         })
     }
 
@@ -182,7 +182,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => {
-            i32::from_number(n).map_err(|err| cx.report(err))
+            i32::from_number(n).map_err(cx.map())
         })
     }
 
@@ -192,7 +192,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => {
-            i64::from_number(n).map_err(|err| cx.report(err))
+            i64::from_number(n).map_err(cx.map())
         })
     }
 
@@ -202,7 +202,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => {
-            i128::from_number(n).map_err(|err| cx.report(err))
+            i128::from_number(n).map_err(cx.map())
         })
     }
 
@@ -212,7 +212,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => {
-            usize::from_number(n).map_err(|err| cx.report(err))
+            usize::from_number(n).map_err(cx.map())
         })
     }
 
@@ -222,7 +222,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => {
-            isize::from_number(n).map_err(|error| cx.report(error))
+            isize::from_number(n).map_err(cx.map())
         })
     }
 

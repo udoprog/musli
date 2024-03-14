@@ -77,6 +77,11 @@ pub trait Context {
         unsafe { &*(self as *const _ as *const _) }
     }
 
+    /// Report the given context error.
+    fn report<T>(&self, error: T) -> Self::Error
+    where
+        Self::Input: From<T>;
+
     /// Generate a map function which maps an error using the `report` function.
     fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
     where
@@ -84,11 +89,6 @@ pub trait Context {
     {
         move |error| self.report(error)
     }
-
-    /// Report the given context error.
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        Self::Input: From<T>;
 
     /// Report a custom error, which is not encapsulated by the error type
     /// expected by the context. This is essentially a type-erased way of
