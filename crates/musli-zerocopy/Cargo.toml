@@ -3,7 +3,7 @@ name = "musli-zerocopy"
 version = "0.0.96"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.73"
+rust-version = "1.76"
 description = """
 Refreshingly simple zero copy primitives by Müsli.
 """
