@@ -13,12 +13,26 @@ use alloc::string::String;
 pub struct Deserializer<'a, C, D> {
     cx: &'a C,
     decoder: D,
+    variants: Option<&'static [&'static str]>,
 }
 
 impl<'a, C, D> Deserializer<'a, C, D> {
     /// Construct a new deserializer out of a decoder.
     pub fn new(cx: &'a C, decoder: D) -> Self {
-        Self { cx, decoder }
+        Self {
+            cx,
+            decoder,
+            variants: None,
+        }
+    }
+
+    /// Construct a new deserializer which deserializes into a variant.
+    pub fn with_variants(cx: &'a C, decoder: D, variants: &'static [&'static str]) -> Self {
+        Self {
+            cx,
+            decoder,
+            variants: Some(variants),
+        }
     }
 }
 
@@ -171,39 +185,19 @@ where
     where
         V: de::Visitor<'de>,
     {
-        struct Visitor<V>(V);
+        let Some(variants) = self.variants else {
+            return self
+                .decoder
+                .decode_string(self.cx, StrVisitor::new(visitor));
+        };
 
-        impl<'de, C, V> musli::de::ValueVisitor<'de, C, str> for Visitor<V>
-        where
-            C: Context,
-            C::Error: de::Error,
-            V: de::Visitor<'de>,
-        {
-            type Ok = V::Value;
+        let tag = self.decoder.decode_usize(self.cx)?;
 
-            #[inline]
-            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                self.0.expecting(f)
-            }
+        let Some(variant) = variants.get(tag) else {
+            return Err(self.cx.message("Invalid variant index"));
+        };
 
-            #[inline]
-            #[cfg(any(feature = "std", feature = "alloc"))]
-            fn visit_owned(self, _: &C, value: String) -> Result<Self::Ok, C::Error> {
-                de::Visitor::visit_string(self.0, value)
-            }
-
-            #[inline]
-            fn visit_borrowed(self, _: &C, value: &'de str) -> Result<Self::Ok, C::Error> {
-                de::Visitor::visit_borrowed_str(self.0, value)
-            }
-
-            #[inline]
-            fn visit_ref(self, _: &C, value: &str) -> Result<Self::Ok, C::Error> {
-                de::Visitor::visit_str(self.0, value)
-            }
-        }
-
-        self.decoder.decode_string(self.cx, Visitor(visitor))
+        visitor.visit_borrowed_str(*variant)
     }
 
     #[inline]
@@ -219,39 +213,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        struct Visitor<V>(V);
-
-        impl<'de, C, V> musli::de::ValueVisitor<'de, C, [u8]> for Visitor<V>
-        where
-            C: Context,
-            C::Error: de::Error,
-            V: de::Visitor<'de>,
-        {
-            type Ok = V::Value;
-
-            #[inline]
-            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                self.0.expecting(f)
-            }
-
-            #[inline]
-            #[cfg(any(feature = "std", feature = "alloc"))]
-            fn visit_owned(self, _: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
-                de::Visitor::visit_byte_buf(self.0, value)
-            }
-
-            #[inline]
-            fn visit_borrowed(self, _: &C, value: &'de [u8]) -> Result<Self::Ok, C::Error> {
-                de::Visitor::visit_borrowed_bytes(self.0, value)
-            }
-
-            #[inline]
-            fn visit_ref(self, _: &C, value: &[u8]) -> Result<Self::Ok, C::Error> {
-                de::Visitor::visit_bytes(self.0, value)
-            }
-        }
-
-        self.decoder.decode_bytes(self.cx, Visitor(visitor))
+        self.decoder.decode_bytes(self.cx, BytesVisitor(visitor))
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -326,57 +288,10 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let decoder = self.decoder.decode_sequence(self.cx)?;
-
-        struct SeqAccess<'a, C, D> {
-            cx: &'a C,
-            decoder: Option<D>,
-        }
-
-        impl<'de, 'a, C, D> de::SeqAccess<'de> for SeqAccess<'a, C, D>
-        where
-            C: Context<Input = D::Error>,
-            C::Error: de::Error,
-            D: SequenceDecoder<'de>,
-        {
-            type Error = C::Error;
-
-            #[inline]
-            fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
-            where
-                T: de::DeserializeSeed<'de>,
-            {
-                let Some(decoder) = &mut self.decoder else {
-                    return Ok(None);
-                };
-
-                let Some(decoder) = decoder.next(self.cx)? else {
-                    if let Some(decoder) = self.decoder.take() {
-                        decoder.end(self.cx)?;
-                    }
-
-                    return Ok(None);
-                };
-
-                let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
-                Ok(Some(output))
-            }
-
-            #[inline]
-            fn size_hint(&self) -> Option<usize> {
-                let decoder = self.decoder.as_ref()?;
-
-                match decoder.size_hint() {
-                    SizeHint::Exact(n) => Some(n),
-                    _ => None,
-                }
-            }
-        }
-
-        visitor.visit_seq(SeqAccess {
-            cx: self.cx,
-            decoder: Some(decoder),
-        })
+        let mut decoder = self.decoder.decode_sequence(self.cx)?;
+        let value = visitor.visit_seq(SeqAccess::new(self.cx, &mut decoder))?;
+        decoder.end(self.cx)?;
+        Ok(value)
     }
 
     #[inline]
@@ -479,7 +394,7 @@ where
     fn deserialize_enum<V>(
         self,
         _: &'static str,
-        _: &'static [&'static str],
+        variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -488,26 +403,7 @@ where
         struct EnumAccess<'a, C, D> {
             cx: &'a C,
             decoder: &'a mut D,
-        }
-
-        impl<'a, 'de, C, D> de::EnumAccess<'de> for EnumAccess<'a, C, D>
-        where
-            C: Context<Input = D::Error>,
-            C::Error: de::Error,
-            D: VariantDecoder<'de>,
-        {
-            type Error = C::Error;
-            type Variant = Self;
-
-            #[inline]
-            fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
-            where
-                V: de::DeserializeSeed<'de>,
-            {
-                let t = self.decoder.tag(self.cx)?;
-                let value = seed.deserialize(Deserializer::new(self.cx, t))?;
-                Ok((value, self))
-            }
+            variants: &'static [&'static str],
         }
 
         impl<'a, 'de, C, D> de::VariantAccess<'de> for EnumAccess<'a, C, D>
@@ -570,11 +466,33 @@ where
             }
         }
 
+        impl<'a, 'de, C, D> de::EnumAccess<'de> for EnumAccess<'a, C, D>
+        where
+            C: Context<Input = D::Error>,
+            C::Error: de::Error,
+            D: VariantDecoder<'de>,
+        {
+            type Error = C::Error;
+            type Variant = Self;
+
+            #[inline]
+            fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+            where
+                V: de::DeserializeSeed<'de>,
+            {
+                let tag = self.decoder.tag(self.cx)?;
+                let value =
+                    seed.deserialize(Deserializer::with_variants(self.cx, tag, self.variants))?;
+                Ok((value, self))
+            }
+        }
+
         let mut decoder = self.decoder.decode_variant(self.cx)?;
 
         let enum_access = EnumAccess {
             cx: self.cx,
             decoder: &mut decoder,
+            variants,
         };
 
         let value = visitor.visit_enum(enum_access)?;
@@ -698,5 +616,116 @@ where
     #[inline]
     fn size_hint(&self) -> Option<usize> {
         Some(self.remaining)
+    }
+}
+
+struct BytesVisitor<V>(V);
+
+impl<'de, C, V> musli::de::ValueVisitor<'de, C, [u8]> for BytesVisitor<V>
+where
+    C: Context,
+    C::Error: de::Error,
+    V: de::Visitor<'de>,
+{
+    type Ok = V::Value;
+
+    #[inline]
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expecting(f)
+    }
+
+    #[inline]
+    #[cfg(any(feature = "std", feature = "alloc"))]
+    fn visit_owned(self, _: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
+        de::Visitor::visit_byte_buf(self.0, value)
+    }
+
+    #[inline]
+    fn visit_borrowed(self, _: &C, value: &'de [u8]) -> Result<Self::Ok, C::Error> {
+        de::Visitor::visit_borrowed_bytes(self.0, value)
+    }
+
+    #[inline]
+    fn visit_ref(self, _: &C, value: &[u8]) -> Result<Self::Ok, C::Error> {
+        de::Visitor::visit_bytes(self.0, value)
+    }
+}
+
+struct SeqAccess<'a, C, D> {
+    cx: &'a C,
+    decoder: &'a mut D,
+}
+
+impl<'a, C, D> SeqAccess<'a, C, D> {
+    fn new(cx: &'a C, decoder: &'a mut D) -> Self {
+        Self { cx, decoder }
+    }
+}
+
+impl<'de, 'a, C, D> de::SeqAccess<'de> for SeqAccess<'a, C, D>
+where
+    C: Context<Input = D::Error>,
+    C::Error: de::Error,
+    D: SequenceDecoder<'de>,
+{
+    type Error = C::Error;
+
+    #[inline]
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        let Some(decoder) = self.decoder.next(self.cx)? else {
+            return Ok(None);
+        };
+
+        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        Ok(Some(output))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> Option<usize> {
+        match self.decoder.size_hint() {
+            SizeHint::Exact(n) => Some(n),
+            _ => None,
+        }
+    }
+}
+
+struct StrVisitor<V>(V);
+
+impl<V> StrVisitor<V> {
+    fn new(visitor: V) -> Self {
+        Self(visitor)
+    }
+}
+
+impl<'de, C, V> musli::de::ValueVisitor<'de, C, str> for StrVisitor<V>
+where
+    C: Context,
+    C::Error: de::Error,
+    V: de::Visitor<'de>,
+{
+    type Ok = V::Value;
+
+    #[inline]
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.expecting(f)
+    }
+
+    #[inline]
+    #[cfg(any(feature = "std", feature = "alloc"))]
+    fn visit_owned(self, _: &C, value: String) -> Result<Self::Ok, C::Error> {
+        de::Visitor::visit_string(self.0, value)
+    }
+
+    #[inline]
+    fn visit_borrowed(self, _: &C, value: &'de str) -> Result<Self::Ok, C::Error> {
+        de::Visitor::visit_borrowed_str(self.0, value)
+    }
+
+    #[inline]
+    fn visit_ref(self, _: &C, value: &str) -> Result<Self::Ok, C::Error> {
+        de::Visitor::visit_str(self.0, value)
     }
 }

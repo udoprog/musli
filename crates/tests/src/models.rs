@@ -16,7 +16,6 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 #[cfg(feature = "musli")]
 use musli::{Decode, Encode};
-use musli_macros::Generate;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 

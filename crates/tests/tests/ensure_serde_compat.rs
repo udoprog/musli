@@ -9,7 +9,7 @@ use std::fmt;
 use musli::de::DecodeOwned;
 use musli::{Decode, Encode};
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tests::generate::Generate;
 
 #[derive(Encode)]
@@ -44,10 +44,20 @@ where
     assert_eq!(value1, value3);
 }
 
+#[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
+#[generate(crate)]
+enum Enum {
+    Empty,
+    Tuple(u32, String),
+    Struct { a: u32, b: String },
+}
+
 #[test]
 fn map_pairs() {
     // Primitive numbers.
     musli_storage_serde_roundtrip::<u32>();
     // Test MapPairs.
     musli_storage_serde_roundtrip::<HashMap<String, u32>>();
+    // Test Enums.
+    musli_storage_serde_roundtrip::<Enum>();
 }
