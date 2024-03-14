@@ -21,7 +21,6 @@ use crate::en::{
     Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
     StructFieldEncoder, VariantEncoder,
 };
-use crate::error::Error;
 use crate::{Buf, Context};
 
 /// An empty buffer.
@@ -86,10 +85,7 @@ pub struct Never<A, B: ?Sized = NeverMarker, C = NeverMarker> {
     _marker: marker::PhantomData<(A, C, B)>,
 }
 
-impl<'de, E> Decoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> Decoder<'de> for Never<E> {
     type Error = E;
     type Buffer = Self;
     type Pack = Self;
@@ -109,10 +105,7 @@ where
     }
 }
 
-impl<E> AsDecoder for Never<E>
-where
-    E: Error,
-{
+impl<E: 'static> AsDecoder for Never<E> {
     type Error = E;
 
     type Decoder<'this> = Never<E>
@@ -128,10 +121,7 @@ where
     }
 }
 
-impl<'de, E> StructFieldDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> StructFieldDecoder<'de> for Never<E> {
     type Error = E;
 
     type FieldName<'this> = Self
@@ -165,10 +155,7 @@ where
     }
 }
 
-impl<'de, E> MapPairsDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> MapPairsDecoder<'de> for Never<E> {
     type Error = E;
 
     type MapPairsKey<'this> = Self
@@ -210,10 +197,7 @@ where
     }
 }
 
-impl<'de, E> StructDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> StructDecoder<'de> for Never<E> {
     type Error = E;
 
     type Field<'this> = Self
@@ -242,10 +226,7 @@ where
     }
 }
 
-impl<'de, E> StructPairsDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> StructPairsDecoder<'de> for Never<E> {
     type Error = E;
 
     type FieldName<'this> = Self
@@ -287,10 +268,7 @@ where
     }
 }
 
-impl<'de, E> VariantDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> VariantDecoder<'de> for Never<E> {
     type Error = E;
 
     type Tag<'this> = Self
@@ -332,10 +310,7 @@ where
     }
 }
 
-impl<'de, E> MapDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> MapDecoder<'de> for Never<E> {
     type Error = E;
 
     type Entry<'this> = Self
@@ -364,10 +339,7 @@ where
     }
 }
 
-impl<'de, E> MapEntryDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> MapEntryDecoder<'de> for Never<E> {
     type Error = E;
 
     type MapKey<'this> = Self
@@ -401,10 +373,7 @@ where
     }
 }
 
-impl<'de, E> SequenceDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> SequenceDecoder<'de> for Never<E> {
     type Error = E;
 
     type Decoder<'this> = Self
@@ -433,10 +402,7 @@ where
     }
 }
 
-impl<'de, E> PackDecoder<'de> for Never<E>
-where
-    E: Error,
-{
+impl<'de, E: 'static> PackDecoder<'de> for Never<E> {
     type Error = E;
 
     type Decoder<'this> = Self
@@ -460,10 +426,7 @@ where
     }
 }
 
-impl<O, E> Encoder for Never<O, E>
-where
-    E: Error,
-{
+impl<O, E: 'static> Encoder for Never<O, E> {
     type Ok = O;
     type Error = E;
     type Pack<'this, C> = Self where C: 'this + Context;
@@ -507,10 +470,7 @@ where
     }
 }
 
-impl<O, E> SequenceEncoder for Never<O, E>
-where
-    E: Error,
-{
+impl<O, E: 'static> SequenceEncoder for Never<O, E> {
     type Ok = O;
     type Error = E;
 
@@ -535,10 +495,7 @@ where
     }
 }
 
-impl<O, E> MapEncoder for Never<O, E>
-where
-    E: Error,
-{
+impl<O, E: 'static> MapEncoder for Never<O, E> {
     type Ok = O;
     type Error = E;
     type Entry<'this> = Self where Self: 'this;
@@ -559,10 +516,7 @@ where
     }
 }
 
-impl<O, E> MapEntryEncoder for Never<O, E>
-where
-    E: Error,
-{
+impl<O, E: 'static> MapEntryEncoder for Never<O, E> {
     type Ok = O;
     type Error = E;
     type MapKey<'this> = Self
@@ -595,10 +549,7 @@ where
     }
 }
 
-impl<O, E> MapPairsEncoder for Never<O, E>
-where
-    E: Error,
-{
+impl<O, E: 'static> MapPairsEncoder for Never<O, E> {
     type Ok = O;
     type Error = E;
     type MapPairsKey<'this> = Self
@@ -631,10 +582,7 @@ where
     }
 }
 
-impl<O, E> StructEncoder for Never<O, E>
-where
-    E: Error,
-{
+impl<O, E: 'static> StructEncoder for Never<O, E> {
     type Ok = O;
     type Error = E;
     type Field<'this> = Self where Self: 'this;
@@ -655,10 +603,7 @@ where
     }
 }
 
-impl<O, E> StructFieldEncoder for Never<O, E>
-where
-    E: Error,
-{
+impl<O, E: 'static> StructFieldEncoder for Never<O, E> {
     type Ok = O;
     type Error = E;
     type FieldName<'this> = Self
@@ -691,10 +636,7 @@ where
     }
 }
 
-impl<O, E> VariantEncoder for Never<O, E>
-where
-    E: Error,
-{
+impl<O, E: 'static> VariantEncoder for Never<O, E> {
     type Ok = O;
     type Error = E;
     type Tag<'this> = Self

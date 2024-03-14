@@ -89,7 +89,7 @@ impl Value {
     #[inline]
     pub fn into_value_decoder<const F: Options, E>(self) -> AsValueDecoder<F, E>
     where
-        E: musli::error::Error + From<ErrorKind>,
+        E: From<ErrorKind>,
     {
         AsValueDecoder::new(self)
     }
@@ -98,7 +98,7 @@ impl Value {
     #[inline]
     pub(crate) fn decoder<const F: Options, E>(&self) -> ValueDecoder<'_, F, E>
     where
-        E: musli::error::Error + From<ErrorKind>,
+        E: From<ErrorKind>,
     {
         ValueDecoder::new(self)
     }
@@ -215,10 +215,9 @@ impl Number {
 struct AnyVisitor<M, E>(marker::PhantomData<(M, E)>);
 
 #[musli::visitor]
-impl<'de, M, E> Visitor<'de> for AnyVisitor<M, E>
+impl<'de, M, E: 'static> Visitor<'de> for AnyVisitor<M, E>
 where
     M: Mode,
-    E: musli::error::Error,
 {
     type Ok = Value;
     type Error = E;
@@ -689,9 +688,9 @@ impl<const F: Options, E> AsValueDecoder<F, E> {
     }
 }
 
-impl<const F: Options, E> AsDecoder for AsValueDecoder<F, E>
+impl<const F: Options, E: 'static> AsDecoder for AsValueDecoder<F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;

@@ -212,7 +212,7 @@ impl From<std::io::Error> for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-impl musli::error::Error for Error {
+impl musli_common::context::Error for Error {
     #[inline]
     fn custom<T>(error: T) -> Self
     where

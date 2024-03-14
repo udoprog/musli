@@ -1,12 +1,7 @@
 //! Things related to working with contexts.
 
-mod error;
-
 use core::fmt;
 use core::marker;
-
-#[doc(inline)]
-pub use self::error::Error;
 
 use crate::Buf;
 

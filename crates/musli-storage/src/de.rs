@@ -40,11 +40,10 @@ pub struct LimitedStorageDecoder<R, const F: Options, E> {
 }
 
 #[musli::decoder]
-impl<'de, R, const F: Options, E> Decoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> Decoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type Pack = Self;
@@ -363,11 +362,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> PackDecoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> PackDecoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type Decoder<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
@@ -389,11 +387,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     #[inline]
     fn new<C>(cx: &C, mut decoder: StorageDecoder<R, F, E>) -> Result<Self, C::Error>
@@ -406,11 +403,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> SequenceDecoder<'de> for LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> SequenceDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type Decoder<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
@@ -442,11 +438,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> MapDecoder<'de> for LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> MapDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
 
@@ -481,11 +476,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> MapEntryDecoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> MapEntryDecoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type MapKey<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
@@ -516,11 +510,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> StructDecoder<'de> for LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> StructDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
 
@@ -550,11 +543,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> StructFieldDecoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> StructFieldDecoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type FieldName<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
@@ -585,11 +577,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> MapPairsDecoder<'de> for LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> MapPairsDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type MapPairsKey<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
@@ -633,11 +624,11 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> StructPairsDecoder<'de> for LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> StructPairsDecoder<'de>
+    for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type FieldName<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
@@ -681,11 +672,10 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> VariantDecoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> VariantDecoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
     E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type Tag<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;

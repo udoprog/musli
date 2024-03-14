@@ -47,9 +47,9 @@ macro_rules! ensure {
 }
 
 #[musli::decoder]
-impl<'de, const F: Options, E> Decoder<'de> for ValueDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> Decoder<'de> for ValueDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
     type Buffer = AsValueDecoder<F, E>;
@@ -411,9 +411,9 @@ where
     }
 }
 
-impl<'a, const F: Options, E> AsDecoder for ValueDecoder<'a, F, E>
+impl<'a, const F: Options, E: 'static> AsDecoder for ValueDecoder<'a, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;
@@ -434,8 +434,8 @@ pub struct IterValueDecoder<'de, const F: Options, E> {
     _marker: marker::PhantomData<E>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'de, const F: Options, E> IterValueDecoder<'de, F, E> {
-    #[cfg(feature = "alloc")]
     #[inline]
     fn new(values: &'de [Value]) -> Self {
         Self {
@@ -445,9 +445,9 @@ impl<'de, const F: Options, E> IterValueDecoder<'de, F, E> {
     }
 }
 
-impl<'de, const F: Options, E> PackDecoder<'de> for IterValueDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> PackDecoder<'de> for IterValueDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -475,9 +475,9 @@ where
     }
 }
 
-impl<'de, const F: Options, E> SequenceDecoder<'de> for IterValueDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> SequenceDecoder<'de> for IterValueDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -516,8 +516,8 @@ pub struct IterValuePairsDecoder<'de, const F: Options, E> {
     _marker: marker::PhantomData<E>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'de, const F: Options, E> IterValuePairsDecoder<'de, F, E> {
-    #[cfg(feature = "alloc")]
     #[inline]
     fn new(values: &'de [(Value, Value)]) -> Self {
         Self {
@@ -527,9 +527,9 @@ impl<'de, const F: Options, E> IterValuePairsDecoder<'de, F, E> {
     }
 }
 
-impl<'de, const F: Options, E> MapDecoder<'de> for IterValuePairsDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> MapDecoder<'de> for IterValuePairsDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -559,9 +559,9 @@ where
     }
 }
 
-impl<'de, const F: Options, E> MapEntryDecoder<'de> for IterValuePairDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> MapEntryDecoder<'de> for IterValuePairDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -596,9 +596,9 @@ where
     }
 }
 
-impl<'de, const F: Options, E> StructDecoder<'de> for IterValuePairsDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> StructDecoder<'de> for IterValuePairsDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -628,9 +628,9 @@ where
     }
 }
 
-impl<'de, const F: Options, E> StructFieldDecoder<'de> for IterValuePairDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> StructFieldDecoder<'de> for IterValuePairDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 
@@ -687,8 +687,8 @@ pub struct IterValueVariantDecoder<'de, const F: Options, E> {
     _marker: marker::PhantomData<E>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'de, const F: Options, E> IterValueVariantDecoder<'de, F, E> {
-    #[cfg(feature = "alloc")]
     #[inline]
     const fn new(pair: &'de (Value, Value)) -> Self {
         Self {
@@ -698,9 +698,9 @@ impl<'de, const F: Options, E> IterValueVariantDecoder<'de, F, E> {
     }
 }
 
-impl<'de, const F: Options, E> VariantDecoder<'de> for IterValueVariantDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> VariantDecoder<'de> for IterValueVariantDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind> + From<SliceUnderflow>,
 {
     type Error = E;
 

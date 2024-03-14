@@ -4,7 +4,6 @@ use crate::de::{
     Decoder, MapDecoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, TypeHint,
     VariantDecoder,
 };
-use crate::error::Error;
 use crate::expecting::{self, Expecting};
 use crate::Context;
 
@@ -19,7 +18,8 @@ pub trait Visitor<'de>: Sized {
     /// The value produced by the visitor.
     type Ok;
     /// The error type produced.
-    type Error: Error;
+    type Error: 'static;
+
     /// String decoder to use.
     type String<C>: ValueVisitor<'de, C, str, Ok = Self::Ok>
     where

@@ -23,7 +23,6 @@
 #![allow(unused)]
 
 use musli::de;
-use musli::error::Error;
 use musli::Context;
 
 use crate::int;

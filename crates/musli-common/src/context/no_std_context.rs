@@ -2,13 +2,13 @@ use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::ops::Range;
 
-use musli::context::Error;
 use musli::{Allocator, Context};
 
-use crate::context::rich_error::{RichError, Step};
 use crate::fixed::{FixedString, FixedVec};
 
 use super::access::{Access, Shared};
+use super::rich_error::{RichError, Step};
+use super::{Error, ErrorMarker};
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
@@ -116,10 +116,10 @@ impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
 impl<const V: usize, const S: usize, A, E> Context for NoStdContext<V, S, A, E>
 where
     A: Allocator,
-    E: musli::error::Error,
+    E: Error,
 {
     type Input = E;
-    type Error = Error;
+    type Error = ErrorMarker;
     type Mark = usize;
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
@@ -134,7 +134,7 @@ where
         E: From<T>,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::from(error));
-        Error
+        ErrorMarker
     }
 
     #[inline]
@@ -143,7 +143,7 @@ where
         E: From<T>,
     {
         self.push_error(mark..self.mark.get(), E::from(message));
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
@@ -152,7 +152,7 @@ where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::custom(message));
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
@@ -161,7 +161,7 @@ where
         T: fmt::Display,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::message(message));
-        Error
+        ErrorMarker
     }
 
     #[inline]
@@ -170,7 +170,7 @@ where
         T: fmt::Display,
     {
         self.push_error(mark..self.mark.get(), E::message(message));
-        Error
+        ErrorMarker
     }
 
     #[inline]

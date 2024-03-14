@@ -1,5 +1,7 @@
 use core::fmt;
 
+use super::Error;
+
 /// Indicates that an error occurred during encoding. This is a placeholder
 /// error that can be used by context implementations and is a ZST.
 ///
@@ -10,9 +12,10 @@ use core::fmt;
 ///
 /// [`Context`]: crate::context::Context
 #[derive(Debug)]
-pub struct Error;
+#[non_exhaustive]
+pub struct ErrorMarker;
 
-impl fmt::Display for Error {
+impl fmt::Display for ErrorMarker {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "error during encoding (see context)")
@@ -20,9 +23,9 @@ impl fmt::Display for Error {
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for Error {}
+impl std::error::Error for ErrorMarker {}
 
-impl crate::error::Error for Error {
+impl Error for ErrorMarker {
     #[inline(always)]
     fn custom<T>(_: T) -> Self
     where

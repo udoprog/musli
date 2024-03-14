@@ -98,7 +98,7 @@ impl From<Infallible> for Error {
     }
 }
 
-impl musli::error::Error for Error {
+impl musli_common::context::Error for Error {
     #[inline]
     fn custom<T>(error: T) -> Self
     where

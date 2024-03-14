@@ -1,7 +1,6 @@
 use core::fmt;
 
 use crate::en::Encode;
-use crate::error::Error;
 use crate::expecting::{self, Expecting};
 use crate::mode::Mode;
 use crate::Context;
@@ -10,8 +9,8 @@ use crate::Context;
 pub trait SequenceEncoder {
     /// Result type of the encoder.
     type Ok;
-    /// The error raised by a sequence encoder.
-    type Error: Error;
+    /// Error type for encoder.
+    type Error: 'static;
 
     /// The encoder returned when advancing the sequence encoder.
     type Encoder<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
@@ -47,9 +46,8 @@ pub trait SequenceEncoder {
 pub trait MapEncoder {
     /// Result type of the encoder.
     type Ok;
-
-    /// The error raised by a map encoder.
-    type Error: Error;
+    /// Error type for encoder.
+    type Error: 'static;
 
     /// Encode the next pair.
     type Entry<'this>: MapEntryEncoder<Ok = Self::Ok, Error = Self::Error>
@@ -85,8 +83,8 @@ pub trait MapEncoder {
 pub trait MapEntryEncoder {
     /// Result type of the encoder.
     type Ok;
-    /// The error raised by a map encoder.
-    type Error: Error;
+    /// Error type for encoder.
+    type Error: 'static;
 
     /// The encoder returned when advancing the map encoder to encode the key.
     type MapKey<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
@@ -141,8 +139,8 @@ pub trait MapEntryEncoder {
 pub trait MapPairsEncoder {
     /// Result type of the encoder.
     type Ok;
-    /// The error raised by a map encoder.
-    type Error: Error;
+    /// Error type for encoder.
+    type Error: 'static;
 
     /// The encoder returned when advancing the map encoder to encode the key.
     type MapPairsKey<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
@@ -191,9 +189,8 @@ pub trait MapPairsEncoder {
 pub trait StructEncoder {
     /// Result type of the encoder.
     type Ok;
-
-    /// The error raised by a map encoder.
-    type Error: Error;
+    /// Error type for encoder.
+    type Error: 'static;
 
     /// Encoder for the next struct field.
     type Field<'this>: StructFieldEncoder<Ok = Self::Ok, Error = Self::Error>
@@ -229,8 +226,8 @@ pub trait StructEncoder {
 pub trait StructFieldEncoder {
     /// Result type of the encoder.
     type Ok;
-    /// The error raised by a map encoder.
-    type Error: Error;
+    /// Error type for encoder.
+    type Error: 'static;
 
     /// The encoder returned when advancing the map encoder to encode the key.
     type FieldName<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
@@ -279,8 +276,8 @@ pub trait StructFieldEncoder {
 pub trait VariantEncoder {
     /// Result type of the encoder.
     type Ok;
-    /// The error raised by a map encoder.
-    type Error: Error;
+    /// Error type for encoder.
+    type Error: 'static;
 
     /// The encoder returned when advancing the map encoder to encode the key.
     type Tag<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
@@ -331,8 +328,9 @@ pub trait Encoder: Sized {
     /// that they are used correctly, since only functions returned by the
     /// [Encoder] is capable of returning this value.
     type Ok;
-    /// The error raised by an encoder.
-    type Error: Error;
+    /// Error type for encoder.
+    type Error: 'static;
+
     /// Encoder returned when encoding an optional value which is present.
     type Some: Encoder<Ok = Self::Ok, Error = Self::Error>;
     /// A simple pack that packs a sequence of elements.

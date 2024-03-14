@@ -1,15 +1,14 @@
 use core::fmt;
 
 use crate::de::{NumberVisitor, SizeHint, TypeHint, ValueVisitor, Visitor};
-use crate::error::Error;
 use crate::expecting::{self, Expecting};
 use crate::mode::Mode;
 use crate::Context;
 
 /// Trait that allows a type to be repeatedly coerced into a decoder.
 pub trait AsDecoder {
-    /// Error type raised by calling `as_decoder`.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder we reborrow as.
     type Decoder<'this>: Decoder<'this, Error = Self::Error>
@@ -24,8 +23,8 @@ pub trait AsDecoder {
 
 /// A pack that can construct decoders.
 pub trait PackDecoder<'de> {
-    /// Error type raised by this unpack.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The encoder to use for the pack.
     type Decoder<'this>: Decoder<'de, Error = Self::Error>
@@ -48,8 +47,8 @@ pub trait PackDecoder<'de> {
 
 /// Trait governing how to decode a sequence.
 pub trait SequenceDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder for individual items.
     type Decoder<'this>: Decoder<'de, Error = Self::Error>
@@ -75,8 +74,8 @@ pub trait SequenceDecoder<'de> {
 
 /// Trait governing how to decode a sequence of pairs.
 pub trait MapDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for a key.
     type Entry<'this>: MapEntryDecoder<'de, Error = Self::Error>
@@ -104,8 +103,8 @@ pub trait MapDecoder<'de> {
 
 /// Trait governing how to decode fields in a struct.
 pub trait StructDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for a key.
     type Field<'this>: StructFieldDecoder<'de, Error = Self::Error>
@@ -132,8 +131,8 @@ pub trait StructDecoder<'de> {
 
 /// Trait governing how to decode a map entry.
 pub trait MapEntryDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for a tuple field index.
     type MapKey<'this>: Decoder<'de, Error = Self::Error>
@@ -168,8 +167,8 @@ pub trait MapEntryDecoder<'de> {
 
 /// Trait governing how to decode a struct field.
 pub trait StructFieldDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for a tuple field index.
     type FieldName<'this>: Decoder<'de, Error = Self::Error>
@@ -207,8 +206,8 @@ pub trait StructFieldDecoder<'de> {
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
 pub trait MapPairsDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for a tuple field index.
     type MapPairsKey<'this>: Decoder<'de, Error = Self::Error>
@@ -256,8 +255,8 @@ pub trait MapPairsDecoder<'de> {
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
 pub trait StructPairsDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for a tuple field index.
     type FieldName<'this>: Decoder<'de, Error = Self::Error>
@@ -299,8 +298,8 @@ pub trait StructPairsDecoder<'de> {
 
 /// Trait governing how to decode a variant.
 pub trait VariantDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for the variant tag.
     type Tag<'this>: Decoder<'de, Error = Self::Error>
@@ -342,8 +341,9 @@ pub trait VariantDecoder<'de> {
 
 /// Trait governing the implementation of a decoder.
 pub trait Decoder<'de>: Sized {
-    /// Error type raised by the decoder.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
+
     /// The type returned when the decoder is buffered.
     type Buffer: AsDecoder<Error = Self::Error>;
     /// Decoder for a value that is present.

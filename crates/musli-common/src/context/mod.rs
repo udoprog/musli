@@ -3,14 +3,18 @@
 mod access;
 #[cfg(feature = "alloc")]
 mod alloc_context;
+mod error_marker;
 mod no_std_context;
 mod rich_error;
+#[doc(inline)]
+pub use self::error_marker::ErrorMarker;
+mod error;
+pub use self::error::Error;
 
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
-use musli::context::Error;
 use musli::{Allocator, Context};
 
 #[cfg(feature = "alloc")]
@@ -56,7 +60,7 @@ where
 impl<A, E> Context for Same<A, E>
 where
     A: Allocator,
-    E: musli::error::Error,
+    E: Error,
 {
     type Input = E;
     type Error = E;
@@ -132,7 +136,7 @@ where
 impl<A, E> Ignore<A, E>
 where
     A: Allocator,
-    E: musli::error::Error,
+    E: Error,
 {
     /// Construct an error or panic.
     pub fn unwrap(self) -> E {
@@ -149,7 +153,7 @@ where
     A: Allocator,
 {
     type Input = E;
-    type Error = Error;
+    type Error = ErrorMarker;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
@@ -159,30 +163,30 @@ where
     }
 
     #[inline(always)]
-    fn report<T>(&self, _: T) -> Error
+    fn report<T>(&self, _: T) -> ErrorMarker
     where
         E: From<T>,
     {
         self.error.set(true);
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
-    fn custom<T>(&self, _: T) -> Error
+    fn custom<T>(&self, _: T) -> ErrorMarker
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
         self.error.set(true);
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
-    fn message<T>(&self, _: T) -> Error
+    fn message<T>(&self, _: T) -> ErrorMarker
     where
         T: fmt::Display,
     {
         self.error.set(true);
-        Error
+        ErrorMarker
     }
 }
 
@@ -192,10 +196,7 @@ pub struct Capture<A, E> {
     error: UnsafeCell<Option<E>>,
 }
 
-impl<A, E> Capture<A, E>
-where
-    E: musli::error::Error,
-{
+impl<A, E> Capture<A, E> {
     /// Construct a new capturing allocator.
     pub fn new(alloc: A) -> Self {
         Self {
@@ -217,10 +218,10 @@ where
 impl<A, E> Context for Capture<A, E>
 where
     A: Allocator,
-    E: musli::error::Error,
+    E: Error,
 {
     type Input = E;
-    type Error = Error;
+    type Error = ErrorMarker;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
@@ -230,7 +231,7 @@ where
     }
 
     #[inline(always)]
-    fn report<T>(&self, error: T) -> Error
+    fn report<T>(&self, error: T) -> ErrorMarker
     where
         E: From<T>,
     {
@@ -240,11 +241,11 @@ where
             self.error.get().replace(Some(E::from(error)));
         }
 
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
-    fn custom<T>(&self, error: T) -> Error
+    fn custom<T>(&self, error: T) -> ErrorMarker
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -253,11 +254,12 @@ where
         unsafe {
             self.error.get().replace(Some(E::custom(error)));
         }
-        Error
+
+        ErrorMarker
     }
 
     #[inline(always)]
-    fn message<T>(&self, message: T) -> Error
+    fn message<T>(&self, message: T) -> ErrorMarker
     where
         T: fmt::Display,
     {
@@ -267,7 +269,7 @@ where
             self.error.get().replace(Some(E::message(message)));
         }
 
-        Error
+        ErrorMarker
     }
 }
 

@@ -32,11 +32,10 @@ impl<W, const F: Options, E> StorageEncoder<W, F, E> {
 }
 
 #[musli::encoder]
-impl<W, const F: Options, E> Encoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E: 'static> Encoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
-    E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
@@ -379,11 +378,10 @@ where
     }
 }
 
-impl<W, const F: Options, E> SequenceEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E: 'static> SequenceEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
-    E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
@@ -406,11 +404,10 @@ where
     }
 }
 
-impl<W, const F: Options, E> MapEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E: 'static> MapEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
-    E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
@@ -433,11 +430,10 @@ where
     }
 }
 
-impl<W, const F: Options, E> MapEntryEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E: 'static> MapEntryEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
-    E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
@@ -469,11 +465,10 @@ where
     }
 }
 
-impl<W, const F: Options, E> MapPairsEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E: 'static> MapPairsEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
-    E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
@@ -505,11 +500,10 @@ where
     }
 }
 
-impl<W, const F: Options, E> StructEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E: 'static> StructEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
-    E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
@@ -532,11 +526,10 @@ where
     }
 }
 
-impl<W, const F: Options, E> StructFieldEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E: 'static> StructFieldEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
-    E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
@@ -568,11 +561,10 @@ where
     }
 }
 
-impl<W, const F: Options, E> VariantEncoder for StorageEncoder<W, F, E>
+impl<W, const F: Options, E: 'static> VariantEncoder for StorageEncoder<W, F, E>
 where
     W: Writer,
     E: From<W::Error>,
-    E: musli::error::Error,
 {
     type Ok = ();
     type Error = E;
