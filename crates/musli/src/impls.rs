@@ -372,6 +372,13 @@ where
     }
 }
 
+#[derive(Encode, Decode)]
+#[musli(crate = crate)]
+enum ResultTag {
+    Ok,
+    Err,
+}
+
 impl<T, U, M> Encode<M> for Result<T, U>
 where
     T: Encode<M>,
@@ -386,8 +393,8 @@ where
         let variant = encoder.encode_variant(cx)?;
 
         match self {
-            Ok(ok) => variant.insert_variant(cx, 0usize, ok),
-            Err(err) => variant.insert_variant(cx, 1usize, err),
+            Ok(ok) => variant.insert_variant(cx, ResultTag::Ok, ok),
+            Err(err) => variant.insert_variant(cx, ResultTag::Err, err),
         }
     }
 }
@@ -405,10 +412,11 @@ where
     {
         let mut variant = decoder.decode_variant(cx)?;
 
-        let this = match variant.tag(cx).and_then(|v| cx.decode(v))? {
-            0 => Ok(variant.variant(cx).and_then(|v| cx.decode(v))?),
-            1 => Err(variant.variant(cx).and_then(|v| cx.decode(v))?),
-            tag => return Err(cx.invalid_variant_tag("Result", tag)),
+        let tag = cx.decode(variant.tag(cx)?)?;
+
+        let this = match tag {
+            ResultTag::Ok => Ok(cx.decode(variant.variant(cx)?)?),
+            ResultTag::Err => Err(cx.decode(variant.variant(cx)?)?),
         };
 
         variant.end(cx)?;

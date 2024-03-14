@@ -1450,8 +1450,8 @@ pub trait Decoder<'de>: Sized {
     ///         let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
     ///         while let Some(mut entry) = map.entry(cx)? {
-    ///             let key = entry.map_key(cx).and_then(|v| cx.decode(v))?;
-    ///             let value = entry.map_value(cx).and_then(|v| cx.decode(v))?;
+    ///             let key = cx.decode(entry.map_key(cx)?)?;
+    ///             let value = cx.decode(entry.map_value(cx)?)?;
     ///             data.insert(key, value);
     ///         }
     ///

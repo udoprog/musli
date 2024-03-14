@@ -291,8 +291,8 @@ pub trait VariantEncoder {
         F: Encode<C::Mode>,
         S: Encode<C::Mode>,
     {
-        self.tag(cx).and_then(|e| tag.encode(cx, e))?;
-        self.variant(cx).and_then(|e| second.encode(cx, e))?;
+        tag.encode(cx, self.tag(cx)?)?;
+        second.encode(cx, self.variant(cx)?)?;
         self.end(cx)
     }
 
