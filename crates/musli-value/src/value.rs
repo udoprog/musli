@@ -20,7 +20,6 @@ use musli::en::{MapEncoder, SequenceEncoder, VariantEncoder};
 use musli::mode::Mode;
 use musli::Context;
 use musli_common::options::Options;
-use musli_common::reader::SliceUnderflow;
 
 use crate::de::ValueDecoder;
 use crate::error::ErrorKind;
@@ -690,7 +689,7 @@ impl<const F: Options, E> AsValueDecoder<F, E> {
 
 impl<const F: Options, E: 'static> AsDecoder for AsValueDecoder<F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;

@@ -378,16 +378,16 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use core::fmt;
+    /// use core::convert::Infallible;
     ///
     /// use musli::Context;
-    /// use musli::context::Error;
     /// use musli::de::{self, Decoder};
     ///
     /// struct MyDecoder;
     ///
     /// #[musli::decoder]
     /// impl Decoder<'_> for MyDecoder {
-    ///     type Error = Error;
+    ///     type Error = Infallible;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")

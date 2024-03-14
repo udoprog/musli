@@ -45,77 +45,77 @@ where
 
     #[inline]
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_bool(self.cx.adapt(), v)
+        self.encoder.encode_bool(self.cx, v)
     }
 
     #[inline]
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i8(self.cx.adapt(), v)
+        self.encoder.encode_i8(self.cx, v)
     }
 
     #[inline]
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i16(self.cx.adapt(), v)
+        self.encoder.encode_i16(self.cx, v)
     }
 
     #[inline]
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i32(self.cx.adapt(), v)
+        self.encoder.encode_i32(self.cx, v)
     }
 
     #[inline]
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i64(self.cx.adapt(), v)
+        self.encoder.encode_i64(self.cx, v)
     }
 
     #[inline]
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u8(self.cx.adapt(), v)
+        self.encoder.encode_u8(self.cx, v)
     }
 
     #[inline]
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u16(self.cx.adapt(), v)
+        self.encoder.encode_u16(self.cx, v)
     }
 
     #[inline]
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u32(self.cx.adapt(), v)
+        self.encoder.encode_u32(self.cx, v)
     }
 
     #[inline]
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u64(self.cx.adapt(), v)
+        self.encoder.encode_u64(self.cx, v)
     }
 
     #[inline]
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_f32(self.cx.adapt(), v)
+        self.encoder.encode_f32(self.cx, v)
     }
 
     #[inline]
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_f64(self.cx.adapt(), v)
+        self.encoder.encode_f64(self.cx, v)
     }
 
     #[inline]
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_char(self.cx.adapt(), v)
+        self.encoder.encode_char(self.cx, v)
     }
 
     #[inline]
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_string(self.cx.adapt(), v)
+        self.encoder.encode_string(self.cx, v)
     }
 
     #[inline]
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_bytes(self.cx.adapt(), v)
+        self.encoder.encode_bytes(self.cx, v)
     }
 
     #[inline]
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_none(self.cx.adapt())
+        self.encoder.encode_none(self.cx)
     }
 
     #[inline]
@@ -123,19 +123,19 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.encode_some(self.cx.adapt())?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), encoder))
+        let encoder = self.encoder.encode_some(self.cx)?;
+        value.serialize(Serializer::<_, _, M>::new(self.cx, encoder))
     }
 
     #[inline]
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_unit(self.cx.adapt())
+        self.encoder.encode_unit(self.cx)
     }
 
     #[inline]
     fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
-        let encoder = self.encoder.encode_struct(self.cx.adapt(), 0)?;
-        encoder.end(self.cx.adapt())
+        let encoder = self.encoder.encode_struct(self.cx, 0)?;
+        encoder.end(self.cx)
     }
 
     #[inline]
@@ -146,7 +146,7 @@ where
         _: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
         encode_variant::<_, _, M, _, _, _>(self.cx, self.encoder, &variant_index, |encoder| {
-            encoder.encode_unit(self.cx.adapt())
+            encoder.encode_unit(self.cx)
         })
     }
 
@@ -159,7 +159,7 @@ where
     where
         T: ser::Serialize,
     {
-        encode_newtype::<_, _, M, _>(self.cx.adapt(), self.encoder, value)
+        encode_newtype::<_, _, M, _>(self.cx, self.encoder, value)
     }
 
     #[inline]
@@ -186,13 +186,13 @@ where
             ));
         };
 
-        let encoder = self.encoder.encode_sequence(self.cx.adapt(), len)?;
+        let encoder = self.encoder.encode_sequence(self.cx, len)?;
         Ok(SerializeSeq::new(self.cx, encoder))
     }
 
     #[inline]
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        let encoder = self.encoder.encode_tuple(self.cx.adapt(), len)?;
+        let encoder = self.encoder.encode_tuple(self.cx, len)?;
         Ok(SerializeSeq::new(self.cx, encoder))
     }
 
@@ -202,7 +202,7 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        let encoder = self.encoder.encode_struct(self.cx.adapt(), len)?;
+        let encoder = self.encoder.encode_struct(self.cx, len)?;
         Ok(SerializeTupleStruct::<_, _, M>::new(self.cx, encoder))
     }
 
@@ -214,9 +214,9 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        let encoder =
-            self.encoder
-                .encode_tuple_variant::<M, _, _>(self.cx.adapt(), &variant_index, len)?;
+        let encoder = self
+            .encoder
+            .encode_tuple_variant::<M, _, _>(self.cx, &variant_index, len)?;
         Ok(SerializeSeq::<_, _, M>::new(self.cx, encoder))
     }
 
@@ -228,7 +228,7 @@ where
             ));
         };
 
-        let encoder = self.encoder.encode_map_pairs(self.cx.adapt(), len)?;
+        let encoder = self.encoder.encode_map_pairs(self.cx, len)?;
         Ok(SerializeMap::new(self.cx, encoder))
     }
 
@@ -238,7 +238,7 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        let encoder = self.encoder.encode_struct(self.cx.adapt(), len)?;
+        let encoder = self.encoder.encode_struct(self.cx, len)?;
         Ok(SerializeStruct::new(self.cx, encoder))
     }
 
@@ -252,7 +252,7 @@ where
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
         let encoder =
             self.encoder
-                .encode_struct_variant::<M, _, _>(self.cx.adapt(), &variant_index, len)?;
+                .encode_struct_variant::<M, _, _>(self.cx, &variant_index, len)?;
         Ok(SerializeStructVariant::<_, _, M>::new(self.cx, encoder))
     }
 
@@ -282,15 +282,15 @@ where
     T: Serialize,
     F: FnOnce(<E::Variant as VariantEncoder>::Variant<'_>) -> Result<O, C::Error>,
 {
-    let mut variant = encoder.encode_variant(cx.adapt())?;
+    let mut variant = encoder.encode_variant(cx)?;
 
-    let tag = variant.tag(cx.adapt())?;
+    let tag = variant.tag(cx)?;
     variant_tag.serialize(Serializer::<_, _, M>::new(cx, tag))?;
 
-    let value = variant.variant(cx.adapt())?;
+    let value = variant.variant(cx)?;
     let output = f(value)?;
 
-    variant.end(cx.adapt())?;
+    variant.end(cx)?;
     Ok(output)
 }
 
@@ -303,18 +303,18 @@ where
     M: Mode,
     T: ?Sized + Serialize,
 {
-    let mut encoder = encoder.encode_struct(cx.adapt(), 1)?;
+    let mut encoder = encoder.encode_struct(cx, 1)?;
 
-    let mut field = encoder.field(cx.adapt())?;
+    let mut field = encoder.field(cx)?;
 
-    let k = field.field_name(cx.adapt())?;
-    Encode::<M>::encode(&0usize, cx.adapt(), k)?;
+    let k = field.field_name(cx)?;
+    Encode::<M>::encode(&0usize, cx, k)?;
 
-    let v = field.field_value(cx.adapt())?;
+    let v = field.field_value(cx)?;
     value.serialize(Serializer::<_, _, M>::new(cx, v))?;
 
-    field.end(cx.adapt())?;
-    encoder.end(cx.adapt())
+    field.end(cx)?;
+    encoder.end(cx)
 }
 
 pub struct SerializeSeq<'a, C, E, M> {
@@ -348,14 +348,14 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.next(self.cx.adapt())?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), encoder))?;
+        let encoder = self.encoder.next(self.cx)?;
+        value.serialize(Serializer::<_, _, M>::new(self.cx, encoder))?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end(self.cx.adapt())
+        self.encoder.end(self.cx)
     }
 }
 
@@ -440,21 +440,21 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.field(self.cx.adapt())?;
+        let mut field = self.encoder.field(self.cx)?;
 
-        let k = field.field_name(self.cx.adapt())?;
-        Encode::<M>::encode(&self.field, self.cx.adapt(), k)?;
+        let k = field.field_name(self.cx)?;
+        Encode::<M>::encode(&self.field, self.cx, k)?;
 
-        let v = field.field_value(self.cx.adapt())?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), v))?;
+        let v = field.field_value(self.cx)?;
+        value.serialize(Serializer::<_, _, M>::new(self.cx, v))?;
 
-        field.end(self.cx.adapt())?;
+        field.end(self.cx)?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end(self.cx.adapt())
+        self.encoder.end(self.cx)
     }
 }
 
@@ -489,8 +489,8 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.map_pairs_key(self.cx.adapt())?;
-        key.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), encoder))?;
+        let encoder = self.encoder.map_pairs_key(self.cx)?;
+        key.serialize(Serializer::<_, _, M>::new(self.cx, encoder))?;
         Ok(())
     }
 
@@ -499,14 +499,14 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.map_pairs_value(self.cx.adapt())?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), encoder))?;
+        let encoder = self.encoder.map_pairs_value(self.cx)?;
+        value.serialize(Serializer::<_, _, M>::new(self.cx, encoder))?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end(self.cx.adapt())
+        self.encoder.end(self.cx)
     }
 }
 
@@ -545,18 +545,18 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.field(self.cx.adapt())?;
-        let k = field.field_name(self.cx.adapt())?;
-        Encode::<M>::encode(key, self.cx.adapt(), k)?;
-        let v = field.field_value(self.cx.adapt())?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), v))?;
-        field.end(self.cx.adapt())?;
+        let mut field = self.encoder.field(self.cx)?;
+        let k = field.field_name(self.cx)?;
+        Encode::<M>::encode(key, self.cx, k)?;
+        let v = field.field_value(self.cx)?;
+        value.serialize(Serializer::<_, _, M>::new(self.cx, v))?;
+        field.end(self.cx)?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end(self.cx.adapt())
+        self.encoder.end(self.cx)
     }
 }
 
@@ -595,17 +595,17 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.field(self.cx.adapt())?;
-        let k = field.field_name(self.cx.adapt())?;
-        Encode::<M>::encode(key, self.cx.adapt(), k)?;
-        let v = field.field_value(self.cx.adapt())?;
-        value.serialize(Serializer::<_, _, M>::new(self.cx.adapt(), v))?;
-        field.end(self.cx.adapt())?;
+        let mut field = self.encoder.field(self.cx)?;
+        let k = field.field_name(self.cx)?;
+        Encode::<M>::encode(key, self.cx, k)?;
+        let v = field.field_value(self.cx)?;
+        value.serialize(Serializer::<_, _, M>::new(self.cx, v))?;
+        field.end(self.cx)?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end(self.cx.adapt())
+        self.encoder.end(self.cx)
     }
 }

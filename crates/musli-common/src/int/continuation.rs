@@ -3,19 +3,18 @@
 //!
 //! ```
 //! use musli_common::context::Ignore;
-//! use musli_common::fixed_bytes::{FixedBytes, FixedBytesOverflow};
+//! use musli_common::fixed_bytes::FixedBytes;
 //! use musli_common::int::continuation as c;
-//! use musli_common::reader::SliceUnderflow;
 //!
 //! let mut buf = musli_common::allocator::buffer();
 //! let alloc = musli_common::allocator::new(&mut buf);
 //!
-//! let cx: Ignore<_, FixedBytesOverflow> = Ignore::new(&alloc);
+//! let cx = Ignore::marker(&alloc);
 //! let mut bytes = FixedBytes::<8>::new();
 //! c::encode(&cx, &mut bytes, 5000u32).unwrap();
 //! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let cx: Ignore<_, SliceUnderflow> = Ignore::new(&alloc);
+//! let cx = Ignore::marker(&alloc);
 //! let number: u32 = c::decode(&cx, bytes.as_slice()).unwrap();
 //! assert_eq!(number, 5000u32);
 //! ```
@@ -38,7 +37,7 @@ const CONT_BYTE: u8 = 0b1000_0000;
 #[inline(never)]
 pub fn decode<'de, C, R, T>(cx: &C, mut r: R) -> Result<T, C::Error>
 where
-    C: Context<Input = R::Error>,
+    C: Context,
     R: Reader<'de>,
     T: int::Unsigned,
 {
@@ -69,7 +68,7 @@ where
 #[inline(never)]
 pub fn encode<C, W, T>(cx: &C, mut w: W, mut value: T) -> Result<(), C::Error>
 where
-    C: Context<Input = W::Error>,
+    C: Context,
     W: Writer,
     T: int::Unsigned,
 {

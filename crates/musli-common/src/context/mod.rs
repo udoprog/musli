@@ -44,6 +44,14 @@ impl<A, E> Same<A, E> {
     }
 }
 
+impl<A> Same<A, ErrorMarker> {
+    /// Construct a new `Same` capturing context.
+    #[inline]
+    pub fn marker(alloc: A) -> Self {
+        Self::new(alloc)
+    }
+}
+
 impl<A, E> Default for Same<A, E>
 where
     A: Default,
@@ -119,10 +127,7 @@ where
     }
 }
 
-impl<A, E> Ignore<A, E>
-where
-    A: Allocator,
-{
+impl<A, E> Ignore<A, E> {
     /// Construct a new ignoring context.
     pub fn new(alloc: A) -> Self {
         Self {
@@ -130,6 +135,13 @@ where
             error: Cell::new(false),
             _marker: PhantomData,
         }
+    }
+}
+
+impl<A> Ignore<A, ErrorMarker> {
+    /// Construct a new ignoring context which collects an error marker.
+    pub fn marker(alloc: A) -> Self {
+        Self::new(alloc)
     }
 }
 
@@ -148,7 +160,7 @@ where
     }
 }
 
-impl<A, E> Context for Ignore<A, E>
+impl<A, E: 'static> Context for Ignore<A, E>
 where
     A: Allocator,
 {

@@ -12,7 +12,7 @@ use musli::mode::Mode;
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_storage::options::Options;
-use musli_storage::reader::{SliceReader, SliceUnderflow};
+use musli_storage::reader::SliceReader;
 
 use crate::error::ErrorKind;
 use crate::value::{Number, Value};
@@ -49,7 +49,7 @@ macro_rules! ensure {
 #[musli::decoder]
 impl<'de, const F: Options, E: 'static> Decoder<'de> for ValueDecoder<'de, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
     type Buffer = AsValueDecoder<F, E>;
@@ -413,7 +413,7 @@ where
 
 impl<'a, const F: Options, E: 'static> AsDecoder for ValueDecoder<'a, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;
@@ -447,7 +447,7 @@ impl<'de, const F: Options, E> IterValueDecoder<'de, F, E> {
 
 impl<'de, const F: Options, E: 'static> PackDecoder<'de> for IterValueDecoder<'de, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
@@ -477,7 +477,7 @@ where
 
 impl<'de, const F: Options, E: 'static> SequenceDecoder<'de> for IterValueDecoder<'de, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
@@ -529,7 +529,7 @@ impl<'de, const F: Options, E> IterValuePairsDecoder<'de, F, E> {
 
 impl<'de, const F: Options, E: 'static> MapDecoder<'de> for IterValuePairsDecoder<'de, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
@@ -561,7 +561,7 @@ where
 
 impl<'de, const F: Options, E: 'static> MapEntryDecoder<'de> for IterValuePairDecoder<'de, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
@@ -598,7 +598,7 @@ where
 
 impl<'de, const F: Options, E: 'static> StructDecoder<'de> for IterValuePairsDecoder<'de, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
@@ -630,7 +630,7 @@ where
 
 impl<'de, const F: Options, E: 'static> StructFieldDecoder<'de> for IterValuePairDecoder<'de, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
@@ -700,7 +700,7 @@ impl<'de, const F: Options, E> IterValueVariantDecoder<'de, F, E> {
 
 impl<'de, const F: Options, E: 'static> VariantDecoder<'de> for IterValueVariantDecoder<'de, F, E>
 where
-    E: From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 

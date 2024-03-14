@@ -32,7 +32,6 @@ impl<M, W> Encoder for JsonEncoder<M, W>
 where
     M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Error = Error;
     type Ok = ();
@@ -54,7 +53,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_bytes(cx.adapt(), b"null")
+        self.writer.write_bytes(cx, b"null")
     }
 
     #[inline]
@@ -63,7 +62,7 @@ where
         C: Context<Input = Self::Error>,
     {
         self.writer
-            .write_bytes(cx.adapt(), if value { b"true" } else { b"false" })
+            .write_bytes(cx, if value { b"true" } else { b"false" })
     }
 
     #[inline]
@@ -84,8 +83,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -94,8 +92,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -104,8 +101,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -114,8 +110,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -124,8 +119,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -134,8 +128,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -144,8 +137,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -154,8 +146,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -164,8 +155,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -174,8 +164,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -184,8 +173,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -194,8 +182,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -204,8 +191,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = ryu::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -214,8 +200,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = ryu::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -235,20 +220,18 @@ where
         let mut it = bytes.iter();
         let last = it.next_back();
 
-        self.writer.write_byte(cx.adapt(), b'[')?;
+        self.writer.write_byte(cx, b'[')?;
 
         for b in it {
-            self.writer
-                .write_bytes(cx.adapt(), buf.format(*b).as_bytes())?;
-            self.writer.write_byte(cx.adapt(), b',')?;
+            self.writer.write_bytes(cx, buf.format(*b).as_bytes())?;
+            self.writer.write_byte(cx, b',')?;
         }
 
         if let Some(b) = last {
-            self.writer
-                .write_bytes(cx.adapt(), buf.format(*b).as_bytes())?;
+            self.writer.write_bytes(cx, buf.format(*b).as_bytes())?;
         }
 
-        self.writer.write_byte(cx.adapt(), b']')?;
+        self.writer.write_byte(cx, b']')?;
         Ok(())
     }
 
@@ -351,14 +334,13 @@ pub struct JsonObjectEncoder<M, W> {
 impl<M, W> JsonObjectEncoder<M, W>
 where
     W: Writer,
-    Error: From<W::Error>,
 {
     #[inline]
     fn new<C>(cx: &C, mut writer: W) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
-        writer.write_byte(cx.adapt(), b'{')?;
+        writer.write_byte(cx, b'{')?;
 
         Ok(Self {
             len: 0,
@@ -372,7 +354,6 @@ impl<M, W> MapEncoder for JsonObjectEncoder<M, W>
 where
     M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -399,7 +380,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b'}')?;
+        self.writer.write_byte(cx, b'}')?;
         Ok(())
     }
 }
@@ -408,7 +389,6 @@ impl<M, W> StructEncoder for JsonObjectEncoder<M, W>
 where
     M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -456,7 +436,6 @@ impl<M, W> MapEntryEncoder for JsonObjectPairEncoder<M, W>
 where
     M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -473,7 +452,7 @@ where
         C: Context<Input = Self::Error>,
     {
         if !self.empty {
-            self.writer.write_byte(cx.adapt(), b',')?;
+            self.writer.write_byte(cx, b',')?;
         }
 
         Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
@@ -484,7 +463,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b':')?;
+        self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
@@ -501,7 +480,6 @@ impl<M, W> StructFieldEncoder for JsonObjectPairEncoder<M, W>
 where
     M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -546,14 +524,13 @@ pub struct JsonVariantEncoder<M, W> {
 impl<M, W> JsonVariantEncoder<M, W>
 where
     W: Writer,
-    Error: From<W::Error>,
 {
     #[inline]
     fn new<C>(cx: &C, mut writer: W) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
-        writer.write_byte(cx.adapt(), b'{')?;
+        writer.write_byte(cx, b'{')?;
 
         Ok(Self {
             writer,
@@ -566,7 +543,6 @@ impl<M, W> VariantEncoder for JsonVariantEncoder<M, W>
 where
     M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -592,7 +568,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b':')?;
+        self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
@@ -601,7 +577,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b'}')
+        self.writer.write_byte(cx, b'}')
     }
 }
 
@@ -618,11 +594,11 @@ impl<W> JsonObjectKeyEncoder<W> {
 
 macro_rules! format_integer {
     ($slf:ident, $cx:expr, $value:ident) => {{
-        $slf.writer.write_byte($cx.adapt(), b'"')?;
+        $slf.writer.write_byte($cx, b'"')?;
         let mut buffer = itoa::Buffer::new();
         $slf.writer
-            .write_bytes($cx.adapt(), buffer.format($value).as_bytes())?;
-        $slf.writer.write_byte($cx.adapt(), b'"')?;
+            .write_bytes($cx, buffer.format($value).as_bytes())?;
+        $slf.writer.write_byte($cx, b'"')?;
         Ok(())
     }};
 }
@@ -631,7 +607,6 @@ macro_rules! format_integer {
 impl<W> Encoder for JsonObjectKeyEncoder<W>
 where
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -756,14 +731,13 @@ pub struct JsonArrayEncoder<M, W> {
 impl<M, W> JsonArrayEncoder<M, W>
 where
     W: Writer,
-    Error: From<W::Error>,
 {
     #[inline]
     fn new<C>(cx: &C, mut writer: W) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
-        writer.write_byte(cx.adapt(), b'[')?;
+        writer.write_byte(cx, b'[')?;
 
         Ok(Self {
             first: true,
@@ -777,7 +751,6 @@ impl<M, W> SequenceEncoder for JsonArrayEncoder<M, W>
 where
     M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -792,7 +765,7 @@ where
         C: Context<Input = Self::Error>,
     {
         if !self.first {
-            self.writer.write_byte(cx.adapt(), b',')?;
+            self.writer.write_byte(cx, b',')?;
         }
 
         self.first = false;
@@ -804,7 +777,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b']')?;
+        self.writer.write_byte(cx, b']')?;
         Ok(())
     }
 }
@@ -815,9 +788,8 @@ fn encode_string<C, W>(cx: &C, mut writer: W, bytes: &[u8]) -> Result<(), C::Err
 where
     C: Context<Input = Error>,
     W: Writer,
-    Error: From<W::Error>,
 {
-    writer.write_byte(cx.adapt(), b'"')?;
+    writer.write_byte(cx, b'"')?;
 
     let mut start = 0;
 
@@ -829,7 +801,7 @@ where
         }
 
         if start < i {
-            writer.write_bytes(cx.adapt(), &bytes[start..i])?;
+            writer.write_bytes(cx, &bytes[start..i])?;
         }
 
         write_escape(cx, &mut writer, escape, b)?;
@@ -837,10 +809,10 @@ where
     }
 
     if start != bytes.len() {
-        writer.write_bytes(cx.adapt(), &bytes[start..])?;
+        writer.write_bytes(cx, &bytes[start..])?;
     }
 
-    writer.write_byte(cx.adapt(), b'"')?;
+    writer.write_byte(cx, b'"')?;
     Ok(())
 }
 
@@ -887,7 +859,6 @@ fn write_escape<C, W>(cx: &C, writer: &mut W, escape: u8, byte: u8) -> Result<()
 where
     C: Context<Input = Error>,
     W: Writer,
-    Error: From<W::Error>,
 {
     let s = match escape {
         BB => b"\\b",
@@ -906,10 +877,10 @@ where
                 HEX_DIGITS[(byte >> 4) as usize],
                 HEX_DIGITS[(byte & 0xF) as usize],
             ];
-            return writer.write_bytes(cx.adapt(), bytes);
+            return writer.write_bytes(cx, bytes);
         }
         _ => unreachable!(),
     };
 
-    writer.write_bytes(cx.adapt(), s)
+    writer.write_bytes(cx, s)
 }

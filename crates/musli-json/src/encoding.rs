@@ -32,7 +32,6 @@ pub const DEFAULT: Encoding = Encoding::new();
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
-    Error: From<W::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -45,7 +44,6 @@ where
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: io::Write,
-    Error: From<io::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_writer(writer, value)
@@ -187,7 +185,6 @@ where
     where
         C: Context<Input = Error>,
         W: Writer,
-        Error: From<W::Error>,
         T: ?Sized + Encode<M>,
     {
         T::encode(value, cx, JsonEncoder::<M, _>::new(writer))

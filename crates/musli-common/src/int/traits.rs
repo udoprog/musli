@@ -64,13 +64,13 @@ pub trait UnsignedOps: Unsigned {
     /// encoding.
     fn write_bytes<C, W>(self, cx: &C, writer: W, byte_order: ByteOrder) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context,
         W: Writer;
 
     /// Read the current value from the reader in little-endian encoding.
     fn read_bytes<'de, C, R>(cx: &C, reader: R, byte_order: ByteOrder) -> Result<Self, C::Error>
     where
-        C: Context<Input = R::Error>,
+        C: Context,
         R: Reader<'de>;
 }
 
@@ -177,7 +177,7 @@ macro_rules! implement_ops {
                 byte_order: ByteOrder,
             ) -> Result<(), C::Error>
             where
-                C: Context<Input = W::Error>,
+                C: Context,
                 W: Writer,
             {
                 let bytes = match byte_order {
@@ -196,7 +196,7 @@ macro_rules! implement_ops {
                 byte_order: ByteOrder,
             ) -> Result<Self, C::Error>
             where
-                C: Context<Input = R::Error>,
+                C: Context,
                 R: Reader<'de>,
             {
                 let bytes = reader.read_array(cx)?;

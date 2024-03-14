@@ -41,7 +41,6 @@ pub const DEFAULT: Encoding = Encoding::new();
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
-    Error: From<W::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -85,7 +84,6 @@ where
 pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
 where
     R: Reader<'de>,
-    Error: From<R::Error>,
     T: Decode<'de, DefaultMode>,
 {
     DEFAULT.decode(reader)

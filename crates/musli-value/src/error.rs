@@ -6,7 +6,6 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 
 use musli::de::{NumberHint, TypeHint};
-use musli_common::reader::SliceUnderflow;
 
 /// An error raised when encoding or decoding [`Value`][crate::Value].
 #[derive(Debug)]
@@ -95,7 +94,6 @@ impl fmt::Display for ErrorKind {
 #[non_exhaustive]
 pub(crate) enum ErrorImpl {
     ValueError(ErrorKind),
-    SliceUnderflow(SliceUnderflow),
     #[cfg(feature = "alloc")]
     Message(Box<str>),
     #[cfg(not(feature = "alloc"))]
@@ -106,20 +104,10 @@ impl fmt::Display for ErrorImpl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ErrorImpl::ValueError(error) => error.fmt(f),
-            ErrorImpl::SliceUnderflow(error) => error.fmt(f),
             #[cfg(feature = "alloc")]
             ErrorImpl::Message(message) => message.fmt(f),
             #[cfg(not(feature = "alloc"))]
             ErrorImpl::Message => write!(f, "Message error (see diagnostics)"),
-        }
-    }
-}
-
-impl From<SliceUnderflow> for Error {
-    #[inline]
-    fn from(error: SliceUnderflow) -> Self {
-        Self {
-            err: ErrorImpl::SliceUnderflow(error),
         }
     }
 }

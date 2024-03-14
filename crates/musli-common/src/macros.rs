@@ -9,7 +9,6 @@ macro_rules! encode_with_extensions {
         pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), Error>
         where
             W: Writer,
-            Error: From<W::Error>,
             T: ?Sized + Encode<M>,
         {
             let mut buf = musli_common::allocator::buffer();
@@ -25,7 +24,6 @@ macro_rules! encode_with_extensions {
         pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), Error>
         where
             W: io::Write,
-            Error: From<io::Error>,
             T: ?Sized + Encode<M>,
         {
             let mut writer = $crate::wrap::wrap(write);
@@ -143,7 +141,6 @@ macro_rules! encoding_impls {
         where
             C: Context<Input = Error>,
             W: Writer,
-            Error: From<W::Error>,
             T: ?Sized + Encode<M>,
         {
             T::encode(value, cx, $encoder_new(writer))
@@ -159,7 +156,6 @@ macro_rules! encoding_impls {
         where
             C: Context<Input = Error>,
             R: Reader<'de>,
-            Error: From<R::Error>,
             T: Decode<'de, M>,
         {
             T::decode(cx, $decoder_new(reader))
@@ -171,7 +167,6 @@ macro_rules! encoding_impls {
         pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
             R: Reader<'de>,
-            Error: From<R::Error>,
             T: Decode<'de, M>,
         {
             let mut buf = musli_common::allocator::buffer();
