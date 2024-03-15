@@ -3,7 +3,7 @@ name = "musli-zerocopy-macros"
 version = "0.0.96"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.73"
+rust-version = "1.76"
 description = """
 Macros for Müsli zero-copy.
 """
@@ -12,8 +12,8 @@ readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no_std", "serialization", "zerocopy"]
-categories = ["no-std", "encoding"]
+keywords = ["no-std::no-alloc", "no_std", "serialization", "zerocopy"]
+categories = ["encoding", "no-std"]
 
 [lib]
 proc-macro = true

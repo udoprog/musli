@@ -1,10 +1,9 @@
 use core::fmt;
 
 use crate::de::{
-    Decoder, NumberHint, NumberVisitor, PairsDecoder, SequenceDecoder, SizeHint, TypeHint,
+    Decoder, MapDecoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, TypeHint,
     VariantDecoder,
 };
-use crate::error::Error;
 use crate::expecting::{self, Expecting};
 use crate::Context;
 
@@ -19,7 +18,8 @@ pub trait Visitor<'de>: Sized {
     /// The value produced by the visitor.
     type Ok;
     /// The error type produced.
-    type Error: Error;
+    type Error: 'static;
+
     /// String decoder to use.
     type String<C>: ValueVisitor<'de, C, str, Ok = Self::Ok>
     where
@@ -50,7 +50,7 @@ pub trait Visitor<'de>: Sized {
         C: Context<Input = Self::Error>,
         D: Decoder<'de, Error = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(&hint, &ExpectingWrapper(self))))
+        Err(cx.message(expecting::unsupported_type(&hint, &ExpectingWrapper(self))))
     }
 
     /// Indicates that the visited type is a `unit`.
@@ -59,7 +59,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unit,
             &ExpectingWrapper(self),
         )))
@@ -71,7 +71,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Bool,
             &ExpectingWrapper(self),
         )))
@@ -83,7 +83,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Char,
             &ExpectingWrapper(self),
         )))
@@ -95,7 +95,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned8,
             &ExpectingWrapper(self),
         )))
@@ -107,7 +107,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned16,
             &ExpectingWrapper(self),
         )))
@@ -119,7 +119,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned32,
             &ExpectingWrapper(self),
         )))
@@ -131,7 +131,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned64,
             &ExpectingWrapper(self),
         )))
@@ -143,7 +143,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned128,
             &ExpectingWrapper(self),
         )))
@@ -155,7 +155,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed8,
             &ExpectingWrapper(self),
         )))
@@ -167,7 +167,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed16,
             &ExpectingWrapper(self),
         )))
@@ -179,7 +179,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed32,
             &ExpectingWrapper(self),
         )))
@@ -191,7 +191,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed64,
             &ExpectingWrapper(self),
         )))
@@ -203,7 +203,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed128,
             &ExpectingWrapper(self),
         )))
@@ -215,7 +215,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Usize,
             &ExpectingWrapper(self),
         )))
@@ -227,7 +227,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Isize,
             &ExpectingWrapper(self),
         )))
@@ -239,7 +239,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Float32,
             &ExpectingWrapper(self),
         )))
@@ -251,7 +251,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Float64,
             &ExpectingWrapper(self),
         )))
@@ -264,7 +264,7 @@ pub trait Visitor<'de>: Sized {
         C: Context<Input = Self::Error>,
         D: Decoder<'de, Error = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             &ExpectingWrapper(self),
         )))
@@ -277,7 +277,7 @@ pub trait Visitor<'de>: Sized {
         C: Context<Input = Self::Error>,
         D: SequenceDecoder<'de, Error = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::SequenceWith(decoder.size_hint()),
             &ExpectingWrapper(self),
         )))
@@ -288,9 +288,9 @@ pub trait Visitor<'de>: Sized {
     fn visit_map<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
-        D: PairsDecoder<'de, Error = Self::Error>,
+        D: MapDecoder<'de, Error = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::MapWith(decoder.size_hint()),
             &ExpectingWrapper(self),
         )))
@@ -302,7 +302,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::StringWith(hint),
             &ExpectingWrapper(self),
         )))
@@ -314,7 +314,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::BytesWith(hint),
             &ExpectingWrapper(self),
         )))
@@ -326,7 +326,7 @@ pub trait Visitor<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::NumberWith(hint),
             &ExpectingWrapper(self),
         )))
@@ -339,7 +339,7 @@ pub trait Visitor<'de>: Sized {
         C: Context<Input = Self::Error>,
         D: VariantDecoder<'de, Error = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
             &ExpectingWrapper(self),
         )))

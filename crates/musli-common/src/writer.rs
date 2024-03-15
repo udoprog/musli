@@ -2,10 +2,7 @@
 //!
 //! To adapt [std::io::Write] types, see the [wrap][crate::wrap::wrap] function.
 
-#[cfg(feature = "alloc")]
-use core::convert::Infallible;
 use core::fmt;
-use core::marker;
 use core::mem::take;
 
 use musli::{Buf, Context};
@@ -18,7 +15,7 @@ pub const MAX_FIXED_BYTES_LEN: usize = 128;
 
 /// Overflow when trying to write to a slice.
 #[derive(Debug)]
-pub struct SliceOverflow {
+pub(crate) struct SliceOverflow {
     n: usize,
     capacity: usize,
 }
@@ -36,9 +33,6 @@ impl fmt::Display for SliceOverflow {
 
 /// The trait governing how a writer works.
 pub trait Writer {
-    /// The error type raised by the writer.
-    type Error: 'static;
-
     /// Reborrowed type.
     ///
     /// Why oh why would we want to do this over having a simple `&'this mut T`?
@@ -49,7 +43,7 @@ pub trait Writer {
     /// avoid constructing a large muted type, like `&mut &mut &mut VecWriter`.
     ///
     /// [Reader]: crate::reader::Reader
-    type Mut<'this>: Writer<Error = Self::Error>
+    type Mut<'this>: Writer
     where
         Self: 'this;
 
@@ -59,19 +53,19 @@ pub trait Writer {
     /// Write a buffer to the current writer.
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
         B: Buf;
 
     /// Write bytes to the current writer.
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>;
+        C: Context;
 
     /// Write a single byte.
     #[inline]
     fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         self.write_bytes(cx, &[b])
     }
@@ -81,7 +75,6 @@ impl<W> Writer for &mut W
 where
     W: ?Sized + Writer,
 {
-    type Error = W::Error;
     type Mut<'this> = &'this mut W where Self: 'this;
 
     #[inline]
@@ -92,7 +85,7 @@ where
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
         B: Buf,
     {
         (*self).write_buffer(cx, buffer)
@@ -101,7 +94,7 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         (*self).write_bytes(cx, bytes)
     }
@@ -109,7 +102,7 @@ where
     #[inline]
     fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         (*self).write_byte(cx, b)
     }
@@ -117,7 +110,6 @@ where
 
 #[cfg(feature = "alloc")]
 impl Writer for Vec<u8> {
-    type Error = Infallible;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -128,7 +120,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -138,7 +130,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         self.extend_from_slice(bytes);
         cx.advance(bytes.len());
@@ -148,7 +140,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         self.push(b);
         cx.advance(1);
@@ -157,7 +149,6 @@ impl Writer for Vec<u8> {
 }
 
 impl Writer for &mut [u8] {
-    type Error = SliceOverflow;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -168,7 +159,7 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -178,10 +169,10 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         if self.len() < bytes.len() {
-            return Err(cx.report(SliceOverflow {
+            return Err(cx.custom(SliceOverflow {
                 n: bytes.len(),
                 capacity: self.len(),
             }));
@@ -197,7 +188,7 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         if self.is_empty() {
             return Err(cx.message(format_args!(
@@ -213,18 +204,14 @@ impl Writer for &mut [u8] {
 }
 
 /// A writer that writes against an underlying [`Buf`].
-pub struct BufWriter<T, E> {
+pub struct BufWriter<T> {
     buf: T,
-    _marker: marker::PhantomData<E>,
 }
 
-impl<T, E> BufWriter<T, E> {
+impl<T> BufWriter<T> {
     /// Construct a new buffer writer.
     pub fn new(buf: T) -> Self {
-        Self {
-            buf,
-            _marker: marker::PhantomData,
-        }
+        Self { buf }
     }
 
     /// Coerce into inner buffer.
@@ -233,12 +220,10 @@ impl<T, E> BufWriter<T, E> {
     }
 }
 
-impl<T, E: 'static> Writer for BufWriter<T, E>
+impl<T> Writer for BufWriter<T>
 where
     T: Buf,
 {
-    type Error = E;
-
     type Mut<'this> = &'this mut Self
     where
         Self: 'this;
@@ -251,7 +236,7 @@ where
     #[inline(always)]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
         B: Buf,
     {
         if !self.buf.write(buffer.as_slice()) {
@@ -264,7 +249,7 @@ where
     #[inline(always)]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         if !self.buf.write(bytes) {
             return Err(cx.message("Buffer overflow"));

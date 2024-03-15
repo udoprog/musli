@@ -5,7 +5,9 @@ use alloc::vec::Vec;
 
 use musli::en::Encoder;
 #[cfg(feature = "alloc")]
-use musli::en::{PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{
+    MapEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
+};
 use musli::Context;
 
 use crate::error::Error;
@@ -425,18 +427,46 @@ impl<O> MapValueEncoder<O> {
 }
 
 #[cfg(feature = "alloc")]
-impl<O> PairsEncoder for MapValueEncoder<O>
+impl<O> MapEncoder for MapValueEncoder<O>
 where
     O: ValueOutput,
 {
     type Ok = ();
     type Error = Error;
 
-    type Encoder<'this> = PairValueEncoder<'this>
+    type Entry<'this> = PairValueEncoder<'this>
     where
         Self: 'this;
 
-    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(PairValueEncoder::new(&mut self.values))
+    }
+
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.output.write(Value::Map(self.values));
+        Ok(())
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<O> StructEncoder for MapValueEncoder<O>
+where
+    O: ValueOutput,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type Field<'this> = PairValueEncoder<'this>
+    where
+        Self: 'this;
+
+    fn field<C>(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -471,18 +501,18 @@ impl<'a> PairValueEncoder<'a> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a> PairEncoder for PairValueEncoder<'a> {
+impl<'a> MapEntryEncoder for PairValueEncoder<'a> {
     type Ok = ();
     type Error = Error;
 
-    type First<'this> = ValueEncoder<&'this mut Value>
+    type MapKey<'this> = ValueEncoder<&'this mut Value>
     where
         Self: 'this;
 
-    type Second<'this> = ValueEncoder<&'this mut Value> where Self: 'this;
+    type MapValue<'this> = ValueEncoder<&'this mut Value> where Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -490,7 +520,44 @@ impl<'a> PairEncoder for PairValueEncoder<'a> {
     }
 
     #[inline]
-    fn second<C>(&mut self, _: &C) -> Result<Self::Second<'_>, C::Error>
+    fn map_value<C>(&mut self, _: &C) -> Result<Self::MapValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(ValueEncoder::new(&mut self.pair.1))
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.output.push(self.pair);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> StructFieldEncoder for PairValueEncoder<'a> {
+    type Ok = ();
+    type Error = Error;
+
+    type FieldName<'this> = ValueEncoder<&'this mut Value>
+    where
+        Self: 'this;
+
+    type FieldValue<'this> = ValueEncoder<&'this mut Value> where Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, _: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(ValueEncoder::new(&mut self.pair.0))
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, _: &C) -> Result<Self::FieldValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {

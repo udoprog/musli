@@ -7,11 +7,10 @@ use core::str;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, NumberHint, NumberVisitor, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
-    SizeHint, TypeHint, ValueVisitor, VariantDecoder, Visitor,
+    Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, NumberHint, NumberVisitor, PackDecoder,
+    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructPairsDecoder, TypeHint,
+    ValueVisitor, VariantDecoder, Visitor,
 };
-#[cfg(feature = "musli-value")]
-use musli::mode::Mode;
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};
@@ -57,9 +56,9 @@ where
             Token::OpenBrace => {
                 let mut object = JsonObjectDecoder::new(cx, None, self.parser)?;
 
-                while let Some(mut pair) = object.next(cx)? {
-                    pair.first(cx)?.skip_any(cx)?;
-                    pair.skip_second(cx)?;
+                while let Some(mut pair) = object.entry(cx)? {
+                    pair.map_key(cx)?.skip_any(cx)?;
+                    pair.skip_map_value(cx)?;
                 }
 
                 Ok(())
@@ -92,7 +91,7 @@ where
         C: Context<Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"true", Error::new(ErrorKind::ExpectedTrue))
+            .parse_exact(cx, *b"true", ErrorKind::ExpectedTrue)
     }
 
     #[inline]
@@ -101,7 +100,7 @@ where
         C: Context<Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"false", Error::new(ErrorKind::ExpectedFalse))
+            .parse_exact(cx, *b"false", ErrorKind::ExpectedFalse)
     }
 
     #[inline]
@@ -110,7 +109,7 @@ where
         C: Context<Input = Error>,
     {
         self.parser
-            .parse_exact(cx, *b"null", Error::new(ErrorKind::ExpectedNull))
+            .parse_exact(cx, *b"null", ErrorKind::ExpectedNull)
     }
 }
 
@@ -126,8 +125,10 @@ where
     type Sequence = JsonSequenceDecoder<P>;
     type Tuple = JsonSequenceDecoder<P>;
     type Map = JsonObjectDecoder<P>;
+    type MapPairs = JsonObjectDecoder<P>;
     type Some = JsonDecoder<P>;
     type Struct = JsonObjectDecoder<P>;
+    type StructPairs = JsonObjectDecoder<P>;
     type Variant = JsonVariantDecoder<P>;
 
     #[inline]
@@ -154,13 +155,12 @@ where
 
     #[cfg(feature = "musli-value")]
     #[inline]
-    fn decode_buffer<M, C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
+    fn decode_buffer<C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
     {
         use musli::de::Decode;
-        let value: musli_value::Value = Decode::<M>::decode(cx, self)?;
+        let value = musli_value::Value::decode(cx, self)?;
         Ok(value.into_value_decoder())
     }
 
@@ -438,11 +438,31 @@ where
     }
 
     #[inline]
-    fn decode_struct<C>(self, cx: &C, len: usize) -> Result<Self::Struct, C::Error>
+    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
-        JsonObjectDecoder::new(cx, Some(len), self.parser)
+        JsonObjectDecoder::new(cx, None, self.parser)
+    }
+
+    #[inline]
+    fn decode_struct<C>(self, cx: &C, len: Option<usize>) -> Result<Self::Struct, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        JsonObjectDecoder::new(cx, len, self.parser)
+    }
+
+    #[inline]
+    fn decode_struct_pairs<C>(
+        self,
+        cx: &C,
+        len: Option<usize>,
+    ) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        JsonObjectDecoder::new(cx, len, self.parser)
     }
 
     #[inline]
@@ -748,6 +768,7 @@ where
 
 pub struct JsonObjectDecoder<P> {
     first: bool,
+    completed: bool,
     len: Option<usize>,
     parser: P,
 }
@@ -773,19 +794,50 @@ where
 
         Ok(Self {
             first: true,
+            completed: false,
             len,
             parser,
         })
     }
+
+    fn parse_map_key<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Error>,
+    {
+        let first = mem::take(&mut self.first);
+
+        loop {
+            let token = self.parser.peek(cx)?;
+
+            if token.is_string() {
+                return Ok(true);
+            }
+
+            match token {
+                Token::Comma if !first => {
+                    self.parser.skip(cx, 1)?;
+                }
+                Token::CloseBrace => {
+                    self.parser.skip(cx, 1)?;
+                    return Ok(false);
+                }
+                token => {
+                    return Err(cx.message(format_args!(
+                        "Expected value, or closing brace `}}` but found {token:?}"
+                    )));
+                }
+            }
+        }
+    }
 }
 
-impl<'de, P> PairsDecoder<'de> for JsonObjectDecoder<P>
+impl<'de, P> MapDecoder<'de> for JsonObjectDecoder<P>
 where
     P: Parser<'de>,
 {
     type Error = Error;
 
-    type Decoder<'this> = JsonObjectPairDecoder<P::Mut<'this>>
+    type Entry<'this> = JsonObjectPairDecoder<P::Mut<'this>>
     where
         Self: 'this;
 
@@ -795,34 +847,15 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn entry<C>(&mut self, cx: &C) -> Result<Option<Self::Entry<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
-        let first = mem::take(&mut self.first);
-
-        loop {
-            let token = self.parser.peek(cx)?;
-
-            if token.is_string() {
-                return Ok(Some(JsonObjectPairDecoder::new(self.parser.borrow_mut())));
-            }
-
-            match token {
-                Token::Comma if !first => {
-                    self.parser.skip(cx, 1)?;
-                }
-                Token::CloseBrace => {
-                    self.parser.skip(cx, 1)?;
-                    return Ok(None);
-                }
-                token => {
-                    return Err(cx.message(format_args!(
-                        "Expected value, or closing brace `}}` but found {token:?}"
-                    )));
-                }
-            }
+        if !self.parse_map_key(cx)? {
+            return Ok(None);
         }
+
+        Ok(Some(JsonObjectPairDecoder::new(self.parser.borrow_mut())))
     }
 
     #[inline]
@@ -834,31 +867,20 @@ where
     }
 }
 
-pub struct JsonObjectPairDecoder<P> {
-    parser: P,
-}
-
-impl<P> JsonObjectPairDecoder<P> {
-    #[inline]
-    fn new(parser: P) -> Self {
-        Self { parser }
-    }
-}
-
-impl<'de, P> PairDecoder<'de> for JsonObjectPairDecoder<P>
+impl<'de, P> MapEntryDecoder<'de> for JsonObjectPairDecoder<P>
 where
     P: Parser<'de>,
 {
     type Error = Error;
 
-    type First<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type MapKey<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
 
-    type Second = JsonDecoder<P>;
+    type MapValue = JsonDecoder<P>;
 
     #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -866,7 +888,7 @@ where
     }
 
     #[inline]
-    fn second<C>(mut self, cx: &C) -> Result<Self::Second, C::Error>
+    fn map_value<C>(mut self, cx: &C) -> Result<Self::MapValue, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -881,7 +903,7 @@ where
     }
 
     #[inline]
-    fn skip_second<C>(mut self, cx: &C) -> Result<bool, C::Error>
+    fn skip_map_value<C>(mut self, cx: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -894,6 +916,214 @@ where
         self.parser.skip(cx, 1)?;
         JsonDecoder::new(self.parser.borrow_mut()).skip_any(cx)?;
         Ok(true)
+    }
+}
+
+impl<'de, P> MapPairsDecoder<'de> for JsonObjectDecoder<P>
+where
+    P: Parser<'de>,
+{
+    type Error = Error;
+
+    type MapPairsKey<'this> = JsonKeyDecoder<P::Mut<'this>>
+    where
+        Self: 'this;
+
+    type MapPairsValue<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, cx: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if !self.parse_map_key(cx)? {
+            self.completed = true;
+            return Ok(None);
+        }
+
+        Ok(Some(JsonKeyDecoder::new(self.parser.borrow_mut())))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let actual = self.parser.peek(cx)?;
+
+        if !matches!(actual, Token::Colon) {
+            return Err(cx.message(format_args!("Expected colon `:`, was {actual}")));
+        }
+
+        self.parser.skip(cx, 1)?;
+        Ok(JsonDecoder::new(self.parser.borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_map_pairs_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let actual = self.parser.peek(cx)?;
+
+        if !matches!(actual, Token::Colon) {
+            return Err(cx.message(format_args!("Expected colon `:`, was {actual}")));
+        }
+
+        self.parser.skip(cx, 1)?;
+        JsonDecoder::new(self.parser.borrow_mut()).skip_any(cx)?;
+        Ok(true)
+    }
+
+    #[inline]
+    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if !self.completed {
+            while self.parse_map_key(cx)? {
+                JsonKeyDecoder::new(self.parser.borrow_mut()).skip_any(cx)?;
+                self.skip_map_pairs_value(cx)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<'de, P> StructPairsDecoder<'de> for JsonObjectDecoder<P>
+where
+    P: Parser<'de>,
+{
+    type Error = Error;
+
+    type FieldName<'this> = JsonKeyDecoder<P::Mut<'this>>
+    where
+        Self: 'this;
+
+    type FieldValue<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if !self.parse_map_key(cx)? {
+            return Err(cx.message("Expected map key, but found closing brace `}`"));
+        }
+
+        Ok(JsonKeyDecoder::new(self.parser.borrow_mut()))
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let actual = self.parser.peek(cx)?;
+
+        if !matches!(actual, Token::Colon) {
+            return Err(cx.message(format_args!("Expected colon `:`, was {actual}")));
+        }
+
+        self.parser.skip(cx, 1)?;
+        Ok(JsonDecoder::new(self.parser.borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_field_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapPairsDecoder::skip_map_pairs_value(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapPairsDecoder::end(self, cx)
+    }
+}
+
+impl<'de, P> StructDecoder<'de> for JsonObjectDecoder<P>
+where
+    P: Parser<'de>,
+{
+    type Error = Error;
+
+    type Field<'this> = JsonObjectPairDecoder<P::Mut<'this>>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        MapDecoder::size_hint(self)
+    }
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::end(self, cx)
+    }
+}
+
+impl<'de, P> StructFieldDecoder<'de> for JsonObjectPairDecoder<P>
+where
+    P: Parser<'de>,
+{
+    type Error = Error;
+
+    type FieldName<'this> = JsonKeyDecoder<P::Mut<'this>>
+    where
+        Self: 'this;
+
+    type FieldValue = JsonDecoder<P>;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_key(self, cx)
+    }
+
+    #[inline]
+    fn field_value<C>(self, cx: &C) -> Result<Self::FieldValue, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_value(self, cx)
+    }
+
+    #[inline]
+    fn skip_field_value<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::skip_map_value(self, cx)
+    }
+}
+
+pub struct JsonObjectPairDecoder<P> {
+    parser: P,
+}
+
+impl<P> JsonObjectPairDecoder<P> {
+    #[inline]
+    fn new(parser: P) -> Self {
+        Self { parser }
     }
 }
 

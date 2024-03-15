@@ -143,7 +143,7 @@ pub trait Parser<'de>: private::Sealed {
         &mut self,
         cx: &C,
         exact: [u8; N],
-        err: Error,
+        err: ErrorKind,
     ) -> Result<(), C::Error>
     where
         C: Context<Input = Error>,
@@ -154,7 +154,7 @@ pub trait Parser<'de>: private::Sealed {
         self.read(cx, &mut bytes)?;
 
         if bytes != exact {
-            return Err(cx.marked_report(mark, err));
+            return Err(cx.marked_report(mark, Error::new(err)));
         }
 
         Ok(())

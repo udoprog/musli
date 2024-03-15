@@ -9,7 +9,7 @@ use std::io;
 
 use musli::de::Decode;
 use musli::en::Encode;
-use musli::mode::{DefaultMode, Mode};
+use musli::mode::DefaultMode;
 use musli::Context;
 
 use crate::de::SelfDecoder;
@@ -40,7 +40,6 @@ pub const DEFAULT: Encoding = Encoding::new();
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
-    Error: From<W::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -84,7 +83,6 @@ where
 pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
 where
     R: Reader<'de>,
-    Error: From<R::Error>,
     T: Decode<'de, DefaultMode>,
 {
     DEFAULT.decode(reader)
@@ -142,32 +140,23 @@ impl Encoding<DefaultMode> {
     }
 }
 
-impl<M, const F: Options> Encoding<M, F>
-where
-    M: Mode,
-{
+impl<M, const F: Options> Encoding<M, F> {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T>
-    where
-        T: Mode,
-    {
+    pub const fn with_mode<T>(self) -> Encoding<T> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
-    musli_common::encoding_impls!(SelfEncoder::<_, F>::new, SelfDecoder::<_, F>::new);
-    musli_common::encoding_from_slice_impls!(SelfDecoder::<_, F>::new);
+    musli_common::encoding_impls!(M, SelfEncoder::<_, F>::new, SelfDecoder::<_, F>::new);
+    musli_common::encoding_from_slice_impls!(M, SelfDecoder::<_, F>::new);
 }
 
-impl<M> Clone for Encoding<M>
-where
-    M: Mode,
-{
+impl<M, const F: Options> Clone for Encoding<M, F> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<M> Copy for Encoding<M> where M: Mode {}
+impl<M, const F: Options> Copy for Encoding<M, F> {}

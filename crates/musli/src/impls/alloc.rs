@@ -20,35 +20,28 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use crate::de::{
-    Decode, Decoder, PairDecoder, PairsDecoder, SequenceDecoder, TraceDecode, ValueVisitor,
+    Decode, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder, TraceDecode, ValueVisitor,
 };
-use crate::en::{Encode, Encoder, PairEncoder, PairsEncoder, SequenceEncoder, TraceEncode};
+use crate::en::{Encode, Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, TraceEncode};
 use crate::internal::size_hint;
-use crate::mode::Mode;
 use crate::Context;
 
-impl<M> Encode<M> for String
-where
-    M: Mode,
-{
+impl<M> Encode<M> for String {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_str(), cx, encoder)
+        self.as_str().encode(cx, encoder)
     }
 }
 
-impl<'de, M> Decode<'de, M> for String
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for String {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
         struct Visitor;
@@ -84,58 +77,47 @@ where
     }
 }
 
-impl<M> Encode<M> for Box<str>
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Box<str> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_ref(), cx, encoder)
+        self.as_ref().encode(cx, encoder)
     }
 }
 
-impl<'de, M> Decode<'de, M> for Box<str>
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Box<str> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
-        Ok(<String as Decode<M>>::decode(cx, decoder)?.into())
+        let string: String = cx.decode(decoder)?;
+        Ok(string.into())
     }
 }
 
 macro_rules! cow {
     ($ty:ty, $source:ty, $decode:ident, $cx:pat, |$owned:ident| $owned_expr:expr, |$borrowed:ident| $borrowed_expr:expr, |$reference:ident| $reference_expr:expr) => {
-        impl<M> Encode<M> for Cow<'_, $ty>
-        where
-            M: Mode,
-        {
+        impl<M> Encode<M> for Cow<'_, $ty> {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<Mode = M, Input = E::Error>,
                 E: Encoder,
             {
-                Encode::<M>::encode(self.as_ref(), cx, encoder)
+                self.as_ref().encode(cx, encoder)
             }
         }
 
-        impl<'de, M> Decode<'de, M> for Cow<'de, $ty>
-        where
-            M: Mode,
-        {
+        impl<'de, M> Decode<'de, M> for Cow<'de, $ty> {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<Mode = M, Input = D::Error>,
                 D: Decoder<'de>,
             {
                 struct Visitor;
@@ -208,14 +190,13 @@ macro_rules! sequence {
     ) => {
         impl<M, T $(, $extra)*> Encode<M> for $ty<T $(, $extra)*>
         where
-            M: Mode,
             T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<Mode = M, Input = E::Error>,
                 E: Encoder,
             {
                 let mut seq = encoder.encode_sequence(cx, self.len())?;
@@ -236,14 +217,13 @@ macro_rules! sequence {
 
         impl<'de, M, T $(, $extra)*> Decode<'de, M> for $ty<T $(, $extra)*>
         where
-            M: Mode,
             T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<Mode = M, Input = D::Error>,
                 D: Decoder<'de>,
             {
                 let mut $access = decoder.decode_sequence(cx)?;
@@ -299,7 +279,6 @@ macro_rules! map {
     ) => {
         impl<'de, M, K, V $(, $extra)*> Encode<M> for $ty<K, V $(, $extra)*>
         where
-            M: Mode,
             K: Encode<M>,
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
@@ -307,17 +286,15 @@ macro_rules! map {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<Mode = M, Input = E::Error>,
                 E: Encoder,
             {
                 let mut map = encoder.encode_map(cx, self.len())?;
 
                 for (k, v) in self {
-                    let mut entry = map.next(cx)?;
-                    let first = entry.first(cx)?;
-                    k.encode(cx, first)?;
-                    let second = entry.second(cx)?;
-                    v.encode(cx, second)?;
+                    let mut entry = map.entry(cx)?;
+                    k.encode(cx, entry.map_key(cx)?)?;
+                    v.encode(cx, entry.map_value(cx)?)?;
                     entry.end(cx)?;
                 }
 
@@ -327,7 +304,6 @@ macro_rules! map {
 
         impl<'de, M, K, V $(, $extra)*> TraceEncode<M> for $ty<K, V $(, $extra)*>
         where
-            M: Mode,
             K: fmt::Display + Encode<M>,
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
@@ -335,18 +311,16 @@ macro_rules! map {
             #[inline]
             fn trace_encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<Mode = M, Input = E::Error>,
                 E: Encoder,
             {
                 let mut map = encoder.encode_map(cx, self.len())?;
 
                 for (k, v) in self {
                     cx.enter_map_key(k);
-                    let mut entry = map.next(cx)?;
-                    let first = entry.first(cx)?;
-                    k.encode(cx, first)?;
-                    let second = entry.second(cx)?;
-                    v.encode(cx, second)?;
+                    let mut entry = map.entry(cx)?;
+                    k.encode(cx, entry.map_key(cx)?)?;
+                    v.encode(cx, entry.map_value(cx)?)?;
                     entry.end(cx)?;
                     cx.leave_map_key();
                 }
@@ -357,7 +331,6 @@ macro_rules! map {
 
         impl<'de, K, V, M $(, $extra)*> Decode<'de, M> for $ty<K, V $(, $extra)*>
         where
-            M: Mode,
             K: Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
@@ -365,15 +338,15 @@ macro_rules! map {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<Mode = M, Input = D::Error>,
                 D: Decoder<'de>,
             {
                 let mut $access = decoder.decode_map(cx)?;
                 let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.next(cx)? {
-                    let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
-                    let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
+                while let Some(mut entry) = $access.entry(cx)? {
+                    let key = entry.map_key(cx).and_then(|key| cx.decode(key))?;
+                    let value = entry.map_value(cx).and_then(|value| cx.decode(value))?;
                     out.insert(key, value);
                 }
 
@@ -384,7 +357,6 @@ macro_rules! map {
 
         impl<'de, K, V, M $(, $extra)*> TraceDecode<'de, M> for $ty<K, V $(, $extra)*>
         where
-            M: Mode,
             K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
@@ -392,16 +364,16 @@ macro_rules! map {
             #[inline]
             fn trace_decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<Mode = M, Input = D::Error>,
                 D: Decoder<'de>,
             {
                 let mut $access = decoder.decode_map(cx)?;
                 let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.next(cx)? {
-                    let key = entry.first(cx).and_then(|key| K::decode(cx, key))?;
+                while let Some(mut entry) = $access.entry(cx)? {
+                    let key = entry.map_key(cx).and_then(|key| cx.decode(key))?;
                     cx.enter_map_key(&key);
-                    let value = entry.second(cx).and_then(|value| V::decode(cx, value))?;
+                    let value = entry.map_value(cx).and_then(|value| cx.decode(value))?;
                     out.insert(key, value);
                     cx.leave_map_key();
                 }
@@ -422,28 +394,22 @@ map!(
     HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default())
 );
 
-impl<M> Encode<M> for CString
-where
-    M: Mode,
-{
+impl<M> Encode<M> for CString {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
         encoder.encode_bytes(cx, self.to_bytes_with_nul())
     }
 }
 
-impl<'de, M> Decode<'de, M> for CString
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for CString {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
         struct Visitor;
@@ -485,31 +451,29 @@ macro_rules! smart_pointer {
     ($ty:ident) => {
         impl<M, T> Encode<M> for $ty<T>
         where
-            M: Mode,
             T: Encode<M>,
         {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<Mode = M, Input = E::Error>,
                 E: Encoder,
             {
-                Encode::<M>::encode(&**self, cx, encoder)
+                (**self).encode(cx, encoder)
             }
         }
 
         impl<'de, M, T> Decode<'de, M> for $ty<T>
         where
-            M: Mode,
             T: Decode<'de, M>,
         {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<Mode = M, Input = D::Error>,
                 D: Decoder<'de>,
             {
-                Ok($ty::new(Decode::<M>::decode(cx, decoder)?))
+                Ok($ty::new(cx.decode(decoder)?))
             }
         }
     };
@@ -520,22 +484,19 @@ smart_pointer!(Rc);
 
 #[cfg(feature = "std")]
 #[derive(Encode, Decode)]
-#[musli(crate = crate)]
+#[musli(crate)]
 enum Tag {
     Unix,
     Windows,
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for OsStr
-where
-    M: Mode,
-{
+impl<M> Encode<M> for OsStr {
     #[cfg(unix)]
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
         use std::os::unix::ffi::OsStrExt;
@@ -543,10 +504,8 @@ where
         use crate::en::VariantEncoder;
 
         let mut variant = encoder.encode_variant(cx)?;
-        let tag = variant.tag(cx)?;
-        Encode::<M>::encode(&Tag::Unix, cx, tag)?;
-        let value = variant.variant(cx)?;
-        Encode::<M>::encode(self.as_bytes(), cx, value)?;
+        Tag::Unix.encode(cx, variant.tag(cx)?)?;
+        self.as_bytes().encode(cx, variant.variant(cx)?)?;
         variant.end(cx)
     }
 
@@ -554,7 +513,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
         use crate::en::VariantEncoder;
@@ -564,7 +523,7 @@ where
         let mut variant = encoder.encode_variant(cx)?;
         let tag = variant.tag(cx)?;
 
-        Encode::<M>::encode(&Tag::Windows, cx, tag)?;
+        Tag::Windows.encode(cx, tag)?;
 
         let Some(mut buf) = cx.alloc() else {
             return Err(cx.message("Failed to allocate buffer"));
@@ -576,36 +535,29 @@ where
             }
         }
 
-        let value = variant.variant(cx)?;
-        Encode::<M>::encode(buf.as_slice(), cx, value)?;
+        buf.as_slice().encode(cx, variant.variant(cx)?)?;
         variant.end(cx)
     }
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for OsString
-where
-    M: Mode,
-{
+impl<M> Encode<M> for OsString {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_os_str(), cx, encoder)
+        self.as_os_str().encode(cx, encoder)
     }
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<'de, M> Decode<'de, M> for OsString
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for OsString {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
         use crate::de::VariantDecoder;
@@ -613,7 +565,7 @@ where
         let mut variant = decoder.decode_variant(cx)?;
 
         let tag = variant.tag(cx)?;
-        let tag = Decode::<M>::decode(cx, tag)?;
+        let tag = cx.decode(tag)?;
 
         match tag {
             #[cfg(not(unix))]
@@ -621,8 +573,7 @@ where
             #[cfg(unix)]
             Tag::Unix => {
                 use std::os::unix::ffi::OsStringExt;
-                let value = variant.variant(cx)?;
-                let bytes = Decode::<M>::decode(cx, value)?;
+                let bytes = cx.decode(variant.variant(cx)?)?;
                 variant.end(cx)?;
                 Ok(OsString::from_vec(bytes))
             }
@@ -671,46 +622,38 @@ where
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for PathBuf
-where
-    M: Mode,
-{
+impl<M> Encode<M> for PathBuf {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_path(), cx, encoder)
+        self.as_path().encode(cx, encoder)
     }
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for Path
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Path {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
-        Encode::<M>::encode(self.as_os_str(), cx, encoder)
+        self.as_os_str().encode(cx, encoder)
     }
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<'de, M> Decode<'de, M> for PathBuf
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for PathBuf {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
-        Ok(PathBuf::from(<OsString as Decode<M>>::decode(cx, decoder)?))
+        let string: OsString = cx.decode(decoder)?;
+        Ok(PathBuf::from(string))
     }
 }

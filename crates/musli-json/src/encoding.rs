@@ -13,7 +13,7 @@ use std::io;
 
 use musli::de::Decode;
 use musli::en::Encode;
-use musli::mode::{DefaultMode, Mode};
+use musli::mode::DefaultMode;
 use musli::Context;
 
 use crate::de::JsonDecoder;
@@ -32,7 +32,6 @@ pub const DEFAULT: Encoding = Encoding::new();
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
-    Error: From<W::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -45,7 +44,6 @@ where
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: io::Write,
-    Error: From<io::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.to_writer(writer, value)
@@ -124,16 +122,13 @@ impl Encoding<DefaultMode> {
     ///
     /// ```rust
     /// use musli_json::Encoding;
-    /// use musli::{Encode, Decode, Mode};
+    /// use musli::{Encode, Decode};
     ///
     /// const CONFIG: Encoding<Json> = Encoding::new().with_mode();
     ///
     /// // Mode marker indicating that some attributes should
     /// // only apply when we're decoding in a JSON mode.
     /// enum Json {}
-    ///
-    /// impl Mode for Json {
-    /// }
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
     /// #[musli(mode = Json, default_field_name = "name")]
@@ -163,15 +158,9 @@ impl Encoding<DefaultMode> {
     }
 }
 
-impl<M> Encoding<M>
-where
-    M: Mode,
-{
+impl<M> Encoding<M> {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T>
-    where
-        T: Mode,
-    {
+    pub const fn with_mode<T>(self) -> Encoding<T> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -185,12 +174,11 @@ where
     #[inline]
     pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         W: Writer,
-        Error: From<W::Error>,
         T: ?Sized + Encode<M>,
     {
-        T::encode(value, cx, JsonEncoder::<M, _>::new(writer))
+        T::encode(value, cx, JsonEncoder::new(writer))
     }
 
     /// Encode the given value to a [`String`] using the current configuration.
@@ -214,11 +202,11 @@ where
     #[inline]
     pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
-        T::encode(value, cx, JsonEncoder::<M, _>::new(&mut data))?;
+        T::encode(value, cx, JsonEncoder::new(&mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }
@@ -245,7 +233,7 @@ where
     #[inline]
     pub fn decode_with<'de, C, P, T>(self, cx: &C, parser: P) -> Result<T, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
@@ -270,7 +258,7 @@ where
     #[inline]
     pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         T: Decode<'de, M>,
     {
         self.from_slice_with(cx, string.as_bytes())
@@ -285,7 +273,7 @@ where
     {
         let mut buf = musli_common::allocator::buffer();
         let alloc = musli_common::allocator::new(&mut buf);
-        let cx = musli_common::context::Same::new(&alloc);
+        let cx = musli_common::context::Same::<_, M, _>::new(&alloc);
         self.from_slice_with(&cx, bytes)
     }
 
@@ -297,14 +285,14 @@ where
     #[inline]
     pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context<Mode = M, Input = Error>,
         T: Decode<'de, M>,
     {
         let mut reader = SliceParser::new(bytes);
         T::decode(cx, JsonDecoder::new(&mut reader))
     }
 
-    musli_common::encode_with_extensions!();
+    musli_common::encode_with_extensions!(M);
 }
 
 impl<M> Clone for Encoding<M> {

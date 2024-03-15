@@ -2,15 +2,14 @@
 #[doc(hidden)]
 #[macro_export]
 macro_rules! encode_with_extensions {
-    () => {
+    ($mode:ident) => {
         /// Encode the given value to the given [Writer] using the current
         /// configuration.
         #[inline]
         pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), Error>
         where
             W: Writer,
-            Error: From<W::Error>,
-            T: ?Sized + Encode<M>,
+            T: ?Sized + Encode<$mode>,
         {
             let mut buf = musli_common::allocator::buffer();
             let alloc = musli_common::allocator::new(&mut buf);
@@ -25,8 +24,7 @@ macro_rules! encode_with_extensions {
         pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), Error>
         where
             W: io::Write,
-            Error: From<io::Error>,
-            T: ?Sized + Encode<M>,
+            T: ?Sized + Encode<$mode>,
         {
             let mut writer = $crate::wrap::wrap(write);
             self.encode(&mut writer, value)
@@ -37,7 +35,7 @@ macro_rules! encode_with_extensions {
         #[inline]
         pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, Error>
         where
-            T: ?Sized + Encode<M>,
+            T: ?Sized + Encode<$mode>,
         {
             let mut vec = Vec::new();
             self.encode(&mut vec, value)?;
@@ -52,8 +50,8 @@ macro_rules! encode_with_extensions {
         #[inline]
         pub fn to_vec_with<C, T>(self, cx: &C, value: &T) -> Result<Vec<u8>, C::Error>
         where
-            C: Context<Input = Error>,
-            T: ?Sized + Encode<M>,
+            C: Context<Mode = $mode, Input = Error>,
+            T: ?Sized + Encode<$mode>,
         {
             let mut vec = Vec::new();
             self.encode_with(cx, &mut vec, value)?;
@@ -65,7 +63,7 @@ macro_rules! encode_with_extensions {
         #[inline]
         pub fn to_fixed_bytes<const N: usize, T>(self, value: &T) -> Result<FixedBytes<N>, Error>
         where
-            T: ?Sized + Encode<M>,
+            T: ?Sized + Encode<$mode>,
         {
             let mut buf = musli_common::allocator::buffer();
             let alloc = musli_common::allocator::new(&mut buf);
@@ -82,8 +80,8 @@ macro_rules! encode_with_extensions {
             value: &T,
         ) -> Result<FixedBytes<N>, C::Error>
         where
-            C: Context<Input = Error>,
-            T: ?Sized + Encode<M>,
+            C: Context<Mode = $mode, Input = Error>,
+            T: ?Sized + Encode<$mode>,
         {
             let mut bytes = FixedBytes::new();
             self.encode_with(cx, &mut bytes, value)?;
@@ -96,19 +94,18 @@ macro_rules! encode_with_extensions {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! encoding_from_slice_impls {
-    ($decoder_new:path) => {
+    ($mode:ident, $decoder_new:path) => {
         /// Decode the given type `T` from the given slice using the current
         /// configuration.
         #[inline]
         pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
         where
-            T: Decode<'de, M>,
+            T: Decode<'de, $mode>,
         {
             let mut buf = musli_common::allocator::buffer();
             let alloc = musli_common::allocator::new(&mut buf);
             let cx = musli_common::context::Same::new(&alloc);
-            let reader = SliceReader::new(bytes);
-            T::decode(&cx, $decoder_new(reader))
+            self.from_slice_with(&cx, bytes)
         }
 
         /// Decode the given type `T` from the given slice using the current
@@ -119,11 +116,11 @@ macro_rules! encoding_from_slice_impls {
         #[inline]
         pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
-            C: Context<Input = Error>,
-            T: Decode<'de, M>,
+            C: Context<Mode = $mode, Input = Error>,
+            T: Decode<'de, $mode>,
         {
             let reader = SliceReader::new(bytes);
-            T::decode(cx, $decoder_new(reader))
+            self.decode_with(cx, reader)
         }
     };
 }
@@ -132,7 +129,7 @@ macro_rules! encoding_from_slice_impls {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! encoding_impls {
-    ($encoder_new:path, $decoder_new:path) => {
+    ($mode:ident, $encoder_new:path, $decoder_new:path) => {
         /// Encode the given value to the given [`Writer`] using the current
         /// configuration.
         ///
@@ -141,10 +138,9 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
         where
-            C: Context<Input = Error>,
+            C: Context<Mode = $mode, Input = Error>,
             W: Writer,
-            Error: From<W::Error>,
-            T: ?Sized + Encode<M>,
+            T: ?Sized + Encode<$mode>,
         {
             T::encode(value, cx, $encoder_new(writer))
         }
@@ -157,10 +153,9 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn decode_with<'de, C, R, T>(self, cx: &C, reader: R) -> Result<T, C::Error>
         where
-            C: Context<Input = Error>,
+            C: Context<Mode = $mode, Input = Error>,
             R: Reader<'de>,
-            Error: From<R::Error>,
-            T: Decode<'de, M>,
+            T: Decode<'de, $mode>,
         {
             T::decode(cx, $decoder_new(reader))
         }
@@ -171,8 +166,7 @@ macro_rules! encoding_impls {
         pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
             R: Reader<'de>,
-            Error: From<R::Error>,
-            T: Decode<'de, M>,
+            T: Decode<'de, $mode>,
         {
             let mut buf = musli_common::allocator::buffer();
             let alloc = musli_common::allocator::new(&mut buf);
@@ -180,6 +174,6 @@ macro_rules! encoding_impls {
             self.decode_with(&cx, reader)
         }
 
-        $crate::encode_with_extensions!();
+        $crate::encode_with_extensions!($mode);
     };
 }

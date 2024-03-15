@@ -106,7 +106,6 @@ pub mod zerocopy_store {
                     zerocopy, $id,
                     #[inline(never)]
                     pub fn $id<'buf>(out: &'buf mut [u8; size_of::<$ty>()], value: &$ty) -> &'buf [u8] {
-                        let bytes = value.as_bytes();
                         out.copy_from_slice(value.as_bytes());
                         out
                     }

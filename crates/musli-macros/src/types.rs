@@ -22,18 +22,21 @@ pub(super) enum Extra {
     Visitor(Option<Ty>),
 }
 
-pub(super) const ENCODER_TYPES: [(&str, Extra); 8] = [
+pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
     ("Error", Extra::None),
     ("Some", Extra::None),
     ("Pack", Extra::Context),
     ("Sequence", Extra::None),
     ("Tuple", Extra::None),
     ("Map", Extra::None),
+    ("MapPairs", Extra::None),
     ("Struct", Extra::None),
     ("Variant", Extra::None),
+    ("TupleVariant", Extra::None),
+    ("StructVariant", Extra::None),
 ];
 
-pub(super) const DECODER_TYPES: [(&str, Extra); 9] = [
+pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("Error", Extra::None),
     ("Buffer", Extra::None),
     ("Some", Extra::None),
@@ -41,11 +44,13 @@ pub(super) const DECODER_TYPES: [(&str, Extra); 9] = [
     ("Sequence", Extra::None),
     ("Tuple", Extra::None),
     ("Map", Extra::None),
+    ("MapPairs", Extra::None),
     ("Struct", Extra::None),
+    ("StructPairs", Extra::None),
     ("Variant", Extra::None),
 ];
 
-pub(super) const VISITOR_TYPES: [(&str, Extra); 3] = [
+pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("String", Extra::Visitor(Some(Ty::Str))),
     ("Bytes", Extra::Visitor(Some(Ty::Bytes))),
     ("Number", Extra::Visitor(None)),

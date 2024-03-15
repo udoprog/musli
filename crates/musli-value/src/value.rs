@@ -12,15 +12,13 @@ use alloc::vec::Vec;
 use musli::de::{AsDecoder, Decode, Decoder, NumberHint, NumberVisitor, TypeHint, Visitor};
 #[cfg(feature = "alloc")]
 use musli::de::{
-    PairDecoder, PairsDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
+    MapDecoder, MapEntryDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
 };
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
-use musli::en::{PairsEncoder, SequenceEncoder, VariantEncoder};
-use musli::mode::Mode;
+use musli::en::{MapEncoder, SequenceEncoder, VariantEncoder};
 use musli::Context;
 use musli_common::options::Options;
-use musli_common::reader::SliceUnderflow;
 
 use crate::de::ValueDecoder;
 use crate::error::ErrorKind;
@@ -89,7 +87,7 @@ impl Value {
     #[inline]
     pub fn into_value_decoder<const F: Options, E>(self) -> AsValueDecoder<F, E>
     where
-        E: musli::error::Error + From<ErrorKind>,
+        E: From<ErrorKind>,
     {
         AsValueDecoder::new(self)
     }
@@ -98,7 +96,7 @@ impl Value {
     #[inline]
     pub(crate) fn decoder<const F: Options, E>(&self) -> ValueDecoder<'_, F, E>
     where
-        E: musli::error::Error + From<ErrorKind>,
+        E: From<ErrorKind>,
     {
         ValueDecoder::new(self)
     }
@@ -162,10 +160,7 @@ from!(isize, Isize);
 from!(f32, F32);
 from!(f64, F64);
 
-impl<M> Encode<M> for Number
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Number {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
         C: Context<Input = E::Error>,
@@ -212,14 +207,10 @@ impl Number {
     }
 }
 
-struct AnyVisitor<M, E>(marker::PhantomData<(M, E)>);
+struct AnyVisitor<E>(marker::PhantomData<E>);
 
 #[musli::visitor]
-impl<'de, M, E> Visitor<'de> for AnyVisitor<M, E>
-where
-    M: Mode,
-    E: musli::error::Error,
-{
+impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
     type Ok = Value;
     type Error = E;
 
@@ -379,9 +370,7 @@ where
         D: Decoder<'de, Error = Self::Error>,
     {
         match decoder {
-            Some(decoder) => Ok(Value::Option(Some(Box::new(Decode::<M>::decode(
-                cx, decoder,
-            )?)))),
+            Some(decoder) => Ok(Value::Option(Some(Box::new(Value::decode(cx, decoder)?)))),
             None => Ok(Value::Option(None)),
         }
     }
@@ -396,7 +385,7 @@ where
         let mut out = Vec::with_capacity(seq.size_hint().or_default());
 
         while let Some(item) = seq.next(cx)? {
-            out.push(Decode::<M>::decode(cx, item)?);
+            out.push(Value::decode(cx, item)?);
         }
 
         seq.end(cx)?;
@@ -408,15 +397,13 @@ where
     fn visit_map<C, D>(self, cx: &C, mut map: D) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
-        D: PairsDecoder<'de, Error = Self::Error>,
+        D: MapDecoder<'de, Error = Self::Error>,
     {
         let mut out = Vec::with_capacity(map.size_hint().or_default());
 
-        while let Some(mut item) = map.next(cx)? {
-            let first = item.first(cx)?;
-            let first = Decode::<M>::decode(cx, first)?;
-            let second = item.second(cx)?;
-            let second = Decode::<M>::decode(cx, second)?;
+        while let Some(mut entry) = map.entry(cx)? {
+            let first = Value::decode(cx, entry.map_key(cx)?)?;
+            let second = Value::decode(cx, entry.map_value(cx)?)?;
             out.push((first, second));
         }
 
@@ -458,25 +445,20 @@ where
         C: Context<Input = Self::Error>,
         D: VariantDecoder<'de, Error = Self::Error>,
     {
-        let first = variant.tag(cx)?;
-        let first = Decode::<M>::decode(cx, first)?;
-        let second = variant.variant(cx)?;
-        let second = Decode::<M>::decode(cx, second)?;
+        let first = cx.decode(variant.tag(cx)?)?;
+        let second = cx.decode(variant.variant(cx)?)?;
         variant.end(cx)?;
         Ok(Value::Variant(Box::new((first, second))))
     }
 }
 
-impl<'de, M> Decode<'de, M> for Value
-where
-    M: Mode,
-{
+impl<'de, M> Decode<'de, M> for Value {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>,
     {
-        decoder.decode_any(cx, AnyVisitor::<M, D::Error>(marker::PhantomData))
+        decoder.decode_any(cx, AnyVisitor::<D::Error>(marker::PhantomData))
     }
 }
 
@@ -617,20 +599,17 @@ where
     }
 }
 
-impl<M> Encode<M> for Value
-where
-    M: Mode,
-{
+impl<M> Encode<M> for Value {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
+        C: Context<Mode = M, Input = E::Error>,
         E: Encoder,
     {
         match self {
             Value::Unit => encoder.encode_unit(cx),
             Value::Bool(b) => encoder.encode_bool(cx, *b),
             Value::Char(c) => encoder.encode_char(cx, *c),
-            Value::Number(n) => Encode::<M>::encode(n, cx, encoder),
+            Value::Number(n) => n.encode(cx, encoder),
             #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => encoder.encode_bytes(cx, bytes),
             #[cfg(feature = "alloc")]
@@ -641,7 +620,7 @@ where
 
                 for value in values {
                     let next = sequence.next(cx)?;
-                    Encode::<M>::encode(value, cx, next)?;
+                    value.encode(cx, next)?;
                 }
 
                 sequence.end(cx)
@@ -651,7 +630,7 @@ where
                 let mut map = encoder.encode_map(cx, values.len())?;
 
                 for (first, second) in values {
-                    map.insert::<M, _, _, _>(cx, first, second)?;
+                    map.insert_entry(cx, first, second)?;
                 }
 
                 map.end(cx)
@@ -660,13 +639,13 @@ where
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;
                 let encoder = encoder.encode_variant(cx)?;
-                encoder.insert::<M, _, _, _>(cx, tag, variant)
+                encoder.insert_variant(cx, tag, variant)
             }
             #[cfg(feature = "alloc")]
             Value::Option(option) => match option {
                 Some(value) => {
                     let encoder = encoder.encode_some(cx)?;
-                    Encode::<M>::encode(&**value, cx, encoder)
+                    value.encode(cx, encoder)
                 }
                 None => encoder.encode_none(cx),
             },
@@ -691,9 +670,9 @@ impl<const F: Options, E> AsValueDecoder<F, E> {
     }
 }
 
-impl<const F: Options, E> AsDecoder for AsValueDecoder<F, E>
+impl<const F: Options, E: 'static> AsDecoder for AsValueDecoder<F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;

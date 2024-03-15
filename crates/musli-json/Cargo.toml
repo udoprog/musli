@@ -3,7 +3,7 @@ name = "musli-json"
 version = "0.0.96"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.73"
+rust-version = "1.76"
 description = """
 JSON support for Müsli.
 """
@@ -12,8 +12,8 @@ readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no_std", "serialization"]
-categories = ["no-std", "encoding"]
+keywords = ["no-std::no-alloc", "no_std", "serialization"]
+categories = ["encoding", "no-std"]
 
 [features]
 default = ["std", "simdutf8", "musli-value", "parse-full"]

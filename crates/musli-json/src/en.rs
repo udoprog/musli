@@ -1,45 +1,44 @@
-use core::{fmt, marker};
+use core::fmt;
 
-use musli::en::{Encoder, PairEncoder, PairsEncoder, SequenceEncoder, VariantEncoder};
-use musli::mode::Mode;
-use musli::Context;
+use musli::en::{
+    Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    StructFieldEncoder, VariantEncoder,
+};
+use musli::{Context, Encode};
 use musli_common::writer::Writer;
 
 use crate::error::Error;
 
 /// A JSON encoder for Müsli.
-pub struct JsonEncoder<M, W> {
+pub struct JsonEncoder<W> {
     writer: W,
-    _marker: marker::PhantomData<M>,
 }
 
-impl<M, W> JsonEncoder<M, W> {
+impl<W> JsonEncoder<W> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(writer: W) -> Self {
-        Self {
-            writer,
-            _marker: marker::PhantomData,
-        }
+        Self { writer }
     }
 }
 
 #[musli::encoder]
-impl<M, W> Encoder for JsonEncoder<M, W>
+impl<W> Encoder for JsonEncoder<W>
 where
-    M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Error = Error;
     type Ok = ();
-    type Pack<'this, C> = JsonArrayEncoder<M, W> where C: 'this + Context;
+    type Pack<'this, C> = JsonArrayEncoder<W> where C: 'this + Context;
     type Some = Self;
-    type Sequence = JsonArrayEncoder<M, W>;
-    type Tuple = JsonArrayEncoder<M, W>;
-    type Map = JsonObjectEncoder<M, W>;
-    type Struct = JsonObjectEncoder<M, W>;
-    type Variant = JsonVariantEncoder<M, W>;
+    type Sequence = JsonArrayEncoder<W>;
+    type Tuple = JsonArrayEncoder<W>;
+    type Map = JsonObjectEncoder<W>;
+    type MapPairs = JsonObjectEncoder<W>;
+    type Struct = JsonObjectEncoder<W>;
+    type Variant = JsonVariantEncoder<W>;
+    type TupleVariant = JsonArrayEncoder<W>;
+    type StructVariant = JsonObjectEncoder<W>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -51,7 +50,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_bytes(cx.adapt(), b"null")
+        self.writer.write_bytes(cx, b"null")
     }
 
     #[inline]
@@ -60,7 +59,7 @@ where
         C: Context<Input = Self::Error>,
     {
         self.writer
-            .write_bytes(cx.adapt(), if value { b"true" } else { b"false" })
+            .write_bytes(cx, if value { b"true" } else { b"false" })
     }
 
     #[inline]
@@ -81,8 +80,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -91,8 +89,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -101,8 +98,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -111,8 +107,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -121,8 +116,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -131,8 +125,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -141,8 +134,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -151,8 +143,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -161,8 +152,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -171,8 +161,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -181,8 +170,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -191,8 +179,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = itoa::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -201,8 +188,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = ryu::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -211,8 +197,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mut buffer = ryu::Buffer::new();
-        self.writer
-            .write_bytes(cx.adapt(), buffer.format(value).as_bytes())
+        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
@@ -232,20 +217,18 @@ where
         let mut it = bytes.iter();
         let last = it.next_back();
 
-        self.writer.write_byte(cx.adapt(), b'[')?;
+        self.writer.write_byte(cx, b'[')?;
 
         for b in it {
-            self.writer
-                .write_bytes(cx.adapt(), buf.format(*b).as_bytes())?;
-            self.writer.write_byte(cx.adapt(), b',')?;
+            self.writer.write_bytes(cx, buf.format(*b).as_bytes())?;
+            self.writer.write_byte(cx, b',')?;
         }
 
         if let Some(b) = last {
-            self.writer
-                .write_bytes(cx.adapt(), buf.format(*b).as_bytes())?;
+            self.writer.write_bytes(cx, buf.format(*b).as_bytes())?;
         }
 
-        self.writer.write_byte(cx.adapt(), b']')?;
+        self.writer.write_byte(cx, b']')?;
         Ok(())
     }
 
@@ -254,11 +237,11 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        let mut seq = JsonArrayEncoder::<M, _>::new(cx, self.writer)?;
+        let mut seq = JsonArrayEncoder::<_>::new(cx, self.writer)?;
 
         for bb in bytes {
             for b in *bb {
-                seq.push::<M, _, _>(cx, b)?;
+                seq.push(cx, b)?;
             }
         }
 
@@ -322,6 +305,14 @@ where
     }
 
     #[inline]
+    fn encode_map_pairs<C>(self, cx: &C, _: usize) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        JsonObjectEncoder::new(cx, self.writer)
+    }
+
+    #[inline]
     fn encode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -336,57 +327,95 @@ where
     {
         JsonVariantEncoder::new(cx, self.writer)
     }
+
+    #[inline]
+    fn encode_tuple_variant<C, T>(
+        mut self,
+        cx: &C,
+        tag: &T,
+        _: usize,
+    ) -> Result<Self::TupleVariant, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: ?Sized + Encode<C::Mode>,
+    {
+        self.writer.write_byte(cx, b'{')?;
+        tag.encode(cx, JsonObjectKeyEncoder::new(self.writer.borrow_mut()))?;
+        self.writer.write_byte(cx, b':')?;
+        JsonArrayEncoder::with_variant(cx, self.writer, true)
+    }
+
+    #[inline]
+    fn encode_struct_variant<C, T>(
+        mut self,
+        cx: &C,
+        tag: &T,
+        _: usize,
+    ) -> Result<Self::StructVariant, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: ?Sized + Encode<C::Mode>,
+    {
+        self.writer.write_byte(cx, b'{')?;
+        tag.encode(cx, JsonObjectKeyEncoder::new(self.writer.borrow_mut()))?;
+        self.writer.write_byte(cx, b':')?;
+        JsonObjectEncoder::with_variant(cx, self.writer, true)
+    }
 }
 
 /// Encoder for a pairs sequence.
-pub struct JsonObjectEncoder<M, W> {
+pub struct JsonObjectEncoder<W> {
     len: usize,
+    variant: bool,
     writer: W,
-    _marker: marker::PhantomData<M>,
 }
 
-impl<M, W> JsonObjectEncoder<M, W>
+impl<W> JsonObjectEncoder<W>
 where
     W: Writer,
-    Error: From<W::Error>,
 {
     #[inline]
-    fn new<C>(cx: &C, mut writer: W) -> Result<Self, C::Error>
+    fn new<C>(cx: &C, writer: W) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
-        writer.write_byte(cx.adapt(), b'{')?;
+        Self::with_variant(cx, writer, false)
+    }
 
+    #[inline]
+    fn with_variant<C>(cx: &C, mut writer: W, variant: bool) -> Result<Self, C::Error>
+    where
+        C: Context<Input = Error>,
+    {
+        writer.write_byte(cx, b'{')?;
         Ok(Self {
             len: 0,
+            variant,
             writer,
-            _marker: marker::PhantomData,
         })
     }
 }
 
-impl<M, W> PairsEncoder for JsonObjectEncoder<M, W>
+impl<W> MapEncoder for JsonObjectEncoder<W>
 where
-    M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
 
-    type Encoder<'this> = JsonObjectPairEncoder<M, W::Mut<'this>>
+    type Entry<'this> = JsonObjectPairEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
-        let len = self.len;
         self.len += 1;
+
         Ok(JsonObjectPairEncoder::new(
-            len == 0,
+            self.len == 1,
             self.writer.borrow_mut(),
         ))
     }
@@ -396,62 +425,133 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b'}')?;
+        self.writer.write_byte(cx, b'}')?;
+
+        if self.variant {
+            self.writer.write_byte(cx, b'}')?;
+        }
+
         Ok(())
     }
 }
 
-/// Encoder for a pair.
-pub struct JsonObjectPairEncoder<M, W> {
-    empty: bool,
-    writer: W,
-    _marker: marker::PhantomData<M>,
-}
-
-impl<M, W> JsonObjectPairEncoder<M, W> {
-    #[inline]
-    const fn new(empty: bool, writer: W) -> Self {
-        Self {
-            empty,
-            writer,
-            _marker: marker::PhantomData,
-        }
-    }
-}
-
-impl<M, W> PairEncoder for JsonObjectPairEncoder<M, W>
+impl<W> MapPairsEncoder for JsonObjectEncoder<W>
 where
-    M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
 
-    type First<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    type MapPairsKey<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
-    type Second<'this> = JsonEncoder<M, W::Mut<'this>> where Self: 'this;
+    type MapPairsValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn first<C>(&mut self, cx: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_pairs_key<C>(&mut self, cx: &C) -> Result<Self::MapPairsKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if self.len > 0 {
+            self.writer.write_byte(cx, b',')?;
+        }
+
+        self.len += 1;
+        Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.writer.write_byte(cx, b':')?;
+        Ok(JsonEncoder::new(self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn end<C>(mut self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.writer.write_byte(cx, b'}')?;
+        Ok(())
+    }
+}
+
+impl<W> StructEncoder for JsonObjectEncoder<W>
+where
+    W: Writer,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type Field<'this> = JsonObjectPairEncoder<W::Mut<'this>>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEncoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEncoder::end(self, cx)
+    }
+}
+
+/// Encoder for a pair.
+pub struct JsonObjectPairEncoder<W> {
+    empty: bool,
+    writer: W,
+}
+
+impl<W> JsonObjectPairEncoder<W> {
+    #[inline]
+    const fn new(empty: bool, writer: W) -> Self {
+        Self { empty, writer }
+    }
+}
+
+impl<W> MapEntryEncoder for JsonObjectPairEncoder<W>
+where
+    W: Writer,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type MapKey<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    where
+        Self: 'this;
+
+    type MapValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
+
+    #[inline]
+    fn map_key<C>(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
         if !self.empty {
-            self.writer.write_byte(cx.adapt(), b',')?;
+            self.writer.write_byte(cx, b',')?;
         }
 
         Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn second<C>(&mut self, cx: &C) -> Result<Self::Second<'_>, C::Error>
+    fn map_value<C>(&mut self, cx: &C) -> Result<Self::MapValue<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b':')?;
+        self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
@@ -464,36 +564,66 @@ where
     }
 }
 
-/// Encoder for a pair.
-pub struct JsonVariantEncoder<M, W> {
-    writer: W,
-    _marker: marker::PhantomData<M>,
-}
-
-impl<M, W> JsonVariantEncoder<M, W>
+impl<W> StructFieldEncoder for JsonObjectPairEncoder<W>
 where
     W: Writer,
-    Error: From<W::Error>,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type FieldName<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    where
+        Self: 'this;
+
+    type FieldValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.map_key(cx)
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.map_value(cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryEncoder::end(self, cx)
+    }
+}
+
+/// Encoder for a pair.
+pub struct JsonVariantEncoder<W> {
+    writer: W,
+}
+
+impl<W> JsonVariantEncoder<W>
+where
+    W: Writer,
 {
     #[inline]
     fn new<C>(cx: &C, mut writer: W) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
-        writer.write_byte(cx.adapt(), b'{')?;
-
-        Ok(Self {
-            writer,
-            _marker: marker::PhantomData,
-        })
+        writer.write_byte(cx, b'{')?;
+        Ok(Self { writer })
     }
 }
 
-impl<M, W> VariantEncoder for JsonVariantEncoder<M, W>
+impl<W> VariantEncoder for JsonVariantEncoder<W>
 where
-    M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -502,7 +632,7 @@ where
     where
         Self: 'this;
 
-    type Variant<'this> = JsonEncoder<M, W::Mut<'this>>
+    type Variant<'this> = JsonEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
@@ -519,7 +649,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b':')?;
+        self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
@@ -528,7 +658,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b'}')
+        self.writer.write_byte(cx, b'}')
     }
 }
 
@@ -545,11 +675,11 @@ impl<W> JsonObjectKeyEncoder<W> {
 
 macro_rules! format_integer {
     ($slf:ident, $cx:expr, $value:ident) => {{
-        $slf.writer.write_byte($cx.adapt(), b'"')?;
+        $slf.writer.write_byte($cx, b'"')?;
         let mut buffer = itoa::Buffer::new();
         $slf.writer
-            .write_bytes($cx.adapt(), buffer.format($value).as_bytes())?;
-        $slf.writer.write_byte($cx.adapt(), b'"')?;
+            .write_bytes($cx, buffer.format($value).as_bytes())?;
+        $slf.writer.write_byte($cx, b'"')?;
         Ok(())
     }};
 }
@@ -558,7 +688,6 @@ macro_rules! format_integer {
 impl<W> Encoder for JsonObjectKeyEncoder<W>
 where
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
@@ -674,42 +803,47 @@ where
 }
 
 /// Encoder for a pairs sequence.
-pub struct JsonArrayEncoder<M, W> {
+pub struct JsonArrayEncoder<W> {
     first: bool,
+    variant: bool,
     writer: W,
-    _marker: marker::PhantomData<M>,
 }
 
-impl<M, W> JsonArrayEncoder<M, W>
+impl<W> JsonArrayEncoder<W>
 where
     W: Writer,
-    Error: From<W::Error>,
 {
     #[inline]
-    fn new<C>(cx: &C, mut writer: W) -> Result<Self, C::Error>
+    fn new<C>(cx: &C, writer: W) -> Result<Self, C::Error>
     where
         C: Context<Input = Error>,
     {
-        writer.write_byte(cx.adapt(), b'[')?;
+        Self::with_variant(cx, writer, false)
+    }
+
+    #[inline]
+    fn with_variant<C>(cx: &C, mut writer: W, variant: bool) -> Result<Self, C::Error>
+    where
+        C: Context<Input = Error>,
+    {
+        writer.write_byte(cx, b'[')?;
 
         Ok(Self {
             first: true,
+            variant,
             writer,
-            _marker: marker::PhantomData,
         })
     }
 }
 
-impl<M, W> SequenceEncoder for JsonArrayEncoder<M, W>
+impl<W> SequenceEncoder for JsonArrayEncoder<W>
 where
-    M: Mode,
     W: Writer,
-    Error: From<W::Error>,
 {
     type Ok = ();
     type Error = Error;
 
-    type Encoder<'this> = JsonEncoder<M, W::Mut<'this>>
+    type Encoder<'this> = JsonEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
@@ -719,7 +853,7 @@ where
         C: Context<Input = Self::Error>,
     {
         if !self.first {
-            self.writer.write_byte(cx.adapt(), b',')?;
+            self.writer.write_byte(cx, b',')?;
         }
 
         self.first = false;
@@ -731,7 +865,12 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.writer.write_byte(cx.adapt(), b']')?;
+        self.writer.write_byte(cx, b']')?;
+
+        if self.variant {
+            self.writer.write_byte(cx, b'}')?;
+        }
+
         Ok(())
     }
 }
@@ -742,9 +881,8 @@ fn encode_string<C, W>(cx: &C, mut writer: W, bytes: &[u8]) -> Result<(), C::Err
 where
     C: Context<Input = Error>,
     W: Writer,
-    Error: From<W::Error>,
 {
-    writer.write_byte(cx.adapt(), b'"')?;
+    writer.write_byte(cx, b'"')?;
 
     let mut start = 0;
 
@@ -756,7 +894,7 @@ where
         }
 
         if start < i {
-            writer.write_bytes(cx.adapt(), &bytes[start..i])?;
+            writer.write_bytes(cx, &bytes[start..i])?;
         }
 
         write_escape(cx, &mut writer, escape, b)?;
@@ -764,10 +902,10 @@ where
     }
 
     if start != bytes.len() {
-        writer.write_bytes(cx.adapt(), &bytes[start..])?;
+        writer.write_bytes(cx, &bytes[start..])?;
     }
 
-    writer.write_byte(cx.adapt(), b'"')?;
+    writer.write_byte(cx, b'"')?;
     Ok(())
 }
 
@@ -814,7 +952,6 @@ fn write_escape<C, W>(cx: &C, writer: &mut W, escape: u8, byte: u8) -> Result<()
 where
     C: Context<Input = Error>,
     W: Writer,
-    Error: From<W::Error>,
 {
     let s = match escape {
         BB => b"\\b",
@@ -833,10 +970,10 @@ where
                 HEX_DIGITS[(byte >> 4) as usize],
                 HEX_DIGITS[(byte & 0xF) as usize],
             ];
-            return writer.write_bytes(cx.adapt(), bytes);
+            return writer.write_bytes(cx, bytes);
         }
         _ => unreachable!(),
     };
 
-    writer.write_bytes(cx.adapt(), s)
+    writer.write_bytes(cx, s)
 }

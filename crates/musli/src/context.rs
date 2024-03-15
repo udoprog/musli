@@ -1,21 +1,17 @@
 //! Things related to working with contexts.
 
-mod error;
-
 use core::fmt;
-use core::marker;
 
-#[doc(inline)]
-pub use self::error::Error;
-
-use crate::Buf;
+use crate::{Buf, Decode, Decoder};
 
 /// Provides ergonomic access to the serialization context.
 ///
 /// This is used to among other things report diagnostics.
 pub trait Context {
+    /// Mode of the context.
+    type Mode;
     /// The error type which is collected by the context.
-    type Input;
+    type Input: 'static;
     /// Error produced by context.
     type Error: 'static;
     /// A mark during processing.
@@ -25,62 +21,31 @@ pub trait Context {
     where
         Self: 'this;
 
+    /// Decode the given input using the associated mode.
+    fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
+    where
+        T: Decode<'de, Self::Mode>,
+        D: Decoder<'de, Error = Self::Input>,
+        Self: Sized,
+    {
+        T::decode(self, decoder)
+    }
+
     /// Allocate a buffer.
     fn alloc(&self) -> Option<Self::Buf<'_>>;
-
-    /// Adapt the current context so that it can convert an error from a
-    /// different type convertible to the current input
-    ///
-    /// This is necessary to support context error modules which consume an
-    /// error kind that is not identical to the current [`Context::Input`], but
-    /// can be converted to one.
-    ///
-    /// ```
-    /// use musli::Context;
-    ///
-    /// struct Function1Error {
-    ///     /* .. */
-    /// }
-    ///
-    /// impl From<Function2Error> for Function1Error {
-    ///     fn from(error: Function2Error) -> Self {
-    ///         /* .. */
-    ///         # Self {  }
-    ///     }
-    /// }
-    ///
-    /// fn function1<C>(cx: &C) -> Result<(), C::Error>
-    /// where
-    ///     C: Context<Input = Function1Error>
-    /// {
-    ///     function2(cx.adapt())
-    /// }
-    ///
-    /// struct Function2Error {
-    ///     /* .. */
-    /// }
-    ///
-    /// // This function uses a different error as input.
-    /// fn function2<C>(cx: &C) -> Result<(), C::Error>
-    /// where
-    ///     C: Context<Input = Function2Error>
-    /// {
-    ///     /* .. */
-    ///     Ok(())
-    /// }
-    /// ```
-    fn adapt<E>(&self) -> &Adapt<Self, E>
-    where
-        Self::Input: From<E>,
-    {
-        // SAFETY: adapter type is repr transparent.
-        unsafe { &*(self as *const _ as *const _) }
-    }
 
     /// Report the given context error.
     fn report<T>(&self, error: T) -> Self::Error
     where
         Self::Input: From<T>;
+
+    /// Generate a map function which maps an error using the `report` function.
+    fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
+    where
+        Self::Input: From<T>,
+    {
+        move |error| self.report(error)
+    }
 
     /// Report a custom error, which is not encapsulated by the error type
     /// expected by the context. This is essentially a type-erased way of
@@ -169,7 +134,7 @@ pub trait Context {
     where
         T: fmt::Debug,
     {
-        self.message(format_args!("Invalid field tag: {tag:?}"))
+        self.message(format_args!("Invalid field tag `{tag:?}`"))
     }
 
     /// Encountered an unsupported field tag.
@@ -211,7 +176,7 @@ pub trait Context {
         T: fmt::Debug,
     {
         self.message(format_args!(
-            "invalid variant field tag: variant: {variant:?}, tag: {tag:?}",
+            "Invalid variant field tag `{tag:?}` for variant `{variant:?}`",
         ))
     }
 
@@ -392,214 +357,4 @@ pub trait Context {
     #[allow(unused_variables)]
     #[inline(always)]
     fn leave_sequence_index(&self) {}
-}
-
-/// Context adaptor returned by [`Context::adapt`].
-#[repr(transparent)]
-pub struct Adapt<C, E>
-where
-    C: ?Sized,
-{
-    error: marker::PhantomData<E>,
-    context: C,
-}
-
-impl<C, E> Context for Adapt<C, E>
-where
-    C: Context,
-    C::Input: From<E>,
-    E: 'static,
-{
-    type Input = E;
-    type Error = C::Error;
-    type Mark = C::Mark;
-    type Buf<'this> = C::Buf<'this> where Self: 'this;
-
-    #[inline(always)]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
-        self.context.alloc()
-    }
-
-    #[inline(always)]
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        Self::Input: From<T>,
-    {
-        self.context.report(Self::Input::from(error))
-    }
-
-    #[inline(always)]
-    fn custom<T>(&self, error: T) -> Self::Error
-    where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
-    {
-        self.context.custom(error)
-    }
-
-    #[inline(always)]
-    fn message<T>(&self, message: T) -> Self::Error
-    where
-        T: fmt::Display,
-    {
-        self.context.message(message)
-    }
-
-    #[inline(always)]
-    fn marked_report<T>(&self, mark: Self::Mark, error: T) -> Self::Error
-    where
-        Self::Input: From<T>,
-    {
-        self.context.marked_report(mark, E::from(error))
-    }
-
-    #[inline(always)]
-    fn marked_message<T>(&self, mark: Self::Mark, message: T) -> Self::Error
-    where
-        T: fmt::Display,
-    {
-        self.context.marked_message(mark, message)
-    }
-
-    #[inline(always)]
-    fn advance(&self, n: usize) {
-        self.context.advance(n);
-    }
-
-    #[inline(always)]
-    fn mark(&self) -> Self::Mark {
-        self.context.mark()
-    }
-
-    #[inline(always)]
-    fn invalid_variant_tag<T>(&self, name: &'static str, tag: T) -> Self::Error
-    where
-        T: fmt::Debug,
-    {
-        self.context.invalid_variant_tag(name, tag)
-    }
-
-    #[inline(always)]
-    fn expected_tag<T>(&self, name: &'static str, tag: T) -> Self::Error
-    where
-        T: fmt::Debug,
-    {
-        self.context.expected_tag(name, tag)
-    }
-
-    #[inline(always)]
-    fn uninhabitable(&self, name: &'static str) -> Self::Error {
-        self.context.uninhabitable(name)
-    }
-
-    #[inline(always)]
-    fn invalid_field_tag<T>(&self, name: &'static str, tag: T) -> Self::Error
-    where
-        T: fmt::Debug,
-    {
-        self.context.invalid_field_tag(name, tag)
-    }
-
-    #[inline(always)]
-    fn invalid_field_string_tag(&self, name: &'static str, field: Self::Buf<'_>) -> Self::Error {
-        self.context.invalid_field_string_tag(name, field)
-    }
-
-    #[inline(always)]
-    fn missing_variant_field<T>(&self, name: &'static str, tag: T) -> Self::Error
-    where
-        T: fmt::Debug,
-    {
-        self.context.missing_variant_field(name, tag)
-    }
-
-    #[inline(always)]
-    fn missing_variant_tag(&self, name: &'static str) -> Self::Error {
-        self.context.missing_variant_tag(name)
-    }
-
-    #[inline(always)]
-    fn invalid_variant_field_tag<V, T>(&self, name: &'static str, variant: V, tag: T) -> Self::Error
-    where
-        V: fmt::Debug,
-        T: fmt::Debug,
-    {
-        self.context.invalid_variant_field_tag(name, variant, tag)
-    }
-
-    #[inline(always)]
-    fn enter_struct(&self, name: &'static str) {
-        self.context.enter_struct(name)
-    }
-
-    #[inline(always)]
-    fn leave_struct(&self) {
-        self.context.leave_struct()
-    }
-
-    #[inline(always)]
-    fn enter_enum(&self, name: &'static str) {
-        self.context.enter_enum(name)
-    }
-
-    #[inline(always)]
-    fn leave_enum(&self) {
-        self.context.leave_enum()
-    }
-
-    #[inline(always)]
-    fn enter_named_field<T>(&self, name: &'static str, tag: T)
-    where
-        T: fmt::Display,
-    {
-        self.context.enter_named_field(name, tag)
-    }
-
-    #[inline(always)]
-    fn enter_unnamed_field<T>(&self, index: u32, tag: T)
-    where
-        T: fmt::Display,
-    {
-        self.context.enter_unnamed_field(index, tag)
-    }
-
-    #[inline(always)]
-    fn leave_field(&self) {
-        self.context.leave_field()
-    }
-
-    #[inline(always)]
-    fn enter_variant<T>(&self, name: &'static str, tag: T)
-    where
-        T: fmt::Display,
-    {
-        self.context.enter_variant(name, tag)
-    }
-
-    #[inline(always)]
-    fn leave_variant(&self) {
-        self.context.leave_variant()
-    }
-
-    #[inline(always)]
-    fn enter_map_key<T>(&self, field: T)
-    where
-        T: fmt::Display,
-    {
-        self.context.enter_map_key(field)
-    }
-
-    #[inline(always)]
-    fn leave_map_key(&self) {
-        self.context.leave_map_key()
-    }
-
-    #[inline(always)]
-    fn enter_sequence_index(&self, index: usize) {
-        self.context.enter_sequence_index(index)
-    }
-
-    #[inline(always)]
-    fn leave_sequence_index(&self) {
-        self.context.leave_sequence_index()
-    }
 }

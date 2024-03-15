@@ -12,7 +12,7 @@ use crate::expander::{
 use crate::internals::attr::{DefaultTag, EnumTagging, Packing};
 use crate::internals::symbol::*;
 use crate::internals::tokens::Tokens;
-use crate::internals::{Ctxt, Expansion, Mode, ModePath, Only};
+use crate::internals::{Ctxt, Expansion, Mode, Only};
 
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
@@ -24,7 +24,6 @@ pub(crate) struct Build<'a> {
     pub(crate) data: BuildData<'a>,
     pub(crate) decode_t_decode: syn::Path,
     pub(crate) encode_t_encode: syn::Path,
-    pub(crate) mode_ident: ModePath<'a>,
     pub(crate) enum_tagging_span: Option<Span>,
 }
 
@@ -205,7 +204,6 @@ pub(crate) fn setup<'a>(
         data,
         decode_t_decode: mode.decode_t_decode(false),
         encode_t_encode: mode.encode_t_encode(false),
-        mode_ident: mode.mode_ident(),
         enum_tagging_span: e.type_attr.enum_tagging_span(mode),
     })
 }
@@ -466,7 +464,7 @@ fn setup_field<'a>(
     };
 
     let var = match &member {
-        syn::Member::Named(ident) => e.cx.escaped_ident(ident),
+        syn::Member::Named(ident) => e.cx.field_ident(ident),
         syn::Member::Unnamed(index) => quote::format_ident!("_{}", index.index),
     };
 

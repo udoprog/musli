@@ -53,14 +53,14 @@ where
 }
 
 /// Format an invalid type message.
-pub(crate) fn invalid_type<'a>(
+pub(crate) fn unsupported_type<'a>(
     actual: &'a dyn fmt::Display,
     expected: &'a dyn Expecting,
 ) -> impl fmt::Display + 'a {
     format_fn(move |f| {
         write! {
             f,
-            "invalid type: got {actual}, but expected {expected}"
+            "Got unsupported type `{actual}`, but expected {expected}"
         }
     })
 }
@@ -73,7 +73,7 @@ pub(crate) fn bad_visitor_type<'a>(
     format_fn(move |f| {
         write! {
             f,
-            "bad reference type {actual}, expected {expected}",
+            "Bad reference type {actual}, expected {expected}",
         }
     })
 }
@@ -138,13 +138,17 @@ expect! {
     pub(crate) Bytes("bytes");
     pub(crate) Array("array");
     pub(crate) Map("map");
+    pub(crate) MapPairs("map pairs");
     pub(crate) Option("option");
     pub(crate) Tuple("tuple");
     pub(crate) Sequence("sequence");
     pub(crate) Unit("unit");
     pub(crate) Struct("struct");
+    pub(crate) StructPairs("struct pairs");
     pub(crate) TupleStruct("tuple struct");
     pub(crate) UnitStruct("unit struct");
     pub(crate) Variant("variant");
+    pub(crate) TupleVariant("tuple variant");
+    pub(crate) StructVariant("struct variant");
     pub(crate) AnyValue("a value");
 }

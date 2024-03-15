@@ -5,14 +5,13 @@ use core::slice;
 #[cfg(feature = "alloc")]
 use musli::de::ValueVisitor;
 use musli::de::{
-    AsDecoder, Decoder, NumberHint, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder,
-    SizeHint, TypeHint, VariantDecoder, Visitor,
+    AsDecoder, Decoder, MapDecoder, MapEntryDecoder, NumberHint, PackDecoder, SequenceDecoder,
+    SizeHint, StructDecoder, StructFieldDecoder, TypeHint, VariantDecoder, Visitor,
 };
-use musli::mode::Mode;
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_storage::options::Options;
-use musli_storage::reader::{SliceReader, SliceUnderflow};
+use musli_storage::reader::SliceReader;
 
 use crate::error::ErrorKind;
 use crate::value::{Number, Value};
@@ -47,9 +46,9 @@ macro_rules! ensure {
 }
 
 #[musli::decoder]
-impl<'de, const F: Options, E> Decoder<'de> for ValueDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> Decoder<'de> for ValueDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
     type Buffer = AsValueDecoder<F, E>;
@@ -74,10 +73,9 @@ where
     }
 
     #[inline]
-    fn decode_buffer<M, C>(self, _: &C) -> Result<Self::Buffer, C::Error>
+    fn decode_buffer<C>(self, _: &C) -> Result<Self::Buffer, C::Error>
     where
         C: Context<Input = Self::Error>,
-        M: Mode,
     {
         Ok(AsValueDecoder::new(self.value.clone()))
     }
@@ -112,7 +110,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => {
-            u8::from_number(n).map_err(|err| cx.report(err))
+            u8::from_number(n).map_err(cx.map())
         })
     }
 
@@ -122,7 +120,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => {
-            u16::from_number(n).map_err(|err| cx.report(err))
+            u16::from_number(n).map_err(cx.map())
         })
     }
 
@@ -132,7 +130,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => {
-            u32::from_number(n).map_err(|err| cx.report(err))
+            u32::from_number(n).map_err(cx.map())
         })
     }
 
@@ -142,7 +140,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => {
-            u64::from_number(n).map_err(|err| cx.report(err))
+            u64::from_number(n).map_err(cx.map())
         })
     }
 
@@ -152,7 +150,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => {
-            u128::from_number(n).map_err(|err| cx.report(err))
+            u128::from_number(n).map_err(cx.map())
         })
     }
 
@@ -162,7 +160,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => {
-            i8::from_number(n).map_err(|err| cx.report(err))
+            i8::from_number(n).map_err(cx.map())
         })
     }
 
@@ -172,7 +170,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => {
-            i16::from_number(n).map_err(|err| cx.report(err))
+            i16::from_number(n).map_err(cx.map())
         })
     }
 
@@ -182,7 +180,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => {
-            i32::from_number(n).map_err(|err| cx.report(err))
+            i32::from_number(n).map_err(cx.map())
         })
     }
 
@@ -192,7 +190,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => {
-            i64::from_number(n).map_err(|err| cx.report(err))
+            i64::from_number(n).map_err(cx.map())
         })
     }
 
@@ -202,7 +200,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => {
-            i128::from_number(n).map_err(|err| cx.report(err))
+            i128::from_number(n).map_err(cx.map())
         })
     }
 
@@ -212,7 +210,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => {
-            usize::from_number(n).map_err(|err| cx.report(err))
+            usize::from_number(n).map_err(cx.map())
         })
     }
 
@@ -222,7 +220,7 @@ where
         C: Context<Input = Self::Error>,
     {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => {
-            isize::from_number(n).map_err(|error| cx.report(error))
+            isize::from_number(n).map_err(cx.map())
         })
     }
 
@@ -334,7 +332,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
+    fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -411,9 +409,9 @@ where
     }
 }
 
-impl<'a, const F: Options, E> AsDecoder for ValueDecoder<'a, F, E>
+impl<'a, const F: Options, E: 'static> AsDecoder for ValueDecoder<'a, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
     type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;
@@ -434,8 +432,8 @@ pub struct IterValueDecoder<'de, const F: Options, E> {
     _marker: marker::PhantomData<E>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'de, const F: Options, E> IterValueDecoder<'de, F, E> {
-    #[cfg(feature = "alloc")]
     #[inline]
     fn new(values: &'de [Value]) -> Self {
         Self {
@@ -445,9 +443,9 @@ impl<'de, const F: Options, E> IterValueDecoder<'de, F, E> {
     }
 }
 
-impl<'de, const F: Options, E> PackDecoder<'de> for IterValueDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> PackDecoder<'de> for IterValueDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
@@ -475,9 +473,9 @@ where
     }
 }
 
-impl<'de, const F: Options, E> SequenceDecoder<'de> for IterValueDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> SequenceDecoder<'de> for IterValueDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
@@ -516,8 +514,8 @@ pub struct IterValuePairsDecoder<'de, const F: Options, E> {
     _marker: marker::PhantomData<E>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'de, const F: Options, E> IterValuePairsDecoder<'de, F, E> {
-    #[cfg(feature = "alloc")]
     #[inline]
     fn new(values: &'de [(Value, Value)]) -> Self {
         Self {
@@ -527,13 +525,13 @@ impl<'de, const F: Options, E> IterValuePairsDecoder<'de, F, E> {
     }
 }
 
-impl<'de, const F: Options, E> PairsDecoder<'de> for IterValuePairsDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> MapDecoder<'de> for IterValuePairsDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 
-    type Decoder<'this> = IterValuePairDecoder<'de, F, E>
+    type Entry<'this> = IterValuePairDecoder<'de, F, E>
     where
         Self: 'this;
 
@@ -543,7 +541,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Option<Self::Entry<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -556,6 +554,112 @@ where
         C: Context<Input = Self::Error>,
     {
         Ok(())
+    }
+}
+
+impl<'de, const F: Options, E: 'static> MapEntryDecoder<'de> for IterValuePairDecoder<'de, F, E>
+where
+    E: From<ErrorKind>,
+{
+    type Error = E;
+
+    type MapKey<'this> = ValueDecoder<'de, F, E>
+    where
+        Self: 'this;
+
+    type MapValue = ValueDecoder<'de, F, E>;
+
+    #[inline]
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(ValueDecoder::new(&self.pair.0))
+    }
+
+    #[inline]
+    fn map_value<C>(self, _: &C) -> Result<Self::MapValue, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(ValueDecoder::new(&self.pair.1))
+    }
+
+    #[inline]
+    fn skip_map_value<C>(self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(true)
+    }
+}
+
+impl<'de, const F: Options, E: 'static> StructDecoder<'de> for IterValuePairsDecoder<'de, F, E>
+where
+    E: From<ErrorKind>,
+{
+    type Error = E;
+
+    type Field<'this> = IterValuePairDecoder<'de, F, E>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        MapDecoder::size_hint(self)
+    }
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::end(self, cx)
+    }
+}
+
+impl<'de, const F: Options, E: 'static> StructFieldDecoder<'de> for IterValuePairDecoder<'de, F, E>
+where
+    E: From<ErrorKind>,
+{
+    type Error = E;
+
+    type FieldName<'this> = ValueDecoder<'de, F, E>
+    where
+        Self: 'this;
+
+    type FieldValue = ValueDecoder<'de, F, E>;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_key(self, cx)
+    }
+
+    #[inline]
+    fn field_value<C>(self, cx: &C) -> Result<Self::FieldValue, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_value(self, cx)
+    }
+
+    #[inline]
+    fn skip_field_value<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::skip_map_value(self, cx)
     }
 }
 
@@ -575,51 +679,14 @@ impl<'de, const F: Options, E> IterValuePairDecoder<'de, F, E> {
     }
 }
 
-impl<'de, const F: Options, E> PairDecoder<'de> for IterValuePairDecoder<'de, F, E>
-where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
-{
-    type Error = E;
-
-    type First<'this> = ValueDecoder<'de, F, E>
-    where
-        Self: 'this;
-
-    type Second = ValueDecoder<'de, F, E>;
-
-    #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        Ok(ValueDecoder::new(&self.pair.0))
-    }
-
-    #[inline]
-    fn second<C>(self, _: &C) -> Result<Self::Second, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        Ok(ValueDecoder::new(&self.pair.1))
-    }
-
-    #[inline]
-    fn skip_second<C>(self, _: &C) -> Result<bool, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        Ok(true)
-    }
-}
-
 /// A decoder over a simple value pair as a variant.
 pub struct IterValueVariantDecoder<'de, const F: Options, E> {
     pair: &'de (Value, Value),
     _marker: marker::PhantomData<E>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'de, const F: Options, E> IterValueVariantDecoder<'de, F, E> {
-    #[cfg(feature = "alloc")]
     #[inline]
     const fn new(pair: &'de (Value, Value)) -> Self {
         Self {
@@ -629,9 +696,9 @@ impl<'de, const F: Options, E> IterValueVariantDecoder<'de, F, E> {
     }
 }
 
-impl<'de, const F: Options, E> VariantDecoder<'de> for IterValueVariantDecoder<'de, F, E>
+impl<'de, const F: Options, E: 'static> VariantDecoder<'de> for IterValueVariantDecoder<'de, F, E>
 where
-    E: musli::error::Error + From<ErrorKind> + From<SliceUnderflow>,
+    E: From<ErrorKind>,
 {
     type Error = E;
 

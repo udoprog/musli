@@ -9,4 +9,4 @@ pub(crate) mod tokens;
 pub(crate) use self::attr::Only;
 pub(crate) use self::ctxt::Ctxt;
 pub(crate) use self::expansion::Expansion;
-pub(crate) use self::mode::{Mode, ModePath};
+pub(crate) use self::mode::Mode;

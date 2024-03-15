@@ -1,5 +1,5 @@
 use crate::de::Decoder;
-use crate::mode::{DefaultMode, Mode};
+use crate::mode::DefaultMode;
 use crate::Context;
 
 /// Please refer to the main [musli documentation](https://docs.rs/musli).
@@ -7,14 +7,11 @@ use crate::Context;
 pub use musli_macros::Decode;
 
 /// Trait governing how types are decoded.
-pub trait Decode<'de, M = DefaultMode>: Sized
-where
-    M: Mode,
-{
+pub trait Decode<'de, M = DefaultMode>: Sized {
     /// Decode the given input.
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>;
 }
 
@@ -26,13 +23,10 @@ where
 ///
 /// [`HashMap<K, V>`]: std::collections::HashMap
 /// [`fmt::Display`]: std::fmt::Display
-pub trait TraceDecode<'de, M = DefaultMode>: Sized
-where
-    M: Mode,
-{
+pub trait TraceDecode<'de, M = DefaultMode>: Sized {
     /// Decode the given input.
     fn trace_decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
+        C: Context<Mode = M, Input = D::Error>,
         D: Decoder<'de>;
 }

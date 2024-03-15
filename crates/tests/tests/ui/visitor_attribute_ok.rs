@@ -1,20 +1,14 @@
 use core::fmt;
-use core::marker;
+use core::convert::Infallible;
 
 use musli::de::Visitor;
-use musli::error::Error;
 
-struct AnyVisitor<E> {
-    _marker: marker::PhantomData<E>,
-}
+struct AnyVisitor;
 
 #[musli::visitor]
-impl<'de, E> Visitor<'de> for AnyVisitor<E>
-where
-    E: Error,
-{
+impl<'de> Visitor<'de> for AnyVisitor {
     type Ok = ();
-    type Error = E;
+    type Error = Infallible;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -1,14 +1,9 @@
-use core::convert::Infallible;
 use core::fmt;
 
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::string::ToString;
-
-use musli_common::fixed_bytes::FixedBytesOverflow;
-use musli_common::reader::SliceUnderflow;
-use musli_common::writer::SliceOverflow;
 
 use crate::reader::Token;
 
@@ -122,11 +117,6 @@ impl fmt::Display for ErrorKind {
 
 #[derive(Debug)]
 pub(crate) enum ErrorImpl {
-    SliceUnderflow(SliceUnderflow),
-    SliceOverflow(SliceOverflow),
-    FixedBytesOverflow(FixedBytesOverflow),
-    #[cfg(feature = "std")]
-    Io(std::io::Error),
     #[cfg(feature = "musli-value")]
     ValueError(musli_value::ErrorKind),
     JsonError(ErrorKind),
@@ -139,11 +129,6 @@ pub(crate) enum ErrorImpl {
 impl fmt::Display for ErrorImpl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorImpl::SliceUnderflow(error) => error.fmt(f),
-            ErrorImpl::SliceOverflow(error) => error.fmt(f),
-            ErrorImpl::FixedBytesOverflow(error) => error.fmt(f),
-            #[cfg(feature = "std")]
-            ErrorImpl::Io(error) => error.fmt(f),
             #[cfg(feature = "musli-value")]
             ErrorImpl::ValueError(error) => error.fmt(f),
             ErrorImpl::JsonError(error) => error.fmt(f),
@@ -152,40 +137,6 @@ impl fmt::Display for ErrorImpl {
             #[cfg(not(feature = "alloc"))]
             ErrorImpl::Message => write!(f, "Message error (see diagnostics)"),
         }
-    }
-}
-
-impl From<SliceUnderflow> for Error {
-    #[inline(always)]
-    fn from(error: SliceUnderflow) -> Self {
-        Self {
-            err: ErrorImpl::SliceUnderflow(error),
-        }
-    }
-}
-
-impl From<SliceOverflow> for Error {
-    #[inline(always)]
-    fn from(error: SliceOverflow) -> Self {
-        Self {
-            err: ErrorImpl::SliceOverflow(error),
-        }
-    }
-}
-
-impl From<FixedBytesOverflow> for Error {
-    #[inline(always)]
-    fn from(error: FixedBytesOverflow) -> Self {
-        Self {
-            err: ErrorImpl::FixedBytesOverflow(error),
-        }
-    }
-}
-
-impl From<Infallible> for Error {
-    #[inline(always)]
-    fn from(value: Infallible) -> Self {
-        match value {}
     }
 }
 
@@ -200,19 +151,9 @@ impl From<musli_value::ErrorKind> for Error {
 }
 
 #[cfg(feature = "std")]
-impl From<std::io::Error> for Error {
-    #[inline(always)]
-    fn from(error: std::io::Error) -> Self {
-        Self {
-            err: ErrorImpl::Io(error),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-impl musli::error::Error for Error {
+impl musli_common::context::Error for Error {
     #[inline]
     fn custom<T>(error: T) -> Self
     where

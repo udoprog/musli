@@ -1,14 +1,15 @@
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
+use core::marker::PhantomData;
 use core::ops::Range;
 
-use musli::context::Error;
 use musli::{Allocator, Context};
 
-use crate::context::rich_error::{RichError, Step};
 use crate::fixed::{FixedString, FixedVec};
 
 use super::access::{Access, Shared};
+use super::rich_error::{RichError, Step};
+use super::{Error, ErrorMarker};
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
@@ -19,7 +20,7 @@ use super::access::{Access, Shared};
 ///   indicator is used instead.
 /// * The `S` parameter indicates the maximum size in bytes (UTF-8) of a stored
 ///   map key.
-pub struct NoStdContext<const P: usize, const S: usize, A, E> {
+pub struct NoStdContext<const P: usize, const S: usize, A, M, E> {
     access: Access,
     mark: Cell<usize>,
     alloc: A,
@@ -27,9 +28,10 @@ pub struct NoStdContext<const P: usize, const S: usize, A, E> {
     path: UnsafeCell<FixedVec<Step<FixedString<S>>, P>>,
     path_cap: Cell<usize>,
     include_type: bool,
+    _marker: PhantomData<M>,
 }
 
-impl<A, E> NoStdContext<16, 32, A, E> {
+impl<A, M, E> NoStdContext<16, 32, A, M, E> {
     /// Construct a new context which uses allocations to a fixed number of
     /// diagnostics.
     ///
@@ -41,7 +43,7 @@ impl<A, E> NoStdContext<16, 32, A, E> {
     }
 }
 
-impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
+impl<const P: usize, const S: usize, A, M, E> NoStdContext<P, S, A, M, E> {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
     pub fn new_with(alloc: A) -> Self {
@@ -53,6 +55,7 @@ impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
             path: UnsafeCell::new(FixedVec::new()),
             path_cap: Cell::new(0),
             include_type: false,
+            _marker: PhantomData,
         }
     }
 
@@ -113,13 +116,14 @@ impl<const P: usize, const S: usize, A, E> NoStdContext<P, S, A, E> {
     }
 }
 
-impl<const V: usize, const S: usize, A, E> Context for NoStdContext<V, S, A, E>
+impl<const V: usize, const S: usize, A, M, E> Context for NoStdContext<V, S, A, M, E>
 where
     A: Allocator,
-    E: musli::error::Error,
+    E: Error,
 {
+    type Mode = M;
     type Input = E;
-    type Error = Error;
+    type Error = ErrorMarker;
     type Mark = usize;
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
@@ -134,7 +138,7 @@ where
         E: From<T>,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::from(error));
-        Error
+        ErrorMarker
     }
 
     #[inline]
@@ -143,7 +147,7 @@ where
         E: From<T>,
     {
         self.push_error(mark..self.mark.get(), E::from(message));
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
@@ -152,7 +156,7 @@ where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::custom(message));
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
@@ -161,7 +165,7 @@ where
         T: fmt::Display,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::message(message));
-        Error
+        ErrorMarker
     }
 
     #[inline]
@@ -170,7 +174,7 @@ where
         T: fmt::Display,
     {
         self.push_error(mark..self.mark.get(), E::message(message));
-        Error
+        ErrorMarker
     }
 
     #[inline]

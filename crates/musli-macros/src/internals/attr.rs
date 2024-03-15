@@ -4,14 +4,13 @@ use std::mem;
 
 use proc_macro2::Span;
 use syn::parse::Parse;
-use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
 
 use crate::expander::determine_tag_method;
 use crate::expander::TagMethod;
 use crate::internals::symbol::*;
-use crate::internals::{Ctxt, Mode, ModePath};
+use crate::internals::{Ctxt, Mode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum Only {
@@ -37,6 +36,7 @@ pub(crate) struct EnumTag<'a> {
 pub(crate) enum EnumTagging<'a> {
     /// The type is internally tagged by the field given by the expression.
     Internal { tag: EnumTag<'a> },
+    /// An enumerator is adjacently tagged.
     Adjacent {
         tag: EnumTag<'a>,
         content: &'a syn::Expr,
@@ -293,8 +293,13 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             // parse #[musli(crate = <path>)]
             if meta.path == CRATE {
-                meta.input.parse::<Token![=]>()?;
-                new.krate.push((meta.path.span(), meta.input.parse()?));
+                let path = if meta.input.parse::<Option<Token![=]>>()?.is_some() {
+                    meta.input.parse()?
+                } else {
+                    syn::parse_quote!(crate)
+                };
+
+                new.krate.push((meta.path.span(), path));
                 return Ok(());
             }
 
@@ -580,14 +585,7 @@ impl Field {
         let encode_path = self.encode_path(mode);
 
         if let Some((span, encode_path)) = encode_path {
-            let mut encode_path = encode_path.clone();
-            let mode_ident = mode.mode_ident();
-
-            if let Some(last) = encode_path.segments.last_mut() {
-                adjust_mode_path(last, mode_ident);
-            }
-
-            (*span, encode_path)
+            (*span, encode_path.clone())
         } else {
             let trace = self.trace(mode).is_some();
             let encode_path = mode.encode_t_encode(trace);
@@ -600,14 +598,7 @@ impl Field {
         let decode_path = self.decode_path(mode);
 
         if let Some((span, decode_path)) = decode_path {
-            let mut decode_path = decode_path.clone();
-            let mode_ident = mode.mode_ident();
-
-            if let Some(last) = decode_path.segments.last_mut() {
-                adjust_mode_path(last, mode_ident);
-            }
-
-            (*span, decode_path)
+            (*span, decode_path.clone())
         } else {
             let trace = self.trace(mode).is_some();
             let decode_path = mode.decode_t_decode(trace);
@@ -730,64 +721,4 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
     }
 
     attr
-}
-
-/// Adjust a mode path.
-fn adjust_mode_path(last: &mut syn::PathSegment, mode_ident: ModePath) {
-    let insert_args = |args: &mut Punctuated<_, _>| {
-        args.insert(
-            0,
-            syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                qself: None,
-                path: mode_ident.as_path(),
-            })),
-        );
-
-        args.insert(
-            1,
-            syn::GenericArgument::Type(syn::Type::Infer(syn::TypeInfer {
-                underscore_token: <Token![_]>::default(),
-            })),
-        );
-
-        args.insert(
-            2,
-            syn::GenericArgument::Type(syn::Type::Infer(syn::TypeInfer {
-                underscore_token: <Token![_]>::default(),
-            })),
-        );
-    };
-
-    match &mut last.arguments {
-        syn::PathArguments::None => {
-            let mut args = syn::AngleBracketedGenericArguments {
-                colon2_token: Some(<Token![::]>::default()),
-                lt_token: <Token![<]>::default(),
-                args: Punctuated::default(),
-                gt_token: <Token![>]>::default(),
-            };
-
-            insert_args(&mut args.args);
-            last.arguments = syn::PathArguments::AngleBracketed(args);
-        }
-        syn::PathArguments::AngleBracketed(args) => {
-            insert_args(&mut args.args);
-        }
-        syn::PathArguments::Parenthesized(args) => {
-            args.inputs.insert(
-                0,
-                syn::Type::Path(syn::TypePath {
-                    qself: None,
-                    path: mode_ident.as_path(),
-                }),
-            );
-
-            args.inputs.insert(
-                1,
-                syn::Type::Infer(syn::TypeInfer {
-                    underscore_token: <Token![_]>::default(),
-                }),
-            );
-        }
-    }
 }

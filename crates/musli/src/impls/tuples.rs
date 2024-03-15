@@ -3,7 +3,6 @@
 use crate::compat::Packed;
 use crate::de::{Decode, Decoder, PackDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder};
-use crate::mode::Mode;
 use crate::Context;
 
 macro_rules! count {
@@ -42,30 +41,26 @@ macro_rules! declare {
     };
 
     (($ty0:ident, $ident0:ident) $(, ($ty:ident, $ident:ident))* $(,)?) => {
-        impl<M, $ty0 $(, $ty)*> Encode<M> for ($ty0, $($ty),*) where M: Mode, $ty0: Encode<M>, $($ty: Encode<M>),* {
+        impl<M, $ty0 $(, $ty)*> Encode<M> for ($ty0, $($ty),*) where $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<Mode = M, Input = E::Error>,
                 E: Encoder,
             {
                 let mut pack = encoder.encode_tuple(cx, count!($ident0 $($ident)*))?;
                 let ($ident0, $($ident),*) = self;
-                let value = pack.next(cx)?;
-                <$ty0>::encode($ident0, cx, value)?;
-                $(
-                    let value = pack.next(cx)?;
-                    <$ty>::encode($ident, cx, value)?;
-                )*
+                $ident0.encode(cx, pack.next(cx)?)?;
+                $($ident.encode(cx, pack.next(cx)?)?;)*
                 pack.end(cx)
             }
         }
 
-        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*) where M: Mode, $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
+        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*) where $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<Mode = M, Input = D::Error>,
                 D: Decoder<'de>
             {
                 let mut unpack = decoder.decode_tuple(cx, count!($ident0 $($ident)*))?;
@@ -76,30 +71,26 @@ macro_rules! declare {
             }
         }
 
-        impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)> where M: Mode, $ty0: Encode<M>, $($ty: Encode<M>),* {
+        impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)> where $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Input = E::Error>,
+                C: Context<Mode = M, Input = E::Error>,
                 E: Encoder,
             {
                 let Packed(($ident0, $($ident),*)) = self;
                 let mut pack = encoder.encode_pack(cx)?;
-                let value = pack.next(cx)?;
-                <$ty0>::encode($ident0, cx, value)?;
-                $(
-                    let value = pack.next(cx)?;
-                    <$ty>::encode($ident, cx, value)?;
-                )*
+                $ident0.encode(cx, pack.next(cx)?)?;
+                $($ident.encode(cx, pack.next(cx)?)?;)*
                 pack.end(cx)
             }
         }
 
-        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)> where M: Mode, $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
+        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)> where $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Input = D::Error>,
+                C: Context<Mode = M, Input = D::Error>,
                 D: Decoder<'de>
             {
                 let mut unpack = decoder.decode_pack(cx)?;

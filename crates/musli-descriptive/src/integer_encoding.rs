@@ -6,7 +6,6 @@ use musli_common::int::{Signed, Unsigned};
 use musli_common::reader::Reader;
 use musli_common::writer::Writer;
 
-use crate::error::Error;
 use crate::tag::{Kind, Tag};
 
 #[inline]
@@ -17,9 +16,8 @@ pub(crate) fn encode_typed_unsigned<C, W, T>(
     value: T,
 ) -> Result<(), C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     W: Writer,
-    Error: From<W::Error>,
     T: Unsigned,
 {
     encode_typed(cx, writer, Kind::Number, bits, value)
@@ -28,9 +26,8 @@ where
 #[inline]
 pub(crate) fn decode_typed_unsigned<'de, C, R, T>(cx: &C, reader: R) -> Result<T, C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     R: Reader<'de>,
-    Error: From<R::Error>,
     T: Unsigned,
 {
     decode_typed(cx, reader, Kind::Number)
@@ -45,30 +42,28 @@ fn encode_typed<C, W, T>(
     value: T,
 ) -> Result<(), C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     W: Writer,
-    Error: From<W::Error>,
     T: Unsigned,
 {
-    writer.write_byte(cx.adapt(), Tag::new(kind, bits).byte())?;
-    c::encode(cx.adapt(), writer, value)
+    writer.write_byte(cx, Tag::new(kind, bits).byte())?;
+    c::encode(cx, writer, value)
 }
 
 #[inline]
 fn decode_typed<'de, C, R, T>(cx: &C, mut reader: R, kind: Kind) -> Result<T, C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     R: Reader<'de>,
-    Error: From<R::Error>,
     T: Unsigned,
 {
-    let tag = Tag::from_byte(reader.read_byte(cx.adapt())?);
+    let tag = Tag::from_byte(reader.read_byte(cx)?);
 
     if tag.kind() != kind {
         return Err(cx.message(format_args!("Expected {kind:?}, got {tag:?}")));
     }
 
-    c::decode(cx.adapt(), reader)
+    c::decode(cx, reader)
 }
 
 #[inline]
@@ -79,9 +74,8 @@ pub(crate) fn encode_typed_signed<C, W, T>(
     value: T,
 ) -> Result<(), C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     W: Writer,
-    Error: From<W::Error>,
     T: Signed,
 {
     encode_typed(cx, writer, Kind::Number, bits, zig::encode(value))
@@ -90,9 +84,8 @@ where
 #[inline]
 pub(crate) fn decode_typed_signed<'de, C, R, T>(cx: &C, reader: R) -> Result<T, C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     R: Reader<'de>,
-    Error: From<R::Error>,
     T: Signed,
 {
     let value: T::Unsigned = decode_typed(cx, reader, Kind::Number)?;

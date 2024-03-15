@@ -26,7 +26,6 @@ impl<W> crate::writer::Writer for Wrap<W>
 where
     W: std::io::Write,
 {
-    type Error = std::io::Error;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -37,7 +36,7 @@ where
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -47,9 +46,9 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
-        self.inner.write_all(bytes).map_err(|err| cx.report(err))?;
+        self.inner.write_all(bytes).map_err(|e| cx.custom(e))?;
         cx.advance(bytes.len());
         Ok(())
     }

@@ -5,8 +5,8 @@ use core::marker;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, PackDecoder, PairDecoder, PairsDecoder, SequenceDecoder, SizeHint, ValueVisitor,
-    VariantDecoder,
+    Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, PackDecoder, SequenceDecoder, SizeHint,
+    StructDecoder, StructFieldDecoder, StructPairsDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::Context;
 use musli_common::options::Options;
@@ -40,11 +40,9 @@ pub struct LimitedStorageDecoder<R, const F: Options, E> {
 }
 
 #[musli::decoder]
-impl<'de, R, const F: Options, E> Decoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> Decoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
-    E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type Pack = Self;
@@ -52,7 +50,9 @@ where
     type Sequence = LimitedStorageDecoder<R, F, E>;
     type Tuple = Self;
     type Map = LimitedStorageDecoder<R, F, E>;
+    type MapPairs = LimitedStorageDecoder<R, F, E>;
     type Struct = LimitedStorageDecoder<R, F, E>;
+    type StructPairs = LimitedStorageDecoder<R, F, E>;
     type Variant = Self;
 
     #[inline]
@@ -66,8 +66,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mark = cx.mark();
-        let count =
-            musli_common::int::decode_usize::<_, _, F>(cx.adapt(), self.reader.borrow_mut())?;
+        let count = musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?;
 
         if count != 0 {
             return Err(cx.marked_message(mark, ExpectedEmptySequence { actual: count }));
@@ -89,7 +88,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.reader.read_array(cx.adapt())
+        self.reader.read_array(cx)
     }
 
     #[inline(always)]
@@ -98,7 +97,7 @@ where
         C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, [u8]>,
     {
-        let len = musli_common::int::decode_usize::<_, _, F>(cx.adapt(), self.reader.borrow_mut())?;
+        let len = musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?;
         self.reader.read_bytes(cx, len, visitor)
     }
 
@@ -154,7 +153,7 @@ where
         C: Context<Input = Self::Error>,
     {
         let mark = cx.mark();
-        let byte = self.reader.read_byte(cx.adapt())?;
+        let byte = self.reader.read_byte(cx)?;
 
         match byte {
             0 => Ok(false),
@@ -182,7 +181,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        self.reader.read_byte(cx.adapt())
+        self.reader.read_byte(cx)
     }
 
     #[inline(always)]
@@ -190,7 +189,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -198,7 +197,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -206,7 +205,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -214,7 +213,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_unsigned::<_, _, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -230,7 +229,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_signed::<_, _, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_signed::<_, _, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -238,7 +237,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_signed::<_, _, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_signed::<_, _, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -246,7 +245,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_signed::<_, _, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_signed::<_, _, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -254,7 +253,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_signed::<_, _, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_signed::<_, _, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -262,7 +261,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        musli_common::int::decode_usize::<_, _, F>(cx.adapt(), self.reader)
+        musli_common::int::decode_usize::<_, _, F>(cx, self.reader)
     }
 
     #[inline(always)]
@@ -300,7 +299,7 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        let b = self.reader.read_byte(cx.adapt())?;
+        let b = self.reader.read_byte(cx)?;
         Ok(if b == 1 { Some(self) } else { None })
     }
 
@@ -329,7 +328,23 @@ where
     }
 
     #[inline]
-    fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
+    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        LimitedStorageDecoder::new(cx, self)
+    }
+
+    #[inline]
+    fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        LimitedStorageDecoder::new(cx, self)
+    }
+
+    #[inline]
+    fn decode_struct_pairs<C>(self, cx: &C, _: Option<usize>) -> Result<Self::StructPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -345,11 +360,9 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> PackDecoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> PackDecoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
-    E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type Decoder<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
@@ -371,28 +384,23 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
-    E: From<R::Error>,
-    E: musli::error::Error,
 {
     #[inline]
     fn new<C>(cx: &C, mut decoder: StorageDecoder<R, F, E>) -> Result<Self, C::Error>
     where
         C: Context<Input = E>,
     {
-        let remaining =
-            musli_common::int::decode_usize::<_, _, F>(cx.adapt(), &mut decoder.reader)?;
+        let remaining = musli_common::int::decode_usize::<_, _, F>(cx, &mut decoder.reader)?;
         Ok(Self { remaining, decoder })
     }
 }
 
-impl<'de, R, const F: Options, E> SequenceDecoder<'de> for LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> SequenceDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
-    E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
     type Decoder<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
@@ -424,15 +432,13 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> PairsDecoder<'de> for LimitedStorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> MapDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
-    E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
 
-    type Decoder<'this> = StorageDecoder<R::Mut<'this>, F, E>
+    type Entry<'this> = StorageDecoder<R::Mut<'this>, F, E>
     where
         Self: 'this;
 
@@ -442,7 +448,7 @@ where
     }
 
     #[inline]
-    fn next<C>(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    fn entry<C>(&mut self, _: &C) -> Result<Option<Self::Entry<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -463,18 +469,16 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> PairDecoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> MapEntryDecoder<'de> for StorageDecoder<R, F, E>
 where
     R: Reader<'de>,
-    E: From<R::Error>,
-    E: musli::error::Error,
 {
     type Error = E;
-    type First<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
-    type Second = Self;
+    type MapKey<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type MapValue = Self;
 
     #[inline]
-    fn first<C>(&mut self, _: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -482,7 +486,7 @@ where
     }
 
     #[inline]
-    fn second<C>(self, _: &C) -> Result<Self::Second, C::Error>
+    fn map_value<C>(self, _: &C) -> Result<Self::MapValue, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -490,7 +494,7 @@ where
     }
 
     #[inline]
-    fn skip_second<C>(self, _: &C) -> Result<bool, C::Error>
+    fn skip_map_value<C>(self, _: &C) -> Result<bool, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -498,11 +502,167 @@ where
     }
 }
 
-impl<'de, R, const F: Options, E> VariantDecoder<'de> for StorageDecoder<R, F, E>
+impl<'de, R, const F: Options, E: 'static> StructDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
-    E: From<R::Error>,
-    E: musli::error::Error,
+{
+    type Error = E;
+
+    type Field<'this> = StorageDecoder<R::Mut<'this>, F, E>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        MapDecoder::size_hint(self)
+    }
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::end(self, cx)
+    }
+}
+
+impl<'de, R, const F: Options, E: 'static> StructFieldDecoder<'de> for StorageDecoder<R, F, E>
+where
+    R: Reader<'de>,
+{
+    type Error = E;
+    type FieldName<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type FieldValue = Self;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_key(self, cx)
+    }
+
+    #[inline]
+    fn field_value<C>(self, cx: &C) -> Result<Self::FieldValue, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::map_value(self, cx)
+    }
+
+    #[inline]
+    fn skip_field_value<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapEntryDecoder::skip_map_value(self, cx)
+    }
+}
+
+impl<'de, R, const F: Options, E: 'static> MapPairsDecoder<'de> for LimitedStorageDecoder<R, F, E>
+where
+    R: Reader<'de>,
+{
+    type Error = E;
+    type MapPairsKey<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type MapPairsValue<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if self.remaining == 0 {
+            return Ok(None);
+        }
+
+        self.remaining -= 1;
+        Ok(Some(StorageDecoder::new(self.decoder.reader.borrow_mut())))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(StorageDecoder::new(self.decoder.reader.borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_map_pairs_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(false)
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<'de, R, const F: Options, E: 'static> StructPairsDecoder<'de>
+    for LimitedStorageDecoder<R, F, E>
+where
+    R: Reader<'de>,
+{
+    type Error = E;
+    type FieldName<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+    type FieldValue<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if self.remaining == 0 {
+            return Err(cx.message("Ran out of struct fields to decode"));
+        }
+
+        self.remaining -= 1;
+        Ok(StorageDecoder::new(self.decoder.reader.borrow_mut()))
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, _: &C) -> Result<Self::FieldValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(StorageDecoder::new(self.decoder.reader.borrow_mut()))
+    }
+
+    #[inline]
+    fn skip_field_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(false)
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<'de, R, const F: Options, E: 'static> VariantDecoder<'de> for StorageDecoder<R, F, E>
+where
+    R: Reader<'de>,
 {
     type Error = E;
     type Tag<'this> = StorageDecoder<R::Mut<'this>, F, E> where Self: 'this;

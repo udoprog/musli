@@ -3,7 +3,7 @@
 
 use musli::{Buf, Context};
 
-use crate::fixed_bytes::{FixedBytes, FixedBytesOverflow};
+use crate::fixed_bytes::FixedBytes;
 use crate::writer::Writer;
 
 /// A writer which buffers `N` bytes inline.
@@ -30,7 +30,7 @@ where
     /// Finish writing.
     pub fn finish<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context<Input = W::Error>,
+        C: Context,
     {
         if !self.buf.is_empty() {
             self.writer.write_bytes(cx, self.buf.as_slice())?;
@@ -43,9 +43,7 @@ where
 impl<const N: usize, W> Writer for BufferedWriter<N, W>
 where
     W: Writer,
-    W::Error: From<FixedBytesOverflow>,
 {
-    type Error = W::Error;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -56,7 +54,7 @@ where
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -66,13 +64,13 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         if self.buf.remaining() < bytes.len() {
             self.writer.write_bytes(cx, self.buf.as_slice())?;
             self.buf.clear();
         }
 
-        self.buf.write_bytes(cx.adapt(), bytes)
+        self.buf.write_bytes(cx, bytes)
     }
 }

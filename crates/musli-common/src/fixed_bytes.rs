@@ -14,7 +14,7 @@ use crate::writer::Writer;
 #[derive(Debug)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub struct FixedBytesOverflow {
+pub(crate) struct FixedBytesOverflow {
     at: usize,
     additional: usize,
     capacity: usize,
@@ -157,10 +157,10 @@ impl<const N: usize> FixedBytes<N> {
     #[inline]
     pub fn write_bytes<C>(&mut self, cx: &C, source: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = FixedBytesOverflow>,
+        C: Context,
     {
         if !self.extend_from_slice(source) {
-            return Err(cx.report(FixedBytesOverflow {
+            return Err(cx.custom(FixedBytesOverflow {
                 at: self.init,
                 additional: source.len(),
                 capacity: N,
@@ -179,7 +179,6 @@ impl<const N: usize> Default for FixedBytes<N> {
 }
 
 impl<const N: usize> Writer for FixedBytes<N> {
-    type Error = FixedBytesOverflow;
     type Mut<'this> = &'this mut Self where Self: 'this;
 
     #[inline]
@@ -190,7 +189,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -200,7 +199,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
+        C: Context,
     {
         FixedBytes::write_bytes(self, cx, bytes)?;
         cx.advance(bytes.len());

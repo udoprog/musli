@@ -12,11 +12,73 @@ use alloc::vec::Vec;
 use rand::distributions::Distribution;
 use rand::distributions::Standard;
 
+pub use musli_macros::Generate;
+
 #[cfg(feature = "std")]
 use std::collections::HashMap;
 
+/// Random number generator.
+pub struct Rng {
+    rng: rand::rngs::StdRng,
+}
+
+impl Rng {
+    pub(super) fn from_seed(seed: u64) -> Self {
+        use rand::SeedableRng;
+
+        Self {
+            rng: rand::rngs::StdRng::seed_from_u64(seed),
+        }
+    }
+
+    /// Get the next vector.
+    pub fn next_vector<T>(&mut self, count: usize) -> Vec<T>
+    where
+        T: Generate,
+    {
+        let mut out = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            out.push(self.next());
+        }
+
+        out
+    }
+
+    /// Get the next value.
+    #[allow(clippy::should_implement_trait)]
+    pub fn next<T>(&mut self) -> T
+    where
+        T: Generate,
+    {
+        T::generate(self)
+    }
+}
+
+impl rand::RngCore for Rng {
+    #[inline]
+    fn next_u32(&mut self) -> u32 {
+        self.rng.next_u32()
+    }
+
+    #[inline]
+    fn next_u64(&mut self) -> u64 {
+        self.rng.next_u64()
+    }
+
+    #[inline]
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.rng.fill_bytes(dest);
+    }
+
+    #[inline]
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+        self.rng.try_fill_bytes(dest)
+    }
+}
+
 miri! {
-    pub const STRING_RANGE: Range<usize> = 0..256, 0..16;
+    pub const STRING_RANGE: Range<usize> = 0..32, 0..16;
     #[cfg(feature = "std")]
     pub const MAP_RANGE: Range<usize> = 10..100, 1..3;
     pub const VEC_RANGE: Range<usize> = 10..100, 1..3;

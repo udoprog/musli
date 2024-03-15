@@ -1,15 +1,13 @@
 use core::fmt;
 
 use crate::de::{NumberVisitor, SizeHint, TypeHint, ValueVisitor, Visitor};
-use crate::error::Error;
 use crate::expecting::{self, Expecting};
-use crate::mode::Mode;
 use crate::Context;
 
 /// Trait that allows a type to be repeatedly coerced into a decoder.
 pub trait AsDecoder {
-    /// Error type raised by calling `as_decoder`.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder we reborrow as.
     type Decoder<'this>: Decoder<'this, Error = Self::Error>
@@ -22,10 +20,10 @@ pub trait AsDecoder {
         C: Context<Input = Self::Error>;
 }
 
-/// A pack that can construct encoders.
+/// A pack that can construct decoders.
 pub trait PackDecoder<'de> {
-    /// Error type raised by this unpack.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The encoder to use for the pack.
     type Decoder<'this>: Decoder<'de, Error = Self::Error>
@@ -48,8 +46,8 @@ pub trait PackDecoder<'de> {
 
 /// Trait governing how to decode a sequence.
 pub trait SequenceDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder for individual items.
     type Decoder<'this>: Decoder<'de, Error = Self::Error>
@@ -74,15 +72,12 @@ pub trait SequenceDecoder<'de> {
 }
 
 /// Trait governing how to decode a sequence of pairs.
-///
-/// Each invocation of [PairsDecoder::next] returns an implementation of
-/// [PairDecoder].
-pub trait PairsDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+pub trait MapDecoder<'de> {
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for a key.
-    type Decoder<'this>: PairDecoder<'de, Error = Self::Error>
+    type Entry<'this>: MapEntryDecoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
@@ -91,8 +86,8 @@ pub trait PairsDecoder<'de> {
 
     /// Decode the next key. This returns `Ok(None)` where there are no more
     /// elements to decode.
-    #[must_use = "decoders must be consumed"]
-    fn next<C>(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
+    #[must_use = "Decoders must be consumed"]
+    fn entry<C>(&mut self, cx: &C) -> Result<Option<Self::Entry<'_>>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
@@ -105,46 +100,205 @@ pub trait PairsDecoder<'de> {
         C: Context<Input = Self::Error>;
 }
 
-/// Trait governing how to decode a field.
-pub trait PairDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+/// Trait governing how to decode fields in a struct.
+pub trait StructDecoder<'de> {
+    /// Error type for decoder.
+    type Error: 'static;
+
+    /// The decoder to use for a key.
+    type Field<'this>: StructFieldDecoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Get a size hint of known remaining fields.
+    fn size_hint(&self) -> SizeHint;
+
+    /// Decode the next field.
+    #[must_use = "Decoders must be consumed"]
+    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// End the pair decoder.
+    ///
+    /// If there are any remaining elements in the sequence of pairs, this
+    /// indicates that they should be flushed.
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to decode a map entry.
+pub trait MapEntryDecoder<'de> {
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for a tuple field index.
-    type First<'this>: Decoder<'de, Error = Self::Error>
+    type MapKey<'this>: Decoder<'de, Error = Self::Error>
     where
         Self: 'this;
 
     /// The decoder to use for a tuple field value.
-    type Second: Decoder<'de, Error = Self::Error>;
+    type MapValue: Decoder<'de, Error = Self::Error>;
 
     /// Return the decoder for the first value in the pair.
     ///
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "decoders must be consumed"]
-    fn first<C>(&mut self, cx: &C) -> Result<Self::First<'_>, C::Error>
+    fn map_key<C>(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Decode the second value in the pair..
     #[must_use = "decoders must be consumed"]
-    fn second<C>(self, cx: &C) -> Result<Self::Second, C::Error>
+    fn map_value<C>(self, cx: &C) -> Result<Self::MapValue, C::Error>
     where
         C: Context<Input = Self::Error>;
 
     /// Indicate that the second value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_second<C>(self, cx: &C) -> Result<bool, C::Error>
+    fn skip_map_value<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to decode a struct field.
+pub trait StructFieldDecoder<'de> {
+    /// Error type for decoder.
+    type Error: 'static;
+
+    /// The decoder to use for a tuple field index.
+    type FieldName<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The decoder to use for a tuple field value.
+    type FieldValue: Decoder<'de, Error = Self::Error>;
+
+    /// Return the decoder for the field name.
+    #[must_use = "decoders must be consumed"]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Decode the field value.
+    #[must_use = "decoders must be consumed"]
+    fn field_value<C>(self, cx: &C) -> Result<Self::FieldValue, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Indicate that the field value should be skipped.
+    ///
+    /// The boolean returned indicates if the value was skipped or not.
+    fn skip_field_value<C>(self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to decode a sequence of map pairs.
+///
+/// This trait exists so that decoders can implement a mode that is compatible
+/// with serde deserialization.
+///
+/// If you do not intend to implement this, then serde compatibility for your
+/// format might be degraded.
+pub trait MapPairsDecoder<'de> {
+    /// Error type for decoder.
+    type Error: 'static;
+
+    /// The decoder to use for a tuple field index.
+    type MapPairsKey<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The decoder to use for a tuple field value.
+    type MapPairsValue<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Try to return the decoder for the first value in the pair.
+    ///
+    /// If this is a map the first value would be the key of the map, if this is
+    /// a struct the first value would be the field of the struct.
+    #[must_use = "decoders must be consumed"]
+    fn map_pairs_key<C>(&mut self, cx: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Decode the value in the map.
+    #[must_use = "decoders must be consumed"]
+    fn map_pairs_value<C>(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Indicate that the value should be skipped.
+    ///
+    /// The boolean returned indicates if the value was skipped or not.
+    fn skip_map_pairs_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// End pair decoding.
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>;
+}
+
+/// Trait governing how to decode a sequence of struct pairs.
+///
+/// This trait exists so that decoders can implement a mode that is compatible
+/// with serde deserialization.
+///
+/// If you do not intend to implement this, then serde compatibility for your
+/// format might be degraded.
+pub trait StructPairsDecoder<'de> {
+    /// Error type for decoder.
+    type Error: 'static;
+
+    /// The decoder to use for a tuple field index.
+    type FieldName<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// The decoder to use for a tuple field value.
+    type FieldValue<'this>: Decoder<'de, Error = Self::Error>
+    where
+        Self: 'this;
+
+    /// Try to return the decoder for the first value in the pair.
+    ///
+    /// If this is a map the first value would be the key of the map, if this is
+    /// a struct the first value would be the field of the struct.
+    #[must_use = "decoders must be consumed"]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Decode the second value in the pair..
+    #[must_use = "decoders must be consumed"]
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// Indicate that the second value should be skipped.
+    ///
+    /// The boolean returned indicates if the value was skipped or not.
+    fn skip_field_value<C>(&mut self, cx: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>;
+
+    /// End pair decoding.
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
     where
         C: Context<Input = Self::Error>;
 }
 
 /// Trait governing how to decode a variant.
 pub trait VariantDecoder<'de> {
-    /// Error type.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
 
     /// The decoder to use for the variant tag.
     type Tag<'this>: Decoder<'de, Error = Self::Error>
@@ -186,8 +340,9 @@ pub trait VariantDecoder<'de> {
 
 /// Trait governing the implementation of a decoder.
 pub trait Decoder<'de>: Sized {
-    /// Error type raised by the decoder.
-    type Error: Error;
+    /// Error type for decoder.
+    type Error: 'static;
+
     /// The type returned when the decoder is buffered.
     type Buffer: AsDecoder<Error = Self::Error>;
     /// Decoder for a value that is present.
@@ -198,18 +353,15 @@ pub trait Decoder<'de>: Sized {
     type Sequence: SequenceDecoder<'de, Error = Self::Error>;
     /// Tuple decoder implementation.
     type Tuple: PackDecoder<'de, Error = Self::Error>;
-    /// Map decoder implementation.
-    type Map: PairsDecoder<'de, Error = Self::Error>;
+    /// Decoder for a map.
+    type Map: MapDecoder<'de, Error = Self::Error>;
+    /// Decoder for a sequence of map pairs.
+    type MapPairs: MapPairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a struct.
-    ///
-    /// The caller receives a [PairsDecoder] which when advanced with
-    /// [PairsDecoder::next] indicates the fields of the structure.
-    type Struct: PairsDecoder<'de, Error = Self::Error>;
+    type Struct: StructDecoder<'de, Error = Self::Error>;
+    /// Decoder for a sequence of struct pairs.
+    type StructPairs: StructPairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a variant.
-    ///
-    /// The caller receives a [PairDecoder] which when advanced with
-    /// [PairDecoder::first] indicates which variant is being decoded and
-    /// [PairDecoder::second] is the content of the variant.
     type Variant: VariantDecoder<'de, Error = Self::Error>;
 
     /// This is a type argument used to hint to any future implementor that they
@@ -225,16 +377,16 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use core::fmt;
+    /// use core::convert::Infallible;
     ///
     /// use musli::Context;
-    /// use musli::context::Error;
     /// use musli::de::{self, Decoder};
     ///
     /// struct MyDecoder;
     ///
     /// #[musli::decoder]
     /// impl Decoder<'_> for MyDecoder {
-    ///     type Error = Error;
+    ///     type Error = Infallible;
     ///
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")
@@ -249,6 +401,17 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
+    /// Skip over the current value.
+    fn skip<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message(format_args!(
+            "Skipping is not supported, expected {}",
+            ExpectingWrapper(self).format()
+        )))
+    }
 
     /// Return a [TypeHint] indicating which type is being produced by the
     /// [Decoder].
@@ -277,8 +440,8 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
-    /// use musli::de::{AsDecoder, PairsDecoder, PairDecoder};
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{AsDecoder, MapDecoder, MapEntryDecoder};
     ///
     /// #[derive(Decode)]
     /// struct Variant2 {
@@ -291,27 +454,27 @@ pub trait Decoder<'de>: Sized {
     ///     Variant2(Variant2),
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyVariantType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyVariantType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut buffer = decoder.decode_buffer::<M, _>(cx)?;
+    ///         let mut buffer = decoder.decode_buffer(cx)?;
     ///
     ///         let mut st = buffer.as_decoder(cx)?.decode_map(cx)?;
     ///
     ///         let discriminant = loop {
-    ///             let Some(mut e) = st.next(cx)? else {
+    ///             let Some(mut e) = st.entry(cx)? else {
     ///                 return Err(cx.missing_variant_tag("MyVariantType"));
     ///             };
     ///
-    ///             let found = e.first(cx)?.decode_string(cx, musli::utils::visit_owned_fn("a string that is 'type'", |cx: &C, string: &str| {
+    ///             let found = e.map_key(cx)?.decode_string(cx, musli::utils::visit_owned_fn("a string that is 'type'", |cx: &C, string: &str| {
     ///                 Ok(string == "type")
     ///             }))?;
     ///
     ///             if found {
-    ///                 break e.second(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
+    ///                 break e.map_value(cx).and_then(|v| cx.decode(v))?;
     ///             }
     ///         };
     ///
@@ -319,16 +482,15 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         match discriminant {
     ///             0 => Ok(MyVariantType::Variant1),
-    ///             1 => Ok(MyVariantType::Variant2(buffer.as_decoder(cx).and_then(|v| Decode::<M>::decode(cx, v))?)),
+    ///             1 => Ok(MyVariantType::Variant2(buffer.as_decoder(cx).and_then(|v| cx.decode(v))?)),
     ///             other => Err(cx.invalid_variant_tag("MyVariantType", other)),
     ///         }
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_buffer<M, C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
+    fn decode_buffer<C>(self, cx: &C) -> Result<Self::Buffer, C::Error>
     where
-        M: Mode,
         C: Context<Input = Self::Error>,
     {
         Err(cx.message(format_args!(
@@ -342,11 +504,11 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct UnitType;
     ///
-    /// impl<'de, M> Decode<'de, M> for UnitType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for UnitType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -362,7 +524,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unit,
             &ExpectingWrapper(self),
         )))
@@ -373,13 +535,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: bool,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -396,7 +558,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Bool,
             &ExpectingWrapper(self),
         )))
@@ -407,13 +569,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: char,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -430,7 +592,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Char,
             &ExpectingWrapper(self),
         )))
@@ -441,13 +603,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: u8,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -464,7 +626,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned8,
             &ExpectingWrapper(self),
         )))
@@ -475,13 +637,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: u16,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -498,7 +660,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned16,
             &ExpectingWrapper(self),
         )))
@@ -509,14 +671,14 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     /// use musli::de;
     ///
     /// struct MyType {
     ///     data: u32,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -533,7 +695,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned32,
             &ExpectingWrapper(self),
         )))
@@ -544,13 +706,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: u64,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -567,7 +729,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned64,
             &ExpectingWrapper(self),
         )))
@@ -578,13 +740,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: u128,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -601,7 +763,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned128,
             &ExpectingWrapper(self),
         )))
@@ -612,13 +774,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: i8,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -635,7 +797,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed8,
             &ExpectingWrapper(self),
         )))
@@ -646,13 +808,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: i16,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -669,7 +831,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed16,
             &ExpectingWrapper(self),
         )))
@@ -680,13 +842,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: i32,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -703,7 +865,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed32,
             &ExpectingWrapper(self),
         )))
@@ -714,13 +876,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: i64,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -737,7 +899,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed64,
             &ExpectingWrapper(self),
         )))
@@ -748,13 +910,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: i128,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -771,7 +933,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed128,
             &ExpectingWrapper(self),
         )))
@@ -782,13 +944,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: usize,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -805,7 +967,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Usize,
             &ExpectingWrapper(self),
         )))
@@ -816,13 +978,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: isize,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -839,7 +1001,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Isize,
             &ExpectingWrapper(self),
         )))
@@ -850,13 +1012,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: f32,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -873,7 +1035,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Float32,
             &ExpectingWrapper(self),
         )))
@@ -884,13 +1046,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: f64,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -907,7 +1069,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Float64,
             &ExpectingWrapper(self),
         )))
@@ -921,7 +1083,7 @@ pub trait Decoder<'de>: Sized {
         C: Context<Input = Self::Error>,
         V: NumberVisitor<'de, C>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Number,
             &ExpectingWrapper(self),
         )))
@@ -932,13 +1094,13 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: [u8; 128],
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: Context<Input = D::Error>,
@@ -955,7 +1117,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Array,
             &ExpectingWrapper(self),
         )))
@@ -968,7 +1130,7 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use std::fmt;
     ///
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     /// use musli::de::ValueVisitor;
     ///
     /// #[derive(Debug, PartialEq)]
@@ -976,7 +1138,7 @@ pub trait Decoder<'de>: Sized {
     ///     data: &'de [u8],
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for BytesReference<'de> where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for BytesReference<'de> {
     ///     #[inline]
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
@@ -1021,7 +1183,7 @@ pub trait Decoder<'de>: Sized {
         C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, [u8]>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Bytes,
             &ExpectingWrapper(self),
         )))
@@ -1036,14 +1198,13 @@ pub trait Decoder<'de>: Sized {
     ///
     /// use musli::Context;
     /// use musli::de::{Decode, Decoder, ValueVisitor};
-    /// use musli::mode::Mode;
     ///
     /// #[derive(Debug, PartialEq)]
     /// struct StringReference<'de> {
     ///     data: &'de str,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for StringReference<'de> where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for StringReference<'de> {
     ///     #[inline]
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
@@ -1088,7 +1249,7 @@ pub trait Decoder<'de>: Sized {
         C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, str>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::String,
             &ExpectingWrapper(self),
         )))
@@ -1099,20 +1260,20 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     ///
     /// struct MyType {
     ///     data: Option<String>,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let data = if let Some(decoder) = decoder.decode_option(cx)? {
-    ///             Some(<String as Decode<M>>::decode(cx, decoder)?)
+    ///             Some(cx.decode(decoder)?)
     ///         } else {
     ///             None
     ///         };
@@ -1129,7 +1290,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             &ExpectingWrapper(self),
         )))
@@ -1143,7 +1304,7 @@ pub trait Decoder<'de>: Sized {
     /// [Encoder::pack][crate::Encoder::encode_pack].
     ///
     /// ```
-    /// use musli::{Context, Mode};
+    /// use musli::{Context};
     /// use musli::de::{Decode, Decoder, PackDecoder};
     ///
     /// struct PackedStruct {
@@ -1151,16 +1312,16 @@ pub trait Decoder<'de>: Sized {
     ///     data: [u8; 364],
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for PackedStruct where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for PackedStruct {
     ///     #[inline]
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut unpack = decoder.decode_pack(cx)?;
-    ///         let field = unpack.next(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
-    ///         let data = unpack.next(cx).and_then(|v| Decode::<M>::decode(cx, v))?;
+    ///         let field = unpack.next(cx).and_then(|v| cx.decode(v))?;
+    ///         let data = unpack.next(cx).and_then(|v| cx.decode(v))?;
     ///         unpack.end(cx)?;
     ///
     ///         Ok(Self {
@@ -1175,7 +1336,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Pack,
             &ExpectingWrapper(self),
         )))
@@ -1186,24 +1347,24 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Decoder, Mode};
+    /// use musli::{Context, Decode, Decoder};
     /// use musli::de::{SequenceDecoder};
     ///
     /// struct MyType {
     ///     data: Vec<String>,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut seq = decoder.decode_sequence(cx)?;
     ///         let mut data = Vec::new();
     ///
     ///         while let Some(decoder) = seq.next(cx)? {
-    ///             data.push(<String as Decode<M>>::decode(cx, decoder)?);
+    ///             data.push(cx.decode(decoder)?);
     ///         }
     ///
     ///         seq.end(cx)?;
@@ -1219,7 +1380,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Sequence,
             &ExpectingWrapper(self),
         )))
@@ -1234,19 +1395,18 @@ pub trait Decoder<'de>: Sized {
     ///
     /// use musli::Context;
     /// use musli::de::{Decode, Decoder, PackDecoder};
-    /// use musli::mode::Mode;
     ///
     /// struct TupleStruct(String, u32);
     ///
-    /// impl<'de, M> Decode<'de, M> for TupleStruct where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for TupleStruct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut tuple = decoder.decode_tuple(cx, 2)?;
-    ///         let string = tuple.next(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
-    ///         let integer = tuple.next(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?;
+    ///         let string = tuple.next(cx).and_then(|v| cx.decode(v))?;
+    ///         let integer = tuple.next(cx).and_then(|v| cx.decode(v))?;
     ///         tuple.end(cx)?;
     ///         Ok(Self(string, integer))
     ///     }
@@ -1257,7 +1417,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Tuple,
             &ExpectingWrapper(self),
         )))
@@ -1273,25 +1433,25 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use std::collections::HashMap;
     ///
-    /// use musli::{Context, Mode, Decode, Decoder};
-    /// use musli::de::{PairsDecoder, PairDecoder};
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{MapDecoder, MapEntryDecoder};
     ///
     /// struct MapStruct {
     ///     data: HashMap<String, u32>,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MapStruct where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for MapStruct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut map = decoder.decode_map(cx)?;
     ///         let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
-    ///         while let Some(mut entry) = map.next(cx)? {
-    ///             let key = entry.first(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
-    ///             let value = entry.second(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?;
+    ///         while let Some(mut entry) = map.entry(cx)? {
+    ///             let key = cx.decode(entry.map_key(cx)?)?;
+    ///             let value = cx.decode(entry.map_value(cx)?)?;
     ///             data.insert(key, value);
     ///         }
     ///
@@ -1308,8 +1468,23 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Map,
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Simplified decoding a map of unknown length.
+    ///
+    /// The length of the map must somehow be determined from the underlying
+    /// format.
+    #[inline]
+    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message(expecting::unsupported_type(
+            &expecting::MapPairs,
             &ExpectingWrapper(self),
         )))
     }
@@ -1327,34 +1502,34 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use std::collections::HashMap;
     ///
-    /// use musli::{Context, Decode, Decoder, Mode};
-    /// use musli::de::{PairsDecoder, PairDecoder};
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{StructDecoder, StructFieldDecoder};
     ///
     /// struct Struct {
     ///     string: String,
     ///     integer: u32,
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for Struct where M: Mode {
+    /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
-    ///         let mut st = decoder.decode_map(cx)?;
+    ///         let mut st = decoder.decode_struct(cx, None)?;
     ///         let mut string = None;
     ///         let mut integer = None;
     ///
-    ///         while let Some(mut entry) = st.next(cx)? {
+    ///         while let Some(mut field) = st.field(cx)? {
     ///             // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///             let tag = entry.first(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?;
+    ///             let tag: String = field.field_name(cx).and_then(|v| cx.decode(v))?;
     ///
     ///             match tag.as_str() {
     ///                 "string" => {
-    ///                     string = Some(entry.second(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?);
+    ///                     string = Some(field.field_value(cx).and_then(|v| cx.decode(v))?);
     ///                 }
     ///                 "integer" => {
-    ///                     integer = Some(entry.second(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?);
+    ///                     integer = Some(field.field_value(cx).and_then(|v| cx.decode(v))?);
     ///                 }
     ///                 tag => {
     ///                     return Err(cx.invalid_field_tag("Struct", tag))
@@ -1372,12 +1547,31 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
+    fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Struct,
+            &ExpectingWrapper(self),
+        )))
+    }
+
+    /// Simplified decoding of a struct which has an expected `len` number of
+    /// elements.
+    ///
+    /// The `len` indicates how many fields the decoder is *expecting* depending
+    /// on how many fields are present in the underlying struct being decoded,
+    /// butit should only be considered advisory.
+    ///
+    /// The size of a struct might therefore change from one session to another.
+    #[inline]
+    fn decode_struct_pairs<C>(self, cx: &C, _: Option<usize>) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message(expecting::unsupported_type(
+            &expecting::StructPairs,
             &ExpectingWrapper(self),
         )))
     }
@@ -1387,7 +1581,7 @@ pub trait Decoder<'de>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Decode, Mode};
+    /// use musli::{Context, Decode};
     /// use musli::de::{Decoder, VariantDecoder};
     ///
     /// enum Enum {
@@ -1395,24 +1589,21 @@ pub trait Decoder<'de>: Sized {
     ///     Variant2(String),
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for Enum
-    /// where
-    ///     M: Mode
-    /// {
+    /// impl<'de, M> Decode<'de, M> for Enum {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Input = D::Error>,
+    ///         C: Context<Mode = M, Input = D::Error>,
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut variant = decoder.decode_variant(cx)?;
-    ///         let tag = variant.tag(cx).and_then(|v| <usize as Decode<M>>::decode(cx, v))?;
+    ///         let tag = variant.tag(cx).and_then(|v| cx.decode(v))?;
     ///
     ///         let this = match tag {
     ///             0 => {
-    ///                 Self::Variant1(variant.variant(cx).and_then(|v| <u32 as Decode<M>>::decode(cx, v))?)
+    ///                 Self::Variant1(variant.variant(cx).and_then(|v| cx.decode(v))?)
     ///             }
     ///             1 => {
-    ///                 Self::Variant2(variant.variant(cx).and_then(|v| <String as Decode<M>>::decode(cx, v))?)
+    ///                 Self::Variant2(variant.variant(cx).and_then(|v| cx.decode(v))?)
     ///             }
     ///             tag => {
     ///                 return Err(cx.invalid_variant_tag("Enum", tag));
@@ -1429,7 +1620,7 @@ pub trait Decoder<'de>: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
             &ExpectingWrapper(self),
         )))

@@ -176,7 +176,7 @@ impl<'a> Expander<'a> {
         let mut out = TokenStream::new();
 
         for build in builds {
-            out.extend(crate::en::expand_encode_entry(build)?);
+            out.extend(crate::en::expand_insert_entry(build)?);
         }
 
         Ok(out)

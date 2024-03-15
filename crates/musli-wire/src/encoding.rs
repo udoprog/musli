@@ -10,7 +10,7 @@ use std::io;
 
 use musli::de::Decode;
 use musli::en::Encode;
-use musli::mode::{DefaultMode, Mode};
+use musli::mode::DefaultMode;
 use musli::Context;
 
 use crate::de::WireDecoder;
@@ -41,7 +41,6 @@ pub const DEFAULT: Encoding = Encoding::new();
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
-    Error: From<W::Error>,
     T: ?Sized + Encode<DefaultMode>,
 {
     DEFAULT.encode(writer, value)
@@ -85,7 +84,6 @@ where
 pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
 where
     R: Reader<'de>,
-    Error: From<R::Error>,
     T: Decode<'de, DefaultMode>,
 {
     DEFAULT.decode(reader)
@@ -148,15 +146,9 @@ impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
     }
 }
 
-impl<M, const F: Options> Encoding<M, F>
-where
-    M: Mode,
-{
+impl<M, const F: Options> Encoding<M, F> {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T, F>
-    where
-        T: Mode,
-    {
+    pub const fn with_mode<T>(self) -> Encoding<T, F> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -180,93 +172,15 @@ where
         }
     }
 
-    /// Configure the encoding to use variable integer encoding.
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_variable_integers(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Configure the encoding to use fixed integer encoding.
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_fixed_integers(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Configure the encoding to use fixed integer little-endian encoding.
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_fixed_integers_le(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Configure the encoding to use fixed integer big-endian encoding.
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_fixed_integers_be(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Configure the encoding to use fixed integer network-endian encoding
-    /// (Default).
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_fixed_integers_ne(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Configure the encoding to use fixed integer custom endian encoding.
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_fixed_integers_endian<E>(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Configure the encoding to use variable length encoding.
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_variable_lengths(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Configure the encoding to use fixed length 32-bit encoding when encoding
-    /// lengths.
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_fixed_lengths(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    /// Configure the encoding to use fixed length 64-bit encoding when encoding
-    /// lengths.
-    #[deprecated = "This does nothing, use `with_options` instead"]
-    pub const fn with_fixed_lengths64(self) -> Encoding<M, F> {
-        Encoding {
-            _marker: marker::PhantomData,
-        }
-    }
-
-    musli_common::encoding_impls!(WireEncoder::<_, F>::new, WireDecoder::<_, F>::new);
-    musli_common::encoding_from_slice_impls!(WireDecoder::<_, F>::new);
+    musli_common::encoding_impls!(M, WireEncoder::<_, F>::new, WireDecoder::<_, F>::new);
+    musli_common::encoding_from_slice_impls!(M, WireDecoder::<_, F>::new);
 }
 
-impl<M, const F: Options> Clone for Encoding<M, F>
-where
-    M: Mode,
-{
+impl<M, const F: Options> Clone for Encoding<M, F> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<M, const F: Options> Copy for Encoding<M, F> where M: Mode {}
+impl<M, const F: Options> Copy for Encoding<M, F> {}

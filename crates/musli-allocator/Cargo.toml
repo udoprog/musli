@@ -3,13 +3,16 @@ name = "musli-allocator"
 version = "0.0.96"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
+description = """
+Allocators for Müsli.
+"""
 documentation = "https://docs.rs/musli"
 readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no_std", "serialization"]
-categories = ["no-std", "memory-management", "rust-patterns"]
+keywords = ["no-std::no-alloc", "no_std", "serialization"]
+categories = ["memory-management", "no-std", "rust-patterns"]
 
 [features]
 default = ["std"]

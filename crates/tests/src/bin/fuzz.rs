@@ -37,19 +37,6 @@ tests::miri! {
     const ALLOCATED: usize = 100, 2;
 }
 
-fn generate<T>(rng: &mut StdRng, count: usize) -> Vec<T>
-where
-    T: Generate,
-{
-    let mut out = Vec::with_capacity(count);
-
-    for _ in 0..count {
-        out.push(T::generate(rng));
-    }
-
-    out
-}
-
 fn main() -> Result<()> {
     #[allow(unused)]
     let root = env::var_os("CARGO_MANIFEST_DIR")
@@ -395,7 +382,7 @@ fn main() -> Result<()> {
             let mut rng = tests::rng_with_seed(seed);
 
             $(
-                let $name = generate::<$ty>(&mut rng, $num);
+                let $name = rng.next_vector::<$ty>($num);
             )*
 
             tests::feature_matrix!(test $(, $name, $ty, $size_hint)*);

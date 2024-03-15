@@ -122,23 +122,22 @@
 //! ```
 //! use musli::Context;
 //! use musli::de::{Decode, Decoder, SequenceDecoder};
-//! use musli::mode::Mode;
 //!
 //! struct MyType {
 //!     data: Vec<String>,
 //! }
 //!
-//! impl<'de, M> Decode<'de, M> for MyType where M: Mode {
+//! impl<'de, M> Decode<'de, M> for MyType {
 //!     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 //!     where
-//!         C: Context<Input = D::Error>,
+//!         C: Context<Mode = M, Input = D::Error>,
 //!         D: Decoder<'de>,
 //!     {
 //!         let mut seq = decoder.decode_sequence(cx)?;
 //!         let mut data = Vec::with_capacity(seq.size_hint().or_default());
 //!
 //!         while let Some(decoder) = seq.next(cx)? {
-//!             data.push(Decode::<M>::decode(cx, decoder)?);
+//!             data.push(cx.decode(decoder)?);
 //!         }
 //!
 //!         seq.end(cx)?;
@@ -299,12 +298,11 @@
 //! different kinds of serialization to a single struct.
 //!
 //! ```
-//! use musli::mode::{DefaultMode, Mode};
+//! use musli::mode::DefaultMode;
 //! use musli::{Decode, Encode};
 //! use musli_json::Encoding;
 //!
 //! enum Alt {}
-//! impl Mode for Alt {}
 //!
 //! #[derive(Decode, Encode)]
 //! #[musli(mode = Alt, packed)]
@@ -410,7 +408,6 @@ pub mod compat;
 pub mod de;
 pub mod derives;
 pub mod en;
-pub mod error;
 mod expecting;
 mod impls;
 mod internal;
@@ -426,7 +423,6 @@ pub mod utils;
 
 pub use self::de::{Decode, Decoder};
 pub use self::en::{Encode, Encoder};
-pub use self::mode::Mode;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`Encoder`].
@@ -527,21 +523,16 @@ pub use musli_macros::decoder;
 /// ```
 /// use core::fmt;
 /// use core::marker;
+/// use core::convert::Infallible;
 ///
 /// use musli::de::Visitor;
-/// use musli::error::Error;
 ///
-/// struct AnyVisitor<E> {
-///     _marker: marker::PhantomData<E>,
-/// }
+/// struct AnyVisitor;
 ///
 /// #[musli::visitor]
-/// impl<'de, E> Visitor<'de> for AnyVisitor<E>
-/// where
-///     E: Error,
-/// {
+/// impl<'de> Visitor<'de> for AnyVisitor {
 ///     type Ok = ();
-///     type Error = E;
+///     type Error = Infallible;
 ///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -1,30 +1,30 @@
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
+use core::marker::PhantomData;
 use core::ops::Range;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use musli::context::Error;
 use musli::{Allocator, Context};
 
-use crate::context::access;
-use crate::context::rich_error::{RichError, Step};
-
-use super::access::Access;
+use super::access::{self, Access};
+use super::rich_error::{RichError, Step};
+use super::{Error, ErrorMarker};
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
-pub struct AllocContext<E, A> {
+pub struct AllocContext<A, M, E> {
     access: Access,
     mark: Cell<usize>,
     alloc: A,
     errors: UnsafeCell<Vec<(Vec<Step<String>>, Range<usize>, E)>>,
     path: UnsafeCell<Vec<Step<String>>>,
     include_type: bool,
+    _marker: PhantomData<M>,
 }
 
-impl<E, A> AllocContext<E, A> {
+impl<A, M, E> AllocContext<A, M, E> {
     /// Construct a new context which uses allocations to store arbitrary
     /// amounts of diagnostics about decoding.
     ///
@@ -37,6 +37,7 @@ impl<E, A> AllocContext<E, A> {
             errors: UnsafeCell::new(Vec::new()),
             path: UnsafeCell::new(Vec::new()),
             include_type: false,
+            _marker: PhantomData,
         }
     }
 
@@ -60,10 +61,10 @@ impl<E, A> AllocContext<E, A> {
     }
 }
 
-impl<E, A> AllocContext<E, A>
+impl<A, M, E> AllocContext<A, M, E>
 where
-    E: musli::error::Error,
     A: Allocator,
+    E: Error,
 {
     fn push_error(&self, range: Range<usize>, message: E) {
         let _access = self.access.exclusive();
@@ -94,13 +95,14 @@ where
     }
 }
 
-impl<E, A> Context for AllocContext<E, A>
+impl<A, M, E> Context for AllocContext<A, M, E>
 where
-    E: musli::error::Error,
     A: Allocator,
+    E: Error,
 {
+    type Mode = M;
     type Input = E;
-    type Error = Error;
+    type Error = ErrorMarker;
     type Mark = usize;
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
@@ -115,7 +117,7 @@ where
         E: From<T>,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::from(error));
-        Error
+        ErrorMarker
     }
 
     #[inline]
@@ -124,7 +126,7 @@ where
         E: From<T>,
     {
         self.push_error(mark..self.mark.get(), E::from(message));
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
@@ -133,7 +135,7 @@ where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::custom(message));
-        Error
+        ErrorMarker
     }
 
     #[inline(always)]
@@ -142,7 +144,7 @@ where
         T: fmt::Display,
     {
         self.push_error(self.mark.get()..self.mark.get(), E::message(message));
-        Error
+        ErrorMarker
     }
 
     #[inline]
@@ -151,7 +153,7 @@ where
         T: fmt::Display,
     {
         self.push_error(mark..self.mark.get(), E::message(message));
-        Error
+        ErrorMarker
     }
 
     #[inline]
