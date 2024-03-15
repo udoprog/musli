@@ -10,7 +10,7 @@ use musli::de::DecodeOwned;
 use musli::{Decode, Encode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tests::generate::Generate;
+use tests::generate::{Generate, Rng};
 
 #[derive(Encode)]
 #[musli(transparent)]
@@ -25,36 +25,48 @@ where
     T: DeserializeOwned;
 
 macro_rules! tester {
-    ($tester:ident, $module:ident $(,)?) => {
-        #[track_caller]
-        fn $tester<T>()
-        where
-            T: Eq + fmt::Debug + Generate + Encode + DecodeOwned + Serialize + DeserializeOwned,
-        {
-            let mut rng = tests::rng_with_seed(RNG_SEED);
+    ($module:ident $(,)?) => {
+        mod $module {
+            use super::*;
 
-            for _ in 0..10 {
-                let value1 = T::generate(&mut rng);
+            #[track_caller]
+            pub(super) fn random<T>()
+            where
+                T: Eq + fmt::Debug + Generate + Encode + DecodeOwned + Serialize + DeserializeOwned,
+            {
+                guided(<T as Generate>::generate);
+            }
 
-                let bytes = $module::to_vec(&value1).expect("Encode musli");
-                let serde = EncodeSerde(&value1);
-                let bytes2 = $module::to_vec(&serde).expect("Encode serde");
+            #[track_caller]
+            pub(super) fn guided<T>(value: fn(&mut Rng) -> T)
+            where
+                T: Eq + fmt::Debug + Encode + DecodeOwned + Serialize + DeserializeOwned,
+            {
+                let mut rng = tests::rng_with_seed(RNG_SEED);
+                let value1 = value(&mut rng);
 
-                let value2: T = $module::from_slice(&bytes2).expect("Decode musli");
-                assert_eq!(value1, value2);
+                let bytes1 = ::$module::to_vec(&value1).expect("Encode musli");
 
-                let DecodeSerde(value3) = $module::from_slice(&bytes).expect("Decode serde");
-                assert_eq!(value1, value3);
+                let value2: T = ::$module::from_slice(&bytes1).expect("Decode musli");
+                assert_eq!(value1, value2, "Musli decoding is incorrect");
 
-                assert_eq!(&bytes, &bytes2);
+                let DecodeSerde(value3) = ::$module::from_slice(&bytes1).expect("Decode serde");
+                assert_eq!(value1, value3, "Serde decoding is incorrect");
+
+                let bytes2 = ::$module::to_vec(&EncodeSerde(&value1)).expect("Encode serde");
+                assert_eq!(&bytes1, &bytes2, "Serde encoding is incorrect");
+
+                let value3: T =
+                    ::$module::from_slice(&bytes2).expect("Decode musli from serde-encoded bytes");
+                assert_eq!(&value1, &value3, "Serde to musli roundtrip is incorrect");
             }
         }
     };
 }
 
-tester!(musli_storage_rt, musli_storage);
-tester!(musli_wire_rt, musli_wire);
-tester!(musli_descriptive_rt, musli_descriptive);
+tester!(musli_storage);
+tester!(musli_wire);
+tester!(musli_descriptive);
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
 #[generate(crate)]
@@ -72,7 +84,6 @@ enum Enum {
 struct Struct {
     #[musli(rename = "a")]
     a: u32,
-    /// TODO: Change to `String` to break.
     #[musli(rename = "b")]
     b: u64,
     #[musli(rename = "enum_")]
@@ -85,33 +96,62 @@ struct StructWithString {
     #[musli(rename = "a")]
     a: u32,
     #[musli(rename = "b")]
-    b: u64,
-    #[musli(rename = "enum_")]
-    enum_: Enum,
+    b: String,
 }
 
 #[test]
 fn musli_storage() {
-    musli_storage_rt::<String>();
-    musli_storage_rt::<StructWithString>();
-    musli_storage_rt::<u32>();
-    musli_storage_rt::<HashMap<String, u32>>();
-    musli_storage_rt::<Enum>();
-    musli_storage_rt::<Struct>();
+    musli_storage::random::<String>();
+
+    musli_storage::random::<StructWithString>();
+
+    musli_storage::random::<u32>();
+
+    musli_storage::random::<HashMap<String, u32>>();
+
+    musli_storage::guided::<Enum>(|_| Enum::Empty);
+
+    musli_storage::guided::<Enum>(|r| Enum::Tuple(r.next(), r.next()));
+
+    musli_storage::guided::<Enum>(|r| Enum::Struct {
+        a: r.next(),
+        b: r.next(),
+    });
+
+    musli_storage::guided::<Struct>(|r| Struct {
+        a: r.next(),
+        b: r.next(),
+        enum_: Enum::Empty,
+    });
+
+    musli_storage::guided::<Struct>(|r| Struct {
+        a: r.next(),
+        b: r.next(),
+        enum_: Enum::Tuple(r.next(), r.next()),
+    });
+
+    musli_storage::guided::<Struct>(|r| Struct {
+        a: r.next(),
+        b: r.next(),
+        enum_: Enum::Struct {
+            a: r.next(),
+            b: r.next(),
+        },
+    });
 }
 
 #[test]
 fn musli_wire() {
-    musli_wire_rt::<u32>();
-    musli_wire_rt::<HashMap<String, u32>>();
-    musli_wire_rt::<Enum>();
-    musli_wire_rt::<Struct>();
+    musli_wire::random::<u32>();
+    musli_wire::random::<HashMap<String, u32>>();
+    musli_wire::random::<Enum>();
+    musli_wire::random::<Struct>();
 }
 
 #[test]
 fn musli_descriptive() {
-    musli_descriptive_rt::<u32>();
-    musli_descriptive_rt::<HashMap<String, u32>>();
-    musli_descriptive_rt::<Enum>();
-    musli_descriptive_rt::<Struct>();
+    musli_descriptive::random::<u32>();
+    musli_descriptive::random::<HashMap<String, u32>>();
+    musli_descriptive::random::<Enum>();
+    musli_descriptive::random::<Struct>();
 }

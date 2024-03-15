@@ -153,12 +153,11 @@ macro_rules! types {
 }
 
 /// Build common RNG with custom seed.
-pub fn rng_with_seed(seed: u64) -> rand::prelude::StdRng {
-    use rand::prelude::*;
-    rand::prelude::StdRng::seed_from_u64(seed)
+pub fn rng_with_seed(seed: u64) -> generate::Rng {
+    generate::Rng::from_seed(seed)
 }
 
 /// Build common RNG.
-pub fn rng() -> rand::prelude::StdRng {
+pub fn rng() -> generate::Rng {
     rng_with_seed(RNG_SEED)
 }
