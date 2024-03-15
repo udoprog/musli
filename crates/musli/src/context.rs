@@ -134,7 +134,7 @@ pub trait Context {
     where
         T: fmt::Debug,
     {
-        self.message(format_args!("Invalid field tag: {tag:?}"))
+        self.message(format_args!("Invalid field tag `{tag:?}`"))
     }
 
     /// Encountered an unsupported field tag.
@@ -176,7 +176,7 @@ pub trait Context {
         T: fmt::Debug,
     {
         self.message(format_args!(
-            "invalid variant field tag: variant: {variant:?}, tag: {tag:?}",
+            "Invalid variant field tag `{tag:?}` for variant `{variant:?}`",
         ))
     }
 

@@ -224,7 +224,7 @@ fn insert_fields(
         };
 
         if let Some((_, skip_encoding_if_path)) = f.skip_encoding_if.as_ref() {
-            let var = syn::Ident::new(&format!("t{}", f.index), f.span);
+            let var = e.cx.ident_with_span(&format!("t{}", f.index), f.span);
 
             let decl = quote! {
                 let #var = !#skip_encoding_if_path(#access);

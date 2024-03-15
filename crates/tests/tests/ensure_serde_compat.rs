@@ -32,19 +32,22 @@ macro_rules! tester {
             T: Eq + fmt::Debug + Generate + Encode + DecodeOwned + Serialize + DeserializeOwned,
         {
             let mut rng = tests::rng_with_seed(RNG_SEED);
-            let value1 = T::generate(&mut rng);
 
-            let bytes = $module::to_vec(&value1).expect("Encode musli");
-            let serde = EncodeSerde(&value1);
-            let bytes2 = $module::to_vec(&serde).expect("Encode serde");
+            for _ in 0..10 {
+                let value1 = T::generate(&mut rng);
 
-            assert_eq!(&bytes, &bytes2);
+                let bytes = $module::to_vec(&value1).expect("Encode musli");
+                let serde = EncodeSerde(&value1);
+                let bytes2 = $module::to_vec(&serde).expect("Encode serde");
 
-            let value2: T = $module::from_slice(&bytes2).expect("Decode musli");
-            assert_eq!(value1, value2);
+                let value2: T = $module::from_slice(&bytes2).expect("Decode musli");
+                assert_eq!(value1, value2);
 
-            let DecodeSerde(value3) = $module::from_slice(&bytes).expect("Decode serde");
-            assert_eq!(value1, value3);
+                let DecodeSerde(value3) = $module::from_slice(&bytes).expect("Decode serde");
+                assert_eq!(value1, value3);
+
+                assert_eq!(&bytes, &bytes2);
+            }
         }
     };
 }
@@ -76,8 +79,21 @@ struct Struct {
     enum_: Enum,
 }
 
+#[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
+#[generate(crate)]
+struct StructWithString {
+    #[musli(rename = "a")]
+    a: u32,
+    #[musli(rename = "b")]
+    b: u64,
+    #[musli(rename = "enum_")]
+    enum_: Enum,
+}
+
 #[test]
 fn musli_storage() {
+    musli_storage_rt::<String>();
+    musli_storage_rt::<StructWithString>();
     musli_storage_rt::<u32>();
     musli_storage_rt::<HashMap<String, u32>>();
     musli_storage_rt::<Enum>();
