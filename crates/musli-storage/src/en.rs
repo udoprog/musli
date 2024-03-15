@@ -338,7 +338,7 @@ where
         mut self,
         cx: &C,
         tag: &T,
-        _: usize,
+        len: usize,
     ) -> Result<Self::StructVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -346,6 +346,7 @@ where
     {
         let encoder = StorageEncoder::<_, F, E>::new(self.writer.borrow_mut());
         tag.encode(cx, encoder)?;
+        musli_common::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         Ok(self)
     }
 }

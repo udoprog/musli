@@ -556,10 +556,8 @@ where
         T: ser::Serialize,
     {
         let mut field = self.encoder.field(self.cx)?;
-        let k = field.field_name(self.cx)?;
-        key.encode(self.cx, k)?;
-        let v = field.field_value(self.cx)?;
-        value.serialize(Serializer::new(self.cx, v))?;
+        key.encode(self.cx, field.field_name(self.cx)?)?;
+        value.serialize(Serializer::new(self.cx, field.field_value(self.cx)?))?;
         field.end(self.cx)?;
         Ok(())
     }
