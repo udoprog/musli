@@ -113,9 +113,11 @@ pub mod test;
 /// Convenient result alias for use with `musli_storage`.
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
+#[cfg(feature = "alloc")]
+pub use self::encoding::to_vec;
 #[cfg(feature = "std")]
-pub use self::encoding::{to_vec, to_writer};
+pub use self::encoding::to_writer;
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
 pub use self::error::Error;
 #[cfg(feature = "test")]
 pub use self::test::transcode;

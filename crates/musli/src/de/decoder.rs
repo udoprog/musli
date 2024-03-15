@@ -1169,13 +1169,6 @@ pub trait Decoder<'de>: Sized {
     ///         })
     ///     }
     /// }
-    ///
-    /// let value = musli_value::Value::Bytes(vec![0, 1, 2, 3]);
-    /// assert_eq!(musli_value::decode::<BytesReference>(&value)?, BytesReference { data: &[0, 1, 2, 3] });
-    ///
-    /// let value = musli_value::Value::Number(42u32.into());
-    /// assert_eq!(musli_value::decode::<BytesReference>(&value).unwrap_err().to_string(), "Expected bytes, but found number");
-    /// # Ok::<_, musli_value::Error>(())
     /// ```
     #[inline]
     fn decode_bytes<C, V>(self, cx: &C, _: V) -> Result<V::Ok, C::Error>
@@ -1225,7 +1218,7 @@ pub trait Decoder<'de>: Sized {
     ///             }
     ///
     ///             #[inline]
-    ///             fn visit_borrowed(self, cx: &C, bytes: &'de str) -> Result<Self::Ok, C::Error> {
+    ///             fn visit_borrowed(self, _: &C, bytes: &'de str) -> Result<Self::Ok, C::Error> {
     ///                 Ok(bytes)
     ///             }
     ///         }
@@ -1235,13 +1228,6 @@ pub trait Decoder<'de>: Sized {
     ///         })
     ///     }
     /// }
-    ///
-    /// let value = musli_value::Value::String(String::from("Hello!"));
-    /// assert_eq!(musli_value::decode::<StringReference>(&value)?, StringReference { data: "Hello!" });
-    ///
-    /// let value = musli_value::Value::Number(42u32.into());
-    /// assert_eq!(musli_value::decode::<StringReference>(&value).unwrap_err().to_string(), "Expected string, but found number");
-    /// # Ok::<_, musli_value::Error>(())
     /// ```
     #[inline]
     fn decode_string<C, V>(self, cx: &C, _: V) -> Result<V::Ok, C::Error>

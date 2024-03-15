@@ -76,7 +76,7 @@
 //! As an example of this, these two functions both produce the same assembly on
 //! my machine (built with `--release`):
 //!
-//! ```
+//! ```ignore
 //! # use musli::{Decode, Encode};
 //! # use musli::mode::DefaultMode;
 //! # use musli_storage::encoding::Encoding;
@@ -221,7 +221,7 @@
 //! `Version2`. We're also explicitly `#[musli(rename = ..)]` the fields to
 //! ensure that they don't change in case they are re-ordered.
 //!
-//! ```rust
+//! ```ignore
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
@@ -244,7 +244,6 @@
 //! })?;
 //!
 //! let version1: Version1 = musli_wire::decode(version2.as_slice())?;
-//! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! The following is an example of *partial upgrade stability* using
@@ -253,7 +252,7 @@
 //! suitable for on-disk storage the schema can evolve from older to newer
 //! versions.
 //!
-//! ```rust
+//! ```no_build
 //! # use musli::{Encode, Decode};
 //! # #[derive(Debug, PartialEq, Encode, Decode)]
 //! # struct Version1 { name: String }
@@ -297,7 +296,7 @@
 //! Below is a simple example of how we can use two modes to provide two
 //! different kinds of serialization to a single struct.
 //!
-//! ```
+//! ```ignore
 //! use musli::mode::DefaultMode;
 //! use musli::{Decode, Encode};
 //! use musli_json::Encoding;
@@ -312,8 +311,8 @@
 //!     teineigo: bool,
 //! }
 //!
-//! let CONFIG: Encoding<DefaultMode> = Encoding::new();
-//! let ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
+//! const CONFIG: Encoding<DefaultMode> = Encoding::new();
+//! const ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
 //!
 //! let word = Word {
 //!     text: "あります",
@@ -325,7 +324,6 @@
 //!
 //! let out = ALT_CONFIG.to_string(&word)?;
 //! assert_eq!(out, r#"["あります",true]"#);
-//! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! <br>

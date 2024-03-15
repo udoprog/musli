@@ -302,8 +302,8 @@ struct Word<'a> {
     teineigo: bool,
 }
 
-let CONFIG: Encoding<DefaultMode> = Encoding::new();
-let ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
+const CONFIG: Encoding<DefaultMode> = Encoding::new();
+const ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
 
 let word = Word {
     text: "あります",

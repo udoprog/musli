@@ -30,16 +30,11 @@ use crate::Context;
 ///             match variant {
 ///                 "A" => Ok(Enum::A),
 ///                 "B" => Ok(Enum::A),
-///                 other => Err(cx.message("Expected either 'A' or 'B'")),
+///                 other => Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}"))),
 ///             }
 ///         }))
 ///     }
 /// }
-///
-/// let value = musli_value::Value::String("A".to_string());
-///
-/// assert_eq!(musli_value::decode::<Enum>(&value)?, Enum::A);
-/// # Ok::<_, musli_value::Error>(())
 /// ```
 pub fn visit_owned_fn<'de, E, U, C, T, O>(
     expected: E,

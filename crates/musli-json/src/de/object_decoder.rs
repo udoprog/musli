@@ -1,8 +1,6 @@
 use core::mem;
 
-use musli::de::{
-    Decoder, MapDecoder, MapPairsDecoder, SizeHint, StructDecoder, StructPairsDecoder,
-};
+use musli::de::{MapDecoder, MapPairsDecoder, SizeHint, StructDecoder, StructPairsDecoder};
 use musli::Context;
 
 use crate::error::{Error, ErrorKind};

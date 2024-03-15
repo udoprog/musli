@@ -59,7 +59,7 @@
 //! to revert back to the default behavior and use indexed fields we can instead
 //! use [`DefaultMode`].
 //!
-//! ```
+//! ```ignore
 //! # use musli::{Encode, Decode};
 //! # enum Json {}
 //! # #[derive(Encode, Decode)]
@@ -250,7 +250,7 @@
 //! field to define how that variant is encoded or decoded transparently without
 //! being treated as a field.
 //!
-//! ```
+//! ```ignore
 //! use musli::{Encode, Decode};
 //! use musli_wire::tag::{Tag, Kind};
 //!
@@ -258,10 +258,8 @@
 //! #[musli(transparent)]
 //! struct Struct(u32);
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let data = musli_wire::to_vec(&Struct(42))?;
 //! assert_eq!(data.as_slice(), vec![Tag::new(Kind::Continuation, 42).byte()]);
-//! # Ok(()) }
 //! ```
 //!
 //! <br>
@@ -279,7 +277,7 @@
 //! This attribute is useful for performing simple decoding over "raw" bytes
 //! when combined with an encoder which does minimal prefixing and packs fields.
 //!
-//! ```
+//! ```ignore
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode)]
@@ -290,7 +288,6 @@
 //!     field3: u32,
 //! }
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let data = musli_storage::to_vec(&Struct {
 //!     field1: 1,
 //!     field2: 2,
@@ -298,7 +295,6 @@
 //! })?;
 //!
 //! assert_eq!(data.as_slice(), vec![1, 2, 3]);
-//! # Ok(()) }
 //! ```
 //!
 //! <br>

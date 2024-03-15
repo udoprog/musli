@@ -1,6 +1,6 @@
 use core::fmt;
 
-use musli::de::{Decoder, NumberHint, NumberVisitor, SizeHint, TypeHint, ValueVisitor, Visitor};
+use musli::de::{Decoder, NumberHint, SizeHint, TypeHint, ValueVisitor, Visitor};
 use musli::Context;
 
 use crate::reader::{Parser, Token};

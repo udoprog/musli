@@ -1,4 +1,4 @@
-use musli::de::{Decoder, MapEntryDecoder, StructFieldDecoder};
+use musli::de::{MapEntryDecoder, StructFieldDecoder};
 use musli::Context;
 
 use crate::reader::{Parser, Token};
