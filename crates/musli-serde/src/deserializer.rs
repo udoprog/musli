@@ -2,7 +2,7 @@ use core::fmt;
 
 use musli::de::{
     Decoder, MapPairsDecoder, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
-    StructFieldDecoder, StructPairsDecoder, VariantDecoder,
+    StructFieldDecoder, StructPairsDecoder, VariantDecoder, Visitor,
 };
 use musli::Context;
 use serde::de;
@@ -31,13 +31,11 @@ where
     type Error = C::Error;
 
     #[inline]
-    fn deserialize_any<V>(self, _: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        Err(self
-            .cx
-            .message("Deserialization of any value is not yet supported"))
+        self.decoder.decode_any(self.cx, AnyVisitor::new(self.cx, visitor))
     }
 
     #[inline]
@@ -188,7 +186,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.decoder.decode_bytes(self.cx, BytesVisitor(visitor))
+        self.decoder.decode_bytes(self.cx, BytesVisitor::new(visitor))
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -501,7 +499,16 @@ where
     }
 }
 
-struct BytesVisitor<V>(V);
+struct BytesVisitor<V> {
+    visitor: V,
+}
+
+impl<V> BytesVisitor<V> {
+    #[inline]
+    fn new(visitor: V) -> Self {
+        Self { visitor }
+    }
+}
 
 impl<'de, C, V> musli::de::ValueVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
@@ -513,23 +520,23 @@ where
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expecting(f)
+        self.visitor.expecting(f)
     }
 
     #[inline]
     #[cfg(any(feature = "std", feature = "alloc"))]
     fn visit_owned(self, _: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
-        de::Visitor::visit_byte_buf(self.0, value)
+        de::Visitor::visit_byte_buf(self.visitor, value)
     }
 
     #[inline]
     fn visit_borrowed(self, _: &C, value: &'de [u8]) -> Result<Self::Ok, C::Error> {
-        de::Visitor::visit_borrowed_bytes(self.0, value)
+        de::Visitor::visit_borrowed_bytes(self.visitor, value)
     }
 
     #[inline]
     fn visit_ref(self, _: &C, value: &[u8]) -> Result<Self::Ok, C::Error> {
-        de::Visitor::visit_bytes(self.0, value)
+        de::Visitor::visit_bytes(self.visitor, value)
     }
 }
 
@@ -613,6 +620,130 @@ where
         de::Visitor::visit_str(self.visitor, value)
     }
 }
+
+struct NumberVisitor<V> {
+    visitor: V,
+}
+
+impl<V> NumberVisitor<V> {
+    fn new(visitor: V) -> Self {
+        Self { visitor }
+    }
+}
+
+impl<'de, C, V> musli::de::NumberVisitor<'de, C> for NumberVisitor<V>
+where
+    C: Context,
+    C::Error: de::Error,
+    V: de::Visitor<'de>,
+{
+    type Ok = V::Value;
+
+    #[inline]
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.visitor.expecting(f)
+    }
+    
+    #[inline]
+    fn visit_u8(self, cx: &C, v: u8) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_u8(v)
+    }
+    
+    #[inline]
+    fn visit_u16(self, cx: &C, v: u16) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_u16(v)
+    }
+    
+    #[inline]
+    fn visit_u32(self, cx: &C, v: u32) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_u32(v)
+    }
+    
+    #[inline]
+    fn visit_u64(self, cx: &C, v: u64) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_u64(v)
+    }
+    
+    #[inline]
+    fn visit_u128(self, cx: &C, v: u128) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_u128(v)
+    }
+    
+    #[inline]
+    fn visit_i8(self, cx: &C, v: i8) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_i8(v)
+    }
+    
+    #[inline]
+    fn visit_i16(self, cx: &C, v: i16) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_i16(v)
+    }
+    
+    #[inline]
+    fn visit_i32(self, cx: &C, v: i32) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_i32(v)
+    }
+    
+    #[inline]
+    fn visit_i64(self, cx: &C, v: i64) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_i64(v)
+    }
+    
+    #[inline]
+    fn visit_i128(self, cx: &C, v: i128) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_i128(v)
+    }
+    
+    #[inline]
+    fn visit_f32(self, cx: &C, v: f32) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_f32(v)
+    }
+    
+    #[inline]
+    fn visit_f64(self, cx: &C, v: f64) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_f64(v)
+    }
+
+    #[inline]
+    fn visit_usize(self, cx: &C, v: usize) -> Result<Self::Ok, C::Error> {
+        if let Ok(v) = u32::try_from(v) {
+            return self.visit_u32(cx, v);
+        }
+
+        if let Ok(v) = u64::try_from(v) {
+            return self.visit_u64(cx, v);
+        }
+
+        if let Ok(v) = u128::try_from(v) {
+            return self.visit_u128(cx, v);
+        }
+
+        Err(cx.message("Unsupported numerical type"))
+    }
+
+    #[inline]
+    fn visit_isize(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error> {
+        if let Ok(v) = i32::try_from(v) {
+            return self.visit_i32(cx, v);
+        }
+
+        if let Ok(v) = i64::try_from(v) {
+            return self.visit_i64(cx, v);
+        }
+
+        if let Ok(v) = i128::try_from(v) {
+            return self.visit_i128(cx, v);
+        }
+
+        Err(cx.message("Unsupported numerical type"))
+    }
+    
+    #[inline]
+    fn visit_bytes(self, cx: &C, v: &'de [u8]) -> Result<Self::Ok, <C as Context>::Error> {
+        self.visitor.visit_bytes(v)
+    }
+}
+
 struct EnumAccess<'a, C, D> {
     cx: &'a C,
     decoder: &'a mut D,
@@ -695,5 +826,259 @@ where
         let tag = self.decoder.tag(self.cx)?;
         let value = seed.deserialize(Deserializer::new(self.cx, tag))?;
         Ok((value, self))
+    }
+}
+
+struct AnyVisitor<'a, V> {
+    visitor: V,
+}
+
+impl<'a, C, V> AnyVisitor<'a, C, V> {
+    fn new(visitor: V) -> Self {
+        Self { visitor }
+    }
+}
+
+#[musli::visitor]
+impl<'de, 'a, V> Visitor<'de> for AnyVisitor<'a, V>
+where
+    V: de::Visitor<'de>,
+{
+    type Ok = V::Value;
+    type Error = C::Error;
+
+    type String<C> = StrVisitor<V>
+    where
+        C: Context<Input = Self::Error>;
+
+    type Bytes<C> = BytesVisitor<V>
+    where
+        C: Context<Input = Self::Error>;
+
+    type Number<C> = NumVisitor<V>
+    where
+        C: Context<Input = Self::Error>;
+
+    #[inline]
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.visitor.expecting(f)
+    }
+
+    #[inline]
+    fn visit_unit<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_unit()
+    }
+
+    #[inline]
+    fn visit_bool<C>(self, cx: &C, v: bool) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_bool(v)
+    }
+
+    #[inline]
+    fn visit_char<C>(self, cx: &C, v: char) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_char(v)
+    }
+
+    #[inline]
+    fn visit_u8<C>(self, cx: &C, v_: u8) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_u8(v)
+    }
+
+    #[inline]
+    fn visit_u16<C>(self, cx: &C, v: u16) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_u16(v)
+    }
+
+    #[inline]
+    fn visit_u32<C>(self, cx: &C, v: u32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_u32(v)
+    }
+
+    #[inline]
+    fn visit_u64<C>(self, cx: &C, v: u64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_u64(v)
+    }
+
+    #[inline]
+    fn visit_u128<C>(self, cx: &C, v: u128) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_u128(v)
+    }
+
+    #[inline]
+    fn visit_i8<C>(self, cx: &C, v: i8) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_i8(v)
+    }
+
+    #[inline]
+    fn visit_i16<C>(self, cx: &C, v: i16) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_i16(v)
+    }
+
+    #[inline]
+    fn visit_i32<C>(self, cx: &C, v: i32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_i32(v)
+    }
+
+    #[inline]
+    fn visit_i64<C>(self, cx: &C, v: i64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_i64(v)
+    }
+
+    #[inline]
+    fn visit_i128<C>(self, cx: &C, v: i128) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_i128(v)
+    }
+
+    #[inline]
+    fn visit_usize<C>(self, cx: &C, v: usize) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if let Ok(v) = u32::try_from(v) {
+            return self.visit_u32(cx, v);
+        }
+
+        if let Ok(v) = u64::try_from(v) {
+            return self.visit_u64(cx, v);
+        }
+
+        if let Ok(v) = u128::try_from(v) {
+            return self.visit_u128(cx, v);
+        }
+
+        Err(cx.message("Unsupported numerical type"))
+    }
+
+    #[inline]
+    fn visit_isize<C>(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        if let Ok(v) = i32::try_from(v) {
+            return self.visit_i32(cx, v);
+        }
+
+        if let Ok(v) = i64::try_from(v) {
+            return self.visit_i64(cx, v);
+        }
+
+        if let Ok(v) = i128::try_from(v) {
+            return self.visit_i128(cx, v);
+        }
+
+        Err(cx.message("Unsupported numerical type"))
+    }
+
+    #[inline]
+    fn visit_f32<C>(self, cx: &C, v: f32) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_f32(v)
+    }
+
+    #[inline]
+    fn visit_f64<C>(self, cx: &C, v: f64) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.visitor.visit_f64(v)
+    }
+
+    #[inline]
+    fn visit_option<C, D>(self, cx: &C, v: Option<D>) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        D: Decoder<'de, Error = Self::Error>,
+    {
+        match v {
+            Some(v) => self.visitor.visit_some(Deserializer::new(cx, v)),
+            None => self.visitor.visit_none(),
+        }
+    }
+
+    #[inline]
+    fn visit_sequence<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        D: SequenceDecoder<'de, Error = Self::Error>,
+    {
+        todo!()
+    }
+
+    #[inline]
+    fn visit_map<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        D: musli::de::MapDecoder<'de, Error = Self::Error>,
+    {
+        todo!()
+    }
+
+    #[inline]
+    fn visit_string<C>(self, cx: &C, hint: SizeHint) -> Result<Self::String<C>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(StrVisitor::new(self.visitor))
+    }
+
+    #[inline]
+    fn visit_bytes<C>(self, cx: &C, hint: SizeHint) -> Result<Self::Bytes<C>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(BytesVisitor::new(self.visitor))
+    }
+
+    #[inline]
+    fn visit_number<C>(
+        self,
+        cx: &C,
+        hint: musli::de::NumberHint,
+    ) -> Result<Self::Number<C>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(NumberVisitor::new(self.visitor))
     }
 }

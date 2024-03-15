@@ -24,10 +24,12 @@ pub trait Visitor<'de>: Sized {
     type String<C>: ValueVisitor<'de, C, str, Ok = Self::Ok>
     where
         C: Context<Input = Self::Error>;
+
     /// Bytes decoder to use.
     type Bytes<C>: ValueVisitor<'de, C, [u8], Ok = Self::Ok>
     where
         C: Context<Input = Self::Error>;
+
     /// Number decoder to use.
     type Number<C>: NumberVisitor<'de, C, Ok = Self::Ok>
     where
