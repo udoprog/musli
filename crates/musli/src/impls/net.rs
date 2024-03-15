@@ -49,7 +49,7 @@ impl<'de, M> Decode<'de, M> for Ipv6Addr {
 }
 
 #[derive(Encode, Decode)]
-#[musli(crate = crate)]
+#[musli(crate)]
 enum IpAddrTag {
     Ipv4,
     Ipv6,
@@ -155,7 +155,7 @@ impl<'de, M> Decode<'de, M> for SocketAddrV6 {
 }
 
 #[derive(Encode, Decode)]
-#[musli(crate = crate)]
+#[musli(crate)]
 enum SocketAddrTag {
     V4,
     V6,

@@ -17,6 +17,8 @@ use crate::tag::{
 };
 use crate::writer::{BufWriter, Writer};
 
+const VARIANT: Tag = Tag::from_mark(Mark::Variant);
+
 /// A very simple encoder.
 pub struct SelfEncoder<W, const F: Options> {
     writer: W,
@@ -345,7 +347,6 @@ where
     where
         C: Context<Input = Self::Error>,
     {
-        const VARIANT: Tag = Tag::from_mark(Mark::Variant);
         self.writer.write_byte(cx, VARIANT.byte())?;
         Ok(self)
     }
@@ -372,9 +373,8 @@ where
     ) -> Result<Self::TupleVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
-        const VARIANT: Tag = Tag::from_mark(Mark::Variant);
         self.writer.write_byte(cx, VARIANT.byte())?;
         tag.encode(cx, SelfEncoder::<_, F>::new(self.writer.borrow_mut()))?;
         self.encode_tuple(cx, len)
@@ -389,9 +389,8 @@ where
     ) -> Result<Self::StructVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
-        const VARIANT: Tag = Tag::from_mark(Mark::Variant);
         self.writer.write_byte(cx, VARIANT.byte())?;
         tag.encode(cx, SelfEncoder::<_, F>::new(self.writer.borrow_mut()))?;
         self.encode_struct(cx, len)

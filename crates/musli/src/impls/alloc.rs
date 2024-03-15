@@ -484,7 +484,7 @@ smart_pointer!(Rc);
 
 #[cfg(feature = "std")]
 #[derive(Encode, Decode)]
-#[musli(crate = crate)]
+#[musli(crate)]
 enum Tag {
     Unix,
     Windows,

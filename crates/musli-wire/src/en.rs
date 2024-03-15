@@ -401,7 +401,7 @@ where
     ) -> Result<Self::TupleVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         self.writer
             .write_byte(cx, Tag::new(Kind::Sequence, 2).byte())?;
@@ -418,7 +418,7 @@ where
     ) -> Result<Self::TupleVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         self.writer
             .write_byte(cx, Tag::new(Kind::Sequence, 2).byte())?;

@@ -373,7 +373,7 @@ where
 }
 
 #[derive(Encode, Decode)]
-#[musli(crate = crate)]
+#[musli(crate)]
 enum ResultTag {
     Ok,
     Err,

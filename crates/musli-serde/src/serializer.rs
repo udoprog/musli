@@ -145,10 +145,10 @@ where
     fn serialize_unit_variant(
         self,
         _: &'static str,
-        variant_index: u32,
-        _: &'static str,
+        _: u32,
+        variant_name: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        encode_variant(self.cx, self.encoder, &variant_index, |encoder| {
+        encode_variant(self.cx, self.encoder, variant_name, |encoder| {
             encoder.encode_unit(self.cx)
         })
     }
@@ -169,14 +169,14 @@ where
     fn serialize_newtype_variant<T: ?Sized>(
         self,
         _: &'static str,
-        variant_index: u32,
-        _: &'static str,
+        _: u32,
+        variant_name: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
         T: ser::Serialize,
     {
-        encode_variant(self.cx, self.encoder, &variant_index, move |encoder| {
+        encode_variant(self.cx, self.encoder, variant_name, move |encoder| {
             encode_newtype(self.cx, encoder, value)
         })
     }
@@ -213,13 +213,13 @@ where
     fn serialize_tuple_variant(
         self,
         _: &'static str,
-        variant_index: u32,
-        _: &'static str,
+        _: u32,
+        variant_name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         let encoder = self
             .encoder
-            .encode_tuple_variant(self.cx, &variant_index, len)?;
+            .encode_tuple_variant(self.cx, variant_name, len)?;
         Ok(SerializeSeq::new(self.cx, encoder))
     }
 
@@ -249,13 +249,13 @@ where
     fn serialize_struct_variant(
         self,
         _: &'static str,
-        variant_index: u32,
-        _: &'static str,
+        _: u32,
+        variant_name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
         let encoder = self
             .encoder
-            .encode_struct_variant(self.cx, &variant_index, len)?;
+            .encode_struct_variant(self.cx, variant_name, len)?;
         Ok(SerializeStructVariant::new(self.cx, encoder))
     }
 
@@ -276,17 +276,12 @@ where
     C: Context<Input = E::Error>,
     C::Error: ser::Error,
     E: Encoder,
-    T: Serialize,
+    T: ?Sized + Serialize,
     F: FnOnce(<E::Variant as VariantEncoder>::Variant<'_>) -> Result<O, C::Error>,
 {
     let mut variant = encoder.encode_variant(cx)?;
-
-    let tag = variant.tag(cx)?;
-    variant_tag.serialize(Serializer::new(cx, tag))?;
-
-    let value = variant.variant(cx)?;
-    let output = f(value)?;
-
+    variant_tag.serialize(Serializer::new(cx, variant.tag(cx)?))?;
+    let output = f(variant.variant(cx)?)?;
     variant.end(cx)?;
     Ok(output)
 }
@@ -519,10 +514,8 @@ where
         T: ser::Serialize,
     {
         let mut field = self.encoder.field(self.cx)?;
-        let k = field.field_name(self.cx)?;
-        key.encode(self.cx, k)?;
-        let v = field.field_value(self.cx)?;
-        value.serialize(Serializer::new(self.cx, v))?;
+        key.encode(self.cx, field.field_name(self.cx)?)?;
+        value.serialize(Serializer::new(self.cx, field.field_value(self.cx)?))?;
         field.end(self.cx)?;
         Ok(())
     }

@@ -326,7 +326,7 @@ where
     ) -> Result<Self::TupleVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         let encoder = StorageEncoder::<_, F, E>::new(self.writer.borrow_mut());
         tag.encode(cx, encoder)?;
@@ -342,7 +342,7 @@ where
     ) -> Result<Self::StructVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         let encoder = StorageEncoder::<_, F, E>::new(self.writer.borrow_mut());
         tag.encode(cx, encoder)?;

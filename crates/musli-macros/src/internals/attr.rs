@@ -293,8 +293,13 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             // parse #[musli(crate = <path>)]
             if meta.path == CRATE {
-                meta.input.parse::<Token![=]>()?;
-                new.krate.push((meta.path.span(), meta.input.parse()?));
+                let path = if meta.input.parse::<Option<Token![=]>>()?.is_some() {
+                    meta.input.parse()?
+                } else {
+                    syn::parse_quote!(crate)
+                };
+
+                new.krate.push((meta.path.span(), path));
                 return Ok(());
             }
 

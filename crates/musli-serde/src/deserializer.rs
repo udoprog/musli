@@ -10,31 +10,15 @@ use serde::de;
 #[cfg(feature = "alloc")]
 use alloc::string::String;
 
-enum Mode {
-    Default,
-    Field(usize, &'static str),
-    Variants(&'static [&'static str]),
-}
-
 pub struct Deserializer<'a, C, D> {
     cx: &'a C,
     decoder: D,
-    mode: Mode,
 }
 
 impl<'a, C, D> Deserializer<'a, C, D> {
     /// Construct a new deserializer out of a decoder.
     pub fn new(cx: &'a C, decoder: D) -> Self {
-        Self {
-            cx,
-            decoder,
-            mode: Mode::Default,
-        }
-    }
-
-    /// Construct a new deserializer which deserializes into a variant.
-    fn with_mode(cx: &'a C, decoder: D, mode: Mode) -> Self {
-        Self { cx, decoder, mode }
+        Self { cx, decoder }
     }
 }
 
@@ -187,29 +171,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        match self.mode {
-            Mode::Default => self
-                .decoder
-                .decode_string(self.cx, StrVisitor::new(visitor)),
-            Mode::Field(index, field) => {
-                let tag = self.decoder.decode_usize(self.cx)?;
-
-                if tag != index {
-                    return Err(self.cx.message("Invalid field index"));
-                }
-
-                visitor.visit_borrowed_str(field)
-            }
-            Mode::Variants(variants) => {
-                let tag = self.decoder.decode_usize(self.cx)?;
-
-                let Some(variant) = variants.get(tag) else {
-                    return Err(self.cx.message("Invalid variant index"));
-                };
-
-                visitor.visit_borrowed_str(*variant)
-            }
-        }
+        self.decoder
+            .decode_string(self.cx, StrVisitor::new(visitor))
     }
 
     #[inline]
@@ -406,111 +369,14 @@ where
     fn deserialize_enum<V>(
         self,
         _: &'static str,
-        variants: &'static [&'static str],
+        _: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        struct EnumAccess<'a, C, D> {
-            cx: &'a C,
-            decoder: &'a mut D,
-            variants: &'static [&'static str],
-        }
-
-        impl<'a, 'de, C, D> de::VariantAccess<'de> for EnumAccess<'a, C, D>
-        where
-            C: Context<Input = D::Error>,
-            C::Error: de::Error,
-            D: VariantDecoder<'de>,
-        {
-            type Error = C::Error;
-
-            #[inline]
-            fn unit_variant(self) -> Result<(), Self::Error> {
-                let decoder = self.decoder.variant(self.cx)?;
-                let st = decoder.decode_struct(self.cx, Some(0))?;
-                st.end(self.cx)?;
-                Ok(())
-            }
-
-            #[inline]
-            fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
-            where
-                T: de::DeserializeSeed<'de>,
-            {
-                let decoder = self.decoder.variant(self.cx)?;
-                let mut tuple = decoder.decode_tuple(self.cx, 1)?;
-                let field = tuple.next(self.cx)?;
-                let value = seed.deserialize(Deserializer::new(self.cx, field))?;
-                tuple.end(self.cx)?;
-                Ok(value)
-            }
-
-            #[inline]
-            fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
-            where
-                V: de::Visitor<'de>,
-            {
-                let decoder = self.decoder.variant(self.cx)?;
-                let mut tuple = decoder.decode_tuple(self.cx, len)?;
-
-                let value = visitor.visit_seq(TupleAccess::new(self.cx, &mut tuple, len))?;
-
-                tuple.end(self.cx)?;
-                Ok(value)
-            }
-
-            #[inline]
-            fn struct_variant<V>(
-                self,
-                fields: &'static [&'static str],
-                visitor: V,
-            ) -> Result<V::Value, Self::Error>
-            where
-                V: de::Visitor<'de>,
-            {
-                let decoder = self.decoder.variant(self.cx)?;
-                let mut st = decoder.decode_struct_pairs(self.cx, Some(fields.len()))?;
-                let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
-                st.end(self.cx)?;
-                Ok(value)
-            }
-        }
-
-        impl<'a, 'de, C, D> de::EnumAccess<'de> for EnumAccess<'a, C, D>
-        where
-            C: Context<Input = D::Error>,
-            C::Error: de::Error,
-            D: VariantDecoder<'de>,
-        {
-            type Error = C::Error;
-            type Variant = Self;
-
-            #[inline]
-            fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
-            where
-                V: de::DeserializeSeed<'de>,
-            {
-                let tag = self.decoder.tag(self.cx)?;
-                let value = seed.deserialize(Deserializer::with_mode(
-                    self.cx,
-                    tag,
-                    Mode::Variants(self.variants),
-                ))?;
-                Ok((value, self))
-            }
-        }
-
         let mut decoder = self.decoder.decode_variant(self.cx)?;
-
-        let enum_access = EnumAccess {
-            cx: self.cx,
-            decoder: &mut decoder,
-            variants,
-        };
-
-        let value = visitor.visit_enum(enum_access)?;
+        let value = visitor.visit_enum(EnumAccess::new(self.cx, &mut decoder))?;
         decoder.end(self.cx)?;
         Ok(value)
     }
@@ -583,7 +449,6 @@ struct StructAccess<'a, C, D> {
     cx: &'a C,
     decoder: &'a mut D,
     remaining: usize,
-    fields: &'static [&'static str],
 }
 
 impl<'a, C, D> StructAccess<'a, C, D> {
@@ -593,7 +458,6 @@ impl<'a, C, D> StructAccess<'a, C, D> {
             cx,
             decoder,
             remaining: fields.len(),
-            fields,
         }
     }
 }
@@ -615,17 +479,9 @@ where
             return Ok(None);
         }
 
-        let Some(field) = self.fields.get(self.remaining) else {
-            return Err(self
-                .cx
-                .message(format_args!("No field at index {}", self.remaining)));
-        };
-
-        let mode = Mode::Field(self.fields.len() - self.remaining, field);
-
         self.remaining -= 1;
         let decoder = self.decoder.field_name(self.cx)?;
-        let output = seed.deserialize(Deserializer::with_mode(self.cx, decoder, mode))?;
+        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
     }
 
@@ -718,11 +574,13 @@ where
     }
 }
 
-struct StrVisitor<V>(V);
+struct StrVisitor<V> {
+    visitor: V,
+}
 
 impl<V> StrVisitor<V> {
     fn new(visitor: V) -> Self {
-        Self(visitor)
+        Self { visitor }
     }
 }
 
@@ -736,22 +594,106 @@ where
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expecting(f)
+        self.visitor.expecting(f)
     }
 
     #[inline]
     #[cfg(any(feature = "std", feature = "alloc"))]
     fn visit_owned(self, _: &C, value: String) -> Result<Self::Ok, C::Error> {
-        de::Visitor::visit_string(self.0, value)
+        de::Visitor::visit_string(self.visitor, value)
     }
 
     #[inline]
     fn visit_borrowed(self, _: &C, value: &'de str) -> Result<Self::Ok, C::Error> {
-        de::Visitor::visit_borrowed_str(self.0, value)
+        de::Visitor::visit_borrowed_str(self.visitor, value)
     }
 
     #[inline]
     fn visit_ref(self, _: &C, value: &str) -> Result<Self::Ok, C::Error> {
-        de::Visitor::visit_str(self.0, value)
+        de::Visitor::visit_str(self.visitor, value)
+    }
+}
+struct EnumAccess<'a, C, D> {
+    cx: &'a C,
+    decoder: &'a mut D,
+}
+
+impl<'a, C, D> EnumAccess<'a, C, D> {
+    fn new(cx: &'a C, decoder: &'a mut D) -> Self {
+        Self { cx, decoder }
+    }
+}
+
+impl<'a, 'de, C, D> de::VariantAccess<'de> for EnumAccess<'a, C, D>
+where
+    C: Context<Input = D::Error>,
+    C::Error: de::Error,
+    D: VariantDecoder<'de>,
+{
+    type Error = C::Error;
+
+    #[inline]
+    fn unit_variant(self) -> Result<(), Self::Error> {
+        self.decoder.variant(self.cx)?.decode_unit(self.cx)
+    }
+
+    #[inline]
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        let decoder = self.decoder.variant(self.cx)?;
+        let mut tuple = decoder.decode_tuple(self.cx, 1)?;
+        let value = seed.deserialize(Deserializer::new(self.cx, tuple.next(self.cx)?))?;
+        tuple.end(self.cx)?;
+        Ok(value)
+    }
+
+    #[inline]
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let decoder = self.decoder.variant(self.cx)?;
+        let mut tuple = decoder.decode_tuple(self.cx, len)?;
+        let value = visitor.visit_seq(TupleAccess::new(self.cx, &mut tuple, len))?;
+        tuple.end(self.cx)?;
+        Ok(value)
+    }
+
+    #[inline]
+    fn struct_variant<V>(
+        self,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let decoder = self.decoder.variant(self.cx)?;
+        let mut st = decoder.decode_struct_pairs(self.cx, Some(fields.len()))?;
+        let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
+        st.end(self.cx)?;
+        Ok(value)
+    }
+}
+
+impl<'a, 'de, C, D> de::EnumAccess<'de> for EnumAccess<'a, C, D>
+where
+    C: Context<Input = D::Error>,
+    C::Error: de::Error,
+    D: VariantDecoder<'de>,
+{
+    type Error = C::Error;
+    type Variant = Self;
+
+    #[inline]
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        let tag = self.decoder.tag(self.cx)?;
+        let value = seed.deserialize(Deserializer::new(self.cx, tag))?;
+        Ok((value, self))
     }
 }

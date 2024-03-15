@@ -1525,7 +1525,7 @@ pub trait Encoder: Sized {
     ) -> Result<Self::TupleVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Variant,
@@ -1585,7 +1585,7 @@ pub trait Encoder: Sized {
     ) -> Result<Self::StructVariant, C::Error>
     where
         C: Context<Input = Self::Error>,
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         Err(cx.message(expecting::invalid_type(
             &expecting::Variant,
