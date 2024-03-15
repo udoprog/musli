@@ -264,7 +264,7 @@ fn decode_enum(
             let name = &v.st.name;
 
             let formatted_tag = en.name_format(tag_value);
-            let decode = decode_variant(e, v, ctx_var, &body_decoder_var, &variant_tag_var, &tag_var, trace).ok()?;
+            let decode = decode_variant(e, v, ctx_var, &body_decoder_var, &variant_tag_var, tag_var, trace).ok()?;
 
             let enter = trace.then(|| quote!{
                 #context_t::enter_variant(#ctx_var, #name, #formatted_tag);
@@ -337,7 +337,7 @@ fn decode_enum(
                 let name = &v.st.name;
 
                 let formatted_tag = en.name_format(tag_value);
-                let decode = decode_variant(e, v, ctx_var, &buffer_decoder_var, &variant_tag_var, &tag_var, trace).ok()?;
+                let decode = decode_variant(e, v, ctx_var, &buffer_decoder_var, &variant_tag_var, tag_var, trace).ok()?;
 
                 let enter = trace.then(|| quote! {
                     #context_t::enter_variant(#ctx_var, #name, #formatted_tag);
@@ -498,7 +498,7 @@ fn decode_enum(
                         ctx_var,
                         &body_decoder_var,
                         &variant_tag_var,
-                        &tag_var,
+                        tag_var,
                         trace,
                     )
                     .ok()?;

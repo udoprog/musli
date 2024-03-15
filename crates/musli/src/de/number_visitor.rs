@@ -160,7 +160,10 @@ where
     where
         D: Decoder<'de, Error = C::Input>,
     {
-        Err(cx.message(expecting::invalid_type(&hint, &ExpectingWrapper::new(self))))
+        Err(cx.message(expecting::unsupported_type(
+            &hint,
+            &ExpectingWrapper::new(self),
+        )))
     }
 }
 

@@ -676,6 +676,14 @@ where
     }
 
     #[inline]
+    fn decode_struct_pairs<C>(self, cx: &C, _: Option<usize>) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.shared_decode_map(cx)
+    }
+
+    #[inline]
     fn decode_variant<C>(mut self, cx: &C) -> Result<Self::Variant, C::Error>
     where
         C: Context<Input = Self::Error>,

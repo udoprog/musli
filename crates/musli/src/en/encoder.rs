@@ -380,7 +380,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unit,
             &ExpectingWrapper::new(self),
         )))
@@ -412,7 +412,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Bool,
             &ExpectingWrapper::new(self),
         )))
@@ -444,7 +444,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Char,
             &ExpectingWrapper::new(self),
         )))
@@ -476,7 +476,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned8,
             &ExpectingWrapper::new(self),
         )))
@@ -508,7 +508,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned16,
             &ExpectingWrapper::new(self),
         )))
@@ -540,7 +540,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned32,
             &ExpectingWrapper::new(self),
         )))
@@ -572,7 +572,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned64,
             &ExpectingWrapper::new(self),
         )))
@@ -604,7 +604,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned128,
             &ExpectingWrapper::new(self),
         )))
@@ -636,7 +636,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed8,
             &ExpectingWrapper::new(self),
         )))
@@ -668,7 +668,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed16,
             &ExpectingWrapper::new(self),
         )))
@@ -700,7 +700,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed32,
             &ExpectingWrapper::new(self),
         )))
@@ -732,7 +732,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed64,
             &ExpectingWrapper::new(self),
         )))
@@ -764,7 +764,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Signed128,
             &ExpectingWrapper::new(self),
         )))
@@ -796,7 +796,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Usize,
             &ExpectingWrapper::new(self),
         )))
@@ -828,7 +828,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Isize,
             &ExpectingWrapper::new(self),
         )))
@@ -860,7 +860,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Float32,
             &ExpectingWrapper::new(self),
         )))
@@ -892,7 +892,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Float64,
             &ExpectingWrapper::new(self),
         )))
@@ -924,7 +924,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Array,
             &ExpectingWrapper::new(self),
         )))
@@ -956,7 +956,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Bytes,
             &ExpectingWrapper::new(self),
         )))
@@ -996,7 +996,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Bytes,
             &ExpectingWrapper::new(self),
         )))
@@ -1028,7 +1028,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::String,
             &ExpectingWrapper::new(self),
         )))
@@ -1067,7 +1067,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             &ExpectingWrapper::new(self),
         )))
@@ -1106,7 +1106,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             &ExpectingWrapper::new(self),
         )))
@@ -1148,7 +1148,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Pack,
             &ExpectingWrapper::new(self),
         )))
@@ -1197,7 +1197,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Sequence,
             &ExpectingWrapper::new(self),
         )))
@@ -1239,7 +1239,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Tuple,
             &ExpectingWrapper::new(self),
         )))
@@ -1276,7 +1276,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Map,
             &ExpectingWrapper::new(self),
         )))
@@ -1317,8 +1317,8 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
-            &expecting::Map,
+        Err(cx.message(expecting::unsupported_type(
+            &expecting::MapPairs,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -1354,7 +1354,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Struct,
             &ExpectingWrapper::new(self),
         )))
@@ -1411,7 +1411,7 @@ pub trait Encoder: Sized {
     where
         C: Context<Input = Self::Error>,
     {
-        Err(cx.message(expecting::invalid_type(
+        Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
             &ExpectingWrapper::new(self),
         )))
@@ -1527,8 +1527,8 @@ pub trait Encoder: Sized {
         C: Context<Input = Self::Error>,
         T: ?Sized + Encode<C::Mode>,
     {
-        Err(cx.message(expecting::invalid_type(
-            &expecting::Variant,
+        Err(cx.message(expecting::unsupported_type(
+            &expecting::TupleVariant,
             &ExpectingWrapper::new(self),
         )))
     }
@@ -1587,8 +1587,8 @@ pub trait Encoder: Sized {
         C: Context<Input = Self::Error>,
         T: ?Sized + Encode<C::Mode>,
     {
-        Err(cx.message(expecting::invalid_type(
-            &expecting::Variant,
+        Err(cx.message(expecting::unsupported_type(
+            &expecting::StructVariant,
             &ExpectingWrapper::new(self),
         )))
     }

@@ -150,7 +150,7 @@ pub fn derive_generate(input: TokenStream) -> TokenStream {
 
     let mut cx = test::Ctxt::default();
 
-    if let Ok(stream) = test::expand(&mut cx, &input) {
+    if let Ok(stream) = test::expand(&mut cx, input) {
         return stream.into();
     }
 

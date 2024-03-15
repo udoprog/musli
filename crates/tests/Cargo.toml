@@ -77,6 +77,7 @@ musli-serde = { path = "../musli-serde", version = "0.0.96", default-features = 
 musli-storage = { path = "../musli-storage", version = "0.0.96", default-features = false, features = ["alloc", "test"] }
 musli-wire = { path = "../musli-wire", version = "0.0.96", default-features = false, features = ["alloc", "test"] }
 musli-descriptive = { path = "../musli-descriptive", version = "0.0.96", default-features = false, features = ["alloc", "test"] }
+musli-json = { path = "../musli-json", version = "0.0.96", default-features = false, features = ["alloc", "test"] }
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 criterion = { version = "0.4.0", features = ["html_reports"] }
 trybuild = "1.0.85"

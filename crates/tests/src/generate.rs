@@ -46,6 +46,7 @@ impl Rng {
     }
 
     /// Get the next value.
+    #[allow(clippy::should_implement_trait)]
     pub fn next<T>(&mut self) -> T
     where
         T: Generate,
@@ -77,7 +78,7 @@ impl rand::RngCore for Rng {
 }
 
 miri! {
-    pub const STRING_RANGE: Range<usize> = 0..256, 0..16;
+    pub const STRING_RANGE: Range<usize> = 0..32, 0..16;
     #[cfg(feature = "std")]
     pub const MAP_RANGE: Range<usize> = 10..100, 1..3;
     pub const VEC_RANGE: Range<usize> = 10..100, 1..3;

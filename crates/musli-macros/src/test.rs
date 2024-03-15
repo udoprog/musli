@@ -8,7 +8,7 @@ pub(super) struct Ctxt {
     pub(super) errors: Vec<syn::Error>,
 }
 
-pub(super) fn expand(cx: &mut Ctxt, input: &syn::DeriveInput) -> Result<TokenStream, ()> {
+pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<TokenStream, ()> {
     let rng = syn::Ident::new("__rng", Span::call_site());
     let generate = syn::Ident::new("Generate", Span::call_site());
 
@@ -82,11 +82,25 @@ pub(super) fn expand(cx: &mut Ctxt, input: &syn::DeriveInput) -> Result<TokenStr
         }
     };
 
+    let types = input
+        .generics
+        .type_params()
+        .map(|t| t.ident.clone())
+        .collect::<Vec<_>>();
+
+    let where_clause = input.generics.make_where_clause();
+
+    for t in types {
+        where_clause
+            .predicates
+            .push(syn::parse_quote!(#t: #generate));
+    }
+
     let (impl_generics, type_generics, where_generics) = input.generics.split_for_impl();
 
     Ok(quote! {
         impl #impl_generics #generate for #ident #type_generics #where_generics {
-            fn generate<T>(#rng: &mut T) -> Self where T: rand::Rng {
+            fn generate<__T>(#rng: &mut __T) -> Self where __T: rand::Rng {
                 #out
             }
         }
