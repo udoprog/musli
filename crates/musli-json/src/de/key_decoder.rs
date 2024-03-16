@@ -4,7 +4,6 @@ use musli::de::{Decoder, NumberHint, SizeHint, TypeHint, ValueVisitor, Visitor};
 use musli::Context;
 
 use crate::reader::{Parser, Token};
-use crate::Error;
 
 use super::{
     JsonDecoder, JsonObjectDecoder, KeySignedVisitor, KeyUnsignedVisitor, StringReference,
@@ -22,7 +21,7 @@ where
     #[inline]
     pub(super) fn skip_any<C>(self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context,
     {
         JsonDecoder::new(self.parser).skip_any(cx)
     }
@@ -41,7 +40,7 @@ where
     #[inline]
     fn decode_escaped_bytes<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context,
         V: ValueVisitor<'de, C, [u8]>,
     {
         let Some(mut scratch) = cx.alloc() else {
@@ -56,12 +55,21 @@ where
 }
 
 #[musli::decoder]
-impl<'de, P> Decoder<'de> for JsonKeyDecoder<P>
+impl<'de, C, P> Decoder<'de, C> for JsonKeyDecoder<P>
 where
+    C: Context,
     P: Parser<'de>,
 {
-    type Error = Error;
+    type Decoder<U> = Self where U: Context;
     type Struct = JsonObjectDecoder<P>;
+
+    #[inline]
+    fn with_context<U>(self, _: &C) -> Result<Self::Decoder<U>, C::Error>
+    where
+        U: Context,
+    {
+        Ok(self)
+    }
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -69,122 +77,81 @@ where
     }
 
     #[inline]
-    fn type_hint<C>(&mut self, cx: &C) -> Result<TypeHint, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn type_hint(&mut self, cx: &C) -> Result<TypeHint, C::Error> {
         JsonDecoder::new(&mut self.parser).type_hint(cx)
     }
 
     #[inline]
-    fn decode_u8<C>(self, cx: &C) -> Result<u8, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_u8(self, cx: &C) -> Result<u8, C::Error> {
         self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_u16<C>(self, cx: &C) -> Result<u16, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_u16(self, cx: &C) -> Result<u16, C::Error> {
         self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_u32<C>(self, cx: &C) -> Result<u32, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_u32(self, cx: &C) -> Result<u32, C::Error> {
         self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_u64<C>(self, cx: &C) -> Result<u64, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_u64(self, cx: &C) -> Result<u64, C::Error> {
         self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_u128<C>(self, cx: &C) -> Result<u128, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_u128(self, cx: &C) -> Result<u128, C::Error> {
         self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i8<C>(self, cx: &C) -> Result<i8, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_i8(self, cx: &C) -> Result<i8, C::Error> {
         self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i16<C>(self, cx: &C) -> Result<i16, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_i16(self, cx: &C) -> Result<i16, C::Error> {
         self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i32<C>(self, cx: &C) -> Result<i32, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_i32(self, cx: &C) -> Result<i32, C::Error> {
         self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i64<C>(self, cx: &C) -> Result<i64, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_i64(self, cx: &C) -> Result<i64, C::Error> {
         self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_i128<C>(self, cx: &C) -> Result<i128, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_i128(self, cx: &C) -> Result<i128, C::Error> {
         self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_usize<C>(self, cx: &C) -> Result<usize, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_usize(self, cx: &C) -> Result<usize, C::Error> {
         self.decode_escaped_bytes(cx, KeyUnsignedVisitor::new())
     }
 
     #[inline]
-    fn decode_isize<C>(self, cx: &C) -> Result<isize, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn decode_isize(self, cx: &C) -> Result<isize, C::Error> {
         self.decode_escaped_bytes(cx, KeySignedVisitor::new())
     }
 
     #[inline]
-    fn decode_string<C, V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_string<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
         V: ValueVisitor<'de, C, str>,
     {
         JsonDecoder::new(self.parser).decode_string(cx, visitor)
     }
 
     #[inline]
-    fn decode_any<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_any<V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
         V: Visitor<'de, C>,
     {
         match self.parser.peek(cx)? {

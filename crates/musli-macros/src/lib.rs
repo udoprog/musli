@@ -79,7 +79,7 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "decoder",
         types::DECODER_TYPES,
-        &["Error"],
+        &[],
         "__UseMusliDecoderAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),
@@ -102,7 +102,7 @@ pub fn map_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "map_decoder",
         types::MAP_DECODER_TYPES,
-        &["Error"],
+        &[],
         "__UseMusliMapDecoderAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),
@@ -125,7 +125,7 @@ pub fn struct_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "struct_decoder",
         types::STRUCT_DECODER_TYPES,
-        &["Error"],
+        &[],
         "__UseMusliStructDecoderAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),
@@ -148,7 +148,7 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "encoder",
         types::ENCODER_TYPES,
-        &["Ok", "Error"],
+        &["Ok"],
         "__UseMusliEncoderAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),

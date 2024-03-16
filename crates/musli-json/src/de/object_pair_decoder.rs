@@ -2,7 +2,6 @@ use musli::de::{MapEntryDecoder, StructFieldDecoder};
 use musli::Context;
 
 use crate::reader::{Parser, Token};
-use crate::Error;
 
 use super::{JsonDecoder, JsonKeyDecoder};
 
@@ -17,31 +16,23 @@ impl<P> JsonObjectPairDecoder<P> {
     }
 }
 
-impl<'de, P> MapEntryDecoder<'de> for JsonObjectPairDecoder<P>
+impl<'de, C, P> MapEntryDecoder<'de, C> for JsonObjectPairDecoder<P>
 where
+    C: Context,
     P: Parser<'de>,
 {
-    type Error = Error;
-
     type MapKey<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
-
     type MapValue = JsonDecoder<P>;
 
     #[inline]
-    fn map_key<C>(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn map_key(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn map_value<C>(mut self, cx: &C) -> Result<Self::MapValue, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn map_value(mut self, cx: &C) -> Result<Self::MapValue, C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
@@ -53,10 +44,7 @@ where
     }
 
     #[inline]
-    fn skip_map_value<C>(mut self, cx: &C) -> Result<bool, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn skip_map_value(mut self, cx: &C) -> Result<bool, C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
@@ -69,39 +57,28 @@ where
     }
 }
 
-impl<'de, P> StructFieldDecoder<'de> for JsonObjectPairDecoder<P>
+impl<'de, C, P> StructFieldDecoder<'de, C> for JsonObjectPairDecoder<P>
 where
+    C: Context,
     P: Parser<'de>,
 {
-    type Error = Error;
-
     type FieldName<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
-
     type FieldValue = JsonDecoder<P>;
 
     #[inline]
-    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
         MapEntryDecoder::map_key(self, cx)
     }
 
     #[inline]
-    fn field_value<C>(self, cx: &C) -> Result<Self::FieldValue, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn field_value(self, cx: &C) -> Result<Self::FieldValue, C::Error> {
         MapEntryDecoder::map_value(self, cx)
     }
 
     #[inline]
-    fn skip_field_value<C>(self, cx: &C) -> Result<bool, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn skip_field_value(self, cx: &C) -> Result<bool, C::Error> {
         MapEntryDecoder::skip_map_value(self, cx)
     }
 }

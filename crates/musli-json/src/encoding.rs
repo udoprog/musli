@@ -174,7 +174,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
     where
-        C: Context<Mode = M, Input = Error>,
+        C: Context<Mode = M>,
         W: Writer,
         T: ?Sized + Encode<M>,
     {
@@ -202,7 +202,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>
     where
-        C: Context<Mode = M, Input = Error>,
+        C: Context<Mode = M>,
         T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
@@ -233,7 +233,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn decode_with<'de, C, P, T>(self, cx: &C, parser: P) -> Result<T, C::Error>
     where
-        C: Context<Mode = M, Input = Error>,
+        C: Context<Mode = M>,
         P: Parser<'de>,
         T: Decode<'de, M>,
     {

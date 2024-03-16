@@ -23,8 +23,8 @@ use crate::Context;
 /// impl<'de, M> Decode<'de, M> for Enum {
 ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 ///     where
-///         C: Context<Input = D::Error>,
-///         D: Decoder<'de>,
+///         C: Context,
+///         D: Decoder<'de, C>,
 ///     {
 ///         decoder.decode_string(cx, musli::utils::visit_owned_fn("A string variant for Enum", |cx: &C, variant: &str| {
 ///             match variant {

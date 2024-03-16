@@ -114,10 +114,12 @@ where
 /// compatibility layer.
 pub fn encode<C, E, T>(value: &T, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 where
-    C: Context<Input = E::Error>,
-    E: Encoder,
+    C: Context,
+    E: Encoder<C>,
     T: Serialize,
 {
+    let encoder = encoder.with_context(cx)?;
+
     let cx = SerdeContext {
         error: RefCell::new(None),
         inner: cx,
@@ -145,10 +147,12 @@ where
 /// compatibility layer.
 pub fn decode<'de, C, D, T>(cx: &C, decoder: D) -> Result<T, C::Error>
 where
-    C: Context<Input = D::Error>,
-    D: Decoder<'de>,
+    C: Context,
+    D: Decoder<'de, C>,
     T: Deserialize<'de>,
 {
+    let decoder = decoder.with_context(cx)?;
+
     let cx = SerdeContext {
         error: RefCell::new(None),
         inner: cx,

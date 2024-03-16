@@ -21,13 +21,10 @@ where
 {
     /// The value produced by the visitor.
     type Ok;
-
     /// String decoder to use.
     type String: ValueVisitor<'de, C, str, Ok = Self::Ok>;
-
     /// Bytes decoder to use.
     type Bytes: ValueVisitor<'de, C, [u8], Ok = Self::Ok>;
-
     /// Number decoder to use.
     type Number: NumberVisitor<'de, C, Ok = Self::Ok>;
 
@@ -45,7 +42,7 @@ where
     /// or the underlying format doesn't know which type to decode.
     fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Error = C::Input>,
+        D: Decoder<'de, C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &hint,
@@ -210,7 +207,7 @@ where
     #[inline]
     fn visit_option<D>(self, cx: &C, _: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Error = C::Input>,
+        D: Decoder<'de, C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
@@ -222,10 +219,10 @@ where
     #[inline]
     fn visit_sequence<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        D: SequenceDecoder<'de, Error = C::Input>,
+        D: SequenceDecoder<'de, C>,
     {
         Err(cx.message(expecting::unsupported_type(
-            &expecting::SequenceWith(decoder.size_hint()),
+            &expecting::SequenceWith(decoder.size_hint(cx)),
             &ExpectingWrapper::new(self),
         )))
     }
@@ -234,10 +231,10 @@ where
     #[inline]
     fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        D: MapDecoder<'de, Error = C::Input>,
+        D: MapDecoder<'de, C>,
     {
         Err(cx.message(expecting::unsupported_type(
-            &expecting::MapWith(decoder.size_hint()),
+            &expecting::MapWith(decoder.size_hint(cx)),
             &ExpectingWrapper::new(self),
         )))
     }
@@ -273,7 +270,7 @@ where
     #[inline]
     fn visit_variant<D>(self, cx: &C, _: D) -> Result<Self::Ok, C::Error>
     where
-        D: VariantDecoder<'de, Error = C::Input>,
+        D: VariantDecoder<'de, C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,

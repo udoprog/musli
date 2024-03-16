@@ -9,8 +9,8 @@ pub trait Encode<M = DefaultMode> {
     /// Encode the given output.
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M, Input = E::Error>,
-        E: Encoder;
+        C: Context<Mode = M>,
+        E: Encoder<C>;
 }
 
 /// Trait governing how types are encoded specifically for tracing.
@@ -25,8 +25,8 @@ pub trait TraceEncode<M = DefaultMode> {
     /// Encode the given output.
     fn trace_encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M, Input = E::Error>,
-        E: Encoder;
+        C: Context<Mode = M>,
+        E: Encoder<C>;
 }
 
 impl<T, M> Encode<M> for &T
@@ -36,8 +36,8 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M, Input = E::Error>,
-        E: Encoder,
+        C: Context<Mode = M>,
+        E: Encoder<C>,
     {
         T::encode(*self, cx, encoder)
     }
@@ -50,8 +50,8 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M, Input = E::Error>,
-        E: Encoder,
+        C: Context<Mode = M>,
+        E: Encoder<C>,
     {
         T::encode(*self, cx, encoder)
     }

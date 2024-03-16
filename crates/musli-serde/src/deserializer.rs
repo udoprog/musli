@@ -24,9 +24,9 @@ impl<'a, C, D> Deserializer<'a, C, D> {
 
 impl<'de, 'a, C, D> de::Deserializer<'de> for Deserializer<'a, C, D>
 where
-    C: Context<Input = D::Error>,
+    C: Context,
     C::Error: de::Error,
-    D: Decoder<'de>,
+    D: Decoder<'de, C>,
 {
     type Error = C::Error;
 
@@ -358,9 +358,9 @@ where {
 
 impl<'de, 'a, C, D> de::SeqAccess<'de> for TupleAccess<'a, C, D>
 where
-    C: Context<Input = D::Error>,
+    C: Context,
     C::Error: de::Error,
-    D: PackDecoder<'de>,
+    D: PackDecoder<'de, C>,
 {
     type Error = C::Error;
 
@@ -404,9 +404,9 @@ impl<'a, C, D> StructAccess<'a, C, D> {
 
 impl<'de, 'a, C, D> de::MapAccess<'de> for StructAccess<'a, C, D>
 where
-    C: Context<Input = D::Error>,
+    C: Context,
     C::Error: de::Error,
-    D: StructPairsDecoder<'de>,
+    D: StructPairsDecoder<'de, C>,
 {
     type Error = C::Error;
 
@@ -495,9 +495,9 @@ impl<'a, C, D> SeqAccess<'a, C, D> {
 
 impl<'de, 'a, C, D> de::SeqAccess<'de> for SeqAccess<'a, C, D>
 where
-    C: Context<Input = D::Error>,
+    C: Context,
     C::Error: de::Error,
-    D: SequenceDecoder<'de>,
+    D: SequenceDecoder<'de, C>,
 {
     type Error = C::Error;
 
@@ -516,7 +516,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
-        match self.decoder.size_hint() {
+        match self.decoder.size_hint(self.cx) {
             SizeHint::Exact(n) => Some(n),
             _ => None,
         }
@@ -536,9 +536,9 @@ impl<'a, C, D: ?Sized> MapAccess<'a, C, D> {
 
 impl<'de, 'a, C, D: ?Sized> de::MapAccess<'de> for MapAccess<'a, C, D>
 where
-    C: Context<Input = D::Error>,
+    C: Context,
     C::Error: de::Error,
-    D: MapPairsDecoder<'de>,
+    D: MapPairsDecoder<'de, C>,
 {
     type Error = C::Error;
 
@@ -726,9 +726,9 @@ impl<'a, C, D> EnumAccess<'a, C, D> {
 
 impl<'a, 'de, C, D> de::VariantAccess<'de> for EnumAccess<'a, C, D>
 where
-    C: Context<Input = D::Error>,
+    C: Context,
     C::Error: de::Error,
-    D: VariantDecoder<'de>,
+    D: VariantDecoder<'de, C>,
 {
     type Error = C::Error;
 
@@ -782,9 +782,9 @@ where
 
 impl<'a, 'de, C, D> de::EnumAccess<'de> for EnumAccess<'a, C, D>
 where
-    C: Context<Input = D::Error>,
+    C: Context,
     C::Error: de::Error,
-    D: VariantDecoder<'de>,
+    D: VariantDecoder<'de, C>,
 {
     type Error = C::Error;
     type Variant = Self;
@@ -924,7 +924,7 @@ where
     #[inline]
     fn visit_option<D>(self, cx: &C, v: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Error = C::Input>,
+        D: Decoder<'de, C>,
     {
         match v {
             Some(v) => self.visitor.visit_some(Deserializer::new(cx, v)),
@@ -935,7 +935,7 @@ where
     #[inline]
     fn visit_sequence<D>(self, cx: &C, mut decoder: D) -> Result<Self::Ok, C::Error>
     where
-        D: SequenceDecoder<'de, Error = C::Input>,
+        D: SequenceDecoder<'de, C>,
     {
         let value = self.visitor.visit_seq(SeqAccess::new(cx, &mut decoder))?;
         decoder.end(cx)?;
@@ -945,7 +945,7 @@ where
     #[inline]
     fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        D: MapDecoder<'de, Error = C::Input>,
+        D: MapDecoder<'de, C>,
     {
         let mut map_decoder = decoder.into_map_pairs(cx)?;
         let value = self

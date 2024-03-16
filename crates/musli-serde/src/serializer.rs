@@ -21,9 +21,9 @@ impl<'a, C, E> Serializer<'a, C, E> {
 
 impl<'a, C, E> ser::Serializer for Serializer<'a, C, E>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: Encoder,
+    E: Encoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -272,11 +272,11 @@ where
 #[inline]
 fn encode_variant<C, E, T, F, O>(cx: &C, encoder: E, variant_tag: &T, f: F) -> Result<O, C::Error>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: Encoder,
+    E: Encoder<C>,
     T: ?Sized + Serialize,
-    F: FnOnce(<E::Variant as VariantEncoder>::Variant<'_>) -> Result<O, C::Error>,
+    F: FnOnce(<E::Variant as VariantEncoder<C>>::Variant<'_>) -> Result<O, C::Error>,
 {
     let mut variant = encoder.encode_variant(cx)?;
     variant_tag.serialize(Serializer::new(cx, variant.tag(cx)?))?;
@@ -298,9 +298,9 @@ impl<'a, C, E> SerializeSeq<'a, C, E> {
 
 impl<'a, C, E> ser::SerializeSeq for SerializeSeq<'a, C, E>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: SequenceEncoder,
+    E: SequenceEncoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -323,9 +323,9 @@ where
 
 impl<'a, C, E> ser::SerializeTuple for SerializeSeq<'a, C, E>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: SequenceEncoder,
+    E: SequenceEncoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -346,9 +346,9 @@ where
 
 impl<'a, C, E> ser::SerializeTupleVariant for SerializeSeq<'a, C, E>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: SequenceEncoder,
+    E: SequenceEncoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -385,9 +385,9 @@ impl<'a, C, E> SerializeTupleStruct<'a, C, E> {
 
 impl<'a, C, E> ser::SerializeTupleStruct for SerializeTupleStruct<'a, C, E>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: StructEncoder,
+    E: StructEncoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -428,9 +428,9 @@ impl<'a, C, E> SerializeMap<'a, C, E> {
 
 impl<'a, C, E> ser::SerializeMap for SerializeMap<'a, C, E>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: MapPairsEncoder,
+    E: MapPairsEncoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -474,9 +474,9 @@ impl<'a, C, E> SerializeStruct<'a, C, E> {
 
 impl<'a, C, E> ser::SerializeStruct for SerializeStruct<'a, C, E>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: StructEncoder,
+    E: StructEncoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -516,9 +516,9 @@ impl<'a, C, E> SerializeStructVariant<'a, C, E> {
 
 impl<'a, C, E> ser::SerializeStructVariant for SerializeStructVariant<'a, C, E>
 where
-    C: Context<Input = E::Error>,
+    C: Context,
     C::Error: ser::Error,
-    E: StructEncoder,
+    E: StructEncoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;

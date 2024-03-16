@@ -1,6 +1,6 @@
 use self::traits::FromUnsigned;
 pub(crate) use self::traits::{Float, Signed, Unsigned};
-use crate::error::{Error, ErrorKind};
+use crate::error::ErrorKind;
 use crate::reader::Parser;
 use musli::Context;
 
@@ -21,7 +21,7 @@ impl<T> SignedPartsBase<T>
 where
     T: Signed,
 {
-    pub(crate) fn compute(self) -> Result<T, Error> {
+    pub(crate) fn compute(self) -> Result<T, ErrorKind> {
         let Self {
             is_negative,
             unsigned,
@@ -33,7 +33,7 @@ where
             unsigned.signed()
         } {
             Some(value) => Ok(value),
-            None => Err(Error::new(ErrorKind::IntegerOverflow)),
+            None => Err(ErrorKind::IntegerOverflow),
         }
     }
 }
@@ -56,7 +56,7 @@ where
     T: Signed,
 {
     #[inline(always)]
-    pub(crate) fn compute(self) -> Result<T, Error> {
+    pub(crate) fn compute(self) -> Result<T, ErrorKind> {
         let Self {
             is_negative,
             unsigned: parts,
@@ -70,7 +70,7 @@ where
             value.signed()
         } {
             Some(value) => Ok(value),
-            None => Err(Error::new(ErrorKind::IntegerOverflow)),
+            None => Err(ErrorKind::IntegerOverflow),
         }
     }
 
@@ -158,12 +158,12 @@ where
     T: Unsigned,
 {
     #[inline(always)]
-    pub(crate) fn compute(self) -> Result<T, Error> {
+    pub(crate) fn compute(self) -> Result<T, ErrorKind> {
         macro_rules! check {
             ($expr:expr, $kind:ident) => {
                 match $expr {
                     Some(value) => value,
-                    None => return Err(Error::new(ErrorKind::$kind)),
+                    None => return Err(ErrorKind::$kind),
                 }
             };
         }
@@ -172,7 +172,7 @@ where
 
         if e == 0 {
             if !m.value.is_zero() {
-                return Err(Error::new(ErrorKind::Decimal));
+                return Err(ErrorKind::Decimal);
             }
 
             return Ok(base);
@@ -195,7 +195,7 @@ where
 
             Ok(base)
         } else if !m.value.is_zero() {
-            Err(Error::new(ErrorKind::Decimal))
+            Err(ErrorKind::Decimal)
         } else {
             Ok(check!(base.checked_neg_pow10(-e as u32), Decimal))
         }
@@ -215,7 +215,7 @@ where
 /// Implementation to skip over a well-formed JSON number.
 pub(crate) fn skip_number<'de, C, P>(cx: &C, p: &mut P) -> Result<(), C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -232,7 +232,7 @@ where
             p.consume_while(cx, is_digit)?;
         }
         _ => {
-            return Err(cx.marked_report(start, Error::new(ErrorKind::InvalidNumeric)));
+            return Err(cx.marked_custom(start, ErrorKind::InvalidNumeric));
         }
     }
 
@@ -266,7 +266,7 @@ where
 pub(crate) fn parse_unsigned_base<'de, T, C, P>(cx: &C, p: &mut P) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -281,7 +281,7 @@ where
 pub(crate) fn parse_unsigned_full<'de, T, C, P>(cx: &C, p: &mut P) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -290,7 +290,7 @@ where
 
     match decode_unsigned_full(cx, p, start)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_report(start, error)),
+        Err(error) => Err(cx.marked_custom(start, error)),
     }
 }
 
@@ -298,7 +298,7 @@ where
 #[inline(always)]
 fn decode_signed_base<'de, T, C, P>(cx: &C, p: &mut P) -> Result<SignedPartsBase<T>, C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
@@ -325,7 +325,7 @@ pub(crate) fn decode_signed_full<'de, T, C, P>(
     p: &mut P,
 ) -> Result<SignedPartsFull<T>, C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
@@ -338,7 +338,7 @@ where
 #[inline(always)]
 fn decode_signed_full_inner<'de, T, C, P>(cx: &C, p: &mut P) -> Result<SignedPartsFull<T>, C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
@@ -365,7 +365,7 @@ where
 pub(crate) fn parse_signed_base<'de, T, C, P>(cx: &C, p: &mut P) -> Result<T, C::Error>
 where
     T: Signed,
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -374,7 +374,7 @@ where
 
     match decode_signed_base(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_report(start, error)),
+        Err(error) => Err(cx.marked_custom(start, error)),
     }
 }
 
@@ -384,7 +384,7 @@ where
 pub(crate) fn parse_signed_full<'de, T, C, P>(cx: &C, p: &mut P) -> Result<T, C::Error>
 where
     T: Signed,
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -393,7 +393,7 @@ where
 
     match decode_signed_full_inner(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_report(start, error)),
+        Err(error) => Err(cx.marked_custom(start, error)),
     }
 }
 
@@ -403,7 +403,7 @@ where
 fn decode_unsigned_base<'de, T, C, P>(cx: &C, p: &mut P, start: C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     let base = match p.read_byte(cx)? {
@@ -418,7 +418,7 @@ where
             base
         }
         _ => {
-            return Err(cx.marked_report(start, Error::new(ErrorKind::InvalidNumeric)));
+            return Err(cx.marked_custom(start, ErrorKind::InvalidNumeric));
         }
     };
 
@@ -435,7 +435,7 @@ fn decode_unsigned_full<'de, T, C, P>(
 ) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     let base = decode_unsigned_base(cx, p, start)?;
@@ -460,7 +460,7 @@ where
                 m.value = match m.value.checked_pow10(zeros as u32) {
                     Some(mantissa) => mantissa,
                     None => {
-                        return Err(cx.marked_report(start, Error::new(ErrorKind::IntegerOverflow)));
+                        return Err(cx.marked_custom(start, ErrorKind::IntegerOverflow));
                     }
                 };
             }
@@ -485,7 +485,7 @@ where
 #[inline(always)]
 fn decode_exponent<'de, C, P>(cx: &C, p: &mut P, start: C::Mark) -> Result<i32, C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     let mut is_negative = false;
@@ -508,7 +508,7 @@ where
 
     match if is_negative { e.negate() } else { e.signed() } {
         Some(value) => Ok(value),
-        None => Err(cx.marked_report(start, Error::new(ErrorKind::IntegerOverflow))),
+        None => Err(cx.marked_custom(start, ErrorKind::IntegerOverflow)),
     }
 }
 
@@ -517,11 +517,11 @@ where
 fn digit<'de, T, C, P>(cx: &C, out: T, p: &mut P, start: C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     let Some(out) = out.checked_mul10() else {
-        return Err(cx.marked_report(start, Error::new(ErrorKind::IntegerOverflow)));
+        return Err(cx.marked_custom(start, ErrorKind::IntegerOverflow));
     };
 
     Ok(out + T::from_byte(p.read_byte(cx)? - b'0'))
@@ -531,7 +531,7 @@ where
 #[inline(always)]
 fn decode_zeros<'de, C, P>(cx: &C, p: &mut P) -> Result<i32, C::Error>
 where
-    C: Context<Input = Error>,
+    C: Context,
     P: ?Sized + Parser<'de>,
 {
     let mut count = 0i32;

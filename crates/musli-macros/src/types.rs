@@ -18,13 +18,14 @@ pub(super) enum Ty {
 pub(super) enum Extra {
     None,
     Context,
+    This,
     Visitor(Option<Ty>),
 }
 
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
-    ("Error", Extra::None),
+    ("Encoder", Extra::Context),
     ("Some", Extra::None),
-    ("Pack", Extra::Context),
+    ("Pack", Extra::This),
     ("Sequence", Extra::None),
     ("Tuple", Extra::None),
     ("Map", Extra::None),
@@ -36,7 +37,7 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
 ];
 
 pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
-    ("Error", Extra::None),
+    ("Decoder", Extra::Context),
     ("Buffer", Extra::None),
     ("Some", Extra::None),
     ("Pack", Extra::None),
@@ -138,7 +139,7 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: self.never_type(arguments, extra, &impl_type.generics)?,
+                path: self.never_type(arguments, extra)?,
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
@@ -147,26 +148,18 @@ impl Types {
         for (ident, extra) in missing {
             let generics = match extra {
                 Extra::Context => {
-                    let c_param = syn::Ident::new("C", Span::call_site());
-                    let this_lifetime = syn::Lifetime::new("'this", Span::call_site());
+                    let c_param = syn::Ident::new("__C", Span::call_site());
 
                     let mut where_clause = syn::WhereClause {
                         where_token: <Token![where]>::default(),
                         predicates: Punctuated::default(),
                     };
 
-                    where_clause.predicates.push(
-                        syn::parse_quote!(#c_param: #this_lifetime + musli::context::Context),
-                    );
+                    where_clause
+                        .predicates
+                        .push(syn::parse_quote!(#c_param: ::musli::context::Context));
 
                     let mut params = Punctuated::default();
-
-                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
-                        attrs: Vec::new(),
-                        lifetime: this_lifetime,
-                        colon_token: None,
-                        bounds: Punctuated::default(),
-                    }));
 
                     params.push(syn::GenericParam::Type(syn::TypeParam {
                         attrs: Vec::new(),
@@ -184,10 +177,47 @@ impl Types {
                         where_clause: Some(where_clause),
                     }
                 }
+                Extra::This => {
+                    let mut it = self.item_impl.generics.type_params();
+
+                    let Some(syn::TypeParam { ident: c_param, .. }) = it.next() else {
+                        return Err(syn::Error::new_spanned(
+                            &self.item_impl.generics,
+                            "Missing generic parameter in associated type (usually `C`)",
+                        ));
+                    };
+
+                    let this_lifetime = syn::Lifetime::new("'this", Span::call_site());
+
+                    let mut where_clause = syn::WhereClause {
+                        where_token: <Token![where]>::default(),
+                        predicates: Punctuated::default(),
+                    };
+
+                    where_clause
+                        .predicates
+                        .push(syn::parse_quote!(#c_param: #this_lifetime));
+
+                    let mut params = Punctuated::default();
+
+                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
+                        attrs: Vec::new(),
+                        lifetime: this_lifetime,
+                        colon_token: None,
+                        bounds: Punctuated::default(),
+                    }));
+
+                    syn::Generics {
+                        lt_token: Some(<Token![<]>::default()),
+                        params,
+                        gt_token: Some(<Token![>]>::default()),
+                        where_clause: Some(where_clause),
+                    }
+                }
                 _ => syn::Generics::default(),
             };
 
-            let never = self.never_type(arguments, extra, &generics)?;
+            let never = self.never_type(arguments, extra)?;
 
             let ty = syn::ImplItemType {
                 attrs: Vec::new(),
@@ -227,12 +257,7 @@ impl Types {
         Ok(self.item_impl.into_token_stream())
     }
 
-    fn never_type(
-        &self,
-        arguments: &[&str],
-        extra: Extra,
-        generics: &syn::Generics,
-    ) -> syn::Result<syn::Path> {
+    fn never_type(&self, arguments: &[&str], extra: Extra) -> syn::Result<syn::Path> {
         let mut never = syn::Path {
             leading_colon: None,
             segments: Punctuated::default(),
@@ -260,15 +285,6 @@ impl Types {
             }
 
             if let Extra::Visitor(ty) = extra {
-                let mut it = self.item_impl.generics.type_params();
-
-                let Some(syn::TypeParam { ident: c_param, .. }) = it.next() else {
-                    return Err(syn::Error::new_spanned(
-                        generics,
-                        "Missing generic parameter in associated type (usually `C`)",
-                    ));
-                };
-
                 if let Some(ty) = ty {
                     match ty {
                         Ty::Str => {
@@ -300,19 +316,17 @@ impl Types {
                         }
                     }
                 }
-
-                args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                    qself: None,
-                    path: ident_path(c_param.clone()),
-                })));
             }
 
-            s.arguments = syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
-                colon2_token: None,
-                lt_token: <Token![<]>::default(),
-                args,
-                gt_token: <Token![>]>::default(),
-            });
+            if !args.is_empty() {
+                s.arguments =
+                    syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                        colon2_token: None,
+                        lt_token: <Token![<]>::default(),
+                        args,
+                        gt_token: <Token![>]>::default(),
+                    });
+            }
 
             s
         });

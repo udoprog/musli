@@ -130,11 +130,11 @@
 //! impl<'de, M> Decode<'de, M> for MyType {
 //!     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 //!     where
-//!         C: Context<Mode = M, Input = D::Error>,
-//!         D: Decoder<'de>,
+//!         C: Context<Mode = M>,
+//!         D: Decoder<'de, C>,
 //!     {
 //!         let mut seq = decoder.decode_sequence(cx)?;
-//!         let mut data = Vec::with_capacity(seq.size_hint().or_default());
+//!         let mut data = Vec::with_capacity(seq.size_hint(cx).or_default());
 //!
 //!         while let Some(decoder) = seq.next(cx)? {
 //!             data.push(cx.decode(decoder)?);
@@ -445,18 +445,15 @@ pub use self::en::{Encode, Encoder};
 /// }
 ///
 /// #[musli::encoder]
-/// impl Encoder for MyEncoder<'_> {
+/// impl<C> Encoder<C> for MyEncoder<'_> where C: Context {
 ///     type Ok = ();
-///     type Error = String;
+///     type Encoder<U> = Self where U: Context;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn encode_u32<C>(self, cx: &C, value: u32) -> Result<(), C::Error>
-///     where
-///         C: Context<Input = Self::Error>
-///     {
+///     fn encode_u32(self, cx: &C, value: u32) -> Result<(), C::Error> {
 ///         *self.value = Some(value);
 ///         Ok(())
 ///     }
@@ -486,17 +483,12 @@ pub use musli_macros::encoder;
 /// struct MyDecoder;
 ///
 /// #[musli::decoder]
-/// impl Decoder<'_> for MyDecoder {
-///     type Error = String;
-///
+/// impl<C> Decoder<'_, C> for MyDecoder where C: Context {
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32<C>(self, _: &C) -> Result<u32, C::Error>
-///     where
-///         C: Context<Input = Self::Error>
-///     {
+///     fn decode_u32(self, _: &C) -> Result<u32, C::Error> {
 ///         Ok(42)
 ///     }
 /// }
@@ -513,22 +505,6 @@ pub use musli_macros::decoder;
 /// any missing types automatically.
 ///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
-///
-/// # Examples
-///
-/// ```
-/// use std::fmt;
-///
-/// use musli::Context;
-/// use musli::de::MapDecoder;
-///
-/// struct MyDecoder;
-///
-/// #[musli::map_decoder]
-/// impl MapDecoder<'_> for MyDecoder {
-///     type Error = String;
-/// }
-/// ```
 #[doc(inline)]
 pub use musli_macros::map_decoder;
 
@@ -541,22 +517,6 @@ pub use musli_macros::map_decoder;
 /// any missing types automatically.
 ///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
-///
-/// # Examples
-///
-/// ```
-/// use std::fmt;
-///
-/// use musli::Context;
-/// use musli::de::StructDecoder;
-///
-/// struct MyDecoder;
-///
-/// #[musli::struct_decoder]
-/// impl StructDecoder<'_> for MyDecoder {
-///     type Error = String;
-/// }
-/// ```
 #[doc(inline)]
 pub use musli_macros::struct_decoder;
 
@@ -576,8 +536,6 @@ pub use musli_macros::struct_decoder;
 ///
 /// ```
 /// use core::fmt;
-/// use core::marker;
-/// use core::convert::Infallible;
 ///
 /// use musli::Context;
 /// use musli::de::Visitor;

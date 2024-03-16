@@ -1,7 +1,7 @@
 use musli::de::VariantDecoder;
 use musli::Context;
 
-use crate::error::{Error, ErrorKind};
+use crate::error::ErrorKind;
 use crate::reader::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder};
@@ -17,14 +17,14 @@ where
     #[inline]
     pub(crate) fn new<C>(cx: &C, mut parser: P) -> Result<Self, C::Error>
     where
-        C: Context<Input = Error>,
+        C: Context,
     {
         parser.skip_whitespace(cx)?;
 
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(cx.report(Error::new(ErrorKind::ExpectedOpenBrace(actual))));
+            return Err(cx.custom(ErrorKind::ExpectedOpenBrace(actual)));
         }
 
         parser.skip(cx, 1)?;
@@ -32,35 +32,27 @@ where
     }
 }
 
-impl<'de, P> VariantDecoder<'de> for JsonVariantDecoder<P>
+impl<'de, C, P> VariantDecoder<'de, C> for JsonVariantDecoder<P>
 where
+    C: Context,
     P: Parser<'de>,
 {
-    type Error = Error;
-
     type Tag<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
-
     type Variant<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn tag<C>(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn variant<C>(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn variant(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(cx.report(Error::new(ErrorKind::ExpectedColon(actual))));
+            return Err(cx.custom(ErrorKind::ExpectedColon(actual)));
         }
 
         self.parser.skip(cx, 1)?;
@@ -68,24 +60,18 @@ where
     }
 
     #[inline]
-    fn skip_variant<C>(&mut self, cx: &C) -> Result<bool, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn skip_variant(&mut self, cx: &C) -> Result<bool, C::Error> {
         let this = self.variant(cx)?;
         JsonDecoder::new(this.parser).skip_any(cx)?;
         Ok(true)
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn end(mut self, cx: &C) -> Result<(), C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::CloseBrace) {
-            return Err(cx.report(Error::new(ErrorKind::ExpectedCloseBrace(actual))));
+            return Err(cx.custom(ErrorKind::ExpectedCloseBrace(actual)));
         }
 
         self.parser.skip(cx, 1)?;

@@ -11,8 +11,8 @@ pub trait Decode<'de, M = DefaultMode>: Sized {
     /// Decode the given input.
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M, Input = D::Error>,
-        D: Decoder<'de>;
+        C: Context<Mode = M>,
+        D: Decoder<'de, C>;
 }
 
 /// Trait governing how types are decoded specifically for tracing.
@@ -27,6 +27,6 @@ pub trait TraceDecode<'de, M = DefaultMode>: Sized {
     /// Decode the given input.
     fn trace_decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M, Input = D::Error>,
-        D: Decoder<'de>;
+        C: Context<Mode = M>,
+        D: Decoder<'de, C>;
 }

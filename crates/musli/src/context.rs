@@ -25,7 +25,7 @@ pub trait Context {
     fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
-        D: Decoder<'de, Error = Self::Input>,
+        D: Decoder<'de, Self>,
         Self: Sized,
     {
         T::decode(self, decoder)
@@ -42,9 +42,9 @@ pub trait Context {
     /// Generate a map function which maps an error using the `report` function.
     fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
     where
-        Self::Input: From<T>,
+        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        move |error| self.report(error)
+        move |error| self.custom(error)
     }
 
     /// Report a custom error, which is not encapsulated by the error type
@@ -82,6 +82,18 @@ pub trait Context {
         T: fmt::Display,
     {
         self.message(message)
+    }
+
+    /// Report an error based on a mark.
+    ///
+    /// A mark is generated using [Context::mark] and indicates a prior state.
+    #[allow(unused_variables)]
+    #[inline(always)]
+    fn marked_custom<T>(&self, mark: Self::Mark, message: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+    {
+        self.custom(message)
     }
 
     /// Advance the context by `n` bytes of input.

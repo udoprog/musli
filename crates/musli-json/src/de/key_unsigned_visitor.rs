@@ -4,7 +4,6 @@ use core::marker;
 use musli::de::ValueVisitor;
 use musli::Context;
 
-use crate::error::Error;
 use crate::reader::integer::Unsigned;
 use crate::reader::SliceParser;
 
@@ -24,7 +23,7 @@ impl<C, T> KeyUnsignedVisitor<C, T> {
 
 impl<'de, C, T> ValueVisitor<'de, C, [u8]> for KeyUnsignedVisitor<C, T>
 where
-    C: Context<Input = Error>,
+    C: Context,
     T: Unsigned,
 {
     type Ok = T;

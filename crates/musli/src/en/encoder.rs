@@ -1,32 +1,31 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use crate::en::Encode;
 use crate::expecting::{self, Expecting};
 use crate::Context;
 
 /// Trait governing how to encode a sequence.
-pub trait SequenceEncoder {
+pub trait SequenceEncoder<C>
+where
+    C: Context,
+{
     /// Result type of the encoder.
     type Ok;
-    /// Error type for encoder.
-    type Error: 'static;
 
     /// The encoder returned when advancing the sequence encoder.
-    type Encoder<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type Encoder<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Prepare encoding of the next element.
     #[must_use = "Encoder must be consumed"]
-    fn next<C>(&mut self, cx: &C) -> Result<Self::Encoder<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn next(&mut self, cx: &C) -> Result<Self::Encoder<'_>, C::Error>;
 
     /// Push an element into the sequence.
     #[inline]
-    fn push<C, T>(&mut self, cx: &C, value: T) -> Result<(), C::Error>
+    fn push<T>(&mut self, cx: &C, value: T) -> Result<(), C::Error>
     where
-        C: Context<Input = Self::Error>,
         T: Encode<C::Mode>,
     {
         let encoder = self.next(cx)?;
@@ -35,29 +34,27 @@ pub trait SequenceEncoder {
     }
 
     /// End the sequence.
-    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 }
 
 /// Encoder for a map.
-pub trait MapEncoder {
+pub trait MapEncoder<C>
+where
+    C: Context,
+{
     /// Result type of the encoder.
     type Ok;
-    /// Error type for encoder.
-    type Error: 'static;
 
     /// Encode the next pair.
-    type Entry<'this>: MapEntryEncoder<Ok = Self::Ok, Error = Self::Error>
+    type Entry<'this>: MapEntryEncoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Insert a pair immediately.
     #[inline]
-    fn insert_entry<C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
+    fn insert_entry<F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
     where
         Self: Sized,
-        C: Context<Input = Self::Error>,
         F: Encode<C::Mode>,
         S: Encode<C::Mode>,
     {
@@ -66,41 +63,37 @@ pub trait MapEncoder {
     }
 
     /// Encode the next pair.
-    fn entry<C>(&mut self, cx: &C) -> Result<Self::Entry<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn entry(&mut self, cx: &C) -> Result<Self::Entry<'_>, C::Error>;
 
     /// Finish encoding pairs.
-    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 }
 
 /// Trait governing how to encode a map entry.
-pub trait MapEntryEncoder {
+pub trait MapEntryEncoder<C>
+where
+    C: Context,
+{
     /// Result type of the encoder.
     type Ok;
-    /// Error type for encoder.
-    type Error: 'static;
 
     /// The encoder returned when advancing the map encoder to encode the key.
-    type MapKey<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type MapKey<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type MapValue<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type MapValue<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert_entry<C, F, S>(mut self, cx: &C, key: F, value: S) -> Result<Self::Ok, C::Error>
+    fn insert_entry<K, V>(mut self, cx: &C, key: K, value: V) -> Result<Self::Ok, C::Error>
     where
         Self: Sized,
-        C: Context<Input = Self::Error>,
-        F: Encode<C::Mode>,
-        S: Encode<C::Mode>,
+        K: Encode<C::Mode>,
+        V: Encode<C::Mode>,
     {
         self.map_key(cx).and_then(|e| key.encode(cx, e))?;
         self.map_value(cx).and_then(|e| value.encode(cx, e))?;
@@ -109,20 +102,14 @@ pub trait MapEntryEncoder {
 
     /// Return the encoder for the key in the entry.
     #[must_use = "Encoders must be consumed"]
-    fn map_key<C>(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn map_key(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error>;
 
     /// Return encoder for value in the entry.
     #[must_use = "Encoders must be consumed"]
-    fn map_value<C>(&mut self, cx: &C) -> Result<Self::MapValue<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn map_value(&mut self, cx: &C) -> Result<Self::MapValue<'_>, C::Error>;
 
     /// Stop encoding this pair.
-    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 }
 
 /// Trait governing how to encode a map entry.
@@ -132,30 +119,29 @@ pub trait MapEntryEncoder {
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
-pub trait MapPairsEncoder {
+pub trait MapPairsEncoder<C>
+where
+    C: Context,
+{
     /// Result type of the encoder.
     type Ok;
-    /// Error type for encoder.
-    type Error: 'static;
 
     /// The encoder returned when advancing the map encoder to encode the key.
-    type MapPairsKey<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type MapPairsKey<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type MapPairsValue<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type MapPairsValue<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Insert the pair immediately.
     #[inline]
-    fn map_pairs_insert<C, F, S>(&mut self, cx: &C, key: F, value: S) -> Result<(), C::Error>
+    fn map_pairs_insert<K, V>(&mut self, cx: &C, key: K, value: V) -> Result<(), C::Error>
     where
-        Self: Sized,
-        C: Context<Input = Self::Error>,
-        F: Encode<C::Mode>,
-        S: Encode<C::Mode>,
+        K: Encode<C::Mode>,
+        V: Encode<C::Mode>,
     {
         self.map_pairs_key(cx).and_then(|e| key.encode(cx, e))?;
         self.map_pairs_value(cx).and_then(|e| value.encode(cx, e))?;
@@ -164,82 +150,71 @@ pub trait MapPairsEncoder {
 
     /// Return the encoder for the key in the entry.
     #[must_use = "Encoders must be consumed"]
-    fn map_pairs_key<C>(&mut self, cx: &C) -> Result<Self::MapPairsKey<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn map_pairs_key(&mut self, cx: &C) -> Result<Self::MapPairsKey<'_>, C::Error>;
 
     /// Return encoder for value in the entry.
     #[must_use = "Encoders must be consumed"]
-    fn map_pairs_value<C>(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn map_pairs_value(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>;
 
     /// Stop encoding this pair.
-    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 }
 
 /// Encoder for a struct.
-pub trait StructEncoder {
+pub trait StructEncoder<C>
+where
+    C: Context,
+{
     /// Result type of the encoder.
     type Ok;
-    /// Error type for encoder.
-    type Error: 'static;
 
     /// Encoder for the next struct field.
-    type Field<'this>: StructFieldEncoder<Ok = Self::Ok, Error = Self::Error>
+    type Field<'this>: StructFieldEncoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
-    /// Insert a pair immediately.
+    /// Insert a field immediately.
     #[inline]
-    fn insert_field<C, F, S>(&mut self, cx: &C, first: F, second: S) -> Result<(), C::Error>
+    fn insert_field<F, V>(&mut self, cx: &C, field: F, value: V) -> Result<(), C::Error>
     where
-        Self: Sized,
-        C: Context<Input = Self::Error>,
         F: Encode<C::Mode>,
-        S: Encode<C::Mode>,
+        V: Encode<C::Mode>,
     {
-        self.field(cx)?.insert_field(cx, first, second)?;
+        self.field(cx)?.insert_field(cx, field, value)?;
         Ok(())
     }
 
-    /// Encode the next pair.
-    fn field<C>(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    /// Encode the next field.
+    fn field(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error>;
 
-    /// Finish encoding pairs.
-    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    /// Finish encoding the struct.
+    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 }
 
 /// Trait governing how to encode a sequence of pairs.
-pub trait StructFieldEncoder {
+pub trait StructFieldEncoder<C>
+where
+    C: Context,
+{
     /// Result type of the encoder.
     type Ok;
-    /// Error type for encoder.
-    type Error: 'static;
 
     /// The encoder returned when advancing the map encoder to encode the key.
-    type FieldName<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type FieldName<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type FieldValue<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type FieldValue<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert_field<C, F, V>(mut self, cx: &C, name: F, value: V) -> Result<Self::Ok, C::Error>
+    fn insert_field<N, V>(mut self, cx: &C, name: N, value: V) -> Result<Self::Ok, C::Error>
     where
         Self: Sized,
-        C: Context<Input = Self::Error>,
-        F: Encode<C::Mode>,
+        N: Encode<C::Mode>,
         V: Encode<C::Mode>,
     {
         self.field_name(cx).and_then(|e| name.encode(cx, e))?;
@@ -249,108 +224,111 @@ pub trait StructFieldEncoder {
 
     /// Return the encoder for the field in the struct.
     #[must_use = "Encoders must be consumed"]
-    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>;
 
     /// Return encoder for the field value in the struct.
     #[must_use = "Encoders must be consumed"]
-    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn field_value(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>;
 
-    /// Stop encoding this pair.
-    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    /// Stop encoding this field.
+    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 }
 
 /// Trait governing how to encode a variant.
-pub trait VariantEncoder {
+pub trait VariantEncoder<C>
+where
+    C: Context,
+{
     /// Result type of the encoder.
     type Ok;
-    /// Error type for encoder.
-    type Error: 'static;
 
     /// The encoder returned when advancing the map encoder to encode the key.
-    type Tag<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type Tag<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// The encoder returned when advancing the map encoder to encode the value.
-    type Variant<'this>: Encoder<Ok = Self::Ok, Error = Self::Error>
+    type Variant<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Insert the variant immediately.
     #[inline]
-    fn insert_variant<C, F, S>(mut self, cx: &C, tag: F, second: S) -> Result<Self::Ok, C::Error>
+    fn insert_variant<T, V>(mut self, cx: &C, tag: T, value: V) -> Result<Self::Ok, C::Error>
     where
         Self: Sized,
-        C: Context<Input = Self::Error>,
-        F: Encode<C::Mode>,
-        S: Encode<C::Mode>,
+        T: Encode<C::Mode>,
+        V: Encode<C::Mode>,
     {
         tag.encode(cx, self.tag(cx)?)?;
-        second.encode(cx, self.variant(cx)?)?;
+        value.encode(cx, self.variant(cx)?)?;
         self.end(cx)
     }
 
     /// Return the encoder for the first element in the variant.
     #[must_use = "Encoders must be consumed"]
-    fn tag<C>(&mut self, cx: &C) -> Result<Self::Tag<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn tag(&mut self, cx: &C) -> Result<Self::Tag<'_>, C::Error>;
 
     /// Return encoder for the second element in the variant.
     #[must_use = "Encoders must be consumed"]
-    fn variant<C>(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn variant(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error>;
 
     /// End the variant encoder.
-    fn end<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>;
+    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 }
 
 /// Trait governing how the encoder works.
-pub trait Encoder: Sized {
+pub trait Encoder<C>: Sized
+where
+    C: Context,
+{
     /// The type returned by the encoder. For [Encode] implementations ensures
     /// that they are used correctly, since only functions returned by the
     /// [Encoder] is capable of returning this value.
     type Ok;
-    /// Error type for encoder.
-    type Error: 'static;
-
-    /// Encoder returned when encoding an optional value which is present.
-    type Some: Encoder<Ok = Self::Ok, Error = Self::Error>;
-    /// A simple pack that packs a sequence of elements.
-    type Pack<'this, C>: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>
+    /// Constructed [`Encoder`] with a different context.
+    type Encoder<U>: Encoder<U, Ok = Self::Ok>
     where
-        C: 'this + Context;
+        U: Context;
+    /// Encoder returned when encoding an optional value which is present.
+    type Some: Encoder<C, Ok = Self::Ok>;
+    /// A simple pack that packs a sequence of elements.
+    type Pack<'this>: SequenceEncoder<C, Ok = Self::Ok>
+    where
+        C: 'this;
     /// The type of a sequence encoder.
-    type Sequence: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Sequence: SequenceEncoder<C, Ok = Self::Ok>;
     /// The type of a tuple encoder.
-    type Tuple: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Tuple: SequenceEncoder<C, Ok = Self::Ok>;
     /// The type of a map encoder.
-    type Map: MapEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Map: MapEncoder<C, Ok = Self::Ok>;
     /// Streaming encoder for map pairs.
-    type MapPairs: MapPairsEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type MapPairs: MapPairsEncoder<C, Ok = Self::Ok>;
     /// Encoder that can encode a struct.
-    type Struct: StructEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Struct: StructEncoder<C, Ok = Self::Ok>;
     /// Encoder for a struct variant.
-    type Variant: VariantEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type Variant: VariantEncoder<C, Ok = Self::Ok>;
     /// Specialized encoder for a tuple variant.
-    type TupleVariant: SequenceEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type TupleVariant: SequenceEncoder<C, Ok = Self::Ok>;
     /// Specialized encoder for a struct variant.
-    type StructVariant: StructEncoder<Ok = Self::Ok, Error = Self::Error>;
+    type StructVariant: StructEncoder<C, Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::encoder]`][crate::encoder] attribute
     /// macro when implementing [`Encoder`].
     #[doc(hidden)]
     type __UseMusliEncoderAttributeMacro;
+
+    /// Construct an encoder with a different context.
+    fn with_context<U>(self, cx: &C) -> Result<Self::Encoder<U>, C::Error>
+    where
+        U: Context,
+    {
+        Err(cx.message(format_args!(
+            "Context switch not supported, expected {}",
+            ExpectingWrapper::new(self).format()
+        )))
+    }
 
     /// An expectation error. Every other implementation defers to this to
     /// report that something unexpected happened.
@@ -368,18 +346,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for EmptyStruct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_unit(cx)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_unit<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_unit(self, cx: &C) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unit,
             &ExpectingWrapper::new(self),
@@ -400,18 +375,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_bool(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_bool<C>(self, cx: &C, _: bool) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_bool(self, cx: &C, _: bool) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bool,
             &ExpectingWrapper::new(self),
@@ -432,18 +404,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_char(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_char<C>(self, cx: &C, _: char) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_char(self, cx: &C, _: char) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Char,
             &ExpectingWrapper::new(self),
@@ -464,18 +433,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u8(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u8<C>(self, cx: &C, _: u8) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_u8(self, cx: &C, _: u8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned8,
             &ExpectingWrapper::new(self),
@@ -496,18 +462,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u16(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u16<C>(self, cx: &C, _: u16) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_u16(self, cx: &C, _: u16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned16,
             &ExpectingWrapper::new(self),
@@ -528,18 +491,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u32(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u32<C>(self, cx: &C, _: u32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_u32(self, cx: &C, _: u32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned32,
             &ExpectingWrapper::new(self),
@@ -560,18 +520,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u64(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u64<C>(self, cx: &C, _: u64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_u64(self, cx: &C, _: u64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned64,
             &ExpectingWrapper::new(self),
@@ -592,18 +549,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u128(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u128<C>(self, cx: &C, _: u128) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_u128(self, cx: &C, _: u128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned128,
             &ExpectingWrapper::new(self),
@@ -624,18 +578,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i8(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i8<C>(self, cx: &C, _: i8) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_i8(self, cx: &C, _: i8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed8,
             &ExpectingWrapper::new(self),
@@ -656,18 +607,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i16(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i16<C>(self, cx: &C, _: i16) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_i16(self, cx: &C, _: i16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed16,
             &ExpectingWrapper::new(self),
@@ -688,18 +636,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i32(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i32<C>(self, cx: &C, _: i32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_i32(self, cx: &C, _: i32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed32,
             &ExpectingWrapper::new(self),
@@ -720,18 +665,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i64(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i64<C>(self, cx: &C, _: i64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_i64(self, cx: &C, _: i64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed64,
             &ExpectingWrapper::new(self),
@@ -752,18 +694,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i128(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i128<C>(self, cx: &C, _: i128) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_i128(self, cx: &C, _: i128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed128,
             &ExpectingWrapper::new(self),
@@ -784,18 +723,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_usize(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_usize<C>(self, cx: &C, _: usize) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_usize(self, cx: &C, _: usize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Usize,
             &ExpectingWrapper::new(self),
@@ -816,18 +752,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_isize(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_isize<C>(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_isize(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Isize,
             &ExpectingWrapper::new(self),
@@ -848,18 +781,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_f32(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_f32<C>(self, cx: &C, _: f32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_f32(self, cx: &C, _: f32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float32,
             &ExpectingWrapper::new(self),
@@ -880,18 +810,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_f64(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_f64<C>(self, cx: &C, _: f64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_f64(self, cx: &C, _: f64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float64,
             &ExpectingWrapper::new(self),
@@ -912,18 +839,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_array(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_array<C, const N: usize>(self, cx: &C, _: [u8; N]) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_array<const N: usize>(self, cx: &C, _: [u8; N]) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Array,
             &ExpectingWrapper::new(self),
@@ -944,18 +868,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_bytes(cx, self.data.as_slice())
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_bytes<C>(self, cx: &C, _: &[u8]) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_bytes(self, cx: &C, _: &[u8]) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bytes,
             &ExpectingWrapper::new(self),
@@ -983,8 +904,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         let (first, second) = self.data.as_slices();
     ///         encoder.encode_bytes_vectored(cx, &[first, second])
@@ -992,10 +913,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_bytes_vectored<C>(self, cx: &C, _: &[&[u8]]) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_bytes_vectored(self, cx: &C, _: &[&[u8]]) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bytes,
             &ExpectingWrapper::new(self),
@@ -1016,18 +934,15 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_string(cx, self.data.as_str())
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_string<C>(self, cx: &C, _: &str) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_string(self, cx: &C, _: &str) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::String,
             &ExpectingWrapper::new(self),
@@ -1048,8 +963,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M, Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
@@ -1063,10 +978,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_some<C>(self, cx: &C) -> Result<Self::Some, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_some(self, cx: &C) -> Result<Self::Some, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             &ExpectingWrapper::new(self),
@@ -1087,8 +999,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M, Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
@@ -1102,10 +1014,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_none<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_none(self, cx: &C) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             &ExpectingWrapper::new(self),
@@ -1133,8 +1042,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for PackedStruct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         let mut pack = encoder.encode_pack(cx)?;
     ///         pack.next(cx)?.encode_u32(cx, self.field)?;
@@ -1144,10 +1053,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_pack<C>(self, cx: &C) -> Result<Self::Pack<'_, C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_pack(self, cx: &C) -> Result<Self::Pack<'_>, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Pack,
             &ExpectingWrapper::new(self),
@@ -1175,8 +1081,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         let mut seq = encoder.encode_sequence(cx, self.data.len())?;
     ///
@@ -1189,14 +1095,11 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_sequence<C>(
+    fn encode_sequence(
         self,
         cx: &C,
         #[allow(unused)] len: usize,
-    ) -> Result<Self::Sequence, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    ) -> Result<Self::Sequence, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Sequence,
             &ExpectingWrapper::new(self),
@@ -1224,8 +1127,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for PackedTuple {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         let mut tuple = encoder.encode_tuple(cx, 2)?;
     ///         tuple.next(cx)?.encode_u32(cx, self.0)?;
@@ -1235,10 +1138,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple<C>(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Tuple, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_tuple(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Tuple, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Tuple,
             &ExpectingWrapper::new(self),
@@ -1261,8 +1161,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Struct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         let mut map = encoder.encode_map(cx, 2)?;
     ///         map.insert_entry(cx, "name", &self.name)?;
@@ -1272,10 +1172,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_map<C>(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Map, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_map(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Map, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Map,
             &ExpectingWrapper::new(self),
@@ -1298,8 +1195,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Struct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         let mut m = encoder.encode_map_pairs(cx, 2)?;
     ///         m.map_pairs_insert(cx, "name", &self.name)?;
@@ -1309,14 +1206,11 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_map_pairs<C>(
+    fn encode_map_pairs(
         self,
         cx: &C,
         #[allow(unused)] len: usize,
-    ) -> Result<Self::MapPairs, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    ) -> Result<Self::MapPairs, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::MapPairs,
             &ExpectingWrapper::new(self),
@@ -1339,8 +1233,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Struct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         let mut st = encoder.encode_struct(cx, 2)?;
     ///         st.insert_field(cx, "name", &self.name)?;
@@ -1350,10 +1244,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_struct<C>(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_struct(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Struct,
             &ExpectingWrapper::new(self),
@@ -1380,8 +1271,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         let mut variant = encoder.encode_variant(cx)?;
     ///
@@ -1407,10 +1298,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_variant<C>(self, cx: &C) -> Result<Self::Variant, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn encode_variant(self, cx: &C) -> Result<Self::Variant, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
             &ExpectingWrapper::new(self),
@@ -1437,8 +1325,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
@@ -1460,9 +1348,8 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_unit_variant<C, T>(self, cx: &C, tag: &T) -> Result<Self::Ok, C::Error>
+    fn encode_unit_variant<T>(self, cx: &C, tag: &T) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
         T: Encode<C::Mode>,
     {
         let mut variant = self.encode_variant(cx)?;
@@ -1493,8 +1380,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
@@ -1517,14 +1404,13 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple_variant<C, T>(
+    fn encode_tuple_variant<T>(
         self,
         cx: &C,
         _: &T,
         _: usize,
     ) -> Result<Self::TupleVariant, C::Error>
     where
-        C: Context<Input = Self::Error>,
         T: ?Sized + Encode<C::Mode>,
     {
         Err(cx.message(expecting::unsupported_type(
@@ -1553,8 +1439,8 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Input = E::Error>,
-    ///         E: Encoder
+    ///         C: Context<Mode = M>,
+    ///         E: Encoder<C>,
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
@@ -1577,14 +1463,13 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_struct_variant<C, T>(
+    fn encode_struct_variant<T>(
         self,
         cx: &C,
         _: &T,
         _: usize,
     ) -> Result<Self::StructVariant, C::Error>
     where
-        C: Context<Input = Self::Error>,
         T: ?Sized + Encode<C::Mode>,
     {
         Err(cx.message(expecting::unsupported_type(
@@ -1595,21 +1480,28 @@ pub trait Encoder: Sized {
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<T>(T);
+struct ExpectingWrapper<T, C> {
+    inner: T,
+    _marker: PhantomData<C>,
+}
 
-impl<T> ExpectingWrapper<T> {
+impl<T, C> ExpectingWrapper<T, C> {
     #[inline]
-    const fn new(value: T) -> Self {
-        Self(value)
+    const fn new(inner: T) -> Self {
+        Self {
+            inner,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<T> Expecting for ExpectingWrapper<T>
+impl<T, C> Expecting for ExpectingWrapper<T, C>
 where
-    T: Encoder,
+    T: Encoder<C>,
+    C: Context,
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expecting(f)
+        self.inner.expecting(f)
     }
 }

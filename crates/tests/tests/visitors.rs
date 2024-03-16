@@ -12,8 +12,8 @@ impl<'de, M> Decode<'de, M> for BytesReference<'de> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
-        D: Decoder<'de>,
+        C: Context,
+        D: Decoder<'de, C>,
     {
         struct Visitor;
 
@@ -69,8 +69,8 @@ impl<'de, M> Decode<'de, M> for StringReference<'de> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
-        D: Decoder<'de>,
+        C: Context,
+        D: Decoder<'de, C>,
     {
         struct Visitor;
 
@@ -124,8 +124,8 @@ pub enum OwnedFn {
 impl<'de, M> Decode<'de, M> for OwnedFn {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Input = D::Error>,
-        D: Decoder<'de>,
+        C: Context,
+        D: Decoder<'de, C>,
     {
         decoder.decode_string(
             cx,
