@@ -405,7 +405,7 @@ impl<M> Encode<M> for CString {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         E: Encoder<C>,
     {
         encoder.encode_bytes(cx, self.to_bytes_with_nul())
@@ -416,7 +416,7 @@ impl<'de, M> Decode<'de, M> for CString {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         D: Decoder<'de, C>,
     {
         struct Visitor;
@@ -503,7 +503,7 @@ impl<M> Encode<M> for OsStr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         E: Encoder<C>,
     {
         use std::os::unix::ffi::OsStrExt;
@@ -520,7 +520,7 @@ impl<M> Encode<M> for OsStr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         E: Encoder<C>,
     {
         use crate::en::VariantEncoder;
@@ -552,7 +552,7 @@ impl<M> Encode<M> for OsString {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         E: Encoder<C>,
     {
         self.as_os_str().encode(cx, encoder)
@@ -564,7 +564,7 @@ impl<'de, M> Decode<'de, M> for OsString {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         D: Decoder<'de, C>,
     {
         use crate::de::VariantDecoder;
@@ -633,7 +633,7 @@ impl<M> Encode<M> for PathBuf {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         E: Encoder<C>,
     {
         self.as_path().encode(cx, encoder)
@@ -645,7 +645,7 @@ impl<M> Encode<M> for Path {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         E: Encoder<C>,
     {
         self.as_os_str().encode(cx, encoder)
@@ -657,7 +657,7 @@ impl<'de, M> Decode<'de, M> for PathBuf {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         D: Decoder<'de, C>,
     {
         let string: OsString = cx.decode(decoder)?;
