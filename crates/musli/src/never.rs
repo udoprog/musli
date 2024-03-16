@@ -92,10 +92,8 @@ impl<'de, E: 'static> Decoder<'de> for Never<E> {
     type Sequence = Self;
     type Tuple = Self;
     type Map = Self;
-    type MapPairs = Self;
     type Some = Self;
     type Struct = Self;
-    type StructPairs = Self;
     type Variant = Self;
     type __UseMusliDecoderAttributeMacro = ();
 
@@ -204,8 +202,20 @@ impl<'de, E: 'static> StructDecoder<'de> for Never<E> {
     where
         Self: 'this;
 
+    type StructPairs = Self;
+
+    type __UseMusliStructDecoderAttributeMacro = ();
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
+        match self._never {}
+    }
+
+    #[inline]
+    fn into_struct_pairs<C>(self, _: &C) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
         match self._never {}
     }
 
@@ -317,8 +327,20 @@ impl<'de, E: 'static> MapDecoder<'de> for Never<E> {
     where
         Self: 'this;
 
+    type MapPairs = Self;
+
+    type __UseMusliMapDecoderAttributeMacro = ();
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
+        match self._never {}
+    }
+
+    #[inline]
+    fn into_map_pairs<C>(self, _: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
         match self._never {}
     }
 

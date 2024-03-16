@@ -141,10 +141,8 @@ where
     type Sequence = JsonSequenceDecoder<P>;
     type Tuple = JsonSequenceDecoder<P>;
     type Map = JsonObjectDecoder<P>;
-    type MapPairs = JsonObjectDecoder<P>;
     type Some = JsonDecoder<P>;
     type Struct = JsonObjectDecoder<P>;
-    type StructPairs = JsonObjectDecoder<P>;
     type Variant = JsonVariantDecoder<P>;
 
     #[inline]
@@ -454,27 +452,7 @@ where
     }
 
     #[inline]
-    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        JsonObjectDecoder::new(cx, None, self.parser)
-    }
-
-    #[inline]
     fn decode_struct<C>(self, cx: &C, len: Option<usize>) -> Result<Self::Struct, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        JsonObjectDecoder::new(cx, len, self.parser)
-    }
-
-    #[inline]
-    fn decode_struct_pairs<C>(
-        self,
-        cx: &C,
-        len: Option<usize>,
-    ) -> Result<Self::StructPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -493,7 +471,7 @@ where
     fn decode_any<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Error>,
-        V: Visitor<'de, Error = Self::Error>,
+        V: Visitor<'de, C>,
     {
         self.parser.skip_whitespace(cx)?;
 

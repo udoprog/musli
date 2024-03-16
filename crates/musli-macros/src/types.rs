@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
 use quote::ToTokens;
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
@@ -44,11 +43,13 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("Sequence", Extra::None),
     ("Tuple", Extra::None),
     ("Map", Extra::None),
-    ("MapPairs", Extra::None),
     ("Struct", Extra::None),
-    ("StructPairs", Extra::None),
     ("Variant", Extra::None),
 ];
+
+pub(super) const MAP_DECODER_TYPES: &[(&str, Extra)] = &[("MapPairs", Extra::None)];
+
+pub(super) const STRUCT_DECODER_TYPES: &[(&str, Extra)] = &[("StructPairs", Extra::None)];
 
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("String", Extra::Visitor(Some(Ty::Str))),
@@ -70,11 +71,11 @@ impl Parse for Types {
 
 impl Types {
     /// Expand encoder types.
-    pub(crate) fn expand<const N: usize>(
+    pub(crate) fn expand(
         mut self,
         what: &str,
         types: &[(&str, Extra)],
-        arguments: [&str; N],
+        arguments: &[&str],
         hint: &str,
     ) -> syn::Result<TokenStream> {
         let mut missing = types
@@ -137,7 +138,7 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: never_type(arguments, extra, &impl_type.generics)?,
+                path: self.never_type(arguments, extra, &impl_type.generics)?,
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
@@ -183,54 +184,10 @@ impl Types {
                         where_clause: Some(where_clause),
                     }
                 }
-                Extra::Visitor(..) => {
-                    let mut where_clause = syn::WhereClause {
-                        where_token: <Token![where]>::default(),
-                        predicates: Punctuated::default(),
-                    };
-
-                    let c_param: syn::Ident = syn::Ident::new("C", Span::call_site());
-
-                    let mut predicate = syn::PredicateType {
-                        lifetimes: None,
-                        bounded_ty: syn::Type::Path(syn::TypePath {
-                            qself: None,
-                            path: ident_path(c_param.clone()),
-                        }),
-                        colon_token: <Token![:]>::default(),
-                        bounds: Punctuated::default(),
-                    };
-
-                    predicate.bounds.push(syn::TypeParamBound::Verbatim(quote!(
-                        musli::Context<Input = Self::Error>
-                    )));
-
-                    where_clause
-                        .predicates
-                        .push(syn::WherePredicate::Type(predicate));
-
-                    let mut params = Punctuated::default();
-
-                    params.push(syn::GenericParam::Type(syn::TypeParam {
-                        attrs: Vec::new(),
-                        ident: c_param,
-                        colon_token: None,
-                        bounds: Punctuated::default(),
-                        eq_token: None,
-                        default: None,
-                    }));
-
-                    syn::Generics {
-                        lt_token: Some(<Token![<]>::default()),
-                        params,
-                        gt_token: Some(<Token![>]>::default()),
-                        where_clause: Some(where_clause),
-                    }
-                }
-                Extra::None => syn::Generics::default(),
+                _ => syn::Generics::default(),
             };
 
-            let never = never_type(arguments, extra, &generics)?;
+            let never = self.never_type(arguments, extra, &generics)?;
 
             let ty = syn::ImplItemType {
                 attrs: Vec::new(),
@@ -269,6 +226,99 @@ impl Types {
 
         Ok(self.item_impl.into_token_stream())
     }
+
+    fn never_type(
+        &self,
+        arguments: &[&str],
+        extra: Extra,
+        generics: &syn::Generics,
+    ) -> syn::Result<syn::Path> {
+        let mut never = syn::Path {
+            leading_colon: None,
+            segments: Punctuated::default(),
+        };
+
+        never.segments.push(syn::PathSegment::from(syn::Ident::new(
+            "musli",
+            Span::call_site(),
+        )));
+        never.segments.push(syn::PathSegment::from(syn::Ident::new(
+            "never",
+            Span::call_site(),
+        )));
+
+        never.segments.push({
+            let mut s = syn::PathSegment::from(syn::Ident::new("Never", Span::call_site()));
+
+            let mut args = Punctuated::default();
+
+            for &arg in arguments {
+                args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    path: self_type(arg),
+                })));
+            }
+
+            if let Extra::Visitor(ty) = extra {
+                let mut it = self.item_impl.generics.type_params();
+
+                let Some(syn::TypeParam { ident: c_param, .. }) = it.next() else {
+                    return Err(syn::Error::new_spanned(
+                        generics,
+                        "Missing generic parameter in associated type (usually `C`)",
+                    ));
+                };
+
+                if let Some(ty) = ty {
+                    match ty {
+                        Ty::Str => {
+                            args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                                qself: None,
+                                path: ident_path(syn::Ident::new("str", Span::call_site())),
+                            })));
+                        }
+                        Ty::Bytes => {
+                            let mut path = syn::Path {
+                                leading_colon: None,
+                                segments: Punctuated::default(),
+                            };
+
+                            path.segments.push(syn::PathSegment::from(syn::Ident::new(
+                                "u8",
+                                Span::call_site(),
+                            )));
+
+                            args.push(syn::GenericArgument::Type(syn::Type::Slice(
+                                syn::TypeSlice {
+                                    bracket_token: syn::token::Bracket::default(),
+                                    elem: Box::new(syn::Type::Path(syn::TypePath {
+                                        qself: None,
+                                        path,
+                                    })),
+                                },
+                            )));
+                        }
+                    }
+                }
+
+                args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    path: ident_path(c_param.clone()),
+                })));
+            }
+
+            s.arguments = syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                colon2_token: None,
+                lt_token: <Token![<]>::default(),
+                args,
+                gt_token: <Token![>]>::default(),
+            });
+
+            s
+        });
+
+        Ok(never)
+    }
 }
 
 fn ident_path(ident: syn::Ident) -> syn::Path {
@@ -280,99 +330,6 @@ fn ident_path(ident: syn::Ident) -> syn::Path {
     not_path.segments.push(syn::PathSegment::from(ident));
 
     not_path
-}
-
-fn never_type<const N: usize>(
-    arguments: [&str; N],
-    extra: Extra,
-    generics: &syn::Generics,
-) -> syn::Result<syn::Path> {
-    let mut never = syn::Path {
-        leading_colon: None,
-        segments: Punctuated::default(),
-    };
-
-    never.segments.push(syn::PathSegment::from(syn::Ident::new(
-        "musli",
-        Span::call_site(),
-    )));
-    never.segments.push(syn::PathSegment::from(syn::Ident::new(
-        "never",
-        Span::call_site(),
-    )));
-
-    never.segments.push({
-        let mut s = syn::PathSegment::from(syn::Ident::new("Never", Span::call_site()));
-
-        let mut args = Punctuated::default();
-
-        for arg in arguments {
-            args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                qself: None,
-                path: self_type(arg),
-            })));
-        }
-
-        if let Extra::Visitor(ty) = extra {
-            let mut it = generics.params.iter();
-
-            let Some(syn::GenericParam::Type(syn::TypeParam { ident: c_param, .. })) = it.next()
-            else {
-                return Err(syn::Error::new_spanned(
-                    generics,
-                    "Missing generic parameter in associated type (usually `C`)",
-                ));
-            };
-
-            if let Some(ty) = ty {
-                match ty {
-                    Ty::Str => {
-                        args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                            qself: None,
-                            path: ident_path(syn::Ident::new("str", Span::call_site())),
-                        })));
-                    }
-                    Ty::Bytes => {
-                        let mut path = syn::Path {
-                            leading_colon: None,
-                            segments: Punctuated::default(),
-                        };
-
-                        path.segments.push(syn::PathSegment::from(syn::Ident::new(
-                            "u8",
-                            Span::call_site(),
-                        )));
-
-                        args.push(syn::GenericArgument::Type(syn::Type::Slice(
-                            syn::TypeSlice {
-                                bracket_token: syn::token::Bracket::default(),
-                                elem: Box::new(syn::Type::Path(syn::TypePath {
-                                    qself: None,
-                                    path,
-                                })),
-                            },
-                        )));
-                    }
-                }
-            }
-
-            args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                qself: None,
-                path: ident_path(c_param.clone()),
-            })));
-        }
-
-        s.arguments = syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
-            colon2_token: None,
-            lt_token: <Token![<]>::default(),
-            args,
-            gt_token: <Token![>]>::default(),
-        });
-
-        s
-    });
-
-    Ok(never)
 }
 
 fn self_type(what: &str) -> syn::Path {

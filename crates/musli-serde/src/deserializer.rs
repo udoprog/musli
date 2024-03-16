@@ -1,8 +1,8 @@
 use core::fmt;
 
 use musli::de::{
-    Decoder, MapPairsDecoder, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
-    StructFieldDecoder, StructPairsDecoder, VariantDecoder, Visitor,
+    Decoder, MapDecoder, MapPairsDecoder, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
+    StructPairsDecoder, VariantDecoder, Visitor,
 };
 use musli::Context;
 use serde::de;
@@ -35,7 +35,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.decoder.decode_any(self.cx, AnyVisitor::new(self.cx, visitor))
+        self.decoder.decode_any(self.cx, AnyVisitor::new(visitor))
     }
 
     #[inline]
@@ -170,7 +170,7 @@ where
         V: de::Visitor<'de>,
     {
         self.decoder
-            .decode_string(self.cx, StrVisitor::new(visitor))
+            .decode_string(self.cx, StringVisitor::new(visitor))
     }
 
     #[inline]
@@ -186,7 +186,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.decoder.decode_bytes(self.cx, BytesVisitor::new(visitor))
+        self.decoder
+            .decode_bytes(self.cx, BytesVisitor::new(visitor))
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -225,8 +226,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let decoder = self.decoder.decode_struct(self.cx, Some(0))?;
-        decoder.end(self.cx)?;
+        self.decoder.decode_unit(self.cx)?;
         visitor.visit_unit()
     }
 
@@ -239,21 +239,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_struct(self.cx, Some(1))?;
-
-        let Some(mut field) = decoder.field(self.cx)? else {
-            return Err(self.cx.message("newtype struct missing first field"));
-        };
-
-        if field.field_name(self.cx)?.decode_usize(self.cx)? != 0 {
-            return Err(self.cx.message("newtype struct missing first field"));
-        }
-
-        let output = visitor
-            .visit_newtype_struct(Deserializer::new(self.cx, field.field_value(self.cx)?))?;
-
-        decoder.end(self.cx)?;
-        Ok(output)
+        visitor.visit_newtype_struct(Deserializer::new(self.cx, self.decoder))
     }
 
     #[inline]
@@ -296,51 +282,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        struct MapAccess<'a, C, D> {
-            cx: &'a C,
-            decoder: &'a mut D,
-        }
-
-        impl<'de, 'a, C, D> de::MapAccess<'de> for MapAccess<'a, C, D>
-        where
-            C: Context<Input = D::Error>,
-            C::Error: de::Error,
-            D: MapPairsDecoder<'de>,
-        {
-            type Error = C::Error;
-
-            #[inline]
-            fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
-            where
-                K: de::DeserializeSeed<'de>,
-            {
-                let Some(decoder) = self.decoder.map_pairs_key(self.cx)? else {
-                    return Ok(None);
-                };
-
-                let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
-                Ok(Some(output))
-            }
-
-            #[inline]
-            fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
-            where
-                V: de::DeserializeSeed<'de>,
-            {
-                let decoder = self.decoder.map_pairs_value(self.cx)?;
-                let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
-                Ok(output)
-            }
-        }
-
-        let mut decoder = self.decoder.decode_map_pairs(self.cx)?;
-
-        let map = MapAccess {
-            cx: self.cx,
-            decoder: &mut decoder,
-        };
-
-        let output = visitor.visit_map(map)?;
+        let mut decoder = self.decoder.decode_map(self.cx)?.into_map_pairs(self.cx)?;
+        let output = visitor.visit_map(MapAccess::new(self.cx, &mut decoder))?;
         decoder.end(self.cx)?;
         Ok(output)
     }
@@ -357,7 +300,8 @@ where
     {
         let mut decoder = self
             .decoder
-            .decode_struct_pairs(self.cx, Some(fields.len()))?;
+            .decode_struct(self.cx, Some(fields.len()))?
+            .into_struct_pairs(self.cx)?;
         let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields))?;
         decoder.end(self.cx)?;
         Ok(output)
@@ -373,10 +317,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_variant(self.cx)?;
-        let value = visitor.visit_enum(EnumAccess::new(self.cx, &mut decoder))?;
-        decoder.end(self.cx)?;
-        Ok(value)
+        let decoder = self.decoder.decode_variant(self.cx)?;
+        visitor.visit_enum(EnumAccess::new(self.cx, decoder))
     }
 
     #[inline]
@@ -581,17 +523,60 @@ where
     }
 }
 
-struct StrVisitor<V> {
+struct MapAccess<'a, C, D: ?Sized> {
+    cx: &'a C,
+    decoder: &'a mut D,
+}
+
+impl<'a, C, D: ?Sized> MapAccess<'a, C, D> {
+    fn new(cx: &'a C, decoder: &'a mut D) -> Self {
+        Self { cx, decoder }
+    }
+}
+
+impl<'de, 'a, C, D: ?Sized> de::MapAccess<'de> for MapAccess<'a, C, D>
+where
+    C: Context<Input = D::Error>,
+    C::Error: de::Error,
+    D: MapPairsDecoder<'de>,
+{
+    type Error = C::Error;
+
+    #[inline]
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        let Some(decoder) = self.decoder.map_pairs_key(self.cx)? else {
+            return Ok(None);
+        };
+
+        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        Ok(Some(output))
+    }
+
+    #[inline]
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        let decoder = self.decoder.map_pairs_value(self.cx)?;
+        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        Ok(output)
+    }
+}
+
+struct StringVisitor<V> {
     visitor: V,
 }
 
-impl<V> StrVisitor<V> {
+impl<V> StringVisitor<V> {
     fn new(visitor: V) -> Self {
         Self { visitor }
     }
 }
 
-impl<'de, C, V> musli::de::ValueVisitor<'de, C, str> for StrVisitor<V>
+impl<'de, C, V> musli::de::ValueVisitor<'de, C, str> for StringVisitor<V>
 where
     C: Context,
     C::Error: de::Error,
@@ -643,114 +628,98 @@ where
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.visitor.expecting(f)
     }
-    
+
     #[inline]
-    fn visit_u8(self, cx: &C, v: u8) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u8(self, _: &C, v: u8) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_u8(v)
     }
-    
+
     #[inline]
-    fn visit_u16(self, cx: &C, v: u16) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u16(self, _: &C, v: u16) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_u16(v)
     }
-    
+
     #[inline]
-    fn visit_u32(self, cx: &C, v: u32) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u32(self, _: &C, v: u32) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_u32(v)
     }
-    
+
     #[inline]
-    fn visit_u64(self, cx: &C, v: u64) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u64(self, _: &C, v: u64) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_u64(v)
     }
-    
+
     #[inline]
-    fn visit_u128(self, cx: &C, v: u128) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u128(self, _: &C, v: u128) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_u128(v)
     }
-    
+
     #[inline]
-    fn visit_i8(self, cx: &C, v: i8) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i8(self, _: &C, v: i8) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_i8(v)
     }
-    
+
     #[inline]
-    fn visit_i16(self, cx: &C, v: i16) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i16(self, _: &C, v: i16) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_i16(v)
     }
-    
+
     #[inline]
-    fn visit_i32(self, cx: &C, v: i32) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i32(self, _: &C, v: i32) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_i32(v)
     }
-    
+
     #[inline]
-    fn visit_i64(self, cx: &C, v: i64) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i64(self, _: &C, v: i64) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_i64(v)
     }
-    
+
     #[inline]
-    fn visit_i128(self, cx: &C, v: i128) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i128(self, _: &C, v: i128) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_i128(v)
     }
-    
+
     #[inline]
-    fn visit_f32(self, cx: &C, v: f32) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_f32(self, _: &C, v: f32) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_f32(v)
     }
-    
+
     #[inline]
-    fn visit_f64(self, cx: &C, v: f64) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_f64(self, _: &C, v: f64) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_f64(v)
     }
 
     #[inline]
     fn visit_usize(self, cx: &C, v: usize) -> Result<Self::Ok, C::Error> {
-        if let Ok(v) = u32::try_from(v) {
-            return self.visit_u32(cx, v);
+        if let Some(value) = unsigned_value(self.visitor, v)? {
+            return Ok(value);
         }
 
-        if let Ok(v) = u64::try_from(v) {
-            return self.visit_u64(cx, v);
-        }
-
-        if let Ok(v) = u128::try_from(v) {
-            return self.visit_u128(cx, v);
-        }
-
-        Err(cx.message("Unsupported numerical type"))
+        Err(cx.message(format_args!("Unsupported usize value {v}")))
     }
 
     #[inline]
-    fn visit_isize(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error> {
-        if let Ok(v) = i32::try_from(v) {
-            return self.visit_i32(cx, v);
+    fn visit_isize(self, cx: &C, v: isize) -> Result<Self::Ok, C::Error> {
+        if let Some(value) = signed_value(self.visitor, v)? {
+            return Ok(value);
         }
 
-        if let Ok(v) = i64::try_from(v) {
-            return self.visit_i64(cx, v);
-        }
-
-        if let Ok(v) = i128::try_from(v) {
-            return self.visit_i128(cx, v);
-        }
-
-        Err(cx.message("Unsupported numerical type"))
+        Err(cx.message(format_args!("Unsupported isize value {v}")))
     }
-    
+
     #[inline]
-    fn visit_bytes(self, cx: &C, v: &'de [u8]) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_bytes(self, _: &C, v: &'de [u8]) -> Result<Self::Ok, <C as Context>::Error> {
         self.visitor.visit_bytes(v)
     }
 }
 
 struct EnumAccess<'a, C, D> {
     cx: &'a C,
-    decoder: &'a mut D,
+    decoder: D,
 }
 
 impl<'a, C, D> EnumAccess<'a, C, D> {
-    fn new(cx: &'a C, decoder: &'a mut D) -> Self {
+    fn new(cx: &'a C, decoder: D) -> Self {
         Self { cx, decoder }
     }
 }
@@ -764,24 +733,22 @@ where
     type Error = C::Error;
 
     #[inline]
-    fn unit_variant(self) -> Result<(), Self::Error> {
+    fn unit_variant(mut self) -> Result<(), Self::Error> {
         self.decoder.variant(self.cx)?.decode_unit(self.cx)
     }
 
     #[inline]
-    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    fn newtype_variant_seed<T>(mut self, seed: T) -> Result<T::Value, Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        let decoder = self.decoder.variant(self.cx)?;
-        let mut tuple = decoder.decode_tuple(self.cx, 1)?;
-        let value = seed.deserialize(Deserializer::new(self.cx, tuple.next(self.cx)?))?;
-        tuple.end(self.cx)?;
+        let value = seed.deserialize(Deserializer::new(self.cx, self.decoder.variant(self.cx)?))?;
+        self.decoder.end(self.cx)?;
         Ok(value)
     }
 
     #[inline]
-    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn tuple_variant<V>(mut self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
@@ -789,12 +756,13 @@ where
         let mut tuple = decoder.decode_tuple(self.cx, len)?;
         let value = visitor.visit_seq(TupleAccess::new(self.cx, &mut tuple, len))?;
         tuple.end(self.cx)?;
+        self.decoder.end(self.cx)?;
         Ok(value)
     }
 
     #[inline]
     fn struct_variant<V>(
-        self,
+        mut self,
         fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
@@ -802,9 +770,12 @@ where
         V: de::Visitor<'de>,
     {
         let decoder = self.decoder.variant(self.cx)?;
-        let mut st = decoder.decode_struct_pairs(self.cx, Some(fields.len()))?;
+        let mut st = decoder
+            .decode_struct(self.cx, Some(fields.len()))?
+            .into_struct_pairs(self.cx)?;
         let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
         st.end(self.cx)?;
+        self.decoder.end(self.cx)?;
         Ok(value)
     }
 }
@@ -819,7 +790,7 @@ where
     type Variant = Self;
 
     #[inline]
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    fn variant_seed<V>(mut self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
     where
         V: de::DeserializeSeed<'de>,
     {
@@ -829,35 +800,28 @@ where
     }
 }
 
-struct AnyVisitor<'a, V> {
+struct AnyVisitor<V> {
     visitor: V,
 }
 
-impl<'a, C, V> AnyVisitor<'a, C, V> {
+impl<V> AnyVisitor<V> {
     fn new(visitor: V) -> Self {
         Self { visitor }
     }
 }
 
 #[musli::visitor]
-impl<'de, 'a, V> Visitor<'de> for AnyVisitor<'a, V>
+impl<'de, C, V> Visitor<'de, C> for AnyVisitor<V>
 where
+    C: Context,
+    C::Error: de::Error,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
-    type Error = C::Error;
 
-    type String<C> = StrVisitor<V>
-    where
-        C: Context<Input = Self::Error>;
-
-    type Bytes<C> = BytesVisitor<V>
-    where
-        C: Context<Input = Self::Error>;
-
-    type Number<C> = NumVisitor<V>
-    where
-        C: Context<Input = Self::Error>;
+    type String = StringVisitor<V>;
+    type Bytes = BytesVisitor<V>;
+    type Number = NumberVisitor<V>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -865,170 +829,102 @@ where
     }
 
     #[inline]
-    fn visit_unit<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_unit(self, _: &C) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_unit()
     }
 
     #[inline]
-    fn visit_bool<C>(self, cx: &C, v: bool) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_bool(self, _: &C, v: bool) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_bool(v)
     }
 
     #[inline]
-    fn visit_char<C>(self, cx: &C, v: char) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_char(self, _: &C, v: char) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_char(v)
     }
 
     #[inline]
-    fn visit_u8<C>(self, cx: &C, v_: u8) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u8(self, _: &C, v: u8) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u8(v)
     }
 
     #[inline]
-    fn visit_u16<C>(self, cx: &C, v: u16) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u16(self, _: &C, v: u16) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u16(v)
     }
 
     #[inline]
-    fn visit_u32<C>(self, cx: &C, v: u32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u32(self, _: &C, v: u32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u32(v)
     }
 
     #[inline]
-    fn visit_u64<C>(self, cx: &C, v: u64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u64(self, _: &C, v: u64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u64(v)
     }
 
     #[inline]
-    fn visit_u128<C>(self, cx: &C, v: u128) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u128(self, _: &C, v: u128) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u128(v)
     }
 
     #[inline]
-    fn visit_i8<C>(self, cx: &C, v: i8) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i8(self, _: &C, v: i8) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i8(v)
     }
 
     #[inline]
-    fn visit_i16<C>(self, cx: &C, v: i16) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i16(self, _: &C, v: i16) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i16(v)
     }
 
     #[inline]
-    fn visit_i32<C>(self, cx: &C, v: i32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i32(self, _: &C, v: i32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i32(v)
     }
 
     #[inline]
-    fn visit_i64<C>(self, cx: &C, v: i64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i64(self, _: &C, v: i64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i64(v)
     }
 
     #[inline]
-    fn visit_i128<C>(self, cx: &C, v: i128) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i128(self, _: &C, v: i128) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i128(v)
     }
 
     #[inline]
-    fn visit_usize<C>(self, cx: &C, v: usize) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        if let Ok(v) = u32::try_from(v) {
-            return self.visit_u32(cx, v);
+    fn visit_usize(self, cx: &C, v: usize) -> Result<Self::Ok, C::Error> {
+        if let Some(value) = unsigned_value(self.visitor, v)? {
+            return Ok(value);
         }
 
-        if let Ok(v) = u64::try_from(v) {
-            return self.visit_u64(cx, v);
-        }
-
-        if let Ok(v) = u128::try_from(v) {
-            return self.visit_u128(cx, v);
-        }
-
-        Err(cx.message("Unsupported numerical type"))
+        Err(cx.message(format_args!("Unsupported usize value {v}")))
     }
 
     #[inline]
-    fn visit_isize<C>(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        if let Ok(v) = i32::try_from(v) {
-            return self.visit_i32(cx, v);
+    fn visit_isize(self, cx: &C, v: isize) -> Result<Self::Ok, C::Error> {
+        if let Some(value) = signed_value(self.visitor, v)? {
+            return Ok(value);
         }
 
-        if let Ok(v) = i64::try_from(v) {
-            return self.visit_i64(cx, v);
-        }
-
-        if let Ok(v) = i128::try_from(v) {
-            return self.visit_i128(cx, v);
-        }
-
-        Err(cx.message("Unsupported numerical type"))
+        Err(cx.message(format_args!("Unsupported isize value {v}")))
     }
 
     #[inline]
-    fn visit_f32<C>(self, cx: &C, v: f32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_f32(self, _: &C, v: f32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_f32(v)
     }
 
     #[inline]
-    fn visit_f64<C>(self, cx: &C, v: f64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_f64(self, _: &C, v: f64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_f64(v)
     }
 
     #[inline]
-    fn visit_option<C, D>(self, cx: &C, v: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<D>(self, cx: &C, v: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: Decoder<'de, Error = Self::Error>,
+        D: Decoder<'de, Error = C::Input>,
     {
         match v {
             Some(v) => self.visitor.visit_some(Deserializer::new(cx, v)),
@@ -1037,48 +933,80 @@ where
     }
 
     #[inline]
-    fn visit_sequence<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, cx: &C, mut decoder: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: SequenceDecoder<'de, Error = Self::Error>,
+        D: SequenceDecoder<'de, Error = C::Input>,
     {
-        todo!()
+        let value = self.visitor.visit_seq(SeqAccess::new(cx, &mut decoder))?;
+        decoder.end(cx)?;
+        Ok(value)
     }
 
     #[inline]
-    fn visit_map<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: musli::de::MapDecoder<'de, Error = Self::Error>,
+        D: MapDecoder<'de, Error = C::Input>,
     {
-        todo!()
+        let mut map_decoder = decoder.into_map_pairs(cx)?;
+        let value = self
+            .visitor
+            .visit_map(MapAccess::new(cx, &mut map_decoder))?;
+        map_decoder.end(cx)?;
+        Ok(value)
     }
 
     #[inline]
-    fn visit_string<C>(self, cx: &C, hint: SizeHint) -> Result<Self::String<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        Ok(StrVisitor::new(self.visitor))
+    fn visit_string(self, _: &C, _: SizeHint) -> Result<Self::String, C::Error> {
+        Ok(StringVisitor::new(self.visitor))
     }
 
     #[inline]
-    fn visit_bytes<C>(self, cx: &C, hint: SizeHint) -> Result<Self::Bytes<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_bytes(self, _: &C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
         Ok(BytesVisitor::new(self.visitor))
     }
 
     #[inline]
-    fn visit_number<C>(
-        self,
-        cx: &C,
-        hint: musli::de::NumberHint,
-    ) -> Result<Self::Number<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_number(self, _: &C, _: musli::de::NumberHint) -> Result<Self::Number, C::Error> {
         Ok(NumberVisitor::new(self.visitor))
     }
+}
+
+fn unsigned_value<'de, V, E>(visitor: V, v: usize) -> Result<Option<V::Value>, E>
+where
+    V: de::Visitor<'de>,
+    E: de::Error,
+{
+    if let Ok(v) = u32::try_from(v) {
+        return Ok(Some(visitor.visit_u32(v)?));
+    }
+
+    if let Ok(v) = u64::try_from(v) {
+        return Ok(Some(visitor.visit_u64(v)?));
+    }
+
+    if let Ok(v) = u128::try_from(v) {
+        return Ok(Some(visitor.visit_u128(v)?));
+    }
+
+    Ok(None)
+}
+
+fn signed_value<'de, V, E>(visitor: V, v: isize) -> Result<Option<V::Value>, E>
+where
+    V: de::Visitor<'de>,
+    E: de::Error,
+{
+    if let Ok(v) = i32::try_from(v) {
+        return Ok(Some(visitor.visit_i32(v)?));
+    }
+
+    if let Ok(v) = i64::try_from(v) {
+        return Ok(Some(visitor.visit_i64(v)?));
+    }
+
+    if let Ok(v) = i128::try_from(v) {
+        return Ok(Some(visitor.visit_i128(v)?));
+    }
+
+    Ok(None)
 }

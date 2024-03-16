@@ -137,8 +137,7 @@ where
 
     #[inline]
     fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
-        let encoder = self.encoder.encode_struct(self.cx, 0)?;
-        encoder.end(self.cx)
+        self.encoder.encode_unit(self.cx)
     }
 
     #[inline]
@@ -162,7 +161,7 @@ where
     where
         T: ser::Serialize,
     {
-        encode_newtype(self.cx, self.encoder, value)
+        value.serialize(Serializer::new(self.cx, self.encoder))
     }
 
     #[inline]
@@ -177,7 +176,7 @@ where
         T: ser::Serialize,
     {
         encode_variant(self.cx, self.encoder, variant_name, move |encoder| {
-            encode_newtype(self.cx, encoder, value)
+            value.serialize(Serializer::new(self.cx, encoder))
         })
     }
 
@@ -284,28 +283,6 @@ where
     let output = f(variant.variant(cx)?)?;
     variant.end(cx)?;
     Ok(output)
-}
-
-#[inline]
-fn encode_newtype<C, E, T>(cx: &C, encoder: E, value: &T) -> Result<E::Ok, C::Error>
-where
-    C: Context<Input = E::Error>,
-    C::Error: ser::Error,
-    E: Encoder,
-    T: ?Sized + Serialize,
-{
-    let mut encoder = encoder.encode_struct(cx, 1)?;
-
-    let mut field = encoder.field(cx)?;
-
-    let k = field.field_name(cx)?;
-    usize::encode(&0usize, cx, k)?;
-
-    let v = field.field_value(cx)?;
-    value.serialize(Serializer::new(cx, v))?;
-
-    field.end(cx)?;
-    encoder.end(cx)
 }
 
 pub struct SerializeSeq<'a, C, E> {

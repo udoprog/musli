@@ -175,8 +175,8 @@ where
     #[inline]
     fn decode_string<C, V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, str>,
         C: Context<Input = Self::Error>,
+        V: ValueVisitor<'de, C, str>,
     {
         JsonDecoder::new(self.parser).decode_string(cx, visitor)
     }
@@ -184,8 +184,8 @@ where
     #[inline]
     fn decode_any<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context<Input = V::Error>,
-        V: Visitor<'de, Error = Self::Error>,
+        C: Context<Input = Self::Error>,
+        V: Visitor<'de, C>,
     {
         match self.parser.peek(cx)? {
             Token::String => {

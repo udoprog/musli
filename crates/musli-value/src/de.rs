@@ -5,8 +5,9 @@ use core::slice;
 #[cfg(feature = "alloc")]
 use musli::de::ValueVisitor;
 use musli::de::{
-    AsDecoder, Decoder, MapDecoder, MapEntryDecoder, NumberHint, PackDecoder, SequenceDecoder,
-    SizeHint, StructDecoder, StructFieldDecoder, TypeHint, VariantDecoder, Visitor,
+    AsDecoder, Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, NumberHint, PackDecoder,
+    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructPairsDecoder, TypeHint,
+    VariantDecoder, Visitor,
 };
 use musli::Context;
 use musli_storage::de::StorageDecoder;
@@ -356,7 +357,7 @@ where
     fn decode_any<C, V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
-        V: Visitor<'de, Error = Self::Error>,
+        V: Visitor<'de, C>,
     {
         match self.value {
             Value::Unit => visitor.visit_unit(cx),
@@ -525,6 +526,7 @@ impl<'de, const F: Options, E> IterValuePairsDecoder<'de, F, E> {
     }
 }
 
+#[musli::map_decoder]
 impl<'de, const F: Options, E: 'static> MapDecoder<'de> for IterValuePairsDecoder<'de, F, E>
 where
     E: From<ErrorKind>,
@@ -535,9 +537,19 @@ where
     where
         Self: 'this;
 
+    type MapPairs = Self;
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.iter.size_hint().1)
+    }
+
+    #[inline]
+    fn into_map_pairs<C>(self, _: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(self)
     }
 
     #[inline]
@@ -546,6 +558,59 @@ where
         C: Context<Input = Self::Error>,
     {
         Ok(self.iter.next().map(IterValuePairDecoder::new))
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
+    }
+}
+
+impl<'de, const F: Options, E: 'static> MapPairsDecoder<'de> for IterValuePairsDecoder<'de, F, E>
+where
+    E: From<ErrorKind>,
+{
+    type Error = E;
+
+    type MapPairsKey<'this> = ValueDecoder<'de, F, E>
+    where
+        Self: 'this;
+
+    type MapPairsValue<'this> = ValueDecoder<'de, F, E> where Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, _: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let Some((name, _)) = self.iter.clone().next() else {
+            return Ok(None);
+        };
+
+        Ok(Some(ValueDecoder::new(name)))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let Some((_, value)) = self.iter.next() else {
+            return Err(cx.report(ErrorKind::ExpectedMapValue));
+        };
+
+        Ok(ValueDecoder::new(value))
+    }
+
+    #[inline]
+    fn skip_map_pairs_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(true)
     }
 
     #[inline]
@@ -594,6 +659,7 @@ where
     }
 }
 
+#[musli::struct_decoder]
 impl<'de, const F: Options, E: 'static> StructDecoder<'de> for IterValuePairsDecoder<'de, F, E>
 where
     E: From<ErrorKind>,
@@ -604,9 +670,19 @@ where
     where
         Self: 'this;
 
+    type StructPairs = Self;
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
         MapDecoder::size_hint(self)
+    }
+
+    #[inline]
+    fn into_struct_pairs<C>(self, _: &C) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context,
+    {
+        Ok(self)
     }
 
     #[inline]
@@ -623,6 +699,59 @@ where
         C: Context<Input = Self::Error>,
     {
         MapDecoder::end(self, cx)
+    }
+}
+
+impl<'de, const F: Options, E: 'static> StructPairsDecoder<'de> for IterValuePairsDecoder<'de, F, E>
+where
+    E: From<ErrorKind>,
+{
+    type Error = E;
+
+    type FieldName<'this> = ValueDecoder<'de, F, E>
+    where
+        Self: 'this;
+
+    type FieldValue<'this> = ValueDecoder<'de, F, E> where Self: 'this;
+
+    #[inline]
+    fn field_name<C>(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let Some((name, _)) = self.iter.clone().next() else {
+            return Err(cx.report(ErrorKind::ExpectedFieldName));
+        };
+
+        Ok(ValueDecoder::new(name))
+    }
+
+    #[inline]
+    fn field_value<C>(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let Some((_, value)) = self.iter.next() else {
+            return Err(cx.report(ErrorKind::ExpectedFieldValue));
+        };
+
+        Ok(ValueDecoder::new(value))
+    }
+
+    #[inline]
+    fn skip_field_value<C>(&mut self, _: &C) -> Result<bool, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(self.iter.next().is_some())
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(())
     }
 }
 

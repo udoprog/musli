@@ -72,7 +72,7 @@ pub trait SequenceDecoder<'de> {
 }
 
 /// Trait governing how to decode a sequence of pairs.
-pub trait MapDecoder<'de> {
+pub trait MapDecoder<'de>: Sized {
     /// Error type for decoder.
     type Error: 'static;
 
@@ -81,8 +81,29 @@ pub trait MapDecoder<'de> {
     where
         Self: 'this;
 
+    /// Decoder for a sequence of map pairs.
+    type MapPairs: MapPairsDecoder<'de, Error = Self::Error>;
+
+    /// This is a type argument used to hint to any future implementor that they
+    /// should be using the [`#[musli::map_decoder]`][crate::map_decoder]
+    /// attribute macro when implementing [`MapDecoder`].
+    #[doc(hidden)]
+    type __UseMusliMapDecoderAttributeMacro;
+
     /// Get a size hint of known remaining elements.
     fn size_hint(&self) -> SizeHint;
+
+    /// Simplified decoding a map of unknown length.
+    ///
+    /// The length of the map must somehow be determined from the underlying
+    /// format.
+    #[inline]
+    fn into_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message("Decoder does not support MapPairs decoding"))
+    }
 
     /// Decode the next key. This returns `Ok(None)` where there are no more
     /// elements to decode.
@@ -101,7 +122,7 @@ pub trait MapDecoder<'de> {
 }
 
 /// Trait governing how to decode fields in a struct.
-pub trait StructDecoder<'de> {
+pub trait StructDecoder<'de>: Sized {
     /// Error type for decoder.
     type Error: 'static;
 
@@ -110,8 +131,33 @@ pub trait StructDecoder<'de> {
     where
         Self: 'this;
 
+    /// Decoder for a sequence of struct pairs.
+    type StructPairs: StructPairsDecoder<'de, Error = Self::Error>;
+
+    /// This is a type argument used to hint to any future implementor that they
+    /// should be using the [`#[musli::struct_decoder]`][crate::struct_decoder]
+    /// attribute macro when implementing [`MapDecoder`].
+    #[doc(hidden)]
+    type __UseMusliStructDecoderAttributeMacro;
+
     /// Get a size hint of known remaining fields.
     fn size_hint(&self) -> SizeHint;
+
+    /// Simplified decoding of a struct which has an expected `len` number of
+    /// elements.
+    ///
+    /// The `len` indicates how many fields the decoder is *expecting* depending
+    /// on how many fields are present in the underlying struct being decoded,
+    /// butit should only be considered advisory.
+    ///
+    /// The size of a struct might therefore change from one session to another.
+    #[inline]
+    fn into_struct_pairs<C>(self, cx: &C) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Err(cx.message("Decoder does not support StructPairs decoding"))
+    }
 
     /// Decode the next field.
     #[must_use = "Decoders must be consumed"]
@@ -355,12 +401,8 @@ pub trait Decoder<'de>: Sized {
     type Tuple: PackDecoder<'de, Error = Self::Error>;
     /// Decoder for a map.
     type Map: MapDecoder<'de, Error = Self::Error>;
-    /// Decoder for a sequence of map pairs.
-    type MapPairs: MapPairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a struct.
     type Struct: StructDecoder<'de, Error = Self::Error>;
-    /// Decoder for a sequence of struct pairs.
-    type StructPairs: StructPairsDecoder<'de, Error = Self::Error>;
     /// Decoder for a variant.
     type Variant: VariantDecoder<'de, Error = Self::Error>;
 
@@ -1460,21 +1502,6 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Simplified decoding a map of unknown length.
-    ///
-    /// The length of the map must somehow be determined from the underlying
-    /// format.
-    #[inline]
-    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        Err(cx.message(expecting::unsupported_type(
-            &expecting::MapPairs,
-            &ExpectingWrapper(self),
-        )))
-    }
-
     /// Decode a struct which has an expected `len` number of elements.
     ///
     /// The `len` indicates how many fields the decoder is *expecting* depending
@@ -1543,25 +1570,6 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Simplified decoding of a struct which has an expected `len` number of
-    /// elements.
-    ///
-    /// The `len` indicates how many fields the decoder is *expecting* depending
-    /// on how many fields are present in the underlying struct being decoded,
-    /// butit should only be considered advisory.
-    ///
-    /// The size of a struct might therefore change from one session to another.
-    #[inline]
-    fn decode_struct_pairs<C>(self, cx: &C, _: Option<usize>) -> Result<Self::StructPairs, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        Err(cx.message(expecting::unsupported_type(
-            &expecting::StructPairs,
-            &ExpectingWrapper(self),
-        )))
-    }
-
     /// Return decoder for a variant.
     ///
     /// # Examples
@@ -1620,7 +1628,7 @@ pub trait Decoder<'de>: Sized {
     fn decode_any<C, V>(self, cx: &C, _: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
-        V: Visitor<'de, Error = Self::Error>,
+        V: Visitor<'de, C>,
     {
         Err(cx.message(format_args!(
             "visitor not supported, expected {}",

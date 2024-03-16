@@ -50,9 +50,7 @@ where
     type Sequence = LimitedStorageDecoder<R, F, E>;
     type Tuple = Self;
     type Map = LimitedStorageDecoder<R, F, E>;
-    type MapPairs = LimitedStorageDecoder<R, F, E>;
     type Struct = LimitedStorageDecoder<R, F, E>;
-    type StructPairs = LimitedStorageDecoder<R, F, E>;
     type Variant = Self;
 
     #[inline]
@@ -328,23 +326,7 @@ where
     }
 
     #[inline]
-    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        LimitedStorageDecoder::new(cx, self)
-    }
-
-    #[inline]
     fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        LimitedStorageDecoder::new(cx, self)
-    }
-
-    #[inline]
-    fn decode_struct_pairs<C>(self, cx: &C, _: Option<usize>) -> Result<Self::StructPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -432,6 +414,7 @@ where
     }
 }
 
+#[musli::map_decoder]
 impl<'de, R, const F: Options, E: 'static> MapDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
@@ -442,9 +425,19 @@ where
     where
         Self: 'this;
 
+    type MapPairs = Self;
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::Exact(self.remaining)
+    }
+
+    #[inline]
+    fn into_map_pairs<C>(self, _: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(self)
     }
 
     #[inline]
@@ -502,6 +495,7 @@ where
     }
 }
 
+#[musli::struct_decoder]
 impl<'de, R, const F: Options, E: 'static> StructDecoder<'de> for LimitedStorageDecoder<R, F, E>
 where
     R: Reader<'de>,
@@ -512,9 +506,19 @@ where
     where
         Self: 'this;
 
+    type StructPairs = Self;
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
         MapDecoder::size_hint(self)
+    }
+
+    #[inline]
+    fn into_struct_pairs<C>(self, _: &C) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(self)
     }
 
     #[inline]

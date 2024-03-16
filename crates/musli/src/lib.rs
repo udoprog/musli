@@ -504,6 +504,62 @@ pub use musli_macros::encoder;
 #[doc(inline)]
 pub use musli_macros::decoder;
 
+/// This is an attribute macro that must be used when implementing
+/// [`MapDecoder`].
+///
+/// It is required to use because a [`MapDecoder`] implementation might
+/// introduce new associated types in the future, and this is [not yet
+/// supported] on a language level in Rust. So this attribute macro polyfills
+/// any missing types automatically.
+///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::MapDecoder;
+///
+/// struct MyDecoder;
+///
+/// #[musli::map_decoder]
+/// impl MapDecoder<'_> for MyDecoder {
+///     type Error = String;
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_macros::map_decoder;
+
+/// This is an attribute macro that must be used when implementing
+/// [`StructDecoder`].
+///
+/// It is required to use because a [`StructDecoder`] implementation might
+/// introduce new associated types in the future, and this is [not yet
+/// supported] on a language level in Rust. So this attribute macro polyfills
+/// any missing types automatically.
+///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::StructDecoder;
+///
+/// struct MyDecoder;
+///
+/// #[musli::struct_decoder]
+/// impl StructDecoder<'_> for MyDecoder {
+///     type Error = String;
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_macros::struct_decoder;
+
 /// This is an attribute macro that must be used when implementing a
 /// [`Visitor`].
 ///
@@ -523,14 +579,17 @@ pub use musli_macros::decoder;
 /// use core::marker;
 /// use core::convert::Infallible;
 ///
+/// use musli::Context;
 /// use musli::de::Visitor;
 ///
 /// struct AnyVisitor;
 ///
 /// #[musli::visitor]
-/// impl<'de> Visitor<'de> for AnyVisitor {
+/// impl<'de, C> Visitor<'de, C> for AnyVisitor
+/// where
+///     C: Context,
+/// {
 ///     type Ok = ();
-///     type Error = Infallible;
 ///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

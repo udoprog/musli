@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use crate::de::{
     Decoder, MapDecoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, TypeHint,
@@ -14,26 +15,21 @@ use super::ValueVisitor;
 /// Each callback on this visitor indicates the type that should be decoded from
 /// the passed in decoder. A typical implementation would simply call the
 /// corresponding decoder function for the type being visited.
-pub trait Visitor<'de>: Sized {
+pub trait Visitor<'de, C>: Sized
+where
+    C: Context,
+{
     /// The value produced by the visitor.
     type Ok;
-    /// The error type produced.
-    type Error: 'static;
 
     /// String decoder to use.
-    type String<C>: ValueVisitor<'de, C, str, Ok = Self::Ok>
-    where
-        C: Context<Input = Self::Error>;
+    type String: ValueVisitor<'de, C, str, Ok = Self::Ok>;
 
     /// Bytes decoder to use.
-    type Bytes<C>: ValueVisitor<'de, C, [u8], Ok = Self::Ok>
-    where
-        C: Context<Input = Self::Error>;
+    type Bytes: ValueVisitor<'de, C, [u8], Ok = Self::Ok>;
 
     /// Number decoder to use.
-    type Number<C>: NumberVisitor<'de, C, Ok = Self::Ok>
-    where
-        C: Context<Input = Self::Error>;
+    type Number: NumberVisitor<'de, C, Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::visitor]`][crate::visitor] attribute
@@ -47,316 +43,267 @@ pub trait Visitor<'de>: Sized {
 
     /// Fallback used when the type is either not implemented for this visitor
     /// or the underlying format doesn't know which type to decode.
-    fn visit_any<C, D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
+    fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: Decoder<'de, Error = Self::Error>,
+        D: Decoder<'de, Error = C::Input>,
     {
-        Err(cx.message(expecting::unsupported_type(&hint, &ExpectingWrapper(self))))
+        Err(cx.message(expecting::unsupported_type(
+            &hint,
+            &ExpectingWrapper::new(self),
+        )))
     }
 
     /// Indicates that the visited type is a `unit`.
     #[inline]
-    fn visit_unit<C>(self, cx: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_unit(self, cx: &C) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unit,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `bool`.
     #[inline]
-    fn visit_bool<C>(self, cx: &C, _: bool) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_bool(self, cx: &C, _: bool) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bool,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `char`.
     #[inline]
-    fn visit_char<C>(self, cx: &C, _: char) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_char(self, cx: &C, _: char) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Char,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `u8`.
     #[inline]
-    fn visit_u8<C>(self, cx: &C, _: u8) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u8(self, cx: &C, _: u8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned8,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `u16`.
     #[inline]
-    fn visit_u16<C>(self, cx: &C, _: u16) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u16(self, cx: &C, _: u16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned16,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `u32`.
     #[inline]
-    fn visit_u32<C>(self, cx: &C, _: u32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u32(self, cx: &C, _: u32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned32,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `u64`.
     #[inline]
-    fn visit_u64<C>(self, cx: &C, _: u64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u64(self, cx: &C, _: u64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned64,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `u128`.
     #[inline]
-    fn visit_u128<C>(self, cx: &C, _: u128) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u128(self, cx: &C, _: u128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned128,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `i8`.
     #[inline]
-    fn visit_i8<C>(self, cx: &C, _: i8) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i8(self, cx: &C, _: i8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed8,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `i16`.
     #[inline]
-    fn visit_i16<C>(self, cx: &C, _: i16) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i16(self, cx: &C, _: i16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed16,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `i32`.
     #[inline]
-    fn visit_i32<C>(self, cx: &C, _: i32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i32(self, cx: &C, _: i32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed32,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `i64`.
     #[inline]
-    fn visit_i64<C>(self, cx: &C, _: i64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i64(self, cx: &C, _: i64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed64,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `i128`.
     #[inline]
-    fn visit_i128<C>(self, cx: &C, _: i128) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i128(self, cx: &C, _: i128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed128,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `usize`.
     #[inline]
-    fn visit_usize<C>(self, cx: &C, _: usize) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_usize(self, cx: &C, _: usize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Usize,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `isize`.
     #[inline]
-    fn visit_isize<C>(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_isize(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Isize,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `f32`.
     #[inline]
-    fn visit_f32<C>(self, cx: &C, _: f32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_f32(self, cx: &C, _: f32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float32,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a `f64`.
     #[inline]
-    fn visit_f64<C>(self, cx: &C, _: f64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_f64(self, cx: &C, _: f64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float64,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is an optional type.
     #[inline]
-    fn visit_option<C, D>(self, cx: &C, _: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<D>(self, cx: &C, _: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: Decoder<'de, Error = Self::Error>,
+        D: Decoder<'de, Error = C::Input>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a sequence.
     #[inline]
-    fn visit_sequence<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: SequenceDecoder<'de, Error = Self::Error>,
+        D: SequenceDecoder<'de, Error = C::Input>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::SequenceWith(decoder.size_hint()),
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a map.
     #[inline]
-    fn visit_map<C, D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: MapDecoder<'de, Error = Self::Error>,
+        D: MapDecoder<'de, Error = C::Input>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::MapWith(decoder.size_hint()),
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is `string`.
     #[inline]
-    fn visit_string<C>(self, cx: &C, hint: SizeHint) -> Result<Self::String<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_string(self, cx: &C, hint: SizeHint) -> Result<Self::String, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::StringWith(hint),
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is `bytes`.
     #[inline]
-    fn visit_bytes<C>(self, cx: &C, hint: SizeHint) -> Result<Self::Bytes<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_bytes(self, cx: &C, hint: SizeHint) -> Result<Self::Bytes, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::BytesWith(hint),
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a number.
     #[inline]
-    fn visit_number<C>(self, cx: &C, hint: NumberHint) -> Result<Self::Number<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_number(self, cx: &C, hint: NumberHint) -> Result<Self::Number, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::NumberWith(hint),
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 
     /// Indicates that the visited type is a variant.
     #[inline]
-    fn visit_variant<C, D>(self, cx: &C, _: D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<D>(self, cx: &C, _: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: VariantDecoder<'de, Error = Self::Error>,
+        D: VariantDecoder<'de, Error = C::Input>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
-            &ExpectingWrapper(self),
+            &ExpectingWrapper::new(self),
         )))
     }
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<T>(T);
+struct ExpectingWrapper<C, T> {
+    inner: T,
+    _marker: PhantomData<C>,
+}
 
-impl<'de, T> Expecting for ExpectingWrapper<T>
+impl<C, T> ExpectingWrapper<C, T> {
+    fn new(inner: T) -> Self {
+        Self {
+            inner,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'de, C, T> Expecting for ExpectingWrapper<C, T>
 where
-    T: Visitor<'de>,
+    C: Context,
+    T: Visitor<'de, C>,
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expecting(f)
+        self.inner.expecting(f)
     }
 }

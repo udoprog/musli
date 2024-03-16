@@ -203,9 +203,7 @@ where
     type Sequence = RemainingSelfDecoder<R, F>;
     type Tuple = SelfTupleDecoder<R, F>;
     type Map = RemainingSelfDecoder<R, F>;
-    type MapPairs = RemainingSelfDecoder<R, F>;
     type Struct = RemainingSelfDecoder<R, F>;
-    type StructPairs = RemainingSelfDecoder<R, F>;
     type Variant = Self;
 
     #[inline]
@@ -660,23 +658,7 @@ where
     }
 
     #[inline]
-    fn decode_map_pairs<C>(self, cx: &C) -> Result<Self::MapPairs, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        self.shared_decode_map(cx)
-    }
-
-    #[inline]
     fn decode_struct<C>(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        self.shared_decode_map(cx)
-    }
-
-    #[inline]
-    fn decode_struct_pairs<C>(self, cx: &C, _: Option<usize>) -> Result<Self::StructPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -706,7 +688,7 @@ where
     fn decode_any<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
-        V: Visitor<'de, Error = Self::Error>,
+        V: Visitor<'de, C>,
     {
         let tag = match self.reader.peek(cx)? {
             Some(b) => Tag::from_byte(b),
@@ -921,6 +903,7 @@ where
     }
 }
 
+#[musli::map_decoder]
 impl<'de, R, const F: Options> MapDecoder<'de> for RemainingSelfDecoder<R, F>
 where
     R: Reader<'de>,
@@ -931,9 +914,19 @@ where
     where
         Self: 'this;
 
+    type MapPairs = Self;
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::Exact(self.remaining)
+    }
+
+    #[inline]
+    fn into_map_pairs<C>(self, _: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(self)
     }
 
     #[inline]
@@ -1108,6 +1101,7 @@ where
     }
 }
 
+#[musli::struct_decoder]
 impl<'de, R, const F: Options> StructDecoder<'de> for RemainingSelfDecoder<R, F>
 where
     R: Reader<'de>,
@@ -1118,9 +1112,19 @@ where
     where
         Self: 'this;
 
+    type StructPairs = Self;
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::Exact(self.remaining)
+    }
+
+    #[inline]
+    fn into_struct_pairs<C>(self, _: &C) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(self)
     }
 
     #[inline]

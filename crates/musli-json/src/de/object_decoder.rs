@@ -73,6 +73,7 @@ where
     }
 }
 
+#[musli::map_decoder]
 impl<'de, P> MapDecoder<'de> for JsonObjectDecoder<P>
 where
     P: Parser<'de>,
@@ -83,9 +84,19 @@ where
     where
         Self: 'this;
 
+    type MapPairs = Self;
+
     #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.len)
+    }
+
+    #[inline]
+    fn into_map_pairs<C>(self, _: &C) -> Result<Self::MapPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(self)
     }
 
     #[inline]
@@ -181,6 +192,49 @@ where
     }
 }
 
+#[musli::struct_decoder]
+impl<'de, P> StructDecoder<'de> for JsonObjectDecoder<P>
+where
+    P: Parser<'de>,
+{
+    type Error = Error;
+
+    type Field<'this> = JsonObjectPairDecoder<P::Mut<'this>>
+    where
+        Self: 'this;
+
+    type StructPairs = Self;
+
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        MapDecoder::size_hint(self)
+    }
+
+    #[inline]
+    fn into_struct_pairs<C>(self, _: &C) -> Result<Self::StructPairs, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(self)
+    }
+
+    #[inline]
+    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::entry(self, cx)
+    }
+
+    #[inline]
+    fn end<C>(self, cx: &C) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        MapDecoder::end(self, cx)
+    }
+}
+
 impl<'de, P> StructPairsDecoder<'de> for JsonObjectDecoder<P>
 where
     P: Parser<'de>,
@@ -234,37 +288,5 @@ where
         C: Context<Input = Self::Error>,
     {
         MapPairsDecoder::end(self, cx)
-    }
-}
-
-impl<'de, P> StructDecoder<'de> for JsonObjectDecoder<P>
-where
-    P: Parser<'de>,
-{
-    type Error = Error;
-
-    type Field<'this> = JsonObjectPairDecoder<P::Mut<'this>>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> SizeHint {
-        MapDecoder::size_hint(self)
-    }
-
-    #[inline]
-    fn field<C>(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        MapDecoder::entry(self, cx)
-    }
-
-    #[inline]
-    fn end<C>(self, cx: &C) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
-        MapDecoder::end(self, cx)
     }
 }

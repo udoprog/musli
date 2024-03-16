@@ -6,7 +6,8 @@ use alloc::vec::Vec;
 use musli::en::Encoder;
 #[cfg(feature = "alloc")]
 use musli::en::{
-    MapEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
+    Encode, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    StructFieldEncoder, VariantEncoder,
 };
 use musli::Context;
 
@@ -79,9 +80,14 @@ where
     #[cfg(feature = "alloc")]
     type Map = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
-    type Struct = MapValueEncoder<O>;
+    type MapPairs = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
+    type Struct = MapValueEncoder<O>;
     type Variant = VariantValueEncoder<O>;
+    #[cfg(feature = "alloc")]
+    type TupleVariant = VariantSequenceEncoder<O>;
+    #[cfg(feature = "alloc")]
+    type StructVariant = VariantStructEncoder<O>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -345,7 +351,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_struct<C>(self, _: &C, _: usize) -> Result<Self::Struct, C::Error>
+    fn encode_map_pairs<C>(self, _: &C, _: usize) -> Result<Self::MapPairs, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
@@ -354,11 +360,64 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
+    fn encode_struct<C>(self, _: &C, _: usize) -> Result<Self::Struct, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(MapValueEncoder::new(self.output))
+    }
+
+    #[inline]
     fn encode_variant<C>(self, _: &C) -> Result<Self::Variant, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
         Ok(VariantValueEncoder::new(self.output))
+    }
+
+    #[inline]
+    fn encode_unit_variant<C, T>(self, cx: &C, tag: &T) -> Result<(), C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: ?Sized + Encode<C::Mode>,
+    {
+        let mut variant = self.encode_variant(cx)?;
+        tag.encode(cx, variant.tag(cx)?)?;
+        variant.variant(cx)?.encode_unit(cx)?;
+        variant.end(cx)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn encode_tuple_variant<C, T>(
+        self,
+        cx: &C,
+        tag: &T,
+        len: usize,
+    ) -> Result<Self::TupleVariant, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: ?Sized + Encode<C::Mode>,
+    {
+        let mut variant = Value::Unit;
+        tag.encode(cx, ValueEncoder::new(&mut variant))?;
+        Ok(VariantSequenceEncoder::new(self.output, variant, len))
+    }
+
+    #[inline]
+    fn encode_struct_variant<C, T>(
+        self,
+        cx: &C,
+        tag: &T,
+        len: usize,
+    ) -> Result<Self::StructVariant, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+        T: ?Sized + Encode<C::Mode>,
+    {
+        let mut variant = Value::Unit;
+        tag.encode(cx, ValueEncoder::new(&mut variant))?;
+        Ok(VariantStructEncoder::new(self.output, variant, len))
     }
 }
 
@@ -392,6 +451,7 @@ where
     where
         Self: 'this;
 
+    #[inline]
     fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -399,6 +459,7 @@ where
         Ok(ValueEncoder::new(&mut self.values))
     }
 
+    #[inline]
     fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -438,6 +499,7 @@ where
     where
         Self: 'this;
 
+    #[inline]
     fn entry<C>(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -445,6 +507,58 @@ where
         Ok(PairValueEncoder::new(&mut self.values))
     }
 
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.output.write(Value::Map(self.values));
+        Ok(())
+    }
+}
+
+impl<O> MapPairsEncoder for MapValueEncoder<O>
+where
+    O: ValueOutput,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type MapPairsKey<'this> = ValueEncoder<&'this mut Value>
+    where
+        Self: 'this;
+
+    type MapPairsValue<'this> = ValueEncoder<&'this mut Value>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn map_pairs_key<C>(&mut self, cx: &C) -> Result<Self::MapPairsKey<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.values.push((Value::Unit, Value::Unit));
+
+        let Some((key, _)) = self.values.last_mut() else {
+            return Err(cx.message("Pair has not been encoded"));
+        };
+
+        Ok(ValueEncoder::new(key))
+    }
+
+    #[inline]
+    fn map_pairs_value<C>(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        let Some((_, value)) = self.values.last_mut() else {
+            return Err(cx.message("Pair has not been encoded"));
+        };
+
+        Ok(ValueEncoder::new(value))
+    }
+
+    #[inline]
     fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -466,6 +580,7 @@ where
     where
         Self: 'this;
 
+    #[inline]
     fn field<C>(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -473,6 +588,7 @@ where
         Ok(PairValueEncoder::new(&mut self.values))
     }
 
+    #[inline]
     fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -608,6 +724,7 @@ where
     where
         Self: 'this;
 
+    #[inline]
     fn tag<C>(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -615,6 +732,7 @@ where
         Ok(ValueEncoder::new(&mut self.pair.0))
     }
 
+    #[inline]
     fn variant<C>(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error>
     where
         C: Context<Input = Self::Error>,
@@ -622,11 +740,118 @@ where
         Ok(ValueEncoder::new(&mut self.pair.1))
     }
 
+    #[inline]
     fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
     where
         C: Context<Input = Self::Error>,
     {
         self.output.write(Value::Variant(Box::new(self.pair)));
+        Ok(())
+    }
+}
+
+/// A variant sequence encoder.
+#[cfg(feature = "alloc")]
+pub struct VariantSequenceEncoder<O> {
+    output: O,
+    variant: Value,
+    values: Vec<Value>,
+}
+
+#[cfg(feature = "alloc")]
+impl<O> VariantSequenceEncoder<O> {
+    #[inline]
+    fn new(output: O, variant: Value, len: usize) -> Self {
+        Self {
+            output,
+            variant,
+            values: Vec::with_capacity(len),
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<O> SequenceEncoder for VariantSequenceEncoder<O>
+where
+    O: ValueOutput,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type Encoder<'this> = ValueEncoder<&'this mut Vec<Value>>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn next<C>(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(ValueEncoder::new(&mut self.values))
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.output.write(Value::Variant(Box::new((
+            self.variant,
+            Value::Sequence(self.values),
+        ))));
+        Ok(())
+    }
+}
+
+/// A variant struct encoder.
+#[cfg(feature = "alloc")]
+pub struct VariantStructEncoder<O> {
+    output: O,
+    variant: Value,
+    fields: Vec<(Value, Value)>,
+}
+
+#[cfg(feature = "alloc")]
+impl<O> VariantStructEncoder<O> {
+    #[inline]
+    fn new(output: O, variant: Value, len: usize) -> Self {
+        Self {
+            output,
+            variant,
+            fields: Vec::with_capacity(len),
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<O> StructEncoder for VariantStructEncoder<O>
+where
+    O: ValueOutput,
+{
+    type Ok = ();
+    type Error = Error;
+
+    type Field<'this> = PairValueEncoder<'this>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn field<C>(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        Ok(PairValueEncoder::new(&mut self.fields))
+    }
+
+    #[inline]
+    fn end<C>(self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: Context<Input = Self::Error>,
+    {
+        self.output.write(Value::Variant(Box::new((
+            self.variant,
+            Value::Map(self.fields),
+        ))));
         Ok(())
     }
 }

@@ -41,6 +41,9 @@ pub enum ErrorKind {
     ExpectedBool(TypeHint),
     ExpectedChar(TypeHint),
     ExpectedNumber(NumberHint, TypeHint),
+    ExpectedFieldName,
+    ExpectedFieldValue,
+    ExpectedMapValue,
     #[cfg(feature = "alloc")]
     ExpectedBytes(TypeHint),
     #[cfg(feature = "alloc")]
@@ -71,6 +74,9 @@ impl fmt::Display for ErrorKind {
             ErrorKind::ExpectedNumber(number, hint) => {
                 write!(f, "Expected {number}, but found {hint}")
             }
+            ErrorKind::ExpectedFieldName => write!(f, "Expected field name"),
+            ErrorKind::ExpectedFieldValue => write!(f, "Expected field value"),
+            ErrorKind::ExpectedMapValue => write!(f, "Expected map value"),
             #[cfg(feature = "alloc")]
             ErrorKind::ExpectedBytes(hint) => write!(f, "Expected bytes, but found {hint}"),
             #[cfg(feature = "alloc")]
