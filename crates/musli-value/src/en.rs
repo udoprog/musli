@@ -83,6 +83,7 @@ where
     type MapPairs = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
     type Struct = MapValueEncoder<O>;
+    #[cfg(feature = "alloc")]
     type Variant = VariantValueEncoder<O>;
     #[cfg(feature = "alloc")]
     type TupleVariant = VariantSequenceEncoder<O>;
@@ -288,11 +289,13 @@ where
         Ok(MapValueEncoder::new(self.output))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_variant(self, _: &C) -> Result<Self::Variant, C::Error> {
         Ok(VariantValueEncoder::new(self.output))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_unit_variant<T>(self, cx: &C, tag: &T) -> Result<(), C::Error>
     where
@@ -306,6 +309,7 @@ where
     }
 
     #[inline]
+    #[cfg(feature = "alloc")]
     fn encode_tuple_variant<T>(
         self,
         cx: &C,
@@ -320,6 +324,7 @@ where
         Ok(VariantSequenceEncoder::new(self.output, variant, len))
     }
 
+    #[cfg(feature = "alloc")]
     #[inline]
     fn encode_struct_variant<T>(
         self,
@@ -419,6 +424,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<C, O> MapPairsEncoder<C> for MapValueEncoder<O>
 where
     C: Context,
