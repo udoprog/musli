@@ -64,7 +64,6 @@ where
     C: Context,
 {
     type Mode = C::Mode;
-    type Input = C::Input;
     type Error = error::SerdeError;
     type Mark = C::Mark;
 
@@ -80,15 +79,6 @@ where
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.inner.alloc()
-    }
-
-    #[inline]
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        Self::Input: From<T>,
-    {
-        *self.error.borrow_mut() = Some(self.inner.report(error));
-        error::SerdeError::Captured
     }
 
     #[inline]

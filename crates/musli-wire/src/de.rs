@@ -446,7 +446,7 @@ where
     }
 }
 
-impl<'de, R, const F: Options> RemainingWireDecoder<R, F> {
+impl<R, const F: Options> RemainingWireDecoder<R, F> {
     #[inline]
     fn new(remaining: usize, decoder: WireDecoder<R, F>) -> Self {
         Self { remaining, decoder }

@@ -258,7 +258,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
     where
-        C: Context<Mode = M, Input = Error>,
+        C: Context<Mode = M>,
         T: Decode<'de, M>,
     {
         self.from_slice_with(cx, string.as_bytes())
@@ -285,7 +285,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
     where
-        C: Context<Mode = M, Input = Error>,
+        C: Context<Mode = M>,
         T: Decode<'de, M>,
     {
         let mut reader = SliceParser::new(bytes);

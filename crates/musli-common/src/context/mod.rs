@@ -72,7 +72,6 @@ where
     E: Error,
 {
     type Mode = M;
-    type Input = E;
     type Error = E;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
@@ -80,14 +79,6 @@ where
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
-    }
-
-    #[inline(always)]
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        E: From<T>,
-    {
-        E::from(error)
     }
 
     #[inline(always)]
@@ -166,7 +157,6 @@ where
     A: Allocator,
 {
     type Mode = M;
-    type Input = E;
     type Error = ErrorMarker;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
@@ -174,15 +164,6 @@ where
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
-    }
-
-    #[inline(always)]
-    fn report<T>(&self, _: T) -> ErrorMarker
-    where
-        E: From<T>,
-    {
-        self.error.set(true);
-        ErrorMarker
     }
 
     #[inline(always)]
@@ -237,7 +218,6 @@ where
     E: Error,
 {
     type Mode = M;
-    type Input = E;
     type Error = ErrorMarker;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
@@ -245,20 +225,6 @@ where
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
-    }
-
-    #[inline(always)]
-    fn report<T>(&self, error: T) -> ErrorMarker
-    where
-        E: From<T>,
-    {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            self.error.get().replace(Some(E::from(error)));
-        }
-
-        ErrorMarker
     }
 
     #[inline(always)]

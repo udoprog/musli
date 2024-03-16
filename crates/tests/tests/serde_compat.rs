@@ -76,7 +76,7 @@ mod musli_value {
         let value2: T = do_try!(::musli_value::decode(&encoded1), "Decode musli");
         assert_eq!(value1, value2, "Musli decoding is incorrect");
 
-        let encoded2 = do_try!(::musli_value::encode(&EncodeSerde(&value1)), "Encode serde");
+        let encoded2 = do_try!(::musli_value::encode(EncodeSerde(&value1)), "Encode serde");
 
         let DecodeSerde(value3) =
             do_try!(::musli_value::decode(&encoded2), "Decode serde", encoded2);

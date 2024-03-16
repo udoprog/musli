@@ -10,21 +10,21 @@ use musli::{Allocator, Context};
 
 use super::access::{self, Access};
 use super::rich_error::{RichError, Step};
-use super::{Error, ErrorMarker};
+use super::ErrorMarker;
 
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
-pub struct AllocContext<A, M, E> {
+pub struct AllocContext<A, M> {
     access: Access,
     mark: Cell<usize>,
     alloc: A,
-    errors: UnsafeCell<Vec<(Vec<Step<String>>, Range<usize>, E)>>,
+    errors: UnsafeCell<Vec<(Vec<Step<String>>, Range<usize>, String)>>,
     path: UnsafeCell<Vec<Step<String>>>,
     include_type: bool,
     _marker: PhantomData<M>,
 }
 
-impl<A, M, E> AllocContext<A, M, E> {
+impl<A, M> AllocContext<A, M> {
     /// Construct a new context which uses allocations to store arbitrary
     /// amounts of diagnostics about decoding.
     ///
@@ -49,7 +49,7 @@ impl<A, M, E> AllocContext<A, M, E> {
     }
 
     /// Iterate over all collected errors.
-    pub fn errors(&self) -> Errors<'_, E> {
+    pub fn errors(&self) -> Errors<'_, String> {
         let access = self.access.shared();
 
         // SAFETY: We've checked above that we have shared access.
@@ -61,12 +61,11 @@ impl<A, M, E> AllocContext<A, M, E> {
     }
 }
 
-impl<A, M, E> AllocContext<A, M, E>
+impl<A, M> AllocContext<A, M>
 where
     A: Allocator,
-    E: Error,
 {
-    fn push_error(&self, range: Range<usize>, message: E) {
+    fn push_error(&self, range: Range<usize>, message: String) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've restricted access to the context, so this is safe.
@@ -95,13 +94,11 @@ where
     }
 }
 
-impl<A, M, E> Context for AllocContext<A, M, E>
+impl<A, M> Context for AllocContext<A, M>
 where
     A: Allocator,
-    E: Error,
 {
     type Mode = M;
-    type Input = E;
     type Error = ErrorMarker;
     type Mark = usize;
     type Buf<'this> = A::Buf<'this> where Self: 'this;
@@ -112,29 +109,11 @@ where
     }
 
     #[inline(always)]
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        E: From<T>,
-    {
-        self.push_error(self.mark.get()..self.mark.get(), E::from(error));
-        ErrorMarker
-    }
-
-    #[inline]
-    fn marked_report<T>(&self, mark: Self::Mark, message: T) -> Self::Error
-    where
-        E: From<T>,
-    {
-        self.push_error(mark..self.mark.get(), E::from(message));
-        ErrorMarker
-    }
-
-    #[inline(always)]
     fn custom<T>(&self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.push_error(self.mark.get()..self.mark.get(), E::custom(message));
+        self.push_error(self.mark.get()..self.mark.get(), message.to_string());
         ErrorMarker
     }
 
@@ -143,7 +122,7 @@ where
     where
         T: fmt::Display,
     {
-        self.push_error(self.mark.get()..self.mark.get(), E::message(message));
+        self.push_error(self.mark.get()..self.mark.get(), message.to_string());
         ErrorMarker
     }
 
@@ -152,7 +131,7 @@ where
     where
         T: fmt::Display,
     {
-        self.push_error(mark..self.mark.get(), E::message(message));
+        self.push_error(mark..self.mark.get(), message.to_string());
         ErrorMarker
     }
 

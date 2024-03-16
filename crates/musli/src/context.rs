@@ -10,8 +10,6 @@ use crate::{Buf, Decode, Decoder};
 pub trait Context {
     /// Mode of the context.
     type Mode;
-    /// The error type which is collected by the context.
-    type Input: 'static;
     /// Error produced by context.
     type Error: 'static;
     /// A mark during processing.
@@ -33,11 +31,6 @@ pub trait Context {
 
     /// Allocate a buffer.
     fn alloc(&self) -> Option<Self::Buf<'_>>;
-
-    /// Report the given context error.
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        Self::Input: From<T>;
 
     /// Generate a map function which maps an error using the `report` function.
     fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
@@ -61,16 +54,6 @@ pub trait Context {
     fn message<T>(&self, message: T) -> Self::Error
     where
         T: fmt::Display;
-
-    /// Report the given encoding error from the given mark.
-    #[allow(unused_variables)]
-    #[inline(always)]
-    fn marked_report<T>(&self, mark: Self::Mark, error: T) -> Self::Error
-    where
-        Self::Input: From<T>,
-    {
-        self.report(error)
-    }
 
     /// Report an error based on a mark.
     ///

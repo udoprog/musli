@@ -768,7 +768,7 @@ where
     }
 }
 
-impl<'de, R, const F: Options> RemainingSelfDecoder<R, F> {
+impl<R, const F: Options> RemainingSelfDecoder<R, F> {
     #[inline]
     fn new(remaining: usize, decoder: SelfDecoder<R, F>) -> Self {
         Self { remaining, decoder }

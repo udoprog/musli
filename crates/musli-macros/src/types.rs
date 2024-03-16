@@ -19,7 +19,7 @@ pub(super) enum Extra {
     None,
     Context,
     This,
-    Visitor(Option<Ty>),
+    Visitor(Ty),
 }
 
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
@@ -53,9 +53,9 @@ pub(super) const MAP_DECODER_TYPES: &[(&str, Extra)] = &[("MapPairs", Extra::Non
 pub(super) const STRUCT_DECODER_TYPES: &[(&str, Extra)] = &[("StructPairs", Extra::None)];
 
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
-    ("String", Extra::Visitor(Some(Ty::Str))),
-    ("Bytes", Extra::Visitor(Some(Ty::Bytes))),
-    ("Number", Extra::Visitor(None)),
+    ("String", Extra::Visitor(Ty::Str)),
+    ("Bytes", Extra::Visitor(Ty::Bytes)),
+    ("Number", Extra::None),
 ];
 
 pub(super) struct Types {
@@ -285,35 +285,33 @@ impl Types {
             }
 
             if let Extra::Visitor(ty) = extra {
-                if let Some(ty) = ty {
-                    match ty {
-                        Ty::Str => {
-                            args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                                qself: None,
-                                path: ident_path(syn::Ident::new("str", Span::call_site())),
-                            })));
-                        }
-                        Ty::Bytes => {
-                            let mut path = syn::Path {
-                                leading_colon: None,
-                                segments: Punctuated::default(),
-                            };
+                match ty {
+                    Ty::Str => {
+                        args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                            qself: None,
+                            path: ident_path(syn::Ident::new("str", Span::call_site())),
+                        })));
+                    }
+                    Ty::Bytes => {
+                        let mut path = syn::Path {
+                            leading_colon: None,
+                            segments: Punctuated::default(),
+                        };
 
-                            path.segments.push(syn::PathSegment::from(syn::Ident::new(
-                                "u8",
-                                Span::call_site(),
-                            )));
+                        path.segments.push(syn::PathSegment::from(syn::Ident::new(
+                            "u8",
+                            Span::call_site(),
+                        )));
 
-                            args.push(syn::GenericArgument::Type(syn::Type::Slice(
-                                syn::TypeSlice {
-                                    bracket_token: syn::token::Bracket::default(),
-                                    elem: Box::new(syn::Type::Path(syn::TypePath {
-                                        qself: None,
-                                        path,
-                                    })),
-                                },
-                            )));
-                        }
+                        args.push(syn::GenericArgument::Type(syn::Type::Slice(
+                            syn::TypeSlice {
+                                bracket_token: syn::token::Bracket::default(),
+                                elem: Box::new(syn::Type::Path(syn::TypePath {
+                                    qself: None,
+                                    path,
+                                })),
+                            },
+                        )));
                     }
                 }
             }
