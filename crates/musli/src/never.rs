@@ -74,10 +74,10 @@ pub enum NeverMarker {}
 ///     }
 /// }
 /// ```
-pub struct Never<C = NeverMarker, B: ?Sized = NeverMarker> {
+pub struct Never<A = NeverMarker, B: ?Sized = NeverMarker> {
     // Field makes type uninhabitable.
     _never: NeverMarker,
-    _marker: marker::PhantomData<(C, B)>,
+    _marker: marker::PhantomData<(A, B)>,
 }
 
 impl<'de, C: ?Sized + Context> Decoder<'de, C> for Never {
@@ -109,9 +109,7 @@ impl<'de, C: ?Sized + Context> Decoder<'de, C> for Never {
 }
 
 impl<C: ?Sized + Context> AsDecoder<C> for Never {
-    type Decoder<'this> = Self
-    where
-        Self: 'this;
+    type Decoder<'this> = Self;
 
     #[inline]
     fn as_decoder(&self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
@@ -120,10 +118,7 @@ impl<C: ?Sized + Context> AsDecoder<C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> StructFieldDecoder<'de, C> for Never {
-    type FieldName<'this> = Self
-    where
-        Self: 'this;
-
+    type FieldName<'this> = Self;
     type FieldValue = Self;
 
     #[inline]
@@ -143,11 +138,8 @@ impl<'de, C: ?Sized + Context> StructFieldDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> MapPairsDecoder<'de, C> for Never {
-    type MapPairsKey<'this> = Self
-    where
-        Self: 'this;
-
-    type MapPairsValue<'this> = Self where Self: 'this;
+    type MapPairsKey<'this> = Self;
+    type MapPairsValue<'this> = Self;
 
     #[inline]
     fn map_pairs_key(&mut self, _: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error> {
@@ -171,10 +163,7 @@ impl<'de, C: ?Sized + Context> MapPairsDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> StructDecoder<'de, C> for Never {
-    type Field<'this> = Self
-    where
-        Self: 'this;
-
+    type Field<'this> = Self;
     type StructPairs = Self;
 
     type __UseMusliStructDecoderAttributeMacro = ();
@@ -201,11 +190,8 @@ impl<'de, C: ?Sized + Context> StructDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> StructPairsDecoder<'de, C> for Never {
-    type FieldName<'this> = Self
-    where
-        Self: 'this;
-
-    type FieldValue<'this> = Self where Self: 'this;
+    type FieldName<'this> = Self;
+    type FieldValue<'this> = Self;
 
     #[inline]
     fn field_name(&mut self, _: &C) -> Result<Self::FieldName<'_>, C::Error> {
@@ -229,11 +215,8 @@ impl<'de, C: ?Sized + Context> StructPairsDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> VariantDecoder<'de, C> for Never {
-    type Tag<'this> = Self
-    where
-        Self: 'this;
-
-    type Variant<'this> = Self where Self: 'this;
+    type Tag<'this> = Self;
+    type Variant<'this> = Self;
 
     #[inline]
     fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
@@ -257,10 +240,7 @@ impl<'de, C: ?Sized + Context> VariantDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> MapDecoder<'de, C> for Never {
-    type Entry<'this> = Self
-    where
-        Self: 'this;
-
+    type Entry<'this> = Self;
     type MapPairs = Self;
 
     type __UseMusliMapDecoderAttributeMacro = ();
@@ -287,10 +267,7 @@ impl<'de, C: ?Sized + Context> MapDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> MapEntryDecoder<'de, C> for Never {
-    type MapKey<'this> = Self
-    where
-        Self: 'this;
-
+    type MapKey<'this> = Self;
     type MapValue = Self;
 
     #[inline]
@@ -310,9 +287,7 @@ impl<'de, C: ?Sized + Context> MapEntryDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> SequenceDecoder<'de, C> for Never {
-    type Decoder<'this> = Self
-    where
-        Self: 'this;
+    type Decoder<'this> = Self;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -331,9 +306,7 @@ impl<'de, C: ?Sized + Context> SequenceDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> PackDecoder<'de, C> for Never {
-    type Decoder<'this> = Self
-    where
-        Self: 'this;
+    type Decoder<'this> = Self;
 
     #[inline]
     fn next(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
@@ -346,7 +319,7 @@ impl<'de, C: ?Sized + Context> PackDecoder<'de, C> for Never {
     }
 }
 
-impl<O, C: ?Sized + Context> Encoder<C> for Never<O> {
+impl<C: ?Sized + Context, O: 'static> Encoder<C> for Never<O> {
     type Ok = O;
     type Encoder<U> = Self where U: Context;
     type Pack<'this> = Self where C: 'this;
@@ -383,7 +356,7 @@ impl<'de, O, C: ?Sized + Context> NumberVisitor<'de, C> for Never<O> {
     }
 }
 
-impl<'de, O, C, T> ValueVisitor<'de, C, T> for Never<O, T>
+impl<'de, C, O: 'static, T> ValueVisitor<'de, C, T> for Never<O, T>
 where
     C: ?Sized + Context,
     T: ?Sized + ToOwned,
@@ -395,12 +368,9 @@ where
     }
 }
 
-impl<O, C: ?Sized + Context> SequenceEncoder<C> for Never<O> {
+impl<O: 'static, C: ?Sized + Context> SequenceEncoder<C> for Never<O> {
     type Ok = O;
-
-    type Encoder<'this> = Self
-    where
-        Self: 'this;
+    type Encoder<'this> = Self;
 
     #[inline]
     fn next(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error> {
@@ -413,9 +383,9 @@ impl<O, C: ?Sized + Context> SequenceEncoder<C> for Never<O> {
     }
 }
 
-impl<O, C: ?Sized + Context> MapEncoder<C> for Never<O> {
+impl<O: 'static, C: ?Sized + Context> MapEncoder<C> for Never<O> {
     type Ok = O;
-    type Entry<'this> = Self where Self: 'this;
+    type Entry<'this> = Self;
 
     #[inline]
     fn entry(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error> {
@@ -427,12 +397,10 @@ impl<O, C: ?Sized + Context> MapEncoder<C> for Never<O> {
     }
 }
 
-impl<O, C: ?Sized + Context> MapEntryEncoder<C> for Never<O> {
+impl<O: 'static, C: ?Sized + Context> MapEntryEncoder<C> for Never<O> {
     type Ok = O;
-    type MapKey<'this> = Self
-    where
-        Self: 'this;
-    type MapValue<'this> = Self where Self: 'this;
+    type MapKey<'this> = Self;
+    type MapValue<'this> = Self;
 
     #[inline]
     fn map_key(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error> {
@@ -450,12 +418,10 @@ impl<O, C: ?Sized + Context> MapEntryEncoder<C> for Never<O> {
     }
 }
 
-impl<O, C: ?Sized + Context> MapPairsEncoder<C> for Never<O> {
+impl<O: 'static, C: ?Sized + Context> MapPairsEncoder<C> for Never<O> {
     type Ok = O;
-    type MapPairsKey<'this> = Self
-    where
-        Self: 'this;
-    type MapPairsValue<'this> = Self where Self: 'this;
+    type MapPairsKey<'this> = Self;
+    type MapPairsValue<'this> = Self;
 
     #[inline]
     fn map_pairs_key(&mut self, _: &C) -> Result<Self::MapPairsKey<'_>, C::Error> {
@@ -473,9 +439,9 @@ impl<O, C: ?Sized + Context> MapPairsEncoder<C> for Never<O> {
     }
 }
 
-impl<O, C: ?Sized + Context> StructEncoder<C> for Never<O> {
+impl<O: 'static, C: ?Sized + Context> StructEncoder<C> for Never<O> {
     type Ok = O;
-    type Field<'this> = Self where Self: 'this;
+    type Field<'this> = Self;
 
     #[inline]
     fn field(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error> {
@@ -487,12 +453,10 @@ impl<O, C: ?Sized + Context> StructEncoder<C> for Never<O> {
     }
 }
 
-impl<O, C: ?Sized + Context> StructFieldEncoder<C> for Never<O> {
+impl<O: 'static, C: ?Sized + Context> StructFieldEncoder<C> for Never<O> {
     type Ok = O;
-    type FieldName<'this> = Self
-    where
-        Self: 'this;
-    type FieldValue<'this> = Self where Self: 'this;
+    type FieldName<'this> = Self;
+    type FieldValue<'this> = Self;
 
     #[inline]
     fn field_name(&mut self, _: &C) -> Result<Self::FieldName<'_>, C::Error> {
@@ -510,12 +474,10 @@ impl<O, C: ?Sized + Context> StructFieldEncoder<C> for Never<O> {
     }
 }
 
-impl<O, C: ?Sized + Context> VariantEncoder<C> for Never<O> {
+impl<O: 'static, C: ?Sized + Context> VariantEncoder<C> for Never<O> {
     type Ok = O;
-    type Tag<'this> = Self
-    where
-        Self: 'this;
-    type Variant<'this> = Self where Self: 'this;
+    type Tag<'this> = Self;
+    type Variant<'this> = Self;
 
     #[inline]
     fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
