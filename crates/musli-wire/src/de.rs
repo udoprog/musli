@@ -182,20 +182,20 @@ where
         write!(f, "type supported by the wire decoder")
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_unit(mut self, cx: &C) -> Result<(), C::Error> {
         self.skip_any(cx)?;
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_pack(mut self, cx: &C) -> Result<Self::Pack, C::Error> {
         let mark = cx.mark();
         let len = self.decode_len(cx, mark)?;
         Ok(WireDecoder::new(self.reader.limit(len)))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_array<const N: usize>(mut self, cx: &C) -> Result<[u8; N], C::Error> {
         let mark = cx.mark();
         let len = self.decode_len(cx, mark)?;
@@ -213,7 +213,7 @@ where
         self.reader.read_array(cx)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_bytes<V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: ValueVisitor<'de, C, [u8]>,
@@ -223,7 +223,7 @@ where
         self.reader.read_bytes(cx, len, visitor)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_string<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: ValueVisitor<'de, C, str>,
@@ -237,26 +237,26 @@ where
         {
             type Ok = V::Ok;
 
-            #[inline(always)]
+            #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 self.0.expecting(f)
             }
 
             #[cfg(feature = "alloc")]
-            #[inline(always)]
+            #[inline]
             fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 let string =
                     musli_common::str::from_utf8_owned(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_owned(cx, string)
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 let string = musli_common::str::from_utf8(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_borrowed(cx, string)
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 let string = musli_common::str::from_utf8(bytes).map_err(|err| cx.custom(err))?;
                 self.0.visit_ref(cx, string)
@@ -266,7 +266,7 @@ where
         self.decode_bytes(cx, Visitor(visitor))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_bool(mut self, cx: &C) -> Result<bool, C::Error> {
         const FALSE: Tag = Tag::new(Kind::Continuation, 0);
         const TRUE: Tag = Tag::new(Kind::Continuation, 1);
@@ -280,7 +280,7 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_char(self, cx: &C) -> Result<char, C::Error> {
         let num = self.decode_u32(cx)?;
 
@@ -290,69 +290,69 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u8(self, cx: &C) -> Result<u8, C::Error> {
         crate::wire_int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u16(self, cx: &C) -> Result<u16, C::Error> {
         crate::wire_int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u32(self, cx: &C) -> Result<u32, C::Error> {
         crate::wire_int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u64(self, cx: &C) -> Result<u64, C::Error> {
         crate::wire_int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u128(self, cx: &C) -> Result<u128, C::Error> {
         crate::wire_int::decode_unsigned::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i8(self, cx: &C) -> Result<i8, C::Error> {
         Ok(self.decode_u8(cx)? as i8)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i16(self, cx: &C) -> Result<i16, C::Error> {
         crate::wire_int::decode_signed::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i32(self, cx: &C) -> Result<i32, C::Error> {
         crate::wire_int::decode_signed::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i64(self, cx: &C) -> Result<i64, C::Error> {
         crate::wire_int::decode_signed::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i128(self, cx: &C) -> Result<i128, C::Error> {
         crate::wire_int::decode_signed::<_, _, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_usize(self, cx: &C) -> Result<usize, C::Error> {
         crate::wire_int::decode_length::<_, _, F>(cx, self.reader)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_isize(self, cx: &C) -> Result<isize, C::Error> {
         Ok(self.decode_usize(cx)? as isize)
     }
 
     /// Decode a 32-bit floating point value by reading the 32-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
-    #[inline(always)]
+    #[inline]
     fn decode_f32(self, cx: &C) -> Result<f32, C::Error> {
         let bits = self.decode_u32(cx)?;
         Ok(f32::from_bits(bits))
@@ -360,13 +360,13 @@ where
 
     /// Decode a 64-bit floating point value by reading the 64-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
-    #[inline(always)]
+    #[inline]
     fn decode_f64(self, cx: &C) -> Result<f64, C::Error> {
         let bits = self.decode_u64(cx)?;
         Ok(f64::from_bits(bits))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_option(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error> {
         // Options are encoded as empty or sequences with a single element.
         const NONE: Tag = Tag::new(Kind::Sequence, 0);

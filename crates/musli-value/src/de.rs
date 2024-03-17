@@ -13,7 +13,7 @@ use musli_storage::de::StorageDecoder;
 use musli_storage::options::Options;
 use musli_storage::reader::SliceReader;
 
-use crate::error::ErrorKind;
+use crate::error::ErrorMessage;
 use crate::value::{Number, Value};
 use crate::AsValueDecoder;
 
@@ -35,7 +35,7 @@ macro_rules! ensure {
             $pat => $block,
             value => {
                 let $hint = value.type_hint();
-                return Err($cx.custom(ErrorKind::$ident $tt));
+                return Err($cx.custom(ErrorMessage::$ident $tt));
             }
         }
     };
@@ -189,7 +189,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
     #[inline]
     fn decode_array<const N: usize>(self, cx: &C) -> Result<[u8; N], C::Error> {
         ensure!(self, cx, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
-            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| cx.custom(ErrorKind::ArrayOutOfBounds))
+            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| cx.custom(ErrorMessage::ArrayOutOfBounds))
         })
     }
 
@@ -359,7 +359,7 @@ impl<'de, C: ?Sized + Context, const F: Options> PackDecoder<'de, C> for IterVal
     fn next(&mut self, cx: &C) -> Result<Self::Decoder<'_>, C::Error> {
         match self.iter.next() {
             Some(value) => Ok(ValueDecoder::new(value)),
-            None => Err(cx.custom(ErrorKind::ExpectedPackValue)),
+            None => Err(cx.custom(ErrorMessage::ExpectedPackValue)),
         }
     }
 
@@ -461,7 +461,7 @@ impl<'de, C: ?Sized + Context, const F: Options> MapPairsDecoder<'de, C>
     #[inline]
     fn map_pairs_value(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
-            return Err(cx.custom(ErrorKind::ExpectedMapValue));
+            return Err(cx.custom(ErrorMessage::ExpectedMapValue));
         };
 
         Ok(ValueDecoder::new(value))
@@ -545,7 +545,7 @@ impl<'de, C: ?Sized + Context, const F: Options> StructPairsDecoder<'de, C>
     #[inline]
     fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
         let Some((name, _)) = self.iter.clone().next() else {
-            return Err(cx.custom(ErrorKind::ExpectedFieldName));
+            return Err(cx.custom(ErrorMessage::ExpectedFieldName));
         };
 
         Ok(ValueDecoder::new(name))
@@ -554,7 +554,7 @@ impl<'de, C: ?Sized + Context, const F: Options> StructPairsDecoder<'de, C>
     #[inline]
     fn field_value(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
-            return Err(cx.custom(ErrorKind::ExpectedFieldValue));
+            return Err(cx.custom(ErrorMessage::ExpectedFieldValue));
         };
 
         Ok(ValueDecoder::new(value))
@@ -657,7 +657,7 @@ impl<'de, C: ?Sized + Context, const F: Options> VariantDecoder<'de, C>
 trait FromNumber: Sized {
     const NUMBER_HINT: NumberHint;
 
-    fn from_number(number: &Number) -> Result<Self, ErrorKind>;
+    fn from_number(number: &Number) -> Result<Self, ErrorMessage>;
 }
 
 macro_rules! integer_from {
@@ -666,7 +666,7 @@ macro_rules! integer_from {
             const NUMBER_HINT: NumberHint = NumberHint::$variant;
 
             #[inline]
-            fn from_number(number: &Number) -> Result<Self, ErrorKind> {
+            fn from_number(number: &Number) -> Result<Self, ErrorMessage> {
                 let out = match number {
                     Number::U8(n) => Self::try_from(*n).ok(),
                     Number::U16(n) => Self::try_from(*n).ok(),
@@ -686,7 +686,7 @@ macro_rules! integer_from {
 
                 match out {
                     Some(out) => Ok(out),
-                    None => Err(ErrorKind::ExpectedNumber(
+                    None => Err(ErrorMessage::ExpectedNumber(
                         Self::NUMBER_HINT,
                         TypeHint::Number(number.type_hint()),
                     )),
@@ -702,7 +702,7 @@ macro_rules! float_from {
             const NUMBER_HINT: NumberHint = NumberHint::$variant;
 
             #[inline]
-            fn from_number(number: &Number) -> Result<Self, ErrorKind> {
+            fn from_number(number: &Number) -> Result<Self, ErrorMessage> {
                 let out = match number {
                     Number::U8(n) => Some(*n as $ty),
                     Number::U16(n) => Some(*n as $ty),
@@ -722,7 +722,7 @@ macro_rules! float_from {
 
                 match out {
                     Some(out) => Ok(out),
-                    None => Err(ErrorKind::ExpectedNumber(
+                    None => Err(ErrorMessage::ExpectedNumber(
                         Self::NUMBER_HINT,
                         TypeHint::Number(number.type_hint()),
                     )),

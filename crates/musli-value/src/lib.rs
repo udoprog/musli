@@ -25,7 +25,7 @@ mod value;
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 pub use self::value::{AsValueDecoder, Value};
-pub use error::{Error, ErrorKind};
+pub use error::Error;
 
 use en::ValueEncoder;
 use musli::mode::DefaultMode;

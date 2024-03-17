@@ -1,7 +1,6 @@
 use musli::de::NumberVisitor;
 use musli::{Buf, Context};
 
-use crate::error::ErrorKind;
 use crate::reader::integer::decode_signed_full;
 use crate::reader::{string, StringReference, Token};
 
@@ -127,7 +126,7 @@ pub trait Parser<'de>: private::Sealed {
         for _ in 0..4 {
             match string::decode_hex_val(self.read_byte(cx)?) {
                 None => {
-                    return Err(cx.marked_custom(start, ErrorKind::InvalidEscape));
+                    return Err(cx.marked_message(start, "Invalid string escape"));
                 }
                 Some(val) => {
                     n = (n << 4) + val;
@@ -139,22 +138,21 @@ pub trait Parser<'de>: private::Sealed {
     }
 
     #[doc(hidden)]
-    fn parse_exact<C, const N: usize>(
-        &mut self,
-        cx: &C,
-        exact: [u8; N],
-        err: ErrorKind,
-    ) -> Result<(), C::Error>
+    fn parse_exact<C>(&mut self, cx: &C, exact: &str) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {
+        debug_assert!(exact.len() <= 5);
+
         let mark = cx.mark();
 
-        let mut bytes = [0u8; N];
-        self.read(cx, &mut bytes)?;
+        let mut bytes = [0u8; 8];
+        let bytes = &mut bytes[..exact.len()];
 
-        if bytes != exact {
-            return Err(cx.marked_custom(mark, err));
+        self.read(cx, bytes)?;
+
+        if bytes != exact.as_bytes() {
+            return Err(cx.marked_message(mark, format_args!("Expected `{exact}`")));
         }
 
         Ok(())

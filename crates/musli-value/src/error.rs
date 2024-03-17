@@ -13,15 +13,6 @@ pub struct Error {
     err: ErrorImpl,
 }
 
-impl Error {
-    #[inline(always)]
-    pub(crate) fn new(kind: ErrorKind) -> Self {
-        Self {
-            err: ErrorImpl::ValueError(kind),
-        }
-    }
-}
-
 impl fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -29,77 +20,10 @@ impl fmt::Display for Error {
     }
 }
 
-/// Errors specifically produced by value decoding.
-#[derive(Debug)]
-#[non_exhaustive]
-#[allow(missing_docs)]
-pub enum ErrorKind {
-    #[cfg(feature = "alloc")]
-    ArrayOutOfBounds,
-    ExpectedPackValue,
-    ExpectedUnit(TypeHint),
-    ExpectedBool(TypeHint),
-    ExpectedChar(TypeHint),
-    ExpectedNumber(NumberHint, TypeHint),
-    ExpectedFieldName,
-    ExpectedFieldValue,
-    ExpectedMapValue,
-    #[cfg(feature = "alloc")]
-    ExpectedBytes(TypeHint),
-    #[cfg(feature = "alloc")]
-    ExpectedString(TypeHint),
-    #[cfg(feature = "alloc")]
-    ExpectedOption(TypeHint),
-    #[cfg(feature = "alloc")]
-    ExpectedSequence(TypeHint),
-    #[cfg(feature = "alloc")]
-    ExpectedPack(TypeHint),
-    #[cfg(feature = "alloc")]
-    ExpectedMap(TypeHint),
-    #[cfg(feature = "alloc")]
-    ExpectedVariant(TypeHint),
-}
-
-impl fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            #[cfg(feature = "alloc")]
-            ErrorKind::ArrayOutOfBounds => {
-                write!(f, "tried to decode array that is out-of-bounds")
-            }
-            ErrorKind::ExpectedPackValue => write!(f, "Expected pack value"),
-            ErrorKind::ExpectedUnit(hint) => write!(f, "Expected unit, but found {hint}"),
-            ErrorKind::ExpectedBool(hint) => write!(f, "Expected boolean, but found {hint}"),
-            ErrorKind::ExpectedChar(hint) => write!(f, "Expected character, but found {hint}"),
-            ErrorKind::ExpectedNumber(number, hint) => {
-                write!(f, "Expected {number}, but found {hint}")
-            }
-            ErrorKind::ExpectedFieldName => write!(f, "Expected field name"),
-            ErrorKind::ExpectedFieldValue => write!(f, "Expected field value"),
-            ErrorKind::ExpectedMapValue => write!(f, "Expected map value"),
-            #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedBytes(hint) => write!(f, "Expected bytes, but found {hint}"),
-            #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedString(hint) => write!(f, "Expected string, but found {hint}"),
-            #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedOption(hint) => write!(f, "Expected option, but found {hint}"),
-            #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedSequence(hint) => write!(f, "Expected sequence, but found {hint}"),
-            #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedPack(hint) => write!(f, "Expected pack, but found {hint}"),
-            #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedMap(hint) => write!(f, "Expected map, but found {hint}"),
-            #[cfg(feature = "alloc")]
-            ErrorKind::ExpectedVariant(hint) => write!(f, "Expected struct, but found {hint}"),
-        }
-    }
-}
-
 #[allow(missing_docs)]
 #[derive(Debug)]
 #[non_exhaustive]
 pub(crate) enum ErrorImpl {
-    ValueError(ErrorKind),
     #[cfg(feature = "alloc")]
     Message(Box<str>),
     #[cfg(not(feature = "alloc"))]
@@ -109,19 +33,11 @@ pub(crate) enum ErrorImpl {
 impl fmt::Display for ErrorImpl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorImpl::ValueError(error) => error.fmt(f),
             #[cfg(feature = "alloc")]
             ErrorImpl::Message(message) => message.fmt(f),
             #[cfg(not(feature = "alloc"))]
             ErrorImpl::Message => write!(f, "Message error (see diagnostics)"),
         }
-    }
-}
-
-impl From<ErrorKind> for Error {
-    #[inline]
-    fn from(error: ErrorKind) -> Self {
-        Self::new(error)
     }
 }
 
@@ -148,6 +64,74 @@ impl musli_common::context::Error for Error {
             err: ErrorImpl::Message(message.to_string().into()),
             #[cfg(not(feature = "alloc"))]
             err: ErrorImpl::Message,
+        }
+    }
+}
+
+/// Errors specifically produced by value decoding.
+#[derive(Debug)]
+#[non_exhaustive]
+#[allow(missing_docs)]
+pub(crate) enum ErrorMessage {
+    #[cfg(feature = "alloc")]
+    ArrayOutOfBounds,
+    ExpectedPackValue,
+    ExpectedUnit(TypeHint),
+    ExpectedBool(TypeHint),
+    ExpectedChar(TypeHint),
+    ExpectedNumber(NumberHint, TypeHint),
+    ExpectedFieldName,
+    ExpectedFieldValue,
+    ExpectedMapValue,
+    #[cfg(feature = "alloc")]
+    ExpectedBytes(TypeHint),
+    #[cfg(feature = "alloc")]
+    ExpectedString(TypeHint),
+    #[cfg(feature = "alloc")]
+    ExpectedOption(TypeHint),
+    #[cfg(feature = "alloc")]
+    ExpectedSequence(TypeHint),
+    #[cfg(feature = "alloc")]
+    ExpectedPack(TypeHint),
+    #[cfg(feature = "alloc")]
+    ExpectedMap(TypeHint),
+    #[cfg(feature = "alloc")]
+    ExpectedVariant(TypeHint),
+}
+
+impl fmt::Display for ErrorMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ArrayOutOfBounds => {
+                write!(f, "tried to decode array that is out-of-bounds")
+            }
+            ErrorMessage::ExpectedPackValue => write!(f, "Expected pack value"),
+            ErrorMessage::ExpectedUnit(hint) => write!(f, "Expected unit, but found {hint}"),
+            ErrorMessage::ExpectedBool(hint) => write!(f, "Expected boolean, but found {hint}"),
+            ErrorMessage::ExpectedChar(hint) => write!(f, "Expected character, but found {hint}"),
+            ErrorMessage::ExpectedNumber(number, hint) => {
+                write!(f, "Expected {number}, but found {hint}")
+            }
+            ErrorMessage::ExpectedFieldName => write!(f, "Expected field name"),
+            ErrorMessage::ExpectedFieldValue => write!(f, "Expected field value"),
+            ErrorMessage::ExpectedMapValue => write!(f, "Expected map value"),
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ExpectedBytes(hint) => write!(f, "Expected bytes, but found {hint}"),
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ExpectedString(hint) => write!(f, "Expected string, but found {hint}"),
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ExpectedOption(hint) => write!(f, "Expected option, but found {hint}"),
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ExpectedSequence(hint) => {
+                write!(f, "Expected sequence, but found {hint}")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ExpectedPack(hint) => write!(f, "Expected pack, but found {hint}"),
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ExpectedMap(hint) => write!(f, "Expected map, but found {hint}"),
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ExpectedVariant(hint) => write!(f, "Expected struct, but found {hint}"),
         }
     }
 }

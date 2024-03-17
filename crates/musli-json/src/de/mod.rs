@@ -31,7 +31,6 @@ use musli::de::{
 };
 use musli::Context;
 
-use crate::error::{Error, ErrorKind};
 #[cfg(not(feature = "parse-full"))]
 use crate::reader::integer::{
     parse_signed_base as parse_signed, parse_unsigned_base as parse_unsigned,
@@ -97,7 +96,7 @@ where
                 self.parser.skip(cx, 1)?;
                 string::skip_string(cx, &mut self.parser, true)
             }
-            actual => Err(cx.marked_custom(start, Error::new(ErrorKind::ExpectedValue(actual)))),
+            actual => Err(cx.marked_message(start, format_args!("Expected value, found {actual}"))),
         }
     }
 
@@ -106,8 +105,7 @@ where
     where
         C: ?Sized + Context,
     {
-        self.parser
-            .parse_exact(cx, *b"true", ErrorKind::ExpectedTrue)
+        self.parser.parse_exact(cx, "true")
     }
 
     #[inline]
@@ -115,8 +113,7 @@ where
     where
         C: ?Sized + Context,
     {
-        self.parser
-            .parse_exact(cx, *b"false", ErrorKind::ExpectedFalse)
+        self.parser.parse_exact(cx, "false")
     }
 
     #[inline]
@@ -124,8 +121,7 @@ where
     where
         C: ?Sized + Context,
     {
-        self.parser
-            .parse_exact(cx, *b"null", ErrorKind::ExpectedNull)
+        self.parser.parse_exact(cx, "null")
     }
 }
 
@@ -197,7 +193,7 @@ where
                 self.parse_false(cx)?;
                 Ok(false)
             }
-            actual => Err(cx.custom(ErrorKind::ExpectedBool(actual))),
+            actual => Err(cx.message(format_args!("Expected boolean, was {actual}"))),
         }
     }
 
@@ -219,7 +215,7 @@ where
 
         match (first, it.next()) {
             (Some(c), None) => Ok(c),
-            _ => Err(cx.marked_custom(start, ErrorKind::CharEmptyString)),
+            _ => Err(cx.marked_message(start, "Expected string with a single character")),
         }
     }
 

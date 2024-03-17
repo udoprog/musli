@@ -103,12 +103,12 @@ where
     type Mark = usize;
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
     }
 
-    #[inline(always)]
+    #[inline]
     fn custom<T>(&self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -117,7 +117,7 @@ where
         ErrorMarker
     }
 
-    #[inline(always)]
+    #[inline]
     fn message<T>(&self, message: T) -> Self::Error
     where
         T: fmt::Display,

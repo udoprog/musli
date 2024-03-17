@@ -1,7 +1,6 @@
 use musli::de::VariantDecoder;
 use musli::Context;
 
-use crate::error::ErrorKind;
 use crate::reader::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder};
@@ -24,7 +23,7 @@ where
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(cx.custom(ErrorKind::ExpectedOpenBrace(actual)));
+            return Err(cx.message(format_args!("Expected open brace, was {actual}")));
         }
 
         parser.skip(cx, 1)?;
@@ -52,7 +51,7 @@ where
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(cx.custom(ErrorKind::ExpectedColon(actual)));
+            return Err(cx.message(format_args!("Expected colon, was {actual}")));
         }
 
         self.parser.skip(cx, 1)?;
@@ -71,7 +70,7 @@ where
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::CloseBrace) {
-            return Err(cx.custom(ErrorKind::ExpectedCloseBrace(actual)));
+            return Err(cx.message(format_args!("Expected closing brace, was {actual}")));
         }
 
         self.parser.skip(cx, 1)?;

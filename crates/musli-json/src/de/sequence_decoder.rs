@@ -3,7 +3,6 @@ use core::mem;
 use musli::de::{PackDecoder, SequenceDecoder, SizeHint};
 use musli::Context;
 
-use crate::error::ErrorKind;
 use crate::reader::{Parser, Token};
 
 use super::JsonDecoder;
@@ -27,7 +26,7 @@ where
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBracket) {
-            return Err(cx.custom(ErrorKind::ExpectedOpenBracket(actual)));
+            return Err(cx.message(format_args!("Expected opening bracket, was {actual}")));
         }
 
         parser.skip(cx, 1)?;
@@ -90,7 +89,7 @@ where
             let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.custom(ErrorKind::ExpectedCloseBracket(actual)));
+                return Err(cx.message(format_args!("Expected closing bracket, was {actual}")));
             }
 
             self.parser.skip(cx, 1)?;
@@ -148,7 +147,7 @@ where
             let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.custom(ErrorKind::ExpectedCloseBracket(actual)));
+                return Err(cx.message(format_args!("Expected closing bracket, was {actual}")));
             }
 
             self.parser.skip(cx, 1)?;

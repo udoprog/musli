@@ -1,8 +1,11 @@
+use crate::error::IntegerError;
+
+use musli::Context;
+
+use crate::reader::Parser;
+
 use self::traits::FromUnsigned;
 pub(crate) use self::traits::{Float, Signed, Unsigned};
-use crate::error::ErrorKind;
-use crate::reader::Parser;
-use musli::Context;
 
 /// Fully deconstructed parts of a signed number.
 #[non_exhaustive]
@@ -21,7 +24,7 @@ impl<T> SignedPartsBase<T>
 where
     T: Signed,
 {
-    pub(crate) fn compute(self) -> Result<T, ErrorKind> {
+    pub(crate) fn compute(self) -> Result<T, IntegerError> {
         let Self {
             is_negative,
             unsigned,
@@ -33,7 +36,7 @@ where
             unsigned.signed()
         } {
             Some(value) => Ok(value),
-            None => Err(ErrorKind::IntegerOverflow),
+            None => Err(IntegerError::IntegerOverflow),
         }
     }
 }
@@ -56,7 +59,7 @@ where
     T: Signed,
 {
     #[inline(always)]
-    pub(crate) fn compute(self) -> Result<T, ErrorKind> {
+    pub(crate) fn compute(self) -> Result<T, IntegerError> {
         let Self {
             is_negative,
             unsigned: parts,
@@ -70,7 +73,7 @@ where
             value.signed()
         } {
             Some(value) => Ok(value),
-            None => Err(ErrorKind::IntegerOverflow),
+            None => Err(IntegerError::IntegerOverflow),
         }
     }
 
@@ -158,12 +161,12 @@ where
     T: Unsigned,
 {
     #[inline(always)]
-    pub(crate) fn compute(self) -> Result<T, ErrorKind> {
+    pub(crate) fn compute(self) -> Result<T, IntegerError> {
         macro_rules! check {
             ($expr:expr, $kind:ident) => {
                 match $expr {
                     Some(value) => value,
-                    None => return Err(ErrorKind::$kind),
+                    None => return Err(IntegerError::$kind),
                 }
             };
         }
@@ -172,7 +175,7 @@ where
 
         if e == 0 {
             if !m.value.is_zero() {
-                return Err(ErrorKind::Decimal);
+                return Err(IntegerError::Decimal);
             }
 
             return Ok(base);
@@ -195,7 +198,7 @@ where
 
             Ok(base)
         } else if !m.value.is_zero() {
-            Err(ErrorKind::Decimal)
+            Err(IntegerError::Decimal)
         } else {
             Ok(check!(base.checked_neg_pow10(-e as u32), Decimal))
         }
@@ -232,7 +235,7 @@ where
             p.consume_while(cx, is_digit)?;
         }
         _ => {
-            return Err(cx.marked_custom(start, ErrorKind::InvalidNumeric));
+            return Err(cx.marked_custom(start, IntegerError::InvalidNumeric));
         }
     }
 
@@ -418,7 +421,7 @@ where
             base
         }
         _ => {
-            return Err(cx.marked_custom(start, ErrorKind::InvalidNumeric));
+            return Err(cx.marked_custom(start, IntegerError::InvalidNumeric));
         }
     };
 
@@ -460,7 +463,7 @@ where
                 m.value = match m.value.checked_pow10(zeros as u32) {
                     Some(mantissa) => mantissa,
                     None => {
-                        return Err(cx.marked_custom(start, ErrorKind::IntegerOverflow));
+                        return Err(cx.marked_custom(start, IntegerError::IntegerOverflow));
                     }
                 };
             }
@@ -508,7 +511,7 @@ where
 
     match if is_negative { e.negate() } else { e.signed() } {
         Some(value) => Ok(value),
-        None => Err(cx.marked_custom(start, ErrorKind::IntegerOverflow)),
+        None => Err(cx.marked_custom(start, IntegerError::IntegerOverflow)),
     }
 }
 
@@ -521,7 +524,7 @@ where
     P: ?Sized + Parser<'de>,
 {
     let Some(out) = out.checked_mul10() else {
-        return Err(cx.marked_custom(start, ErrorKind::IntegerOverflow));
+        return Err(cx.marked_custom(start, IntegerError::IntegerOverflow));
     };
 
     Ok(out + T::from_byte(p.read_byte(cx)? - b'0'))

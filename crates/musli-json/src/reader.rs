@@ -8,7 +8,7 @@ pub(crate) mod string;
 mod tests;
 mod token;
 
-pub use self::parser::Parser;
+pub(crate) use self::parser::Parser;
 pub(crate) use self::slice_parser::SliceParser;
 pub use self::string::StringReference;
 pub(crate) use self::token::Token;

@@ -5,21 +5,10 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
-use crate::reader::Token;
-
 /// Error raised during json encoding.
 #[derive(Debug)]
 pub struct Error {
     err: ErrorImpl,
-}
-
-impl Error {
-    #[inline(always)]
-    pub(crate) fn new(kind: ErrorKind) -> Self {
-        Self {
-            err: ErrorImpl::JsonError(kind),
-        }
-    }
 }
 
 impl fmt::Display for Error {
@@ -30,96 +19,7 @@ impl fmt::Display for Error {
 }
 
 #[derive(Debug)]
-#[non_exhaustive]
-pub enum ErrorKind {
-    IntegerOverflow,
-    Decimal,
-    InvalidNumeric,
-    ControlCharacterInString,
-    LoneLeadingSurrogatePair,
-    ExpectedColon(Token),
-    ExpectedOpenBrace(Token),
-    ExpectedCloseBrace(Token),
-    ExpectedOpenBracket(Token),
-    ExpectedCloseBracket(Token),
-    InvalidEscape,
-    BufferUnderflow,
-    BufferOverflow,
-    UnexpectedHexEscapeEnd,
-    InvalidUnicode,
-    CharEmptyString,
-    ExpectedNull,
-    ExpectedTrue,
-    ExpectedFalse,
-    ExpectedBool(Token),
-    ExpectedString(Token),
-    ExpectedValue(Token),
-    ParseFloat(lexical::Error),
-    Eof,
-}
-
-impl fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ErrorKind::IntegerOverflow => write!(f, "Arithmetic overflow"),
-            ErrorKind::Decimal => write!(f, "Decimal number"),
-            ErrorKind::InvalidNumeric => write!(f, "Invalid numeric"),
-            ErrorKind::ControlCharacterInString => {
-                write!(f, "Control character while parsing string")
-            }
-            ErrorKind::LoneLeadingSurrogatePair => {
-                write!(f, "Lone leading surrogate in hex escape")
-            }
-            ErrorKind::ExpectedColon(actual) => {
-                write!(f, "Expected `:`, found {actual}")
-            }
-            ErrorKind::ExpectedOpenBrace(actual) => {
-                write!(f, "Expected opening brace, found {actual}")
-            }
-            ErrorKind::ExpectedCloseBrace(actual) => {
-                write!(f, "Expected closing brace, found {actual}")
-            }
-            ErrorKind::ExpectedOpenBracket(actual) => {
-                write!(f, "Expected opening bracket, found {actual}")
-            }
-            ErrorKind::ExpectedCloseBracket(actual) => {
-                write!(f, "Expected closing bracket, found {actual}")
-            }
-            ErrorKind::InvalidEscape => write!(f, "Invalid string escape"),
-            ErrorKind::BufferUnderflow => write!(f, "Buffer underflow"),
-            ErrorKind::BufferOverflow => write!(f, "Buffer overflow"),
-            ErrorKind::UnexpectedHexEscapeEnd => {
-                write!(f, "Unexpected end of hex escape")
-            }
-            ErrorKind::InvalidUnicode => write!(f, "Invalid unicode"),
-            ErrorKind::CharEmptyString => {
-                write!(f, "Expected string with a single character")
-            }
-            ErrorKind::ExpectedNull => write!(f, "Expected `null`"),
-            ErrorKind::ExpectedTrue => write!(f, "Expected `true`"),
-            ErrorKind::ExpectedFalse => write!(f, "Expected `false`"),
-            ErrorKind::ExpectedBool(actual) => {
-                write!(f, "Expected boolean, found {actual}")
-            }
-            ErrorKind::ExpectedString(actual) => {
-                write!(f, "Expected string, found {actual}")
-            }
-            ErrorKind::ExpectedValue(actual) => {
-                write!(f, "Expected value, found {actual}")
-            }
-            ErrorKind::ParseFloat(error) => {
-                write!(f, "Expected float, got {error}")
-            }
-            ErrorKind::Eof => write!(f, "Eof while parsing"),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub(crate) enum ErrorImpl {
-    #[cfg(feature = "musli-value")]
-    ValueError(musli_value::ErrorKind),
-    JsonError(ErrorKind),
     #[cfg(feature = "alloc")]
     Message(Box<str>),
     #[cfg(not(feature = "alloc"))]
@@ -129,23 +29,10 @@ pub(crate) enum ErrorImpl {
 impl fmt::Display for ErrorImpl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            #[cfg(feature = "musli-value")]
-            ErrorImpl::ValueError(error) => error.fmt(f),
-            ErrorImpl::JsonError(error) => error.fmt(f),
             #[cfg(feature = "alloc")]
             ErrorImpl::Message(message) => message.fmt(f),
             #[cfg(not(feature = "alloc"))]
             ErrorImpl::Message => write!(f, "Message error (see diagnostics)"),
-        }
-    }
-}
-
-#[cfg(feature = "musli-value")]
-impl From<musli_value::ErrorKind> for Error {
-    #[inline(always)]
-    fn from(error: musli_value::ErrorKind) -> Self {
-        Error {
-            err: ErrorImpl::ValueError(error),
         }
     }
 }
@@ -173,6 +60,40 @@ impl musli_common::context::Error for Error {
             err: ErrorImpl::Message(message.to_string().into()),
             #[cfg(not(feature = "alloc"))]
             err: ErrorImpl::Message,
+        }
+    }
+}
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub(crate) enum ErrorMessage {
+    ParseFloat(lexical::Error),
+}
+
+impl fmt::Display for ErrorMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ErrorMessage::ParseFloat(error) => {
+                write!(f, "Expected float, got {error}")
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub(crate) enum IntegerError {
+    IntegerOverflow,
+    Decimal,
+    InvalidNumeric,
+}
+
+impl fmt::Display for IntegerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IntegerError::IntegerOverflow => write!(f, "Arithmetic overflow"),
+            IntegerError::Decimal => write!(f, "Decimal number"),
+            IntegerError::InvalidNumeric => write!(f, "Invalid numeric"),
         }
     }
 }

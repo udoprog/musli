@@ -1,6 +1,6 @@
 use musli::{Buf, Context};
 
-use crate::error::ErrorKind;
+use crate::error::ErrorMessage;
 use crate::reader::{Parser, StringReference, Token};
 
 use lexical::parse_float_options::JSON;
@@ -44,7 +44,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         let actual = self.peek(cx)?;
 
         if !matches!(actual, Token::String) {
-            return Err(cx.marked_custom(start, ErrorKind::ExpectedString(actual)));
+            return Err(cx.marked_message(start, format_args!("Expected string, found {actual}")));
         }
 
         self.skip(cx, 1)?;
@@ -71,7 +71,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         let outcome = self.index.wrapping_add(n);
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.custom(ErrorKind::BufferUnderflow));
+            return Err(cx.message("Buffer underflow"));
         }
 
         self.index = outcome;
@@ -87,7 +87,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         let outcome = self.index.wrapping_add(buf.len());
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.custom(ErrorKind::BufferUnderflow));
+            return Err(cx.message("Buffer underflow"));
         }
 
         buf.copy_from_slice(&self.slice[self.index..outcome]);
@@ -135,7 +135,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         ) {
             Ok(out) => out,
             Err(error) => {
-                return Err(cx.custom(ErrorKind::ParseFloat(error)));
+                return Err(cx.custom(ErrorMessage::ParseFloat(error)));
             }
         };
 
@@ -154,7 +154,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         ) {
             Ok(out) => out,
             Err(error) => {
-                return Err(cx.custom(ErrorKind::ParseFloat(error)));
+                return Err(cx.custom(ErrorMessage::ParseFloat(error)));
             }
         };
 

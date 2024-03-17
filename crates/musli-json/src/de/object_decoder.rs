@@ -3,7 +3,6 @@ use core::mem;
 use musli::de::{MapDecoder, MapPairsDecoder, SizeHint, StructDecoder, StructPairsDecoder};
 use musli::Context;
 
-use crate::error::ErrorKind;
 use crate::reader::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder, JsonObjectPairDecoder};
@@ -29,7 +28,7 @@ where
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
-            return Err(cx.custom(ErrorKind::ExpectedOpenBrace(actual)));
+            return Err(cx.message(format_args!("Expected opening brace, was {actual}")));
         }
 
         parser.skip(cx, 1)?;

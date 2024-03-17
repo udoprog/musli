@@ -109,14 +109,14 @@ where
         write!(f, "type supported by the wire encoder")
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_unit(mut self, cx: &C) -> Result<Self::Ok, C::Error> {
         self.writer
             .write_byte(cx, Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_pack(self, cx: &C) -> Result<Self::Pack<'_>, C::Error> {
         let Some(buf) = cx.alloc() else {
             return Err(cx.message("Failed to allocate pack buffer"));
@@ -125,19 +125,19 @@ where
         Ok(WirePackEncoder::new(self.writer, buf))
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_array<const N: usize>(self, cx: &C, array: [u8; N]) -> Result<Self::Ok, C::Error> {
         self.encode_bytes(cx, array.as_slice())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_bytes(mut self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         encode_prefix::<_, _, F>(cx, &mut self.writer, bytes.len())?;
         self.writer.write_bytes(cx, bytes)?;
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_bytes_vectored(mut self, cx: &C, vectors: &[&[u8]]) -> Result<Self::Ok, C::Error> {
         let len = vectors.iter().map(|v| v.len()).sum();
         encode_prefix::<_, _, F>(cx, &mut self.writer, len)?;
@@ -149,22 +149,22 @@ where
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_string(self, cx: &C, string: &str) -> Result<Self::Ok, C::Error> {
         self.encode_bytes(cx, string.as_bytes())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_usize(mut self, cx: &C, value: usize) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_length::<_, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_isize(mut self, cx: &C, value: isize) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_length::<_, _, F>(cx, &mut self.writer, value as usize)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_bool(mut self, cx: &C, value: bool) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(
             cx,
@@ -172,79 +172,79 @@ where
         )
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_char(self, cx: &C, value: char) -> Result<Self::Ok, C::Error> {
         self.encode_u32(cx, value as u32)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u8(mut self, cx: &C, value: u8) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u16(mut self, cx: &C, value: u16) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u32(mut self, cx: &C, value: u32) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u64(mut self, cx: &C, value: u64) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u128(mut self, cx: &C, value: u128) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i8(self, cx: &C, value: i8) -> Result<Self::Ok, C::Error> {
         self.encode_u8(cx, value as u8)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i16(mut self, cx: &C, value: i16) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_signed::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i32(mut self, cx: &C, value: i32) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_signed::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i64(mut self, cx: &C, value: i64) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_signed::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i128(mut self, cx: &C, value: i128) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_signed::<_, _, _, F>(cx, &mut self.writer, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_f32(self, cx: &C, value: f32) -> Result<Self::Ok, C::Error> {
         self.encode_u32(cx, value.to_bits())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_f64(self, cx: &C, value: f64) -> Result<Self::Ok, C::Error> {
         self.encode_u64(cx, value.to_bits())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_some(mut self, cx: &C) -> Result<Self::Some, C::Error> {
         self.writer
             .write_byte(cx, Tag::new(Kind::Sequence, 1).byte())?;
         Ok(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_none(mut self, cx: &C) -> Result<Self::Ok, C::Error> {
         self.writer
             .write_byte(cx, Tag::new(Kind::Sequence, 0).byte())?;

@@ -9,6 +9,7 @@ fn bug_28_skip_any() {
         a: u32,
     }
 
+    #[track_caller]
     fn test_case(input: &str) {
         assert_eq!(musli_json::from_str::<T>(input).unwrap().a, 42, "{input}");
     }
