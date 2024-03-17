@@ -43,5 +43,5 @@ pub mod writer;
 mod macros;
 
 #[cfg_attr(feature = "std", path = "system/std.rs")]
-#[cfg_attr(not(feature = "std"), path = "system/nostd.rs")]
+#[cfg_attr(not(feature = "std"), path = "system/no_std.rs")]
 mod system;
