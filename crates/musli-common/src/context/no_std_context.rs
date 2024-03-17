@@ -164,6 +164,17 @@ where
     }
 
     #[inline]
+    fn marked_custom<T>(&self, mark: Self::Mark, message: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+    {
+        let mut s = FixedString::new();
+        _ = write!(s, "{message}");
+        self.push_error(mark..self.mark.get(), s);
+        ErrorMarker
+    }
+
+    #[inline]
     fn mark(&self) -> Self::Mark {
         self.mark.get()
     }
