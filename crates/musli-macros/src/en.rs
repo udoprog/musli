@@ -204,10 +204,10 @@ fn insert_fields(
             Packing::Tagged | Packing::Transparent => {
                 encode = quote! {
                     #enter
-                    let mut #pair_encoder_var = #struct_encoder_t::field(&mut #encoder_var, #ctx_var)?;
-                    let #field_encoder_var = #struct_field_encoder_t::field_name(&mut #pair_encoder_var, #ctx_var)?;
+                    let mut #pair_encoder_var = #struct_encoder_t::encode_field(&mut #encoder_var, #ctx_var)?;
+                    let #field_encoder_var = #struct_field_encoder_t::encode_field_name(&mut #pair_encoder_var, #ctx_var)?;
                     #encode_t_encode(&#tag, #ctx_var, #field_encoder_var)?;
-                    let #value_encoder_var = #struct_field_encoder_t::field_value(&mut #pair_encoder_var, #ctx_var)?;
+                    let #value_encoder_var = #struct_field_encoder_t::encode_field_value(&mut #pair_encoder_var, #ctx_var)?;
                     #encode_path(#access, #ctx_var, #value_encoder_var)?;
                     #struct_field_encoder_t::end(#pair_encoder_var, #ctx_var)?;
                     #leave
@@ -216,7 +216,7 @@ fn insert_fields(
             Packing::Packed => {
                 encode = quote! {
                     #enter
-                    let #sequence_decoder_next_var = #sequence_encoder_t::next(&mut #pack_var, #ctx_var)?;
+                    let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(&mut #pack_var, #ctx_var)?;
                     #encode_path(#access, #ctx_var, #sequence_decoder_next_var)?;
                     #leave
                 };
@@ -353,10 +353,10 @@ fn encode_variant(
                 encode = quote! {{
                     let mut #variant_encoder = #encoder_t::encode_variant(#encoder_var, #ctx_var)?;
 
-                    let #tag_encoder = #variant_encoder_t::tag(&mut #variant_encoder, #ctx_var)?;
+                    let #tag_encoder = #variant_encoder_t::encode_tag(&mut #variant_encoder, #ctx_var)?;
                     #encode_t_encode(&#tag, #ctx_var, #tag_encoder)?;
 
-                    let #encoder_var = #variant_encoder_t::variant(&mut #variant_encoder, #ctx_var)?;
+                    let #encoder_var = #variant_encoder_t::encode_value(&mut #variant_encoder, #ctx_var)?;
                     #encode;
                     #variant_encoder_t::end(#variant_encoder, #ctx_var)?
                 }};
@@ -400,11 +400,11 @@ fn encode_variant(
                 encode = quote! {{
                     let mut #struct_encoder = #encoder_t::encode_struct(#encoder_var, #ctx_var, 2)?;
                     #struct_encoder_t::insert_field(&mut #struct_encoder, #ctx_var, &#field_tag, #tag)?;
-                    let mut #pair = #struct_encoder_t::field(&mut #struct_encoder, #ctx_var)?;
-                    let #content_tag = #struct_field_encoder_t::field_name(&mut #pair, #ctx_var)?;
+                    let mut #pair = #struct_encoder_t::encode_field(&mut #struct_encoder, #ctx_var)?;
+                    let #content_tag = #struct_field_encoder_t::encode_field_name(&mut #pair, #ctx_var)?;
                     #encode_t_encode(&#content, #ctx_var, #content_tag)?;
 
-                    let #content_struct = #struct_field_encoder_t::field_value(&mut #pair, #ctx_var)?;
+                    let #content_struct = #struct_field_encoder_t::encode_field_value(&mut #pair, #ctx_var)?;
                     let mut #encoder_var = #encoder_t::encode_struct(#content_struct, #ctx_var, #len)?;
                     #(#decls)*
                     #(#encoders)*

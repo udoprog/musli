@@ -1,7 +1,7 @@
 use std::fmt;
 
 use musli::en::{
-    MapPairsEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
+    MapEntriesEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
 };
 use musli::{Context, Encode, Encoder};
 
@@ -28,13 +28,13 @@ where
     type Ok = E::Ok;
     type Error = C::Error;
 
-    type SerializeSeq = SerializeSeq<'a, C, E::Sequence>;
-    type SerializeTuple = SerializeSeq<'a, C, E::Tuple>;
-    type SerializeTupleStruct = SerializeTupleStruct<'a, C, E::Struct>;
-    type SerializeTupleVariant = SerializeSeq<'a, C, E::TupleVariant>;
-    type SerializeMap = SerializeMap<'a, C, E::MapPairs>;
-    type SerializeStruct = SerializeStruct<'a, C, E::Struct>;
-    type SerializeStructVariant = SerializeStructVariant<'a, C, E::StructVariant>;
+    type SerializeSeq = SerializeSeq<'a, C, E::EncodeSequence>;
+    type SerializeTuple = SerializeSeq<'a, C, E::EncodeTuple>;
+    type SerializeTupleStruct = SerializeTupleStruct<'a, C, E::EncodeStruct>;
+    type SerializeTupleVariant = SerializeSeq<'a, C, E::EncodeTupleVariant>;
+    type SerializeMap = SerializeMap<'a, C, E::EncodeMapEntries>;
+    type SerializeStruct = SerializeStruct<'a, C, E::EncodeStruct>;
+    type SerializeStructVariant = SerializeStructVariant<'a, C, E::EncodeStructVariant>;
 
     #[inline]
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
@@ -230,7 +230,7 @@ where
             ));
         };
 
-        let encoder = self.encoder.encode_map_pairs(self.cx, len)?;
+        let encoder = self.encoder.encode_map_entries(self.cx, len)?;
         Ok(SerializeMap::new(self.cx, encoder))
     }
 
@@ -276,11 +276,11 @@ where
     C::Error: ser::Error,
     E: Encoder<C>,
     T: ?Sized + Serialize,
-    F: FnOnce(<E::Variant as VariantEncoder<C>>::Variant<'_>) -> Result<O, C::Error>,
+    F: FnOnce(<E::EncodeVariant as VariantEncoder<C>>::EncodeValue<'_>) -> Result<O, C::Error>,
 {
     let mut variant = encoder.encode_variant(cx)?;
-    variant_tag.serialize(Serializer::new(cx, variant.tag(cx)?))?;
-    let output = f(variant.variant(cx)?)?;
+    variant_tag.serialize(Serializer::new(cx, variant.encode_tag(cx)?))?;
+    let output = f(variant.encode_value(cx)?)?;
     variant.end(cx)?;
     Ok(output)
 }
@@ -310,7 +310,7 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.next(self.cx)?;
+        let encoder = self.encoder.encode_next(self.cx)?;
         value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
@@ -397,12 +397,12 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.field(self.cx)?;
+        let mut field = self.encoder.encode_field(self.cx)?;
 
-        let k = field.field_name(self.cx)?;
+        let k = field.encode_field_name(self.cx)?;
         self.field.encode(self.cx, k)?;
 
-        let v = field.field_value(self.cx)?;
+        let v = field.encode_field_value(self.cx)?;
         value.serialize(Serializer::new(self.cx, v))?;
 
         field.end(self.cx)?;
@@ -430,7 +430,7 @@ impl<'a, C, E> ser::SerializeMap for SerializeMap<'a, C, E>
 where
     C: ?Sized + Context,
     C::Error: ser::Error,
-    E: MapPairsEncoder<C>,
+    E: MapEntriesEncoder<C>,
 {
     type Ok = E::Ok;
     type Error = C::Error;
@@ -440,7 +440,7 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.map_pairs_key(self.cx)?;
+        let encoder = self.encoder.encode_map_entry_key(self.cx)?;
         key.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
@@ -450,7 +450,7 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.map_pairs_value(self.cx)?;
+        let encoder = self.encoder.encode_map_entry_value(self.cx)?;
         value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
@@ -490,9 +490,9 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.field(self.cx)?;
-        key.encode(self.cx, field.field_name(self.cx)?)?;
-        value.serialize(Serializer::new(self.cx, field.field_value(self.cx)?))?;
+        let mut field = self.encoder.encode_field(self.cx)?;
+        key.encode(self.cx, field.encode_field_name(self.cx)?)?;
+        value.serialize(Serializer::new(self.cx, field.encode_field_value(self.cx)?))?;
         field.end(self.cx)?;
         Ok(())
     }
@@ -532,9 +532,9 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.field(self.cx)?;
-        key.encode(self.cx, field.field_name(self.cx)?)?;
-        value.serialize(Serializer::new(self.cx, field.field_value(self.cx)?))?;
+        let mut field = self.encoder.encode_field(self.cx)?;
+        key.encode(self.cx, field.encode_field_name(self.cx)?)?;
+        value.serialize(Serializer::new(self.cx, field.encode_field_value(self.cx)?))?;
         field.end(self.cx)?;
         Ok(())
     }

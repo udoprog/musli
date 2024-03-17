@@ -346,9 +346,7 @@ where
         E: Encoder<C>,
     {
         match self {
-            Some(value) => encoder
-                .encode_some(cx)
-                .and_then(|encoder| value.encode(cx, encoder)),
+            Some(value) => value.encode(cx, encoder.encode_some(cx)?),
             None => encoder.encode_none(cx),
         }
     }
@@ -412,11 +410,11 @@ where
     {
         let mut variant = decoder.decode_variant(cx)?;
 
-        let tag = cx.decode(variant.tag(cx)?)?;
+        let tag = cx.decode(variant.decode_tag(cx)?)?;
 
         let this = match tag {
-            ResultTag::Ok => Ok(cx.decode(variant.variant(cx)?)?),
-            ResultTag::Err => Err(cx.decode(variant.variant(cx)?)?),
+            ResultTag::Ok => Ok(cx.decode(variant.decode_value(cx)?)?),
+            ResultTag::Err => Err(cx.decode(variant.decode_value(cx)?)?),
         };
 
         variant.end(cx)?;

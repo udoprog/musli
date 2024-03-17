@@ -32,7 +32,7 @@ pub mod serde_dlhn {
         where
             for<'de> T: Deserialize<'de>,
         {
-            let mut buffer = &self.buffer[..];
+            let mut buffer = self.buffer;
             let mut deserializer = Deserializer::new(&mut buffer);
             T::deserialize(&mut deserializer)
         }

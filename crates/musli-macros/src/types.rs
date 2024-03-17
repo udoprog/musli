@@ -23,34 +23,34 @@ pub(super) enum Extra {
 }
 
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
-    ("Encoder", Extra::Context),
-    ("Some", Extra::None),
-    ("Pack", Extra::This),
-    ("Sequence", Extra::None),
-    ("Tuple", Extra::None),
-    ("Map", Extra::None),
-    ("MapPairs", Extra::None),
-    ("Struct", Extra::None),
-    ("Variant", Extra::None),
-    ("TupleVariant", Extra::None),
-    ("StructVariant", Extra::None),
+    ("WithContext", Extra::Context),
+    ("EncodeSome", Extra::None),
+    ("EncodePack", Extra::This),
+    ("EncodeSequence", Extra::None),
+    ("EncodeTuple", Extra::None),
+    ("EncodeMap", Extra::None),
+    ("EncodeMapEntries", Extra::None),
+    ("EncodeStruct", Extra::None),
+    ("EncodeVariant", Extra::None),
+    ("EncodeTupleVariant", Extra::None),
+    ("EncodeStructVariant", Extra::None),
 ];
 
 pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
-    ("Decoder", Extra::Context),
-    ("Buffer", Extra::None),
-    ("Some", Extra::None),
-    ("Pack", Extra::None),
-    ("Sequence", Extra::None),
-    ("Tuple", Extra::None),
-    ("Map", Extra::None),
-    ("Struct", Extra::None),
-    ("Variant", Extra::None),
+    ("WithContext", Extra::Context),
+    ("DecodeBuffer", Extra::None),
+    ("DecodeSome", Extra::None),
+    ("DecodePack", Extra::None),
+    ("DecodeSequence", Extra::None),
+    ("DecodeTuple", Extra::None),
+    ("DecodeMap", Extra::None),
+    ("DecodeStruct", Extra::None),
+    ("DecodeVariant", Extra::None),
 ];
 
-pub(super) const MAP_DECODER_TYPES: &[(&str, Extra)] = &[("MapPairs", Extra::None)];
+pub(super) const MAP_DECODER_TYPES: &[(&str, Extra)] = &[("IntoMapEntries", Extra::None)];
 
-pub(super) const STRUCT_DECODER_TYPES: &[(&str, Extra)] = &[("StructPairs", Extra::None)];
+pub(super) const STRUCT_DECODER_TYPES: &[(&str, Extra)] = &[("IntoStructFields", Extra::None)];
 
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("String", Extra::Visitor(Ty::Str)),

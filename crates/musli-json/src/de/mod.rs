@@ -71,8 +71,8 @@ where
             Token::OpenBrace => {
                 let mut object = JsonObjectDecoder::new(cx, None, self.parser)?;
 
-                while let Some(mut pair) = object.entry(cx)? {
-                    pair.map_key(cx)?.skip_any(cx)?;
+                while let Some(mut pair) = object.decode_entry(cx)? {
+                    pair.decode_map_key(cx)?.skip_any(cx)?;
                     pair.skip_map_value(cx)?;
                 }
 
@@ -81,7 +81,7 @@ where
             Token::OpenBracket => {
                 let mut seq = JsonSequenceDecoder::new(cx, None, self.parser)?;
 
-                while let Some(item) = SequenceDecoder::next(&mut seq, cx)? {
+                while let Some(item) = SequenceDecoder::decode_next(&mut seq, cx)? {
                     item.skip_any(cx)?;
                 }
 
@@ -131,19 +131,19 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Decoder<U> = Self where U: Context;
+    type WithContext<U> = Self where U: Context;
     #[cfg(feature = "musli-value")]
-    type Buffer = musli_value::AsValueDecoder<BUFFER_OPTIONS>;
-    type Pack = JsonSequenceDecoder<P>;
-    type Sequence = JsonSequenceDecoder<P>;
-    type Tuple = JsonSequenceDecoder<P>;
-    type Map = JsonObjectDecoder<P>;
-    type Some = JsonDecoder<P>;
-    type Struct = JsonObjectDecoder<P>;
-    type Variant = JsonVariantDecoder<P>;
+    type DecodeBuffer = musli_value::AsValueDecoder<BUFFER_OPTIONS>;
+    type DecodePack = JsonSequenceDecoder<P>;
+    type DecodeSequence = JsonSequenceDecoder<P>;
+    type DecodeTuple = JsonSequenceDecoder<P>;
+    type DecodeMap = JsonObjectDecoder<P>;
+    type DecodeSome = JsonDecoder<P>;
+    type DecodeStruct = JsonObjectDecoder<P>;
+    type DecodeVariant = JsonVariantDecoder<P>;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Decoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -171,7 +171,7 @@ where
 
     #[cfg(feature = "musli-value")]
     #[inline]
-    fn decode_buffer(self, cx: &C) -> Result<Self::Buffer, C::Error> {
+    fn decode_buffer(self, cx: &C) -> Result<Self::DecodeBuffer, C::Error> {
         use musli::de::Decode;
         let value = musli_value::Value::decode(cx, self)?;
         Ok(value.into_value_decoder())
@@ -295,7 +295,7 @@ where
         let mut bytes = [0; N];
         let mut index = 0;
 
-        while let Some(item) = SequenceDecoder::next(&mut seq, cx)? {
+        while let Some(item) = SequenceDecoder::decode_next(&mut seq, cx)? {
             if index == N {
                 return Err(cx.message(format_args!(
                     "Overflowed array at {index} elements, expected {N}"
@@ -326,7 +326,7 @@ where
         let mut seq = self.decode_sequence(cx)?;
         let mut bytes = Vec::with_capacity(seq.size_hint(cx).or_default());
 
-        while let Some(item) = SequenceDecoder::next(&mut seq, cx)? {
+        while let Some(item) = SequenceDecoder::decode_next(&mut seq, cx)? {
             bytes.push(item.decode_u8(cx)?);
         }
 
@@ -349,7 +349,7 @@ where
     }
 
     #[inline]
-    fn decode_option(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error> {
+    fn decode_option(mut self, cx: &C) -> Result<Option<Self::DecodeSome>, C::Error> {
         if self.parser.peek(cx)?.is_null() {
             self.parse_null(cx)?;
             Ok(None)
@@ -359,32 +359,32 @@ where
     }
 
     #[inline]
-    fn decode_pack(self, cx: &C) -> Result<Self::Pack, C::Error> {
+    fn decode_pack(self, cx: &C) -> Result<Self::DecodePack, C::Error> {
         JsonSequenceDecoder::new(cx, None, self.parser)
     }
 
     #[inline]
-    fn decode_sequence(self, cx: &C) -> Result<Self::Sequence, C::Error> {
+    fn decode_sequence(self, cx: &C) -> Result<Self::DecodeSequence, C::Error> {
         JsonSequenceDecoder::new(cx, None, self.parser)
     }
 
     #[inline]
-    fn decode_tuple(self, cx: &C, len: usize) -> Result<Self::Tuple, C::Error> {
+    fn decode_tuple(self, cx: &C, len: usize) -> Result<Self::DecodeTuple, C::Error> {
         JsonSequenceDecoder::new(cx, Some(len), self.parser)
     }
 
     #[inline]
-    fn decode_map(self, cx: &C) -> Result<Self::Map, C::Error> {
+    fn decode_map(self, cx: &C) -> Result<Self::DecodeMap, C::Error> {
         JsonObjectDecoder::new(cx, None, self.parser)
     }
 
     #[inline]
-    fn decode_struct(self, cx: &C, len: Option<usize>) -> Result<Self::Struct, C::Error> {
+    fn decode_struct(self, cx: &C, len: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
         JsonObjectDecoder::new(cx, len, self.parser)
     }
 
     #[inline]
-    fn decode_variant(self, cx: &C) -> Result<Self::Variant, C::Error> {
+    fn decode_variant(self, cx: &C) -> Result<Self::DecodeVariant, C::Error> {
         JsonVariantDecoder::new(cx, self.parser)
     }
 

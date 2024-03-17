@@ -60,11 +60,11 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Decoder<U> = Self where U: Context;
-    type Struct = JsonObjectDecoder<P>;
+    type WithContext<U> = Self where U: Context;
+    type DecodeStruct = JsonObjectDecoder<P>;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Decoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {

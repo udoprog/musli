@@ -4,9 +4,9 @@ use core::fmt;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, NumberHint, NumberVisitor, PackDecoder,
-    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructPairsDecoder, TypeHint,
-    ValueVisitor, VariantDecoder, Visitor,
+    Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint, NumberVisitor,
+    PackDecoder, SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder,
+    TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::Context;
 use musli_storage::de::StorageDecoder;
@@ -197,17 +197,17 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Decoder<U> = Self where U: Context;
-    type Pack = SelfDecoder<Limit<R>, F>;
-    type Some = Self;
-    type Sequence = RemainingSelfDecoder<R, F>;
-    type Tuple = SelfTupleDecoder<R, F>;
-    type Map = RemainingSelfDecoder<R, F>;
-    type Struct = RemainingSelfDecoder<R, F>;
-    type Variant = Self;
+    type WithContext<U> = Self where U: Context;
+    type DecodePack = SelfDecoder<Limit<R>, F>;
+    type DecodeSome = Self;
+    type DecodeSequence = RemainingSelfDecoder<R, F>;
+    type DecodeTuple = SelfTupleDecoder<R, F>;
+    type DecodeMap = RemainingSelfDecoder<R, F>;
+    type DecodeStruct = RemainingSelfDecoder<R, F>;
+    type DecodeVariant = Self;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Decoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -289,7 +289,7 @@ where
     }
 
     #[inline]
-    fn decode_pack(mut self, cx: &C) -> Result<Self::Pack, C::Error> {
+    fn decode_pack(mut self, cx: &C) -> Result<Self::DecodePack, C::Error> {
         let pos = cx.mark();
         let len = self.decode_pack_length(cx, pos)?;
         Ok(SelfDecoder::new(self.reader.limit(len)))
@@ -546,7 +546,7 @@ where
     }
 
     #[inline]
-    fn decode_option(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error> {
+    fn decode_option(mut self, cx: &C) -> Result<Option<Self::DecodeSome>, C::Error> {
         // Options are encoded as empty or sequences with a single element.
         const NONE: Tag = Tag::from_mark(Mark::None);
         const SOME: Tag = Tag::from_mark(Mark::Some);
@@ -567,12 +567,12 @@ where
     }
 
     #[inline]
-    fn decode_sequence(self, cx: &C) -> Result<Self::Sequence, C::Error> {
+    fn decode_sequence(self, cx: &C) -> Result<Self::DecodeSequence, C::Error> {
         self.shared_decode_sequence(cx)
     }
 
     #[inline]
-    fn decode_tuple(mut self, cx: &C, len: usize) -> Result<Self::Tuple, C::Error> {
+    fn decode_tuple(mut self, cx: &C, len: usize) -> Result<Self::DecodeTuple, C::Error> {
         let pos = cx.mark();
         let actual = self.decode_prefix(cx, Kind::Sequence, pos)?;
 
@@ -586,17 +586,17 @@ where
     }
 
     #[inline]
-    fn decode_map(self, cx: &C) -> Result<Self::Map, C::Error> {
+    fn decode_map(self, cx: &C) -> Result<Self::DecodeMap, C::Error> {
         self.shared_decode_map(cx)
     }
 
     #[inline]
-    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error> {
+    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
         self.shared_decode_map(cx)
     }
 
     #[inline]
-    fn decode_variant(mut self, cx: &C) -> Result<Self::Variant, C::Error> {
+    fn decode_variant(mut self, cx: &C) -> Result<Self::DecodeVariant, C::Error> {
         const VARIANT: Tag = Tag::from_mark(Mark::Variant);
 
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
@@ -733,10 +733,10 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Decoder<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F> where Self: 'this;
+    type DecodeNext<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
@@ -755,10 +755,10 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Decoder<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeNext<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
@@ -780,7 +780,7 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Decoder<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeNext<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -788,7 +788,7 @@ where
     }
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -800,7 +800,7 @@ where
     #[inline]
     fn end(mut self, cx: &C) -> Result<(), C::Error> {
         // Skip remaining elements.
-        while let Some(mut item) = SequenceDecoder::next(&mut self, cx)? {
+        while let Some(mut item) = SequenceDecoder::decode_next(&mut self, cx)? {
             item.skip_any(cx)?;
         }
 
@@ -814,10 +814,10 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Entry<'this> = SelfDecoder<R::Mut<'this>, F>
+    type DecodeEntry<'this> = SelfDecoder<R::Mut<'this>, F>
     where
         Self: 'this;
-    type MapPairs = Self;
+    type IntoMapEntries = Self;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -825,12 +825,12 @@ where
     }
 
     #[inline]
-    fn into_map_pairs(self, _: &C) -> Result<Self::MapPairs, C::Error> {
+    fn into_map_entries(self, _: &C) -> Result<Self::IntoMapEntries, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn entry(&mut self, _: &C) -> Result<Option<Self::Entry<'_>>, C::Error> {
+    fn decode_entry(&mut self, _: &C) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -842,7 +842,7 @@ where
     #[inline]
     fn end(mut self, cx: &C) -> Result<(), C::Error> {
         // Skip remaining elements.
-        while let Some(mut item) = MapDecoder::entry(&mut self, cx)? {
+        while let Some(mut item) = MapDecoder::decode_entry(&mut self, cx)? {
             item.skip_any(cx)?;
         }
 
@@ -850,20 +850,23 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> MapPairsDecoder<'de, C> for RemainingSelfDecoder<R, F>
+impl<'de, C, R, const F: Options> MapEntriesDecoder<'de, C> for RemainingSelfDecoder<R, F>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type MapPairsKey<'this> = SelfDecoder<R::Mut<'this>, F>
+    type DecodeMapEntryKey<'this> = SelfDecoder<R::Mut<'this>, F>
     where
         Self: 'this;
-    type MapPairsValue<'this> = SelfDecoder<R::Mut<'this>, F>
+    type DecodeMapEntryValue<'this> = SelfDecoder<R::Mut<'this>, F>
     where
         Self: 'this;
 
     #[inline]
-    fn map_pairs_key(&mut self, _: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error> {
+    fn decode_map_entry_key(
+        &mut self,
+        _: &C,
+    ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -873,13 +876,13 @@ where
     }
 
     #[inline]
-    fn map_pairs_value(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error> {
+    fn decode_map_entry_value(&mut self, _: &C) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
         Ok(SelfDecoder::new(self.decoder.reader.borrow_mut()))
     }
 
     #[inline]
-    fn skip_map_pairs_value(&mut self, cx: &C) -> Result<bool, C::Error> {
-        self.map_pairs_value(cx)?.skip_any(cx)?;
+    fn skip_map_entry_value(&mut self, cx: &C) -> Result<bool, C::Error> {
+        self.decode_map_entry_value(cx)?.skip_any(cx)?;
         Ok(true)
     }
 
@@ -895,20 +898,23 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> StructPairsDecoder<'de, C> for RemainingSelfDecoder<R, F>
+impl<'de, C, R, const F: Options> StructFieldsDecoder<'de, C> for RemainingSelfDecoder<R, F>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type FieldName<'this> = SelfDecoder<R::Mut<'this>, F>
+    type DecodeStructFieldName<'this> = SelfDecoder<R::Mut<'this>, F>
     where
         Self: 'this;
-    type FieldValue<'this> = SelfDecoder<R::Mut<'this>, F>
+    type DecodeStructFieldValue<'this> = SelfDecoder<R::Mut<'this>, F>
     where
         Self: 'this;
 
     #[inline]
-    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
+    fn decode_struct_field_name(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
         if self.remaining == 0 {
             return Err(cx.message("Ran out of fields"));
         }
@@ -918,18 +924,21 @@ where
     }
 
     #[inline]
-    fn field_value(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error> {
-        MapPairsDecoder::map_pairs_value(self, cx)
+    fn decode_struct_field_value(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
+        MapEntriesDecoder::decode_map_entry_value(self, cx)
     }
 
     #[inline]
-    fn skip_field_value(&mut self, cx: &C) -> Result<bool, C::Error> {
-        MapPairsDecoder::skip_map_pairs_value(self, cx)
+    fn skip_struct_field_value(&mut self, cx: &C) -> Result<bool, C::Error> {
+        MapEntriesDecoder::skip_map_entry_value(self, cx)
     }
 
     #[inline]
     fn end(self, cx: &C) -> Result<(), C::Error> {
-        MapPairsDecoder::end(self, cx)
+        MapEntriesDecoder::end(self, cx)
     }
 }
 
@@ -938,16 +947,16 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type MapKey<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
-    type MapValue = Self;
+    type DecodeMapKey<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeMapValue = Self;
 
     #[inline]
-    fn map_key(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error> {
+    fn decode_map_key(&mut self, _: &C) -> Result<Self::DecodeMapKey<'_>, C::Error> {
         Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn map_value(self, _: &C) -> Result<Self::MapValue, C::Error> {
+    fn decode_map_value(self, _: &C) -> Result<Self::DecodeMapValue, C::Error> {
         Ok(self)
     }
 
@@ -964,10 +973,10 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Field<'this> = SelfDecoder<R::Mut<'this>, F>
+    type DecodeField<'this> = SelfDecoder<R::Mut<'this>, F>
     where
         Self: 'this;
-    type StructPairs = Self;
+    type IntoStructFields = Self;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -975,13 +984,13 @@ where
     }
 
     #[inline]
-    fn into_struct_pairs(self, _: &C) -> Result<Self::StructPairs, C::Error> {
+    fn into_struct_fields(self, _: &C) -> Result<Self::IntoStructFields, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn field(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error> {
-        MapDecoder::entry(self, cx)
+    fn decode_field(&mut self, cx: &C) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
+        MapDecoder::decode_entry(self, cx)
     }
 
     #[inline]
@@ -995,17 +1004,17 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type FieldName<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
-    type FieldValue = Self;
+    type DecodeFieldName<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeFieldValue = Self;
 
     #[inline]
-    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
-        MapEntryDecoder::map_key(self, cx)
+    fn decode_field_name(&mut self, cx: &C) -> Result<Self::DecodeFieldName<'_>, C::Error> {
+        MapEntryDecoder::decode_map_key(self, cx)
     }
 
     #[inline]
-    fn field_value(self, cx: &C) -> Result<Self::FieldValue, C::Error> {
-        MapEntryDecoder::map_value(self, cx)
+    fn decode_field_value(self, cx: &C) -> Result<Self::DecodeFieldValue, C::Error> {
+        MapEntryDecoder::decode_map_value(self, cx)
     }
 
     #[inline]
@@ -1019,21 +1028,21 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Tag<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
-    type Variant<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeTag<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeVariant<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
+    fn decode_tag(&mut self, _: &C) -> Result<Self::DecodeTag<'_>, C::Error> {
         Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn variant(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error> {
+    fn decode_value(&mut self, _: &C) -> Result<Self::DecodeVariant<'_>, C::Error> {
         Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn skip_variant(&mut self, cx: &C) -> Result<bool, C::Error> {
+    fn skip_value(&mut self, cx: &C) -> Result<bool, C::Error> {
         self.skip_any(cx)?;
         Ok(true)
     }

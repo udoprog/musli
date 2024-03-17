@@ -1,8 +1,8 @@
 use core::fmt;
 
 use musli::de::{
-    Decoder, MapDecoder, MapPairsDecoder, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
-    StructPairsDecoder, VariantDecoder, Visitor,
+    Decoder, MapDecoder, MapEntriesDecoder, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
+    StructFieldsDecoder, VariantDecoder, Visitor,
 };
 use musli::Context;
 use serde::de;
@@ -282,7 +282,10 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_map(self.cx)?.into_map_pairs(self.cx)?;
+        let mut decoder = self
+            .decoder
+            .decode_map(self.cx)?
+            .into_map_entries(self.cx)?;
         let output = visitor.visit_map(MapAccess::new(self.cx, &mut decoder))?;
         decoder.end(self.cx)?;
         Ok(output)
@@ -301,7 +304,7 @@ where
         let mut decoder = self
             .decoder
             .decode_struct(self.cx, Some(fields.len()))?
-            .into_struct_pairs(self.cx)?;
+            .into_struct_fields(self.cx)?;
         let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields))?;
         decoder.end(self.cx)?;
         Ok(output)
@@ -374,7 +377,7 @@ where
 
         self.remaining -= 1;
 
-        let decoder = self.decoder.next(self.cx)?;
+        let decoder = self.decoder.decode_next(self.cx)?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
     }
@@ -405,7 +408,7 @@ impl<'de, 'a, C, D> de::MapAccess<'de> for StructAccess<'a, C, D>
 where
     C: ?Sized + Context,
     C::Error: de::Error,
-    D: StructPairsDecoder<'de, C>,
+    D: StructFieldsDecoder<'de, C>,
 {
     type Error = C::Error;
 
@@ -419,7 +422,7 @@ where
         }
 
         self.remaining -= 1;
-        let decoder = self.decoder.field_name(self.cx)?;
+        let decoder = self.decoder.decode_struct_field_name(self.cx)?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
     }
@@ -429,7 +432,7 @@ where
     where
         V: de::DeserializeSeed<'de>,
     {
-        let decoder = self.decoder.field_value(self.cx)?;
+        let decoder = self.decoder.decode_struct_field_value(self.cx)?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(output)
     }
@@ -505,7 +508,7 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.next(self.cx)? else {
+        let Some(decoder) = self.decoder.decode_next(self.cx)? else {
             return Ok(None);
         };
 
@@ -537,7 +540,7 @@ impl<'de, 'a, C, D: ?Sized> de::MapAccess<'de> for MapAccess<'a, C, D>
 where
     C: ?Sized + Context,
     C::Error: de::Error,
-    D: MapPairsDecoder<'de, C>,
+    D: MapEntriesDecoder<'de, C>,
 {
     type Error = C::Error;
 
@@ -546,7 +549,7 @@ where
     where
         K: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.map_pairs_key(self.cx)? else {
+        let Some(decoder) = self.decoder.decode_map_entry_key(self.cx)? else {
             return Ok(None);
         };
 
@@ -559,7 +562,7 @@ where
     where
         V: de::DeserializeSeed<'de>,
     {
-        let decoder = self.decoder.map_pairs_value(self.cx)?;
+        let decoder = self.decoder.decode_map_entry_value(self.cx)?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(output)
     }
@@ -733,7 +736,7 @@ where
 
     #[inline]
     fn unit_variant(mut self) -> Result<(), Self::Error> {
-        self.decoder.variant(self.cx)?.decode_unit(self.cx)
+        self.decoder.decode_value(self.cx)?.decode_unit(self.cx)
     }
 
     #[inline]
@@ -741,7 +744,10 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        let value = seed.deserialize(Deserializer::new(self.cx, self.decoder.variant(self.cx)?))?;
+        let value = seed.deserialize(Deserializer::new(
+            self.cx,
+            self.decoder.decode_value(self.cx)?,
+        ))?;
         self.decoder.end(self.cx)?;
         Ok(value)
     }
@@ -751,7 +757,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let decoder = self.decoder.variant(self.cx)?;
+        let decoder = self.decoder.decode_value(self.cx)?;
         let mut tuple = decoder.decode_tuple(self.cx, len)?;
         let value = visitor.visit_seq(TupleAccess::new(self.cx, &mut tuple, len))?;
         tuple.end(self.cx)?;
@@ -768,10 +774,10 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let decoder = self.decoder.variant(self.cx)?;
+        let decoder = self.decoder.decode_value(self.cx)?;
         let mut st = decoder
             .decode_struct(self.cx, Some(fields.len()))?
-            .into_struct_pairs(self.cx)?;
+            .into_struct_fields(self.cx)?;
         let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
         st.end(self.cx)?;
         self.decoder.end(self.cx)?;
@@ -793,7 +799,7 @@ where
     where
         V: de::DeserializeSeed<'de>,
     {
-        let tag = self.decoder.tag(self.cx)?;
+        let tag = self.decoder.decode_tag(self.cx)?;
         let value = seed.deserialize(Deserializer::new(self.cx, tag))?;
         Ok((value, self))
     }
@@ -946,7 +952,7 @@ where
     where
         D: MapDecoder<'de, C>,
     {
-        let mut map_decoder = decoder.into_map_pairs(cx)?;
+        let mut map_decoder = decoder.into_map_entries(cx)?;
         let value = self
             .visitor
             .visit_map(MapAccess::new(cx, &mut map_decoder))?;

@@ -1,6 +1,6 @@
 use core::mem;
 
-use musli::de::{MapDecoder, MapPairsDecoder, SizeHint, StructDecoder, StructPairsDecoder};
+use musli::de::{MapDecoder, MapEntriesDecoder, SizeHint, StructDecoder, StructFieldsDecoder};
 use musli::Context;
 
 use crate::reader::{Parser, Token};
@@ -78,10 +78,10 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Entry<'this> = JsonObjectPairDecoder<P::Mut<'this>>
+    type DecodeEntry<'this> = JsonObjectPairDecoder<P::Mut<'this>>
     where
         Self: 'this;
-    type MapPairs = Self;
+    type IntoMapEntries = Self;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -89,12 +89,12 @@ where
     }
 
     #[inline]
-    fn into_map_pairs(self, _: &C) -> Result<Self::MapPairs, C::Error> {
+    fn into_map_entries(self, _: &C) -> Result<Self::IntoMapEntries, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn entry(&mut self, cx: &C) -> Result<Option<Self::Entry<'_>>, C::Error> {
+    fn decode_entry(&mut self, cx: &C) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
         if !self.parse_map_key(cx)? {
             return Ok(None);
         }
@@ -108,18 +108,21 @@ where
     }
 }
 
-impl<'de, C, P> MapPairsDecoder<'de, C> for JsonObjectDecoder<P>
+impl<'de, C, P> MapEntriesDecoder<'de, C> for JsonObjectDecoder<P>
 where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type MapPairsKey<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type DecodeMapEntryKey<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
-    type MapPairsValue<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
+    type DecodeMapEntryValue<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn map_pairs_key(&mut self, cx: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error> {
+    fn decode_map_entry_key(
+        &mut self,
+        cx: &C,
+    ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
         if !self.parse_map_key(cx)? {
             self.completed = true;
             return Ok(None);
@@ -129,7 +132,10 @@ where
     }
 
     #[inline]
-    fn map_pairs_value(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error> {
+    fn decode_map_entry_value(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
@@ -141,7 +147,7 @@ where
     }
 
     #[inline]
-    fn skip_map_pairs_value(&mut self, cx: &C) -> Result<bool, C::Error> {
+    fn skip_map_entry_value(&mut self, cx: &C) -> Result<bool, C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
@@ -158,7 +164,7 @@ where
         if !self.completed {
             while self.parse_map_key(cx)? {
                 JsonKeyDecoder::new(self.parser.borrow_mut()).skip_any(cx)?;
-                self.skip_map_pairs_value(cx)?;
+                self.skip_map_entry_value(cx)?;
             }
         }
 
@@ -172,10 +178,10 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Field<'this> = JsonObjectPairDecoder<P::Mut<'this>>
+    type DecodeField<'this> = JsonObjectPairDecoder<P::Mut<'this>>
     where
         Self: 'this;
-    type StructPairs = Self;
+    type IntoStructFields = Self;
 
     #[inline]
     fn size_hint(&self, cx: &C) -> SizeHint {
@@ -183,13 +189,13 @@ where
     }
 
     #[inline]
-    fn into_struct_pairs(self, _: &C) -> Result<Self::StructPairs, C::Error> {
+    fn into_struct_fields(self, _: &C) -> Result<Self::IntoStructFields, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn field(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error> {
-        MapDecoder::entry(self, cx)
+    fn decode_field(&mut self, cx: &C) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
+        MapDecoder::decode_entry(self, cx)
     }
 
     #[inline]
@@ -198,18 +204,21 @@ where
     }
 }
 
-impl<'de, C, P> StructPairsDecoder<'de, C> for JsonObjectDecoder<P>
+impl<'de, C, P> StructFieldsDecoder<'de, C> for JsonObjectDecoder<P>
 where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type FieldName<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type DecodeStructFieldName<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
-    type FieldValue<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
+    type DecodeStructFieldValue<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
+    fn decode_struct_field_name(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
         if !self.parse_map_key(cx)? {
             return Err(cx.message("Expected map key, but found closing brace `}`"));
         }
@@ -218,7 +227,10 @@ where
     }
 
     #[inline]
-    fn field_value(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error> {
+    fn decode_struct_field_value(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
@@ -230,12 +242,12 @@ where
     }
 
     #[inline]
-    fn skip_field_value(&mut self, cx: &C) -> Result<bool, C::Error> {
-        MapPairsDecoder::skip_map_pairs_value(self, cx)
+    fn skip_struct_field_value(&mut self, cx: &C) -> Result<bool, C::Error> {
+        MapEntriesDecoder::skip_map_entry_value(self, cx)
     }
 
     #[inline]
     fn end(self, cx: &C) -> Result<(), C::Error> {
-        MapPairsDecoder::end(self, cx)
+        MapEntriesDecoder::end(self, cx)
     }
 }

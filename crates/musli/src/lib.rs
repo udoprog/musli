@@ -136,7 +136,7 @@
 //!         let mut seq = decoder.decode_sequence(cx)?;
 //!         let mut data = Vec::with_capacity(seq.size_hint(cx).or_default());
 //!
-//!         while let Some(decoder) = seq.next(cx)? {
+//!         while let Some(decoder) = seq.decode_next(cx)? {
 //!             data.push(cx.decode(decoder)?);
 //!         }
 //!
@@ -447,7 +447,6 @@ pub use self::en::{Encode, Encoder};
 /// #[musli::encoder]
 /// impl<C: ?Sized + Context> Encoder<C> for MyEncoder<'_> {
 ///     type Ok = ();
-///     type Encoder<U> = Self where U: Context;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")

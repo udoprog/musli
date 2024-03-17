@@ -36,18 +36,18 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Tag<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type DecodeTag<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
-    type Variant<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
+    type DecodeVariant<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
+    fn decode_tag(&mut self, _: &C) -> Result<Self::DecodeTag<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn variant(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error> {
+    fn decode_value(&mut self, cx: &C) -> Result<Self::DecodeVariant<'_>, C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
@@ -59,8 +59,8 @@ where
     }
 
     #[inline]
-    fn skip_variant(&mut self, cx: &C) -> Result<bool, C::Error> {
-        let this = self.variant(cx)?;
+    fn skip_value(&mut self, cx: &C) -> Result<bool, C::Error> {
+        let this = self.decode_value(cx)?;
         JsonDecoder::new(this.parser).skip_any(cx)?;
         Ok(true)
     }

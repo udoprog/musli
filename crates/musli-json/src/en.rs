@@ -1,7 +1,7 @@
 use core::fmt;
 
 use musli::en::{
-    Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder,
     StructFieldEncoder, VariantEncoder,
 };
 use musli::{Context, Encode};
@@ -21,25 +21,26 @@ impl<W> JsonEncoder<W> {
 }
 
 #[musli::encoder]
-impl<C: ?Sized + Context, W> Encoder<C> for JsonEncoder<W>
+impl<C, W> Encoder<C> for JsonEncoder<W>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
     type Ok = ();
-    type Encoder<U> = Self where U: Context;
-    type Pack<'this> = JsonArrayEncoder<W> where C: 'this;
-    type Some = Self;
-    type Sequence = JsonArrayEncoder<W>;
-    type Tuple = JsonArrayEncoder<W>;
-    type Map = JsonObjectEncoder<W>;
-    type MapPairs = JsonObjectEncoder<W>;
-    type Struct = JsonObjectEncoder<W>;
-    type Variant = JsonVariantEncoder<W>;
-    type TupleVariant = JsonArrayEncoder<W>;
-    type StructVariant = JsonObjectEncoder<W>;
+    type WithContext<U> = Self where U: Context;
+    type EncodePack<'this> = JsonArrayEncoder<W> where C: 'this;
+    type EncodeSome = Self;
+    type EncodeSequence = JsonArrayEncoder<W>;
+    type EncodeTuple = JsonArrayEncoder<W>;
+    type EncodeMap = JsonObjectEncoder<W>;
+    type EncodeMapEntries = JsonObjectEncoder<W>;
+    type EncodeStruct = JsonObjectEncoder<W>;
+    type EncodeVariant = JsonVariantEncoder<W>;
+    type EncodeTupleVariant = JsonArrayEncoder<W>;
+    type EncodeStructVariant = JsonObjectEncoder<W>;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Encoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -200,7 +201,7 @@ where
     }
 
     #[inline]
-    fn encode_some(self, _: &C) -> Result<Self::Some, C::Error> {
+    fn encode_some(self, _: &C) -> Result<Self::EncodeSome, C::Error> {
         Ok(self)
     }
 
@@ -210,37 +211,37 @@ where
     }
 
     #[inline]
-    fn encode_pack(self, cx: &C) -> Result<Self::Pack<'_>, C::Error> {
+    fn encode_pack(self, cx: &C) -> Result<Self::EncodePack<'_>, C::Error> {
         JsonArrayEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_sequence(self, cx: &C, _: usize) -> Result<Self::Sequence, C::Error> {
+    fn encode_sequence(self, cx: &C, _: usize) -> Result<Self::EncodeSequence, C::Error> {
         JsonArrayEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_tuple(self, cx: &C, _: usize) -> Result<Self::Tuple, C::Error> {
+    fn encode_tuple(self, cx: &C, _: usize) -> Result<Self::EncodeTuple, C::Error> {
         JsonArrayEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_map(self, cx: &C, _: usize) -> Result<Self::Map, C::Error> {
+    fn encode_map(self, cx: &C, _: usize) -> Result<Self::EncodeMap, C::Error> {
         JsonObjectEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_map_pairs(self, cx: &C, _: usize) -> Result<Self::MapPairs, C::Error> {
+    fn encode_map_entries(self, cx: &C, _: usize) -> Result<Self::EncodeMapEntries, C::Error> {
         JsonObjectEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_struct(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error> {
+    fn encode_struct(self, cx: &C, _: usize) -> Result<Self::EncodeStruct, C::Error> {
         JsonObjectEncoder::new(cx, self.writer)
     }
 
     #[inline]
-    fn encode_variant(self, cx: &C) -> Result<Self::Variant, C::Error> {
+    fn encode_variant(self, cx: &C) -> Result<Self::EncodeVariant, C::Error> {
         JsonVariantEncoder::new(cx, self.writer)
     }
 
@@ -250,7 +251,7 @@ where
         cx: &C,
         tag: &T,
         _: usize,
-    ) -> Result<Self::TupleVariant, C::Error>
+    ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -266,7 +267,7 @@ where
         cx: &C,
         tag: &T,
         _: usize,
-    ) -> Result<Self::StructVariant, C::Error>
+    ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -315,12 +316,12 @@ where
     W: Writer,
 {
     type Ok = ();
-    type Entry<'this> = JsonObjectPairEncoder<W::Mut<'this>>
+    type EncodeEntry<'this> = JsonObjectPairEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn entry(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error> {
+    fn encode_entry(&mut self, _: &C) -> Result<Self::EncodeEntry<'_>, C::Error> {
         self.len += 1;
 
         Ok(JsonObjectPairEncoder::new(
@@ -341,18 +342,18 @@ where
     }
 }
 
-impl<C: ?Sized + Context, W> MapPairsEncoder<C> for JsonObjectEncoder<W>
+impl<C: ?Sized + Context, W> MapEntriesEncoder<C> for JsonObjectEncoder<W>
 where
     W: Writer,
 {
     type Ok = ();
-    type MapPairsKey<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    type EncodeMapEntryKey<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
-    type MapPairsValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
+    type EncodeMapEntryValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn map_pairs_key(&mut self, cx: &C) -> Result<Self::MapPairsKey<'_>, C::Error> {
+    fn encode_map_entry_key(&mut self, cx: &C) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
         if self.len > 0 {
             self.writer.write_byte(cx, b',')?;
         }
@@ -362,7 +363,10 @@ where
     }
 
     #[inline]
-    fn map_pairs_value(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error> {
+    fn encode_map_entry_value(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
         self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
@@ -379,13 +383,13 @@ where
     W: Writer,
 {
     type Ok = ();
-    type Field<'this> = JsonObjectPairEncoder<W::Mut<'this>>
+    type EncodeField<'this> = JsonObjectPairEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn field(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error> {
-        MapEncoder::entry(self, cx)
+    fn encode_field(&mut self, cx: &C) -> Result<Self::EncodeField<'_>, C::Error> {
+        MapEncoder::encode_entry(self, cx)
     }
 
     #[inline]
@@ -412,13 +416,13 @@ where
     W: Writer,
 {
     type Ok = ();
-    type MapKey<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    type EncodeMapKey<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
-    type MapValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
+    type EncodeMapValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn map_key(&mut self, cx: &C) -> Result<Self::MapKey<'_>, C::Error> {
+    fn encode_map_key(&mut self, cx: &C) -> Result<Self::EncodeMapKey<'_>, C::Error> {
         if !self.empty {
             self.writer.write_byte(cx, b',')?;
         }
@@ -427,7 +431,7 @@ where
     }
 
     #[inline]
-    fn map_value(&mut self, cx: &C) -> Result<Self::MapValue<'_>, C::Error> {
+    fn encode_map_value(&mut self, cx: &C) -> Result<Self::EncodeMapValue<'_>, C::Error> {
         self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
@@ -443,19 +447,19 @@ where
     W: Writer,
 {
     type Ok = ();
-    type FieldName<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    type EncodeFieldName<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
-    type FieldValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
+    type EncodeFieldValue<'this> = JsonEncoder<W::Mut<'this>> where Self: 'this;
 
     #[inline]
-    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
-        self.map_key(cx)
+    fn encode_field_name(&mut self, cx: &C) -> Result<Self::EncodeFieldName<'_>, C::Error> {
+        self.encode_map_key(cx)
     }
 
     #[inline]
-    fn field_value(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error> {
-        self.map_value(cx)
+    fn encode_field_value(&mut self, cx: &C) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
+        self.encode_map_value(cx)
     }
 
     #[inline]
@@ -488,20 +492,20 @@ where
     W: Writer,
 {
     type Ok = ();
-    type Tag<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    type EncodeTag<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
     where
         Self: 'this;
-    type Variant<'this> = JsonEncoder<W::Mut<'this>>
+    type EncodeValue<'this> = JsonEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
+    fn encode_tag(&mut self, _: &C) -> Result<Self::EncodeTag<'_>, C::Error> {
         Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn variant(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error> {
+    fn encode_value(&mut self, cx: &C) -> Result<Self::EncodeValue<'_>, C::Error> {
         self.writer.write_byte(cx, b':')?;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
@@ -540,10 +544,10 @@ where
     W: Writer,
 {
     type Ok = ();
-    type Encoder<U> = Self where U: Context;
+    type WithContext<U> = Self where U: Context;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Encoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -660,12 +664,12 @@ where
     W: Writer,
 {
     type Ok = ();
-    type Encoder<'this> = JsonEncoder<W::Mut<'this>>
+    type EncodeNext<'this> = JsonEncoder<W::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn next(&mut self, cx: &C) -> Result<Self::Encoder<'_>, C::Error> {
+    fn encode_next(&mut self, cx: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
         if !self.first {
             self.writer.write_byte(cx, b',')?;
         }
