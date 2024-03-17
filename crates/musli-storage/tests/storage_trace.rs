@@ -2,7 +2,7 @@
 
 use musli::{Decode, Encode};
 use musli_common::allocator::{System, SystemBuffer};
-use musli_common::context::AllocContext;
+use musli_common::context::SystemContext;
 
 #[derive(Encode)]
 enum InnerFrom {
@@ -32,7 +32,7 @@ struct To {
 fn storage_trace() {
     let mut buf = SystemBuffer::new();
     let alloc = System::new(&mut buf);
-    let cx = AllocContext::new(&alloc);
+    let cx = SystemContext::new(&alloc);
 
     let from = From {
         ok: 10,

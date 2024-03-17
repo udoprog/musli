@@ -28,7 +28,7 @@ impl<'a, S, E> RichError<'a, S, E> {
 
 impl<'a, S, E> fmt::Display for RichError<'a, S, E>
 where
-    S: AsRef<str>,
+    S: fmt::Display,
     E: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -66,7 +66,7 @@ pub(crate) enum Step<S> {
 
 fn format_path<S>(path: &[Step<S>], path_cap: usize) -> impl fmt::Display + '_
 where
-    S: AsRef<str>,
+    S: fmt::Display,
 {
     FormatPath { path, path_cap }
 }
@@ -78,7 +78,7 @@ struct FormatPath<'a, S> {
 
 impl<'a, S> fmt::Display for FormatPath<'a, S>
 where
-    S: AsRef<str>,
+    S: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut has_type = false;
@@ -143,7 +143,7 @@ where
                         level += 1;
                     }
 
-                    write!(f, "[{}]", key.as_ref())?;
+                    write!(f, "[{}]", key)?;
                     has_field = true;
                 }
             }

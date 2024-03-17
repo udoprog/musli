@@ -12,9 +12,8 @@ use super::access::{self, Access};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
 
-/// A rich context which uses allocations and tracks the exact location of every
-/// error.
-pub struct AllocContext<A, M> {
+/// A rich context dynamically allocating space using the system allocator.
+pub struct SystemContext<A, M> {
     access: Access,
     mark: Cell<usize>,
     alloc: A,
@@ -24,7 +23,7 @@ pub struct AllocContext<A, M> {
     _marker: PhantomData<M>,
 }
 
-impl<A, M> AllocContext<A, M> {
+impl<A, M> SystemContext<A, M> {
     /// Construct a new context which uses allocations to store arbitrary
     /// amounts of diagnostics about decoding.
     ///
@@ -61,7 +60,7 @@ impl<A, M> AllocContext<A, M> {
     }
 }
 
-impl<A, M> AllocContext<A, M>
+impl<A, M> SystemContext<A, M>
 where
     A: Allocator,
 {
@@ -94,7 +93,7 @@ where
     }
 }
 
-impl<A, M> Context for AllocContext<A, M>
+impl<A, M> Context for SystemContext<A, M>
 where
     A: Allocator,
 {

@@ -6,7 +6,7 @@ use core::alloc::GlobalAlloc;
 
 use musli::{Decode, Encode};
 use musli_json::allocator::{Stack, StackBuffer};
-use musli_json::context::NoStdContext;
+use musli_json::context::StackContext;
 
 struct Allocator;
 
@@ -55,7 +55,7 @@ struct Value<'a> {
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let mut buf = StackBuffer::<1024>::new();
     let alloc = Stack::new(&mut buf);
-    let cx = NoStdContext::new(&alloc);
+    let cx = StackContext::new(&alloc);
 
     let encoding = musli_json::Encoding::new();
 

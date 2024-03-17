@@ -1,11 +1,11 @@
 //! Helper types to set up a basic Müsli [`Context`].
 
 mod access;
-#[cfg(feature = "alloc")]
-mod alloc_context;
 mod error_marker;
-mod no_std_context;
 mod rich_error;
+mod stack_context;
+#[cfg(feature = "alloc")]
+mod system_context;
 pub use self::error_marker::ErrorMarker;
 mod error;
 pub use self::error::Error;
@@ -18,9 +18,9 @@ use musli::mode::DefaultMode;
 use musli::{Allocator, Context};
 
 #[cfg(feature = "alloc")]
-pub use self::alloc_context::AllocContext;
+pub use self::system_context::SystemContext;
 
-pub use self::no_std_context::NoStdContext;
+pub use self::stack_context::StackContext;
 
 pub use self::rich_error::RichError;
 
