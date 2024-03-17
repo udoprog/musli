@@ -80,7 +80,7 @@ impl<'de, M> Decode<'de, M> for IpAddr {
     {
         let mut variant = decoder.decode_variant(cx)?;
 
-        let tag: IpAddrTag = variant.decode_tag(cx).and_then(|v| cx.decode(v))?;
+        let tag: IpAddrTag = cx.decode(variant.decode_tag(cx)?)?;
 
         let this = match tag {
             IpAddrTag::Ipv4 => Self::V4(cx.decode(variant.decode_value(cx)?)?),
@@ -114,8 +114,8 @@ impl<'de, M> Decode<'de, M> for SocketAddrV4 {
         D: Decoder<'de, C>,
     {
         let mut unpack = decoder.decode_pack(cx)?;
-        let ip = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
-        let port = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
+        let ip = cx.decode(unpack.decode_next(cx)?)?;
+        let port = cx.decode(unpack.decode_next(cx)?)?;
         unpack.end(cx)?;
         Ok(SocketAddrV4::new(ip, port))
     }
@@ -145,10 +145,10 @@ impl<'de, M> Decode<'de, M> for SocketAddrV6 {
         D: Decoder<'de, C>,
     {
         let mut unpack = decoder.decode_pack(cx)?;
-        let ip = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
-        let port = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
-        let flowinfo = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
-        let scope_id = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
+        let ip = cx.decode(unpack.decode_next(cx)?)?;
+        let port = cx.decode(unpack.decode_next(cx)?)?;
+        let flowinfo = cx.decode(unpack.decode_next(cx)?)?;
+        let scope_id = cx.decode(unpack.decode_next(cx)?)?;
         unpack.end(cx)?;
         Ok(Self::new(ip, port, flowinfo, scope_id))
     }

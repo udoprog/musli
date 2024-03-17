@@ -693,7 +693,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some(cx).and_then(|e| data.encode(cx, e))
+    ///                 data.encode(cx, encoder.encode_some(cx)?)
     ///             }
     ///             None => {
     ///                 encoder.encode_none(cx)
@@ -729,7 +729,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
-    ///                 encoder.encode_some(cx).and_then(|e| data.encode(cx, e))
+    ///                 data.encode(cx, encoder.encode_some(cx)?)
     ///             }
     ///             None => {
     ///                 encoder.encode_none(cx)

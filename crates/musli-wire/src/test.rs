@@ -36,8 +36,8 @@ where
         D: Decoder<'de, C>,
     {
         let mut unpack = decoder.decode_pack(cx)?;
-        let tag = unpack.decode_next(cx).and_then(|v| Tag::decode(cx, v))?;
-        let value = unpack.decode_next(cx).and_then(|v| T::decode(cx, v))?;
+        let tag = cx.decode(unpack.decode_next(cx)?)?;
+        let value = cx.decode(unpack.decode_next(cx)?)?;
         unpack.end(cx)?;
         Ok(Self { tag, value })
     }

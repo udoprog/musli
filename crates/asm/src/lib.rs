@@ -119,7 +119,8 @@ pub mod zerocopy_store {
 
 #[cfg(feature = "musli-zerocopy")]
 pub mod musli_zerocopy_swap {
-    use musli_zerocopy::{endian, ByteOrder, Endian, Ref, ZeroCopy};
+    use musli_zerocopy::endian;
+    use musli_zerocopy::{Ref, ZeroCopy};
 
     #[inline(never)]
     pub fn array_le(value: [u32; 8]) -> [u32; 8] {

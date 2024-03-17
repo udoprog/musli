@@ -146,7 +146,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     ///         match discriminant {
     ///             0 => Ok(MyVariantType::Variant1),
-    ///             1 => Ok(MyVariantType::Variant2(buffer.as_decoder(cx).and_then(|v| cx.decode(v))?)),
+    ///             1 => Ok(MyVariantType::Variant2(cx.decode(buffer.as_decoder(cx)?)?)),
     ///             other => Err(cx.invalid_variant_tag("MyVariantType", other)),
     ///         }
     ///     }

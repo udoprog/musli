@@ -346,9 +346,7 @@ where
         E: Encoder<C>,
     {
         match self {
-            Some(value) => encoder
-                .encode_some(cx)
-                .and_then(|encoder| value.encode(cx, encoder)),
+            Some(value) => value.encode(cx, encoder.encode_some(cx)?),
             None => encoder.encode_none(cx),
         }
     }

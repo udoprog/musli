@@ -511,8 +511,8 @@ impl<M> Encode<M> for OsStr {
         use crate::en::VariantEncoder;
 
         let mut variant = encoder.encode_variant(cx)?;
-        Tag::Unix.encode(cx, variant.tag(cx)?)?;
-        self.as_bytes().encode(cx, variant.variant(cx)?)?;
+        Tag::Unix.encode(cx, variant.encode_tag(cx)?)?;
+        self.as_bytes().encode(cx, variant.encode_value(cx)?)?;
         variant.end(cx)
     }
 
@@ -580,7 +580,8 @@ impl<'de, M> Decode<'de, M> for OsString {
             #[cfg(unix)]
             Tag::Unix => {
                 use std::os::unix::ffi::OsStringExt;
-                let bytes = cx.decode(variant.variant(cx)?)?;
+
+                let bytes = cx.decode(variant.decode_value(cx)?)?;
                 variant.end(cx)?;
                 Ok(OsString::from_vec(bytes))
             }
