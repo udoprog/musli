@@ -45,7 +45,7 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Decoder<'this> = JsonDecoder<P::Mut<'this>>
+    type DecodeNext<'this> = JsonDecoder<P::Mut<'this>>
     where
         Self: 'this;
 
@@ -55,7 +55,7 @@ where
     }
 
     #[inline]
-    fn next(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error> {
+    fn decode_next(&mut self, cx: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         let first = mem::take(&mut self.first);
 
         loop {
@@ -105,12 +105,12 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Decoder<'this> = JsonDecoder<P::Mut<'this>>
+    type DecodeNext<'this> = JsonDecoder<P::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn next(&mut self, cx: &C) -> Result<Self::Decoder<'_>, C::Error> {
+    fn decode_next(&mut self, cx: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         let first = mem::take(&mut self.first);
 
         loop {

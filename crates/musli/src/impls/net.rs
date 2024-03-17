@@ -114,8 +114,8 @@ impl<'de, M> Decode<'de, M> for SocketAddrV4 {
         D: Decoder<'de, C>,
     {
         let mut unpack = decoder.decode_pack(cx)?;
-        let ip = unpack.next(cx).and_then(|v| cx.decode(v))?;
-        let port = unpack.next(cx).and_then(|v| cx.decode(v))?;
+        let ip = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
+        let port = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
         unpack.end(cx)?;
         Ok(SocketAddrV4::new(ip, port))
     }
@@ -145,10 +145,10 @@ impl<'de, M> Decode<'de, M> for SocketAddrV6 {
         D: Decoder<'de, C>,
     {
         let mut unpack = decoder.decode_pack(cx)?;
-        let ip = unpack.next(cx).and_then(|v| cx.decode(v))?;
-        let port = unpack.next(cx).and_then(|v| cx.decode(v))?;
-        let flowinfo = unpack.next(cx).and_then(|v| cx.decode(v))?;
-        let scope_id = unpack.next(cx).and_then(|v| cx.decode(v))?;
+        let ip = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
+        let port = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
+        let flowinfo = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
+        let scope_id = unpack.decode_next(cx).and_then(|v| cx.decode(v))?;
         unpack.end(cx)?;
         Ok(Self::new(ip, port, flowinfo, scope_id))
     }

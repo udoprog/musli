@@ -216,7 +216,7 @@ fn insert_fields(
             Packing::Packed => {
                 encode = quote! {
                     #enter
-                    let #sequence_decoder_next_var = #sequence_encoder_t::next(&mut #pack_var, #ctx_var)?;
+                    let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(&mut #pack_var, #ctx_var)?;
                     #encode_path(#access, #ctx_var, #sequence_decoder_next_var)?;
                     #leave
                 };
@@ -353,10 +353,10 @@ fn encode_variant(
                 encode = quote! {{
                     let mut #variant_encoder = #encoder_t::encode_variant(#encoder_var, #ctx_var)?;
 
-                    let #tag_encoder = #variant_encoder_t::tag(&mut #variant_encoder, #ctx_var)?;
+                    let #tag_encoder = #variant_encoder_t::encode_tag(&mut #variant_encoder, #ctx_var)?;
                     #encode_t_encode(&#tag, #ctx_var, #tag_encoder)?;
 
-                    let #encoder_var = #variant_encoder_t::variant(&mut #variant_encoder, #ctx_var)?;
+                    let #encoder_var = #variant_encoder_t::encode_value(&mut #variant_encoder, #ctx_var)?;
                     #encode;
                     #variant_encoder_t::end(#variant_encoder, #ctx_var)?
                 }};

@@ -39,17 +39,17 @@ impl<'de, R, const F: Options, C: ?Sized + Context> Decoder<'de, C> for StorageD
 where
     R: Reader<'de>,
 {
-    type Decoder<U> = Self where U: Context;
-    type Pack = Self;
-    type Some = Self;
-    type Sequence = LimitedStorageDecoder<R, F>;
-    type Tuple = Self;
-    type Map = LimitedStorageDecoder<R, F>;
-    type Struct = LimitedStorageDecoder<R, F>;
-    type Variant = Self;
+    type WithContext<U> = Self where U: Context;
+    type DecodePack = Self;
+    type DecodeSome = Self;
+    type DecodeSequence = LimitedStorageDecoder<R, F>;
+    type DecodeTuple = Self;
+    type DecodeMap = LimitedStorageDecoder<R, F>;
+    type DecodeStruct = LimitedStorageDecoder<R, F>;
+    type DecodeVariant = Self;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Decoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -74,7 +74,7 @@ where
     }
 
     #[inline]
-    fn decode_pack(self, _: &C) -> Result<Self::Pack, C::Error> {
+    fn decode_pack(self, _: &C) -> Result<Self::DecodePack, C::Error> {
         Ok(self)
     }
 
@@ -237,33 +237,33 @@ where
     }
 
     #[inline]
-    fn decode_option(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error> {
+    fn decode_option(mut self, cx: &C) -> Result<Option<Self::DecodeSome>, C::Error> {
         let b = self.reader.read_byte(cx)?;
         Ok(if b == 1 { Some(self) } else { None })
     }
 
     #[inline]
-    fn decode_sequence(self, cx: &C) -> Result<Self::Sequence, C::Error> {
+    fn decode_sequence(self, cx: &C) -> Result<Self::DecodeSequence, C::Error> {
         LimitedStorageDecoder::new(cx, self)
     }
 
     #[inline]
-    fn decode_tuple(self, _: &C, _: usize) -> Result<Self::Tuple, C::Error> {
+    fn decode_tuple(self, _: &C, _: usize) -> Result<Self::DecodeTuple, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn decode_map(self, cx: &C) -> Result<Self::Map, C::Error> {
+    fn decode_map(self, cx: &C) -> Result<Self::DecodeMap, C::Error> {
         LimitedStorageDecoder::new(cx, self)
     }
 
     #[inline]
-    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error> {
+    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
         LimitedStorageDecoder::new(cx, self)
     }
 
     #[inline]
-    fn decode_variant(self, _: &C) -> Result<Self::Variant, C::Error> {
+    fn decode_variant(self, _: &C) -> Result<Self::DecodeVariant, C::Error> {
         Ok(self)
     }
 }
@@ -272,10 +272,10 @@ impl<'de, R, const F: Options, C: ?Sized + Context> PackDecoder<'de, C> for Stor
 where
     R: Reader<'de>,
 {
-    type Decoder<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeNext<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
@@ -304,7 +304,7 @@ impl<'de, R, const F: Options, C: ?Sized + Context> SequenceDecoder<'de, C>
 where
     R: Reader<'de>,
 {
-    type Decoder<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeNext<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -312,7 +312,7 @@ where
     }
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }

@@ -43,18 +43,18 @@ macro_rules! ensure {
 
 #[musli::decoder]
 impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecoder<'de, F> {
-    type Decoder<U> = Self where U: Context;
-    type Buffer = AsValueDecoder<F>;
-    type Some = Self;
-    type Pack = StorageDecoder<SliceReader<'de>, F>;
-    type Sequence = IterValueDecoder<'de, F>;
-    type Tuple = IterValueDecoder<'de, F>;
-    type Map = IterValuePairsDecoder<'de, F>;
-    type Struct = IterValuePairsDecoder<'de, F>;
-    type Variant = IterValueVariantDecoder<'de, F>;
+    type WithContext<U> = Self where U: Context;
+    type DecodeBuffer = AsValueDecoder<F>;
+    type DecodeSome = Self;
+    type DecodePack = StorageDecoder<SliceReader<'de>, F>;
+    type DecodeSequence = IterValueDecoder<'de, F>;
+    type DecodeTuple = IterValueDecoder<'de, F>;
+    type DecodeMap = IterValuePairsDecoder<'de, F>;
+    type DecodeStruct = IterValuePairsDecoder<'de, F>;
+    type DecodeVariant = IterValueVariantDecoder<'de, F>;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Decoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -72,7 +72,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
     }
 
     #[inline]
-    fn decode_buffer(self, _: &C) -> Result<Self::Buffer, C::Error> {
+    fn decode_buffer(self, _: &C) -> Result<Self::DecodeBuffer, C::Error> {
         Ok(AsValueDecoder::new(self.value.clone()))
     }
 
@@ -217,7 +217,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_option(self, cx: &C) -> Result<Option<Self::Some>, C::Error> {
+    fn decode_option(self, cx: &C) -> Result<Option<Self::DecodeSome>, C::Error> {
         ensure!(self, cx, hint, ExpectedOption(hint), Value::Option(option) => {
             Ok(option.as_ref().map(|some| ValueDecoder::new(some)))
         })
@@ -225,7 +225,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_pack(self, cx: &C) -> Result<Self::Pack, C::Error> {
+    fn decode_pack(self, cx: &C) -> Result<Self::DecodePack, C::Error> {
         ensure!(self, cx, hint, ExpectedPack(hint), Value::Bytes(pack) => {
             Ok(StorageDecoder::new(SliceReader::new(pack)))
         })
@@ -233,7 +233,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_sequence(self, cx: &C) -> Result<Self::Sequence, C::Error> {
+    fn decode_sequence(self, cx: &C) -> Result<Self::DecodeSequence, C::Error> {
         ensure!(self, cx, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
             Ok(IterValueDecoder::new(sequence))
         })
@@ -241,7 +241,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_tuple(self, cx: &C, _: usize) -> Result<Self::Tuple, C::Error> {
+    fn decode_tuple(self, cx: &C, _: usize) -> Result<Self::DecodeTuple, C::Error> {
         ensure!(self, cx, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
             Ok(IterValueDecoder::new(sequence))
         })
@@ -249,7 +249,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_map(self, cx: &C) -> Result<Self::Map, C::Error> {
+    fn decode_map(self, cx: &C) -> Result<Self::DecodeMap, C::Error> {
         ensure!(self, cx, hint, ExpectedMap(hint), Value::Map(map) => {
             Ok(IterValuePairsDecoder::new(map))
         })
@@ -257,7 +257,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error> {
+    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
         ensure!(self, cx, hint, ExpectedMap(hint), Value::Map(st) => {
             Ok(IterValuePairsDecoder::new(st))
         })
@@ -265,7 +265,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_variant(self, cx: &C) -> Result<Self::Variant, C::Error> {
+    fn decode_variant(self, cx: &C) -> Result<Self::DecodeVariant, C::Error> {
         ensure!(self, cx, hint, ExpectedVariant(hint), Value::Variant(st) => {
             Ok(IterValueVariantDecoder::new(st))
         })
@@ -351,12 +351,12 @@ impl<'de, const F: Options> IterValueDecoder<'de, F> {
 }
 
 impl<'de, C: ?Sized + Context, const F: Options> PackDecoder<'de, C> for IterValueDecoder<'de, F> {
-    type Decoder<'this> = ValueDecoder<'de, F>
+    type DecodeNext<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
 
     #[inline]
-    fn next(&mut self, cx: &C) -> Result<Self::Decoder<'_>, C::Error> {
+    fn decode_next(&mut self, cx: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         match self.iter.next() {
             Some(value) => Ok(ValueDecoder::new(value)),
             None => Err(cx.custom(ErrorMessage::ExpectedPackValue)),
@@ -372,7 +372,7 @@ impl<'de, C: ?Sized + Context, const F: Options> PackDecoder<'de, C> for IterVal
 impl<'de, C: ?Sized + Context, const F: Options> SequenceDecoder<'de, C>
     for IterValueDecoder<'de, F>
 {
-    type Decoder<'this> = ValueDecoder<'de, F>
+    type DecodeNext<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
 
@@ -382,7 +382,7 @@ impl<'de, C: ?Sized + Context, const F: Options> SequenceDecoder<'de, C>
     }
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         match self.iter.next() {
             Some(value) => Ok(Some(ValueDecoder::new(value))),
             None => Ok(None),

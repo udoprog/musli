@@ -46,7 +46,7 @@ where
 
         for (index, value) in self.0.iter().enumerate() {
             cx.enter_sequence_index(index);
-            let encoder = seq.next(cx)?;
+            let encoder = seq.encode_next(cx)?;
             T::encode(value, cx, encoder)?;
             cx.leave_sequence_index();
         }

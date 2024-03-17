@@ -28,13 +28,13 @@ where
     type Ok = E::Ok;
     type Error = C::Error;
 
-    type SerializeSeq = SerializeSeq<'a, C, E::Sequence>;
-    type SerializeTuple = SerializeSeq<'a, C, E::Tuple>;
-    type SerializeTupleStruct = SerializeTupleStruct<'a, C, E::Struct>;
-    type SerializeTupleVariant = SerializeSeq<'a, C, E::TupleVariant>;
-    type SerializeMap = SerializeMap<'a, C, E::MapPairs>;
-    type SerializeStruct = SerializeStruct<'a, C, E::Struct>;
-    type SerializeStructVariant = SerializeStructVariant<'a, C, E::StructVariant>;
+    type SerializeSeq = SerializeSeq<'a, C, E::EncodeSequence>;
+    type SerializeTuple = SerializeSeq<'a, C, E::EncodeTuple>;
+    type SerializeTupleStruct = SerializeTupleStruct<'a, C, E::EncodeStruct>;
+    type SerializeTupleVariant = SerializeSeq<'a, C, E::EncodeTupleVariant>;
+    type SerializeMap = SerializeMap<'a, C, E::EncodeMapPairs>;
+    type SerializeStruct = SerializeStruct<'a, C, E::EncodeStruct>;
+    type SerializeStructVariant = SerializeStructVariant<'a, C, E::EncodeStructVariant>;
 
     #[inline]
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
@@ -276,11 +276,11 @@ where
     C::Error: ser::Error,
     E: Encoder<C>,
     T: ?Sized + Serialize,
-    F: FnOnce(<E::Variant as VariantEncoder<C>>::Variant<'_>) -> Result<O, C::Error>,
+    F: FnOnce(<E::EncodeVariant as VariantEncoder<C>>::EncodeValue<'_>) -> Result<O, C::Error>,
 {
     let mut variant = encoder.encode_variant(cx)?;
-    variant_tag.serialize(Serializer::new(cx, variant.tag(cx)?))?;
-    let output = f(variant.variant(cx)?)?;
+    variant_tag.serialize(Serializer::new(cx, variant.encode_tag(cx)?))?;
+    let output = f(variant.encode_value(cx)?)?;
     variant.end(cx)?;
     Ok(output)
 }
@@ -310,7 +310,7 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.next(self.cx)?;
+        let encoder = self.encoder.encode_next(self.cx)?;
         value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }

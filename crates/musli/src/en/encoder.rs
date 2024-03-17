@@ -10,13 +10,13 @@ pub trait SequenceEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
     /// The encoder returned when advancing the sequence encoder.
-    type Encoder<'this>: Encoder<C, Ok = Self::Ok>
+    type EncodeNext<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
-    /// Prepare encoding of the next element.
+    /// Return encoder for the next element.
     #[must_use = "Encoder must be consumed"]
-    fn next(&mut self, cx: &C) -> Result<Self::Encoder<'_>, C::Error>;
+    fn encode_next(&mut self, cx: &C) -> Result<Self::EncodeNext<'_>, C::Error>;
 
     /// Push an element into the sequence.
     #[inline]
@@ -24,12 +24,12 @@ pub trait SequenceEncoder<C: ?Sized + Context> {
     where
         T: Encode<C::Mode>,
     {
-        let encoder = self.next(cx)?;
+        let encoder = self.encode_next(cx)?;
         value.encode(cx, encoder)?;
         Ok(())
     }
 
-    /// End the sequence.
+    /// Finish encoding the sequence.
     fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 }
 
@@ -212,11 +212,11 @@ pub trait VariantEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
     /// The encoder returned when advancing the map encoder to encode the key.
-    type Tag<'this>: Encoder<C, Ok = Self::Ok>
+    type EncodeTag<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
     /// The encoder returned when advancing the map encoder to encode the value.
-    type Variant<'this>: Encoder<C, Ok = Self::Ok>
+    type EncodeValue<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
 
@@ -228,18 +228,18 @@ pub trait VariantEncoder<C: ?Sized + Context> {
         T: Encode<C::Mode>,
         V: Encode<C::Mode>,
     {
-        tag.encode(cx, self.tag(cx)?)?;
-        value.encode(cx, self.variant(cx)?)?;
+        tag.encode(cx, self.encode_tag(cx)?)?;
+        value.encode(cx, self.encode_value(cx)?)?;
         self.end(cx)
     }
 
     /// Return the encoder for the first element in the variant.
     #[must_use = "Encoders must be consumed"]
-    fn tag(&mut self, cx: &C) -> Result<Self::Tag<'_>, C::Error>;
+    fn encode_tag(&mut self, cx: &C) -> Result<Self::EncodeTag<'_>, C::Error>;
 
     /// Return encoder for the second element in the variant.
     #[must_use = "Encoders must be consumed"]
-    fn variant(&mut self, cx: &C) -> Result<Self::Variant<'_>, C::Error>;
+    fn encode_value(&mut self, cx: &C) -> Result<Self::EncodeValue<'_>, C::Error>;
 
     /// End the variant encoder.
     fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
@@ -252,31 +252,31 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// [Encoder] is capable of returning this value.
     type Ok;
     /// Constructed [`Encoder`] with a different context.
-    type Encoder<U>: Encoder<U, Ok = Self::Ok>
+    type WithContext<U>: Encoder<U, Ok = Self::Ok>
     where
         U: Context;
-    /// Encoder returned when encoding an optional value which is present.
-    type Some: Encoder<C, Ok = Self::Ok>;
     /// A simple pack that packs a sequence of elements.
-    type Pack<'this>: SequenceEncoder<C, Ok = Self::Ok>
+    type EncodePack<'this>: SequenceEncoder<C, Ok = Self::Ok>
     where
         C: 'this;
+    /// Encoder returned when encoding an optional value which is present.
+    type EncodeSome: Encoder<C, Ok = Self::Ok>;
     /// The type of a sequence encoder.
-    type Sequence: SequenceEncoder<C, Ok = Self::Ok>;
+    type EncodeSequence: SequenceEncoder<C, Ok = Self::Ok>;
     /// The type of a tuple encoder.
-    type Tuple: SequenceEncoder<C, Ok = Self::Ok>;
+    type EncodeTuple: SequenceEncoder<C, Ok = Self::Ok>;
     /// The type of a map encoder.
-    type Map: MapEncoder<C, Ok = Self::Ok>;
+    type EncodeMap: MapEncoder<C, Ok = Self::Ok>;
     /// Streaming encoder for map pairs.
-    type MapPairs: MapPairsEncoder<C, Ok = Self::Ok>;
+    type EncodeMapPairs: MapPairsEncoder<C, Ok = Self::Ok>;
     /// Encoder that can encode a struct.
-    type Struct: StructEncoder<C, Ok = Self::Ok>;
+    type EncodeStruct: StructEncoder<C, Ok = Self::Ok>;
     /// Encoder for a struct variant.
-    type Variant: VariantEncoder<C, Ok = Self::Ok>;
+    type EncodeVariant: VariantEncoder<C, Ok = Self::Ok>;
     /// Specialized encoder for a tuple variant.
-    type TupleVariant: SequenceEncoder<C, Ok = Self::Ok>;
+    type EncodeTupleVariant: SequenceEncoder<C, Ok = Self::Ok>;
     /// Specialized encoder for a struct variant.
-    type StructVariant: StructEncoder<C, Ok = Self::Ok>;
+    type EncodeStructVariant: StructEncoder<C, Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::encoder]`][crate::encoder] attribute
@@ -285,7 +285,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     type __UseMusliEncoderAttributeMacro;
 
     /// Construct an encoder with a different context.
-    fn with_context<U>(self, cx: &C) -> Result<Self::Encoder<U>, C::Error>
+    fn with_context<U>(self, cx: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -943,7 +943,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_some(self, cx: &C) -> Result<Self::Some, C::Error> {
+    fn encode_some(self, cx: &C) -> Result<Self::EncodeSome, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             &ExpectingWrapper::new(self),
@@ -1018,7 +1018,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_pack(self, cx: &C) -> Result<Self::Pack<'_>, C::Error> {
+    fn encode_pack(self, cx: &C) -> Result<Self::EncodePack<'_>, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Pack,
             &ExpectingWrapper::new(self),
@@ -1064,7 +1064,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         self,
         cx: &C,
         #[allow(unused)] len: usize,
-    ) -> Result<Self::Sequence, C::Error> {
+    ) -> Result<Self::EncodeSequence, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Sequence,
             &ExpectingWrapper::new(self),
@@ -1103,7 +1103,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Tuple, C::Error> {
+    fn encode_tuple(
+        self,
+        cx: &C,
+        #[allow(unused)] len: usize,
+    ) -> Result<Self::EncodeTuple, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Tuple,
             &ExpectingWrapper::new(self),
@@ -1137,7 +1141,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_map(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Map, C::Error> {
+    fn encode_map(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::EncodeMap, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Map,
             &ExpectingWrapper::new(self),
@@ -1175,7 +1179,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         self,
         cx: &C,
         #[allow(unused)] len: usize,
-    ) -> Result<Self::MapPairs, C::Error> {
+    ) -> Result<Self::EncodeMapPairs, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::MapPairs,
             &ExpectingWrapper::new(self),
@@ -1209,7 +1213,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_struct(self, cx: &C, _: usize) -> Result<Self::Struct, C::Error> {
+    fn encode_struct(self, cx: &C, _: usize) -> Result<Self::EncodeStruct, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Struct,
             &ExpectingWrapper::new(self),
@@ -1263,7 +1267,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_variant(self, cx: &C) -> Result<Self::Variant, C::Error> {
+    fn encode_variant(self, cx: &C) -> Result<Self::EncodeVariant, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
             &ExpectingWrapper::new(self),
@@ -1318,9 +1322,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         T: Encode<C::Mode>,
     {
         let mut variant = self.encode_variant(cx)?;
-        let t = variant.tag(cx)?;
+        let t = variant.encode_tag(cx)?;
         Encode::encode(tag, cx, t)?;
-        let v = variant.variant(cx)?;
+        let v = variant.encode_value(cx)?;
         v.encode_unit(cx)?;
         variant.end(cx)
     }
@@ -1374,7 +1378,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         cx: &C,
         _: &T,
         _: usize,
-    ) -> Result<Self::TupleVariant, C::Error>
+    ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -1433,7 +1437,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         cx: &C,
         _: &T,
         _: usize,
-    ) -> Result<Self::StructVariant, C::Error>
+    ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {

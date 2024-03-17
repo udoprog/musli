@@ -197,17 +197,17 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Decoder<U> = Self where U: Context;
-    type Pack = SelfDecoder<Limit<R>, F>;
-    type Some = Self;
-    type Sequence = RemainingSelfDecoder<R, F>;
-    type Tuple = SelfTupleDecoder<R, F>;
-    type Map = RemainingSelfDecoder<R, F>;
-    type Struct = RemainingSelfDecoder<R, F>;
-    type Variant = Self;
+    type WithContext<U> = Self where U: Context;
+    type DecodePack = SelfDecoder<Limit<R>, F>;
+    type DecodeSome = Self;
+    type DecodeSequence = RemainingSelfDecoder<R, F>;
+    type DecodeTuple = SelfTupleDecoder<R, F>;
+    type DecodeMap = RemainingSelfDecoder<R, F>;
+    type DecodeStruct = RemainingSelfDecoder<R, F>;
+    type DecodeVariant = Self;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Decoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -289,7 +289,7 @@ where
     }
 
     #[inline]
-    fn decode_pack(mut self, cx: &C) -> Result<Self::Pack, C::Error> {
+    fn decode_pack(mut self, cx: &C) -> Result<Self::DecodePack, C::Error> {
         let pos = cx.mark();
         let len = self.decode_pack_length(cx, pos)?;
         Ok(SelfDecoder::new(self.reader.limit(len)))
@@ -546,7 +546,7 @@ where
     }
 
     #[inline]
-    fn decode_option(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error> {
+    fn decode_option(mut self, cx: &C) -> Result<Option<Self::DecodeSome>, C::Error> {
         // Options are encoded as empty or sequences with a single element.
         const NONE: Tag = Tag::from_mark(Mark::None);
         const SOME: Tag = Tag::from_mark(Mark::Some);
@@ -567,12 +567,12 @@ where
     }
 
     #[inline]
-    fn decode_sequence(self, cx: &C) -> Result<Self::Sequence, C::Error> {
+    fn decode_sequence(self, cx: &C) -> Result<Self::DecodeSequence, C::Error> {
         self.shared_decode_sequence(cx)
     }
 
     #[inline]
-    fn decode_tuple(mut self, cx: &C, len: usize) -> Result<Self::Tuple, C::Error> {
+    fn decode_tuple(mut self, cx: &C, len: usize) -> Result<Self::DecodeTuple, C::Error> {
         let pos = cx.mark();
         let actual = self.decode_prefix(cx, Kind::Sequence, pos)?;
 
@@ -586,17 +586,17 @@ where
     }
 
     #[inline]
-    fn decode_map(self, cx: &C) -> Result<Self::Map, C::Error> {
+    fn decode_map(self, cx: &C) -> Result<Self::DecodeMap, C::Error> {
         self.shared_decode_map(cx)
     }
 
     #[inline]
-    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error> {
+    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
         self.shared_decode_map(cx)
     }
 
     #[inline]
-    fn decode_variant(mut self, cx: &C) -> Result<Self::Variant, C::Error> {
+    fn decode_variant(mut self, cx: &C) -> Result<Self::DecodeVariant, C::Error> {
         const VARIANT: Tag = Tag::from_mark(Mark::Variant);
 
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
@@ -733,10 +733,10 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Decoder<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F> where Self: 'this;
+    type DecodeNext<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         Ok(StorageDecoder::new(self.reader.borrow_mut()))
     }
 
@@ -755,10 +755,10 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Decoder<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeNext<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         Ok(SelfDecoder::new(self.reader.borrow_mut()))
     }
 
@@ -780,7 +780,7 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    type Decoder<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type DecodeNext<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -788,7 +788,7 @@ where
     }
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -800,7 +800,7 @@ where
     #[inline]
     fn end(mut self, cx: &C) -> Result<(), C::Error> {
         // Skip remaining elements.
-        while let Some(mut item) = SequenceDecoder::next(&mut self, cx)? {
+        while let Some(mut item) = SequenceDecoder::decode_next(&mut self, cx)? {
             item.skip_any(cx)?;
         }
 

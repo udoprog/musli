@@ -68,30 +68,30 @@ where
     O: ValueOutput,
 {
     type Ok = ();
-    type Encoder<U> = Self where U: Context;
+    type WithContext<U> = Self where U: Context;
     #[cfg(feature = "alloc")]
-    type Some = ValueEncoder<SomeValueWriter<O>>;
+    type EncodeSome = ValueEncoder<SomeValueWriter<O>>;
     #[cfg(feature = "alloc")]
-    type Pack<'this> = SequenceValueEncoder<O> where C: 'this;
+    type EncodePack<'this> = SequenceValueEncoder<O> where C: 'this;
     #[cfg(feature = "alloc")]
-    type Sequence = SequenceValueEncoder<O>;
+    type EncodeSequence = SequenceValueEncoder<O>;
     #[cfg(feature = "alloc")]
-    type Tuple = SequenceValueEncoder<O>;
+    type EncodeTuple = SequenceValueEncoder<O>;
     #[cfg(feature = "alloc")]
-    type Map = MapValueEncoder<O>;
+    type EncodeMap = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
-    type MapPairs = MapValueEncoder<O>;
+    type EncodeMapPairs = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
-    type Struct = MapValueEncoder<O>;
+    type EncodeStruct = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
-    type Variant = VariantValueEncoder<O>;
+    type EncodeVariant = VariantValueEncoder<O>;
     #[cfg(feature = "alloc")]
-    type TupleVariant = VariantSequenceEncoder<O>;
+    type EncodeTupleVariant = VariantSequenceEncoder<O>;
     #[cfg(feature = "alloc")]
-    type StructVariant = VariantStructEncoder<O>;
+    type EncodeStructVariant = VariantStructEncoder<O>;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Encoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -240,7 +240,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_some(self, _: &C) -> Result<Self::Some, C::Error> {
+    fn encode_some(self, _: &C) -> Result<Self::EncodeSome, C::Error> {
         Ok(ValueEncoder::new(SomeValueWriter {
             output: self.output,
         }))
@@ -255,43 +255,43 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_pack(self, _: &'_ C) -> Result<Self::Pack<'_>, C::Error> {
+    fn encode_pack(self, _: &'_ C) -> Result<Self::EncodePack<'_>, C::Error> {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_sequence(self, _: &C, _: usize) -> Result<Self::Sequence, C::Error> {
+    fn encode_sequence(self, _: &C, _: usize) -> Result<Self::EncodeSequence, C::Error> {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_tuple(self, _: &C, _: usize) -> Result<Self::Tuple, C::Error> {
+    fn encode_tuple(self, _: &C, _: usize) -> Result<Self::EncodeTuple, C::Error> {
         Ok(SequenceValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_map(self, _: &C, _: usize) -> Result<Self::Map, C::Error> {
+    fn encode_map(self, _: &C, _: usize) -> Result<Self::EncodeMap, C::Error> {
         Ok(MapValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_map_pairs(self, _: &C, _: usize) -> Result<Self::MapPairs, C::Error> {
+    fn encode_map_pairs(self, _: &C, _: usize) -> Result<Self::EncodeMapPairs, C::Error> {
         Ok(MapValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_struct(self, _: &C, _: usize) -> Result<Self::Struct, C::Error> {
+    fn encode_struct(self, _: &C, _: usize) -> Result<Self::EncodeStruct, C::Error> {
         Ok(MapValueEncoder::new(self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_variant(self, _: &C) -> Result<Self::Variant, C::Error> {
+    fn encode_variant(self, _: &C) -> Result<Self::EncodeVariant, C::Error> {
         Ok(VariantValueEncoder::new(self.output))
     }
 
@@ -302,8 +302,8 @@ where
         T: ?Sized + Encode<C::Mode>,
     {
         let mut variant = self.encode_variant(cx)?;
-        tag.encode(cx, variant.tag(cx)?)?;
-        variant.variant(cx)?.encode_unit(cx)?;
+        tag.encode(cx, variant.encode_tag(cx)?)?;
+        variant.encode_value(cx)?.encode_unit(cx)?;
         variant.end(cx)?;
         Ok(())
     }
@@ -315,7 +315,7 @@ where
         cx: &C,
         tag: &T,
         len: usize,
-    ) -> Result<Self::TupleVariant, C::Error>
+    ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -331,7 +331,7 @@ where
         cx: &C,
         tag: &T,
         len: usize,
-    ) -> Result<Self::StructVariant, C::Error>
+    ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -367,12 +367,12 @@ where
 {
     type Ok = ();
 
-    type Encoder<'this> = ValueEncoder<&'this mut Vec<Value>>
+    type EncodeNext<'this> = ValueEncoder<&'this mut Vec<Value>>
     where
         Self: 'this;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error> {
+    fn encode_next(&mut self, _: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(ValueEncoder::new(&mut self.values))
     }
 
@@ -588,20 +588,20 @@ where
     O: ValueOutput,
 {
     type Ok = ();
-    type Tag<'this> = ValueEncoder<&'this mut Value>
+    type EncodeTag<'this> = ValueEncoder<&'this mut Value>
     where
         Self: 'this;
-    type Variant<'this> = ValueEncoder<&'this mut Value>
+    type EncodeValue<'this> = ValueEncoder<&'this mut Value>
     where
         Self: 'this;
 
     #[inline]
-    fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
+    fn encode_tag(&mut self, _: &C) -> Result<Self::EncodeTag<'_>, C::Error> {
         Ok(ValueEncoder::new(&mut self.pair.0))
     }
 
     #[inline]
-    fn variant(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error> {
+    fn encode_value(&mut self, _: &C) -> Result<Self::EncodeValue<'_>, C::Error> {
         Ok(ValueEncoder::new(&mut self.pair.1))
     }
 
@@ -640,12 +640,12 @@ where
 {
     type Ok = ();
 
-    type Encoder<'this> = ValueEncoder<&'this mut Vec<Value>>
+    type EncodeNext<'this> = ValueEncoder<&'this mut Vec<Value>>
     where
         Self: 'this;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error> {
+    fn encode_next(&mut self, _: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(ValueEncoder::new(&mut self.values))
     }
 

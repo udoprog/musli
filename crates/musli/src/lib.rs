@@ -447,7 +447,6 @@ pub use self::en::{Encode, Encoder};
 /// #[musli::encoder]
 /// impl<C: ?Sized + Context> Encoder<C> for MyEncoder<'_> {
 ///     type Ok = ();
-///     type Encoder<U> = Self where U: Context;
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")

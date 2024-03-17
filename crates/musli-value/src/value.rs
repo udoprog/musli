@@ -320,7 +320,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     {
         let mut out = Vec::with_capacity(seq.size_hint(cx).or_default());
 
-        while let Some(item) = seq.next(cx)? {
+        while let Some(item) = seq.decode_next(cx)? {
             out.push(Value::decode(cx, item)?);
         }
 
@@ -535,7 +535,7 @@ impl<M> Encode<M> for Value {
                 let mut sequence = encoder.encode_sequence(cx, values.len())?;
 
                 for value in values {
-                    let next = sequence.next(cx)?;
+                    let next = sequence.encode_next(cx)?;
                     value.encode(cx, next)?;
                 }
 

@@ -206,7 +206,7 @@ macro_rules! sequence {
 
                 for value in self {
                     $cx.enter_sequence_index(index);
-                    let encoder = seq.next($cx)?;
+                    let encoder = seq.encode_next($cx)?;
                     value.encode($cx, encoder)?;
                     $cx.leave_sequence_index();
                     index = index.wrapping_add(1);
@@ -232,7 +232,7 @@ macro_rules! sequence {
 
                 let mut index = 0;
 
-                while let Some(value) = $access.next($cx)? {
+                while let Some(value) = $access.decode_next($cx)? {
                     $cx.enter_sequence_index(index);
                     out.$insert(T::decode($cx, value)?);
                     $cx.leave_sequence_index();
@@ -528,7 +528,7 @@ impl<M> Encode<M> for OsStr {
         use std::os::windows::ffi::OsStrExt;
 
         let mut variant = encoder.encode_variant(cx)?;
-        let tag = variant.tag(cx)?;
+        let tag = variant.encode_tag(cx)?;
 
         Tag::Windows.encode(cx, tag)?;
 
@@ -542,7 +542,7 @@ impl<M> Encode<M> for OsStr {
             }
         }
 
-        buf.as_slice().encode(cx, variant.variant(cx)?)?;
+        buf.as_slice().encode(cx, variant.encode_value(cx)?)?;
         variant.end(cx)
     }
 }

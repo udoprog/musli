@@ -1042,7 +1042,7 @@ fn decode_packed(
 
         assign.push(quote! {
             #member: {
-                let field_decoder = #pack_decoder_t::next(&mut unpack, #ctx_var)?;
+                let field_decoder = #pack_decoder_t::decode_next(&mut unpack, #ctx_var)?;
                 #decode_path(#ctx_var, field_decoder)?
             }
         });

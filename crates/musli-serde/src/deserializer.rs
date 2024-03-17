@@ -374,7 +374,7 @@ where
 
         self.remaining -= 1;
 
-        let decoder = self.decoder.next(self.cx)?;
+        let decoder = self.decoder.decode_next(self.cx)?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
     }
@@ -505,7 +505,7 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.next(self.cx)? else {
+        let Some(decoder) = self.decoder.decode_next(self.cx)? else {
             return Ok(None);
         };
 

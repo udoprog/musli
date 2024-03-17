@@ -18,7 +18,7 @@ macro_rules! implement {
             {
                 let mut tuple = encoder.encode_tuple(cx, $count)?;
                 $(
-                self.$field.encode(cx, tuple.next(cx)?)?;
+                self.$field.encode(cx, tuple.encode_next(cx)?)?;
                 )*
                 tuple.end(cx)
             }
@@ -54,7 +54,7 @@ macro_rules! implement_new {
                 E: Encoder<C>,
             {
                 let mut tuple = encoder.encode_tuple(cx, $count)?;
-                $(self.$field().encode(cx, tuple.next(cx)?)?;)*
+                $(self.$field().encode(cx, tuple.encode_next(cx)?)?;)*
                 tuple.end(cx)
             }
         }

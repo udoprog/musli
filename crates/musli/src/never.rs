@@ -81,21 +81,21 @@ pub struct Never<A = NeverMarker, B: ?Sized = NeverMarker> {
 }
 
 impl<'de, C: ?Sized + Context> Decoder<'de, C> for Never {
-    type Decoder<U> = Self
+    type WithContext<U> = Self
     where
         U: Context;
-    type Buffer = Self;
-    type Pack = Self;
-    type Sequence = Self;
-    type Tuple = Self;
-    type Map = Self;
-    type Some = Self;
-    type Struct = Self;
-    type Variant = Self;
+    type DecodeBuffer = Self;
+    type DecodePack = Self;
+    type DecodeSequence = Self;
+    type DecodeTuple = Self;
+    type DecodeMap = Self;
+    type DecodeSome = Self;
+    type DecodeStruct = Self;
+    type DecodeVariant = Self;
     type __UseMusliDecoderAttributeMacro = ();
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Decoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -287,7 +287,7 @@ impl<'de, C: ?Sized + Context> MapEntryDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> SequenceDecoder<'de, C> for Never {
-    type Decoder<'this> = Self;
+    type DecodeNext<'this> = Self;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -295,7 +295,7 @@ impl<'de, C: ?Sized + Context> SequenceDecoder<'de, C> for Never {
     }
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Option<Self::Decoder<'_>>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         match self._never {}
     }
 
@@ -306,10 +306,10 @@ impl<'de, C: ?Sized + Context> SequenceDecoder<'de, C> for Never {
 }
 
 impl<'de, C: ?Sized + Context> PackDecoder<'de, C> for Never {
-    type Decoder<'this> = Self;
+    type DecodeNext<'this> = Self;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
+    fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         match self._never {}
     }
 
@@ -321,21 +321,21 @@ impl<'de, C: ?Sized + Context> PackDecoder<'de, C> for Never {
 
 impl<C: ?Sized + Context, O: 'static> Encoder<C> for Never<O> {
     type Ok = O;
-    type Encoder<U> = Self where U: Context;
-    type Pack<'this> = Self where C: 'this;
-    type Some = Self;
-    type Sequence = Self;
-    type Tuple = Self;
-    type Map = Self;
-    type MapPairs = Self;
-    type Struct = Self;
-    type Variant = Self;
-    type TupleVariant = Self;
-    type StructVariant = Self;
+    type WithContext<U> = Self where U: Context;
+    type EncodePack<'this> = Self where C: 'this;
+    type EncodeSome = Self;
+    type EncodeSequence = Self;
+    type EncodeTuple = Self;
+    type EncodeMap = Self;
+    type EncodeMapPairs = Self;
+    type EncodeStruct = Self;
+    type EncodeVariant = Self;
+    type EncodeTupleVariant = Self;
+    type EncodeStructVariant = Self;
     type __UseMusliEncoderAttributeMacro = ();
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::Encoder<U>, C::Error>
+    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -370,10 +370,10 @@ where
 
 impl<O: 'static, C: ?Sized + Context> SequenceEncoder<C> for Never<O> {
     type Ok = O;
-    type Encoder<'this> = Self;
+    type EncodeNext<'this> = Self;
 
     #[inline]
-    fn next(&mut self, _: &C) -> Result<Self::Encoder<'_>, C::Error> {
+    fn encode_next(&mut self, _: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
         match self._never {}
     }
 
@@ -476,16 +476,16 @@ impl<O: 'static, C: ?Sized + Context> StructFieldEncoder<C> for Never<O> {
 
 impl<O: 'static, C: ?Sized + Context> VariantEncoder<C> for Never<O> {
     type Ok = O;
-    type Tag<'this> = Self;
-    type Variant<'this> = Self;
+    type EncodeTag<'this> = Self;
+    type EncodeValue<'this> = Self;
 
     #[inline]
-    fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
+    fn encode_tag(&mut self, _: &C) -> Result<Self::EncodeTag<'_>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn variant(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error> {
+    fn encode_value(&mut self, _: &C) -> Result<Self::EncodeValue<'_>, C::Error> {
         match self._never {}
     }
 

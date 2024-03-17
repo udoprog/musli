@@ -50,8 +50,8 @@ macro_rules! declare {
             {
                 let mut pack = encoder.encode_tuple(cx, count!($ident0 $($ident)*))?;
                 let ($ident0, $($ident),*) = self;
-                $ident0.encode(cx, pack.next(cx)?)?;
-                $($ident.encode(cx, pack.next(cx)?)?;)*
+                $ident0.encode(cx, pack.encode_next(cx)?)?;
+                $($ident.encode(cx, pack.encode_next(cx)?)?;)*
                 pack.end(cx)
             }
         }
@@ -63,10 +63,10 @@ macro_rules! declare {
                 C: ?Sized + Context<Mode = M>,
                 D: Decoder<'de, C>
             {
-                let mut unpack = decoder.decode_tuple(cx, count!($ident0 $($ident)*))?;
-                let $ident0 = unpack.next(cx).and_then(|v| <$ty0>::decode(cx, v))?;
-                $(let $ident = unpack.next(cx).and_then(|v| <$ty>::decode(cx, v))?;)*
-                unpack.end(cx)?;
+                let mut tuple = decoder.decode_tuple(cx, count!($ident0 $($ident)*))?;
+                let $ident0 = cx.decode(tuple.decode_next(cx)?)?;
+                $(let $ident = cx.decode(tuple.decode_next(cx)?)?;)*
+                tuple.end(cx)?;
                 Ok(($ident0, $($ident),*))
             }
         }
@@ -80,8 +80,8 @@ macro_rules! declare {
             {
                 let Packed(($ident0, $($ident),*)) = self;
                 let mut pack = encoder.encode_pack(cx)?;
-                $ident0.encode(cx, pack.next(cx)?)?;
-                $($ident.encode(cx, pack.next(cx)?)?;)*
+                $ident0.encode(cx, pack.encode_next(cx)?)?;
+                $($ident.encode(cx, pack.encode_next(cx)?)?;)*
                 pack.end(cx)
             }
         }
@@ -93,10 +93,10 @@ macro_rules! declare {
                 C: ?Sized + Context<Mode = M>,
                 D: Decoder<'de, C>
             {
-                let mut unpack = decoder.decode_pack(cx)?;
-                let $ident0 = unpack.next(cx).and_then(|v| <$ty0>::decode(cx, v))?;
-                $(let $ident = unpack.next(cx).and_then(|v| <$ty>::decode(cx, v))?;)*
-                unpack.end(cx)?;
+                let mut pack = decoder.decode_pack(cx)?;
+                let $ident0 = cx.decode(pack.decode_next(cx)?)?;
+                $(let $ident = cx.decode(pack.decode_next(cx)?)?;)*
+                pack.end(cx)?;
                 Ok(Packed(($ident0, $($ident),*)))
             }
         }

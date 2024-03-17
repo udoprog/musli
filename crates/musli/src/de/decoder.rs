@@ -19,13 +19,13 @@ pub trait AsDecoder<C: ?Sized + Context> {
 /// A pack that can construct decoders.
 pub trait PackDecoder<'de, C: ?Sized + Context> {
     /// The encoder to use for the pack.
-    type Decoder<'this>: Decoder<'de, C>
+    type DecodeNext<'this>: Decoder<'de, C>
     where
         Self: 'this;
 
     /// Return decoder to unpack the next element.
     #[must_use = "decoders must be consumed"]
-    fn next(&mut self, cx: &C) -> Result<Self::Decoder<'_>, C::Error>;
+    fn decode_next(&mut self, cx: &C) -> Result<Self::DecodeNext<'_>, C::Error>;
 
     /// Stop decoding the current pack.
     ///
@@ -36,7 +36,7 @@ pub trait PackDecoder<'de, C: ?Sized + Context> {
 /// Trait governing how to decode a sequence.
 pub trait SequenceDecoder<'de, C: ?Sized + Context> {
     /// The decoder for individual items.
-    type Decoder<'this>: Decoder<'de, C>
+    type DecodeNext<'this>: Decoder<'de, C>
     where
         Self: 'this;
 
@@ -45,7 +45,7 @@ pub trait SequenceDecoder<'de, C: ?Sized + Context> {
 
     /// Decode the next element.
     #[must_use = "decoders must be consumed"]
-    fn next(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>;
+    fn decode_next(&mut self, cx: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error>;
 
     /// Stop decoding the current sequence.
     ///
@@ -304,25 +304,25 @@ pub trait VariantDecoder<'de, C: ?Sized + Context> {
 /// Trait governing the implementation of a decoder.
 pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Constructed [`Decoder`] with a different context.
-    type Decoder<U>: Decoder<'de, U>
+    type WithContext<U>: Decoder<'de, U>
     where
         U: Context;
     /// The type returned when the decoder is buffered.
-    type Buffer: AsDecoder<C>;
+    type DecodeBuffer: AsDecoder<C>;
     /// Decoder for a value that is present.
-    type Some: Decoder<'de, C>;
+    type DecodeSome: Decoder<'de, C>;
     /// Pack decoder implementation.
-    type Pack: PackDecoder<'de, C>;
+    type DecodePack: PackDecoder<'de, C>;
     /// Sequence decoder implementation.
-    type Sequence: SequenceDecoder<'de, C>;
+    type DecodeSequence: SequenceDecoder<'de, C>;
     /// Tuple decoder implementation.
-    type Tuple: PackDecoder<'de, C>;
+    type DecodeTuple: PackDecoder<'de, C>;
     /// Decoder for a map.
-    type Map: MapDecoder<'de, C>;
+    type DecodeMap: MapDecoder<'de, C>;
     /// Decoder for a struct.
-    type Struct: StructDecoder<'de, C>;
+    type DecodeStruct: StructDecoder<'de, C>;
     /// Decoder for a variant.
-    type Variant: VariantDecoder<'de, C>;
+    type DecodeVariant: VariantDecoder<'de, C>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::decoder]`][crate::decoder] attribute
@@ -331,7 +331,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     type __UseMusliDecoderAttributeMacro;
 
     /// Construct an decoder with a different context.
-    fn with_context<U>(self, cx: &C) -> Result<Self::Decoder<U>, C::Error>
+    fn with_context<U>(self, cx: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -449,7 +449,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_buffer(self, cx: &C) -> Result<Self::Buffer, C::Error> {
+    fn decode_buffer(self, cx: &C) -> Result<Self::DecodeBuffer, C::Error> {
         Err(cx.message(format_args!(
             "buffering not supported, expected {}",
             ExpectingWrapper::new(self).format()
@@ -1172,7 +1172,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// ```
     #[inline]
     #[must_use = "decoders must be consumed"]
-    fn decode_option(self, cx: &C) -> Result<Option<Self::Some>, C::Error> {
+    fn decode_option(self, cx: &C) -> Result<Option<Self::DecodeSome>, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             &ExpectingWrapper::new(self),
@@ -1215,7 +1215,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_pack(self, cx: &C) -> Result<Self::Pack, C::Error> {
+    fn decode_pack(self, cx: &C) -> Result<Self::DecodePack, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Pack,
             &ExpectingWrapper::new(self),
@@ -1256,7 +1256,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_sequence(self, cx: &C) -> Result<Self::Sequence, C::Error> {
+    fn decode_sequence(self, cx: &C) -> Result<Self::DecodeSequence, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Sequence,
             &ExpectingWrapper::new(self),
@@ -1290,7 +1290,11 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_tuple(self, cx: &C, #[allow(unused)] len: usize) -> Result<Self::Tuple, C::Error> {
+    fn decode_tuple(
+        self,
+        cx: &C,
+        #[allow(unused)] len: usize,
+    ) -> Result<Self::DecodeTuple, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Tuple,
             &ExpectingWrapper::new(self),
@@ -1338,7 +1342,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_map(self, cx: &C) -> Result<Self::Map, C::Error> {
+    fn decode_map(self, cx: &C) -> Result<Self::DecodeMap, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Map,
             &ExpectingWrapper::new(self),
@@ -1403,7 +1407,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::Struct, C::Error> {
+    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Struct,
             &ExpectingWrapper::new(self),
@@ -1450,7 +1454,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_variant(self, cx: &C) -> Result<Self::Variant, C::Error> {
+    fn decode_variant(self, cx: &C) -> Result<Self::DecodeVariant, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
             &ExpectingWrapper::new(self),
