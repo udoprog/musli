@@ -336,9 +336,9 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     {
         let mut out = Vec::with_capacity(map.size_hint(cx).or_default());
 
-        while let Some(mut entry) = map.entry(cx)? {
-            let first = Value::decode(cx, entry.map_key(cx)?)?;
-            let second = Value::decode(cx, entry.map_value(cx)?)?;
+        while let Some(mut entry) = map.decode_entry(cx)? {
+            let first = Value::decode(cx, entry.decode_map_key(cx)?)?;
+            let second = Value::decode(cx, entry.decode_map_value(cx)?)?;
             out.push((first, second));
         }
 
@@ -370,8 +370,8 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     where
         D: VariantDecoder<'de, C>,
     {
-        let first = cx.decode(variant.tag(cx)?)?;
-        let second = cx.decode(variant.variant(cx)?)?;
+        let first = cx.decode(variant.decode_tag(cx)?)?;
+        let second = cx.decode(variant.decode_value(cx)?)?;
         variant.end(cx)?;
         Ok(Value::Variant(Box::new((first, second))))
     }

@@ -4,8 +4,8 @@ use core::slice;
 #[cfg(feature = "alloc")]
 use musli::de::ValueVisitor;
 use musli::de::{
-    AsDecoder, Decoder, MapDecoder, MapEntryDecoder, MapPairsDecoder, NumberHint, PackDecoder,
-    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructPairsDecoder, TypeHint,
+    AsDecoder, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint, PackDecoder,
+    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, TypeHint,
     VariantDecoder, Visitor,
 };
 use musli::Context;
@@ -414,10 +414,10 @@ impl<'de, const F: Options> IterValuePairsDecoder<'de, F> {
 impl<'de, C: ?Sized + Context, const F: Options> MapDecoder<'de, C>
     for IterValuePairsDecoder<'de, F>
 {
-    type Entry<'this> = IterValuePairDecoder<'de, F>
+    type DecodeEntry<'this> = IterValuePairDecoder<'de, F>
     where
         Self: 'this;
-    type MapPairs = Self;
+    type IntoMapEntries = Self;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -425,12 +425,12 @@ impl<'de, C: ?Sized + Context, const F: Options> MapDecoder<'de, C>
     }
 
     #[inline]
-    fn into_map_pairs(self, _: &C) -> Result<Self::MapPairs, C::Error> {
+    fn into_map_entries(self, _: &C) -> Result<Self::IntoMapEntries, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn entry(&mut self, _: &C) -> Result<Option<Self::Entry<'_>>, C::Error> {
+    fn decode_entry(&mut self, _: &C) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
         Ok(self.iter.next().map(IterValuePairDecoder::new))
     }
 
@@ -440,17 +440,20 @@ impl<'de, C: ?Sized + Context, const F: Options> MapDecoder<'de, C>
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> MapPairsDecoder<'de, C>
+impl<'de, C: ?Sized + Context, const F: Options> MapEntriesDecoder<'de, C>
     for IterValuePairsDecoder<'de, F>
 {
-    type MapPairsKey<'this> = ValueDecoder<'de, F>
+    type DecodeMapEntryKey<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
 
-    type MapPairsValue<'this> = ValueDecoder<'de, F> where Self: 'this;
+    type DecodeMapEntryValue<'this> = ValueDecoder<'de, F> where Self: 'this;
 
     #[inline]
-    fn map_pairs_key(&mut self, _: &C) -> Result<Option<Self::MapPairsKey<'_>>, C::Error> {
+    fn decode_map_entry_key(
+        &mut self,
+        _: &C,
+    ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
         let Some((name, _)) = self.iter.clone().next() else {
             return Ok(None);
         };
@@ -459,7 +462,10 @@ impl<'de, C: ?Sized + Context, const F: Options> MapPairsDecoder<'de, C>
     }
 
     #[inline]
-    fn map_pairs_value(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error> {
+    fn decode_map_entry_value(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
             return Err(cx.custom(ErrorMessage::ExpectedMapValue));
         };
@@ -468,7 +474,7 @@ impl<'de, C: ?Sized + Context, const F: Options> MapPairsDecoder<'de, C>
     }
 
     #[inline]
-    fn skip_map_pairs_value(&mut self, _: &C) -> Result<bool, C::Error> {
+    fn skip_map_entry_value(&mut self, _: &C) -> Result<bool, C::Error> {
         Ok(true)
     }
 
@@ -481,19 +487,19 @@ impl<'de, C: ?Sized + Context, const F: Options> MapPairsDecoder<'de, C>
 impl<'de, C: ?Sized + Context, const F: Options> MapEntryDecoder<'de, C>
     for IterValuePairDecoder<'de, F>
 {
-    type MapKey<'this> = ValueDecoder<'de, F>
+    type DecodeMapKey<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
 
-    type MapValue = ValueDecoder<'de, F>;
+    type DecodeMapValue = ValueDecoder<'de, F>;
 
     #[inline]
-    fn map_key(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error> {
+    fn decode_map_key(&mut self, _: &C) -> Result<Self::DecodeMapKey<'_>, C::Error> {
         Ok(ValueDecoder::new(&self.pair.0))
     }
 
     #[inline]
-    fn map_value(self, _: &C) -> Result<Self::MapValue, C::Error> {
+    fn decode_map_value(self, _: &C) -> Result<Self::DecodeMapValue, C::Error> {
         Ok(ValueDecoder::new(&self.pair.1))
     }
 
@@ -507,10 +513,10 @@ impl<'de, C: ?Sized + Context, const F: Options> MapEntryDecoder<'de, C>
 impl<'de, C: ?Sized + Context, const F: Options> StructDecoder<'de, C>
     for IterValuePairsDecoder<'de, F>
 {
-    type Field<'this> = IterValuePairDecoder<'de, F>
+    type DecodeField<'this> = IterValuePairDecoder<'de, F>
     where
         Self: 'this;
-    type StructPairs = Self;
+    type IntoStructFields = Self;
 
     #[inline]
     fn size_hint(&self, cx: &C) -> SizeHint {
@@ -518,13 +524,13 @@ impl<'de, C: ?Sized + Context, const F: Options> StructDecoder<'de, C>
     }
 
     #[inline]
-    fn into_struct_pairs(self, _: &C) -> Result<Self::StructPairs, C::Error> {
+    fn into_struct_fields(self, _: &C) -> Result<Self::IntoStructFields, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn field(&mut self, cx: &C) -> Result<Option<Self::Field<'_>>, C::Error> {
-        MapDecoder::entry(self, cx)
+    fn decode_field(&mut self, cx: &C) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
+        MapDecoder::decode_entry(self, cx)
     }
 
     #[inline]
@@ -533,17 +539,20 @@ impl<'de, C: ?Sized + Context, const F: Options> StructDecoder<'de, C>
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> StructPairsDecoder<'de, C>
+impl<'de, C: ?Sized + Context, const F: Options> StructFieldsDecoder<'de, C>
     for IterValuePairsDecoder<'de, F>
 {
-    type FieldName<'this> = ValueDecoder<'de, F>
+    type DecodeStructFieldName<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
 
-    type FieldValue<'this> = ValueDecoder<'de, F> where Self: 'this;
+    type DecodeStructFieldValue<'this> = ValueDecoder<'de, F> where Self: 'this;
 
     #[inline]
-    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
+    fn decode_struct_field_name(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
         let Some((name, _)) = self.iter.clone().next() else {
             return Err(cx.custom(ErrorMessage::ExpectedFieldName));
         };
@@ -552,7 +561,10 @@ impl<'de, C: ?Sized + Context, const F: Options> StructPairsDecoder<'de, C>
     }
 
     #[inline]
-    fn field_value(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error> {
+    fn decode_struct_field_value(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
             return Err(cx.custom(ErrorMessage::ExpectedFieldValue));
         };
@@ -561,7 +573,7 @@ impl<'de, C: ?Sized + Context, const F: Options> StructPairsDecoder<'de, C>
     }
 
     #[inline]
-    fn skip_field_value(&mut self, _: &C) -> Result<bool, C::Error> {
+    fn skip_struct_field_value(&mut self, _: &C) -> Result<bool, C::Error> {
         Ok(self.iter.next().is_some())
     }
 
@@ -574,20 +586,20 @@ impl<'de, C: ?Sized + Context, const F: Options> StructPairsDecoder<'de, C>
 impl<'de, C: ?Sized + Context, const F: Options> StructFieldDecoder<'de, C>
     for IterValuePairDecoder<'de, F>
 {
-    type FieldName<'this> = ValueDecoder<'de, F>
+    type DecodeFieldName<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
 
-    type FieldValue = ValueDecoder<'de, F>;
+    type DecodeFieldValue = ValueDecoder<'de, F>;
 
     #[inline]
-    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
-        MapEntryDecoder::map_key(self, cx)
+    fn decode_field_name(&mut self, cx: &C) -> Result<Self::DecodeFieldName<'_>, C::Error> {
+        MapEntryDecoder::decode_map_key(self, cx)
     }
 
     #[inline]
-    fn field_value(self, cx: &C) -> Result<Self::FieldValue, C::Error> {
-        MapEntryDecoder::map_value(self, cx)
+    fn decode_field_value(self, cx: &C) -> Result<Self::DecodeFieldValue, C::Error> {
+        MapEntryDecoder::decode_map_value(self, cx)
     }
 
     #[inline]
@@ -624,26 +636,26 @@ impl<'de, const F: Options> IterValueVariantDecoder<'de, F> {
 impl<'de, C: ?Sized + Context, const F: Options> VariantDecoder<'de, C>
     for IterValueVariantDecoder<'de, F>
 {
-    type Tag<'this> = ValueDecoder<'de, F>
+    type DecodeTag<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
 
-    type Variant<'this> = ValueDecoder<'de, F>
+    type DecodeVariant<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
 
     #[inline]
-    fn tag(&mut self, _: &C) -> Result<Self::Tag<'_>, C::Error> {
+    fn decode_tag(&mut self, _: &C) -> Result<Self::DecodeTag<'_>, C::Error> {
         Ok(ValueDecoder::new(&self.pair.0))
     }
 
     #[inline]
-    fn variant(&mut self, _: &C) -> Result<Self::Variant<'_>, C::Error> {
+    fn decode_value(&mut self, _: &C) -> Result<Self::DecodeVariant<'_>, C::Error> {
         Ok(ValueDecoder::new(&self.pair.1))
     }
 
     #[inline]
-    fn skip_variant(&mut self, _: &C) -> Result<bool, C::Error> {
+    fn skip_value(&mut self, _: &C) -> Result<bool, C::Error> {
         Ok(true)
     }
 

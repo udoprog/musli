@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use musli::en::Encoder;
 #[cfg(feature = "alloc")]
 use musli::en::{
-    Encode, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    Encode, MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder,
     StructFieldEncoder, VariantEncoder,
 };
 use musli::Context;
@@ -80,7 +80,7 @@ where
     #[cfg(feature = "alloc")]
     type EncodeMap = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
-    type EncodeMapPairs = MapValueEncoder<O>;
+    type EncodeMapEntries = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
     type EncodeStruct = MapValueEncoder<O>;
     #[cfg(feature = "alloc")]
@@ -279,7 +279,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_map_pairs(self, _: &C, _: usize) -> Result<Self::EncodeMapPairs, C::Error> {
+    fn encode_map_entries(self, _: &C, _: usize) -> Result<Self::EncodeMapEntries, C::Error> {
         Ok(MapValueEncoder::new(self.output))
     }
 
@@ -408,12 +408,12 @@ where
     O: ValueOutput,
 {
     type Ok = ();
-    type Entry<'this> = PairValueEncoder<'this>
+    type EncodeEntry<'this> = PairValueEncoder<'this>
     where
         Self: 'this;
 
     #[inline]
-    fn entry(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error> {
+    fn encode_entry(&mut self, _: &C) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(PairValueEncoder::new(&mut self.values))
     }
 
@@ -425,21 +425,21 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<C, O> MapPairsEncoder<C> for MapValueEncoder<O>
+impl<C, O> MapEntriesEncoder<C> for MapValueEncoder<O>
 where
     C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();
-    type MapPairsKey<'this> = ValueEncoder<&'this mut Value>
+    type EncodeMapEntryKey<'this> = ValueEncoder<&'this mut Value>
     where
         Self: 'this;
-    type MapPairsValue<'this> = ValueEncoder<&'this mut Value>
+    type EncodeMapEntryValue<'this> = ValueEncoder<&'this mut Value>
     where
         Self: 'this;
 
     #[inline]
-    fn map_pairs_key(&mut self, cx: &C) -> Result<Self::MapPairsKey<'_>, C::Error> {
+    fn encode_map_entry_key(&mut self, cx: &C) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
         self.values.push((Value::Unit, Value::Unit));
 
         let Some((key, _)) = self.values.last_mut() else {
@@ -450,7 +450,10 @@ where
     }
 
     #[inline]
-    fn map_pairs_value(&mut self, cx: &C) -> Result<Self::MapPairsValue<'_>, C::Error> {
+    fn encode_map_entry_value(
+        &mut self,
+        cx: &C,
+    ) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
         let Some((_, value)) = self.values.last_mut() else {
             return Err(cx.message("Pair has not been encoded"));
         };
@@ -473,12 +476,12 @@ where
 {
     type Ok = ();
 
-    type Field<'this> = PairValueEncoder<'this>
+    type EncodeField<'this> = PairValueEncoder<'this>
     where
         Self: 'this;
 
     #[inline]
-    fn field(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error> {
+    fn encode_field(&mut self, _: &C) -> Result<Self::EncodeField<'_>, C::Error> {
         Ok(PairValueEncoder::new(&mut self.values))
     }
 
@@ -513,18 +516,18 @@ where
     C: ?Sized + Context,
 {
     type Ok = ();
-    type MapKey<'this> = ValueEncoder<&'this mut Value>
+    type EncodeMapKey<'this> = ValueEncoder<&'this mut Value>
     where
         Self: 'this;
-    type MapValue<'this> = ValueEncoder<&'this mut Value> where Self: 'this;
+    type EncodeMapValue<'this> = ValueEncoder<&'this mut Value> where Self: 'this;
 
     #[inline]
-    fn map_key(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error> {
+    fn encode_map_key(&mut self, _: &C) -> Result<Self::EncodeMapKey<'_>, C::Error> {
         Ok(ValueEncoder::new(&mut self.pair.0))
     }
 
     #[inline]
-    fn map_value(&mut self, _: &C) -> Result<Self::MapValue<'_>, C::Error> {
+    fn encode_map_value(&mut self, _: &C) -> Result<Self::EncodeMapValue<'_>, C::Error> {
         Ok(ValueEncoder::new(&mut self.pair.1))
     }
 
@@ -541,18 +544,18 @@ where
     C: ?Sized + Context,
 {
     type Ok = ();
-    type FieldName<'this> = ValueEncoder<&'this mut Value>
+    type EncodeFieldName<'this> = ValueEncoder<&'this mut Value>
     where
         Self: 'this;
-    type FieldValue<'this> = ValueEncoder<&'this mut Value> where Self: 'this;
+    type EncodeFieldValue<'this> = ValueEncoder<&'this mut Value> where Self: 'this;
 
     #[inline]
-    fn field_name(&mut self, _: &C) -> Result<Self::FieldName<'_>, C::Error> {
+    fn encode_field_name(&mut self, _: &C) -> Result<Self::EncodeFieldName<'_>, C::Error> {
         Ok(ValueEncoder::new(&mut self.pair.0))
     }
 
     #[inline]
-    fn field_value(&mut self, _: &C) -> Result<Self::FieldValue<'_>, C::Error> {
+    fn encode_field_value(&mut self, _: &C) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
         Ok(ValueEncoder::new(&mut self.pair.1))
     }
 
@@ -687,12 +690,12 @@ where
 {
     type Ok = ();
 
-    type Field<'this> = PairValueEncoder<'this>
+    type EncodeField<'this> = PairValueEncoder<'this>
     where
         Self: 'this;
 
     #[inline]
-    fn field(&mut self, _: &C) -> Result<Self::Field<'_>, C::Error> {
+    fn encode_field(&mut self, _: &C) -> Result<Self::EncodeField<'_>, C::Error> {
         Ok(PairValueEncoder::new(&mut self.fields))
     }
 

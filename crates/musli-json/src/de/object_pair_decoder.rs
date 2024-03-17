@@ -21,18 +21,18 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type MapKey<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type DecodeMapKey<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
-    type MapValue = JsonDecoder<P>;
+    type DecodeMapValue = JsonDecoder<P>;
 
     #[inline]
-    fn map_key(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error> {
+    fn decode_map_key(&mut self, _: &C) -> Result<Self::DecodeMapKey<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn map_value(mut self, cx: &C) -> Result<Self::MapValue, C::Error> {
+    fn decode_map_value(mut self, cx: &C) -> Result<Self::DecodeMapValue, C::Error> {
         let actual = self.parser.peek(cx)?;
 
         if !matches!(actual, Token::Colon) {
@@ -62,19 +62,19 @@ where
     C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type FieldName<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type DecodeFieldName<'this> = JsonKeyDecoder<P::Mut<'this>>
     where
         Self: 'this;
-    type FieldValue = JsonDecoder<P>;
+    type DecodeFieldValue = JsonDecoder<P>;
 
     #[inline]
-    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
-        MapEntryDecoder::map_key(self, cx)
+    fn decode_field_name(&mut self, cx: &C) -> Result<Self::DecodeFieldName<'_>, C::Error> {
+        MapEntryDecoder::decode_map_key(self, cx)
     }
 
     #[inline]
-    fn field_value(self, cx: &C) -> Result<Self::FieldValue, C::Error> {
-        MapEntryDecoder::map_value(self, cx)
+    fn decode_field_value(self, cx: &C) -> Result<Self::DecodeFieldValue, C::Error> {
+        MapEntryDecoder::decode_map_value(self, cx)
     }
 
     #[inline]

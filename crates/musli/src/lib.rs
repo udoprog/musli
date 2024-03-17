@@ -136,7 +136,7 @@
 //!         let mut seq = decoder.decode_sequence(cx)?;
 //!         let mut data = Vec::with_capacity(seq.size_hint(cx).or_default());
 //!
-//!         while let Some(decoder) = seq.next(cx)? {
+//!         while let Some(decoder) = seq.decode_next(cx)? {
 //!             data.push(cx.decode(decoder)?);
 //!         }
 //!

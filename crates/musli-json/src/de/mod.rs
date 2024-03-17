@@ -71,8 +71,8 @@ where
             Token::OpenBrace => {
                 let mut object = JsonObjectDecoder::new(cx, None, self.parser)?;
 
-                while let Some(mut pair) = object.entry(cx)? {
-                    pair.map_key(cx)?.skip_any(cx)?;
+                while let Some(mut pair) = object.decode_entry(cx)? {
+                    pair.decode_map_key(cx)?.skip_any(cx)?;
                     pair.skip_map_value(cx)?;
                 }
 

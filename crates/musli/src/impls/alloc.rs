@@ -298,9 +298,9 @@ macro_rules! map {
                 let mut map = encoder.encode_map($cx, self.len())?;
 
                 for (k, v) in self {
-                    let mut entry = map.entry($cx)?;
-                    k.encode($cx, entry.map_key($cx)?)?;
-                    v.encode($cx, entry.map_value($cx)?)?;
+                    let mut entry = map.encode_entry($cx)?;
+                    k.encode($cx, entry.encode_map_key($cx)?)?;
+                    v.encode($cx, entry.encode_map_value($cx)?)?;
                     entry.end($cx)?;
                 }
 
@@ -324,9 +324,9 @@ macro_rules! map {
 
                 for (k, v) in self {
                     $cx.enter_map_key(k);
-                    let mut entry = map.entry($cx)?;
-                    k.encode($cx, entry.map_key($cx)?)?;
-                    v.encode($cx, entry.map_value($cx)?)?;
+                    let mut entry = map.encode_entry($cx)?;
+                    k.encode($cx, entry.encode_map_key($cx)?)?;
+                    v.encode($cx, entry.encode_map_value($cx)?)?;
                     entry.end($cx)?;
                     $cx.leave_map_key();
                 }
@@ -350,9 +350,9 @@ macro_rules! map {
                 let mut $access = decoder.decode_map($cx)?;
                 let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.entry($cx)? {
-                    let key = entry.map_key($cx).and_then(|key| $cx.decode(key))?;
-                    let value = entry.map_value($cx).and_then(|value| $cx.decode(value))?;
+                while let Some(mut entry) = $access.decode_entry($cx)? {
+                    let key = $cx.decode(entry.decode_map_key($cx)?)?;
+                    let value = $cx.decode(entry.decode_map_value($cx)?)?;
                     out.insert(key, value);
                 }
 
@@ -376,10 +376,10 @@ macro_rules! map {
                 let mut $access = decoder.decode_map($cx)?;
                 let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.entry($cx)? {
-                    let key = entry.map_key($cx).and_then(|key| $cx.decode(key))?;
+                while let Some(mut entry) = $access.decode_entry($cx)? {
+                    let key = $cx.decode(entry.decode_map_key($cx)?)?;
                     $cx.enter_map_key(&key);
-                    let value = entry.map_value($cx).and_then(|value| $cx.decode(value))?;
+                    let value = $cx.decode(entry.decode_map_value($cx)?)?;
                     out.insert(key, value);
                     $cx.leave_map_key();
                 }
@@ -571,7 +571,7 @@ impl<'de, M> Decode<'de, M> for OsString {
 
         let mut variant = decoder.decode_variant(cx)?;
 
-        let tag = variant.tag(cx)?;
+        let tag = variant.decode_tag(cx)?;
         let tag = cx.decode(tag)?;
 
         match tag {
@@ -619,7 +619,7 @@ impl<'de, M> Decode<'de, M> for OsString {
                     }
                 }
 
-                let value = variant.variant(cx)?;
+                let value = variant.decode_value(cx)?;
                 let os_string = value.decode_bytes(cx, Visitor)?;
                 variant.end(cx)?;
                 Ok(os_string)

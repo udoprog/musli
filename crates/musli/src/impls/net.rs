@@ -80,11 +80,11 @@ impl<'de, M> Decode<'de, M> for IpAddr {
     {
         let mut variant = decoder.decode_variant(cx)?;
 
-        let tag: IpAddrTag = variant.tag(cx).and_then(|v| cx.decode(v))?;
+        let tag: IpAddrTag = variant.decode_tag(cx).and_then(|v| cx.decode(v))?;
 
         let this = match tag {
-            IpAddrTag::Ipv4 => Self::V4(cx.decode(variant.variant(cx)?)?),
-            IpAddrTag::Ipv6 => Self::V6(cx.decode(variant.variant(cx)?)?),
+            IpAddrTag::Ipv4 => Self::V4(cx.decode(variant.decode_value(cx)?)?),
+            IpAddrTag::Ipv6 => Self::V6(cx.decode(variant.decode_value(cx)?)?),
         };
 
         variant.end(cx)?;
@@ -186,11 +186,11 @@ impl<'de, M> Decode<'de, M> for SocketAddr {
     {
         let mut variant = decoder.decode_variant(cx)?;
 
-        let tag: SocketAddrTag = cx.decode(variant.tag(cx)?)?;
+        let tag: SocketAddrTag = cx.decode(variant.decode_tag(cx)?)?;
 
         let this = match tag {
-            SocketAddrTag::V4 => Self::V4(cx.decode(variant.variant(cx)?)?),
-            SocketAddrTag::V6 => Self::V6(cx.decode(variant.variant(cx)?)?),
+            SocketAddrTag::V4 => Self::V4(cx.decode(variant.decode_value(cx)?)?),
+            SocketAddrTag::V6 => Self::V6(cx.decode(variant.decode_value(cx)?)?),
         };
 
         variant.end(cx)?;

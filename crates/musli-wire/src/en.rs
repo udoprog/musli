@@ -1,8 +1,8 @@
 use core::fmt;
 
 use musli::en::{
-    Encode, Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
-    StructFieldEncoder, VariantEncoder,
+    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder,
+    StructEncoder, StructFieldEncoder, VariantEncoder,
 };
 use musli::{Buf, Context};
 use musli_storage::en::StorageEncoder;
@@ -90,7 +90,7 @@ where
     type EncodeSequence = Self;
     type EncodeTuple = Self;
     type EncodeMap = Self;
-    type EncodeMapPairs = Self;
+    type EncodeMapEntries = Self;
     type EncodeStruct = Self;
     type EncodeVariant = Self;
     type EncodeTupleVariant = Self;
@@ -276,7 +276,7 @@ where
     }
 
     #[inline]
-    fn encode_map_pairs(self, cx: &C, len: usize) -> Result<Self::EncodeMapPairs, C::Error> {
+    fn encode_map_entries(self, cx: &C, len: usize) -> Result<Self::EncodeMapEntries, C::Error> {
         self.encode_map(cx, len)
     }
 
@@ -412,10 +412,10 @@ where
     W: Writer,
 {
     type Ok = ();
-    type Entry<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeEntry<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn entry(&mut self, _: &C) -> Result<Self::Entry<'_>, C::Error> {
+    fn encode_entry(&mut self, _: &C) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
@@ -425,22 +425,22 @@ where
     }
 }
 
-impl<C, W, const F: Options> MapPairsEncoder<C> for WireEncoder<W, F>
+impl<C, W, const F: Options> MapEntriesEncoder<C> for WireEncoder<W, F>
 where
     C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
-    type MapPairsKey<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
-    type MapPairsValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapEntryKey<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapEntryValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn map_pairs_key(&mut self, _: &C) -> Result<Self::MapPairsKey<'_>, C::Error> {
+    fn encode_map_entry_key(&mut self, _: &C) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn map_pairs_value(&mut self, _: &C) -> Result<Self::MapPairsValue<'_>, C::Error> {
+    fn encode_map_entry_value(&mut self, _: &C) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
@@ -456,16 +456,16 @@ where
     W: Writer,
 {
     type Ok = ();
-    type MapKey<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
-    type MapValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapKey<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn map_key(&mut self, _: &C) -> Result<Self::MapKey<'_>, C::Error> {
+    fn encode_map_key(&mut self, _: &C) -> Result<Self::EncodeMapKey<'_>, C::Error> {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn map_value(&mut self, _: &C) -> Result<Self::MapValue<'_>, C::Error> {
+    fn encode_map_value(&mut self, _: &C) -> Result<Self::EncodeMapValue<'_>, C::Error> {
         Ok(WireEncoder::new(self.writer.borrow_mut()))
     }
 
@@ -481,11 +481,11 @@ where
     W: Writer,
 {
     type Ok = ();
-    type Field<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeField<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn field(&mut self, cx: &C) -> Result<Self::Field<'_>, C::Error> {
-        MapEncoder::entry(self, cx)
+    fn encode_field(&mut self, cx: &C) -> Result<Self::EncodeField<'_>, C::Error> {
+        MapEncoder::encode_entry(self, cx)
     }
 
     #[inline]
@@ -500,22 +500,22 @@ where
     W: Writer,
 {
     type Ok = ();
-    type FieldName<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
-    type FieldValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeFieldName<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeFieldValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
 
     #[inline]
-    fn field_name(&mut self, cx: &C) -> Result<Self::FieldName<'_>, C::Error> {
-        self.map_key(cx)
+    fn encode_field_name(&mut self, cx: &C) -> Result<Self::EncodeFieldName<'_>, C::Error> {
+        MapEntryEncoder::encode_map_key(self, cx)
     }
 
     #[inline]
-    fn field_value(&mut self, cx: &C) -> Result<Self::FieldValue<'_>, C::Error> {
-        self.map_value(cx)
+    fn encode_field_value(&mut self, cx: &C) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
+        MapEntryEncoder::encode_map_value(self, cx)
     }
 
     #[inline]
-    fn end(self, _: &C) -> Result<Self::Ok, C::Error> {
-        Ok(())
+    fn end(self, cx: &C) -> Result<Self::Ok, C::Error> {
+        MapEntryEncoder::end(self, cx)
     }
 }
 

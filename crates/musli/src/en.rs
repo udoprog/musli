@@ -21,6 +21,6 @@ mod encoder;
 
 pub use self::encode::{Encode, TraceEncode};
 pub use self::encoder::{
-    Encoder, MapEncoder, MapEntryEncoder, MapPairsEncoder, SequenceEncoder, StructEncoder,
+    Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder,
     StructFieldEncoder, VariantEncoder,
 };
