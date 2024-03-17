@@ -34,6 +34,7 @@ pub mod fixed_bytes;
 pub mod int;
 #[macro_use]
 pub mod options;
+mod buf;
 pub mod reader;
 pub mod str;
 pub mod wrap;

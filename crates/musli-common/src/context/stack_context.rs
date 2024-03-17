@@ -5,7 +5,8 @@ use core::ops::Range;
 
 use musli::{Allocator, Context};
 
-use crate::fixed::{FixedString, FixedVec};
+use crate::buf::BufString;
+use crate::fixed::FixedVec;
 
 use super::access::{Access, Shared};
 use super::rich_error::{RichError, Step};
@@ -20,33 +21,42 @@ use super::ErrorMarker;
 ///   indicator is used instead.
 /// * The `S` parameter indicates the maximum size in bytes (UTF-8) of a stored
 ///   map key.
-pub struct NoStdContext<const P: usize, const S: usize, A, M> {
+pub struct StackContext<'a, const P: usize, A: ?Sized, M>
+where
+    A: Allocator,
+{
     access: Access,
     mark: Cell<usize>,
-    alloc: A,
-    error: UnsafeCell<Option<(Range<usize>, FixedString<S>)>>,
-    path: UnsafeCell<FixedVec<Step<FixedString<S>>, P>>,
+    alloc: &'a A,
+    error: UnsafeCell<Option<(Range<usize>, BufString<A::Buf<'a>>)>>,
+    path: UnsafeCell<FixedVec<Step<BufString<A::Buf<'a>>>, P>>,
     path_cap: Cell<usize>,
     include_type: bool,
     _marker: PhantomData<M>,
 }
 
-impl<A, M> NoStdContext<16, 32, A, M> {
+impl<'a, A: ?Sized, M> StackContext<'a, 16, A, M>
+where
+    A: Allocator,
+{
     /// Construct a new context which uses allocations to a fixed number of
     /// diagnostics.
     ///
     /// This uses the default values of:
     /// * 16 path elements stored.
     /// * A maximum map key of 32 bytes (UTF-8).
-    pub fn new(alloc: A) -> Self {
+    pub fn new(alloc: &'a A) -> Self {
         Self::new_with(alloc)
     }
 }
 
-impl<const P: usize, const S: usize, A, M> NoStdContext<P, S, A, M> {
+impl<'a, const P: usize, A: ?Sized, M> StackContext<'a, P, A, M>
+where
+    A: Allocator,
+{
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
-    pub fn new_with(alloc: A) -> Self {
+    pub fn new_with(alloc: &'a A) -> Self {
         Self {
             access: Access::new(),
             mark: Cell::new(0),
@@ -67,7 +77,7 @@ impl<const P: usize, const S: usize, A, M> NoStdContext<P, S, A, M> {
     }
 
     /// Iterate over all collected errors.
-    pub fn errors(&self) -> Errors<'_, S> {
+    pub fn errors(&self) -> Errors<'_, impl fmt::Display + 'a> {
         let access = self.access.shared();
 
         Errors {
@@ -79,7 +89,7 @@ impl<const P: usize, const S: usize, A, M> NoStdContext<P, S, A, M> {
     }
 
     /// Push an error into the collection.
-    fn push_error(&self, range: Range<usize>, error: FixedString<S>) {
+    fn push_error(&self, range: Range<usize>, error: BufString<A::Buf<'a>>) {
         // SAFETY: We've restricted access to the context, so this is safe.
         unsafe {
             self.error.get().replace(Some((range, error)));
@@ -87,7 +97,7 @@ impl<const P: usize, const S: usize, A, M> NoStdContext<P, S, A, M> {
     }
 
     /// Push a path.
-    fn push_path(&self, step: Step<FixedString<S>>) {
+    fn push_path(&self, step: Step<BufString<A::Buf<'a>>>) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
@@ -114,9 +124,22 @@ impl<const P: usize, const S: usize, A, M> NoStdContext<P, S, A, M> {
             (*self.path.get()).pop();
         }
     }
+
+    fn format_string<T>(&self, value: T) -> Option<BufString<A::Buf<'a>>>
+    where
+        T: fmt::Display,
+    {
+        let Some(buf) = self.alloc.alloc() else {
+            return None;
+        };
+
+        let mut string = BufString::new(buf);
+        _ = write!(string, "{}", value);
+        Some(string)
+    }
 }
 
-impl<const V: usize, const S: usize, A, M> Context for NoStdContext<V, S, A, M>
+impl<'a, const V: usize, A, M> Context for StackContext<'a, V, A, M>
 where
     A: Allocator,
 {
@@ -135,9 +158,10 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        let mut s = FixedString::new();
-        _ = write!(s, "{message}");
-        self.push_error(self.mark.get()..self.mark.get(), s);
+        if let Some(string) = self.format_string(message) {
+            self.push_error(self.mark.get()..self.mark.get(), string);
+        }
+
         ErrorMarker
     }
 
@@ -146,9 +170,10 @@ where
     where
         T: fmt::Display,
     {
-        let mut s = FixedString::new();
-        _ = write!(s, "{message}");
-        self.push_error(self.mark.get()..self.mark.get(), s);
+        if let Some(string) = self.format_string(message) {
+            self.push_error(self.mark.get()..self.mark.get(), string);
+        }
+
         ErrorMarker
     }
 
@@ -157,9 +182,10 @@ where
     where
         T: fmt::Display,
     {
-        let mut s = FixedString::new();
-        _ = write!(s, "{message}");
-        self.push_error(mark..self.mark.get(), s);
+        if let Some(string) = self.format_string(message) {
+            self.push_error(mark..self.mark.get(), string);
+        }
+
         ErrorMarker
     }
 
@@ -168,9 +194,10 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        let mut s = FixedString::new();
-        _ = write!(s, "{message}");
-        self.push_error(mark..self.mark.get(), s);
+        if let Some(string) = self.format_string(message) {
+            self.push_error(mark..self.mark.get(), string);
+        }
+
         ErrorMarker
     }
 
@@ -258,9 +285,9 @@ where
     where
         T: fmt::Display,
     {
-        let mut string = FixedString::new();
-        _ = write!(string, "{}", field);
-        self.push_path(Step::Key(string));
+        if let Some(string) = self.format_string(field) {
+            self.push_path(Step::Key(string));
+        }
     }
 
     #[inline]
@@ -270,15 +297,15 @@ where
 }
 
 /// An iterator over available errors.
-pub struct Errors<'a, const S: usize> {
-    path: &'a [Step<FixedString<S>>],
-    error: Option<&'a (Range<usize>, FixedString<S>)>,
+pub struct Errors<'a, S> {
+    path: &'a [Step<S>],
+    error: Option<&'a (Range<usize>, S)>,
     path_cap: usize,
     _access: Shared<'a>,
 }
 
-impl<'a, const S: usize> Iterator for Errors<'a, S> {
-    type Item = RichError<'a, FixedString<S>, FixedString<S>>;
+impl<'a, S> Iterator for Errors<'a, S> {
+    type Item = RichError<'a, S, S>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

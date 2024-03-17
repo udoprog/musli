@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use musli::{Decode, Encode};
 use musli_common::allocator::{System, SystemBuffer};
-use musli_common::context::AllocContext;
+use musli_common::context::SystemContext;
 
 #[derive(Encode)]
 struct From {
@@ -21,7 +21,7 @@ struct Collection {
 fn trace_collection() {
     let mut buf = SystemBuffer::new();
     let alloc = System::new(&mut buf);
-    let cx = AllocContext::new(&alloc);
+    let cx = SystemContext::new(&alloc);
 
     let mut values = HashMap::new();
 
@@ -39,7 +39,7 @@ fn trace_collection() {
         unreachable!()
     };
 
-    let cx = AllocContext::new(&alloc);
+    let cx = SystemContext::new(&alloc);
 
     let Ok(..) = encoding.from_slice_with::<_, Collection>(&cx, &bytes) else {
         if let Some(error) = cx.errors().next() {

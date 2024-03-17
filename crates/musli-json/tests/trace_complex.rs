@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use musli::{Decode, Encode};
 use musli_common::allocator::{System, SystemBuffer};
-use musli_common::context::AllocContext;
+use musli_common::context::SystemContext;
 
 #[derive(Encode)]
 enum InnerFrom {
@@ -35,7 +35,7 @@ struct To {
 fn trace_complex() {
     let mut buf = SystemBuffer::new();
     let alloc = System::new(&mut buf);
-    let cx = AllocContext::new(&alloc);
+    let cx = SystemContext::new(&alloc);
 
     let mut field = HashMap::new();
 
@@ -59,7 +59,7 @@ fn trace_complex() {
         unreachable!()
     };
 
-    let cx = AllocContext::new(&alloc);
+    let cx = SystemContext::new(&alloc);
 
     let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
         if let Some(error) = cx.errors().next() {

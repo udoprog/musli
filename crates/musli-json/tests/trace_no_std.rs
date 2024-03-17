@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use musli::{Decode, Encode};
 use musli_common::allocator::{Stack, StackBuffer};
-use musli_common::context::NoStdContext;
+use musli_common::context::StackContext;
 
 #[derive(Encode)]
 struct From {
@@ -21,7 +21,7 @@ struct Collection {
 fn trace_no_std() {
     let mut buf = StackBuffer::<1024>::new();
     let alloc = Stack::new(&mut buf);
-    let cx = NoStdContext::new(&alloc);
+    let cx = StackContext::new(&alloc);
 
     let mut values = HashMap::new();
 
@@ -39,7 +39,7 @@ fn trace_no_std() {
         unreachable!()
     };
 
-    let cx = NoStdContext::new(&alloc);
+    let cx = StackContext::new(&alloc);
 
     let Ok(..) = encoding.from_slice_with::<_, Collection>(&cx, &bytes) else {
         if let Some(error) = cx.errors().next() {
