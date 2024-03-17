@@ -50,7 +50,7 @@ macro_rules! encode_with_extensions {
         #[inline]
         pub fn to_vec_with<C, T>(self, cx: &C, value: &T) -> Result<Vec<u8>, C::Error>
         where
-            C: Context<Mode = $mode, Input = Error>,
+            C: ?Sized + Context<Mode = $mode>,
             T: ?Sized + Encode<$mode>,
         {
             let mut vec = Vec::new();
@@ -80,7 +80,7 @@ macro_rules! encode_with_extensions {
             value: &T,
         ) -> Result<FixedBytes<N>, C::Error>
         where
-            C: Context<Mode = $mode, Input = Error>,
+            C: ?Sized + Context<Mode = $mode>,
             T: ?Sized + Encode<$mode>,
         {
             let mut bytes = FixedBytes::new();
@@ -116,7 +116,7 @@ macro_rules! encoding_from_slice_impls {
         #[inline]
         pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
-            C: Context<Mode = $mode, Input = Error>,
+            C: ?Sized + Context<Mode = $mode>,
             T: Decode<'de, $mode>,
         {
             let reader = SliceReader::new(bytes);
@@ -138,7 +138,7 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
         where
-            C: Context<Mode = $mode, Input = Error>,
+            C: ?Sized + Context<Mode = $mode>,
             W: Writer,
             T: ?Sized + Encode<$mode>,
         {
@@ -153,7 +153,7 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn decode_with<'de, C, R, T>(self, cx: &C, reader: R) -> Result<T, C::Error>
         where
-            C: Context<Mode = $mode, Input = Error>,
+            C: ?Sized + Context<Mode = $mode>,
             R: Reader<'de>,
             T: Decode<'de, $mode>,
         {

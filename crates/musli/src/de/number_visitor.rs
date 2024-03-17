@@ -6,10 +6,7 @@ use crate::expecting::{self, Expecting};
 use crate::Context;
 
 /// A visitor capable of processing arbitrary number values.
-pub trait NumberVisitor<'de, C>: Sized
-where
-    C: Context,
-{
+pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     /// The output of the visitor.
     type Ok;
 
@@ -158,7 +155,7 @@ where
     #[inline]
     fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Error = C::Input>,
+        D: Decoder<'de, C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &hint,
@@ -168,18 +165,18 @@ where
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<T, C>(T, marker::PhantomData<C>);
+struct ExpectingWrapper<'a, T, C: ?Sized>(T, marker::PhantomData<&'a C>);
 
-impl<T, C> ExpectingWrapper<T, C> {
+impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
     #[inline]
     fn new(value: T) -> Self {
         Self(value, marker::PhantomData)
     }
 }
 
-impl<'de, T, C> Expecting for ExpectingWrapper<T, C>
+impl<'a, 'de, T, C> Expecting for ExpectingWrapper<'a, T, C>
 where
-    C: Context,
+    C: ?Sized + Context,
     T: NumberVisitor<'de, C>,
 {
     #[inline]

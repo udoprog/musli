@@ -170,12 +170,8 @@ impl<M, const F: Options> Encoding<M, F> {
         }
     }
 
-    musli_common::encoding_impls!(
-        M,
-        StorageEncoder::<_, F, _>::new,
-        StorageDecoder::<_, F, _>::new
-    );
-    musli_common::encoding_from_slice_impls!(M, StorageDecoder::<_, F, _>::new);
+    musli_common::encoding_impls!(M, StorageEncoder::<_, F>::new, StorageDecoder::<_, F>::new);
+    musli_common::encoding_from_slice_impls!(M, StorageDecoder::<_, F>::new);
 }
 
 impl<M, const F: Options> Clone for Encoding<M, F> {

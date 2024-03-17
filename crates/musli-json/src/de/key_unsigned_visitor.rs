@@ -4,17 +4,16 @@ use core::marker;
 use musli::de::ValueVisitor;
 use musli::Context;
 
-use crate::error::Error;
 use crate::reader::integer::Unsigned;
 use crate::reader::SliceParser;
 
 use super::parse_unsigned;
 
-pub(crate) struct KeyUnsignedVisitor<C, T> {
-    _marker: marker::PhantomData<(C, T)>,
+pub(crate) struct KeyUnsignedVisitor<T> {
+    _marker: marker::PhantomData<T>,
 }
 
-impl<C, T> KeyUnsignedVisitor<C, T> {
+impl<T> KeyUnsignedVisitor<T> {
     pub(super) const fn new() -> Self {
         Self {
             _marker: marker::PhantomData,
@@ -22,9 +21,9 @@ impl<C, T> KeyUnsignedVisitor<C, T> {
     }
 }
 
-impl<'de, C, T> ValueVisitor<'de, C, [u8]> for KeyUnsignedVisitor<C, T>
+impl<'de, C, T> ValueVisitor<'de, C, [u8]> for KeyUnsignedVisitor<T>
 where
-    C: Context<Input = Error>,
+    C: ?Sized + Context,
     T: Unsigned,
 {
     type Ok = T;

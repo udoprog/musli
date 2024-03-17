@@ -25,6 +25,71 @@ struct DecodeSerde<T>(#[musli(with = musli_serde)] T)
 where
     T: DeserializeOwned;
 
+mod musli_value {
+    use super::*;
+
+    #[track_caller]
+    pub(super) fn random<T>(module: &str)
+    where
+        T: Eq + fmt::Debug + Generate + Encode + DecodeOwned + Serialize + DeserializeOwned,
+    {
+        guided(module, <T as Generate>::generate);
+    }
+
+    #[track_caller]
+    pub(super) fn guided<T>(module: &str, value: fn(&mut Rng) -> T)
+    where
+        T: Eq + fmt::Debug + Encode + DecodeOwned + Serialize + DeserializeOwned,
+    {
+        macro_rules! do_try {
+            ($expr:expr, $msg:expr) => {
+                match $expr {
+                    Ok(value) => value,
+                    Err(err) => panic! {
+                        "{module}<{}>: {}:\n{}",
+                        ::std::any::type_name::<T>(),
+                        $msg,
+                        err
+                    },
+                }
+            };
+
+            ($expr:expr, $msg:expr, $encoded:expr) => {
+                match $expr {
+                    Ok(value) => value,
+                    Err(err) => panic! {
+                        "{module}<{}>: {}:\n{}\n{:?}",
+                        ::std::any::type_name::<T>(),
+                        $msg,
+                        err,
+                        $encoded
+                    },
+                }
+            };
+        }
+
+        let mut rng = tests::rng_with_seed(RNG_SEED);
+        let value1 = value(&mut rng);
+
+        let encoded1 = do_try!(::musli_value::encode(&value1), "Encode musli");
+
+        let value2: T = do_try!(::musli_value::decode(&encoded1), "Decode musli");
+        assert_eq!(value1, value2, "Musli decoding is incorrect");
+
+        let encoded2 = do_try!(::musli_value::encode(EncodeSerde(&value1)), "Encode serde");
+
+        let DecodeSerde(value3) =
+            do_try!(::musli_value::decode(&encoded2), "Decode serde", encoded2);
+
+        assert_eq! {
+            value1,
+            value3,
+            "Serde decoding is incorrect\nBytes: {:?}",
+            encoded2,
+        };
+    }
+}
+
 macro_rules! tester {
     ($module:ident $(,)?) => {
         mod $module {
@@ -209,4 +274,9 @@ fn musli_descriptive() {
 #[test]
 fn musli_json() {
     build_test!(musli_json);
+}
+
+#[test]
+fn musli_value() {
+    build_test!(musli_value);
 }

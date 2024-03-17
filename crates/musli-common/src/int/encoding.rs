@@ -15,7 +15,7 @@ pub fn encode_unsigned<C, W, T, const F: Options>(
     value: T,
 ) -> Result<(), C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
     T: Unsigned + UnsignedOps,
 {
@@ -36,7 +36,7 @@ pub fn decode_unsigned<'de, C, R, T: UnsignedOps, const F: Options>(
     reader: R,
 ) -> Result<T, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
     T: Unsigned,
 {
@@ -53,7 +53,7 @@ where
 #[inline]
 pub fn encode_signed<C, W, T, const F: Options>(cx: &C, writer: W, value: T) -> Result<(), C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
     T: Signed,
     T::Unsigned: UnsignedOps,
@@ -71,7 +71,7 @@ where
 #[inline]
 pub fn decode_signed<'de, C, R, T, const F: Options>(cx: &C, reader: R) -> Result<T, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
     T: Signed,
     T::Unsigned: UnsignedOps,
@@ -92,7 +92,7 @@ where
 #[inline]
 pub fn encode_usize<C, W, const F: Options>(cx: &C, writer: W, value: usize) -> Result<(), C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     match crate::options::length::<F>() {
@@ -118,7 +118,7 @@ where
 #[inline]
 pub fn decode_usize<'de, C, R, const F: Options>(cx: &C, reader: R) -> Result<usize, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     match crate::options::length::<F>() {

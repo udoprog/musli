@@ -13,8 +13,8 @@ macro_rules! implement {
             #[allow(unused_mut)]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Mode = M, Input = E::Error>,
-                E: Encoder,
+                C: ?Sized + Context<Mode = M>,
+                E: Encoder<C>,
             {
                 let mut tuple = encoder.encode_tuple(cx, $count)?;
                 $(
@@ -31,8 +31,8 @@ macro_rules! implement {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Mode = M, Input = D::Error>,
-                D: Decoder<'de>,
+                C: ?Sized + Context<Mode = M>,
+                D: Decoder<'de, C>,
             {
                 let ($($field,)*) = cx.decode(decoder)?;
                 Ok($ty { $($field,)* })
@@ -50,8 +50,8 @@ macro_rules! implement_new {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context<Mode = M, Input = E::Error>,
-                E: Encoder,
+                C: ?Sized + Context<Mode = M>,
+                E: Encoder<C>,
             {
                 let mut tuple = encoder.encode_tuple(cx, $count)?;
                 $(self.$field().encode(cx, tuple.next(cx)?)?;)*
@@ -66,8 +66,8 @@ macro_rules! implement_new {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context<Mode = M, Input = D::Error>,
-                D: Decoder<'de>,
+                C: ?Sized + Context<Mode = M>,
+                D: Decoder<'de, C>,
             {
                 let ($($field,)*) = Decode::decode(cx, decoder)?;
                 Ok($ty::new($($field,)*))

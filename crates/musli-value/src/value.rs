@@ -1,5 +1,3 @@
-use core::marker;
-
 #[cfg(feature = "alloc")]
 use alloc::borrow::ToOwned;
 #[cfg(feature = "alloc")]
@@ -21,7 +19,6 @@ use musli::Context;
 use musli_common::options::Options;
 
 use crate::de::ValueDecoder;
-use crate::error::ErrorKind;
 
 /// A dynamic value capable of representing any [Müsli] type whether it be
 /// complex or simple.
@@ -85,19 +82,13 @@ impl Value {
     /// Construct a [AsValueDecoder] implementation out of this value which
     /// emits the specified error `E`.
     #[inline]
-    pub fn into_value_decoder<const F: Options, E>(self) -> AsValueDecoder<F, E>
-    where
-        E: From<ErrorKind>,
-    {
+    pub fn into_value_decoder<const F: Options>(self) -> AsValueDecoder<F> {
         AsValueDecoder::new(self)
     }
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<const F: Options, E>(&self) -> ValueDecoder<'_, F, E>
-    where
-        E: From<ErrorKind>,
-    {
+    pub(crate) fn decoder<const F: Options>(&self) -> ValueDecoder<'_, F> {
         ValueDecoder::new(self)
     }
 }
@@ -163,8 +154,8 @@ from!(f64, F64);
 impl<M> Encode<M> for Number {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
-        E: Encoder,
+        C: ?Sized + Context<Mode = M>,
+        E: Encoder<C>,
     {
         match self {
             Number::U8(n) => encoder.encode_u8(cx, *n),
@@ -207,19 +198,17 @@ impl Number {
     }
 }
 
-struct AnyVisitor<E>(marker::PhantomData<E>);
+struct AnyVisitor;
 
 #[musli::visitor]
-impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
+impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     type Ok = Value;
-    type Error = E;
-
     #[cfg(feature = "alloc")]
-    type String<C> = StringVisitor where C: Context<Input = E>;
+    type String = StringVisitor;
     #[cfg(feature = "alloc")]
-    type Bytes<C> = BytesVisitor where C: Context<Input = E>;
+    type Bytes = BytesVisitor;
     #[cfg(feature = "alloc")]
-    type Number<C> = ValueNumberVisitor where C: Context<Input = E>;
+    type Number = ValueNumberVisitor;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -227,147 +216,95 @@ impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
     }
 
     #[inline]
-    fn visit_unit<C>(self, _: &C) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_unit(self, _: &C) -> Result<Self::Ok, C::Error> {
         Ok(Value::Unit)
     }
 
     #[inline]
-    fn visit_bool<C>(self, _: &C, value: bool) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_bool(self, _: &C, value: bool) -> Result<Self::Ok, C::Error> {
         Ok(Value::Bool(value))
     }
 
     #[inline]
-    fn visit_char<C>(self, _: &C, value: char) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_char(self, _: &C, value: char) -> Result<Self::Ok, C::Error> {
         Ok(Value::Char(value))
     }
 
     #[inline]
-    fn visit_u8<C>(self, _: &C, value: u8) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u8(self, _: &C, value: u8) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U8(value)))
     }
 
     #[inline]
-    fn visit_u16<C>(self, _: &C, value: u16) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u16(self, _: &C, value: u16) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U16(value)))
     }
 
     #[inline]
-    fn visit_u32<C>(self, _: &C, value: u32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u32(self, _: &C, value: u32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U32(value)))
     }
 
     #[inline]
-    fn visit_u64<C>(self, _: &C, value: u64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u64(self, _: &C, value: u64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U64(value)))
     }
 
     #[inline]
-    fn visit_u128<C>(self, _: &C, value: u128) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_u128(self, _: &C, value: u128) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U128(value)))
     }
 
     #[inline]
-    fn visit_i8<C>(self, _: &C, value: i8) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i8(self, _: &C, value: i8) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I8(value)))
     }
 
     #[inline]
-    fn visit_i16<C>(self, _: &C, value: i16) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i16(self, _: &C, value: i16) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I16(value)))
     }
 
     #[inline]
-    fn visit_i32<C>(self, _: &C, value: i32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i32(self, _: &C, value: i32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I32(value)))
     }
 
     #[inline]
-    fn visit_i64<C>(self, _: &C, value: i64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i64(self, _: &C, value: i64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I64(value)))
     }
 
     #[inline]
-    fn visit_i128<C>(self, _: &C, value: i128) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_i128(self, _: &C, value: i128) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I128(value)))
     }
 
     #[inline]
-    fn visit_usize<C>(self, _: &C, value: usize) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_usize(self, _: &C, value: usize) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::Usize(value)))
     }
 
     #[inline]
-    fn visit_isize<C>(self, _: &C, value: isize) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_isize(self, _: &C, value: isize) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::Isize(value)))
     }
 
     #[inline]
-    fn visit_f32<C>(self, _: &C, value: f32) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_f32(self, _: &C, value: f32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::F32(value)))
     }
 
     #[inline]
-    fn visit_f64<C>(self, _: &C, value: f64) -> Result<Self::Ok, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_f64(self, _: &C, value: f64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::F64(value)))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_option<C, D>(self, cx: &C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<D>(self, cx: &C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: Decoder<'de, Error = Self::Error>,
+        D: Decoder<'de, C>,
     {
         match decoder {
             Some(decoder) => Ok(Value::Option(Some(Box::new(Value::decode(cx, decoder)?)))),
@@ -377,12 +314,11 @@ impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_sequence<C, D>(self, cx: &C, mut seq: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, cx: &C, mut seq: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: SequenceDecoder<'de, Error = Self::Error>,
+        D: SequenceDecoder<'de, C>,
     {
-        let mut out = Vec::with_capacity(seq.size_hint().or_default());
+        let mut out = Vec::with_capacity(seq.size_hint(cx).or_default());
 
         while let Some(item) = seq.next(cx)? {
             out.push(Value::decode(cx, item)?);
@@ -394,12 +330,11 @@ impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_map<C, D>(self, cx: &C, mut map: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, cx: &C, mut map: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: MapDecoder<'de, Error = Self::Error>,
+        D: MapDecoder<'de, C>,
     {
-        let mut out = Vec::with_capacity(map.size_hint().or_default());
+        let mut out = Vec::with_capacity(map.size_hint(cx).or_default());
 
         while let Some(mut entry) = map.entry(cx)? {
             let first = Value::decode(cx, entry.map_key(cx)?)?;
@@ -413,37 +348,27 @@ impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_bytes<C>(self, _: &C, _: SizeHint) -> Result<Self::Bytes<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_bytes(self, _: &C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
         Ok(BytesVisitor)
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_string<C>(self, _: &C, _: SizeHint) -> Result<Self::String<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_string(self, _: &C, _: SizeHint) -> Result<Self::String, C::Error> {
         Ok(StringVisitor)
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_number<C>(self, _: &C, _: NumberHint) -> Result<Self::Number<C>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn visit_number(self, _: &C, _: NumberHint) -> Result<Self::Number, C::Error> {
         Ok(ValueNumberVisitor)
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_variant<C, D>(self, cx: &C, mut variant: D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<D>(self, cx: &C, mut variant: D) -> Result<Self::Ok, C::Error>
     where
-        C: Context<Input = Self::Error>,
-        D: VariantDecoder<'de, Error = Self::Error>,
+        D: VariantDecoder<'de, C>,
     {
         let first = cx.decode(variant.tag(cx)?)?;
         let second = cx.decode(variant.variant(cx)?)?;
@@ -455,10 +380,10 @@ impl<'de, E: 'static> Visitor<'de> for AnyVisitor<E> {
 impl<'de, M> Decode<'de, M> for Value {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M, Input = D::Error>,
-        D: Decoder<'de>,
+        C: ?Sized + Context<Mode = M>,
+        D: Decoder<'de, C>,
     {
-        decoder.decode_any(cx, AnyVisitor::<D::Error>(marker::PhantomData))
+        decoder.decode_any(cx, AnyVisitor)
     }
 }
 
@@ -466,10 +391,7 @@ impl<'de, M> Decode<'de, M> for Value {
 struct BytesVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C> ValueVisitor<'de, C, [u8]> for BytesVisitor
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, [u8]> for BytesVisitor {
     type Ok = Value;
 
     #[inline]
@@ -493,10 +415,7 @@ where
 struct StringVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C> ValueVisitor<'de, C, str> for StringVisitor
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, str> for StringVisitor {
     type Ok = Value;
 
     #[inline]
@@ -517,10 +436,7 @@ where
 
 struct ValueNumberVisitor;
 
-impl<'de, C> NumberVisitor<'de, C> for ValueNumberVisitor
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> NumberVisitor<'de, C> for ValueNumberVisitor {
     type Ok = Value;
 
     #[inline]
@@ -602,8 +518,8 @@ where
 impl<M> Encode<M> for Value {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M, Input = E::Error>,
-        E: Encoder,
+        C: ?Sized + Context<Mode = M>,
+        E: Encoder<C>,
     {
         match self {
             Value::Unit => encoder.encode_unit(cx),
@@ -654,34 +570,23 @@ impl<M> Encode<M> for Value {
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct AsValueDecoder<const F: Options, E> {
+pub struct AsValueDecoder<const F: Options> {
     value: Value,
-    _marker: marker::PhantomData<E>,
 }
 
-impl<const F: Options, E> AsValueDecoder<F, E> {
+impl<const F: Options> AsValueDecoder<F> {
     /// Construct a new buffered value decoder.
     #[inline]
     pub fn new(value: Value) -> Self {
-        Self {
-            value,
-            _marker: marker::PhantomData,
-        }
+        Self { value }
     }
 }
 
-impl<const F: Options, E: 'static> AsDecoder for AsValueDecoder<F, E>
-where
-    E: From<ErrorKind>,
-{
-    type Error = E;
-    type Decoder<'this> = ValueDecoder<'this, F, E> where Self: 'this;
+impl<const F: Options, C: ?Sized + Context> AsDecoder<C> for AsValueDecoder<F> {
+    type Decoder<'this> = ValueDecoder<'this, F> where Self: 'this;
 
     #[inline]
-    fn as_decoder<C>(&self, _: &C) -> Result<Self::Decoder<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn as_decoder(&self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
         Ok(self.value.decoder())
     }
 }

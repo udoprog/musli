@@ -157,7 +157,7 @@ impl<const N: usize> FixedBytes<N> {
     #[inline]
     pub fn write_bytes<C>(&mut self, cx: &C, source: &[u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         if !self.extend_from_slice(source) {
             return Err(cx.custom(FixedBytesOverflow {
@@ -189,7 +189,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -199,7 +199,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         FixedBytes::write_bytes(self, cx, bytes)?;
         cx.advance(bytes.len());

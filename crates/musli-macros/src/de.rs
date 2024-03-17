@@ -73,8 +73,8 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
             #[inline]
             fn decode<#c_param, #d_param>(#ctx_var: &#c_param, #root_decoder_var: #d_param) -> #core_result<Self, <#c_param as #context_t>::Error>
             where
-                #c_param: #context_t<Mode = #mode_ident, Input = <#d_param as #decoder_t<#lt>>::Error>,
-                #d_param: #decoder_t<#lt>
+                #c_param: ?Sized + #context_t<Mode = #mode_ident>,
+                #d_param: #decoder_t<#lt, #c_param>
             {
                 #body
             }

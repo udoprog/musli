@@ -10,8 +10,6 @@ use crate::{Buf, Decode, Decoder};
 pub trait Context {
     /// Mode of the context.
     type Mode;
-    /// The error type which is collected by the context.
-    type Input: 'static;
     /// Error produced by context.
     type Error: 'static;
     /// A mark during processing.
@@ -25,8 +23,7 @@ pub trait Context {
     fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
-        D: Decoder<'de, Error = Self::Input>,
-        Self: Sized,
+        D: Decoder<'de, Self>,
     {
         T::decode(self, decoder)
     }
@@ -34,17 +31,12 @@ pub trait Context {
     /// Allocate a buffer.
     fn alloc(&self) -> Option<Self::Buf<'_>>;
 
-    /// Report the given context error.
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        Self::Input: From<T>;
-
     /// Generate a map function which maps an error using the `report` function.
     fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
     where
-        Self::Input: From<T>,
+        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        move |error| self.report(error)
+        move |error| self.custom(error)
     }
 
     /// Report a custom error, which is not encapsulated by the error type
@@ -62,16 +54,6 @@ pub trait Context {
     where
         T: fmt::Display;
 
-    /// Report the given encoding error from the given mark.
-    #[allow(unused_variables)]
-    #[inline(always)]
-    fn marked_report<T>(&self, mark: Self::Mark, error: T) -> Self::Error
-    where
-        Self::Input: From<T>,
-    {
-        self.report(error)
-    }
-
     /// Report an error based on a mark.
     ///
     /// A mark is generated using [Context::mark] and indicates a prior state.
@@ -82,6 +64,18 @@ pub trait Context {
         T: fmt::Display,
     {
         self.message(message)
+    }
+
+    /// Report an error based on a mark.
+    ///
+    /// A mark is generated using [Context::mark] and indicates a prior state.
+    #[allow(unused_variables)]
+    #[inline(always)]
+    fn marked_custom<T>(&self, mark: Self::Mark, message: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+    {
+        self.custom(message)
     }
 
     /// Advance the context by `n` bytes of input.

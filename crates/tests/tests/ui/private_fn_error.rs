@@ -12,8 +12,8 @@ mod array {
     #[inline]
     fn encode<C, E, T, const N: usize>(this: &[T; N], cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Input = E::Error>,
-        E: Encoder,
+        C: ?Sized + Context,
+        E: Encoder<C>,
     {
         todo!()
     }
@@ -21,8 +21,8 @@ mod array {
     #[inline]
     fn decode<'de, C, D, T, const N: usize>(cx: &C, decoder: D) -> Result<[T; N], C::Error>
     where
-        C: Context<Input = D::Error>,
-        D: Decoder<'de>,
+        C: ?Sized + Context,
+        D: Decoder<'de, C>,
     {
         todo!()
     }

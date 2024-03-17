@@ -53,7 +53,7 @@ use self::serializer::Serializer;
 
 struct SerdeContext<'a, C>
 where
-    C: Context,
+    C: ?Sized + Context,
 {
     error: RefCell<Option<C::Error>>,
     inner: &'a C,
@@ -61,10 +61,9 @@ where
 
 impl<'a, C> Context for SerdeContext<'a, C>
 where
-    C: Context,
+    C: ?Sized + Context,
 {
     type Mode = C::Mode;
-    type Input = C::Input;
     type Error = error::SerdeError;
     type Mark = C::Mark;
 
@@ -80,15 +79,6 @@ where
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.inner.alloc()
-    }
-
-    #[inline]
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        Self::Input: From<T>,
-    {
-        *self.error.borrow_mut() = Some(self.inner.report(error));
-        error::SerdeError::Captured
     }
 
     #[inline]
@@ -114,10 +104,12 @@ where
 /// compatibility layer.
 pub fn encode<C, E, T>(value: &T, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 where
-    C: Context<Input = E::Error>,
-    E: Encoder,
+    C: ?Sized + Context,
+    E: Encoder<C>,
     T: Serialize,
 {
+    let encoder = encoder.with_context(cx)?;
+
     let cx = SerdeContext {
         error: RefCell::new(None),
         inner: cx,
@@ -145,10 +137,12 @@ where
 /// compatibility layer.
 pub fn decode<'de, C, D, T>(cx: &C, decoder: D) -> Result<T, C::Error>
 where
-    C: Context<Input = D::Error>,
-    D: Decoder<'de>,
+    C: ?Sized + Context,
+    D: Decoder<'de, C>,
     T: Deserialize<'de>,
 {
+    let decoder = decoder.with_context(cx)?;
+
     let cx = SerdeContext {
         error: RefCell::new(None),
         inner: cx,

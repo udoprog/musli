@@ -1,6 +1,6 @@
 use musli::{Buf, Context};
 
-use crate::error::{Error, ErrorKind};
+use crate::error::ErrorMessage;
 use crate::reader::{Parser, StringReference, Token};
 
 use lexical::parse_float_options::JSON;
@@ -37,14 +37,14 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         scratch: &'scratch mut S,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
         S: ?Sized + Buf,
     {
         let start = cx.mark();
         let actual = self.peek(cx)?;
 
         if !matches!(actual, Token::String) {
-            return Err(cx.marked_report(start, Error::new(ErrorKind::ExpectedString(actual))));
+            return Err(cx.marked_message(start, format_args!("Expected string, found {actual}")));
         }
 
         self.skip(cx, 1)?;
@@ -56,7 +56,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     #[inline]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
     {
         let mut byte = [0];
         self.read(cx, &mut byte[..])?;
@@ -66,12 +66,12 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     #[inline]
     fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
     {
         let outcome = self.index.wrapping_add(n);
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.report(Error::new(ErrorKind::BufferUnderflow)));
+            return Err(cx.message("Buffer underflow"));
         }
 
         self.index = outcome;
@@ -82,12 +82,12 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     #[inline]
     fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
     {
         let outcome = self.index.wrapping_add(buf.len());
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.report(Error::new(ErrorKind::BufferUnderflow)));
+            return Err(cx.message("Buffer underflow"));
         }
 
         buf.copy_from_slice(&self.slice[self.index..outcome]);
@@ -99,7 +99,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     #[inline]
     fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
     {
         while matches!(
             self.slice.get(self.index),
@@ -120,14 +120,14 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     #[inline]
     fn peek_byte<C>(&mut self, _: &C) -> Result<Option<u8>, C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
     {
         Ok(self.slice.get(self.index).copied())
     }
 
     fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
     {
         let (value, read) = match lexical::parse_partial_with_options::<f32, _, FORMAT>(
             &self.slice[self.index..],
@@ -135,7 +135,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         ) {
             Ok(out) => out,
             Err(error) => {
-                return Err(cx.report(Error::new(ErrorKind::ParseFloat(error))));
+                return Err(cx.custom(ErrorMessage::ParseFloat(error)));
             }
         };
 
@@ -146,7 +146,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
 
     fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
     {
         let (value, read) = match lexical::parse_partial_with_options::<f64, _, FORMAT>(
             &self.slice[self.index..],
@@ -154,7 +154,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         ) {
             Ok(out) => out,
             Err(error) => {
-                return Err(cx.report(Error::new(ErrorKind::ParseFloat(error))));
+                return Err(cx.custom(ErrorMessage::ParseFloat(error)));
             }
         };
 

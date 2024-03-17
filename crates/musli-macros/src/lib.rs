@@ -79,8 +79,54 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "decoder",
         types::DECODER_TYPES,
-        ["Error"],
+        &[],
         "__UseMusliDecoderAttributeMacro",
+    ) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+#[proc_macro_attribute]
+pub fn map_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attr = proc_macro2::TokenStream::from(attr);
+
+    if !attr.is_empty() {
+        return syn::Error::new_spanned(attr, "Arguments not supported")
+            .to_compile_error()
+            .into();
+    }
+
+    let input = syn::parse_macro_input!(input as types::Types);
+
+    match input.expand(
+        "map_decoder",
+        types::MAP_DECODER_TYPES,
+        &[],
+        "__UseMusliMapDecoderAttributeMacro",
+    ) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+#[proc_macro_attribute]
+pub fn struct_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attr = proc_macro2::TokenStream::from(attr);
+
+    if !attr.is_empty() {
+        return syn::Error::new_spanned(attr, "Arguments not supported")
+            .to_compile_error()
+            .into();
+    }
+
+    let input = syn::parse_macro_input!(input as types::Types);
+
+    match input.expand(
+        "struct_decoder",
+        types::STRUCT_DECODER_TYPES,
+        &[],
+        "__UseMusliStructDecoderAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
@@ -102,7 +148,7 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "encoder",
         types::ENCODER_TYPES,
-        ["Ok", "Error"],
+        &["Ok"],
         "__UseMusliEncoderAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),
@@ -125,7 +171,7 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "visitor",
         types::VISITOR_TYPES,
-        ["Ok"],
+        &["Ok"],
         "__UseMusliVisitorAttributeMacro",
     ) {
         Ok(tokens) => tokens.into(),

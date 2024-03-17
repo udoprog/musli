@@ -6,7 +6,6 @@ mod alloc_context;
 mod error_marker;
 mod no_std_context;
 mod rich_error;
-#[doc(inline)]
 pub use self::error_marker::ErrorMarker;
 mod error;
 pub use self::error::Error;
@@ -48,6 +47,7 @@ impl<A, M, E> Same<A, M, E> {
 impl<A> Same<A, DefaultMode, ErrorMarker> {
     /// Construct a new `Same` capturing context.
     #[inline]
+    #[doc(hidden)]
     pub fn marker(alloc: A) -> Self {
         Self::new(alloc)
     }
@@ -57,7 +57,7 @@ impl<A, M, E> Default for Same<A, M, E>
 where
     A: Default,
 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self {
             alloc: A::default(),
@@ -72,25 +72,16 @@ where
     E: Error,
 {
     type Mode = M;
-    type Input = E;
     type Error = E;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
     }
 
-    #[inline(always)]
-    fn report<T>(&self, error: T) -> Self::Error
-    where
-        E: From<T>,
-    {
-        E::from(error)
-    }
-
-    #[inline(always)]
+    #[inline]
     fn custom<T>(&self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -98,7 +89,7 @@ where
         E::custom(message)
     }
 
-    #[inline(always)]
+    #[inline]
     fn message<T>(&self, message: T) -> Self::Error
     where
         T: fmt::Display,
@@ -119,7 +110,7 @@ impl<A, M, E> Default for Ignore<A, M, E>
 where
     A: Default,
 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self {
             alloc: A::default(),
@@ -142,6 +133,7 @@ impl<A, M, E> Ignore<A, M, E> {
 
 impl<A> Ignore<A, DefaultMode, ErrorMarker> {
     /// Construct a new ignoring context which collects an error marker.
+    #[doc(hidden)]
     pub fn marker(alloc: A) -> Self {
         Self::new(alloc)
     }
@@ -166,26 +158,16 @@ where
     A: Allocator,
 {
     type Mode = M;
-    type Input = E;
     type Error = ErrorMarker;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
     }
 
-    #[inline(always)]
-    fn report<T>(&self, _: T) -> ErrorMarker
-    where
-        E: From<T>,
-    {
-        self.error.set(true);
-        ErrorMarker
-    }
-
-    #[inline(always)]
+    #[inline]
     fn custom<T>(&self, _: T) -> ErrorMarker
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -194,7 +176,7 @@ where
         ErrorMarker
     }
 
-    #[inline(always)]
+    #[inline]
     fn message<T>(&self, _: T) -> ErrorMarker
     where
         T: fmt::Display,
@@ -237,31 +219,16 @@ where
     E: Error,
 {
     type Mode = M;
-    type Input = E;
     type Error = ErrorMarker;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
     }
 
-    #[inline(always)]
-    fn report<T>(&self, error: T) -> ErrorMarker
-    where
-        E: From<T>,
-    {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            self.error.get().replace(Some(E::from(error)));
-        }
-
-        ErrorMarker
-    }
-
-    #[inline(always)]
+    #[inline]
     fn custom<T>(&self, error: T) -> ErrorMarker
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -275,7 +242,7 @@ where
         ErrorMarker
     }
 
-    #[inline(always)]
+    #[inline]
     fn message<T>(&self, message: T) -> ErrorMarker
     where
         T: fmt::Display,
@@ -294,7 +261,7 @@ impl<A, M, E> Default for Capture<A, M, E>
 where
     A: Default,
 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::new(A::default())
     }

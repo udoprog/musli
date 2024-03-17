@@ -25,7 +25,7 @@ mod value;
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 pub use self::value::{AsValueDecoder, Value};
-pub use error::{Error, ErrorKind};
+pub use error::Error;
 
 use en::ValueEncoder;
 use musli::mode::DefaultMode;
@@ -55,5 +55,5 @@ where
     let mut buf = musli_common::allocator::buffer();
     let alloc = musli_common::allocator::new(&mut buf);
     let cx = musli_common::context::Same::<_, DefaultMode, Error>::new(&alloc);
-    T::decode(&cx, value.decoder::<DEFAULT_OPTIONS, _>())
+    T::decode(&cx, value.decoder::<DEFAULT_OPTIONS>())
 }

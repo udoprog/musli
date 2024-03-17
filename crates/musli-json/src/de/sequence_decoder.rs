@@ -3,7 +3,6 @@ use core::mem;
 use musli::de::{PackDecoder, SequenceDecoder, SizeHint};
 use musli::Context;
 
-use crate::error::{Error, ErrorKind};
 use crate::reader::{Parser, Token};
 
 use super::JsonDecoder;
@@ -22,12 +21,12 @@ where
     #[inline]
     pub(crate) fn new<C>(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
     where
-        C: Context<Input = Error>,
+        C: ?Sized + Context,
     {
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBracket) {
-            return Err(cx.report(Error::new(ErrorKind::ExpectedOpenBracket(actual))));
+            return Err(cx.message(format_args!("Expected opening bracket, was {actual}")));
         }
 
         parser.skip(cx, 1)?;
@@ -41,26 +40,22 @@ where
     }
 }
 
-impl<'de, P> SequenceDecoder<'de> for JsonSequenceDecoder<P>
+impl<'de, C, P> SequenceDecoder<'de, C> for JsonSequenceDecoder<P>
 where
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Error = Error;
-
     type Decoder<'this> = JsonDecoder<P::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> SizeHint {
+    fn size_hint(&self, _: &C) -> SizeHint {
         SizeHint::from(self.len)
     }
 
     #[inline]
-    fn next<C>(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn next(&mut self, cx: &C) -> Result<Option<Self::Decoder<'_>>, C::Error> {
         let first = mem::take(&mut self.first);
 
         loop {
@@ -89,15 +84,12 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn end(mut self, cx: &C) -> Result<(), C::Error> {
         if !self.terminated {
             let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.report(Error::new(ErrorKind::ExpectedCloseBracket(actual))));
+                return Err(cx.message(format_args!("Expected closing bracket, was {actual}")));
             }
 
             self.parser.skip(cx, 1)?;
@@ -108,21 +100,17 @@ where
     }
 }
 
-impl<'de, P> PackDecoder<'de> for JsonSequenceDecoder<P>
+impl<'de, C, P> PackDecoder<'de, C> for JsonSequenceDecoder<P>
 where
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
-    type Error = Error;
-
     type Decoder<'this> = JsonDecoder<P::Mut<'this>>
     where
         Self: 'this;
 
     #[inline]
-    fn next<C>(&mut self, cx: &C) -> Result<Self::Decoder<'_>, C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn next(&mut self, cx: &C) -> Result<Self::Decoder<'_>, C::Error> {
         let first = mem::take(&mut self.first);
 
         loop {
@@ -154,15 +142,12 @@ where
     }
 
     #[inline]
-    fn end<C>(mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: Context<Input = Self::Error>,
-    {
+    fn end(mut self, cx: &C) -> Result<(), C::Error> {
         if !self.terminated {
             let actual = self.parser.peek(cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.report(Error::new(ErrorKind::ExpectedCloseBracket(actual))));
+                return Err(cx.message(format_args!("Expected closing bracket, was {actual}")));
             }
 
             self.parser.skip(cx, 1)?;
