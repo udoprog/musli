@@ -53,7 +53,7 @@ use self::serializer::Serializer;
 
 struct SerdeContext<'a, C>
 where
-    C: Context,
+    C: ?Sized + Context,
 {
     error: RefCell<Option<C::Error>>,
     inner: &'a C,
@@ -61,7 +61,7 @@ where
 
 impl<'a, C> Context for SerdeContext<'a, C>
 where
-    C: Context,
+    C: ?Sized + Context,
 {
     type Mode = C::Mode;
     type Error = error::SerdeError;
@@ -104,7 +104,7 @@ where
 /// compatibility layer.
 pub fn encode<C, E, T>(value: &T, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     E: Encoder<C>,
     T: Serialize,
 {
@@ -137,7 +137,7 @@ where
 /// compatibility layer.
 pub fn decode<'de, C, D, T>(cx: &C, decoder: D) -> Result<T, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     D: Decoder<'de, C>,
     T: Deserialize<'de>,
 {

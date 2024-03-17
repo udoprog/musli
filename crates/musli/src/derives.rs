@@ -592,13 +592,13 @@
 //!
 //!     pub fn encode<C, E>(field: &Field, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
-//!         C: Context,
+//!         C: ?Sized + Context,
 //!         E: Encoder<C>,
 //! # { todo!() }
 //!
 //!     pub fn decode<'de, C, D>(cx: &C, decoder: D) -> Result<Field, C::Error>
 //!     where
-//!         C: Context,
+//!         C: ?Sized + Context,
 //!         D: Decoder<'de, C>,
 //! # { todo!() }
 //! }
@@ -629,13 +629,13 @@
 //!
 //!     pub fn encode<C, E, T>(field: &Field<T>, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
-//!         C: Context,
+//!         C: ?Sized + Context,
 //!         E: Encoder<C>,
 //! # { todo!() }
 //!
 //!     pub fn decode<'de, C, D, T>(cx: &C, decoder: D) -> Result<Field<T>, C::Error>
 //!     where
-//!         C: Context,
+//!         C: ?Sized + Context,
 //!         D: Decoder<'de, C>,
 //! # { todo!() }
 //! }
@@ -666,7 +666,7 @@
 //!
 //!     pub fn encode<C, E>(uuid: &CustomUuid, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
-//!         C: Context,
+//!         C: ?Sized + Context,
 //!         E: Encoder<C>,
 //!     {
 //!         uuid.0.encode(cx, encoder)
@@ -674,7 +674,7 @@
 //!
 //!     pub fn decode<'de, C, D>(cx: &C, decoder: D) -> Result<CustomUuid, C::Error>
 //!     where
-//!         C: Context,
+//!         C: ?Sized + Context,
 //!         D: Decoder<'de, C>,
 //!     {
 //!         Ok(CustomUuid(cx.decode(decoder)?))
@@ -689,7 +689,7 @@
 //!
 //!     pub fn encode<C, E, T>(set: &HashSet<T>, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
 //!     where
-//!         C: Context,
+//!         C: ?Sized + Context,
 //!         E: Encoder<C>,
 //!         T: Encode<C::Mode> + Eq + Hash,
 //!     {
@@ -698,7 +698,7 @@
 //!
 //!     pub fn decode<'de, C, D, T>(cx: &C, decoder: D) -> Result<HashSet<T>, C::Error>
 //!     where
-//!         C: Context,
+//!         C: ?Sized + Context,
 //!         D: Decoder<'de, C>,
 //!         T: Decode<'de, C::Mode> + Eq + Hash,
 //!     {

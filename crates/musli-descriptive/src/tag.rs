@@ -225,7 +225,7 @@ impl<'de, M> Decode<'de, M> for Tag {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         D: Decoder<'de, C>,
     {
         Ok(Self::from_byte(decoder.decode_u8(cx)?))

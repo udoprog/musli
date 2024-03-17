@@ -64,7 +64,7 @@ impl<O> ValueEncoder<O> {
 #[musli::encoder]
 impl<C, O> Encoder<C> for ValueEncoder<O>
 where
-    C: Context,
+    C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();
@@ -362,7 +362,7 @@ impl<O> SequenceValueEncoder<O> {
 #[cfg(feature = "alloc")]
 impl<C, O> SequenceEncoder<C> for SequenceValueEncoder<O>
 where
-    C: Context,
+    C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();
@@ -404,7 +404,7 @@ impl<O> MapValueEncoder<O> {
 #[cfg(feature = "alloc")]
 impl<C, O> MapEncoder<C> for MapValueEncoder<O>
 where
-    C: Context,
+    C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();
@@ -427,7 +427,7 @@ where
 #[cfg(feature = "alloc")]
 impl<C, O> MapPairsEncoder<C> for MapValueEncoder<O>
 where
-    C: Context,
+    C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();
@@ -468,7 +468,7 @@ where
 #[cfg(feature = "alloc")]
 impl<C, O> StructEncoder<C> for MapValueEncoder<O>
 where
-    C: Context,
+    C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();
@@ -510,7 +510,7 @@ impl<'a> PairValueEncoder<'a> {
 #[cfg(feature = "alloc")]
 impl<'a, C> MapEntryEncoder<C> for PairValueEncoder<'a>
 where
-    C: Context,
+    C: ?Sized + Context,
 {
     type Ok = ();
     type MapKey<'this> = ValueEncoder<&'this mut Value>
@@ -538,7 +538,7 @@ where
 #[cfg(feature = "alloc")]
 impl<'a, C> StructFieldEncoder<C> for PairValueEncoder<'a>
 where
-    C: Context,
+    C: ?Sized + Context,
 {
     type Ok = ();
     type FieldName<'this> = ValueEncoder<&'this mut Value>
@@ -584,7 +584,7 @@ impl<O> VariantValueEncoder<O> {
 #[cfg(feature = "alloc")]
 impl<C, O> VariantEncoder<C> for VariantValueEncoder<O>
 where
-    C: Context,
+    C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();
@@ -635,7 +635,7 @@ impl<O> VariantSequenceEncoder<O> {
 #[cfg(feature = "alloc")]
 impl<C, O> SequenceEncoder<C> for VariantSequenceEncoder<O>
 where
-    C: Context,
+    C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();
@@ -682,7 +682,7 @@ impl<O> VariantStructEncoder<O> {
 #[cfg(feature = "alloc")]
 impl<C, O> StructEncoder<C> for VariantStructEncoder<O>
 where
-    C: Context,
+    C: ?Sized + Context,
     O: ValueOutput,
 {
     type Ok = ();

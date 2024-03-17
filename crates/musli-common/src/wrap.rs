@@ -36,7 +36,7 @@ where
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -46,9 +46,9 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
-        self.inner.write_all(bytes).map_err(|e| cx.custom(e))?;
+        self.inner.write_all(bytes).map_err(cx.map())?;
         cx.advance(bytes.len());
         Ok(())
     }

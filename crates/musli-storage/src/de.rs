@@ -35,9 +35,8 @@ pub struct LimitedStorageDecoder<R, const F: Options> {
 }
 
 #[musli::decoder]
-impl<'de, R, const F: Options, C> Decoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> Decoder<'de, C> for StorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type Decoder<U> = Self where U: Context;
@@ -102,7 +101,7 @@ where
 
         impl<'de, C, V> ValueVisitor<'de, C, [u8]> for Visitor<V>
         where
-            C: Context,
+            C: ?Sized + Context,
             V: ValueVisitor<'de, C, str>,
         {
             type Ok = V::Ok;
@@ -269,9 +268,8 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C> PackDecoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> PackDecoder<'de, C> for StorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type Decoder<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -294,16 +292,16 @@ where
     #[inline]
     fn new<C>(cx: &C, mut decoder: StorageDecoder<R, F>) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let remaining = musli_common::int::decode_usize::<_, _, F>(cx, &mut decoder.reader)?;
         Ok(Self { remaining, decoder })
     }
 }
 
-impl<'de, R, const F: Options, C> SequenceDecoder<'de, C> for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> SequenceDecoder<'de, C>
+    for LimitedStorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type Decoder<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -330,9 +328,9 @@ where
 }
 
 #[musli::map_decoder]
-impl<'de, R, const F: Options, C> MapDecoder<'de, C> for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> MapDecoder<'de, C>
+    for LimitedStorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type Entry<'this> = StorageDecoder<R::Mut<'this>, F>
@@ -366,9 +364,8 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C> MapEntryDecoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> MapEntryDecoder<'de, C> for StorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type MapKey<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -391,9 +388,9 @@ where
 }
 
 #[musli::struct_decoder]
-impl<'de, R, const F: Options, C> StructDecoder<'de, C> for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> StructDecoder<'de, C>
+    for LimitedStorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type Field<'this> = StorageDecoder<R::Mut<'this>, F>
@@ -423,9 +420,9 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C> StructFieldDecoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> StructFieldDecoder<'de, C>
+    for StorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type FieldName<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -447,9 +444,9 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C> MapPairsDecoder<'de, C> for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> MapPairsDecoder<'de, C>
+    for LimitedStorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type MapPairsKey<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -481,9 +478,9 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C> StructPairsDecoder<'de, C> for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> StructPairsDecoder<'de, C>
+    for LimitedStorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type FieldName<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -515,9 +512,8 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C> VariantDecoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> VariantDecoder<'de, C> for StorageDecoder<R, F>
 where
-    C: Context,
     R: Reader<'de>,
 {
     type Tag<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;

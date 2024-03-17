@@ -53,19 +53,19 @@ pub trait Writer {
     /// Write a buffer to the current writer.
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         B: Buf;
 
     /// Write bytes to the current writer.
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context;
+        C: ?Sized + Context;
 
     /// Write a single byte.
     #[inline]
     fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         self.write_bytes(cx, &[b])
     }
@@ -85,7 +85,7 @@ where
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         B: Buf,
     {
         (*self).write_buffer(cx, buffer)
@@ -94,7 +94,7 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (*self).write_bytes(cx, bytes)
     }
@@ -102,7 +102,7 @@ where
     #[inline]
     fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (*self).write_byte(cx, b)
     }
@@ -120,7 +120,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -130,7 +130,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         self.extend_from_slice(bytes);
         cx.advance(bytes.len());
@@ -140,7 +140,7 @@ impl Writer for Vec<u8> {
     #[inline]
     fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         self.push(b);
         cx.advance(1);
@@ -159,7 +159,7 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -169,7 +169,7 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         if self.len() < bytes.len() {
             return Err(cx.custom(SliceOverflow {
@@ -188,7 +188,7 @@ impl Writer for &mut [u8] {
     #[inline]
     fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         if self.is_empty() {
             return Err(cx.message(format_args!(
@@ -236,7 +236,7 @@ where
     #[inline(always)]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         B: Buf,
     {
         if !self.buf.write(buffer.as_slice()) {
@@ -249,7 +249,7 @@ where
     #[inline(always)]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         if !self.buf.write(bytes) {
             return Err(cx.message("Buffer overflow"));

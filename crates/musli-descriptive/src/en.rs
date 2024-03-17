@@ -48,9 +48,8 @@ impl<W, B, const F: Options> SelfPackEncoder<W, B, F> {
 }
 
 #[musli::encoder]
-impl<C, W, const F: Options> Encoder<C> for SelfEncoder<W, F>
+impl<C: ?Sized + Context, W, const F: Options> Encoder<C> for SelfEncoder<W, F>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -305,9 +304,8 @@ where
     }
 }
 
-impl<C, W, B, const F: Options> SequenceEncoder<C> for SelfPackEncoder<W, B, F>
+impl<C: ?Sized + Context, W, B, const F: Options> SequenceEncoder<C> for SelfPackEncoder<W, B, F>
 where
-    C: Context,
     W: Writer,
     B: Buf,
 {
@@ -356,9 +354,8 @@ where
     }
 }
 
-impl<C, W, const F: Options> SequenceEncoder<C> for SelfEncoder<W, F>
+impl<C: ?Sized + Context, W, const F: Options> SequenceEncoder<C> for SelfEncoder<W, F>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -375,9 +372,8 @@ where
     }
 }
 
-impl<C, W, const F: Options> MapEncoder<C> for SelfEncoder<W, F>
+impl<C: ?Sized + Context, W, const F: Options> MapEncoder<C> for SelfEncoder<W, F>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -394,9 +390,8 @@ where
     }
 }
 
-impl<C, W, const F: Options> MapEntryEncoder<C> for SelfEncoder<W, F>
+impl<C: ?Sized + Context, W, const F: Options> MapEntryEncoder<C> for SelfEncoder<W, F>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -419,9 +414,8 @@ where
     }
 }
 
-impl<C, W, const F: Options> MapPairsEncoder<C> for SelfEncoder<W, F>
+impl<C: ?Sized + Context, W, const F: Options> MapPairsEncoder<C> for SelfEncoder<W, F>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -444,9 +438,8 @@ where
     }
 }
 
-impl<C, W, const F: Options> StructEncoder<C> for SelfEncoder<W, F>
+impl<C: ?Sized + Context, W, const F: Options> StructEncoder<C> for SelfEncoder<W, F>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -463,9 +456,8 @@ where
     }
 }
 
-impl<C, W, const F: Options> StructFieldEncoder<C> for SelfEncoder<W, F>
+impl<C: ?Sized + Context, W, const F: Options> StructFieldEncoder<C> for SelfEncoder<W, F>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -488,9 +480,8 @@ where
     }
 }
 
-impl<C, W, const F: Options> VariantEncoder<C> for SelfEncoder<W, F>
+impl<C: ?Sized + Context, W, const F: Options> VariantEncoder<C> for SelfEncoder<W, F>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -515,14 +506,13 @@ where
 
 /// Encode a length prefix.
 #[inline]
-fn encode_prefix<C, W, const F: Options>(
+fn encode_prefix<C: ?Sized + Context, W, const F: Options>(
     cx: &C,
     mut writer: W,
     kind: Kind,
     len: usize,
 ) -> Result<(), C::Error>
 where
-    C: Context,
     W: Writer,
 {
     let (tag, embedded) = Tag::with_len(kind, len);

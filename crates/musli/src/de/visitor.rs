@@ -15,10 +15,7 @@ use super::ValueVisitor;
 /// Each callback on this visitor indicates the type that should be decoded from
 /// the passed in decoder. A typical implementation would simply call the
 /// corresponding decoder function for the type being visited.
-pub trait Visitor<'de, C>: Sized
-where
-    C: Context,
-{
+pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     /// The value produced by the visitor.
     type Ok;
     /// String decoder to use.
@@ -280,12 +277,12 @@ where
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<C, T> {
+struct ExpectingWrapper<'a, C: ?Sized, T> {
     inner: T,
-    _marker: PhantomData<C>,
+    _marker: PhantomData<&'a C>,
 }
 
-impl<C, T> ExpectingWrapper<C, T> {
+impl<'a, C: ?Sized, T> ExpectingWrapper<'a, C, T> {
     fn new(inner: T) -> Self {
         Self {
             inner,
@@ -294,9 +291,9 @@ impl<C, T> ExpectingWrapper<C, T> {
     }
 }
 
-impl<'de, C, T> Expecting for ExpectingWrapper<C, T>
+impl<'a, 'de, C, T> Expecting for ExpectingWrapper<'a, C, T>
 where
-    C: Context,
+    C: ?Sized + Context,
     T: Visitor<'de, C>,
 {
     #[inline]

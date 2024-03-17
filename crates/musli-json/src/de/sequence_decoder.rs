@@ -22,7 +22,7 @@ where
     #[inline]
     pub(crate) fn new<C>(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let actual = parser.peek(cx)?;
 
@@ -43,7 +43,7 @@ where
 
 impl<'de, C, P> SequenceDecoder<'de, C> for JsonSequenceDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type Decoder<'this> = JsonDecoder<P::Mut<'this>>
@@ -103,7 +103,7 @@ where
 
 impl<'de, C, P> PackDecoder<'de, C> for JsonSequenceDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type Decoder<'this> = JsonDecoder<P::Mut<'this>>

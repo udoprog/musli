@@ -12,7 +12,7 @@ mod bytes {
 
     pub(crate) fn encode<C, E>(this: &[u8], cx: &C, mut encoder: E) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         todo!()
@@ -20,7 +20,7 @@ mod bytes {
 
     pub(crate) fn decode<'de, C, D>(cx: &C, mut decoder: D) -> Result<Vec<u8>, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         todo!()

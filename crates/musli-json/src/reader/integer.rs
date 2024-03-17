@@ -215,7 +215,7 @@ where
 /// Implementation to skip over a well-formed JSON number.
 pub(crate) fn skip_number<'de, C, P>(cx: &C, p: &mut P) -> Result<(), C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -266,7 +266,7 @@ where
 pub(crate) fn parse_unsigned_base<'de, T, C, P>(cx: &C, p: &mut P) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -281,7 +281,7 @@ where
 pub(crate) fn parse_unsigned_full<'de, T, C, P>(cx: &C, p: &mut P) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -298,7 +298,7 @@ where
 #[inline(always)]
 fn decode_signed_base<'de, T, C, P>(cx: &C, p: &mut P) -> Result<SignedPartsBase<T>, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
@@ -325,7 +325,7 @@ pub(crate) fn decode_signed_full<'de, T, C, P>(
     p: &mut P,
 ) -> Result<SignedPartsFull<T>, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
@@ -338,7 +338,7 @@ where
 #[inline(always)]
 fn decode_signed_full_inner<'de, T, C, P>(cx: &C, p: &mut P) -> Result<SignedPartsFull<T>, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
@@ -365,7 +365,7 @@ where
 pub(crate) fn parse_signed_base<'de, T, C, P>(cx: &C, p: &mut P) -> Result<T, C::Error>
 where
     T: Signed,
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -384,7 +384,7 @@ where
 pub(crate) fn parse_signed_full<'de, T, C, P>(cx: &C, p: &mut P) -> Result<T, C::Error>
 where
     T: Signed,
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     p.skip_whitespace(cx)?;
@@ -403,7 +403,7 @@ where
 fn decode_unsigned_base<'de, T, C, P>(cx: &C, p: &mut P, start: C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     let base = match p.read_byte(cx)? {
@@ -435,7 +435,7 @@ fn decode_unsigned_full<'de, T, C, P>(
 ) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     let base = decode_unsigned_base(cx, p, start)?;
@@ -485,7 +485,7 @@ where
 #[inline(always)]
 fn decode_exponent<'de, C, P>(cx: &C, p: &mut P, start: C::Mark) -> Result<i32, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     let mut is_negative = false;
@@ -517,7 +517,7 @@ where
 fn digit<'de, T, C, P>(cx: &C, out: T, p: &mut P, start: C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     let Some(out) = out.checked_mul10() else {
@@ -531,7 +531,7 @@ where
 #[inline(always)]
 fn decode_zeros<'de, C, P>(cx: &C, p: &mut P) -> Result<i32, C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: ?Sized + Parser<'de>,
 {
     let mut count = 0i32;

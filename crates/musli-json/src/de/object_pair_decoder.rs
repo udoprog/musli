@@ -18,7 +18,7 @@ impl<P> JsonObjectPairDecoder<P> {
 
 impl<'de, C, P> MapEntryDecoder<'de, C> for JsonObjectPairDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type MapKey<'this> = JsonKeyDecoder<P::Mut<'this>>
@@ -59,7 +59,7 @@ where
 
 impl<'de, C, P> StructFieldDecoder<'de, C> for JsonObjectPairDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type FieldName<'this> = JsonKeyDecoder<P::Mut<'this>>

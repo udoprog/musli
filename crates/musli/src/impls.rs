@@ -20,7 +20,7 @@ impl<M> Encode<M> for () {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         encoder.encode_unit(cx)
@@ -31,7 +31,7 @@ impl<'de, M> Decode<'de, M> for () {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         decoder.decode_unit(cx)
@@ -42,7 +42,7 @@ impl<T, M> Encode<M> for marker::PhantomData<T> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         encoder.encode_unit(cx)
@@ -52,7 +52,7 @@ impl<T, M> Encode<M> for marker::PhantomData<T> {
 impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T> {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         decoder.decode_unit(cx)?;
@@ -67,7 +67,7 @@ macro_rules! atomic_impl {
             impl<'de, M> Decode<'de, M> for core::sync::atomic::$ty {
                 fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
                 where
-                    C: Context,
+                    C: ?Sized + Context,
                     D: Decoder<'de, C>,
                 {
                     cx.decode(decoder).map(Self::new)
@@ -89,7 +89,7 @@ macro_rules! non_zero {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context,
+                C: ?Sized + Context,
                 E: Encoder<C>,
             {
                 self.get().encode(cx, encoder)
@@ -99,7 +99,7 @@ macro_rules! non_zero {
         impl<'de, M> Decode<'de, M> for $ty {
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context,
+                C: ?Sized + Context,
                 D: Decoder<'de, C>,
             {
                 let value = cx.decode(decoder)?;
@@ -151,7 +151,7 @@ impl<M, const N: usize> Encode<M> for [u8; N] {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         encoder.encode_array(cx, *self)
@@ -162,7 +162,7 @@ impl<'de, M, const N: usize> Decode<'de, M> for [u8; N] {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         decoder.decode_array(cx)
@@ -175,7 +175,7 @@ macro_rules! impl_number {
             #[inline]
             fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
-                C: Context,
+                C: ?Sized + Context,
                 E: Encoder<C>,
             {
                 encoder.$write(cx, *self)
@@ -186,7 +186,7 @@ macro_rules! impl_number {
             #[inline]
             fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
-                C: Context,
+                C: ?Sized + Context,
                 D: Decoder<'de, C>,
             {
                 decoder.$read(cx)
@@ -199,7 +199,7 @@ impl<M> Encode<M> for bool {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         encoder.encode_bool(cx, *self)
@@ -210,7 +210,7 @@ impl<'de, M> Decode<'de, M> for bool {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         decoder.decode_bool(cx)
@@ -221,7 +221,7 @@ impl<M> Encode<M> for char {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         encoder.encode_char(cx, *self)
@@ -232,7 +232,7 @@ impl<'de, M> Decode<'de, M> for char {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         decoder.decode_char(cx)
@@ -258,7 +258,7 @@ impl<M> Encode<M> for str {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         encoder.encode_string(cx, self)
@@ -269,14 +269,14 @@ impl<'de, M> Decode<'de, M> for &'de str {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         struct Visitor;
 
         impl<'de, C> ValueVisitor<'de, C, str> for Visitor
         where
-            C: Context,
+            C: ?Sized + Context,
         {
             type Ok = &'de str;
 
@@ -298,7 +298,7 @@ impl<'de, M> Decode<'de, M> for &'de str {
 impl<M> Encode<M> for [u8] {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         encoder.encode_bytes(cx, self)
@@ -309,14 +309,14 @@ impl<'de, M> Decode<'de, M> for &'de [u8] {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         struct Visitor;
 
         impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
         where
-            C: Context,
+            C: ?Sized + Context,
         {
             type Ok = &'de [u8];
 
@@ -342,7 +342,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         match self {
@@ -361,7 +361,7 @@ where
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         D: Decoder<'de, C>,
     {
         if let Some(decoder) = decoder.decode_option(cx)? {
@@ -387,7 +387,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         let variant = encoder.encode_variant(cx)?;
@@ -407,7 +407,7 @@ where
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         D: Decoder<'de, C>,
     {
         let mut variant = decoder.decode_variant(cx)?;
@@ -431,7 +431,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         self.0.encode(cx, encoder)
@@ -445,7 +445,7 @@ where
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         D: Decoder<'de, C>,
     {
         Ok(Wrapping(cx.decode(decoder)?))
@@ -456,7 +456,7 @@ impl<M> Encode<M> for CStr {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         E: Encoder<C>,
     {
         encoder.encode_bytes(cx, self.to_bytes_with_nul())
@@ -467,7 +467,7 @@ impl<'de, M> Decode<'de, M> for &'de CStr {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         let bytes = cx.decode(decoder)?;

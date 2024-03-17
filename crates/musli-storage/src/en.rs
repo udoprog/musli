@@ -29,7 +29,7 @@ impl<W, const F: Options> StorageEncoder<W, F> {
 #[musli::encoder]
 impl<W, const F: Options, C> Encoder<C> for StorageEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -264,7 +264,7 @@ where
 
 impl<W, const F: Options, C> SequenceEncoder<C> for StorageEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -283,7 +283,7 @@ where
 
 impl<W, const F: Options, C> MapEncoder<C> for StorageEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -302,7 +302,7 @@ where
 
 impl<W, const F: Options, C> MapEntryEncoder<C> for StorageEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -327,7 +327,7 @@ where
 
 impl<W, const F: Options, C> MapPairsEncoder<C> for StorageEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -352,7 +352,7 @@ where
 
 impl<W, const F: Options, C> StructEncoder<C> for StorageEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -371,7 +371,7 @@ where
 
 impl<W, const F: Options, C> StructFieldEncoder<C> for StorageEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -396,7 +396,7 @@ where
 
 impl<W, const F: Options, C> VariantEncoder<C> for StorageEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();

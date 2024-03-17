@@ -15,7 +15,7 @@ impl<M> Encode<M> for Bytes<Vec<u8>> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         encoder.encode_bytes(cx, self.0.as_slice())
@@ -26,14 +26,14 @@ impl<'de, M> Decode<'de, M> for Bytes<Vec<u8>> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         D: Decoder<'de, C>,
     {
         struct Visitor;
 
         impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
         where
-            C: Context,
+            C: ?Sized + Context,
         {
             type Ok = Vec<u8>;
 
@@ -61,7 +61,7 @@ impl<M> Encode<M> for Bytes<VecDeque<u8>> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         let (first, second) = self.0.as_slices();
@@ -73,7 +73,7 @@ impl<'de, M> Decode<'de, M> for Bytes<VecDeque<u8>> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         D: Decoder<'de, C>,
     {
         cx.decode(decoder)

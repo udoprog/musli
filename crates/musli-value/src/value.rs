@@ -154,7 +154,7 @@ from!(f64, F64);
 impl<M> Encode<M> for Number {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         match self {
@@ -201,10 +201,7 @@ impl Number {
 struct AnyVisitor;
 
 #[musli::visitor]
-impl<'de, C> Visitor<'de, C> for AnyVisitor
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     type Ok = Value;
     #[cfg(feature = "alloc")]
     type String = StringVisitor;
@@ -383,7 +380,7 @@ where
 impl<'de, M> Decode<'de, M> for Value {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         D: Decoder<'de, C>,
     {
         decoder.decode_any(cx, AnyVisitor)
@@ -394,10 +391,7 @@ impl<'de, M> Decode<'de, M> for Value {
 struct BytesVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C> ValueVisitor<'de, C, [u8]> for BytesVisitor
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, [u8]> for BytesVisitor {
     type Ok = Value;
 
     #[inline]
@@ -421,10 +415,7 @@ where
 struct StringVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C> ValueVisitor<'de, C, str> for StringVisitor
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, str> for StringVisitor {
     type Ok = Value;
 
     #[inline]
@@ -445,10 +436,7 @@ where
 
 struct ValueNumberVisitor;
 
-impl<'de, C> NumberVisitor<'de, C> for ValueNumberVisitor
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> NumberVisitor<'de, C> for ValueNumberVisitor {
     type Ok = Value;
 
     #[inline]
@@ -530,7 +518,7 @@ where
 impl<M> Encode<M> for Value {
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         match self {
@@ -594,10 +582,7 @@ impl<const F: Options> AsValueDecoder<F> {
     }
 }
 
-impl<const F: Options, C> AsDecoder<C> for AsValueDecoder<F>
-where
-    C: Context,
-{
+impl<const F: Options, C: ?Sized + Context> AsDecoder<C> for AsValueDecoder<F> {
     type Decoder<'this> = ValueDecoder<'this, F> where Self: 'this;
 
     #[inline]

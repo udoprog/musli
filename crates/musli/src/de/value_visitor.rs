@@ -23,9 +23,8 @@ use crate::Context;
 /// [Decoder]: crate::de::Decoder
 /// [Decoder::decode_bytes]: crate::de::Decoder::decode_bytes
 /// [Decoder::decode_string]: crate::de::Decoder::decode_string
-pub trait ValueVisitor<'de, C, T>: Sized
+pub trait ValueVisitor<'de, C: ?Sized + Context, T>: Sized
 where
-    C: Context,
     T: ?Sized + ToOwned,
 {
     /// The value produced.
@@ -73,24 +72,21 @@ where
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<U, C, T>(U, marker::PhantomData<(C, T)>)
+struct ExpectingWrapper<'a, U, C: ?Sized, T>(U, marker::PhantomData<(&'a C, T)>)
 where
     T: ?Sized;
 
-impl<U, C, T> ExpectingWrapper<U, C, T>
-where
-    T: ?Sized,
-{
+impl<'a, U, C: ?Sized, T: ?Sized> ExpectingWrapper<'a, U, C, T> {
     #[inline]
     fn new(value: U) -> Self {
         Self(value, marker::PhantomData)
     }
 }
 
-impl<'de, U, C, T> Expecting for ExpectingWrapper<U, C, T>
+impl<'a, 'de, U, C, T> Expecting for ExpectingWrapper<'a, U, C, T>
 where
     U: ValueVisitor<'de, C, T>,
-    C: Context,
+    C: ?Sized + Context,
     T: ?Sized + ToOwned,
 {
     #[inline]

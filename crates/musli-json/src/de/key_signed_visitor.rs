@@ -9,11 +9,11 @@ use crate::reader::SliceParser;
 
 use super::parse_signed;
 
-pub(crate) struct KeySignedVisitor<C, T> {
-    _marker: marker::PhantomData<(C, T)>,
+pub(crate) struct KeySignedVisitor<T> {
+    _marker: marker::PhantomData<T>,
 }
 
-impl<C, T> KeySignedVisitor<C, T> {
+impl<T> KeySignedVisitor<T> {
     pub(super) const fn new() -> Self {
         Self {
             _marker: marker::PhantomData,
@@ -21,9 +21,8 @@ impl<C, T> KeySignedVisitor<C, T> {
     }
 }
 
-impl<'de, C, T> ValueVisitor<'de, C, [u8]> for KeySignedVisitor<C, T>
+impl<'de, C: ?Sized + Context, T> ValueVisitor<'de, C, [u8]> for KeySignedVisitor<T>
 where
-    C: Context,
     T: Signed,
 {
     type Ok = T;

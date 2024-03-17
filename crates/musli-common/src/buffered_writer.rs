@@ -30,7 +30,7 @@ where
     /// Finish writing.
     pub fn finish<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         if !self.buf.is_empty() {
             self.writer.write_bytes(cx, self.buf.as_slice())?;
@@ -54,7 +54,7 @@ where
     #[inline]
     fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         B: Buf,
     {
         // SAFETY: the buffer never outlives this function call.
@@ -64,7 +64,7 @@ where
     #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         if self.buf.remaining() < bytes.len() {
             self.writer.write_bytes(cx, self.buf.as_slice())?;

@@ -39,23 +39,23 @@ pub trait Parser<'de>: private::Sealed {
         scratch: &'scratch mut S,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         S: ?Sized + Buf;
 
     #[doc(hidden)]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
     where
-        C: Context;
+        C: ?Sized + Context;
 
     #[doc(hidden)]
     fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
     where
-        C: Context;
+        C: ?Sized + Context;
 
     #[doc(hidden)]
     fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context;
+        C: ?Sized + Context;
 
     #[doc(hidden)]
     fn pos(&self) -> u32;
@@ -64,18 +64,18 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context;
+        C: ?Sized + Context;
 
     /// Peek the next byte.
     #[doc(hidden)]
     fn peek_byte<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
     where
-        C: Context;
+        C: ?Sized + Context;
 
     #[doc(hidden)]
     fn consume_while<C>(&mut self, cx: &C, m: fn(u8) -> bool) -> Result<usize, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let mut c = 0;
 
@@ -94,7 +94,7 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn peek<C>(&mut self, cx: &C) -> Result<Token, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         self.skip_whitespace(cx)?;
 
@@ -109,17 +109,17 @@ pub trait Parser<'de>: private::Sealed {
     /// Parse a 32-bit floating point number.
     fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
     where
-        C: Context;
+        C: ?Sized + Context;
 
     /// Parse a 64-bit floating point number.
     fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
     where
-        C: Context;
+        C: ?Sized + Context;
 
     #[doc(hidden)]
     fn parse_hex_escape<C>(&mut self, cx: &C) -> Result<u16, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let mut n = 0;
         let start = cx.mark();
@@ -146,7 +146,7 @@ pub trait Parser<'de>: private::Sealed {
         err: ErrorKind,
     ) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let mark = cx.mark();
 
@@ -165,7 +165,7 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn parse_number<C, V>(&mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         V: NumberVisitor<'de, C>,
     {
         let signed = decode_signed_full::<i128, _, _>(cx, self)?;
@@ -253,7 +253,7 @@ where
         scratch: &'scratch mut S,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         S: ?Sized + Buf,
     {
         (**self).parse_string(cx, validate, scratch)
@@ -262,7 +262,7 @@ where
     #[inline(always)]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (**self).read_byte(cx)
     }
@@ -270,7 +270,7 @@ where
     #[inline(always)]
     fn peek<C>(&mut self, cx: &C) -> Result<Token, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (**self).peek(cx)
     }
@@ -283,7 +283,7 @@ where
     #[inline(always)]
     fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (**self).skip_whitespace(cx)
     }
@@ -291,7 +291,7 @@ where
     #[inline(always)]
     fn peek_byte<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (**self).peek_byte(cx)
     }
@@ -299,7 +299,7 @@ where
     #[inline(always)]
     fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (**self).skip(cx, n)
     }
@@ -307,7 +307,7 @@ where
     #[inline(always)]
     fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (**self).read(cx, buf)
     }
@@ -315,7 +315,7 @@ where
     #[inline(always)]
     fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (**self).parse_f32(cx)
     }
@@ -323,7 +323,7 @@ where
     #[inline(always)]
     fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         (**self).parse_f64(cx)
     }

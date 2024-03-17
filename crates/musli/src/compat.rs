@@ -39,7 +39,7 @@ where
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         let mut seq = encoder.encode_sequence(cx, self.0.len())?;
@@ -59,7 +59,7 @@ impl<M> Encode<M> for Sequence<()> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         encoder.encode_sequence(cx, 0)?.end(cx)
@@ -69,7 +69,7 @@ impl<M> Encode<M> for Sequence<()> {
 impl<'de, M> Decode<'de, M> for Sequence<()> {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         let seq = decoder.decode_sequence(cx)?;
@@ -97,7 +97,7 @@ impl<const N: usize, M> Encode<M> for Bytes<[u8; N]> {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
         encoder.encode_array(cx, self.0)
@@ -108,7 +108,7 @@ impl<'de, M, const N: usize> Decode<'de, M> for Bytes<[u8; N]> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         decoder.decode_array(cx).map(Self)

@@ -174,7 +174,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         W: Writer,
         T: ?Sized + Encode<M>,
     {
@@ -202,7 +202,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
@@ -233,7 +233,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn decode_with<'de, C, P, T>(self, cx: &C, parser: P) -> Result<T, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
@@ -258,7 +258,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         T: Decode<'de, M>,
     {
         self.from_slice_with(cx, string.as_bytes())
@@ -285,7 +285,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         T: Decode<'de, M>,
     {
         let mut reader = SliceParser::new(bytes);

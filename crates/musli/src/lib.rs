@@ -130,7 +130,7 @@
 //! impl<'de, M> Decode<'de, M> for MyType {
 //!     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 //!     where
-//!         C: Context<Mode = M>,
+//!         C: ?Sized + Context<Mode = M>,
 //!         D: Decoder<'de, C>,
 //!     {
 //!         let mut seq = decoder.decode_sequence(cx)?;
@@ -445,7 +445,7 @@ pub use self::en::{Encode, Encoder};
 /// }
 ///
 /// #[musli::encoder]
-/// impl<C> Encoder<C> for MyEncoder<'_> where C: Context {
+/// impl<C: ?Sized + Context> Encoder<C> for MyEncoder<'_> {
 ///     type Ok = ();
 ///     type Encoder<U> = Self where U: Context;
 ///
@@ -483,7 +483,7 @@ pub use musli_macros::encoder;
 /// struct MyDecoder;
 ///
 /// #[musli::decoder]
-/// impl<C> Decoder<'_, C> for MyDecoder where C: Context {
+/// impl<C: ?Sized + Context> Decoder<'_, C> for MyDecoder {
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
@@ -543,10 +543,7 @@ pub use musli_macros::struct_decoder;
 /// struct AnyVisitor;
 ///
 /// #[musli::visitor]
-/// impl<'de, C> Visitor<'de, C> for AnyVisitor
-/// where
-///     C: Context,
-/// {
+/// impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 ///     type Ok = ();
 ///
 ///     #[inline]

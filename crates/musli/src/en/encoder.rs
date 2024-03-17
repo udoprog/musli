@@ -6,13 +6,9 @@ use crate::expecting::{self, Expecting};
 use crate::Context;
 
 /// Trait governing how to encode a sequence.
-pub trait SequenceEncoder<C>
-where
-    C: Context,
-{
+pub trait SequenceEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
-
     /// The encoder returned when advancing the sequence encoder.
     type Encoder<'this>: Encoder<C, Ok = Self::Ok>
     where
@@ -38,13 +34,9 @@ where
 }
 
 /// Encoder for a map.
-pub trait MapEncoder<C>
-where
-    C: Context,
-{
+pub trait MapEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
-
     /// Encode the next pair.
     type Entry<'this>: MapEntryEncoder<C, Ok = Self::Ok>
     where
@@ -70,18 +62,13 @@ where
 }
 
 /// Trait governing how to encode a map entry.
-pub trait MapEntryEncoder<C>
-where
-    C: Context,
-{
+pub trait MapEntryEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
-
     /// The encoder returned when advancing the map encoder to encode the key.
     type MapKey<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
-
     /// The encoder returned when advancing the map encoder to encode the value.
     type MapValue<'this>: Encoder<C, Ok = Self::Ok>
     where
@@ -119,18 +106,13 @@ where
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
-pub trait MapPairsEncoder<C>
-where
-    C: Context,
-{
+pub trait MapPairsEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
-
     /// The encoder returned when advancing the map encoder to encode the key.
     type MapPairsKey<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
-
     /// The encoder returned when advancing the map encoder to encode the value.
     type MapPairsValue<'this>: Encoder<C, Ok = Self::Ok>
     where
@@ -161,13 +143,9 @@ where
 }
 
 /// Encoder for a struct.
-pub trait StructEncoder<C>
-where
-    C: Context,
-{
+pub trait StructEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
-
     /// Encoder for the next struct field.
     type Field<'this>: StructFieldEncoder<C, Ok = Self::Ok>
     where
@@ -192,18 +170,13 @@ where
 }
 
 /// Trait governing how to encode a sequence of pairs.
-pub trait StructFieldEncoder<C>
-where
-    C: Context,
-{
+pub trait StructFieldEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
-
     /// The encoder returned when advancing the map encoder to encode the key.
     type FieldName<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
-
     /// The encoder returned when advancing the map encoder to encode the value.
     type FieldValue<'this>: Encoder<C, Ok = Self::Ok>
     where
@@ -235,18 +208,13 @@ where
 }
 
 /// Trait governing how to encode a variant.
-pub trait VariantEncoder<C>
-where
-    C: Context,
-{
+pub trait VariantEncoder<C: ?Sized + Context> {
     /// Result type of the encoder.
     type Ok;
-
     /// The encoder returned when advancing the map encoder to encode the key.
     type Tag<'this>: Encoder<C, Ok = Self::Ok>
     where
         Self: 'this;
-
     /// The encoder returned when advancing the map encoder to encode the value.
     type Variant<'this>: Encoder<C, Ok = Self::Ok>
     where
@@ -278,10 +246,7 @@ where
 }
 
 /// Trait governing how the encoder works.
-pub trait Encoder<C>: Sized
-where
-    C: Context,
-{
+pub trait Encoder<C: ?Sized + Context>: Sized {
     /// The type returned by the encoder. For [Encode] implementations ensures
     /// that they are used correctly, since only functions returned by the
     /// [Encoder] is capable of returning this value.
@@ -346,7 +311,7 @@ where
     /// impl<M> Encode<M> for EmptyStruct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_unit(cx)
@@ -375,7 +340,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_bool(cx, self.data)
@@ -404,7 +369,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_char(cx, self.data)
@@ -433,7 +398,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u8(cx, self.data)
@@ -462,7 +427,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u16(cx, self.data)
@@ -491,7 +456,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u32(cx, self.data)
@@ -520,7 +485,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u64(cx, self.data)
@@ -549,7 +514,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_u128(cx, self.data)
@@ -578,7 +543,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i8(cx, self.data)
@@ -607,7 +572,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i16(cx, self.data)
@@ -636,7 +601,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i32(cx, self.data)
@@ -665,7 +630,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i64(cx, self.data)
@@ -694,7 +659,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_i128(cx, self.data)
@@ -723,7 +688,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_usize(cx, self.data)
@@ -752,7 +717,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_isize(cx, self.data)
@@ -781,7 +746,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_f32(cx, self.data)
@@ -810,7 +775,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_f64(cx, self.data)
@@ -839,7 +804,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_array(cx, self.data)
@@ -868,7 +833,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_bytes(cx, self.data.as_slice())
@@ -904,7 +869,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         let (first, second) = self.data.as_slices();
@@ -934,7 +899,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         encoder.encode_string(cx, self.data.as_str())
@@ -963,7 +928,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         match &self.data {
@@ -999,7 +964,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         match &self.data {
@@ -1042,7 +1007,7 @@ where
     /// impl<M> Encode<M> for PackedStruct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         let mut pack = encoder.encode_pack(cx)?;
@@ -1081,7 +1046,7 @@ where
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         let mut seq = encoder.encode_sequence(cx, self.data.len())?;
@@ -1127,7 +1092,7 @@ where
     /// impl<M> Encode<M> for PackedTuple {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         let mut tuple = encoder.encode_tuple(cx, 2)?;
@@ -1161,7 +1126,7 @@ where
     /// impl<M> Encode<M> for Struct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         let mut map = encoder.encode_map(cx, 2)?;
@@ -1195,7 +1160,7 @@ where
     /// impl<M> Encode<M> for Struct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         let mut m = encoder.encode_map_pairs(cx, 2)?;
@@ -1233,7 +1198,7 @@ where
     /// impl<M> Encode<M> for Struct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         let mut st = encoder.encode_struct(cx, 2)?;
@@ -1271,7 +1236,7 @@ where
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         let mut variant = encoder.encode_variant(cx)?;
@@ -1325,7 +1290,7 @@ where
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         match self {
@@ -1380,7 +1345,7 @@ where
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         match self {
@@ -1439,7 +1404,7 @@ where
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         E: Encoder<C>,
     ///     {
     ///         match self {
@@ -1480,12 +1445,12 @@ where
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<T, C> {
+struct ExpectingWrapper<'a, T, C: ?Sized> {
     inner: T,
-    _marker: PhantomData<C>,
+    _marker: PhantomData<&'a C>,
 }
 
-impl<T, C> ExpectingWrapper<T, C> {
+impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
     #[inline]
     const fn new(inner: T) -> Self {
         Self {
@@ -1495,10 +1460,10 @@ impl<T, C> ExpectingWrapper<T, C> {
     }
 }
 
-impl<T, C> Expecting for ExpectingWrapper<T, C>
+impl<'a, T, C> Expecting for ExpectingWrapper<'a, T, C>
 where
     T: Encoder<C>,
-    C: Context,
+    C: ?Sized + Context,
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

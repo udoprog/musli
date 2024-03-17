@@ -10,12 +10,12 @@ use serde::de;
 #[cfg(feature = "alloc")]
 use alloc::string::String;
 
-pub struct Deserializer<'a, C, D> {
+pub struct Deserializer<'a, C: ?Sized, D> {
     cx: &'a C,
     decoder: D,
 }
 
-impl<'a, C, D> Deserializer<'a, C, D> {
+impl<'a, C: ?Sized, D> Deserializer<'a, C, D> {
     /// Construct a new deserializer out of a decoder.
     pub fn new(cx: &'a C, decoder: D) -> Self {
         Self { cx, decoder }
@@ -24,7 +24,7 @@ impl<'a, C, D> Deserializer<'a, C, D> {
 
 impl<'de, 'a, C, D> de::Deserializer<'de> for Deserializer<'a, C, D>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     D: Decoder<'de, C>,
 {
@@ -339,15 +339,14 @@ where
     }
 }
 
-struct TupleAccess<'a, C, D> {
+struct TupleAccess<'a, C: ?Sized, D> {
     cx: &'a C,
     decoder: &'a mut D,
     remaining: usize,
 }
 
-impl<'a, C, D> TupleAccess<'a, C, D> {
-    fn new(cx: &'a C, decoder: &'a mut D, len: usize) -> Self
-where {
+impl<'a, C: ?Sized, D> TupleAccess<'a, C, D> {
+    fn new(cx: &'a C, decoder: &'a mut D, len: usize) -> Self {
         TupleAccess {
             cx,
             decoder,
@@ -358,7 +357,7 @@ where {
 
 impl<'de, 'a, C, D> de::SeqAccess<'de> for TupleAccess<'a, C, D>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     D: PackDecoder<'de, C>,
 {
@@ -385,13 +384,13 @@ where
         Some(self.remaining)
     }
 }
-struct StructAccess<'a, C, D> {
+struct StructAccess<'a, C: ?Sized, D> {
     cx: &'a C,
     decoder: &'a mut D,
     remaining: usize,
 }
 
-impl<'a, C, D> StructAccess<'a, C, D> {
+impl<'a, C: ?Sized, D> StructAccess<'a, C, D> {
     #[inline]
     fn new(cx: &'a C, decoder: &'a mut D, fields: &'static [&'static str]) -> Self {
         StructAccess {
@@ -404,7 +403,7 @@ impl<'a, C, D> StructAccess<'a, C, D> {
 
 impl<'de, 'a, C, D> de::MapAccess<'de> for StructAccess<'a, C, D>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     D: StructPairsDecoder<'de, C>,
 {
@@ -454,7 +453,7 @@ impl<V> BytesVisitor<V> {
 
 impl<'de, C, V> musli::de::ValueVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     V: de::Visitor<'de>,
 {
@@ -482,12 +481,12 @@ where
     }
 }
 
-struct SeqAccess<'a, C, D> {
+struct SeqAccess<'a, C: ?Sized, D> {
     cx: &'a C,
     decoder: &'a mut D,
 }
 
-impl<'a, C, D> SeqAccess<'a, C, D> {
+impl<'a, C: ?Sized, D> SeqAccess<'a, C, D> {
     fn new(cx: &'a C, decoder: &'a mut D) -> Self {
         Self { cx, decoder }
     }
@@ -495,7 +494,7 @@ impl<'a, C, D> SeqAccess<'a, C, D> {
 
 impl<'de, 'a, C, D> de::SeqAccess<'de> for SeqAccess<'a, C, D>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     D: SequenceDecoder<'de, C>,
 {
@@ -523,12 +522,12 @@ where
     }
 }
 
-struct MapAccess<'a, C, D: ?Sized> {
+struct MapAccess<'a, C: ?Sized, D: ?Sized> {
     cx: &'a C,
     decoder: &'a mut D,
 }
 
-impl<'a, C, D: ?Sized> MapAccess<'a, C, D> {
+impl<'a, C: ?Sized, D: ?Sized> MapAccess<'a, C, D> {
     fn new(cx: &'a C, decoder: &'a mut D) -> Self {
         Self { cx, decoder }
     }
@@ -536,7 +535,7 @@ impl<'a, C, D: ?Sized> MapAccess<'a, C, D> {
 
 impl<'de, 'a, C, D: ?Sized> de::MapAccess<'de> for MapAccess<'a, C, D>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     D: MapPairsDecoder<'de, C>,
 {
@@ -578,7 +577,7 @@ impl<V> StringVisitor<V> {
 
 impl<'de, C, V> musli::de::ValueVisitor<'de, C, str> for StringVisitor<V>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     V: de::Visitor<'de>,
 {
@@ -618,7 +617,7 @@ impl<V> NumberVisitor<V> {
 
 impl<'de, C, V> musli::de::NumberVisitor<'de, C> for NumberVisitor<V>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     V: de::Visitor<'de>,
 {
@@ -713,12 +712,12 @@ where
     }
 }
 
-struct EnumAccess<'a, C, D> {
+struct EnumAccess<'a, C: ?Sized, D> {
     cx: &'a C,
     decoder: D,
 }
 
-impl<'a, C, D> EnumAccess<'a, C, D> {
+impl<'a, C: ?Sized, D> EnumAccess<'a, C, D> {
     fn new(cx: &'a C, decoder: D) -> Self {
         Self { cx, decoder }
     }
@@ -726,7 +725,7 @@ impl<'a, C, D> EnumAccess<'a, C, D> {
 
 impl<'a, 'de, C, D> de::VariantAccess<'de> for EnumAccess<'a, C, D>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     D: VariantDecoder<'de, C>,
 {
@@ -782,7 +781,7 @@ where
 
 impl<'a, 'de, C, D> de::EnumAccess<'de> for EnumAccess<'a, C, D>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     D: VariantDecoder<'de, C>,
 {
@@ -813,7 +812,7 @@ impl<V> AnyVisitor<V> {
 #[musli::visitor]
 impl<'de, C, V> Visitor<'de, C> for AnyVisitor<V>
 where
-    C: Context,
+    C: ?Sized + Context,
     C::Error: de::Error,
     V: de::Visitor<'de>,
 {

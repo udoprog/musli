@@ -60,7 +60,7 @@ pub enum NeverMarker {}
 /// struct MyDecoder(u32);
 ///
 /// #[musli::decoder]
-/// impl<C> Decoder<'_, C> for MyDecoder where C: Context {
+/// impl<C: ?Sized + Context> Decoder<'_, C> for MyDecoder where {
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
@@ -80,10 +80,7 @@ pub struct Never<C = NeverMarker, B: ?Sized = NeverMarker> {
     _marker: marker::PhantomData<(C, B)>,
 }
 
-impl<'de, C> Decoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> Decoder<'de, C> for Never {
     type Decoder<U> = Self
     where
         U: Context;
@@ -111,10 +108,7 @@ where
     }
 }
 
-impl<C> AsDecoder<C> for Never
-where
-    C: Context,
-{
+impl<C: ?Sized + Context> AsDecoder<C> for Never {
     type Decoder<'this> = Self
     where
         Self: 'this;
@@ -125,10 +119,7 @@ where
     }
 }
 
-impl<'de, C> StructFieldDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> StructFieldDecoder<'de, C> for Never {
     type FieldName<'this> = Self
     where
         Self: 'this;
@@ -151,10 +142,7 @@ where
     }
 }
 
-impl<'de, C> MapPairsDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> MapPairsDecoder<'de, C> for Never {
     type MapPairsKey<'this> = Self
     where
         Self: 'this;
@@ -182,10 +170,7 @@ where
     }
 }
 
-impl<'de, C> StructDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> StructDecoder<'de, C> for Never {
     type Field<'this> = Self
     where
         Self: 'this;
@@ -215,10 +200,7 @@ where
     }
 }
 
-impl<'de, C> StructPairsDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> StructPairsDecoder<'de, C> for Never {
     type FieldName<'this> = Self
     where
         Self: 'this;
@@ -246,10 +228,7 @@ where
     }
 }
 
-impl<'de, C> VariantDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> VariantDecoder<'de, C> for Never {
     type Tag<'this> = Self
     where
         Self: 'this;
@@ -277,10 +256,7 @@ where
     }
 }
 
-impl<'de, C> MapDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> MapDecoder<'de, C> for Never {
     type Entry<'this> = Self
     where
         Self: 'this;
@@ -310,10 +286,7 @@ where
     }
 }
 
-impl<'de, C> MapEntryDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> MapEntryDecoder<'de, C> for Never {
     type MapKey<'this> = Self
     where
         Self: 'this;
@@ -336,10 +309,7 @@ where
     }
 }
 
-impl<'de, C> SequenceDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> SequenceDecoder<'de, C> for Never {
     type Decoder<'this> = Self
     where
         Self: 'this;
@@ -360,10 +330,7 @@ where
     }
 }
 
-impl<'de, C> PackDecoder<'de, C> for Never
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context> PackDecoder<'de, C> for Never {
     type Decoder<'this> = Self
     where
         Self: 'this;
@@ -379,10 +346,7 @@ where
     }
 }
 
-impl<O, C> Encoder<C> for Never<O>
-where
-    C: Context,
-{
+impl<O, C: ?Sized + Context> Encoder<C> for Never<O> {
     type Ok = O;
     type Encoder<U> = Self where U: Context;
     type Pack<'this> = Self where C: 'this;
@@ -411,10 +375,7 @@ where
     }
 }
 
-impl<'de, O, C> NumberVisitor<'de, C> for Never<O>
-where
-    C: Context,
-{
+impl<'de, O, C: ?Sized + Context> NumberVisitor<'de, C> for Never<O> {
     type Ok = O;
 
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -424,7 +385,7 @@ where
 
 impl<'de, O, C, T> ValueVisitor<'de, C, T> for Never<O, T>
 where
-    C: Context,
+    C: ?Sized + Context,
     T: ?Sized + ToOwned,
 {
     type Ok = O;
@@ -434,10 +395,7 @@ where
     }
 }
 
-impl<O, C> SequenceEncoder<C> for Never<O>
-where
-    C: Context,
-{
+impl<O, C: ?Sized + Context> SequenceEncoder<C> for Never<O> {
     type Ok = O;
 
     type Encoder<'this> = Self
@@ -455,10 +413,7 @@ where
     }
 }
 
-impl<O, C> MapEncoder<C> for Never<O>
-where
-    C: Context,
-{
+impl<O, C: ?Sized + Context> MapEncoder<C> for Never<O> {
     type Ok = O;
     type Entry<'this> = Self where Self: 'this;
 
@@ -472,10 +427,7 @@ where
     }
 }
 
-impl<O, C> MapEntryEncoder<C> for Never<O>
-where
-    C: Context,
-{
+impl<O, C: ?Sized + Context> MapEntryEncoder<C> for Never<O> {
     type Ok = O;
     type MapKey<'this> = Self
     where
@@ -498,10 +450,7 @@ where
     }
 }
 
-impl<O, C> MapPairsEncoder<C> for Never<O>
-where
-    C: Context,
-{
+impl<O, C: ?Sized + Context> MapPairsEncoder<C> for Never<O> {
     type Ok = O;
     type MapPairsKey<'this> = Self
     where
@@ -524,10 +473,7 @@ where
     }
 }
 
-impl<O, C> StructEncoder<C> for Never<O>
-where
-    C: Context,
-{
+impl<O, C: ?Sized + Context> StructEncoder<C> for Never<O> {
     type Ok = O;
     type Field<'this> = Self where Self: 'this;
 
@@ -541,10 +487,7 @@ where
     }
 }
 
-impl<O, C> StructFieldEncoder<C> for Never<O>
-where
-    C: Context,
-{
+impl<O, C: ?Sized + Context> StructFieldEncoder<C> for Never<O> {
     type Ok = O;
     type FieldName<'this> = Self
     where
@@ -567,10 +510,7 @@ where
     }
 }
 
-impl<O, C> VariantEncoder<C> for Never<O>
-where
-    C: Context,
-{
+impl<O, C: ?Sized + Context> VariantEncoder<C> for Never<O> {
     type Ok = O;
     type Tag<'this> = Self
     where

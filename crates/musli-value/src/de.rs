@@ -42,10 +42,7 @@ macro_rules! ensure {
 }
 
 #[musli::decoder]
-impl<'de, const F: Options, C> Decoder<'de, C> for ValueDecoder<'de, F>
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecoder<'de, F> {
     type Decoder<U> = Self where U: Context;
     type Buffer = AsValueDecoder<F>;
     type Some = Self;
@@ -328,10 +325,7 @@ where
     }
 }
 
-impl<'a, const F: Options, C> AsDecoder<C> for ValueDecoder<'a, F>
-where
-    C: Context,
-{
+impl<'a, C: ?Sized + Context, const F: Options> AsDecoder<C> for ValueDecoder<'a, F> {
     type Decoder<'this> = ValueDecoder<'this, F> where Self: 'this;
 
     #[inline]
@@ -356,10 +350,7 @@ impl<'de, const F: Options> IterValueDecoder<'de, F> {
     }
 }
 
-impl<'de, const F: Options, C> PackDecoder<'de, C> for IterValueDecoder<'de, F>
-where
-    C: Context,
-{
+impl<'de, C: ?Sized + Context, const F: Options> PackDecoder<'de, C> for IterValueDecoder<'de, F> {
     type Decoder<'this> = ValueDecoder<'de, F>
     where
         Self: 'this;
@@ -378,9 +369,8 @@ where
     }
 }
 
-impl<'de, const F: Options, C> SequenceDecoder<'de, C> for IterValueDecoder<'de, F>
-where
-    C: Context,
+impl<'de, C: ?Sized + Context, const F: Options> SequenceDecoder<'de, C>
+    for IterValueDecoder<'de, F>
 {
     type Decoder<'this> = ValueDecoder<'de, F>
     where
@@ -421,9 +411,8 @@ impl<'de, const F: Options> IterValuePairsDecoder<'de, F> {
 }
 
 #[musli::map_decoder]
-impl<'de, const F: Options, C> MapDecoder<'de, C> for IterValuePairsDecoder<'de, F>
-where
-    C: Context,
+impl<'de, C: ?Sized + Context, const F: Options> MapDecoder<'de, C>
+    for IterValuePairsDecoder<'de, F>
 {
     type Entry<'this> = IterValuePairDecoder<'de, F>
     where
@@ -451,9 +440,8 @@ where
     }
 }
 
-impl<'de, const F: Options, C> MapPairsDecoder<'de, C> for IterValuePairsDecoder<'de, F>
-where
-    C: Context,
+impl<'de, C: ?Sized + Context, const F: Options> MapPairsDecoder<'de, C>
+    for IterValuePairsDecoder<'de, F>
 {
     type MapPairsKey<'this> = ValueDecoder<'de, F>
     where
@@ -490,9 +478,8 @@ where
     }
 }
 
-impl<'de, const F: Options, C> MapEntryDecoder<'de, C> for IterValuePairDecoder<'de, F>
-where
-    C: Context,
+impl<'de, C: ?Sized + Context, const F: Options> MapEntryDecoder<'de, C>
+    for IterValuePairDecoder<'de, F>
 {
     type MapKey<'this> = ValueDecoder<'de, F>
     where
@@ -517,9 +504,8 @@ where
 }
 
 #[musli::struct_decoder]
-impl<'de, const F: Options, C> StructDecoder<'de, C> for IterValuePairsDecoder<'de, F>
-where
-    C: Context,
+impl<'de, C: ?Sized + Context, const F: Options> StructDecoder<'de, C>
+    for IterValuePairsDecoder<'de, F>
 {
     type Field<'this> = IterValuePairDecoder<'de, F>
     where
@@ -532,10 +518,7 @@ where
     }
 
     #[inline]
-    fn into_struct_pairs(self, _: &C) -> Result<Self::StructPairs, C::Error>
-    where
-        C: Context,
-    {
+    fn into_struct_pairs(self, _: &C) -> Result<Self::StructPairs, C::Error> {
         Ok(self)
     }
 
@@ -550,9 +533,8 @@ where
     }
 }
 
-impl<'de, const F: Options, C> StructPairsDecoder<'de, C> for IterValuePairsDecoder<'de, F>
-where
-    C: Context,
+impl<'de, C: ?Sized + Context, const F: Options> StructPairsDecoder<'de, C>
+    for IterValuePairsDecoder<'de, F>
 {
     type FieldName<'this> = ValueDecoder<'de, F>
     where
@@ -589,9 +571,8 @@ where
     }
 }
 
-impl<'de, const F: Options, C> StructFieldDecoder<'de, C> for IterValuePairDecoder<'de, F>
-where
-    C: Context,
+impl<'de, C: ?Sized + Context, const F: Options> StructFieldDecoder<'de, C>
+    for IterValuePairDecoder<'de, F>
 {
     type FieldName<'this> = ValueDecoder<'de, F>
     where
@@ -640,9 +621,8 @@ impl<'de, const F: Options> IterValueVariantDecoder<'de, F> {
     }
 }
 
-impl<'de, const F: Options, C> VariantDecoder<'de, C> for IterValueVariantDecoder<'de, F>
-where
-    C: Context,
+impl<'de, C: ?Sized + Context, const F: Options> VariantDecoder<'de, C>
+    for IterValueVariantDecoder<'de, F>
 {
     type Tag<'this> = ValueDecoder<'de, F>
     where

@@ -6,10 +6,7 @@ use crate::expecting::{self, Expecting};
 use crate::Context;
 
 /// Trait that allows a type to be repeatedly coerced into a decoder.
-pub trait AsDecoder<C>
-where
-    C: Context,
-{
+pub trait AsDecoder<C: ?Sized + Context> {
     /// The decoder we reborrow as.
     type Decoder<'this>: Decoder<'this, C>
     where
@@ -20,10 +17,7 @@ where
 }
 
 /// A pack that can construct decoders.
-pub trait PackDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait PackDecoder<'de, C: ?Sized + Context> {
     /// The encoder to use for the pack.
     type Decoder<'this>: Decoder<'de, C>
     where
@@ -40,10 +34,7 @@ where
 }
 
 /// Trait governing how to decode a sequence.
-pub trait SequenceDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait SequenceDecoder<'de, C: ?Sized + Context> {
     /// The decoder for individual items.
     type Decoder<'this>: Decoder<'de, C>
     where
@@ -63,10 +54,7 @@ where
 }
 
 /// Trait governing how to decode a sequence of pairs.
-pub trait MapDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait MapDecoder<'de, C: ?Sized + Context> {
     /// The decoder to use for a key.
     type Entry<'this>: MapEntryDecoder<'de, C>
     where
@@ -109,10 +97,7 @@ where
 }
 
 /// Trait governing how to decode fields in a struct.
-pub trait StructDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait StructDecoder<'de, C: ?Sized + Context> {
     /// The decoder to use for a key.
     type Field<'this>: StructFieldDecoder<'de, C>
     where
@@ -158,10 +143,7 @@ where
 }
 
 /// Trait governing how to decode a map entry.
-pub trait MapEntryDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait MapEntryDecoder<'de, C: ?Sized + Context> {
     /// The decoder to use for a tuple field index.
     type MapKey<'this>: Decoder<'de, C>
     where
@@ -188,10 +170,7 @@ where
 }
 
 /// Trait governing how to decode a struct field.
-pub trait StructFieldDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait StructFieldDecoder<'de, C: ?Sized + Context> {
     /// The decoder to use for a tuple field index.
     type FieldName<'this>: Decoder<'de, C>
     where
@@ -221,10 +200,7 @@ where
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
-pub trait MapPairsDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait MapPairsDecoder<'de, C: ?Sized + Context> {
     /// The decoder to use for a tuple field index.
     type MapPairsKey<'this>: Decoder<'de, C>
     where
@@ -262,10 +238,7 @@ where
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
-pub trait StructPairsDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait StructPairsDecoder<'de, C: ?Sized + Context> {
     /// The decoder to use for a tuple field index.
     type FieldName<'this>: Decoder<'de, C>
     where
@@ -297,10 +270,7 @@ where
 }
 
 /// Trait governing how to decode a variant.
-pub trait VariantDecoder<'de, C>
-where
-    C: Context,
-{
+pub trait VariantDecoder<'de, C: ?Sized + Context> {
     /// The decoder to use for the variant tag.
     type Tag<'this>: Decoder<'de, C>
     where
@@ -332,10 +302,7 @@ where
 }
 
 /// Trait governing the implementation of a decoder.
-pub trait Decoder<'de, C>: Sized
-where
-    C: Context,
-{
+pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Constructed [`Decoder`] with a different context.
     type Decoder<U>: Decoder<'de, U>
     where
@@ -389,7 +356,7 @@ where
     /// struct MyDecoder;
     ///
     /// #[musli::decoder]
-    /// impl<C> Decoder<'_, C> for MyDecoder where C: Context {
+    /// impl<C: ?Sized + Context> Decoder<'_, C> for MyDecoder {
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")
     ///     }
@@ -450,7 +417,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyVariantType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let mut buffer = decoder.decode_buffer(cx)?;
@@ -501,7 +468,7 @@ where
     /// impl<'de, M> Decode<'de, M> for UnitType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         decoder.decode_unit(cx)?;
@@ -531,7 +498,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -562,7 +529,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -593,7 +560,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -624,7 +591,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -656,7 +623,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -687,7 +654,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -718,7 +685,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -749,7 +716,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -780,7 +747,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -811,7 +778,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -842,7 +809,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -873,7 +840,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -904,7 +871,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -935,7 +902,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -966,7 +933,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -997,7 +964,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -1041,7 +1008,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
@@ -1077,14 +1044,14 @@ where
     ///     #[inline]
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         struct Visitor;
     ///
     ///         impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
     ///         where
-    ///             C: Context,
+    ///             C: ?Sized + Context,
     ///         {
     ///             type Ok = &'de [u8];
     ///
@@ -1135,14 +1102,14 @@ where
     ///     #[inline]
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         struct Visitor;
     ///
     ///         impl<'de, C> ValueVisitor<'de, C, str> for Visitor
     ///         where
-    ///             C: Context,
+    ///             C: ?Sized + Context,
     ///         {
     ///             type Ok = &'de str;
     ///
@@ -1188,7 +1155,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let data = if let Some(decoder) = decoder.decode_option(cx)? {
@@ -1232,7 +1199,7 @@ where
     ///     #[inline]
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let mut unpack = decoder.decode_pack(cx)?;
@@ -1270,7 +1237,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let mut seq = decoder.decode_sequence(cx)?;
@@ -1311,7 +1278,7 @@ where
     /// impl<'de, M> Decode<'de, M> for TupleStruct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let mut tuple = decoder.decode_tuple(cx, 2)?;
@@ -1350,7 +1317,7 @@ where
     /// impl<'de, M> Decode<'de, M> for MapStruct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let mut map = decoder.decode_map(cx)?;
@@ -1402,7 +1369,7 @@ where
     /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let mut st = decoder.decode_struct(cx, None)?;
@@ -1459,7 +1426,7 @@ where
     /// impl<'de, M> Decode<'de, M> for Enum {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
-    ///         C: Context<Mode = M>,
+    ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let mut variant = decoder.decode_variant(cx)?;
@@ -1506,12 +1473,12 @@ where
     }
 }
 
-struct ExpectingWrapper<T, C> {
+struct ExpectingWrapper<'a, T, C: ?Sized> {
     inner: T,
-    _marker: PhantomData<C>,
+    _marker: PhantomData<&'a C>,
 }
 
-impl<T, C> ExpectingWrapper<T, C> {
+impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
     fn new(inner: T) -> Self {
         Self {
             inner,
@@ -1520,10 +1487,10 @@ impl<T, C> ExpectingWrapper<T, C> {
     }
 }
 
-impl<'de, T, C> Expecting for ExpectingWrapper<T, C>
+impl<'a, 'de, T, C> Expecting for ExpectingWrapper<'a, T, C>
 where
     T: Decoder<'de, C>,
-    C: Context,
+    C: ?Sized + Context,
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -23,7 +23,7 @@ use crate::Context;
 /// impl<'de, M> Decode<'de, M> for Enum {
 ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
 ///     where
-///         C: Context,
+///         C: ?Sized + Context,
 ///         D: Decoder<'de, C>,
 ///     {
 ///         decoder.decode_string(cx, musli::utils::visit_owned_fn("A string variant for Enum", |cx: &C, variant: &str| {
@@ -43,7 +43,7 @@ pub fn visit_owned_fn<'de, E, U, C, T, O>(
 where
     E: fmt::Display,
     U: FnOnce(&C, &T) -> Result<O, C::Error>,
-    C: Context,
+    C: ?Sized + Context,
     T: ?Sized + ToOwned,
 {
     FromFn { expected, function }
@@ -58,8 +58,8 @@ impl<'de, W, U, C, T, O> ValueVisitor<'de, C, T> for FromFn<W, U>
 where
     W: fmt::Display,
     U: FnOnce(&C, &T) -> Result<O, C::Error>,
+    C: ?Sized + Context,
     T: ?Sized + ToOwned,
-    C: Context,
 {
     type Ok = O;
 

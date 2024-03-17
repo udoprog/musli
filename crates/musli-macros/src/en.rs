@@ -52,7 +52,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
             #[inline]
             fn encode<#c_param, #e_param>(&self, #ctx_var: &#c_param, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t<#c_param>>::Ok, <#c_param as #context_t>::Error>
             where
-                #c_param: #context_t<Mode = #mode_ident>,
+                #c_param: ?Sized + #context_t<Mode = #mode_ident>,
                 #e_param: #encoder_t<#c_param>,
             {
                 #body

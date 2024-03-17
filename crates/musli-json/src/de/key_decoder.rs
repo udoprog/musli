@@ -21,7 +21,7 @@ where
     #[inline]
     pub(super) fn skip_any<C>(self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         JsonDecoder::new(self.parser).skip_any(cx)
     }
@@ -40,7 +40,7 @@ where
     #[inline]
     fn decode_escaped_bytes<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         V: ValueVisitor<'de, C, [u8]>,
     {
         let Some(mut scratch) = cx.alloc() else {
@@ -57,7 +57,7 @@ where
 #[musli::decoder]
 impl<'de, C, P> Decoder<'de, C> for JsonKeyDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type Decoder<U> = Self where U: Context;

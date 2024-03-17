@@ -63,7 +63,7 @@ where
     /// Skip over any values.
     pub(crate) fn skip_any<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let start = cx.mark();
         let actual = self.parser.peek(cx)?;
@@ -104,7 +104,7 @@ where
     #[inline]
     fn parse_true<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         self.parser
             .parse_exact(cx, *b"true", ErrorKind::ExpectedTrue)
@@ -113,7 +113,7 @@ where
     #[inline]
     fn parse_false<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         self.parser
             .parse_exact(cx, *b"false", ErrorKind::ExpectedFalse)
@@ -122,7 +122,7 @@ where
     #[inline]
     fn parse_null<C>(mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         self.parser
             .parse_exact(cx, *b"null", ErrorKind::ExpectedNull)
@@ -132,7 +132,7 @@ where
 #[musli::decoder]
 impl<'de, C, P> Decoder<'de, C> for JsonDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type Decoder<U> = Self where U: Context;
@@ -353,10 +353,7 @@ where
     }
 
     #[inline]
-    fn decode_option(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error>
-    where
-        C: Context,
-    {
+    fn decode_option(mut self, cx: &C) -> Result<Option<Self::Some>, C::Error> {
         if self.parser.peek(cx)?.is_null() {
             self.parse_null(cx)?;
             Ok(None)

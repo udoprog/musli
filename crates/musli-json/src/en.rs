@@ -21,9 +21,8 @@ impl<W> JsonEncoder<W> {
 }
 
 #[musli::encoder]
-impl<C, W> Encoder<C> for JsonEncoder<W>
+impl<C: ?Sized + Context, W> Encoder<C> for JsonEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -292,7 +291,7 @@ where
     #[inline]
     fn new<C>(cx: &C, writer: W) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         Self::with_variant(cx, writer, false)
     }
@@ -300,7 +299,7 @@ where
     #[inline]
     fn with_variant<C>(cx: &C, mut writer: W, variant: bool) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         writer.write_byte(cx, b'{')?;
         Ok(Self {
@@ -311,9 +310,8 @@ where
     }
 }
 
-impl<C, W> MapEncoder<C> for JsonObjectEncoder<W>
+impl<C: ?Sized + Context, W> MapEncoder<C> for JsonObjectEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -343,9 +341,8 @@ where
     }
 }
 
-impl<C, W> MapPairsEncoder<C> for JsonObjectEncoder<W>
+impl<C: ?Sized + Context, W> MapPairsEncoder<C> for JsonObjectEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -377,9 +374,8 @@ where
     }
 }
 
-impl<C, W> StructEncoder<C> for JsonObjectEncoder<W>
+impl<C: ?Sized + Context, W> StructEncoder<C> for JsonObjectEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -411,9 +407,8 @@ impl<W> JsonObjectPairEncoder<W> {
     }
 }
 
-impl<C, W> MapEntryEncoder<C> for JsonObjectPairEncoder<W>
+impl<C: ?Sized + Context, W> MapEntryEncoder<C> for JsonObjectPairEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -443,9 +438,8 @@ where
     }
 }
 
-impl<C, W> StructFieldEncoder<C> for JsonObjectPairEncoder<W>
+impl<C: ?Sized + Context, W> StructFieldEncoder<C> for JsonObjectPairEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -482,16 +476,15 @@ where
     #[inline]
     fn new<C>(cx: &C, mut writer: W) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         writer.write_byte(cx, b'{')?;
         Ok(Self { writer })
     }
 }
 
-impl<C, W> VariantEncoder<C> for JsonVariantEncoder<W>
+impl<C: ?Sized + Context, W> VariantEncoder<C> for JsonVariantEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -542,9 +535,8 @@ macro_rules! format_integer {
 }
 
 #[musli::encoder]
-impl<C, W> Encoder<C> for JsonObjectKeyEncoder<W>
+impl<C: ?Sized + Context, W> Encoder<C> for JsonObjectKeyEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -643,7 +635,7 @@ where
     #[inline]
     fn new<C>(cx: &C, writer: W) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         Self::with_variant(cx, writer, false)
     }
@@ -651,7 +643,7 @@ where
     #[inline]
     fn with_variant<C>(cx: &C, mut writer: W, variant: bool) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         writer.write_byte(cx, b'[')?;
 
@@ -663,9 +655,8 @@ where
     }
 }
 
-impl<C, W> SequenceEncoder<C> for JsonArrayEncoder<W>
+impl<C: ?Sized + Context, W> SequenceEncoder<C> for JsonArrayEncoder<W>
 where
-    C: Context,
     W: Writer,
 {
     type Ok = ();
@@ -699,7 +690,7 @@ where
 #[inline]
 fn encode_string<C, W>(cx: &C, mut writer: W, bytes: &[u8]) -> Result<(), C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     writer.write_byte(cx, b'"')?;
@@ -770,7 +761,7 @@ static HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
 
 fn write_escape<C, W>(cx: &C, writer: &mut W, escape: u8, byte: u8) -> Result<(), C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     let s = match escape {

@@ -29,7 +29,7 @@ where
     #[inline]
     fn encode_map_len<C>(&mut self, cx: &C, len: usize) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let Some(len) = len.checked_mul(2) else {
             return Err(cx.message("Map length overflow"));
@@ -48,7 +48,7 @@ where
     #[inline]
     fn encode_tuple_len<C>(&mut self, cx: &C, len: usize) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(cx, tag.byte())?;
@@ -80,7 +80,7 @@ impl<W, B, const F: Options> WirePackEncoder<W, B, F> {
 #[musli::encoder]
 impl<C, W, const F: Options> Encoder<C> for WireEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -338,7 +338,7 @@ where
 
 impl<C, W, B, const F: Options> SequenceEncoder<C> for WirePackEncoder<W, B, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
     B: Buf,
 {
@@ -389,7 +389,7 @@ where
 
 impl<C, W, const F: Options> SequenceEncoder<C> for WireEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -408,7 +408,7 @@ where
 
 impl<C, W, const F: Options> MapEncoder<C> for WireEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -427,7 +427,7 @@ where
 
 impl<C, W, const F: Options> MapPairsEncoder<C> for WireEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -452,7 +452,7 @@ where
 
 impl<C, W, const F: Options> MapEntryEncoder<C> for WireEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -477,7 +477,7 @@ where
 
 impl<C, W, const F: Options> StructEncoder<C> for WireEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -496,7 +496,7 @@ where
 
 impl<C, W, const F: Options> StructFieldEncoder<C> for WireEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -521,7 +521,7 @@ where
 
 impl<C, W, const F: Options> VariantEncoder<C> for WireEncoder<W, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     type Ok = ();
@@ -548,7 +548,7 @@ where
 #[inline]
 fn encode_prefix<C, W, const F: Options>(cx: &C, writer: &mut W, len: usize) -> Result<(), C::Error>
 where
-    C: Context,
+    C: ?Sized + Context,
     W: Writer,
 {
     let (tag, embedded) = Tag::with_len(Kind::Prefix, len);

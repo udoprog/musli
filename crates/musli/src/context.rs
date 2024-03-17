@@ -24,7 +24,6 @@ pub trait Context {
     where
         T: Decode<'de, Self::Mode>,
         D: Decoder<'de, Self>,
-        Self: Sized,
     {
         T::decode(self, decoder)
     }

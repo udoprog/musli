@@ -22,7 +22,7 @@ where
     #[inline]
     pub(super) fn new<C>(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         parser.skip_whitespace(cx)?;
 
@@ -44,7 +44,7 @@ where
 
     fn parse_map_key<C>(&mut self, cx: &C) -> Result<bool, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let first = mem::take(&mut self.first);
 
@@ -76,7 +76,7 @@ where
 #[musli::map_decoder]
 impl<'de, C, P> MapDecoder<'de, C> for JsonObjectDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type Entry<'this> = JsonObjectPairDecoder<P::Mut<'this>>
@@ -111,7 +111,7 @@ where
 
 impl<'de, C, P> MapPairsDecoder<'de, C> for JsonObjectDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type MapPairsKey<'this> = JsonKeyDecoder<P::Mut<'this>>
@@ -170,7 +170,7 @@ where
 #[musli::struct_decoder]
 impl<'de, C, P> StructDecoder<'de, C> for JsonObjectDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type Field<'this> = JsonObjectPairDecoder<P::Mut<'this>>
@@ -201,7 +201,7 @@ where
 
 impl<'de, C, P> StructPairsDecoder<'de, C> for JsonObjectDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type FieldName<'this> = JsonKeyDecoder<P::Mut<'this>>

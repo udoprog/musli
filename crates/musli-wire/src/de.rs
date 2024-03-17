@@ -36,7 +36,7 @@ where
     /// Skip over any sequences of values.
     pub(crate) fn skip_any<C>(&mut self, cx: &C) -> Result<(), C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
@@ -78,7 +78,7 @@ where
     #[inline]
     fn decode_sequence_len<C>(&mut self, cx: &C) -> Result<usize, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
@@ -102,7 +102,7 @@ where
         cx: &C,
     ) -> Result<RemainingWireDecoder<R, F>, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let len = self.decode_sequence_len(cx)?;
         Ok(RemainingWireDecoder::new(len / 2, self))
@@ -112,7 +112,7 @@ where
     #[inline]
     fn shared_decode_sequence<C>(mut self, cx: &C) -> Result<RemainingWireDecoder<R, F>, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let len = self.decode_sequence_len(cx)?;
         Ok(RemainingWireDecoder::new(len, self))
@@ -122,7 +122,7 @@ where
     #[inline]
     fn decode_len<C>(&mut self, cx: &C, start: C::Mark) -> Result<usize, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
@@ -157,7 +157,7 @@ pub struct RemainingWireDecoder<R, const F: Options> {
 #[musli::decoder]
 impl<'de, C, R, const F: Options> Decoder<'de, C> for WireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Decoder<U> = Self where U: Context;
@@ -232,7 +232,7 @@ where
 
         impl<'de, C, V> ValueVisitor<'de, C, [u8]> for Visitor<V>
         where
-            C: Context,
+            C: ?Sized + Context,
             V: ValueVisitor<'de, C, str>,
         {
             type Ok = V::Ok;
@@ -426,7 +426,7 @@ where
 
 impl<'de, C, R, const F: Options> PackDecoder<'de, C> for WireDecoder<Limit<R>, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Decoder<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F> where Self: 'this;
@@ -455,7 +455,7 @@ impl<R, const F: Options> RemainingWireDecoder<R, F> {
 
 impl<'de, C, R, const F: Options> SequenceDecoder<'de, C> for RemainingWireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Decoder<'this> = WireDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -488,7 +488,7 @@ where
 
 impl<'de, C, R, const F: Options> VariantDecoder<'de, C> for WireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Tag<'this> = WireDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -519,7 +519,7 @@ where
 #[musli::map_decoder]
 impl<'de, C, R, const F: Options> MapDecoder<'de, C> for RemainingWireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Entry<'this> = WireDecoder<R::Mut<'this>, F>
@@ -560,7 +560,7 @@ where
 
 impl<'de, C, R, const F: Options> MapEntryDecoder<'de, C> for WireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type MapKey<'this> = WireDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -586,7 +586,7 @@ where
 #[musli::struct_decoder]
 impl<'de, C, R, const F: Options> StructDecoder<'de, C> for RemainingWireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Field<'this> = WireDecoder<R::Mut<'this>, F>
@@ -617,7 +617,7 @@ where
 
 impl<'de, C, R, const F: Options> StructFieldDecoder<'de, C> for WireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type FieldName<'this> = WireDecoder<R::Mut<'this>, F> where Self: 'this;
@@ -641,7 +641,7 @@ where
 
 impl<'de, C, R, const F: Options> MapPairsDecoder<'de, C> for RemainingWireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type MapPairsKey<'this> = WireDecoder<R::Mut<'this>, F>
@@ -686,7 +686,7 @@ where
 
 impl<'de, C, R, const F: Options> StructPairsDecoder<'de, C> for RemainingWireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type FieldName<'this> = WireDecoder<R::Mut<'this>, F>
@@ -802,7 +802,7 @@ impl<R, const F: Options> TupleWireDecoder<R, F> {
 
 impl<'de, C, R, const F: Options> PackDecoder<'de, C> for TupleWireDecoder<R, F>
 where
-    C: Context,
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Decoder<'this> = WireDecoder<R::Mut<'this>, F> where Self: 'this;

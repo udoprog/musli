@@ -12,14 +12,14 @@ impl<'de, M> Decode<'de, M> for BytesReference<'de> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         struct Visitor;
 
         impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
         where
-            C: Context,
+            C: ?Sized + Context,
         {
             type Ok = &'de [u8];
 
@@ -69,14 +69,14 @@ impl<'de, M> Decode<'de, M> for StringReference<'de> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         struct Visitor;
 
         impl<'de, C> ValueVisitor<'de, C, str> for Visitor
         where
-            C: Context,
+            C: ?Sized + Context,
         {
             type Ok = &'de str;
 
@@ -124,7 +124,7 @@ pub enum OwnedFn {
 impl<'de, M> Decode<'de, M> for OwnedFn {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
         decoder.decode_string(

@@ -17,7 +17,7 @@ where
     #[inline]
     pub(crate) fn new<C>(cx: &C, mut parser: P) -> Result<Self, C::Error>
     where
-        C: Context,
+        C: ?Sized + Context,
     {
         parser.skip_whitespace(cx)?;
 
@@ -34,7 +34,7 @@ where
 
 impl<'de, C, P> VariantDecoder<'de, C> for JsonVariantDecoder<P>
 where
-    C: Context,
+    C: ?Sized + Context,
     P: Parser<'de>,
 {
     type Tag<'this> = JsonKeyDecoder<P::Mut<'this>>
