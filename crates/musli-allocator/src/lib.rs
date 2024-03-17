@@ -10,7 +10,9 @@
 //! * The [`Stack`] allocator, which can allocate buffers from a fixed-size
 //!   slice.
 //!
-//! # Examples
+//! <br>
+//!
+//! ## Examples
 //!
 //! ```
 //! use musli::{Allocator, Buf};

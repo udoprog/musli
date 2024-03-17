@@ -128,13 +128,13 @@ struct MyType {
 impl<'de, M> Decode<'de, M> for MyType {
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     where
-        C: Context<Mode = M>,
+        C: ?Sized + Context<Mode = M>,
         D: Decoder<'de, C>,
     {
         let mut seq = decoder.decode_sequence(cx)?;
         let mut data = Vec::with_capacity(seq.size_hint(cx).or_default());
 
-        while let Some(decoder) = seq.next(cx)? {
+        while let Some(decoder) = seq.decode_next(cx)? {
             data.push(cx.decode(decoder)?);
         }
 
@@ -250,13 +250,7 @@ decoded from `Version1` but *not* the other way around. That's why it's
 suitable for on-disk storage the schema can evolve from older to newer
 versions.
 
-```no_build
-# use musli::{Encode, Decode};
-# #[derive(Debug, PartialEq, Encode, Decode)]
-# struct Version1 { name: String }
-# #[derive(Debug, PartialEq, Encode, Decode)]
-# struct Version2 { name: String, #[musli(default)] age: Option<u32> }
-# fn main() -> Result<(), Box<dyn std::error::Error>> {
+```rust
 let version2 = musli_storage::to_vec(&Version2 {
     name: String::from("Aristotle"),
     age: Some(62),
@@ -269,7 +263,6 @@ let version1 = musli_storage::to_vec(&Version1 {
 })?;
 
 let version2: Version2 = musli_storage::decode(version1.as_slice())?;
-# Ok(()) }
 ```
 
 <br>

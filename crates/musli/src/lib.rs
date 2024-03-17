@@ -252,7 +252,7 @@
 //! suitable for on-disk storage the schema can evolve from older to newer
 //! versions.
 //!
-//! ```no_build
+//! ```ignore
 //! # use musli::{Encode, Decode};
 //! # #[derive(Debug, PartialEq, Encode, Decode)]
 //! # struct Version1 { name: String }

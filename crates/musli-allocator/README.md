@@ -13,7 +13,9 @@ This crate contains two types of allocators:
 * The [`Stack`] allocator, which can allocate buffers from a fixed-size
   slice.
 
-# Examples
+<br>
+
+## Examples
 
 ```rust
 use musli::{Allocator, Buf};
