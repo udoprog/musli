@@ -23,7 +23,7 @@ pub use musli_macros::Decode;
 /// }
 /// ````
 ///
-/// Implementing by hand:
+/// Implementing manually:
 ///
 /// ```
 /// use musli::{Context, Decode, Decoder};

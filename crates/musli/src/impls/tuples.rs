@@ -93,11 +93,11 @@ macro_rules! declare {
                 C: ?Sized + Context<Mode = M>,
                 D: Decoder<'de, C>
             {
-                let mut pack = decoder.decode_pack(cx)?;
-                let $ident0 = cx.decode(pack.decode_next(cx)?)?;
-                $(let $ident = cx.decode(pack.decode_next(cx)?)?;)*
-                pack.end(cx)?;
-                Ok(Packed(($ident0, $($ident),*)))
+                decoder.decode_pack_fn(cx, |cx, pack| {
+                    let $ident0 = pack.next(cx)?;
+                    $(let $ident = pack.next(cx)?;)*
+                    Ok(Packed(($ident0, $($ident),*)))
+                })
             }
         }
 

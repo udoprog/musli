@@ -1,6 +1,6 @@
 use crate::Context;
 
-use super::{Decoder, SizeHint};
+use super::{Decode, Decoder, SizeHint};
 
 /// Trait governing how to decode a sequence.
 pub trait SequenceDecoder<'de, C: ?Sized + Context> {
@@ -20,4 +20,18 @@ pub trait SequenceDecoder<'de, C: ?Sized + Context> {
     ///
     /// This is required to call after a sequence has finished decoding.
     fn end(self, cx: &C) -> Result<(), C::Error>;
+
+    /// Decode the next element of the given type.
+    #[inline]
+    fn next<T>(&mut self, cx: &C) -> Result<Option<T>, C::Error>
+    where
+        Self: Sized,
+        T: Decode<'de, C::Mode>,
+    {
+        let Some(decoder) = self.decode_next(cx)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(T::decode(cx, decoder)?))
+    }
 }

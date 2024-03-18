@@ -21,7 +21,7 @@ pub use musli_macros::Encode;
 /// }
 /// ````
 ///
-/// Implementing by hand:
+/// Implementing manually:
 ///
 /// ```
 /// use musli::{Context, Encode, Encoder};

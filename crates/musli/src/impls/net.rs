@@ -113,11 +113,9 @@ impl<'de, M> Decode<'de, M> for SocketAddrV4 {
         C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
-        let mut unpack = decoder.decode_pack(cx)?;
-        let ip = cx.decode(unpack.decode_next(cx)?)?;
-        let port = cx.decode(unpack.decode_next(cx)?)?;
-        unpack.end(cx)?;
-        Ok(SocketAddrV4::new(ip, port))
+        decoder.decode_pack_fn(cx, |cx, pack| {
+            Ok(SocketAddrV4::new(pack.next(cx)?, pack.next(cx)?))
+        })
     }
 }
 
@@ -144,13 +142,14 @@ impl<'de, M> Decode<'de, M> for SocketAddrV6 {
         C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
-        let mut unpack = decoder.decode_pack(cx)?;
-        let ip = cx.decode(unpack.decode_next(cx)?)?;
-        let port = cx.decode(unpack.decode_next(cx)?)?;
-        let flowinfo = cx.decode(unpack.decode_next(cx)?)?;
-        let scope_id = cx.decode(unpack.decode_next(cx)?)?;
-        unpack.end(cx)?;
-        Ok(Self::new(ip, port, flowinfo, scope_id))
+        decoder.decode_pack_fn(cx, |cx, pack| {
+            Ok(Self::new(
+                pack.next(cx)?,
+                pack.next(cx)?,
+                pack.next(cx)?,
+                pack.next(cx)?,
+            ))
+        })
     }
 }
 

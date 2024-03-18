@@ -1,6 +1,6 @@
 use crate::Context;
 
-use super::Decoder;
+use super::{Decode, Decoder};
 
 /// A pack that can construct decoders.
 pub trait PackDecoder<'de, C: ?Sized + Context> {
@@ -17,4 +17,14 @@ pub trait PackDecoder<'de, C: ?Sized + Context> {
     ///
     /// This is required to call after a pack has finished decoding.
     fn end(self, cx: &C) -> Result<(), C::Error>;
+
+    /// Unpack a value of the given type.
+    #[inline]
+    fn next<T>(&mut self, cx: &C) -> Result<T, C::Error>
+    where
+        Self: Sized,
+        T: Decode<'de, C::Mode>,
+    {
+        T::decode(cx, self.decode_next(cx)?)
+    }
 }
