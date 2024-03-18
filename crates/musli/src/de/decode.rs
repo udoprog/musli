@@ -7,6 +7,43 @@ use crate::Context;
 pub use musli_macros::Decode;
 
 /// Trait governing how types are decoded.
+///
+/// This is typically implemented automatically using the [`Encode` derive].
+///
+/// [`Encode` derive]: https://docs.rs/musli/latest/musli/derives/
+///
+/// # Examples
+///
+/// ```
+/// use musli::Decode;
+///
+/// #[derive(Decode)]
+/// struct MyType {
+///     data: [u8; 128],
+/// }
+/// ````
+///
+/// Implementing manually:
+///
+/// ```
+/// use musli::{Context, Decode, Decoder};
+///
+/// struct MyType {
+///     data: [u8; 128],
+/// }
+///
+/// impl<'de, M> Decode<'de, M> for MyType {
+///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+///     where
+///         C: ?Sized + Context<Mode = M>,
+///         D: Decoder<'de, C>,
+///     {
+///         Ok(Self {
+///             data: decoder.decode_array(cx)?,
+///         })
+///     }
+/// }
+/// ```
 pub trait Decode<'de, M = DefaultMode>: Sized {
     /// Decode the given input.
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>

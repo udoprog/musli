@@ -1,9 +1,11 @@
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::de::{NumberVisitor, SizeHint, TypeHint, ValueVisitor, Visitor};
+use crate::de::{NumberVisitor, StructDecoder, TypeHint, ValueVisitor, Visitor};
 use crate::expecting::{self, Expecting};
 use crate::Context;
+
+use super::{AsDecoder, MapDecoder, PackDecoder, SequenceDecoder, VariantDecoder};
 
 /// Trait governing the implementation of a decoder.
 pub trait Decoder<'de, C: ?Sized + Context>: Sized {
@@ -849,14 +851,24 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
-    /// struct MyType {
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// struct OptionalField {
     ///     data: Option<String>,
     /// }
+    /// ```
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType {
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct OptionalField { data: Option<String>}
+    ///
+    /// impl<'de, M> Decode<'de, M> for OptionalField {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: ?Sized + Context<Mode = M>,
@@ -868,9 +880,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///             None
     ///         };
     ///
-    ///         Ok(Self {
-    ///             data,
-    ///         })
+    ///         Ok(Self { data })
     ///     }
     /// }
     /// ```
@@ -890,14 +900,27 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// compatible with what's being returned by
     /// [Encoder::pack][crate::Encoder::encode_pack].
     ///
-    /// ```
-    /// use musli::{Context};
-    /// use musli::de::{Decode, Decoder, PackDecoder};
+    /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct PackedStruct {
     ///     field: u32,
-    ///     data: [u8; 364],
+    ///     data: [u8; 128],
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::de::{Decode, Decoder, PackDecoder};
+    /// # struct PackedStruct { field: u32, data: [u8; 128] }
     ///
     /// impl<'de, M> Decode<'de, M> for PackedStruct {
     ///     #[inline]
@@ -907,14 +930,11 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///         D: Decoder<'de, C>,
     ///     {
     ///         let mut pack = decoder.decode_pack(cx)?;
-    ///         let field = cx.decode(pack.decode_next(cx)?)?;
-    ///         let data = cx.decode(pack.decode_next(cx)?)?;
+    ///         let field = pack.next(cx)?;
+    ///         let data = pack.next(cx)?;
     ///         pack.end(cx)?;
     ///
-    ///         Ok(Self {
-    ///             field,
-    ///             data,
-    ///         })
+    ///         Ok(Self { field, data })
     ///     }
     /// }
     /// ```
@@ -926,19 +946,84 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
+    /// Construct an unpack that can decode more than one element at a time.
+    ///
+    /// This hints to the format that it should attempt to decode all of the
+    /// elements in the packed sequence from an as compact format as possible
+    /// compatible with what's being returned by
+    /// [Encoder::pack][crate::Encoder::encode_pack].
+    ///
+    /// # Examples
+    ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct PackedStruct {
+    ///     field: u32,
+    ///     data: [u8; 128],
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::de::{Decode, Decoder, PackDecoder};
+    /// # struct PackedStruct { field: u32, data: [u8; 128] }
+    ///
+    /// impl<'de, M> Decode<'de, M> for PackedStruct {
+    ///     #[inline]
+    ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         D: Decoder<'de, C>,
+    ///     {
+    ///         decoder.decode_pack_fn(cx, |cx, pack| Ok(Self {
+    ///             field: pack.next(cx)?,
+    ///             data: pack.next(cx)?,
+    ///         }))
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_pack_fn<F, O>(self, cx: &C, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&C, &mut Self::DecodePack) -> Result<O, C::Error>,
+    {
+        let mut pack = self.decode_pack(cx)?;
+        let result = f(cx, &mut pack)?;
+        pack.end(cx)?;
+        Ok(result)
+    }
+
     /// Decode a sequence.
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{SequenceDecoder};
+    /// Deriving an implementation:
     ///
-    /// struct MyType {
+    /// ```
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct VectorField {
     ///     data: Vec<String>,
     /// }
+    /// ```
     ///
-    /// impl<'de, M> Decode<'de, M> for MyType {
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::de::{Decode, Decoder, SequenceDecoder};
+    /// # struct VectorField { data: Vec<String> }
+    ///
+    /// impl<'de, M> Decode<'de, M> for VectorField {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: ?Sized + Context<Mode = M>,
@@ -953,9 +1038,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     ///         seq.end(cx)?;
     ///
-    ///         Ok(Self {
-    ///             data
-    ///         })
+    ///         Ok(Self { data })
     ///     }
     /// }
     /// ```
@@ -967,17 +1050,83 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
+    /// Decode a sequence using a closure which is easier to get right.
+    ///
+    /// # Examples
+    ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct VectorField {
+    ///     data: Vec<String>,
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::Context;
+    /// use musli::de::{Decode, Decoder, SequenceDecoder};
+    ///
+    /// struct VectorField {
+    ///     data: Vec<String>,
+    /// }
+    ///
+    /// impl<'de, M> Decode<'de, M> for VectorField {
+    ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         D: Decoder<'de, C>,
+    ///     {
+    ///         decoder.decode_sequence_fn(cx, |cx, seq| {
+    ///             let mut data = Vec::new();
+    ///
+    ///             while let Some(decoder) = seq.decode_next(cx)? {
+    ///                 data.push(cx.decode(decoder)?);
+    ///             }
+    ///
+    ///             Ok(Self { data })
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_sequence_fn<F, O>(self, cx: &C, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&C, &mut Self::DecodeSequence) -> Result<O, C::Error>,
+    {
+        let mut sequence = self.decode_sequence(cx)?;
+        let result = f(cx, &mut sequence)?;
+        sequence.end(cx)?;
+        Ok(result)
+    }
+
     /// Decode a fixed-length sequence of elements of length `len`.
     ///
     /// # Examples
+    ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct TupleStruct(String, u32);
+    /// ```
+    ///
+    /// Implementing manually:
     ///
     /// ```
     /// use std::collections::HashMap;
     ///
     /// use musli::Context;
     /// use musli::de::{Decode, Decoder, PackDecoder};
-    ///
-    /// struct TupleStruct(String, u32);
+    /// # struct TupleStruct(String, u32);
     ///
     /// impl<'de, M> Decode<'de, M> for TupleStruct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -1005,22 +1154,79 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Decode a map of unknown length.
+    /// Decode a fixed-length sequence of elements of length `len`.
+    ///
+    /// # Examples
+    ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct TupleStruct(String, u32);
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    ///
+    /// use musli::Context;
+    /// use musli::de::{Decode, Decoder, PackDecoder};
+    /// # struct TupleStruct(String, u32);
+    ///
+    /// impl<'de, M> Decode<'de, M> for TupleStruct {
+    ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         D: Decoder<'de, C>,
+    ///     {
+    ///         decoder.decode_tuple_fn(cx, 2, |cx, tuple| {
+    ///             Ok(Self(tuple.next(cx)?, tuple.next(cx)?))
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_tuple_fn<F, O>(self, cx: &C, len: usize, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&C, &mut Self::DecodeTuple) -> Result<O, C::Error>,
+    {
+        let mut tuple = self.decode_tuple(cx, len)?;
+        let result = f(cx, &mut tuple)?;
+        tuple.end(cx)?;
+        Ok(result)
+    }
+
+    /// Decode a map.
     ///
     /// The length of the map must somehow be determined from the underlying
     /// format.
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
     /// ```
     /// use std::collections::HashMap;
+    /// use musli::de::Decode;
     ///
-    /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{MapDecoder, MapEntryDecoder};
-    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MapStruct {
     ///     data: HashMap<String, u32>,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{MapDecoder, MapEntryDecoder};
+    /// # use std::collections::HashMap;
+    /// # struct MapStruct { data: HashMap<String, u32> }
     ///
     /// impl<'de, M> Decode<'de, M> for MapStruct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -1051,6 +1257,65 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
             &expecting::Map,
             &ExpectingWrapper::new(self),
         )))
+    }
+
+    /// Decode a map using a simplified function.
+    ///
+    /// The length of the map must somehow be determined from the underlying
+    /// format.
+    ///
+    /// # Examples
+    ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    ///
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct MapStruct {
+    ///     data: HashMap<String, u32>,
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    ///
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{MapDecoder, MapEntryDecoder};
+    /// # struct MapStruct { data: HashMap<String, u32> }
+    ///
+    /// impl<'de, M> Decode<'de, M> for MapStruct {
+    ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         D: Decoder<'de, C>,
+    ///     {
+    ///         decoder.decode_map_fn(cx, |cx, map| {
+    ///             let mut data = HashMap::with_capacity(map.size_hint(cx).or_default());
+    ///
+    ///             while let Some((key, value)) = map.entry(cx)? {
+    ///                 data.insert(key, value);
+    ///             }
+    ///
+    ///             Ok(Self { data })
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_map_fn<F, O>(self, cx: &C, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&C, &mut Self::DecodeMap) -> Result<O, C::Error>,
+    {
+        let mut map = self.decode_map(cx)?;
+        let result = f(cx, &mut map)?;
+        map.end(cx)?;
+        Ok(result)
     }
 
     /// Decode a struct which has an expected `len` number of elements.
@@ -1179,307 +1444,6 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
             ExpectingWrapper::new(self).format()
         )))
     }
-}
-
-/// Trait that allows a type to be repeatedly coerced into a decoder.
-pub trait AsDecoder<C: ?Sized + Context> {
-    /// The decoder we reborrow as.
-    type Decoder<'this>: Decoder<'this, C>
-    where
-        Self: 'this;
-
-    /// Borrow self as a new decoder.
-    fn as_decoder(&self, cx: &C) -> Result<Self::Decoder<'_>, C::Error>;
-}
-
-/// A pack that can construct decoders.
-pub trait PackDecoder<'de, C: ?Sized + Context> {
-    /// The encoder to use for the pack.
-    type DecodeNext<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-
-    /// Return decoder to unpack the next element.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_next(&mut self, cx: &C) -> Result<Self::DecodeNext<'_>, C::Error>;
-
-    /// Stop decoding the current pack.
-    ///
-    /// This is required to call after a pack has finished decoding.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
-}
-
-/// Trait governing how to decode a sequence.
-pub trait SequenceDecoder<'de, C: ?Sized + Context> {
-    /// The decoder for individual items.
-    type DecodeNext<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-
-    /// Get a size hint of known remaining elements.
-    fn size_hint(&self, cx: &C) -> SizeHint;
-
-    /// Decode the next element.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_next(&mut self, cx: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error>;
-
-    /// Stop decoding the current sequence.
-    ///
-    /// This is required to call after a sequence has finished decoding.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
-}
-
-/// Trait governing how to decode a sequence of pairs.
-pub trait MapDecoder<'de, C: ?Sized + Context> {
-    /// The decoder to use for a key.
-    type DecodeEntry<'this>: MapEntryDecoder<'de, C>
-    where
-        Self: 'this;
-
-    /// Decoder for a sequence of map pairs.
-    type IntoMapEntries: MapEntriesDecoder<'de, C>;
-
-    /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::map_decoder]`][crate::map_decoder]
-    /// attribute macro when implementing [`MapDecoder`].
-    #[doc(hidden)]
-    type __UseMusliMapDecoderAttributeMacro;
-
-    /// Get a size hint of known remaining elements.
-    fn size_hint(&self, cx: &C) -> SizeHint;
-
-    /// Decode the next key. This returns `Ok(None)` where there are no more
-    /// elements to decode.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_entry(&mut self, cx: &C) -> Result<Option<Self::DecodeEntry<'_>>, C::Error>;
-
-    /// End the pair decoder.
-    ///
-    /// If there are any remaining elements in the sequence of pairs, this
-    /// indicates that they should be flushed.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
-
-    /// Simplified decoding a map of unknown length.
-    ///
-    /// The length of the map must somehow be determined from the underlying
-    /// format.
-    #[inline]
-    fn into_map_entries(self, cx: &C) -> Result<Self::IntoMapEntries, C::Error>
-    where
-        Self: Sized,
-    {
-        Err(cx.message("Decoder does not support MapPairs decoding"))
-    }
-}
-
-/// Trait governing how to decode fields in a struct.
-pub trait StructDecoder<'de, C: ?Sized + Context> {
-    /// The decoder to use for a key.
-    type DecodeField<'this>: StructFieldDecoder<'de, C>
-    where
-        Self: 'this;
-    /// Decoder for a sequence of struct pairs.
-    type IntoStructFields: StructFieldsDecoder<'de, C>;
-
-    /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::struct_decoder]`][crate::struct_decoder]
-    /// attribute macro when implementing [`MapDecoder`].
-    #[doc(hidden)]
-    type __UseMusliStructDecoderAttributeMacro;
-
-    /// Get a size hint of known remaining fields.
-    fn size_hint(&self, cx: &C) -> SizeHint;
-
-    /// Decode the next field.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_field(&mut self, cx: &C) -> Result<Option<Self::DecodeField<'_>>, C::Error>;
-
-    /// End the pair decoder.
-    ///
-    /// If there are any remaining elements in the sequence of pairs, this
-    /// indicates that they should be flushed.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
-
-    /// Simplified decoding of a struct which has an expected `len` number of
-    /// elements.
-    ///
-    /// The `len` indicates how many fields the decoder is *expecting* depending
-    /// on how many fields are present in the underlying struct being decoded,
-    /// butit should only be considered advisory.
-    ///
-    /// The size of a struct might therefore change from one session to another.
-    #[inline]
-    fn into_struct_fields(self, cx: &C) -> Result<Self::IntoStructFields, C::Error>
-    where
-        Self: Sized,
-    {
-        Err(cx.message("Decoder does not support StructPairs decoding"))
-    }
-}
-
-/// Trait governing how to decode a map entry.
-pub trait MapEntryDecoder<'de, C: ?Sized + Context> {
-    /// The decoder to use for a tuple field index.
-    type DecodeMapKey<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-    /// The decoder to use for a tuple field value.
-    type DecodeMapValue: Decoder<'de, C>;
-
-    /// Return the decoder for the first value in the pair.
-    ///
-    /// If this is a map the first value would be the key of the map, if this is
-    /// a struct the first value would be the field of the struct.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_map_key(&mut self, cx: &C) -> Result<Self::DecodeMapKey<'_>, C::Error>;
-
-    /// Decode the second value in the pair..
-    #[must_use = "Decoders must be consumed"]
-    fn decode_map_value(self, cx: &C) -> Result<Self::DecodeMapValue, C::Error>;
-
-    /// Indicate that the second value should be skipped.
-    ///
-    /// The boolean returned indicates if the value was skipped or not.
-    fn skip_map_value(self, cx: &C) -> Result<bool, C::Error>;
-}
-
-/// Trait governing how to decode a struct field.
-pub trait StructFieldDecoder<'de, C: ?Sized + Context> {
-    /// The decoder to use for a tuple field index.
-    type DecodeFieldName<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-    /// The decoder to use for a tuple field value.
-    type DecodeFieldValue: Decoder<'de, C>;
-
-    /// Return the decoder for the field name.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_field_name(&mut self, cx: &C) -> Result<Self::DecodeFieldName<'_>, C::Error>;
-
-    /// Decode the field value.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_field_value(self, cx: &C) -> Result<Self::DecodeFieldValue, C::Error>;
-
-    /// Indicate that the field value should be skipped.
-    ///
-    /// The boolean returned indicates if the value was skipped or not.
-    fn skip_field_value(self, cx: &C) -> Result<bool, C::Error>;
-}
-
-/// Trait governing how to decode a sequence of map pairs.
-///
-/// This trait exists so that decoders can implement a mode that is compatible
-/// with serde deserialization.
-///
-/// If you do not intend to implement this, then serde compatibility for your
-/// format might be degraded.
-pub trait MapEntriesDecoder<'de, C: ?Sized + Context> {
-    /// The decoder to use for a tuple field index.
-    type DecodeMapEntryKey<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-
-    /// The decoder to use for a tuple field value.
-    type DecodeMapEntryValue<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-
-    /// Try to return the decoder for the first value in the pair.
-    ///
-    /// If this is a map the first value would be the key of the map, if this is
-    /// a struct the first value would be the field of the struct.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_map_entry_key(
-        &mut self,
-        cx: &C,
-    ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error>;
-
-    /// Decode the value in the map.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_map_entry_value(&mut self, cx: &C)
-        -> Result<Self::DecodeMapEntryValue<'_>, C::Error>;
-
-    /// Indicate that the value should be skipped.
-    ///
-    /// The boolean returned indicates if the value was skipped or not.
-    fn skip_map_entry_value(&mut self, cx: &C) -> Result<bool, C::Error>;
-
-    /// End pair decoding.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
-}
-
-/// Trait governing how to decode a sequence of struct pairs.
-///
-/// This trait exists so that decoders can implement a mode that is compatible
-/// with serde deserialization.
-///
-/// If you do not intend to implement this, then serde compatibility for your
-/// format might be degraded.
-pub trait StructFieldsDecoder<'de, C: ?Sized + Context> {
-    /// The decoder to use for a tuple field index.
-    type DecodeStructFieldName<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-    /// The decoder to use for a tuple field value.
-    type DecodeStructFieldValue<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-
-    /// Try to return the decoder for the first value in the pair.
-    ///
-    /// If this is a map the first value would be the key of the map, if this is
-    /// a struct the first value would be the field of the struct.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_struct_field_name(
-        &mut self,
-        cx: &C,
-    ) -> Result<Self::DecodeStructFieldName<'_>, C::Error>;
-
-    /// Decode the second value in the pair..
-    #[must_use = "Decoders must be consumed"]
-    fn decode_struct_field_value(
-        &mut self,
-        cx: &C,
-    ) -> Result<Self::DecodeStructFieldValue<'_>, C::Error>;
-
-    /// Indicate that the second value should be skipped.
-    ///
-    /// The boolean returned indicates if the value was skipped or not.
-    fn skip_struct_field_value(&mut self, cx: &C) -> Result<bool, C::Error>;
-
-    /// End pair decoding.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
-}
-
-/// Trait governing how to decode a variant.
-pub trait VariantDecoder<'de, C: ?Sized + Context> {
-    /// The decoder to use for the variant tag.
-    type DecodeTag<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-    /// The decoder to use for the variant value.
-    type DecodeVariant<'this>: Decoder<'de, C>
-    where
-        Self: 'this;
-
-    /// Return the decoder for the first value in the pair.
-    ///
-    /// If this is a map the first value would be the key of the map, if this is
-    /// a struct the first value would be the field of the struct.
-    #[must_use = "Decoders must be consumed"]
-    fn decode_tag(&mut self, cx: &C) -> Result<Self::DecodeTag<'_>, C::Error>;
-
-    /// Decode the second value in the pair..
-    #[must_use = "Decoders must be consumed"]
-    fn decode_value(&mut self, cx: &C) -> Result<Self::DecodeVariant<'_>, C::Error>;
-
-    /// Indicate that the second value should be skipped.
-    ///
-    /// The boolean returned indicates if the value was skipped or not.
-    fn skip_value(&mut self, cx: &C) -> Result<bool, C::Error>;
-
-    /// End the pair decoder.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
 }
 
 struct ExpectingWrapper<'a, T, C: ?Sized> {

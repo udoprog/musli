@@ -1,9 +1,12 @@
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::en::Encode;
 use crate::expecting::{self, Expecting};
 use crate::Context;
+
+use super::{
+    Encode, MapEncoder, MapEntriesEncoder, SequenceEncoder, StructEncoder, VariantEncoder,
+};
 
 /// Trait governing how the encoder works.
 pub trait Encoder<C: ?Sized + Context>: Sized {
@@ -558,7 +561,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// use musli::{Context, Encode, Encoder};
     ///
     /// struct MyType {
-    ///     data: [u8; 364],
+    ///     data: [u8; 128],
     /// }
     ///
     /// impl<M> Encode<M> for MyType {
@@ -761,7 +764,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// struct PackedStruct {
     ///     field: u32,
-    ///     data: [u8; 364],
+    ///     data: [u8; 128],
     /// }
     ///
     /// impl<M> Encode<M> for PackedStruct {
@@ -847,7 +850,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// use musli::Context;
     /// use musli::en::{Encode, Encoder, SequenceEncoder};
     ///
-    /// struct PackedTuple(u32, [u8; 364]);
+    /// struct PackedTuple(u32, [u8; 128]);
     ///
     /// impl<M> Encode<M> for PackedTuple {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -1210,247 +1213,6 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
             &expecting::StructVariant,
             &ExpectingWrapper::new(self),
         )))
-    }
-}
-
-/// Trait governing how to encode a sequence.
-pub trait SequenceEncoder<C: ?Sized + Context> {
-    /// Result type of the encoder.
-    type Ok;
-    /// The encoder returned when advancing the sequence encoder.
-    type EncodeNext<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-
-    /// Return encoder for the next element.
-    #[must_use = "Encoder must be consumed"]
-    fn encode_next(&mut self, cx: &C) -> Result<Self::EncodeNext<'_>, C::Error>;
-
-    /// Finish encoding the sequence.
-    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
-
-    /// Push an element into the sequence.
-    #[inline]
-    fn push<T>(&mut self, cx: &C, value: T) -> Result<(), C::Error>
-    where
-        T: Encode<C::Mode>,
-    {
-        let encoder = self.encode_next(cx)?;
-        value.encode(cx, encoder)?;
-        Ok(())
-    }
-}
-
-/// Encoder for a map.
-pub trait MapEncoder<C: ?Sized + Context> {
-    /// Result type of the encoder.
-    type Ok;
-    /// Encode the next pair.
-    type EncodeEntry<'this>: MapEntryEncoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-
-    /// Encode the next pair.
-    fn encode_entry(&mut self, cx: &C) -> Result<Self::EncodeEntry<'_>, C::Error>;
-
-    /// Finish encoding pairs.
-    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
-
-    /// Insert a pair immediately.
-    #[inline]
-    fn insert_entry<F, S>(&mut self, cx: &C, key: F, value: S) -> Result<(), C::Error>
-    where
-        Self: Sized,
-        F: Encode<C::Mode>,
-        S: Encode<C::Mode>,
-    {
-        self.encode_entry(cx)?.insert_entry(cx, key, value)?;
-        Ok(())
-    }
-}
-
-/// Trait governing how to encode a map entry.
-pub trait MapEntryEncoder<C: ?Sized + Context> {
-    /// Result type of the encoder.
-    type Ok;
-    /// The encoder returned when advancing the map encoder to encode the key.
-    type EncodeMapKey<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-    /// The encoder returned when advancing the map encoder to encode the value.
-    type EncodeMapValue<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-
-    /// Return the encoder for the key in the entry.
-    #[must_use = "Encoders must be consumed"]
-    fn encode_map_key(&mut self, cx: &C) -> Result<Self::EncodeMapKey<'_>, C::Error>;
-
-    /// Return encoder for value in the entry.
-    #[must_use = "Encoders must be consumed"]
-    fn encode_map_value(&mut self, cx: &C) -> Result<Self::EncodeMapValue<'_>, C::Error>;
-
-    /// Stop encoding this pair.
-    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
-
-    /// Insert the pair immediately.
-    #[inline]
-    fn insert_entry<K, V>(mut self, cx: &C, key: K, value: V) -> Result<Self::Ok, C::Error>
-    where
-        Self: Sized,
-        K: Encode<C::Mode>,
-        V: Encode<C::Mode>,
-    {
-        key.encode(cx, self.encode_map_key(cx)?)?;
-        value.encode(cx, self.encode_map_value(cx)?)?;
-        self.end(cx)
-    }
-}
-
-/// Trait governing how to encode a map entry.
-///
-/// This trait exists so that decoders can implement a mode that is compatible
-/// with serde serialization.
-///
-/// If you do not intend to implement this, then serde compatibility for your
-/// format might be degraded.
-pub trait MapEntriesEncoder<C: ?Sized + Context> {
-    /// Result type of the encoder.
-    type Ok;
-    /// The encoder returned when advancing the map encoder to encode the key.
-    type EncodeMapEntryKey<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-    /// The encoder returned when advancing the map encoder to encode the value.
-    type EncodeMapEntryValue<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-
-    /// Return the encoder for the key in the entry.
-    #[must_use = "Encoders must be consumed"]
-    fn encode_map_entry_key(&mut self, cx: &C) -> Result<Self::EncodeMapEntryKey<'_>, C::Error>;
-
-    /// Return encoder for value in the entry.
-    #[must_use = "Encoders must be consumed"]
-    fn encode_map_entry_value(&mut self, cx: &C)
-        -> Result<Self::EncodeMapEntryValue<'_>, C::Error>;
-
-    /// Stop encoding this pair.
-    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
-
-    /// Insert the pair immediately.
-    #[inline]
-    fn insert_entry<K, V>(&mut self, cx: &C, key: K, value: V) -> Result<(), C::Error>
-    where
-        K: Encode<C::Mode>,
-        V: Encode<C::Mode>,
-    {
-        key.encode(cx, self.encode_map_entry_key(cx)?)?;
-        value.encode(cx, self.encode_map_entry_value(cx)?)?;
-        Ok(())
-    }
-}
-
-/// Encoder for a struct.
-pub trait StructEncoder<C: ?Sized + Context> {
-    /// Result type of the encoder.
-    type Ok;
-    /// Encoder for the next struct field.
-    type EncodeField<'this>: StructFieldEncoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-
-    /// Encode the next field.
-    fn encode_field(&mut self, cx: &C) -> Result<Self::EncodeField<'_>, C::Error>;
-
-    /// Finish encoding the struct.
-    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
-
-    /// Insert a field immediately.
-    #[inline]
-    fn insert_field<F, V>(&mut self, cx: &C, field: F, value: V) -> Result<(), C::Error>
-    where
-        F: Encode<C::Mode>,
-        V: Encode<C::Mode>,
-    {
-        self.encode_field(cx)?.insert_field(cx, field, value)?;
-        Ok(())
-    }
-}
-
-/// Trait governing how to encode a sequence of pairs.
-pub trait StructFieldEncoder<C: ?Sized + Context> {
-    /// Result type of the encoder.
-    type Ok;
-    /// The encoder returned when advancing the map encoder to encode the key.
-    type EncodeFieldName<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-    /// The encoder returned when advancing the map encoder to encode the value.
-    type EncodeFieldValue<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-
-    /// Return the encoder for the field in the struct.
-    #[must_use = "Encoders must be consumed"]
-    fn encode_field_name(&mut self, cx: &C) -> Result<Self::EncodeFieldName<'_>, C::Error>;
-
-    /// Return encoder for the field value in the struct.
-    #[must_use = "Encoders must be consumed"]
-    fn encode_field_value(&mut self, cx: &C) -> Result<Self::EncodeFieldValue<'_>, C::Error>;
-
-    /// Stop encoding this field.
-    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
-
-    /// Insert the pair immediately.
-    #[inline]
-    fn insert_field<N, V>(mut self, cx: &C, name: N, value: V) -> Result<Self::Ok, C::Error>
-    where
-        Self: Sized,
-        N: Encode<C::Mode>,
-        V: Encode<C::Mode>,
-    {
-        name.encode(cx, self.encode_field_name(cx)?)?;
-        value.encode(cx, self.encode_field_value(cx)?)?;
-        self.end(cx)
-    }
-}
-
-/// Trait governing how to encode a variant.
-pub trait VariantEncoder<C: ?Sized + Context> {
-    /// Result type of the encoder.
-    type Ok;
-    /// The encoder returned when advancing the map encoder to encode the key.
-    type EncodeTag<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-    /// The encoder returned when advancing the map encoder to encode the value.
-    type EncodeValue<'this>: Encoder<C, Ok = Self::Ok>
-    where
-        Self: 'this;
-
-    /// Return the encoder for the first element in the variant.
-    #[must_use = "Encoders must be consumed"]
-    fn encode_tag(&mut self, cx: &C) -> Result<Self::EncodeTag<'_>, C::Error>;
-
-    /// Return encoder for the second element in the variant.
-    #[must_use = "Encoders must be consumed"]
-    fn encode_value(&mut self, cx: &C) -> Result<Self::EncodeValue<'_>, C::Error>;
-
-    /// End the variant encoder.
-    fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
-
-    /// Insert the variant immediately.
-    #[inline]
-    fn insert_variant<T, V>(mut self, cx: &C, tag: T, value: V) -> Result<Self::Ok, C::Error>
-    where
-        Self: Sized,
-        T: Encode<C::Mode>,
-        V: Encode<C::Mode>,
-    {
-        tag.encode(cx, self.encode_tag(cx)?)?;
-        value.encode(cx, self.encode_value(cx)?)?;
-        self.end(cx)
     }
 }
 

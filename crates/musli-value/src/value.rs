@@ -320,8 +320,8 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     {
         let mut out = Vec::with_capacity(seq.size_hint(cx).or_default());
 
-        while let Some(item) = seq.decode_next(cx)? {
-            out.push(Value::decode(cx, item)?);
+        while let Some(item) = seq.next(cx)? {
+            out.push(item);
         }
 
         seq.end(cx)?;

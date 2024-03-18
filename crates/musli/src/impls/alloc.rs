@@ -347,17 +347,15 @@ macro_rules! map {
                 C: ?Sized + Context<Mode = M>,
                 D: Decoder<'de, C>,
             {
-                let mut $access = decoder.decode_map($cx)?;
-                let mut out = $with_capacity;
+                decoder.decode_map_fn($cx, |$cx, $access| {
+                    let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.decode_entry($cx)? {
-                    let key = $cx.decode(entry.decode_map_key($cx)?)?;
-                    let value = $cx.decode(entry.decode_map_value($cx)?)?;
-                    out.insert(key, value);
-                }
+                    while let Some((key, value)) = $access.entry($cx)? {
+                        out.insert(key, value);
+                    }
 
-                $access.end($cx)?;
-                Ok(out)
+                    Ok(out)
+                })
             }
         }
 
@@ -373,19 +371,19 @@ macro_rules! map {
                 C: ?Sized + Context<Mode = M>,
                 D: Decoder<'de, C>,
             {
-                let mut $access = decoder.decode_map($cx)?;
-                let mut out = $with_capacity;
+                decoder.decode_map_fn($cx, |$cx, $access| {
+                    let mut out = $with_capacity;
 
-                while let Some(mut entry) = $access.decode_entry($cx)? {
-                    let key = $cx.decode(entry.decode_map_key($cx)?)?;
-                    $cx.enter_map_key(&key);
-                    let value = $cx.decode(entry.decode_map_value($cx)?)?;
-                    out.insert(key, value);
-                    $cx.leave_map_key();
-                }
+                    while let Some(mut entry) = $access.decode_entry($cx)? {
+                        let key = $cx.decode(entry.decode_map_key($cx)?)?;
+                        $cx.enter_map_key(&key);
+                        let value = $cx.decode(entry.decode_map_value($cx)?)?;
+                        out.insert(key, value);
+                        $cx.leave_map_key();
+                    }
 
-                $access.end($cx)?;
-                Ok(out)
+                    Ok(out)
+                })
             }
         }
     }

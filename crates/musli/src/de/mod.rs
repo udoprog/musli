@@ -16,21 +16,52 @@
 //! }
 //! ```
 
-mod decode;
-mod decoder;
-mod number_visitor;
-mod type_hint;
-mod value_visitor;
-mod visitor;
+mod as_decoder;
+pub use self::as_decoder::AsDecoder;
 
+mod decode;
 pub use self::decode::{Decode, TraceDecode};
-pub use self::decoder::{
-    AsDecoder, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder,
-    SequenceDecoder, StructDecoder, StructFieldDecoder, StructFieldsDecoder, VariantDecoder,
-};
+
+mod decoder;
+pub use self::decoder::Decoder;
+
+mod map_decoder;
+pub use self::map_decoder::MapDecoder;
+
+mod map_entries_decoder;
+pub use self::map_entries_decoder::MapEntriesDecoder;
+
+mod map_entry_decoder;
+pub use self::map_entry_decoder::MapEntryDecoder;
+
+mod number_visitor;
 pub use self::number_visitor::NumberVisitor;
+
+mod pack_decoder;
+pub use self::pack_decoder::PackDecoder;
+
+mod sequence_decoder;
+pub use self::sequence_decoder::SequenceDecoder;
+
+mod struct_decoder;
+pub use self::struct_decoder::StructDecoder;
+
+mod struct_field_decoder;
+pub use self::struct_field_decoder::StructFieldDecoder;
+
+mod struct_fields_decoder;
+pub use self::struct_fields_decoder::StructFieldsDecoder;
+
+mod type_hint;
 pub use self::type_hint::{NumberHint, SizeHint, TypeHint};
+
+mod value_visitor;
 pub use self::value_visitor::ValueVisitor;
+
+mod variant_decoder;
+pub use self::variant_decoder::VariantDecoder;
+
+mod visitor;
 pub use self::visitor::Visitor;
 
 use crate::mode::DefaultMode;
