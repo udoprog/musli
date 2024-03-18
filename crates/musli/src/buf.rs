@@ -14,6 +14,7 @@ pub trait Buf {
     ///
     /// This allows allocators to provide more efficient means of extending the
     /// current buffer with one provided from the same allocator.
+    #[inline(always)]
     fn write_buffer<B>(&mut self, other: B) -> bool
     where
         B: Buf,
@@ -34,6 +35,7 @@ pub trait Buf {
     fn len(&self) -> usize;
 
     /// Test if the buffer is empty.
+    #[inline(always)]
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -51,6 +53,11 @@ impl Buf for [u8] {
     #[inline(always)]
     fn len(&self) -> usize {
         <[_]>::len(self)
+    }
+
+    #[inline(always)]
+    fn is_empty(&self) -> usize {
+        <[_]>::is_empty(self)
     }
 
     #[inline(always)]
