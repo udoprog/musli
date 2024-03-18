@@ -211,7 +211,7 @@ fn enum_discriminants() -> Result<()> {
 #[test]
 fn enum_boundaries() -> Result<()> {
     macro_rules! test_case {
-        ($name:ident, $repr:ident, $num:ty, $min:literal, $max:literal, $illegal_repr:ident $(,)?) => {{
+        ($name:ident, $repr:ident, $num:ty, $min:literal, $max:literal $(,)?) => {{
             #[derive(Debug, PartialEq, ZeroCopy)]
             #[repr($repr)]
             #[zero_copy(crate)]
@@ -250,22 +250,15 @@ fn enum_boundaries() -> Result<()> {
             assert_eq!(buf.load(after_min)?, &$name::AfterMin);
             assert_eq!(
                 buf.load(v4),
-                Err(Error::$illegal_repr::<$name>(<$num>::MAX - 1))
+                Err(Error::__illegal_enum_discriminant::<$name>(<$num>::MAX - 1))
             );
         }};
     }
 
-    test_case!(U8, u8, u8, 0, 255u8, __illegal_enum_u8);
-    test_case!(U16, u16, u16, 0, 65_535u16, __illegal_enum_u16);
-    test_case!(U32, u32, u32, 0, 4_294_967_295u32, __illegal_enum_u32);
-    test_case!(
-        U64,
-        u64,
-        u64,
-        0,
-        18_446_744_073_709_551_615u64,
-        __illegal_enum_u64
-    );
+    test_case!(U8, u8, u8, 0, 255u8);
+    test_case!(U16, u16, u16, 0, 65_535u16);
+    test_case!(U32, u32, u32, 0, 4_294_967_295u32,);
+    test_case!(U64, u64, u64, 0, 18_446_744_073_709_551_615u64,);
     // nightly: feature(repr128)
     #[cfg(rune_nightly)]
     test_case!(
@@ -274,25 +267,16 @@ fn enum_boundaries() -> Result<()> {
         u128,
         0u128,
         340_282_366_920_938_463_463_374_607_431_768_211_455u128
-        __illegal_enum_u128,
     );
-    test_case!(I8, i8, i8, -128i8, 127i8, __illegal_enum_i8);
-    test_case!(I16, i16, i16, -32_768i16, 32_767i16, __illegal_enum_i16);
-    test_case!(
-        I32,
-        i32,
-        i32,
-        -2_147_483_648i32,
-        2_147_483_647i32,
-        __illegal_enum_i32
-    );
+    test_case!(I8, i8, i8, -128i8, 127i8);
+    test_case!(I16, i16, i16, -32_768i16, 32_767i16,);
+    test_case!(I32, i32, i32, -2_147_483_648i32, 2_147_483_647i32,);
     test_case!(
         I64,
         i64,
         i64,
         -9_223_372_036_854_775_808i64,
         9_223_372_036_854_775_807i64,
-        __illegal_enum_i64,
     );
     // nightly: feature(repr128)
     #[cfg(rune_nightly)]
@@ -302,7 +286,6 @@ fn enum_boundaries() -> Result<()> {
         i128,
         -170_141_183_460_469_231_731_687_303_715_884_105_728i128,
         170_141_183_460_469_231_731_687_303_715_884_105_727i128,
-        __illegal_enum_i128,
     );
     Ok(())
 }
@@ -310,7 +293,7 @@ fn enum_boundaries() -> Result<()> {
 #[test]
 fn test_signed_wraparound() -> Result<()> {
     macro_rules! test_case {
-        ($name:ident, $repr:ident, $num:ty, $illegal_repr:ident $(,)?) => {{
+        ($name:ident, $repr:ident, $num:ty $(,)?) => {{
             #[derive(Debug, PartialEq, ZeroCopy)]
             #[repr($repr)]
             #[zero_copy(crate)]
@@ -337,25 +320,25 @@ fn test_signed_wraparound() -> Result<()> {
             assert_eq!(buf.load(one)?, &$name::One);
             assert_eq!(
                 buf.load(v4),
-                Err(Error::$illegal_repr::<$name>(<$num>::MAX))
+                Err(Error::__illegal_enum_discriminant::<$name>(<$num>::MAX))
             );
         }};
     }
 
-    test_case!(I8, i8, i8, __illegal_enum_i8);
-    test_case!(I16, i16, i16, __illegal_enum_i16);
-    test_case!(I32, i32, i32, __illegal_enum_i32);
-    test_case!(I64, i64, i64, __illegal_enum_i64);
+    test_case!(I8, i8, i8);
+    test_case!(I16, i16, i16);
+    test_case!(I32, i32, i32);
+    test_case!(I64, i64, i64);
     // nightly: feature(repr128)
     #[cfg(rune_nightly)]
-    test_case!(I128, i128, i128, __illegal_enum_i128);
+    test_case!(I128, i128, i128);
     Ok(())
 }
 
 #[test]
 fn test_neg0() -> Result<()> {
     macro_rules! test_case {
-        ($name:ident, $repr:ident, $num:ty, $illegal_repr:ident $(,)?) => {{
+        ($name:ident, $repr:ident, $num:ty $(,)?) => {{
             #[derive(Debug, PartialEq, ZeroCopy)]
             #[repr($repr)]
             #[zero_copy(crate)]
@@ -382,18 +365,18 @@ fn test_neg0() -> Result<()> {
             assert_eq!(buf.load(one)?, &$name::One);
             assert_eq!(
                 buf.load(v4),
-                Err(Error::$illegal_repr::<$name>(<$num>::MAX))
+                Err(Error::__illegal_enum_discriminant::<$name>(<$num>::MAX))
             );
         }};
     }
 
-    test_case!(I8, i8, i8, __illegal_enum_i8);
-    test_case!(I16, i16, i16, __illegal_enum_i16);
-    test_case!(I32, i32, i32, __illegal_enum_i32);
-    test_case!(I64, i64, i64, __illegal_enum_i64);
+    test_case!(I8, i8, i8);
+    test_case!(I16, i16, i16);
+    test_case!(I32, i32, i32);
+    test_case!(I64, i64, i64);
     // nightly: feature(repr128)
     #[cfg(rune_nightly)]
-    test_case!(I128, i128, i128, __illegal_enum_i128);
+    test_case!(I128, i128, i128);
     Ok(())
 }
 

@@ -101,22 +101,6 @@ impl fmt::Display for Repr {
     }
 }
 
-macro_rules! illegal_enum {
-    ($name:ident, $repr:ident, $ty:ty) => {
-        /// Private helper function to indicate that an illegal enum
-        /// representation has been encountered.
-        #[doc(hidden)]
-        pub fn $name<T>(repr: $ty) -> Self {
-            Self::new(ErrorKind::IllegalRepr {
-                name: type_name::<T>(),
-                repr: Repr {
-                    kind: ReprKind::$repr(repr),
-                },
-            })
-        }
-    };
-}
-
 /// Müsli's zero copy error type.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -130,18 +114,14 @@ impl Error {
         Self { kind }
     }
 
-    illegal_enum!(__illegal_enum_u8, U8, u8);
-    illegal_enum!(__illegal_enum_u16, U16, u16);
-    illegal_enum!(__illegal_enum_u32, U32, u32);
-    illegal_enum!(__illegal_enum_u64, U64, u64);
-    illegal_enum!(__illegal_enum_u128, U128, u128);
-    illegal_enum!(__illegal_enum_i8, I8, i8);
-    illegal_enum!(__illegal_enum_i16, I16, i16);
-    illegal_enum!(__illegal_enum_i32, I32, i32);
-    illegal_enum!(__illegal_enum_i64, I64, i64);
-    illegal_enum!(__illegal_enum_i128, I128, i128);
-    illegal_enum!(__illegal_enum_usize, Usize, usize);
-    illegal_enum!(__illegal_enum_isize, Isize, isize);
+    #[inline(always)]
+    #[doc(hidden)]
+    pub fn __illegal_enum_discriminant<T>(discriminant: impl IntoRepr) -> Self {
+        Self::new(ErrorKind::IllegalDiscriminant {
+            name: type_name::<T>(),
+            discriminant: discriminant.into_repr(),
+        })
+    }
 }
 
 impl fmt::Display for Error {
@@ -220,9 +200,9 @@ pub(crate) enum ErrorKind {
         index: usize,
         len: usize,
     },
-    IllegalRepr {
+    IllegalDiscriminant {
         name: &'static str,
-        repr: Repr,
+        discriminant: Repr,
     },
     IllegalChar {
         repr: u32,
@@ -313,8 +293,8 @@ impl fmt::Display for ErrorKind {
             ErrorKind::StrideOutOfBounds { index, len } => {
                 write!(f, "Stride at index {index} out of bound 0-{len}")
             }
-            ErrorKind::IllegalRepr { name, repr } => {
-                write!(f, "Illegal enum representation {repr} for enum {name}")
+            ErrorKind::IllegalDiscriminant { name, discriminant } => {
+                write!(f, "Illegal discriminant {discriminant} for enum {name}")
             }
             ErrorKind::IllegalChar { repr } => {
                 write!(f, "Illegal char representation {repr}")

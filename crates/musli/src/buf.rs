@@ -56,7 +56,7 @@ impl Buf for [u8] {
     }
 
     #[inline(always)]
-    fn is_empty(&self) -> usize {
+    fn is_empty(&self) -> bool {
         <[_]>::is_empty(self)
     }
 

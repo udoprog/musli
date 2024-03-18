@@ -383,8 +383,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 }
             };
 
-            let illegal_enum = quote::format_ident!("__illegal_enum_{}", num.as_ty());
-
             validate = quote! {
                 #(#discriminants)*
 
@@ -392,7 +390,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 // validating over fields within the size of this type.
                 match *#validator::field::<#ty>(validator)? {
                     #(#validate_variants,)*
-                    value => return #result::Err(#error::#illegal_enum::<Self>(value)),
+                    value => return #result::Err(#error::__illegal_enum_discriminant::<Self>(value)),
                 }
             };
 
