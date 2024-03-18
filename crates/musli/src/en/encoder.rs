@@ -561,7 +561,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// use musli::{Context, Encode, Encoder};
     ///
     /// struct MyType {
-    ///     data: [u8; 364],
+    ///     data: [u8; 128],
     /// }
     ///
     /// impl<M> Encode<M> for MyType {
@@ -764,7 +764,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// struct PackedStruct {
     ///     field: u32,
-    ///     data: [u8; 364],
+    ///     data: [u8; 128],
     /// }
     ///
     /// impl<M> Encode<M> for PackedStruct {
@@ -850,7 +850,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// use musli::Context;
     /// use musli::en::{Encode, Encoder, SequenceEncoder};
     ///
-    /// struct PackedTuple(u32, [u8; 364]);
+    /// struct PackedTuple(u32, [u8; 128]);
     ///
     /// impl<M> Encode<M> for PackedTuple {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>

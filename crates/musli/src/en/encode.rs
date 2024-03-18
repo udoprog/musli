@@ -5,6 +5,41 @@ use crate::Context;
 pub use musli_macros::Encode;
 
 /// Trait governing how types are encoded.
+///
+/// This is typically implemented automatically using the [`Encode` derive].
+///
+/// [`Encode` derive]: https://docs.rs/musli/latest/musli/derives/
+///
+/// # Examples
+///
+/// ```
+/// use musli::Encode;
+///
+/// #[derive(Encode)]
+/// struct MyType {
+///     data: [u8; 128],
+/// }
+/// ````
+///
+/// Implementing by hand:
+///
+/// ```
+/// use musli::{Context, Encode, Encoder};
+///
+/// struct MyType {
+///     data: [u8; 128],
+/// }
+///
+/// impl<M> Encode<M> for MyType {
+///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+///     where
+///         C: ?Sized + Context<Mode = M>,
+///         E: Encoder<C>,
+///     {
+///         encoder.encode_array(cx, self.data)
+///     }
+/// }
+/// ```
 pub trait Encode<M = DefaultMode> {
     /// Encode the given output.
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>

@@ -898,7 +898,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// struct PackedStruct {
     ///     field: u32,
-    ///     data: [u8; 364],
+    ///     data: [u8; 128],
     /// }
     ///
     /// impl<'de, M> Decode<'de, M> for PackedStruct {
