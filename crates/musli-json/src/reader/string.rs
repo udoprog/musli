@@ -109,7 +109,7 @@ where
                 cx.advance(1);
 
                 if !parse_escape(cx, reader, validate, scratch)? {
-                    return Err(cx.marked_custom(open_mark, "Buffer overflow"));
+                    return Err(cx.marked_message(open_mark, "Buffer overflow"));
                 }
 
                 open = reader.index;
@@ -136,7 +136,7 @@ where
     C: ?Sized + Context,
 {
     if musli_common::str::from_utf8(bytes).is_err() {
-        Err(cx.marked_custom(start, "Invalid unicode string"))
+        Err(cx.marked_message(start, "Invalid unicode string"))
     } else {
         Ok(())
     }

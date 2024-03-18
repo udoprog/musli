@@ -172,7 +172,7 @@ impl Writer for &mut [u8] {
         C: ?Sized + Context,
     {
         if self.len() < bytes.len() {
-            return Err(cx.custom(SliceOverflow {
+            return Err(cx.message(SliceOverflow {
                 n: bytes.len(),
                 capacity: self.len(),
             }));

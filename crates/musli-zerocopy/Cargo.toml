@@ -16,8 +16,8 @@ keywords = ["no-std::no-alloc", "no_std", "serialization", "zerocopy"]
 categories = ["encoding", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc"]
+default = ["std", "alloc"]
+std = []
 alloc = []
 
 [dependencies]

@@ -6,8 +6,8 @@ use musli::Buf;
 
 use crate::fixed::CapacityError;
 
-/// A string around a buffer.
-pub(crate) struct BufString<B> {
+/// A string wrapped around a context buffer.
+pub struct BufString<B> {
     buf: B,
 }
 
@@ -16,7 +16,7 @@ where
     B: Buf,
 {
     /// Construct a new fixed string.
-    pub(crate) const fn new(buf: B) -> BufString<B> {
+    pub const fn new(buf: B) -> BufString<B> {
         BufString { buf }
     }
 

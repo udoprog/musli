@@ -73,6 +73,8 @@ jobs:
       fail-fast: false
       matrix:
         package: [musli, musli-allocator, musli-common, musli-storage, musli-descriptive, musli-wire, musli-json, musli-value]
+    env:
+      RUSTFLAGS: -D warnings
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable

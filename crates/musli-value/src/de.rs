@@ -35,7 +35,7 @@ macro_rules! ensure {
             $pat => $block,
             value => {
                 let $hint = value.type_hint();
-                return Err($cx.custom(ErrorMessage::$ident $tt));
+                return Err($cx.message(ErrorMessage::$ident $tt));
             }
         }
     };
@@ -94,84 +94,84 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
     #[inline]
     fn decode_u8(self, cx: &C) -> Result<u8, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => {
-            u8::from_number(n).map_err(cx.map())
+            u8::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_u16(self, cx: &C) -> Result<u16, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => {
-            u16::from_number(n).map_err(cx.map())
+            u16::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_u32(self, cx: &C) -> Result<u32, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => {
-            u32::from_number(n).map_err(cx.map())
+            u32::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_u64(self, cx: &C) -> Result<u64, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => {
-            u64::from_number(n).map_err(cx.map())
+            u64::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_u128(self, cx: &C) -> Result<u128, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => {
-            u128::from_number(n).map_err(cx.map())
+            u128::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_i8(self, cx: &C) -> Result<i8, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => {
-            i8::from_number(n).map_err(cx.map())
+            i8::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_i16(self, cx: &C) -> Result<i16, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => {
-            i16::from_number(n).map_err(cx.map())
+            i16::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_i32(self, cx: &C) -> Result<i32, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => {
-            i32::from_number(n).map_err(cx.map())
+            i32::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_i64(self, cx: &C) -> Result<i64, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => {
-            i64::from_number(n).map_err(cx.map())
+            i64::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_i128(self, cx: &C) -> Result<i128, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => {
-            i128::from_number(n).map_err(cx.map())
+            i128::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_usize(self, cx: &C) -> Result<usize, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => {
-            usize::from_number(n).map_err(cx.map())
+            usize::from_number(n).map_err(cx.map_message())
         })
     }
 
     #[inline]
     fn decode_isize(self, cx: &C) -> Result<isize, C::Error> {
         ensure!(self, cx, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => {
-            isize::from_number(n).map_err(cx.map())
+            isize::from_number(n).map_err(cx.map_message())
         })
     }
 
@@ -189,7 +189,7 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de, C> for ValueDecode
     #[inline]
     fn decode_array<const N: usize>(self, cx: &C) -> Result<[u8; N], C::Error> {
         ensure!(self, cx, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
-            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| cx.custom(ErrorMessage::ArrayOutOfBounds))
+            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| cx.message(ErrorMessage::ArrayOutOfBounds))
         })
     }
 
@@ -359,7 +359,7 @@ impl<'de, C: ?Sized + Context, const F: Options> PackDecoder<'de, C> for IterVal
     fn decode_next(&mut self, cx: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
         match self.iter.next() {
             Some(value) => Ok(ValueDecoder::new(value)),
-            None => Err(cx.custom(ErrorMessage::ExpectedPackValue)),
+            None => Err(cx.message(ErrorMessage::ExpectedPackValue)),
         }
     }
 
@@ -467,7 +467,7 @@ impl<'de, C: ?Sized + Context, const F: Options> MapEntriesDecoder<'de, C>
         cx: &C,
     ) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
-            return Err(cx.custom(ErrorMessage::ExpectedMapValue));
+            return Err(cx.message(ErrorMessage::ExpectedMapValue));
         };
 
         Ok(ValueDecoder::new(value))
@@ -554,7 +554,7 @@ impl<'de, C: ?Sized + Context, const F: Options> StructFieldsDecoder<'de, C>
         cx: &C,
     ) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
         let Some((name, _)) = self.iter.clone().next() else {
-            return Err(cx.custom(ErrorMessage::ExpectedFieldName));
+            return Err(cx.message(ErrorMessage::ExpectedFieldName));
         };
 
         Ok(ValueDecoder::new(name))
@@ -566,7 +566,7 @@ impl<'de, C: ?Sized + Context, const F: Options> StructFieldsDecoder<'de, C>
         cx: &C,
     ) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
-            return Err(cx.custom(ErrorMessage::ExpectedFieldValue));
+            return Err(cx.message(ErrorMessage::ExpectedFieldValue));
         };
 
         Ok(ValueDecoder::new(value))

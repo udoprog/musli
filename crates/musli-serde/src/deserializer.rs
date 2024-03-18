@@ -468,7 +468,7 @@ where
     }
 
     #[inline]
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn visit_owned(self, _: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
         de::Visitor::visit_byte_buf(self.visitor, value)
     }
@@ -592,7 +592,7 @@ where
     }
 
     #[inline]
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn visit_owned(self, _: &C, value: String) -> Result<Self::Ok, C::Error> {
         de::Visitor::visit_string(self.visitor, value)
     }

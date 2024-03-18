@@ -174,7 +174,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         C: ?Sized + Context,
     {
         if self.len() < n {
-            return Err(cx.custom(SliceUnderflow {
+            return Err(cx.message(SliceUnderflow {
                 n,
                 remaining: self.len(),
             }));
@@ -348,7 +348,7 @@ where
     let outcome = range.start.wrapping_add(len);
 
     if outcome > range.end || outcome < range.start {
-        Err(cx.custom(SliceUnderflow {
+        Err(cx.message(SliceUnderflow {
             n: len,
             remaining: (range.end as usize).wrapping_sub(range.start as usize),
         }))
@@ -385,7 +385,7 @@ where
                 self.remaining = remaining;
                 Ok(())
             }
-            None => Err(cx.custom("Reader out of bounds")),
+            None => Err(cx.message("Reader out of bounds")),
         }
     }
 }

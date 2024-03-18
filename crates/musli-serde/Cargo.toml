@@ -15,8 +15,8 @@ keywords = ["no-std::no-alloc", "no_std", "serde", "serialization"]
 categories = ["encoding", "encoding", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc", "musli/std", "serde/std"]
+default = ["std", "alloc"]
+std = ["musli/std", "serde/std"]
 alloc = ["musli/alloc", "serde/alloc"]
 
 [dependencies]

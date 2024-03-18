@@ -45,6 +45,7 @@ mod serializer;
 use core::cell::RefCell;
 use core::fmt;
 
+use musli::context::StdError;
 use musli::{Context, Decoder, Encoder};
 use serde::{Deserialize, Serialize};
 
@@ -84,7 +85,7 @@ where
     #[inline]
     fn custom<T>(&self, error: T) -> Self::Error
     where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+        T: 'static + Send + Sync + StdError,
     {
         *self.error.borrow_mut() = Some(self.inner.custom(error));
         error::SerdeError::Captured

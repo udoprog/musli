@@ -19,11 +19,11 @@ impl fmt::Display for Error {
 }
 
 #[derive(Debug)]
-pub(crate) enum ErrorImpl {
+enum ErrorImpl {
     #[cfg(feature = "alloc")]
     Message(Box<str>),
     #[cfg(not(feature = "alloc"))]
-    Message,
+    Empty,
 }
 
 impl fmt::Display for ErrorImpl {
@@ -32,7 +32,7 @@ impl fmt::Display for ErrorImpl {
             #[cfg(feature = "alloc")]
             ErrorImpl::Message(message) => message.fmt(f),
             #[cfg(not(feature = "alloc"))]
-            ErrorImpl::Message => write!(f, "Message error (see diagnostics)"),
+            ErrorImpl::Empty => write!(f, "Message error (see diagnostics)"),
         }
     }
 }
@@ -59,7 +59,7 @@ impl musli_common::context::Error for Error {
             #[cfg(feature = "alloc")]
             err: ErrorImpl::Message(message.to_string().into()),
             #[cfg(not(feature = "alloc"))]
-            err: ErrorImpl::Message,
+            err: ErrorImpl::Empty,
         }
     }
 }
@@ -76,6 +76,15 @@ impl fmt::Display for ErrorMessage {
             ErrorMessage::ParseFloat(error) => {
                 write!(f, "Expected float, got {error}")
             }
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for ErrorMessage {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ErrorMessage::ParseFloat(error) => Some(error),
         }
     }
 }

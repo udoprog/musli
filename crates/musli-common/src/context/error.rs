@@ -7,6 +7,8 @@
 
 use core::fmt;
 
+use musli::context::StdError;
+
 #[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
 
@@ -15,7 +17,7 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     /// Construct a custom error.
     fn custom<T>(error: T) -> Self
     where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug;
+        T: 'static + Send + Sync + StdError;
 
     /// Collect an error from something that can be displayed.
     ///
@@ -26,7 +28,7 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
         T: fmt::Display;
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "alloc"))]
 impl Error for std::io::Error {
     fn custom<T>(message: T) -> Self
     where

@@ -14,6 +14,7 @@ use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
+use musli::context::StdError;
 use musli::mode::DefaultMode;
 use musli::{Allocator, Context};
 
@@ -84,7 +85,7 @@ where
     #[inline]
     fn custom<T>(&self, message: T) -> Self::Error
     where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+        T: 'static + Send + Sync + StdError,
     {
         E::custom(message)
     }
@@ -146,7 +147,7 @@ where
     /// Construct an error or panic.
     pub fn unwrap(self) -> E {
         if self.error.get() {
-            return E::custom("error");
+            return E::message("error");
         }
 
         panic!("did not error")
@@ -231,7 +232,7 @@ where
     #[inline]
     fn custom<T>(&self, error: T) -> ErrorMarker
     where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+        T: 'static + Send + Sync + StdError,
     {
         // SAFETY: We're restricting access to the context, so that this is
         // safe.

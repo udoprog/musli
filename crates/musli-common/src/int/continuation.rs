@@ -54,7 +54,7 @@ where
         shift += 7;
 
         if shift >= T::BITS {
-            return Err(cx.custom("Bits overflow"));
+            return Err(cx.message("Bits overflow"));
         }
 
         b = r.read_byte(cx)?;

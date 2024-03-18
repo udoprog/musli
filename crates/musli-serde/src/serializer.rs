@@ -1,4 +1,5 @@
-use std::fmt;
+#[cfg(any(feature = "std", feature = "alloc"))]
+use core::fmt;
 
 use musli::en::{
     MapEntriesEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
@@ -264,7 +265,19 @@ where
     where
         T: fmt::Display,
     {
-        let string = value.to_string();
+        use core::fmt::Write;
+        use musli_common::buf::BufString;
+
+        let Some(buf) = self.cx.alloc() else {
+            return Err(ser::Error::custom("Failed to allocate"));
+        };
+
+        let mut string = BufString::new(buf);
+
+        if write!(string, "{value}").is_err() {
+            return Err(ser::Error::custom("Failed to write to string"));
+        }
+
         self.serialize_str(&string)
     }
 }

@@ -160,7 +160,7 @@ impl<const N: usize> FixedBytes<N> {
         C: ?Sized + Context,
     {
         if !self.extend_from_slice(source) {
-            return Err(cx.custom(FixedBytesOverflow {
+            return Err(cx.message(FixedBytesOverflow {
                 at: self.init,
                 additional: source.len(),
                 capacity: N,

@@ -1,7 +1,7 @@
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 use crate::de::SizeHint;
 
-#[cfg(any(feature = "std", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 #[inline]
 pub(crate) fn cautious<S>(hint: S) -> usize
 where

@@ -70,7 +70,7 @@ pub enum NeverMarker {}
 ///             return Ok(self.0);
 ///         }
 ///
-///         Err(cx.custom("I do not have the answer..."))
+///         Err(cx.message("I do not have the answer..."))
 ///     }
 /// }
 /// ```
