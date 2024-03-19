@@ -270,7 +270,7 @@ where
         self.writer.write_byte(cx, b'{')?;
         tag.encode(cx, JsonObjectKeyEncoder::new(self.writer.borrow_mut()))?;
         self.writer.write_byte(cx, b':')?;
-        JsonArrayEncoder::with_variant(cx, self.writer, true)
+        JsonArrayEncoder::with_end(cx, self.writer, b"]}")
     }
 
     #[inline]
@@ -286,7 +286,7 @@ where
         self.writer.write_byte(cx, b'{')?;
         tag.encode(cx, JsonObjectKeyEncoder::new(self.writer.borrow_mut()))?;
         self.writer.write_byte(cx, b':')?;
-        JsonObjectEncoder::with_variant(cx, self.writer, true)
+        JsonObjectEncoder::with_end(cx, self.writer, b"}}")
     }
 }
 
