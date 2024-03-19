@@ -170,7 +170,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// struct UnitStruct;
@@ -208,7 +208,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// #[musli(packed)]
@@ -1122,7 +1122,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// #[musli(packed)]
@@ -1175,7 +1175,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// #[musli(packed)]
@@ -1224,7 +1224,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// struct VectorField {
@@ -1273,7 +1273,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// struct VectorField {
@@ -1327,7 +1327,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// struct TupleStruct(String, u32);
@@ -1373,7 +1373,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// struct TupleStruct(String, u32);
@@ -1420,7 +1420,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// ```
     /// use std::collections::HashMap;
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// struct MapStruct {
@@ -1479,7 +1479,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// ```
     /// use std::collections::HashMap;
     ///
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// #[musli(packed)]
@@ -1539,7 +1539,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Deriving an implementation:
     ///
     /// ```
-    /// use musli::de::Decode;
+    /// use musli::Decode;
     ///
     /// #[derive(Decode)]
     /// struct Struct {

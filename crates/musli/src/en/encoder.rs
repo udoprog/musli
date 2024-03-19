@@ -66,12 +66,22 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// struct UnitStruct;
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
+    /// # struct UnitStruct;
     ///
-    /// struct EmptyStruct;
-    ///
-    /// impl<M> Encode<M> for EmptyStruct {
+    /// impl<M> Encode<M> for UnitStruct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     ///     where
     ///         C: ?Sized + Context<Mode = M>,
@@ -93,12 +103,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: bool
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: bool,
-    /// }
+    /// # struct MyType { data: bool }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -122,12 +143,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: char
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: char,
-    /// }
+    /// # struct MyType { data: char }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -151,12 +183,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: u8
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: u8,
-    /// }
+    /// # struct MyType { data: u8 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -180,12 +223,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: u16
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: u16,
-    /// }
+    /// # struct MyType { data: u16 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -209,12 +263,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: u32
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: u32,
-    /// }
+    /// # struct MyType { data: u32 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -238,12 +303,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: u64
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: u64,
-    /// }
+    /// # struct MyType { data: u64 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -267,12 +343,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: u128
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: u128,
-    /// }
+    /// # struct MyType { data: u128 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -296,12 +383,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: i8
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: i8,
-    /// }
+    /// # struct MyType { data: i8 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -325,12 +423,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: i16
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: i16,
-    /// }
+    /// # struct MyType { data: i16 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -354,12 +463,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: i32
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: i32,
-    /// }
+    /// # struct MyType { data: i32 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -383,12 +503,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: i64
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: i64,
-    /// }
+    /// # struct MyType { data: i64 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -412,12 +543,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: i128
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: i128,
-    /// }
+    /// # struct MyType { data: i128 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -437,16 +579,27 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Encode Rusts [`usize`].
+    /// Encode a [`usize`].
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: usize
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: usize,
-    /// }
+    /// # struct MyType { data: usize }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -466,16 +619,27 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Encode Rusts [`isize`].
+    /// Encode a [`isize`].
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: isize
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: isize,
-    /// }
+    /// # struct MyType { data: isize }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -499,12 +663,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: f32
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: f32,
-    /// }
+    /// # struct MyType { data: f32 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -528,12 +703,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: f64
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: f64,
-    /// }
+    /// # struct MyType { data: f64 }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -557,12 +743,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: [u8; 128]
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: [u8; 128],
-    /// }
+    /// # struct MyType { data: [u8; 128] }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -586,12 +783,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: Vec<u8>
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: Vec<u8>,
-    /// }
+    /// # struct MyType { data: Vec<u8> }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -616,18 +824,29 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// This can be useful to avoid allocations when a caller doesn't have
     /// access to a single byte sequence like in
-    /// [VecDeque][std::collections::VecDeque].
+    /// [`VecDeque`][std::collections::VecDeque].
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
     /// ```
     /// use std::collections::VecDeque;
+    /// use musli::Encode;
     ///
-    /// use musli::{Context, Encode, Encoder};
-    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
     /// struct MyType {
-    ///     data: VecDeque<u8>,
+    ///     data: VecDeque<u8>
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// # use std::collections::VecDeque;
+    /// # struct MyType { data: VecDeque<u8> }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -652,12 +871,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: String
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: String,
-    /// }
+    /// # struct MyType { data: String }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -681,12 +911,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: Option<String>
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: Option<String>,
-    /// }
+    /// # struct MyType { data: Option<String> }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -717,12 +958,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: Option<String>
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Encode, Encoder};
-    ///
-    /// struct MyType {
-    ///     data: Option<String>,
-    /// }
+    /// # struct MyType { data: Option<String> }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -759,8 +1011,8 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, SequenceEncoder};
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{SequenceEncoder};
     ///
     /// struct PackedStruct {
     ///     field: u32,
@@ -798,13 +1050,24 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, SequenceEncoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
     /// struct MyType {
-    ///     data: Vec<String>,
+    ///     data: Vec<String>
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{SequenceEncoder};
+    /// # struct MyType { data: Vec<String> }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -847,8 +1110,8 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, SequenceEncoder};
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{SequenceEncoder};
     ///
     /// struct PackedTuple(u32, [u8; 128]);
     ///
@@ -881,14 +1144,24 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, MapEncoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
     /// struct Struct {
     ///     name: String,
     ///     age: u32,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{MapEncoder};
+    /// # struct Struct { name: String, age: u32 }
     ///
     /// impl<M> Encode<M> for Struct {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -916,8 +1189,8 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, MapEntriesEncoder};
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{MapEntriesEncoder};
     ///
     /// struct Struct {
     ///     name: String,
@@ -959,8 +1232,8 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, StructEncoder};
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{StructEncoder};
     ///
     /// struct Struct {
     ///     name: String,
@@ -993,17 +1266,25 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, VariantEncoder, StructEncoder};
+    /// use musli::Encode;
     ///
+    /// #[derive(Encode)]
     /// enum Enum {
     ///     UnitVariant,
     ///     TupleVariant(String),
-    ///     Variant {
+    ///     StructVariant {
     ///         data: String,
     ///         age: u32,
     ///     }
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// # enum Enum { UnitVariant, TupleVariant(String), StructVariant { data: String, age: u32 } }
     ///
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -1020,7 +1301,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///             Enum::TupleVariant(data) => {
     ///                 variant.insert_variant(cx, "variant2", data)
     ///             }
-    ///             Enum::Variant { data, age } => {
+    ///             Enum::StructVariant { data, age } => {
     ///                 variant.encode_tag(cx)?.encode_string(cx, "variant3")?;
     ///
     ///                 let mut st = variant.encode_value(cx)?.encode_struct(cx, 2)?;
@@ -1046,18 +1327,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, VariantEncoder, StructEncoder, SequenceEncoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
     /// enum Enum {
     ///     UnitVariant,
-    ///     TupleVariant(String),
-    ///     Variant {
-    ///         data: String,
-    ///         age: u32,
-    ///     }
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// # enum Enum { UnitVariant }
     ///
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -1068,17 +1354,6 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///         match self {
     ///             Enum::UnitVariant => {
     ///                 encoder.encode_unit_variant(cx, &"variant1")
-    ///             }
-    ///             Enum::TupleVariant(data) => {
-    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant2", 1)?;
-    ///                 variant.push(cx, data)?;
-    ///                 variant.end(cx)
-    ///             }
-    ///             Enum::Variant { data, age } => {
-    ///                 let mut variant = encoder.encode_struct_variant(cx, &"variant3", 2)?;
-    ///                 variant.insert_field(cx, "data", data)?;
-    ///                 variant.insert_field(cx, "age", age)?;
-    ///                 variant.end(cx)
     ///             }
     ///         }
     ///     }
@@ -1101,18 +1376,23 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, VariantEncoder, StructEncoder, SequenceEncoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
     /// enum Enum {
-    ///     UnitVariant,
     ///     TupleVariant(String),
-    ///     Variant {
-    ///         data: String,
-    ///         age: u32,
-    ///     }
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// # enum Enum { TupleVariant(String) }
     ///
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -1121,19 +1401,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///         E: Encoder<C>,
     ///     {
     ///         match self {
-    ///             Enum::UnitVariant => {
-    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant1", 0)?;
-    ///                 variant.end(cx)
-    ///             }
     ///             Enum::TupleVariant(data) => {
     ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant2", 1)?;
     ///                 variant.push(cx, data)?;
-    ///                 variant.end(cx)
-    ///             }
-    ///             Enum::Variant { data, age } => {
-    ///                 let mut variant = encoder.encode_struct_variant(cx, &"variant3", 2)?;
-    ///                 variant.insert_field(cx, "data", data)?;
-    ///                 variant.insert_field(cx, "age", age)?;
     ///                 variant.end(cx)
     ///             }
     ///         }
@@ -1160,18 +1430,26 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::Context;
-    /// use musli::en::{Encode, Encoder, VariantEncoder, StructEncoder, SequenceEncoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
     /// enum Enum {
-    ///     UnitVariant,
-    ///     TupleVariant(String),
-    ///     Variant {
+    ///     StructVariant {
     ///         data: String,
     ///         age: u32,
     ///     }
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// # enum Enum { StructVariant { data: String, age: u32 } }
     ///
     /// impl<M> Encode<M> for Enum {
     ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -1180,16 +1458,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     ///         E: Encoder<C>,
     ///     {
     ///         match self {
-    ///             Enum::UnitVariant => {
-    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant1", 0)?;
-    ///                 variant.end(cx)
-    ///             }
-    ///             Enum::TupleVariant(data) => {
-    ///                 let mut variant = encoder.encode_tuple_variant(cx, &"variant2", 1)?;
-    ///                 variant.push(cx, data)?;
-    ///                 variant.end(cx)
-    ///             }
-    ///             Enum::Variant { data, age } => {
+    ///             Enum::StructVariant { data, age } => {
     ///                 let mut variant = encoder.encode_struct_variant(cx, &"variant3", 2)?;
     ///                 variant.insert_field(cx, "data", data)?;
     ///                 variant.insert_field(cx, "age", age)?;
