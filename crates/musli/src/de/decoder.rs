@@ -9,25 +9,26 @@ use super::{AsDecoder, MapDecoder, PackDecoder, SequenceDecoder, VariantDecoder}
 
 /// Trait governing the implementation of a decoder.
 pub trait Decoder<'de, C: ?Sized + Context>: Sized {
-    /// Constructed [`Decoder`] with a different context.
+    /// [`Decoder`] with a different context returned by
+    /// [`Decoder::with_context`]
     type WithContext<U>: Decoder<'de, U>
     where
         U: Context;
-    /// The type returned when the decoder is buffered.
+    /// Decoder returned by [`Decoder::decode_buffer`].
     type DecodeBuffer: AsDecoder<C>;
-    /// Decoder for a value that is present.
+    /// Decoder returned by [`Decoder::decode_option`].
     type DecodeSome: Decoder<'de, C>;
-    /// Pack decoder implementation.
+    /// Decoder returned by [`Decoder::decode_pack`].
     type DecodePack: PackDecoder<'de, C>;
-    /// Sequence decoder implementation.
+    /// Decoder returned by [`Decoder::decode_sequence`].
     type DecodeSequence: SequenceDecoder<'de, C>;
-    /// Tuple decoder implementation.
+    /// Decoder returned by [`Decoder::decode_tuple`].
     type DecodeTuple: PackDecoder<'de, C>;
-    /// Decoder for a map.
+    /// Decoder returned by [`Decoder::decode_map`].
     type DecodeMap: MapDecoder<'de, C>;
-    /// Decoder for a struct.
+    /// Decoder returned by [`Decoder::decode_struct`].
     type DecodeStruct: StructDecoder<'de, C>;
-    /// Decoder for a variant.
+    /// Decoder returned by [`Decoder::decode_variant`].
     type DecodeVariant: VariantDecoder<'de, C>;
 
     /// This is a type argument used to hint to any future implementor that they
@@ -74,7 +75,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// ```
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
-    /// Skip over the current value.
+    /// Skip over the current next value.
     fn skip(self, cx: &C) -> Result<(), C::Error> {
         Err(cx.message(format_args!(
             "Skipping is not supported, expected {}",
@@ -162,14 +163,24 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Decode a unit or something that is empty.
+    /// Decode a unit.
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// struct UnitStruct;
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    ///
-    /// struct UnitType;
+    /// # struct UnitType;
     ///
     /// impl<'de, M> Decode<'de, M> for UnitType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -194,21 +205,32 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::de::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct BooleanField {
+    ///     field: bool,
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
+    /// # struct BooleanField { field: bool }
     ///
-    /// struct MyType {
-    ///     data: bool,
-    /// }
-    ///
-    /// impl<'de, M> Decode<'de, M> for MyType {
+    /// impl<'de, M> Decode<'de, M> for BooleanField {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
     ///     where
     ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
     ///         Ok(Self {
-    ///             data: decoder.decode_bool(cx)?,
+    ///             field: decoder.decode_bool(cx)?,
     ///         })
     ///     }
     /// }
@@ -225,12 +247,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: char,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: char }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -256,12 +289,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: u8,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: u8 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -287,12 +331,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: u16,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: u16 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -318,13 +373,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
-    /// use musli::de;
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: u32,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: u32 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -350,12 +415,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: u64,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: u64 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -381,12 +457,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: u128,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: u128 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -412,12 +499,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: i8,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: i8 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -443,12 +541,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: i16,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: i16 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -474,12 +583,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: i32,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: i32 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -505,12 +625,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: i64,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: i64 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -536,12 +667,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: i128,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: i128 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -563,16 +705,27 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Decode Rusts [`usize`].
+    /// Decode a [`usize`].
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: usize,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: usize }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -594,16 +747,27 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Decode Rusts [`isize`].
+    /// Decode a [`isize`].
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: isize,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: isize }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -629,12 +793,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: f32,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: f32 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -660,12 +835,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: f64,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: f64 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -704,12 +890,23 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
+    /// Deriving an implementation:
     ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
     /// struct MyType {
     ///     data: [u8; 128],
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// # struct MyType { data: [u8; 128] }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -735,16 +932,26 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct BytesReference<'de> {
+    ///     data: &'de [u8],
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use std::fmt;
     ///
     /// use musli::{Context, Decode, Decoder};
     /// use musli::de::ValueVisitor;
-    ///
-    /// #[derive(Debug, PartialEq)]
-    /// struct BytesReference<'de> {
-    ///     data: &'de [u8],
-    /// }
+    /// # struct BytesReference<'de> { data: &'de [u8] }
     ///
     /// impl<'de, M> Decode<'de, M> for BytesReference<'de> {
     ///     #[inline]
@@ -793,16 +1000,26 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use musli::Decode;
+    ///
+    /// #[derive(Decode)]
+    /// #[musli(packed)]
+    /// struct StringReference<'de> {
+    ///     data: &'de str,
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
     /// ```
     /// use std::fmt;
     ///
     /// use musli::Context;
     /// use musli::de::{Decode, Decoder, ValueVisitor};
-    ///
-    /// #[derive(Debug, PartialEq)]
-    /// struct StringReference<'de> {
-    ///     data: &'de str,
-    /// }
+    /// # struct StringReference<'de> { data: &'de str }
     ///
     /// impl<'de, M> Decode<'de, M> for StringReference<'de> {
     ///     #[inline]
@@ -1010,7 +1227,6 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// use musli::de::Decode;
     ///
     /// #[derive(Decode)]
-    /// #[musli(packed)]
     /// struct VectorField {
     ///     data: Vec<String>,
     /// }
@@ -1060,7 +1276,6 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// use musli::de::Decode;
     ///
     /// #[derive(Decode)]
-    /// #[musli(packed)]
     /// struct VectorField {
     ///     data: Vec<String>,
     /// }
@@ -1115,15 +1330,12 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// use musli::de::Decode;
     ///
     /// #[derive(Decode)]
-    /// #[musli(packed)]
     /// struct TupleStruct(String, u32);
     /// ```
     ///
     /// Implementing manually:
     ///
     /// ```
-    /// use std::collections::HashMap;
-    ///
     /// use musli::Context;
     /// use musli::de::{Decode, Decoder, PackDecoder};
     /// # struct TupleStruct(String, u32);
@@ -1164,15 +1376,12 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// use musli::de::Decode;
     ///
     /// #[derive(Decode)]
-    /// #[musli(packed)]
     /// struct TupleStruct(String, u32);
     /// ```
     ///
     /// Implementing manually:
     ///
     /// ```
-    /// use std::collections::HashMap;
-    ///
     /// use musli::Context;
     /// use musli::de::{Decode, Decoder, PackDecoder};
     /// # struct TupleStruct(String, u32);
@@ -1214,7 +1423,6 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// use musli::de::Decode;
     ///
     /// #[derive(Decode)]
-    /// #[musli(packed)]
     /// struct MapStruct {
     ///     data: HashMap<String, u32>,
     /// }
@@ -1328,16 +1536,24 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///
     /// # Examples
     ///
+    /// Deriving an implementation:
+    ///
     /// ```
-    /// use std::collections::HashMap;
+    /// use musli::de::Decode;
     ///
-    /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{StructDecoder, StructFieldDecoder};
-    ///
+    /// #[derive(Decode)]
     /// struct Struct {
     ///     string: String,
     ///     integer: u32,
     /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{StructDecoder, StructFieldDecoder};
+    /// # struct Struct { string: String, integer: u32 }
     ///
     /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -1383,7 +1599,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Return decoder for a variant.
+    /// Return a decoder for a variant.
     ///
     /// # Examples
     ///
