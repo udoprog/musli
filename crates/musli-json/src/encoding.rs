@@ -131,7 +131,7 @@ impl Encoding<DefaultMode> {
     /// enum Json {}
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
-    /// #[musli(mode = Json, default_field_name = "name")]
+    /// #[musli(mode = Json, default_field = "name")]
     /// struct Struct<'a> {
     ///     name: &'a str,
     ///     age: u32,

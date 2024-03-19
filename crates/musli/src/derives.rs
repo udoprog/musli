@@ -46,8 +46,8 @@
 //! enum Json {}
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "index")]
-//! #[musli(mode = Json, default_field_name = "name")]
+//! #[musli(default_field = "index")]
+//! #[musli(mode = Json, default_field = "name")]
 //! struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
@@ -63,7 +63,7 @@
 //! # use musli::{Encode, Decode};
 //! # enum Json {}
 //! # #[derive(Encode, Decode)]
-//! # #[musli(mode = Json, default_field_name = "name")]
+//! # #[musli(mode = Json, default_field = "name")]
 //! # struct Person<'a> { name: &'a str, age: u32 }
 //! use musli_json::Encoding;
 //!
@@ -108,8 +108,8 @@
 //! enum Json {}
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "index")]
-//! #[musli(mode = Json, default_field_name = "name")]
+//! #[musli(default_field = "index")]
+//! #[musli(mode = Json, default_field = "name")]
 //! struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
@@ -150,7 +150,7 @@
 //! use musli::{Decode, Encode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "name")]
+//! #[musli(default_field = "name")]
 //! struct Name<'a> {
 //!     sur_name: &'a str,
 //!     #[musli(decode_only, rename = "last")]
@@ -164,7 +164,7 @@
 //!
 //! Container attributes apply to the container, such as directly on the
 //! `struct` or `enum`. Like the uses of `#[musli(packed)]` and
-//! `#[musli(default_variant_name = "name")]` here:
+//! `#[musli(default_variant = "name")]` here:
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -176,7 +176,7 @@
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_variant_name = "name")]
+//! #[musli(default_variant = "name")]
 //! enum Enum {
 //!     /* the body of the struct */
 //! }
@@ -184,27 +184,27 @@
 //!
 //! <br>
 //!
-//! #### `#[musli(default_field_name = "..")]`
+//! #### `#[musli(default_field = "..")]`
 //!
 //! This determines how the default tag for a field is determined. It can take
 //! either `"name"` or `"index"`.
 //!
-//! * `#[musli(default_field_name = "index")]` will use the index of the field.
+//! * `#[musli(default_field = "index")]` will use the index of the field.
 //!   This is the default.
-//! * `#[musli(default_field_name = "name")]` will use the name of the field.
+//! * `#[musli(default_field = "name")]` will use the name of the field.
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "name")]
+//! #[musli(default_field = "name")]
 //! struct Struct {
 //!     field1: u32,
 //!     field2: u32,
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "name")]
+//! #[musli(default_field = "name")]
 //! enum Enum {
 //!     Variant1 {
 //!         field1: u32,
@@ -217,21 +217,21 @@
 //!
 //! <br>
 //!
-//! #### `#[musli(default_variant_name = "..")]`
+//! #### `#[musli(default_variant = "..")]`
 //!
 //! This determines how the default tag for a variant is determined. It can take
 //! either `"name"` or `"index"`.
 //!
-//! * `#[musli(default_variant_name = "index")]` will use the index of the
+//! * `#[musli(default_variant = "index")]` will use the index of the
 //!   variant. This is the default.
-//! * `#[musli(default_variant_name = "name")]` will use the name of the
+//! * `#[musli(default_variant = "name")]` will use the name of the
 //!   variant.
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_variant_name = "name")]
+//! #[musli(default_variant = "name")]
 //! enum Enum {
 //!     Variant1 {
 //!         field1: u32,
@@ -397,7 +397,7 @@
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_variant_name = "name")]
+//! #[musli(default_variant = "name")]
 //! enum Enum {
 //!     #[musli(rename = "Other")]
 //!     Something {
@@ -462,23 +462,23 @@
 //!
 //! <br>
 //!
-//! #### `#[musli(default_field_name = "..")]`
+//! #### `#[musli(default_field = "..")]`
 //!
 //! This determines how the default tag for a field in the current variant is
 //! determined. This overrides the tagging convention specified on the
 //! *container* and can take either `"name"` or `"index"`.
 //!
-//! * `#[musli(default_field_name = "index")]` will use the index of the field.
+//! * `#[musli(default_field = "index")]` will use the index of the field.
 //!   This is the default.
-//! * `#[musli(default_field_name = "name")]` will use the name of the field.
+//! * `#[musli(default_field = "name")]` will use the name of the field.
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "index")]
+//! #[musli(default_field = "index")]
 //! enum Enum {
-//!     #[musli(default_field_name = "name")]
+//!     #[musli(default_field = "name")]
 //!     Variant {
 //!         field1: u32,
 //!     },
@@ -529,14 +529,14 @@
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "name")]
+//! #[musli(default_field = "name")]
 //! struct Struct {
 //!     #[musli(rename = "other")]
 //!     something: String,
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field_name = "name")]
+//! #[musli(default_field = "name")]
 //! enum Enum {
 //!     Variant {
 //!         #[musli(rename = "other")]

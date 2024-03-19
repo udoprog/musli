@@ -3,8 +3,8 @@ use musli::{Decode, Encode};
 enum Packed {}
 
 #[derive(Encode, Decode)]
-#[musli(default_field_name = "name")]
-#[musli(mode = Packed, encode_only, packed, default_field_name = "index")]
+#[musli(default_field = "name")]
+#[musli(mode = Packed, encode_only, packed, default_field = "index")]
 struct Person<'a> {
     name: &'a str,
     age: u32,

@@ -296,7 +296,7 @@ enum Alt {}
 
 #[derive(Decode, Encode)]
 #[musli(mode = Alt, packed)]
-#[musli(default_field_name = "name")]
+#[musli(default_field = "name")]
 struct Word<'a> {
     text: &'a str,
     teineigo: bool,

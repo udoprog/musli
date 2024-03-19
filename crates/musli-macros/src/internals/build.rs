@@ -211,7 +211,7 @@ pub(crate) fn setup<'a>(
 fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -> Result<Body<'a>> {
     let mut fields = Vec::with_capacity(data.fields.len());
 
-    let default_field_name = e.type_attr.default_field_name(mode).map(|&(_, v)| v);
+    let default_field = e.type_attr.default_field(mode).map(|&(_, v)| v);
     let packing = e
         .type_attr
         .packing(mode)
@@ -225,7 +225,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
             e,
             mode,
             f,
-            default_field_name,
+            default_field,
             packing,
             None,
             &mut tag_methods,
@@ -305,17 +305,14 @@ fn setup_variant<'a>(
         .map(|&(_, v)| v)
         .unwrap_or_default();
 
-    let default_field_name = data
+    let default_field = data
         .attr
-        .default_field_name(mode)
-        .or_else(|| e.type_attr.default_field_name(mode))
+        .default_field(mode)
+        .or_else(|| e.type_attr.default_field(mode))
         .map(|&(_, v)| v);
 
-    let (tag, tag_method) = data.expand_tag(
-        e,
-        mode,
-        e.type_attr.default_variant_name(mode).map(|&(_, v)| v),
-    )?;
+    let (tag, tag_method) =
+        data.expand_tag(e, mode, e.type_attr.default_variant(mode).map(|&(_, v)| v))?;
     tag_methods.insert(data.span, tag_method);
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
@@ -352,7 +349,7 @@ fn setup_variant<'a>(
             e,
             mode,
             f,
-            default_field_name,
+            default_field,
             variant_packing,
             Some(&mut patterns),
             &mut field_tag_methods,
@@ -382,14 +379,14 @@ fn setup_field<'a>(
     e: &'a Expander,
     mode: Mode<'_>,
     data: &'a FieldData<'a>,
-    default_field_name: Option<DefaultTag>,
+    default_field: Option<DefaultTag>,
     packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
     tag_methods: &mut TagMethods,
 ) -> Result<Field<'a>> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
-    let (tag, tag_method) = data.expand_tag(e, mode, default_field_name)?;
+    let (tag, tag_method) = data.expand_tag(e, mode, default_field)?;
     tag_methods.insert(data.span, tag_method);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
     let default_attr = data.attr.default_field(mode).map(|&(s, ())| s);

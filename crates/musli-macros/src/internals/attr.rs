@@ -194,10 +194,10 @@ layer! {
         name_type: syn::Type,
         /// `#[musli(name_format_with)]`.
         name_format_with: syn::Path,
-        /// `#[musli(default_variant_name = "..")]`.
-        default_variant_name: DefaultTag,
-        /// `#[musli(default_field_name = "..")]`.
-        default_field_name: DefaultTag,
+        /// `#[musli(default_variant = "..")]`.
+        default_variant: DefaultTag,
+        /// `#[musli(default_field = "..")]`.
+        default_field: DefaultTag,
         /// If `#[musli(tag = <expr>)]` is specified.
         tag: syn::Expr,
         /// If `#[musli(content = <expr>)]` is specified.
@@ -318,32 +318,31 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // parse #[musli(default_variant_name = "..")]
+            // parse #[musli(default_variant = "..")]
             if meta.path == DEFAULT_VARIANT_NAME {
                 meta.input.parse::<Token![=]>()?;
                 let string = meta.input.parse::<syn::LitStr>()?;
 
-                new.default_variant_name
-                    .push(match string.value().as_str() {
-                        "index" => (meta.path.span(), DefaultTag::Index),
-                        "name" => (meta.path.span(), DefaultTag::Name),
-                        _ => {
-                            return Err(syn::Error::new_spanned(
-                                string,
-                                format_args!("#[{ATTR}({DEFAULT_VARIANT_NAME})] Bad value"),
-                            ));
-                        }
-                    });
+                new.default_variant.push(match string.value().as_str() {
+                    "index" => (meta.path.span(), DefaultTag::Index),
+                    "name" => (meta.path.span(), DefaultTag::Name),
+                    _ => {
+                        return Err(syn::Error::new_spanned(
+                            string,
+                            format_args!("#[{ATTR}({DEFAULT_VARIANT_NAME})] Bad value"),
+                        ));
+                    }
+                });
 
                 return Ok(());
             }
 
-            // parse #[musli(default_field_name = "..")]
+            // parse #[musli(default_field = "..")]
             if meta.path == DEFAULT_FIELD_NAME {
                 meta.input.parse::<Token![=]>()?;
                 let string = meta.input.parse::<syn::LitStr>()?;
 
-                new.default_field_name.push(match string.value().as_str() {
+                new.default_field.push(match string.value().as_str() {
                     "index" => (meta.path.span(), DefaultTag::Index),
                     "name" => (meta.path.span(), DefaultTag::Name),
                     _ => {
@@ -433,9 +432,9 @@ layer! {
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
         /// `#[musli(default)]`.
-        default_field: (),
-        /// `#[musli(default_field_name = "..")]`.
-        default_field_name: DefaultTag,
+        default_attr_field: (),
+        /// `#[musli(default_field = "..")]`.
+        default_field: DefaultTag,
         @multiple
     }
 }
@@ -443,7 +442,7 @@ layer! {
 impl VariantAttr {
     /// Test if the `#[musli(default)]` tag is specified.
     pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
-        self.default_field(mode).map(|&(s, ())| s)
+        self.default_attr_field(mode).map(|&(s, ())| s)
     }
 }
 
@@ -502,16 +501,16 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
             // parse #[musli(default)]
             if meta.path == DEFAULT {
-                new.default_field.push((meta.path.span(), ()));
+                new.default_attr_field.push((meta.path.span(), ()));
                 return Ok(());
             }
 
-            // parse #[musli(default_field_name = "..")]
+            // parse #[musli(default_field = "..")]
             if meta.path == DEFAULT_FIELD_NAME {
                 meta.input.parse::<Token![=]>()?;
                 let string = meta.input.parse::<syn::LitStr>()?;
 
-                new.default_field_name.push(match string.value().as_str() {
+                new.default_field.push(match string.value().as_str() {
                     "index" => (meta.path.span(), DefaultTag::Index),
                     "name" => (meta.path.span(), DefaultTag::Name),
                     _ => {
