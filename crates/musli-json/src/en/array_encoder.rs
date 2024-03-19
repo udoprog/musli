@@ -1,3 +1,5 @@
+use core::mem::take;
+
 use musli::en::SequenceEncoder;
 use musli::Context;
 use musli_common::writer::Writer;
@@ -7,7 +9,7 @@ use super::JsonEncoder;
 /// Encoder for a JSON array.
 pub(crate) struct JsonArrayEncoder<W> {
     first: bool,
-    variant: bool,
+    end: &'static [u8],
     writer: W,
 }
 
@@ -20,11 +22,11 @@ where
     where
         C: ?Sized + Context,
     {
-        Self::with_variant(cx, writer, false)
+        Self::with_end(cx, writer, b"]")
     }
 
     #[inline]
-    pub(super) fn with_variant<C>(cx: &C, mut writer: W, variant: bool) -> Result<Self, C::Error>
+    pub(super) fn with_end<C>(cx: &C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error>
     where
         C: ?Sized + Context,
     {
@@ -32,7 +34,7 @@ where
 
         Ok(Self {
             first: true,
-            variant,
+            end,
             writer,
         })
     }
@@ -49,22 +51,15 @@ where
 
     #[inline]
     fn encode_next(&mut self, cx: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
-        if !self.first {
+        if !take(&mut self.first) {
             self.writer.write_byte(cx, b',')?;
         }
 
-        self.first = false;
         Ok(JsonEncoder::new(self.writer.borrow_mut()))
     }
 
     #[inline]
     fn end(mut self, cx: &C) -> Result<Self::Ok, C::Error> {
-        self.writer.write_byte(cx, b']')?;
-
-        if self.variant {
-            self.writer.write_byte(cx, b'}')?;
-        }
-
-        Ok(())
+        self.writer.write_bytes(cx, self.end)
     }
 }

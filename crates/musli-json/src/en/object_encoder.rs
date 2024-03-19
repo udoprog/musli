@@ -7,7 +7,7 @@ use super::{JsonEncoder, JsonObjectKeyEncoder, JsonObjectPairEncoder};
 /// An object encoder for JSON.
 pub(crate) struct JsonObjectEncoder<W> {
     len: usize,
-    variant: bool,
+    end: &'static [u8],
     writer: W,
 }
 
@@ -20,11 +20,11 @@ where
     where
         C: ?Sized + Context,
     {
-        Self::with_variant(cx, writer, false)
+        Self::with_end(cx, writer, b"}")
     }
 
     #[inline]
-    pub(super) fn with_variant<C>(cx: &C, mut writer: W, variant: bool) -> Result<Self, C::Error>
+    pub(super) fn with_end<C>(cx: &C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error>
     where
         C: ?Sized + Context,
     {
@@ -32,7 +32,7 @@ where
 
         Ok(Self {
             len: 0,
-            variant,
+            end,
             writer,
         })
     }
@@ -59,13 +59,7 @@ where
 
     #[inline]
     fn end(mut self, cx: &C) -> Result<Self::Ok, C::Error> {
-        self.writer.write_byte(cx, b'}')?;
-
-        if self.variant {
-            self.writer.write_byte(cx, b'}')?;
-        }
-
-        Ok(())
+        self.writer.write_bytes(cx, self.end)
     }
 }
 
@@ -100,8 +94,7 @@ where
 
     #[inline]
     fn end(mut self, cx: &C) -> Result<Self::Ok, C::Error> {
-        self.writer.write_byte(cx, b'}')?;
-        Ok(())
+        self.writer.write_byte(cx, b'}')
     }
 }
 
