@@ -3,11 +3,7 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(
-    tag = "type",
-    default_field_name = "name",
-    default_variant_name = "name"
-)]
+#[musli(tag = "type", default_field = "name", default_variant = "name")]
 pub enum InternallyTagged {
     Variant1 {
         string: String,
@@ -23,8 +19,8 @@ pub enum InternallyTagged {
 #[musli(
     tag = "type",
     content = "content",
-    default_field_name = "name",
-    default_variant_name = "name"
+    default_field = "name",
+    default_variant = "name"
 )]
 pub enum AdjacentlyTagged {
     Variant1 {

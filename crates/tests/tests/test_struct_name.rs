@@ -5,14 +5,14 @@ use tests::wire::tag::{Kind, Tag};
 use tests::wire::Typed;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(default_field_name = "name")]
+#[musli(default_field = "name")]
 pub struct Named {
     string: String,
     number: u32,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(default_field_name = "index")]
+#[musli(default_field = "index")]
 pub struct Indexed {
     string: String,
     number: u32,
