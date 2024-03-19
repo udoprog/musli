@@ -158,7 +158,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn decode_buffer(self, cx: &C) -> Result<Self::DecodeBuffer, C::Error> {
         Err(cx.message(format_args!(
-            "buffering not supported, expected {}",
+            "Decode buffering not supported, expected {}",
             ExpectingWrapper::new(self).format()
         )))
     }

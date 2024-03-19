@@ -19,7 +19,7 @@ categories = ["encoding", "no-std"]
 default = ["std", "alloc", "simdutf8", "musli-value", "parse-full"]
 std = ["musli/std", "musli-common/std", "musli-value?/std", "alloc", "lexical/std"]
 alloc = ["musli/alloc", "musli-common/alloc", "musli-value?/alloc"]
-test = []
+test = ["musli-value"]
 simdutf8 = ["musli-common/simdutf8"]
 parse-full = []
 

@@ -53,7 +53,7 @@ musli = { path = "../musli", version = "0.0.96", default-features = false, optio
 musli-wire = { path = "../musli-wire", version = "0.0.96", default-features = false, features = ["alloc", "test"], optional = true }
 musli-descriptive = { path = "../musli-descriptive", version = "0.0.96", default-features = false, features = ["alloc", "test"], optional = true }
 musli-storage = { path = "../musli-storage", version = "0.0.96", default-features = false, features = ["alloc", "test"], optional = true }
-musli-json = { path = "../musli-json", version = "0.0.96", default-features = false, features = ["alloc", "test",], optional = true }
+musli-json = { path = "../musli-json", version = "0.0.96", default-features = false, features = ["alloc", "test"], optional = true }
 musli-value = { path = "../musli-value", version = "0.0.96", default-features = false, features = ["alloc", "test"], optional = true }
 musli-zerocopy = { path = "../musli-zerocopy", version = "0.0.96", default-features = false, features = ["alloc"], optional = true }
 musli-macros = { path = "../musli-macros", version = "0.0.96", features = ["test"] }

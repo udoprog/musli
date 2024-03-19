@@ -37,7 +37,6 @@ pub enum AdjacentlyTagged {
     },
 }
 
-#[cfg(feature = "test")]
 macro_rules! test {
     ($ty:ident :: $variant:ident $body:tt $(, json = $json:expr)?) => {{
         let expected = $ty::$variant $body;
@@ -49,8 +48,6 @@ macro_rules! test {
 }
 
 #[test]
-#[cfg(feature = "test")]
-#[ignore = "doesn't work right now"]
 fn test_internally_tagged() {
     test! {
         InternallyTagged::Variant1 {
@@ -76,7 +73,6 @@ fn test_internally_tagged() {
 }
 
 #[test]
-#[cfg(feature = "test")]
 fn test_adjacently_tagged() {
     test! {
         AdjacentlyTagged::Variant1 {
