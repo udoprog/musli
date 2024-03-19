@@ -17,6 +17,9 @@ use crate::options::Options;
 use crate::reader::{Limit, Reader};
 use crate::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
 
+#[cfg(feature = "musli-value")]
+const BUFFER_OPTIONS: musli_common::options::Options = musli_common::options::new().build();
+
 /// A very simple decoder.
 pub struct SelfDecoder<R, const F: Options> {
     reader: R,
@@ -198,6 +201,8 @@ where
     R: Reader<'de>,
 {
     type WithContext<U> = Self where U: Context;
+    #[cfg(feature = "musli-value")]
+    type DecodeBuffer = musli_value::AsValueDecoder<BUFFER_OPTIONS>;
     type DecodePack = SelfDecoder<Limit<R>, F>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingSelfDecoder<R, F>;
@@ -280,6 +285,14 @@ where
             }),
             _ => Ok(TypeHint::Any),
         }
+    }
+
+    #[cfg(feature = "musli-value")]
+    #[inline]
+    fn decode_buffer(self, cx: &C) -> Result<Self::DecodeBuffer, C::Error> {
+        use musli::de::Decode;
+        let value = musli_value::Value::decode(cx, self)?;
+        Ok(value.into_value_decoder())
     }
 
     #[inline]

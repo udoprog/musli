@@ -16,9 +16,9 @@ keywords = ["no-std::no-alloc", "no_std", "serialization"]
 categories = ["encoding", "no-std"]
 
 [features]
-default = ["std", "alloc", "simdutf8"]
-std = ["musli/std", "musli-common/std", "musli-storage/std"]
-alloc = ["musli/alloc", "musli-common/alloc", "musli-storage/alloc"]
+default = ["std", "alloc", "simdutf8", "musli-value"]
+std = ["musli/std", "musli-common/std", "musli-storage/std", "musli-value?/std"]
+alloc = ["musli/alloc", "musli-common/alloc", "musli-storage/alloc", "musli-value?/alloc"]
 test = []
 simdutf8 = ["musli-common/simdutf8"]
 
@@ -26,3 +26,4 @@ simdutf8 = ["musli-common/simdutf8"]
 musli = { path = "../musli", version = "0.0.96", default-features = false }
 musli-common = { path = "../musli-common", version = "0.0.96", default-features = false }
 musli-storage = { path = "../musli-storage", version = "0.0.96", default-features = false }
+musli-value = { path = "../musli-value", version = "0.0.96", default-features = false, optional = true }

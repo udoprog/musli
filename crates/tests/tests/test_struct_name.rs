@@ -1,7 +1,7 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
-#[cfg(feature = "test")]
 use tests::wire::tag::{Kind, Tag};
-#[cfg(feature = "test")]
 use tests::wire::Typed;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -19,8 +19,6 @@ pub struct Indexed {
 }
 
 #[test]
-#[cfg(feature = "test")]
-#[ignore = "figure out what's going wrong"]
 fn struct_named_fields() {
     tests::rt!(Named {
         string: String::from("foo"),
@@ -64,7 +62,6 @@ fn struct_named_fields() {
 }
 
 #[test]
-#[cfg(feature = "test")]
 fn struct_indexed_fields() {
     tests::rt!(Indexed {
         string: String::from("foo"),
