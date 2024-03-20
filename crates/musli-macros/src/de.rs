@@ -7,6 +7,7 @@ use syn::Token;
 use crate::expander::{Result, TagMethod};
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
+use crate::internals::tokens::Tokens;
 
 pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     e.validate_decode()?;
@@ -45,10 +46,13 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         generics.params.push(lt.clone().into());
     }
 
-    let decode_t = &e.tokens.decode_t;
-    let context_t = &e.tokens.context_t;
-    let core_result: &syn::Path = &e.tokens.core_result;
-    let decoder_t = &e.tokens.decoder_t;
+    let Tokens {
+        decode_t,
+        context_t,
+        core_result,
+        decoder_t,
+        ..
+    } = e.tokens;
 
     let (mut generics, mode_ident) = e.expansion.as_impl_generics(generics, e.tokens);
 

@@ -6,6 +6,7 @@ use syn::Token;
 use crate::expander::Result;
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Variant};
+use crate::internals::tokens::Tokens;
 
 pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
     e.validate_encode()?;
@@ -26,10 +27,13 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         return Err(());
     }
 
-    let encode_t = &e.tokens.encode_t;
-    let context_t = &e.tokens.context_t;
-    let encoder_t = &e.tokens.encoder_t;
-    let core_result = &e.tokens.core_result;
+    let Tokens {
+        encode_t,
+        context_t,
+        core_result,
+        encoder_t,
+        ..
+    } = e.tokens;
 
     let (mut impl_generics, mode_ident) = e
         .expansion
