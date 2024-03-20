@@ -1656,7 +1656,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
         V: Visitor<'de, C>,
     {
         Err(cx.message(format_args!(
-            "visitor not supported, expected {}",
+            "Any type not supported, expected {}",
             ExpectingWrapper::new(self).format()
         )))
     }
