@@ -26,8 +26,8 @@ macro_rules! encode_with_extensions {
             W: io::Write,
             T: ?Sized + Encode<$mode>,
         {
-            let mut writer = $crate::wrap::wrap(write);
-            self.encode(&mut writer, value)
+            let writer = $crate::wrap::wrap(write);
+            self.encode(writer, value)
         }
 
         /// Encode the given value to a [`Vec`] using the current configuration.

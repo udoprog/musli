@@ -78,7 +78,7 @@ where
 
     #[inline]
     fn type_hint(&mut self, cx: &C) -> Result<TypeHint, C::Error> {
-        JsonDecoder::new(&mut self.parser).type_hint(cx)
+        JsonDecoder::new(self.parser.borrow_mut()).type_hint(cx)
     }
 
     #[inline]
