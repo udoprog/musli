@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::Token;
@@ -14,8 +14,8 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let encoder_var = e.cx.ident("encoder");
     let ctx_var = e.cx.ident("ctx");
-    let c_param = e.cx.ident("C");
-    let e_param = e.cx.ident("E");
+    let c_param = e.cx.type_with_span("C", Span::call_site());
+    let e_param = e.cx.type_with_span("E", Span::call_site());
 
     let body = match &e.data {
         BuildData::Struct(st) => encode_struct(&e, st, &ctx_var, &encoder_var, true)?,

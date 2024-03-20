@@ -14,6 +14,8 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     let ctx_var = e.cx.ident("ctx");
     let root_decoder_var = e.cx.ident("decoder");
     let tag_var = e.cx.ident("tag");
+    let c_param = e.cx.type_with_span("C", Span::call_site());
+    let d_param = e.cx.type_with_span("D", Span::call_site());
 
     let body = match &e.data {
         BuildData::Struct(st) => {
@@ -58,9 +60,6 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
                 .map(|(_, v)| v.clone()),
         );
     }
-
-    let c_param = e.cx.ident("C");
-    let d_param = e.cx.ident("D");
 
     let (impl_generics, _, where_clause) = generics.split_for_impl();
     let (_, type_generics, _) = e.input.generics.split_for_impl();
