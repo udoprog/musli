@@ -7,8 +7,7 @@ pub struct GenericWithBound<T> {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_generic_with_bound() {
+fn generic_with_bound() {
     tests::rt!(
         GenericWithBound<String>,
         GenericWithBound {

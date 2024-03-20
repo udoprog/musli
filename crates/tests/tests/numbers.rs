@@ -1,7 +1,7 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
-#[cfg(feature = "test")]
 use tests::wire::tag::{Kind, Tag};
-#[cfg(feature = "test")]
 use tests::wire::Typed;
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode)]
@@ -13,9 +13,19 @@ struct StructWithNumbers {
     e: i128,
 }
 
+#[derive(Debug, Clone, PartialEq, Decode)]
+#[musli(packed)]
+struct Unpacked {
+    count: Tag,
+    a: (Tag, Tag),
+    b: (Tag, Tag),
+    c: (Tag, Tag),
+    d: (Tag, Tag),
+    e: (Tag, Typed<[u8; 5]>),
+}
+
 #[test]
-#[cfg(feature = "test")]
-fn test_signed_unpacked() {
+fn signed_unpacked() {
     let out = tests::rt!(StructWithNumbers {
         a: -1,
         b: 1,
@@ -38,15 +48,4 @@ fn test_signed_unpacked() {
             e: (Tag::new(Kind::Continuation, 4), Typed::new(Tag::empty(Kind::Continuation), [128, 144, 223, 192, 74])),
         }
     };
-
-    #[derive(Debug, Clone, PartialEq, Decode)]
-    #[musli(packed)]
-    struct Unpacked {
-        count: Tag,
-        a: (Tag, Tag),
-        b: (Tag, Tag),
-        c: (Tag, Tag),
-        d: (Tag, Tag),
-        e: (Tag, Typed<[u8; 5]>),
-    }
 }

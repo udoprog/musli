@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Decode, Encode)]
@@ -18,8 +20,7 @@ pub struct SkipSerializeUntagged {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_skip_serialize() {
+fn skip_serialize() {
     tests::rt!(SkipSerializeUntagged {
         before: 1,
         skipped: Some(2),

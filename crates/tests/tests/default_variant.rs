@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -17,8 +19,7 @@ pub enum OnlyFallback {
 
 /// Test that enums can use fallback variants when decoding.
 #[test]
-#[cfg(feature = "test")]
-fn test_fallback_variant() {
+fn fallback_variant() {
     let actual = tests::wire::transcode::<_, OnlyFallback>(SeveralVariants::Variant1);
     assert_eq!(actual, OnlyFallback::Fallback);
 

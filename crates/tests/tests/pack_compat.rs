@@ -1,14 +1,11 @@
 //! This is a test that ensures that arbitrary packs of data can be successfully skipped over.
 
-#[cfg(feature = "test")]
+#![cfg(feature = "test")]
+
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
-#[cfg(feature = "test")]
-use musli_wire::tag::MAX_INLINE_LEN;
-#[cfg(feature = "test")]
-use musli_wire::Encoding;
-#[cfg(not(feature = "test"))]
-const MAX_INLINE_LEN: usize = 64;
+use tests::wire::tag::MAX_INLINE_LEN;
+use tests::wire::Encoding;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct Inner;
@@ -59,8 +56,7 @@ struct IgnoreBoth {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_packed_compat() {
+fn packed_compat() {
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
     let data = ENCODING

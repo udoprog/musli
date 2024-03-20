@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 /// Empty enums should work.
@@ -21,8 +23,7 @@ struct StructWithOption {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
+fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
     let name = String::from("Aristotle");
 
     let data = tests::wire::to_vec(&Struct { name: name.clone() })?;

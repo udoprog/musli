@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::compat::{Bytes, Sequence};
 use musli::{Decode, Encode};
 
@@ -26,8 +28,7 @@ pub struct Numbers {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_primitives_max() {
+fn primitives_max() {
     tests::rt!(Numbers {
         bool_field: true,
         char_field: char::MAX,
@@ -50,8 +51,7 @@ fn test_primitives_max() {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_primitives_min() {
+fn primitives_min() {
     tests::rt!(Numbers {
         bool_field: false,
         char_field: '\u{0000}',

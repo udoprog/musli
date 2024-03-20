@@ -1,5 +1,3 @@
-#![cfg(feature = "std")]
-
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -44,7 +42,7 @@ macro_rules! test {
 }
 
 #[test]
-fn test_internally_tagged() {
+fn internally_tagged() {
     test! {
         InternallyTagged::Variant1 {
             string: String::from("Hello"),
@@ -69,7 +67,7 @@ fn test_internally_tagged() {
 }
 
 #[test]
-fn test_adjacently_tagged() {
+fn adjacently_tagged() {
     test! {
         AdjacentlyTagged::Variant1 {
             string: String::from("Hello"),
