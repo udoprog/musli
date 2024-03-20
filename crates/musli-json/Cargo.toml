@@ -1,6 +1,6 @@
 [package]
 name = "musli-json"
-version = "0.0.96"
+version = "0.0.97"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.76"
@@ -12,8 +12,8 @@ readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no-std::no-alloc", "no_std", "serialization"]
-categories = ["encoding", "no-std"]
+keywords = ["no_std", "serialization"]
+categories = ["encoding", "no-std", "no-std::no-alloc"]
 
 [features]
 default = ["std", "alloc", "simdutf8", "musli-value", "parse-full"]
@@ -24,9 +24,9 @@ simdutf8 = ["musli-common/simdutf8"]
 parse-full = []
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.96", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.96", default-features = false }
-musli-value = { path = "../musli-value", version = "0.0.96", default-features = false, optional = true }
+musli = { path = "../musli", version = "0.0.97", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.97", default-features = false }
+musli-value = { path = "../musli-value", version = "0.0.97", default-features = false, optional = true }
 
 itoa = "1.0.9"
 ryu = "1.0.15"

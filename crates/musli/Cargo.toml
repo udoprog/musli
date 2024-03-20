@@ -1,6 +1,6 @@
 [package]
 name = "musli"
-version = "0.0.96"
+version = "0.0.97"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.76"
@@ -12,8 +12,8 @@ readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no-std::no-alloc", "no_std", "serialization"]
-categories = ["encoding", "no-std"]
+keywords = ["no_std", "serialization"]
+categories = ["encoding", "no-std", "no-std::no-alloc"]
 
 [features]
 default = ["std", "alloc"]
@@ -21,4 +21,4 @@ std = []
 alloc = []
 
 [dependencies]
-musli-macros = { version = "=0.0.96", path = "../musli-macros" }
+musli-macros = { version = "=0.0.97", path = "../musli-macros" }
