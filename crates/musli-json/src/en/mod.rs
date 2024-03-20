@@ -292,12 +292,12 @@ where
 
 /// Encode a sequence of chars as a string.
 #[inline]
-fn encode_string<C, W>(cx: &C, mut writer: W, bytes: &[u8]) -> Result<(), C::Error>
+fn encode_string<C, W>(cx: &C, mut w: W, bytes: &[u8]) -> Result<(), C::Error>
 where
     C: ?Sized + Context,
     W: Writer,
 {
-    writer.write_byte(cx, b'"')?;
+    w.write_byte(cx, b'"')?;
 
     let mut start = 0;
 
@@ -309,18 +309,18 @@ where
         }
 
         if start < i {
-            writer.write_bytes(cx, &bytes[start..i])?;
+            w.write_bytes(cx, &bytes[start..i])?;
         }
 
-        write_escape(cx, &mut writer, escape, b)?;
+        write_escape(cx, w.borrow_mut(), escape, b)?;
         start = i + 1;
     }
 
     if start != bytes.len() {
-        writer.write_bytes(cx, &bytes[start..])?;
+        w.write_bytes(cx, &bytes[start..])?;
     }
 
-    writer.write_byte(cx, b'"')?;
+    w.write_byte(cx, b'"')?;
     Ok(())
 }
 
@@ -363,7 +363,7 @@ static ESCAPE: [u8; 256] = [
 // Hex digits.
 static HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
 
-fn write_escape<C, W>(cx: &C, writer: &mut W, escape: u8, byte: u8) -> Result<(), C::Error>
+fn write_escape<C, W>(cx: &C, mut writer: W, escape: u8, byte: u8) -> Result<(), C::Error>
 where
     C: ?Sized + Context,
     W: Writer,

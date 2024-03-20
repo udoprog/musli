@@ -288,8 +288,8 @@ impl<M> Encoding<M> {
         C: ?Sized + Context<Mode = M>,
         T: Decode<'de, M>,
     {
-        let mut reader = SliceParser::new(bytes);
-        T::decode(cx, JsonDecoder::new(&mut reader))
+        let reader = SliceParser::new(bytes);
+        T::decode(cx, JsonDecoder::new(reader))
     }
 
     musli_common::encode_with_extensions!(M);

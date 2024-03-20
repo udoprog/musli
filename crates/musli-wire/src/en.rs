@@ -39,7 +39,7 @@ where
         self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, &mut self.writer, len)?;
+            crate::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(())
@@ -54,7 +54,7 @@ where
         self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, &mut self.writer, len)?;
+            crate::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(())
@@ -132,7 +132,7 @@ where
 
     #[inline]
     fn encode_bytes(mut self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-        encode_prefix::<_, _, F>(cx, &mut self.writer, bytes.len())?;
+        encode_prefix::<_, _, F>(cx, self.writer.borrow_mut(), bytes.len())?;
         self.writer.write_bytes(cx, bytes)?;
         Ok(())
     }
@@ -140,7 +140,7 @@ where
     #[inline]
     fn encode_bytes_vectored(mut self, cx: &C, vectors: &[&[u8]]) -> Result<Self::Ok, C::Error> {
         let len = vectors.iter().map(|v| v.len()).sum();
-        encode_prefix::<_, _, F>(cx, &mut self.writer, len)?;
+        encode_prefix::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(cx, bytes)?;
@@ -156,12 +156,12 @@ where
 
     #[inline]
     fn encode_usize(mut self, cx: &C, value: usize) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_length::<_, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_length::<_, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_isize(mut self, cx: &C, value: isize) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_length::<_, _, F>(cx, &mut self.writer, value as usize)
+        crate::wire_int::encode_length::<_, _, F>(cx, self.writer.borrow_mut(), value as usize)
     }
 
     #[inline]
@@ -179,27 +179,27 @@ where
 
     #[inline]
     fn encode_u8(mut self, cx: &C, value: u8) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_u16(mut self, cx: &C, value: u16) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_u32(mut self, cx: &C, value: u32) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_u64(mut self, cx: &C, value: u64) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_u128(mut self, cx: &C, value: u128) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_unsigned::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
@@ -209,22 +209,22 @@ where
 
     #[inline]
     fn encode_i16(mut self, cx: &C, value: i16) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_signed::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_signed::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_i32(mut self, cx: &C, value: i32) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_signed::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_signed::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_i64(mut self, cx: &C, value: i64) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_signed::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_signed::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_i128(mut self, cx: &C, value: i128) -> Result<Self::Ok, C::Error> {
-        crate::wire_int::encode_signed::<_, _, _, F>(cx, &mut self.writer, value)
+        crate::wire_int::encode_signed::<_, _, _, F>(cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
@@ -257,7 +257,7 @@ where
         self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, &mut self.writer, len)?;
+            crate::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -290,7 +290,7 @@ where
         self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, &mut self.writer, len)?;
+            crate::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -546,7 +546,7 @@ where
 
 /// Encode a length prefix.
 #[inline]
-fn encode_prefix<C, W, const F: Options>(cx: &C, writer: &mut W, len: usize) -> Result<(), C::Error>
+fn encode_prefix<C, W, const F: Options>(cx: &C, mut writer: W, len: usize) -> Result<(), C::Error>
 where
     C: ?Sized + Context,
     W: Writer,

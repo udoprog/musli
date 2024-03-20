@@ -90,11 +90,11 @@ where
             Token::Null => self.parse_null(cx),
             Token::True => self.parse_true(cx),
             Token::False => self.parse_false(cx),
-            Token::Number => integer::skip_number(cx, &mut self.parser),
+            Token::Number => integer::skip_number(cx, self.parser.borrow_mut()),
             Token::String => {
                 // Skip over opening quote.
                 self.parser.skip(cx, 1)?;
-                string::skip_string(cx, &mut self.parser, true)
+                string::skip_string(cx, self.parser.borrow_mut(), true)
             }
             actual => Err(cx.marked_message(start, format_args!("Expected value, found {actual}"))),
         }
@@ -221,62 +221,62 @@ where
 
     #[inline]
     fn decode_u8(mut self, cx: &C) -> Result<u8, C::Error> {
-        parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_u16(mut self, cx: &C) -> Result<u16, C::Error> {
-        parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_u32(mut self, cx: &C) -> Result<u32, C::Error> {
-        parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_u64(mut self, cx: &C) -> Result<u64, C::Error> {
-        parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_u128(mut self, cx: &C) -> Result<u128, C::Error> {
-        parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_i8(mut self, cx: &C) -> Result<i8, C::Error> {
-        parse_signed(cx, &mut self.parser)
+        parse_signed(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_i16(mut self, cx: &C) -> Result<i16, C::Error> {
-        parse_signed(cx, &mut self.parser)
+        parse_signed(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_i32(mut self, cx: &C) -> Result<i32, C::Error> {
-        parse_signed(cx, &mut self.parser)
+        parse_signed(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_i64(mut self, cx: &C) -> Result<i64, C::Error> {
-        parse_signed(cx, &mut self.parser)
+        parse_signed(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_i128(mut self, cx: &C) -> Result<i128, C::Error> {
-        parse_signed(cx, &mut self.parser)
+        parse_signed(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_usize(mut self, cx: &C) -> Result<usize, C::Error> {
-        parse_unsigned(cx, &mut self.parser)
+        parse_unsigned(cx, self.parser.borrow_mut())
     }
 
     #[inline]
     fn decode_isize(mut self, cx: &C) -> Result<isize, C::Error> {
-        parse_signed(cx, &mut self.parser)
+        parse_signed(cx, self.parser.borrow_mut())
     }
 
     #[inline]
