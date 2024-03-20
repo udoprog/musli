@@ -608,17 +608,17 @@ where
     }
 }
 
-struct NumberVisitor<V> {
+struct AnyNumberVisitor<V> {
     visitor: V,
 }
 
-impl<V> NumberVisitor<V> {
+impl<V> AnyNumberVisitor<V> {
     fn new(visitor: V) -> Self {
         Self { visitor }
     }
 }
 
-impl<'de, C, V> musli::de::NumberVisitor<'de, C> for NumberVisitor<V>
+impl<'de, C, V> musli::de::NumberVisitor<'de, C> for AnyNumberVisitor<V>
 where
     C: ?Sized + Context,
     C::Error: de::Error,
@@ -653,6 +653,12 @@ where
 
     #[inline]
     fn visit_u128(self, _: &C, v: u128) -> Result<Self::Ok, <C as Context>::Error> {
+        // Serde's 128-bit support is very broken, so just try to avoid it if we can.
+        // See: https://github.com/serde-rs/serde/issues/2576
+        if let Ok(v) = u64::try_from(v) {
+            return self.visitor.visit_u64(v);
+        }
+
         self.visitor.visit_u128(v)
     }
 
@@ -678,6 +684,12 @@ where
 
     #[inline]
     fn visit_i128(self, _: &C, v: i128) -> Result<Self::Ok, <C as Context>::Error> {
+        // Serde's 128-bit support is very broken, so just try to avoid it if we can.
+        // See: https://github.com/serde-rs/serde/issues/2576
+        if let Ok(v) = i64::try_from(v) {
+            return self.visitor.visit_i64(v);
+        }
+
         self.visitor.visit_i128(v)
     }
 
@@ -826,7 +838,7 @@ where
 
     type String = StringVisitor<V>;
     type Bytes = BytesVisitor<V>;
-    type Number = NumberVisitor<V>;
+    type Number = AnyNumberVisitor<V>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -870,6 +882,12 @@ where
 
     #[inline]
     fn visit_u128(self, _: &C, v: u128) -> Result<Self::Ok, C::Error> {
+        // Serde's 128-bit support is very broken, so just try to avoid it if we can.
+        // See: https://github.com/serde-rs/serde/issues/2576
+        if let Ok(v) = u64::try_from(v) {
+            return self.visitor.visit_u64(v);
+        }
+
         self.visitor.visit_u128(v)
     }
 
@@ -895,6 +913,12 @@ where
 
     #[inline]
     fn visit_i128(self, _: &C, v: i128) -> Result<Self::Ok, C::Error> {
+        // Serde's 128-bit support is very broken, so just try to avoid it if we can.
+        // See: https://github.com/serde-rs/serde/issues/2576
+        if let Ok(v) = i64::try_from(v) {
+            return self.visitor.visit_i64(v);
+        }
+
         self.visitor.visit_i128(v)
     }
 
@@ -972,7 +996,7 @@ where
 
     #[inline]
     fn visit_number(self, _: &C, _: musli::de::NumberHint) -> Result<Self::Number, C::Error> {
-        Ok(NumberVisitor::new(self.visitor))
+        Ok(AnyNumberVisitor::new(self.visitor))
     }
 }
 
