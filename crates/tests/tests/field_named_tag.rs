@@ -8,7 +8,6 @@ struct TestStruct {
 /// `tag` is used as a variable name to decode the field tag.
 /// It should not be confused with an actual field named `tag`.
 #[test]
-#[cfg(feature = "test")]
-fn test_struct_with_field_named_tag() {
+fn struct_with_field_named_tag() {
     tests::rt!(TestStruct { tag: 42 });
 }

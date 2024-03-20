@@ -11,11 +11,11 @@ publish = false
 
 [features]
 default = ["std", "alloc"]
+std = ["musli?/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "serde?/std"]
+alloc = ["musli?/alloc", "musli-wire?/alloc", "musli-storage?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
 extra = ["rkyv", "dlhn", "serde_cbor"]
 full = ["rmp-serde", "bincode", "postcard", "musli-json", "serde_json", "bitcode", "bitcode-derive"]
 text = ["musli-json", "serde_json"]
-std = ["musli?/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "serde?/std"]
-alloc = ["musli?/alloc", "musli-wire?/alloc", "musli-storage?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
 simdutf8 = ["musli-wire?/simdutf8", "musli-storage?/simdutf8", "musli-descriptive?/simdutf8", "musli-json?/simdutf8", "bitcode?/simdutf8"]
 parse-full = ["musli-json?/parse-full"]
 musli-wire = ["musli", "dep:musli-wire"]

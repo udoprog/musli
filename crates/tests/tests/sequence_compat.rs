@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::compat::Sequence;
 use musli::{Decode, Encode};
 
@@ -10,8 +12,7 @@ pub struct SequenceCompat {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_sequence_compat() {
+fn sequence_compat() {
     tests::rt!(SequenceCompat {
         empty_sequence: Sequence(()),
     });

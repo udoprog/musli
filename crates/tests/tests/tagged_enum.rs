@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -19,8 +21,7 @@ pub enum Variants {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_tagged_enums() {
+fn tagged_enums() {
     tests::rt!(EmptyVariants::Variant1);
     tests::rt!(EmptyVariants::Variant2);
 

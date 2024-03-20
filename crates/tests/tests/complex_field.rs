@@ -47,14 +47,12 @@ pub struct StructCustomFieldAsStruct {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_bytes_tag_vec() {
+fn bytes_tag_vec() {
     tests::rt!(BytesTagVec(b"hello world".to_vec()));
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_custom_struct_tag() {
+fn custom_struct_tag() {
     tests::rt!(StructCustomFieldAsStruct {
         field1: 42,
         field2: 84,
@@ -71,8 +69,7 @@ pub struct StructCustomTag {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_custom_tag() {
+fn custom_tag() {
     tests::rt!(StructCustomTag {
         field1: 42,
         field2: 84,
@@ -87,8 +84,7 @@ struct StructWithBytesTag {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_struct_with_bytes_tag() {
+fn struct_with_bytes_tag() {
     tests::rt!(StructWithBytesTag {
         string: String::from("Some String"),
     });
@@ -107,8 +103,7 @@ enum EnumWithBytesTag {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_bytes_tag_in_enum() {
+fn bytes_tag_in_enum() {
     tests::rt!(EnumWithBytesTag::Variant1 {
         string: String::from("st"),
     });

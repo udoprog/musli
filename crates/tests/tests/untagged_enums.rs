@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode)]
@@ -28,8 +30,7 @@ pub struct Empty;
 /// Untagged enums may only implement `Encode`, and will be encoded according to
 /// the exact specification of fields part of the variant.
 #[test]
-#[cfg(feature = "test")]
-fn test_untagged_enums() -> Result<(), Box<dyn std::error::Error>> {
+fn untagged_enums() -> Result<(), Box<dyn std::error::Error>> {
     use musli::compat::Packed;
 
     let out = tests::wire::to_vec(&UntaggedEnum1::Variant1).unwrap();

@@ -46,12 +46,12 @@ where
 /// Roundtrip encode the given value.
 #[macro_export]
 macro_rules! rt {
-    ($enum:ident :: $variant:ident $($body:tt)?) => {
-        $crate::rt!($enum, $enum :: $variant $($body)*)
+    ($enum:ident :: $variant:ident $($tt:tt)?) => {
+        $crate::rt!($enum, $enum :: $variant $($tt)*)
     };
 
-    ($struct:ident $($body:tt)?) => {
-        $crate::rt!($struct, $struct $($body)*)
+    ($struct:ident $($tt:tt)?) => {
+        $crate::rt!($struct, $struct $($tt)*)
     };
 
     ($ty:ty, $expr:expr) => {{
@@ -65,6 +65,7 @@ macro_rules! rt {
 
 /// Encode a type as one and decode as another.
 #[inline(never)]
+#[track_caller]
 pub fn transcode<T, O>(value: T) -> O
 where
     T: Debug + PartialEq + Encode<DefaultMode>,

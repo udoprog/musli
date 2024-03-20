@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -21,8 +23,7 @@ pub struct Struct5 {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_struct() {
+fn structs() {
     tests::rt!(EmptyStruct);
     tests::rt!(Struct2(String::from("Hello World")));
     tests::rt!(Struct3(String::from("Hello World"), 42));

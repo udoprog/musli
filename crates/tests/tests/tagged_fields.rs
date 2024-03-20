@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -15,8 +17,7 @@ pub struct StructTo {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_struct_renamed() {
+fn struct_renamed() {
     let from = tests::rt!(StructFrom {
         string: String::from("a string"),
         number: 42,

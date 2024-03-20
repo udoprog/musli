@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -31,8 +33,7 @@ struct TransparentEnumUnpacked {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_transparent_struct() {
+fn transparent_struct() {
     tests::rt!(TransparentStruct {
         string: String::from("Hello"),
     });
@@ -47,24 +48,7 @@ fn test_transparent_struct() {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_transparent_enum() {
+fn transparent_enum() {
     tests::rt!(TransparentEnum::Transparent(42));
-
-    /*
-    let unpacked = tests::wire::transcode::<_, TransparentEnumUnpacked>(
-        TransparentEnum::Transparent(42),
-    )?;
-
-    assert_eq!(
-        unpacked,
-        TransparentEnumUnpacked {
-            type_tag: tests::wire::tag::VARIANT,
-            variant_tag_type: tests::wire::tag::Continuation,
-            variant_tag: 1,
-            value_type: tests::wire::tag::Continuation,
-            value: 42,
-        }
-    );
-    */
+    tests::rt!(TransparentEnum::NotTransparent { a: 1, b: 2 });
 }

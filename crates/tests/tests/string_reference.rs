@@ -1,4 +1,5 @@
-#[cfg(feature = "test")]
+#![cfg(feature = "test")]
+
 use anyhow::Result;
 
 use musli::{Decode, Encode};
@@ -10,8 +11,7 @@ struct StructWithStr<'a> {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_deserialize_roundtrip() -> Result<()> {
+fn string_reference() -> Result<()> {
     let data = tests::wire::to_vec(&StructWithStr {
         name: "Jane Doe",
         age: 42,

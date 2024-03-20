@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -13,17 +15,12 @@ pub enum OtherEnum {
     Variant3(u32),
 }
 
-#[cfg(feature = "test")]
 const OTHER: OtherStruct = OtherStruct {
     field1: 10,
     field2: 20,
 };
-
-#[cfg(feature = "test")]
 const ENUM1: OtherEnum = OtherEnum::Variant1;
-#[cfg(feature = "test")]
 const ENUM2: OtherEnum = OtherEnum::Variant2 { field: 10 };
-#[cfg(feature = "test")]
 const ENUM3: OtherEnum = OtherEnum::Variant3(10);
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -51,8 +48,7 @@ pub struct SimpleStructEnum {
 pub struct SimpleStructToEmpty;
 
 #[test]
-#[cfg(feature = "test")]
-fn test_simple_struct_compat() {
+fn simple_struct_compat() {
     let to = tests::wire::transcode::<_, SimpleStructTo>(SimpleStructFrom {
         field: String::from("Aristotle"),
         interior: 42,
@@ -70,8 +66,7 @@ fn test_simple_struct_compat() {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_simple_struct_to_enum_compat() {
+fn simple_struct_to_enum_compat() {
     for expected in [ENUM1, ENUM2, ENUM3] {
         let to = tests::wire::transcode::<_, SimpleStructEnum>(SimpleStructFrom {
             field: String::from("Aristotle"),
@@ -86,8 +81,7 @@ fn test_simple_struct_to_enum_compat() {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_simple_struct_compat_to_empty() {
+fn simple_struct_compat_to_empty() {
     let to = tests::wire::transcode::<_, SimpleStructToEmpty>(SimpleStructFrom {
         field: String::from("Aristotle"),
         interior: 42,

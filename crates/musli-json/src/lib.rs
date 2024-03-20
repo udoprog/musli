@@ -56,6 +56,9 @@ mod en;
 pub mod encoding;
 mod error;
 pub mod reader;
+#[cfg(feature = "test")]
+#[macro_use]
+pub mod test;
 
 /// Convenient result alias for use with `musli_json`.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

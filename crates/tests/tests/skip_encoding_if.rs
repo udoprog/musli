@@ -1,3 +1,5 @@
+#![cfg(feature = "test")]
+
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -11,8 +13,7 @@ pub struct SkipSerializeOuter {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_skip_serializing_if_outer() {
+fn skip_serializing_if_outer() {
     tests::rt!(SkipSerializeOuter {
         flag: false,
         inner: Some(SkipSerializeInner),

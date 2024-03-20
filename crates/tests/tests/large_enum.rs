@@ -44,8 +44,7 @@ pub enum LargeEnumStringVariants {
 }
 
 #[test]
-#[cfg(feature = "test")]
-fn test_large_enum_string_variants() {
+fn large_enum_string_variants() {
     use std::net::{Ipv4Addr, Ipv6Addr};
 
     const ID: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
