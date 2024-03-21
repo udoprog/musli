@@ -17,7 +17,8 @@ use core::fmt;
 
 use musli::en::{Encoder, SequenceEncoder};
 use musli::{Context, Encode};
-use musli_common::writer::Writer;
+
+use crate::writer::Writer;
 
 /// A JSON encoder for Müsli.
 pub(crate) struct JsonEncoder<W> {

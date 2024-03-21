@@ -97,18 +97,16 @@ error[E0063]: missing field `sneaky_field` in initializer of `SneakyEnumNamed`
 error[E0023]: this pattern has 1 field, but the corresponding tuple variant has 2 fields
   --> tests/ui/deny_sneaky_field_error.rs:44:10
    |
-44 |   #[derive(ZeroCopy)]
-   |            ^^^^^^^^ expected 2 fields, found 1
-45 |   #[repr(u8)]
-46 |   #[sneaky_fields(Sneaky)]
-   |                   ------ tuple variant has 2 fields
-47 |   enum SneakyEnumUnnamed {
-   |  ______-
-48 | |     Unnamed(u32)
-   | |     ------- ---
-   | |_____|_____|
-   |       |
-   |       tuple variant defined here
+44 | #[derive(ZeroCopy)]
+   |          ^^^^^^^^ expected 2 fields, found 1
+45 | #[repr(u8)]
+46 | #[sneaky_fields(Sneaky)]
+   |                 ------ tuple variant has 2 fields
+47 | enum SneakyEnumUnnamed {
+48 |     Unnamed(u32)
+   |     ------- ---
+   |     |
+   |     tuple variant defined here
    |
    = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
 help: use `_` to explicitly ignore each field

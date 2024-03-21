@@ -9,16 +9,16 @@ use musli::de::{
     TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::Context;
+use musli_common::int::continuation as c;
 use musli_storage::de::StorageDecoder;
 
-use crate::int::continuation as c;
 use crate::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
 use crate::options::Options;
 use crate::reader::{Limit, Reader};
 use crate::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
 
 #[cfg(feature = "musli-value")]
-const BUFFER_OPTIONS: musli_common::options::Options = musli_common::options::new().build();
+const BUFFER_OPTIONS: crate::options::Options = crate::options::new().build();
 
 /// A very simple decoder.
 pub struct SelfDecoder<R, const F: Options> {
@@ -71,7 +71,7 @@ where
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+                    musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
                 };
 
                 self.reader.skip(cx, len)?;
@@ -84,7 +84,7 @@ where
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+                    musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
                 };
 
                 for _ in 0..len {
@@ -95,7 +95,7 @@ where
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+                    musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
                 };
 
                 for _ in 0..len {
@@ -154,7 +154,7 @@ where
         Ok(if let Some(len) = tag.data() {
             len as usize
         } else {
-            crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+            musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
         })
     }
 
@@ -170,7 +170,7 @@ where
             Kind::Bytes => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+                musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
             }),
             Kind::Pack => {
                 let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {

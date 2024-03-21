@@ -5,8 +5,9 @@ use musli::en::{
     StructEncoder, StructFieldEncoder, VariantEncoder,
 };
 use musli::Context;
-use musli_common::options::{self, Options};
-use musli_common::writer::Writer;
+
+use crate::options::{self, Options};
+use crate::writer::Writer;
 
 const DEFAULT_OPTIONS: options::Options = options::new().build();
 

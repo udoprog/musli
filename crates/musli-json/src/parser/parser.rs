@@ -10,7 +10,7 @@ mod private {
     impl<'de, R> Sealed for &mut R where R: ?Sized + super::Parser<'de> {}
 }
 
-/// Parser trait for this crate.
+/// Trait governing how JSON is parsed depending on the kind of buffer provided.
 pub trait Parser<'de>: private::Sealed {
     /// Reborrowed type.
     ///

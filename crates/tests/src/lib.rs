@@ -56,6 +56,7 @@ pub mod json {
 
 /// Roundtrip the given expression through all supported formats.
 #[macro_export]
+#[doc(hidden)]
 macro_rules! rt {
     ($enum:ident :: $variant:ident $($tt:tt)?) => {
         $crate::rt!($enum, $enum :: $variant $($tt)*)

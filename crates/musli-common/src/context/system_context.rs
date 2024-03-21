@@ -12,12 +12,14 @@ use super::access::{self, Access};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
 
+type BufTriplet<E> = (Vec<Step<String>>, Range<usize>, E);
+
 /// A rich context dynamically allocating space using the system allocator.
 pub struct SystemContext<A, M> {
     access: Access,
     mark: Cell<usize>,
     alloc: A,
-    errors: UnsafeCell<Vec<(Vec<Step<String>>, Range<usize>, String)>>,
+    errors: UnsafeCell<Vec<BufTriplet<String>>>,
     path: UnsafeCell<Vec<Step<String>>>,
     include_type: bool,
     _marker: PhantomData<M>,
@@ -238,7 +240,7 @@ where
 
 /// An iterator over collected errors.
 pub struct Errors<'a, E> {
-    errors: &'a [(Vec<Step<String>>, Range<usize>, E)],
+    errors: &'a [BufTriplet<E>],
     index: usize,
     // NB: Drop order is significant, drop the shared access last.
     _access: access::Shared<'a>,

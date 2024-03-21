@@ -54,7 +54,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl musli_common::context::Error for Error {
+impl crate::context::Error for Error {
     #[inline]
     #[allow(unused_variables)]
     fn custom<T>(error: T) -> Self

@@ -1,8 +1,8 @@
 #![allow(unused)]
 
 use musli::{Decode, Encode};
-use musli_common::allocator::{System, SystemBuffer};
-use musli_common::context::SystemContext;
+use musli_storage::allocator::{System, SystemBuffer};
+use musli_storage::context::SystemContext;
 
 #[derive(Encode)]
 enum InnerFrom {

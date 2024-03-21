@@ -2,7 +2,8 @@ use core::fmt;
 
 use musli::en::Encoder;
 use musli::Context;
-use musli_common::writer::Writer;
+
+use crate::writer::Writer;
 
 pub(crate) struct JsonObjectKeyEncoder<W> {
     writer: W,

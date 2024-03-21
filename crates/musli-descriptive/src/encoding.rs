@@ -15,7 +15,7 @@ use musli::Context;
 use crate::de::SelfDecoder;
 use crate::en::SelfEncoder;
 use crate::error::Error;
-use crate::fixed_bytes::FixedBytes;
+use crate::fixed::FixedBytes;
 use crate::options::{self, Options};
 use crate::reader::{Reader, SliceReader};
 use crate::writer::Writer;
