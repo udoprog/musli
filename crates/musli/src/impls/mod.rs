@@ -12,8 +12,8 @@ use core::num::{
 };
 use core::{fmt, marker};
 
-use crate::de::{Decode, Decoder, ValueVisitor, VariantDecoder};
-use crate::en::{Encode, Encoder, VariantEncoder};
+use crate::de::{Decode, DecodeBytes, Decoder, ValueVisitor, VariantDecoder};
+use crate::en::{Encode, EncodeBytes, Encoder, SequenceEncoder, VariantEncoder};
 use crate::Context;
 
 impl<M> Encode<M> for () {
@@ -147,14 +147,23 @@ where
     }
 }
 
-impl<M, const N: usize> Encode<M> for [u8; N] {
+impl<M, T, const N: usize> Encode<M> for [T; N]
+where
+    T: Encode<M>,
+{
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
-        encoder.encode_array(cx, *self)
+        let mut seq = encoder.encode_sequence(cx, N)?;
+
+        for value in self.iter() {
+            value.encode(cx, seq.encode_next(cx)?)?;
+        }
+
+        seq.end(cx)
     }
 }
 
@@ -295,13 +304,28 @@ impl<'de, M> Decode<'de, M> for &'de str {
     }
 }
 
-impl<M> Encode<M> for [u8] {
+impl<M, T> Encode<M> for [T]
+where
+    T: Encode<M>,
+{
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
-        encoder.encode_bytes(cx, self)
+        let mut seq = encoder.encode_sequence(cx, self.len())?;
+
+        let mut index = 0;
+
+        for value in self {
+            cx.enter_sequence_index(index);
+            let encoder = seq.encode_next(cx)?;
+            T::encode(value, cx, encoder)?;
+            cx.leave_sequence_index();
+            index = index.wrapping_add(index);
+        }
+
+        seq.end(cx)
     }
 }
 
@@ -470,5 +494,49 @@ impl<'de, M> Decode<'de, M> for &'de CStr {
     {
         let bytes = cx.decode(decoder)?;
         CStr::from_bytes_with_nul(bytes).map_err(|error| cx.custom(error))
+    }
+}
+
+impl<M> EncodeBytes<M> for [u8] {
+    #[inline]
+    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: ?Sized + Context<Mode = M>,
+        E: Encoder<C>,
+    {
+        encoder.encode_bytes(cx, self)
+    }
+}
+
+impl<const N: usize, M> EncodeBytes<M> for [u8; N] {
+    #[inline]
+    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: ?Sized + Context<Mode = M>,
+        E: Encoder<C>,
+    {
+        encoder.encode_array(cx, self)
+    }
+}
+
+impl<'de, M> DecodeBytes<'de, M> for &'de [u8] {
+    #[inline]
+    fn decode_bytes<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    where
+        C: ?Sized + Context,
+        D: Decoder<'de, C>,
+    {
+        Decode::decode(cx, decoder)
+    }
+}
+
+impl<'de, M, const N: usize> DecodeBytes<'de, M> for [u8; N] {
+    #[inline]
+    fn decode_bytes<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    where
+        C: ?Sized + Context,
+        D: Decoder<'de, C>,
+    {
+        decoder.decode_array(cx)
     }
 }

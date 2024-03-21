@@ -11,7 +11,7 @@ impl<M> Encode<M> for Ipv4Addr {
         C: ?Sized + Context,
         E: Encoder<C>,
     {
-        encoder.encode_array(cx, self.octets())
+        encoder.encode_array(cx, &self.octets())
     }
 }
 
@@ -33,7 +33,7 @@ impl<M> Encode<M> for Ipv6Addr {
         C: ?Sized + Context,
         E: Encoder<C>,
     {
-        encoder.encode_array(cx, self.octets())
+        encoder.encode_array(cx, &self.octets())
     }
 }
 

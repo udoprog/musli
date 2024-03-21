@@ -206,7 +206,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_array<const N: usize>(self, _: &C, array: [u8; N]) -> Result<Self::Ok, C::Error> {
+    fn encode_array<const N: usize>(self, _: &C, array: &[u8; N]) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Bytes(array.into()));
         Ok(())
     }
@@ -220,11 +220,15 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_bytes_vectored(self, _: &C, input: &[&[u8]]) -> Result<Self::Ok, C::Error> {
-        let mut bytes = Vec::new();
+    fn encode_bytes_vectored<I>(self, _: &C, len: usize, vectors: I) -> Result<Self::Ok, C::Error>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<[u8]>,
+    {
+        let mut bytes = Vec::with_capacity(len);
 
-        for b in input {
-            bytes.extend_from_slice(b);
+        for b in vectors {
+            bytes.extend_from_slice(b.as_ref());
         }
 
         self.output.write(Value::Bytes(bytes));

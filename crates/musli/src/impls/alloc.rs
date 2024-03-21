@@ -20,9 +20,12 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use crate::de::{
-    Decode, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder, TraceDecode, ValueVisitor,
+    Decode, DecodeBytes, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder, TraceDecode,
+    ValueVisitor,
 };
-use crate::en::{Encode, Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, TraceEncode};
+use crate::en::{
+    Encode, EncodeBytes, Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, TraceEncode,
+};
 use crate::internal::size_hint;
 use crate::Context;
 
@@ -77,7 +80,10 @@ impl<'de, M> Decode<'de, M> for String {
     }
 }
 
-impl<M> Encode<M> for Box<str> {
+impl<M, T> Encode<M> for Box<T>
+where
+    T: ?Sized + Encode<M>,
+{
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
     where
@@ -100,22 +106,60 @@ impl<'de, M> Decode<'de, M> for Box<str> {
     }
 }
 
+impl<'de, M, T> Decode<'de, M> for Box<[T]>
+where
+    T: Decode<'de, M>,
+{
+    #[inline]
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    where
+        C: ?Sized + Context<Mode = M>,
+        D: Decoder<'de, C>,
+    {
+        let vec: Vec<T> = cx.decode(decoder)?;
+        Ok(Box::from(vec))
+    }
+}
+
+impl<'de, M, T> Decode<'de, M> for Box<T>
+where
+    T: Decode<'de, M>,
+{
+    #[inline]
+    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    where
+        C: ?Sized + Context<Mode = M>,
+        D: Decoder<'de, C>,
+    {
+        let vec: T = cx.decode(decoder)?;
+        Ok(Box::new(vec))
+    }
+}
+
 macro_rules! cow {
-    ($ty:ty, $source:ty, $decode:ident, $cx:pat, |$owned:ident| $owned_expr:expr, |$borrowed:ident| $borrowed_expr:expr, |$reference:ident| $reference_expr:expr) => {
-        impl<M> Encode<M> for Cow<'_, $ty> {
+    (
+        $encode:ident :: $encode_fn:ident,
+        $decode:ident :: $decode_fn:ident,
+        $ty:ty, $source:ty,
+        $decode_method:ident, $cx:pat,
+        |$owned:ident| $owned_expr:expr,
+        |$borrowed:ident| $borrowed_expr:expr,
+        |$reference:ident| $reference_expr:expr $(,)?
+    ) => {
+        impl<M> $encode<M> for Cow<'_, $ty> {
             #[inline]
-            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+            fn $encode_fn<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
             where
                 C: ?Sized + Context<Mode = M>,
                 E: Encoder<C>,
             {
-                self.as_ref().encode(cx, encoder)
+                self.as_ref().$encode_fn(cx, encoder)
             }
         }
 
-        impl<'de, M> Decode<'de, M> for Cow<'de, $ty> {
+        impl<'de, M> $decode<'de, M> for Cow<'de, $ty> {
             #[inline]
-            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+            fn $decode_fn<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
             where
                 C: ?Sized + Context<Mode = M>,
                 D: Decoder<'de, C>,
@@ -161,13 +205,15 @@ macro_rules! cow {
                     }
                 }
 
-                decoder.$decode(cx, Visitor)
+                decoder.$decode_method(cx, Visitor)
             }
         }
     };
 }
 
 cow! {
+    Encode::encode,
+    Decode::decode,
     str, str, decode_string, _,
     |owned| Cow::Owned(owned),
     |borrowed| Cow::Borrowed(borrowed),
@@ -175,10 +221,21 @@ cow! {
 }
 
 cow! {
+    Encode::encode,
+    Decode::decode,
     CStr, [u8], decode_bytes, cx,
     |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(|error| cx.custom(error))?),
     |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(|error| cx.custom(error))?),
     |reference| Cow::Owned(CStr::from_bytes_with_nul(reference).map_err(|error| cx.custom(error))?.to_owned())
+}
+
+cow! {
+    EncodeBytes::encode_bytes,
+    DecodeBytes::decode_bytes,
+    [u8], [u8], decode_bytes, _,
+    |owned| Cow::Owned(owned),
+    |borrowed| Cow::Borrowed(borrowed),
+    |reference| Cow::Owned(reference.to_owned())
 }
 
 macro_rules! sequence {
@@ -661,5 +718,74 @@ impl<'de, M> Decode<'de, M> for PathBuf {
     {
         let string: OsString = cx.decode(decoder)?;
         Ok(PathBuf::from(string))
+    }
+}
+
+impl<M> EncodeBytes<M> for Vec<u8> {
+    #[inline]
+    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: ?Sized + Context<Mode = M>,
+        E: Encoder<C>,
+    {
+        encoder.encode_bytes(cx, self.as_slice())
+    }
+}
+
+impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
+    #[inline]
+    fn decode_bytes<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    where
+        C: ?Sized + Context<Mode = M>,
+        D: Decoder<'de, C>,
+    {
+        struct Visitor;
+
+        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+        where
+            C: ?Sized + Context,
+        {
+            type Ok = Vec<u8>;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "bytes")
+            }
+
+            #[inline]
+            fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+                Ok(bytes.to_vec())
+            }
+
+            #[inline]
+            fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+                Ok(bytes.to_vec())
+            }
+        }
+
+        decoder.decode_bytes(cx, Visitor)
+    }
+}
+
+impl<M> EncodeBytes<M> for VecDeque<u8> {
+    #[inline]
+    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: ?Sized + Context<Mode = M>,
+        E: Encoder<C>,
+    {
+        let (first, second) = self.as_slices();
+        encoder.encode_bytes_vectored(cx, self.len(), &[first, second])
+    }
+}
+
+impl<'de, M> DecodeBytes<'de, M> for VecDeque<u8> {
+    #[inline]
+    fn decode_bytes<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    where
+        C: ?Sized + Context<Mode = M>,
+        D: Decoder<'de, C>,
+    {
+        Ok(VecDeque::from(<Vec<u8>>::decode_bytes(cx, decoder)?))
     }
 }

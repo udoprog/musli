@@ -8,9 +8,9 @@ pub use musli_macros::Decode;
 
 /// Trait governing how types are decoded.
 ///
-/// This is typically implemented automatically using the [`Encode` derive].
+/// This is typically implemented automatically using the [`Decode` derive].
 ///
-/// [`Encode` derive]: https://docs.rs/musli/latest/musli/derives/
+/// [`Decode` derive]: https://docs.rs/musli/latest/musli/derives/
 ///
 /// # Examples
 ///

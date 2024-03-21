@@ -72,9 +72,9 @@ where
     fn encode_array<const N: usize>(
         mut self,
         cx: &C,
-        array: [u8; N],
+        array: &[u8; N],
     ) -> Result<Self::Ok, C::Error> {
-        self.writer.write_bytes(cx, &array)
+        self.writer.write_bytes(cx, array)
     }
 
     #[inline]
@@ -85,12 +85,20 @@ where
     }
 
     #[inline]
-    fn encode_bytes_vectored(mut self, cx: &C, vectors: &[&[u8]]) -> Result<Self::Ok, C::Error> {
-        let len = vectors.iter().map(|v| v.len()).sum();
+    fn encode_bytes_vectored<I>(
+        mut self,
+        cx: &C,
+        len: usize,
+        vectors: I,
+    ) -> Result<Self::Ok, C::Error>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<[u8]>,
+    {
         musli_common::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
 
         for bytes in vectors {
-            self.writer.write_bytes(cx, bytes)?;
+            self.writer.write_bytes(cx, bytes.as_ref())?;
         }
 
         Ok(())
