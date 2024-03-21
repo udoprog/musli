@@ -1,12 +1,12 @@
 use musli::de::NumberVisitor;
 use musli::{Buf, Context};
 
-use crate::reader::integer::decode_signed_full;
-use crate::reader::{string, StringReference, Token};
+use crate::parser::integer::decode_signed_full;
+use crate::parser::{string, StringReference, Token};
 
 mod private {
     pub trait Sealed {}
-    impl<'de> Sealed for crate::reader::SliceParser<'de> {}
+    impl<'de> Sealed for crate::parser::SliceParser<'de> {}
     impl<'de, R> Sealed for &mut R where R: ?Sized + super::Parser<'de> {}
 }
 

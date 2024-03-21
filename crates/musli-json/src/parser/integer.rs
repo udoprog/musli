@@ -2,7 +2,7 @@ use crate::error::IntegerError;
 
 use musli::Context;
 
-use crate::reader::Parser;
+use crate::parser::Parser;
 
 use self::traits::FromUnsigned;
 pub(crate) use self::traits::{Float, Signed, Unsigned};

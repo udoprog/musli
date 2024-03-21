@@ -20,7 +20,7 @@ use crate::de::JsonDecoder;
 use crate::en::JsonEncoder;
 use crate::error::Error;
 use crate::fixed_bytes::FixedBytes;
-use crate::reader::{Parser, SliceParser};
+use crate::parser::{Parser, SliceParser};
 use crate::writer::Writer;
 
 /// The default configuration.

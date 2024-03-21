@@ -3,7 +3,7 @@ use core::mem;
 use musli::de::{MapDecoder, MapEntriesDecoder, SizeHint, StructDecoder, StructFieldsDecoder};
 use musli::Context;
 
-use crate::reader::{Parser, Token};
+use crate::parser::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder, JsonObjectPairDecoder};
 
