@@ -15,6 +15,10 @@ license = "MIT OR Apache-2.0"
 keywords = ["no_std", "serialization"]
 categories = ["encoding", "no-std", "no-std::no-alloc"]
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
+
 [features]
 default = ["std", "alloc"]
 std = ["musli/std", "simdutf8?/std", "musli-allocator/std"]
