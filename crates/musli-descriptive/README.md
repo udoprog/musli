@@ -52,7 +52,7 @@ assert_eq!(version1, Version1 {
 
 ## Configuring
 
-To configure the behavior of the wire format you can use the [Encoding]
+To configure the behavior of the wire format you can use the [`Encoding`]
 type:
 
 ```rust
@@ -91,5 +91,5 @@ the type which is contained in the field.
 [default encoding format]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 [MAX_INLINE_LEN]: https://docs.rs/musli-wire/latest/musli_descriptive/tag/constant.MAX_INLINE_LEN.html
 [Müsli]: https://docs.rs/musli
-[Encoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
+[`Encoding`]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 [Value]: https://docs.rs/musli-value

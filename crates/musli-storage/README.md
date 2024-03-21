@@ -57,8 +57,8 @@ assert_eq!(version2, Version2 {
 
 ## Configuring
 
-To tweak the behavior of the storage format you can use the
-[Encoding] type:
+To tweak the behavior of the storage format you can use the [`Encoding`]
+type:
 
 ```rust
 use musli_storage::Encoding;
@@ -91,4 +91,5 @@ assert_eq!(expected, actual);
 [default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 [musli-wire]: https://docs.rs/musli-wire
 [Müsli]: https://docs.rs/musli
-[Encoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
+[`Encoding`]:
+    https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
