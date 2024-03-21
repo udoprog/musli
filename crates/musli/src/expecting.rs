@@ -119,7 +119,6 @@ expect! {
     pub(crate) Bool("boolean");
     pub(crate) Char("character");
     pub(crate) Number("arbitrary precision number");
-    pub(crate) NumberComponents("number from 128-bit components");
     pub(crate) Unsigned8("8-bit unsigned integer");
     pub(crate) Unsigned16("16-bit unsigned integer");
     pub(crate) Unsigned32("32-bit unsigned integer");

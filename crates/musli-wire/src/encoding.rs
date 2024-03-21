@@ -1,5 +1,5 @@
-//! Module that defines [Encoding] whith allows for customization of the
-//! encoding format, and the [DEFAULT] encoding configuration.
+//! Module that defines [`Encoding`] whith allows for customization of the
+//! encoding format, and the [`DEFAULT`] encoding configuration.
 
 use core::marker;
 
@@ -21,7 +21,7 @@ use crate::options::{self, Options};
 use crate::reader::{Reader, SliceReader};
 use crate::writer::Writer;
 
-/// The default flavor used by the [DEFAULT] configuration.
+/// The default flavor used by the [`DEFAULT`] configuration.
 pub const DEFAULT_OPTIONS: options::Options = options::new().build();
 
 /// The default configuration.
@@ -35,7 +35,7 @@ pub const DEFAULT_OPTIONS: options::Options = options::new().build();
 /// [continuation]: musli_common::int::continuation
 pub const DEFAULT: Encoding = Encoding::new();
 
-/// Encode the given value to the given [Writer] using the [DEFAULT]
+/// Encode the given value to the given [Writer] using the [`DEFAULT`]
 /// configuration.
 #[inline]
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
@@ -46,7 +46,7 @@ where
     DEFAULT.encode(writer, value)
 }
 
-/// Encode the given value to the given [Write][io::Write] using the [DEFAULT]
+/// Encode the given value to the given [Write][io::Write] using the [`DEFAULT`]
 /// configuration.
 #[cfg(feature = "std")]
 #[inline]
@@ -58,7 +58,7 @@ where
     DEFAULT.to_writer(writer, value)
 }
 
-/// Encode the given value to a [Vec] using the [DEFAULT] configuration.
+/// Encode the given value to a [Vec] using the [`DEFAULT`] configuration.
 #[cfg(feature = "alloc")]
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
@@ -68,7 +68,7 @@ where
     DEFAULT.to_vec(value)
 }
 
-/// Encode the given value to a fixed-size bytes using the [DEFAULT]
+/// Encode the given value to a fixed-size bytes using the [`DEFAULT`]
 /// configuration.
 #[inline]
 pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, Error>
@@ -78,7 +78,7 @@ where
     DEFAULT.to_fixed_bytes::<N, _>(value)
 }
 
-/// Decode the given type `T` from the given [Reader] using the [DEFAULT]
+/// Decode the given type `T` from the given [Reader] using the [`DEFAULT`]
 /// configuration.
 #[inline]
 pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
@@ -89,7 +89,7 @@ where
     DEFAULT.decode(reader)
 }
 
-/// Decode the given type `T` from the given slice using the [DEFAULT]
+/// Decode the given type `T` from the given slice using the [`DEFAULT`]
 /// configuration.
 #[inline]
 pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
@@ -105,8 +105,8 @@ pub struct Encoding<M = DefaultMode, const F: Options = DEFAULT_OPTIONS> {
 }
 
 impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
-    /// Construct a new [Encoding] instance which uses [Variable] integer
-    /// encoding.
+    /// Construct a new [`Encoding`] instance with the [`DEFAULT_OPTIONS`]
+    /// configuration.
     ///
     /// You can modify this using the available factory methods:
     ///

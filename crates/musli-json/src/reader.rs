@@ -1,4 +1,4 @@
-//! [Parser] trait and utilities used for musli-json.
+//! [`Parser`] trait and utilities used for musli-json.
 
 pub(crate) mod integer;
 mod parser;
@@ -8,7 +8,7 @@ pub(crate) mod string;
 mod tests;
 mod token;
 
-pub(crate) use self::parser::Parser;
+pub use self::parser::Parser;
 pub(crate) use self::slice_parser::SliceParser;
-pub use self::string::StringReference;
+pub(crate) use self::string::StringReference;
 pub(crate) use self::token::Token;

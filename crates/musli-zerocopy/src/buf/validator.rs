@@ -244,9 +244,9 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// # Safety
     ///
     /// The caller is responsible for ensuring that the field is properly
-    /// aligned already by for example calling [`align::<F>()`].
+    /// aligned already by for example calling [`align_with::<F>()`].
     ///
-    /// [`align::<F>()`]: Self::align
+    /// [`align_with::<F>()`]: Self::align_with
     #[inline]
     pub(crate) unsafe fn validate_only<F>(&mut self) -> Result<(), Error>
     where

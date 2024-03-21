@@ -55,7 +55,8 @@ mod de;
 mod en;
 pub mod encoding;
 mod error;
-pub mod reader;
+mod reader;
+pub use self::reader::Parser;
 #[cfg(feature = "test")]
 #[macro_use]
 pub mod test;

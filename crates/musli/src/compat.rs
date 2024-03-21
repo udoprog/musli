@@ -48,6 +48,9 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
 /// This is useful for values which have a generic implementation to be encoded
 /// as a sequence, such as [`Vec`] and [`VecDeque`].
 ///
+/// [`Vec`]: alloc::vec::Vec
+/// [`VecDeque`]: alloc::collections::VecDeque
+///
 /// # Examples
 ///
 /// ```

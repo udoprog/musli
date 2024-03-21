@@ -29,7 +29,7 @@ const _: () = {
 
 /// A buffer that can be used to store data on the stack.
 ///
-/// See the [module level documentation][self] for more information.
+/// See the [module level documentation][super] for more information.
 #[repr(align(8))]
 pub struct StackBuffer<const N: usize = DEFAULT_STACK_BUFFER> {
     data: [MaybeUninit<u8>; N],

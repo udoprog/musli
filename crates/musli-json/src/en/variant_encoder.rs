@@ -4,7 +4,7 @@ use musli_common::writer::Writer;
 
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 
-/// Encoder<C> for a pair.
+/// A JSON variant encoder.
 pub(crate) struct JsonVariantEncoder<W> {
     writer: W,
 }
