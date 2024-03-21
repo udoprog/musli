@@ -395,12 +395,15 @@ extern crate alloc;
 extern crate std;
 
 pub mod context;
+#[doc(inline)]
 pub use self::context::Context;
 
 mod allocator;
+#[doc(inline)]
 pub use self::allocator::Allocator;
 
 mod buf;
+#[doc(inline)]
 pub use self::buf::Buf;
 
 pub mod compat;
@@ -420,7 +423,9 @@ mod no_std;
 mod no_std;
 pub mod utils;
 
+#[doc(inline)]
 pub use self::de::{Decode, Decoder};
+#[doc(inline)]
 pub use self::en::{Encode, Encoder};
 
 /// This is an attribute macro that must be used when implementing a

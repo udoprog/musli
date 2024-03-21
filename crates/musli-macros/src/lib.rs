@@ -21,7 +21,7 @@ mod internals;
 mod test;
 mod types;
 
-/// Please refer to the main [musli documentation](https://docs.rs/musli).
+/// Please refer to the main [musli `derives` documentation](https://docs.rs/musli/latest/musli/derives/).
 #[proc_macro_derive(Encode, attributes(musli))]
 pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
@@ -43,6 +43,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Please refer to the main [musli `derives` documentation](https://docs.rs/musli/latest/musli/derives/).
 #[proc_macro_derive(Decode, attributes(musli))]
 pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
@@ -64,6 +65,7 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = proc_macro2::TokenStream::from(attr);
@@ -87,6 +89,7 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
+/// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn map_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = proc_macro2::TokenStream::from(attr);
@@ -110,6 +113,7 @@ pub fn map_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
+/// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn struct_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = proc_macro2::TokenStream::from(attr);
@@ -133,6 +137,7 @@ pub fn struct_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
+/// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = proc_macro2::TokenStream::from(attr);
@@ -156,6 +161,7 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
+/// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = proc_macro2::TokenStream::from(attr);
