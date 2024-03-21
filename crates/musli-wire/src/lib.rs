@@ -48,7 +48,7 @@
 //!
 //! ## Configuring
 //!
-//! To configure the behavior of the wire format you can use the [Encoding]
+//! To configure the behavior of the wire format you can use the [`Encoding`]
 //! type:
 //!
 //! ```rust
@@ -95,7 +95,7 @@
 //! [MAX_INLINE_LEN]: https://docs.rs/musli-wire/latest/musli_wire/tag/constant.MAX_INLINE_LEN.html
 //! [Müsli]: https://docs.rs/musli
 //! [Encoding::with_max_pack]: https://docs.rs/musli-wire/latest/musli_wire/encoding/struct.Encoding.html#method.with_max_pack
-//! [Encoding]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
+//! [`Encoding`]: https://docs.rs/musli-wire/latest/musli-wire/struct.Encoding.html
 
 #![deny(missing_docs)]
 #![no_std]

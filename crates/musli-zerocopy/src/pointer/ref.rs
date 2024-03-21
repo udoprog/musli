@@ -491,7 +491,7 @@ impl<E: ByteOrder, O: Size> Ref<str, E, O> {
 
 /// An iterator over a `Ref<[T]>` which produces `Ref<T>` values.
 ///
-/// See [Ref::<[T]>::iter].
+/// See [`Ref::iter`].
 pub struct Iter<T, E, O> {
     start: usize,
     end: usize,

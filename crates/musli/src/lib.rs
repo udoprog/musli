@@ -386,6 +386,7 @@
 
 #![deny(missing_docs)]
 #![no_std]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -504,6 +505,8 @@ pub use musli_macros::decoder;
 /// any missing types automatically.
 ///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// [`MapDecoder`]: crate::de::MapDecoder
 #[doc(inline)]
 pub use musli_macros::map_decoder;
 
@@ -516,6 +519,7 @@ pub use musli_macros::map_decoder;
 /// any missing types automatically.
 ///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+/// [`StructDecoder`]: crate::de::StructDecoder
 #[doc(inline)]
 pub use musli_macros::struct_decoder;
 

@@ -1,4 +1,4 @@
-//! Module that defines [Encoding] whith allows for customization of the
+//! Module that defines [`Encoding`] whith allows for customization of the
 //! encoding format, and the [DEFAULT] encoding configuration.
 
 use core::marker;
@@ -79,7 +79,7 @@ where
     DEFAULT.to_fixed_bytes::<N, _>(value)
 }
 
-/// Decode the given type `T` from the given [Parser] using the [DEFAULT]
+/// Decode the given type `T` from the given [`Parser`] using the [DEFAULT]
 /// configuration.
 #[inline]
 pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
@@ -116,7 +116,7 @@ pub struct Encoding<M = DefaultMode> {
 }
 
 impl Encoding<DefaultMode> {
-    /// Construct a new [Encoding].
+    /// Construct a new [`Encoding`].
     ///
     /// You can modify this using the available factory methods:
     ///
@@ -211,7 +211,7 @@ impl<M> Encoding<M> {
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }
 
-    /// Decode the given type `T` from the given [Parser] using the current
+    /// Decode the given type `T` from the given [`Parser`] using the current
     /// configuration.
     #[inline]
     pub fn decode<'de, P, T>(self, parser: P) -> Result<T, Error>
@@ -225,7 +225,7 @@ impl<M> Encoding<M> {
         self.decode_with(&cx, parser)
     }
 
-    /// Decode the given type `T` from the given [Parser] using the current
+    /// Decode the given type `T` from the given [`Parser`] using the current
     /// configuration.
     ///
     /// This is the same as [`Encoding::decode`] but allows for using a

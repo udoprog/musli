@@ -3,9 +3,6 @@ use core::fmt;
 /// Indicates that an error occurred during encoding. This is a placeholder
 /// error that can be used by context implementations and is a ZST.
 ///
-/// Using it directly as a musli [`Error`] is not a good idea, since it discards
-/// any diagnostics provided to it.
-///
 /// Error details are expected to be reported to the corresponding [`Context`].
 ///
 /// [`Context`]: crate::context::Context

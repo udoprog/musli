@@ -99,7 +99,7 @@ where
         T: ZeroCopy,
     {
         // SAFETY:
-        // 1. The [`RawTableInner`] must already have properly initialized control bytes since
+        // 1. The [`Constructor`] must already have properly initialized control bytes since
         //    we will never expose `Constructor::new_uninitialized` in a public API.
         let slot = self.find_insert_slot(hash)?;
 
@@ -195,49 +195,60 @@ where
         }
     }
 
-    /// Fixes up an insertion slot returned by the [`RawTableInner::find_insert_slot_in_group`] method.
+    /// Fixes up an insertion slot returned by the
+    /// [`Constructor::find_insert_slot_in_group`] method.
     ///
-    /// In tables smaller than the group width (`self.buckets() < Group::WIDTH`), trailing control
-    /// bytes outside the range of the table are filled with [`EMPTY`] entries. These will unfortunately
-    /// trigger a match of [`RawTableInner::find_insert_slot_in_group`] function. This is because
-    /// the `Some(bit)` returned by `group.match_empty_or_deleted().lowest_set_bit()` after masking
-    /// (`(probe_seq.pos + bit) & self.bucket_mask`) may point to a full bucket that is already occupied.
-    /// We detect this situation here and perform a second scan starting at the beginning of the table.
-    /// This second scan is guaranteed to find an empty slot (due to the load factor) before hitting the
-    /// trailing control bytes (containing [`EMPTY`] bytes).
+    /// In tables smaller than the group width (`self.buckets() <
+    /// Group::WIDTH`), trailing control bytes outside the range of the table
+    /// are filled with [`EMPTY`] entries. These will unfortunately trigger a
+    /// match of [`Constructor::find_insert_slot_in_group`] function. This is
+    /// because the `Some(bit)` returned by
+    /// `group.match_empty_or_deleted().lowest_set_bit()` after masking
+    /// (`(probe_seq.pos + bit) & self.bucket_mask`) may point to a full bucket
+    /// that is already occupied. We detect this situation here and perform a
+    /// second scan starting at the beginning of the table. This second scan is
+    /// guaranteed to find an empty slot (due to the load factor) before hitting
+    /// the trailing control bytes (containing [`EMPTY`] bytes).
     ///
-    /// If this function is called correctly, it is guaranteed to return [`InsertSlot`] with an
-    /// index of an empty or deleted bucket in the range `0..self.buckets()` (see `Warning` and
-    /// `Safety`).
+    /// If this function is called correctly, it is guaranteed to return
+    /// [`InsertSlot`] with an index of an empty or deleted bucket in the range
+    /// `0..self.buckets()` (see `Warning` and `Safety`).
+    ///
+    /// [`EMPTY`]: super::raw::EMPTY
     ///
     /// # Warning
     ///
-    /// The table must have at least 1 empty or deleted `bucket`, otherwise if the table is less than
-    /// the group width (`self.buckets() < Group::WIDTH`) this function returns an index outside of the
-    /// table indices range `0..self.buckets()` (`0..=self.bucket_mask`). Attempt to write data at that
-    /// index will cause immediate [`undefined behavior`].
+    /// The table must have at least 1 empty or deleted `bucket`, otherwise if
+    /// the table is less than the group width (`self.buckets() < Group::WIDTH`)
+    /// this function returns an index outside of the table indices range
+    /// `0..self.buckets()` (`0..=self.bucket_mask`). Attempt to write data at
+    /// that index will cause immediate [`undefined behavior`].
     ///
     /// # Safety
     ///
-    /// The safety rules are directly derived from the safety rules for [`RawTableInner::ctrl`] method.
-    /// Thus, in order to uphold those safety contracts, as well as for the correct logic of the work
-    /// of this crate, the following rules are necessary and sufficient:
+    /// The safety rules are directly derived from the safety rules for
+    /// [`Constructor::ctrl`] method. Thus, in order to uphold those safety
+    /// contracts, as well as for the correct logic of the work of this crate,
+    /// the following rules are necessary and sufficient:
     ///
-    /// * The [`RawTableInner`] must have properly initialized control bytes otherwise calling this
-    ///   function results in [`undefined behavior`].
+    /// * The [`Constructor`] must have properly initialized control bytes
+    ///   otherwise calling this function results in [`undefined behavior`].
     ///
-    /// * This function must only be used on insertion slots found by [`RawTableInner::find_insert_slot_in_group`]
-    ///   (after the `find_insert_slot_in_group` function, but before insertion into the table).
+    /// * This function must only be used on insertion slots found by
+    ///   [`find_insert_slot_in_group`] (after the `find_insert_slot_in_group`
+    ///   function, but before insertion into the table).
     ///
-    /// * The `index` must not be greater than the `self.bucket_mask`, i.e. `(index + 1) <= self.buckets()`
-    ///   (this one is provided by the [`RawTableInner::find_insert_slot_in_group`] function).
+    /// * The `index` must not be greater than the `self.bucket_mask`, i.e.
+    ///   `(index + 1) <= self.buckets()` (this one is provided by the
+    ///   [`find_insert_slot_in_group`] function).
     ///
-    /// Calling this function with an index not provided by [`RawTableInner::find_insert_slot_in_group`]
-    /// may result in [`undefined behavior`] even if the index satisfies the safety rules of the
-    /// [`RawTableInner::ctrl`] function (`index < self.bucket_mask + 1 + Group::WIDTH`).
+    /// Calling this function with an index not provided by
+    /// [`find_insert_slot_in_group`] may result in [`undefined behavior`] even
+    /// if the index satisfies the safety rules of the [`ctrl`] function (`index
+    /// < self.bucket_mask + 1 + Group::WIDTH`).
     ///
-    /// [`RawTableInner::ctrl`]: RawTableInner::ctrl
-    /// [`RawTableInner::find_insert_slot_in_group`]: RawTableInner::find_insert_slot_in_group
+    /// [`ctrl`]: Self::ctrl
+    /// [`find_insert_slot_in_group`]: Self::find_insert_slot_in_group
     /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
     fn fix_insert_slot(&mut self, mut index: usize) -> InsertSlot {
@@ -325,7 +336,8 @@ where
         // because the number of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
         let index2 = ((index.wrapping_sub(Group::WIDTH)) & self.bucket_mask) + Group::WIDTH;
 
-        // SAFETY: The caller must uphold the safety rules for the [`RawTableInner::set_ctrl`]
+        // SAFETY: The caller must uphold the safety rules for the
+        // `Constructor::set_ctrl`.
         *self.ctrl_mut(index) = ctrl;
         *self.ctrl_mut(index2) = ctrl;
     }
@@ -415,6 +427,8 @@ impl<'a, T> Bucket<'a, T> {
 
     /// Overwrites a memory location with the given `value` without reading or
     /// dropping the old value (like [`ptr::write`] function).
+    ///
+    /// [`ptr::write`]: core::ptr::write
     #[inline]
     pub(crate) fn write(&self, value: &T)
     where

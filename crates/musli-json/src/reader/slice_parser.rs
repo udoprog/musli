@@ -7,8 +7,8 @@ use lexical::parse_float_options::JSON;
 
 const FORMAT: u128 = lexical::format::STANDARD;
 
-/// An efficient [Reader] wrapper around a slice.
-pub struct SliceParser<'de> {
+/// An efficient [`Parser`] wrapper around a slice.
+pub(crate) struct SliceParser<'de> {
     pub(crate) slice: &'de [u8],
     pub(crate) index: usize,
 }
@@ -16,7 +16,7 @@ pub struct SliceParser<'de> {
 impl<'de> SliceParser<'de> {
     /// Construct a new instance around the specified slice.
     #[inline]
-    pub fn new(slice: &'de [u8]) -> Self {
+    pub(crate) fn new(slice: &'de [u8]) -> Self {
         Self { slice, index: 0 }
     }
 }

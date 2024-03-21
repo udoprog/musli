@@ -2,14 +2,14 @@ use crate::ZeroCopy;
 
 /// An entry which is used when constructing a [`Map<K, V>`].
 ///
-/// To construct a map, this type is used to provide [`OwnedBuf`] with a pair
-/// of values.
+/// To construct a map, this type is used to provide [`OwnedBuf`] with a pair of
+/// values.
 ///
 /// Note that this primarily exists because tuples are not support. The layout
 /// of a tuple is `repr(Rust)`, so there is no way to construct legal references
 /// to them.
 ///
-/// [`Map<K, V>`]: crate::map::Map
+/// [`Map<K, V>`]: crate::swiss::Map
 /// [`OwnedBuf`]: crate::buf::OwnedBuf
 #[derive(Debug, ZeroCopy)]
 #[zero_copy(crate, bounds = {K: ZeroCopy, V: ZeroCopy})]

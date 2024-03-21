@@ -80,20 +80,6 @@ impl<'de, M> Decode<'de, M> for String {
     }
 }
 
-impl<M, T> Encode<M> for Box<T>
-where
-    T: ?Sized + Encode<M>,
-{
-    #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
-    where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
-    {
-        self.as_ref().encode(cx, encoder)
-    }
-}
-
 impl<'de, M> Decode<'de, M> for Box<str> {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -118,21 +104,6 @@ where
     {
         let vec: Vec<T> = cx.decode(decoder)?;
         Ok(Box::from(vec))
-    }
-}
-
-impl<'de, M, T> Decode<'de, M> for Box<T>
-where
-    T: Decode<'de, M>,
-{
-    #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
-    where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>,
-    {
-        let vec: T = cx.decode(decoder)?;
-        Ok(Box::new(vec))
     }
 }
 
@@ -449,6 +420,7 @@ macro_rules! map {
 map!(cx, BTreeMap<K: Ord, V>, map, BTreeMap::new());
 
 #[cfg(feature = "std")]
+#[cfg_attr(doc_cfg, doc(feature = "std"))]
 map!(
     cx,
     HashMap<K: Eq + Hash, V, S: BuildHasher + Default>,
@@ -510,49 +482,99 @@ impl<'de, M> Decode<'de, M> for CString {
 }
 
 macro_rules! smart_pointer {
-    ($ty:ident) => {
-        impl<M, T> Encode<M> for $ty<T>
-        where
-            T: Encode<M>,
-        {
-            #[inline]
-            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ($($ty:ident),* $(,)?) => {
+        $(
+            impl<M, T> Encode<M> for $ty<T>
             where
-                C: ?Sized + Context<Mode = M>,
-                E: Encoder<C>,
+                T: ?Sized + Encode<M>,
             {
-                (**self).encode(cx, encoder)
+                #[inline]
+                fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+                where
+                    C: ?Sized + Context<Mode = M>,
+                    E: Encoder<C>,
+                {
+                    self.as_ref().encode(cx, encoder)
+                }
             }
-        }
 
-        impl<'de, M, T> Decode<'de, M> for $ty<T>
-        where
-            T: Decode<'de, M>,
-        {
-            #[inline]
-            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+            impl<'de, M, T> Decode<'de, M> for $ty<T>
             where
-                C: ?Sized + Context<Mode = M>,
-                D: Decoder<'de, C>,
+                T: Decode<'de, M>,
             {
-                Ok($ty::new(cx.decode(decoder)?))
+                #[inline]
+                fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+                where
+                    C: ?Sized + Context<Mode = M>,
+                    D: Decoder<'de, C>,
+                {
+                    Ok($ty::new(cx.decode(decoder)?))
+                }
             }
-        }
+
+            impl<'de, M> DecodeBytes<'de, M> for $ty<[u8]> {
+                #[inline]
+                fn decode_bytes<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+                where
+                    C: ?Sized + Context<Mode = M>,
+                    D: Decoder<'de, C>,
+                {
+                    Ok($ty::from(<Vec<u8>>::decode_bytes(cx, decoder)?))
+                }
+            }
+
+            impl<'de, M> Decode<'de, M> for $ty<CStr> {
+                #[inline]
+                fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+                where
+                    C: ?Sized + Context<Mode = M>,
+                    D: Decoder<'de, C>,
+                {
+                    Ok($ty::from(CString::decode(cx, decoder)?))
+                }
+            }
+
+            #[cfg(all(feature = "std", any(unix, windows)))]
+            #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+            impl<'de, M> Decode<'de, M> for $ty<Path> {
+                #[inline]
+                fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+                where
+                    C: ?Sized + Context<Mode = M>,
+                    D: Decoder<'de, C>,
+                {
+                    Ok($ty::from(PathBuf::decode(cx, decoder)?))
+                }
+            }
+
+            #[cfg(all(feature = "std", any(unix, windows)))]
+            #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+            impl<'de, M> Decode<'de, M> for $ty<OsStr> {
+                #[inline]
+                fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+                where
+                    C: ?Sized + Context<Mode = M>,
+                    D: Decoder<'de, C>,
+                {
+                    Ok($ty::from(OsString::decode(cx, decoder)?))
+                }
+            }
+        )*
     };
 }
 
-smart_pointer!(Arc);
-smart_pointer!(Rc);
+smart_pointer!(Box, Arc, Rc);
 
 #[cfg(feature = "std")]
 #[derive(Encode, Decode)]
 #[musli(crate)]
-enum Tag {
+enum PlatformTag {
     Unix,
     Windows,
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<M> Encode<M> for OsStr {
     #[cfg(unix)]
     #[inline]
@@ -566,7 +588,7 @@ impl<M> Encode<M> for OsStr {
         use crate::en::VariantEncoder;
 
         let mut variant = encoder.encode_variant(cx)?;
-        Tag::Unix.encode(cx, variant.encode_tag(cx)?)?;
+        PlatformTag::Unix.encode(cx, variant.encode_tag(cx)?)?;
         self.as_bytes().encode(cx, variant.encode_value(cx)?)?;
         variant.end(cx)
     }
@@ -585,7 +607,7 @@ impl<M> Encode<M> for OsStr {
         let mut variant = encoder.encode_variant(cx)?;
         let tag = variant.encode_tag(cx)?;
 
-        Tag::Windows.encode(cx, tag)?;
+        PlatformTag::Windows.encode(cx, tag)?;
 
         let Some(mut buf) = cx.alloc() else {
             return Err(cx.message("Failed to allocate buffer"));
@@ -603,6 +625,7 @@ impl<M> Encode<M> for OsStr {
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<M> Encode<M> for OsString {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -615,6 +638,7 @@ impl<M> Encode<M> for OsString {
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<'de, M> Decode<'de, M> for OsString {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
@@ -631,9 +655,9 @@ impl<'de, M> Decode<'de, M> for OsString {
 
         match tag {
             #[cfg(not(unix))]
-            Tag::Unix => Err(cx.message("Unsupported OsString::Unix variant")),
+            PlatformTag::Unix => Err(cx.message("Unsupported OsString::Unix variant")),
             #[cfg(unix)]
-            Tag::Unix => {
+            PlatformTag::Unix => {
                 use std::os::unix::ffi::OsStringExt;
 
                 let bytes = cx.decode(variant.decode_value(cx)?)?;
@@ -641,9 +665,9 @@ impl<'de, M> Decode<'de, M> for OsString {
                 Ok(OsString::from_vec(bytes))
             }
             #[cfg(not(windows))]
-            Tag::Windows => Err(cx.message("Unsupported OsString::Windows variant")),
+            PlatformTag::Windows => Err(cx.message("Unsupported OsString::Windows variant")),
             #[cfg(windows)]
-            Tag::Windows => {
+            PlatformTag::Windows => {
                 use std::os::windows::ffi::OsStringExt;
 
                 struct Visitor;
@@ -685,18 +709,7 @@ impl<'de, M> Decode<'de, M> for OsString {
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
-impl<M> Encode<M> for PathBuf {
-    #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
-    where
-        C: ?Sized + Context,
-        E: Encoder<C>,
-    {
-        self.as_path().encode(cx, encoder)
-    }
-}
-
-#[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<M> Encode<M> for Path {
     #[inline]
     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
@@ -709,6 +722,20 @@ impl<M> Encode<M> for Path {
 }
 
 #[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+impl<M> Encode<M> for PathBuf {
+    #[inline]
+    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    where
+        C: ?Sized + Context,
+        E: Encoder<C>,
+    {
+        self.as_path().encode(cx, encoder)
+    }
+}
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<'de, M> Decode<'de, M> for PathBuf {
     #[inline]
     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>

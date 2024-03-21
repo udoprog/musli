@@ -103,3 +103,14 @@ jobs:
       with:
         components: rustfmt
     - run: cargo fmt --check --all
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --lib --no-deps --all-features --document-private-items
+        env:
+          RUSTFLAGS: --cfg doc_cfg
+          RUSTDOCFLAGS: --cfg doc_cfg -Dwarnings

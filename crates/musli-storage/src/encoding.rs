@@ -1,4 +1,4 @@
-//! Module that defines [Encoding] whith allows for customization of the
+//! Module that defines [`Encoding`] whith allows for customization of the
 //! encoding format, and the [DEFAULT] encoding configuration.
 
 #[cfg(feature = "alloc")]
@@ -20,7 +20,8 @@ use crate::options::{self, Options};
 use crate::reader::{Reader, SliceReader};
 use crate::writer::Writer;
 
-const DEFAULT_OPTIONS: Options = options::new().build();
+/// Default options to use with [`Encoding`].
+pub const DEFAULT_OPTIONS: Options = options::new().build();
 
 /// The default configuration.
 ///
@@ -103,10 +104,9 @@ pub struct Encoding<M = DefaultMode, const F: Options = DEFAULT_OPTIONS> {
 }
 
 impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
-    /// Construct a new [Encoding] instance which uses [Variable] integer
-    /// encoding.
+    /// Construct a new [`Encoding`] instance which uses [`DEFAULT_OPTIONS`].
     ///
-    /// You can modify this behavior by using a custom [Options] instance:
+    /// You can modify this behavior by using a custom [`Options`] instance:
     ///
     /// ```rust
     /// use musli_storage::Encoding;
