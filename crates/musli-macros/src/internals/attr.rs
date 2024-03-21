@@ -574,6 +574,8 @@ layer! {
         default_field: (),
         /// Use the alternate TraceDecode for the field.
         trace: (),
+        /// Use the alternate EncodeBytes for the field.
+        bytes: (),
         @multiple
     }
 }
@@ -587,7 +589,8 @@ impl Field {
             (*span, encode_path.clone())
         } else {
             let trace = self.trace(mode).is_some();
-            let encode_path = mode.encode_t_encode(trace);
+            let bytes = self.bytes(mode).is_some();
+            let encode_path = mode.encode_t_encode(trace, bytes);
             (span, encode_path)
         }
     }
@@ -600,7 +603,8 @@ impl Field {
             (*span, decode_path.clone())
         } else {
             let trace = self.trace(mode).is_some();
-            let decode_path = mode.decode_t_decode(trace);
+            let bytes = self.bytes(mode).is_some();
+            let decode_path = mode.decode_t_decode(trace, bytes);
             (span, decode_path)
         }
     }
@@ -692,9 +696,15 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // parse #[musli(default)]
+            // parse #[musli(trace)]
             if meta.path.is_ident("trace") {
                 new.trace.push((meta.path.span(), ()));
+                return Ok(());
+            }
+
+            // parse #[musli(bytes)]
+            if meta.path.is_ident("bytes") {
+                new.bytes.push((meta.path.span(), ()));
                 return Ok(());
             }
 

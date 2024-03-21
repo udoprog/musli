@@ -45,6 +45,7 @@ miri! {
 #[cfg_attr(any(feature = "musli-zerocopy", feature = "zerocopy"), repr(C))]
 pub struct PrimitivesPacked {
     unsigned8: u8,
+    #[cfg_attr(feature = "musli", musli(bytes))]
     _pad0: [u8; 1],
     unsigned16: u16,
     unsigned32: u32,
@@ -52,6 +53,7 @@ pub struct PrimitivesPacked {
     #[cfg(not(feature = "model-no-128"))]
     unsigned128: u128,
     signed8: i8,
+    #[cfg_attr(feature = "musli", musli(bytes))]
     _pad1: [u8; 1],
     signed16: i16,
     signed32: i32,
@@ -63,6 +65,7 @@ pub struct PrimitivesPacked {
     #[cfg(not(feature = "model-no-usize"))]
     signedsize: isize,
     float32: f32,
+    #[cfg_attr(feature = "musli", musli(bytes))]
     _pad3: [u8; 4],
     float64: f64,
 }
@@ -148,6 +151,7 @@ impl PartialEq<Primitives> for &Primitives {
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct Allocated {
     string: String,
+    #[cfg_attr(feature = "musli", musli(bytes))]
     bytes: Vec<u8>,
     #[cfg(not(feature = "model-no-cstring"))]
     c_string: CString,

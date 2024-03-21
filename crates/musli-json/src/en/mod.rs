@@ -169,8 +169,8 @@ where
     }
 
     #[inline]
-    fn encode_array<const N: usize>(self, cx: &C, bytes: [u8; N]) -> Result<Self::Ok, C::Error> {
-        self.encode_bytes(cx, bytes.as_slice())
+    fn encode_array<const N: usize>(self, cx: &C, bytes: &[u8; N]) -> Result<Self::Ok, C::Error> {
+        self.encode_bytes(cx, bytes)
     }
 
     #[inline]
@@ -195,11 +195,15 @@ where
     }
 
     #[inline]
-    fn encode_bytes_vectored(self, cx: &C, bytes: &[&[u8]]) -> Result<Self::Ok, C::Error> {
+    fn encode_bytes_vectored<I>(self, cx: &C, _: usize, vectors: I) -> Result<Self::Ok, C::Error>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<[u8]>,
+    {
         let mut seq = JsonArrayEncoder::<_>::new(cx, self.writer)?;
 
-        for bb in bytes {
-            for b in *bb {
+        for bb in vectors {
+            for &b in bb.as_ref() {
                 seq.push(cx, b)?;
             }
         }

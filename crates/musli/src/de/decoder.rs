@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -90,7 +92,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// detailed (`a 32-bit unsigned integer`) to vague (`a number`).
     ///
     /// This is used to construct dynamic containers of types.
-    fn type_hint(&mut self, _: &C) -> Result<TypeHint, C::Error> {
+    fn type_hint(&mut self, cx: &C) -> Result<TypeHint, C::Error> {
         Ok(TypeHint::Any)
     }
 
@@ -876,7 +878,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// Decode an unknown number using a visitor that can handle arbitrary
     /// precision numbers.
     #[inline]
-    fn decode_number<V>(self, cx: &C, _: V) -> Result<V::Ok, C::Error>
+    fn decode_number<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: NumberVisitor<'de, C>,
     {
@@ -986,7 +988,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_bytes<V>(self, cx: &C, _: V) -> Result<V::Ok, C::Error>
+    fn decode_bytes<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: ValueVisitor<'de, C, [u8]>,
     {
@@ -1054,7 +1056,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_string<V>(self, cx: &C, _: V) -> Result<V::Ok, C::Error>
+    fn decode_string<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: ValueVisitor<'de, C, str>,
     {
@@ -1592,7 +1594,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
+    fn decode_struct(self, cx: &C, fields: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Struct,
             &ExpectingWrapper::new(self),
@@ -1651,7 +1653,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     /// If the current encoding does not support dynamic decoding,
     /// [`Visitor::visit_any`] will be called with the current decoder.
     #[inline]
-    fn decode_any<V>(self, cx: &C, _: V) -> Result<V::Ok, C::Error>
+    fn decode_any<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: Visitor<'de, C>,
     {

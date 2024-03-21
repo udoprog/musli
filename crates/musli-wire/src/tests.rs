@@ -23,6 +23,7 @@ struct To {
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(packed)]
 struct Field<const N: usize> {
+    #[musli(bytes)]
     value: [u8; N],
 }
 

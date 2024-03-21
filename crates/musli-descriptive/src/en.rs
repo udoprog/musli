@@ -95,8 +95,8 @@ where
     }
 
     #[inline]
-    fn encode_array<const N: usize>(self, cx: &C, array: [u8; N]) -> Result<Self::Ok, C::Error> {
-        self.encode_bytes(cx, array.as_slice())
+    fn encode_array<const N: usize>(self, cx: &C, array: &[u8; N]) -> Result<Self::Ok, C::Error> {
+        self.encode_bytes(cx, array)
     }
 
     #[inline]
@@ -107,12 +107,20 @@ where
     }
 
     #[inline]
-    fn encode_bytes_vectored(mut self, cx: &C, vectors: &[&[u8]]) -> Result<Self::Ok, C::Error> {
-        let len = vectors.iter().map(|v| v.len()).sum();
+    fn encode_bytes_vectored<I>(
+        mut self,
+        cx: &C,
+        len: usize,
+        vectors: I,
+    ) -> Result<Self::Ok, C::Error>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<[u8]>,
+    {
         encode_prefix::<_, _, F>(cx, self.writer.borrow_mut(), Kind::Bytes, len)?;
 
         for bytes in vectors {
-            self.writer.write_bytes(cx, bytes)?;
+            self.writer.write_bytes(cx, bytes.as_ref())?;
         }
 
         Ok(())

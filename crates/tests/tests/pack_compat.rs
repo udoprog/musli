@@ -13,12 +13,14 @@ pub struct Inner;
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(packed)]
 struct SmallPack {
+    #[musli(bytes)]
     small: [u8; MAX_INLINE_LEN],
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(packed)]
 struct LargePack {
+    #[musli(bytes)]
     large: [u8; 128],
 }
 

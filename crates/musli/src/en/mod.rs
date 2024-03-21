@@ -19,6 +19,9 @@
 mod encode;
 pub use self::encode::{Encode, TraceEncode};
 
+mod encode_bytes;
+pub use self::encode_bytes::EncodeBytes;
+
 mod encoder;
 pub use self::encoder::Encoder;
 

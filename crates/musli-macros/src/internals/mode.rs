@@ -32,11 +32,11 @@ pub(crate) struct Mode<'a> {
 
 impl<'a> Mode<'a> {
     /// Construct a typed encode call.
-    pub(crate) fn encode_t_encode(&self, trace: bool) -> syn::Path {
-        let (mut encode_t, name) = if trace {
-            (self.tokens.trace_encode_t.clone(), "trace_encode")
-        } else {
-            (self.tokens.encode_t.clone(), "encode")
+    pub(crate) fn encode_t_encode(&self, trace: bool, bytes: bool) -> syn::Path {
+        let (mut encode_t, name) = match (trace, bytes) {
+            (_, true) => (self.tokens.encode_bytes_t.clone(), "encode_bytes"),
+            (true, _) => (self.tokens.trace_encode_t.clone(), "trace_encode"),
+            _ => (self.tokens.encode_t.clone(), "encode"),
         };
 
         if let Some(segment) = encode_t.segments.last_mut() {
@@ -54,11 +54,11 @@ impl<'a> Mode<'a> {
     }
 
     /// Construct a typed encode call.
-    pub(crate) fn decode_t_decode(&self, trace: bool) -> syn::Path {
-        let (mut decode_t, method) = if trace {
-            (self.tokens.trace_decode_t.clone(), "trace_decode")
-        } else {
-            (self.tokens.decode_t.clone(), "decode")
+    pub(crate) fn decode_t_decode(&self, trace: bool, bytes: bool) -> syn::Path {
+        let (mut decode_t, name) = match (trace, bytes) {
+            (_, true) => (self.tokens.decode_bytes_t.clone(), "decode_bytes"),
+            (true, _) => (self.tokens.trace_decode_t.clone(), "trace_decode"),
+            _ => (self.tokens.decode_t.clone(), "decode"),
         };
 
         if let Some(segment) = decode_t.segments.last_mut() {
@@ -68,7 +68,7 @@ impl<'a> Mode<'a> {
         decode_t
             .segments
             .push(syn::PathSegment::from(syn::Ident::new(
-                method,
+                name,
                 decode_t.span(),
             )));
 

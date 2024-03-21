@@ -4,28 +4,34 @@ use musli::{Decode, Encode};
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub struct A {
+    #[musli(bytes)]
     pub id: [u8; 16],
     pub ip: IpAddr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub struct B {
+    #[musli(bytes)]
     pub id: [u8; 16],
+    #[musli(bytes)]
     pub user_id: [u8; 16],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub struct C {
+    #[musli(bytes)]
     pub id: [u8; 16],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub struct D {
+    #[musli(bytes)]
     pub id: [u8; 16],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub struct E {
+    #[musli(bytes)]
     pub id: [u8; 16],
 }
 

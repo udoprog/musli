@@ -1,6 +1,7 @@
 use core::fmt;
 
 use bstr::BStr;
+use musli::compat::Bytes;
 use musli::{Decode, Encode};
 
 #[derive(Debug, Encode, Decode, PartialEq, Eq)]
@@ -16,7 +17,7 @@ impl fmt::Display for FieldVariantTag<'_> {
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[musli(transparent)]
-struct BytesTag<'a>(&'a [u8]);
+struct BytesTag<'a>(#[musli(bytes)] &'a [u8]);
 
 impl fmt::Display for BytesTag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -60,11 +61,11 @@ fn custom_struct_tag() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = [u8; 4], name_format_with = BStr::new)]
+#[musli(name_type = Bytes<[u8; 4]>, name_format_with = BStr::new)]
 pub struct StructCustomTag {
-    #[musli(rename = [1, 2, 3, 4])]
+    #[musli(rename = Bytes([1, 2, 3, 4]))]
     field1: u32,
-    #[musli(rename = [2, 3, 4, 5])]
+    #[musli(rename = Bytes([2, 3, 4, 5]))]
     field2: u32,
 }
 
