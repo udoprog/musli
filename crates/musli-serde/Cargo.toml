@@ -1,6 +1,6 @@
 [package]
 name = "musli-serde"
-version = "0.0.99"
+version = "0.0.100"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 description = """
@@ -24,8 +24,8 @@ std = ["musli/std", "serde/std"]
 alloc = ["musli/alloc", "serde/alloc"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.99", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.99", default-features = false }
+musli = { path = "../musli", version = "0.0.100", default-features = false }
+musli-common = { path = "../musli-common", version = "0.0.100", default-features = false }
 serde = { version = "1.0.197", default-features = false }
 
 [dev-dependencies]
