@@ -1,6 +1,6 @@
 [package]
 name = "musli-allocator"
-version = "0.0.98"
+version = "0.0.99"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 description = """
@@ -24,4 +24,4 @@ std = ["musli/std"]
 alloc = ["musli/alloc"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.98", default-features = false }
+musli = { path = "../musli", version = "0.0.99", default-features = false }
