@@ -1,9 +1,3 @@
-//! Trait for governing how a particular source of bytes is read.
-//!
-//! `musli` requires all sources to reference the complete data being read from
-//! it which allows it to make the assumption the bytes are always returned with
-//! the `'de` lifetime.
-
 use core::array;
 use core::fmt;
 use core::marker;

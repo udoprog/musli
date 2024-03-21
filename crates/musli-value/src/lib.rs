@@ -9,6 +9,7 @@
 
 #![deny(missing_docs)]
 #![no_std]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -24,15 +25,18 @@ mod value;
 /// Convenient result alias for use with `musli_value`.
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
+#[doc(inline)]
 pub use self::value::{AsValueDecoder, Value};
+#[doc(inline)]
 pub use error::Error;
+#[doc(inline)]
+pub use musli_common::exports::*;
 
 use en::ValueEncoder;
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
-use musli_storage::options;
 
-const DEFAULT_OPTIONS: options::Options = options::new().build();
+const DEFAULT_OPTIONS: crate::options::Options = crate::options::new().build();
 
 /// Encode something that implements [Encode] into a [Value].
 pub fn encode<T>(value: T) -> Result<Value, Error>
@@ -40,9 +44,9 @@ where
     T: Encode,
 {
     let mut output = Value::Unit;
-    let mut buf = musli_common::allocator::buffer();
-    let alloc = musli_common::allocator::new(&mut buf);
-    let cx = musli_common::context::Same::<_, DefaultMode, Error>::new(&alloc);
+    let mut buf = musli_common::exports::allocator::buffer();
+    let alloc = musli_common::exports::allocator::new(&mut buf);
+    let cx = musli_common::exports::context::Same::<_, DefaultMode, Error>::new(&alloc);
     value.encode(&cx, ValueEncoder::new(&mut output))?;
     Ok(output)
 }
@@ -52,8 +56,8 @@ pub fn decode<'de, T>(value: &'de Value) -> Result<T, Error>
 where
     T: Decode<'de>,
 {
-    let mut buf = musli_common::allocator::buffer();
-    let alloc = musli_common::allocator::new(&mut buf);
-    let cx = musli_common::context::Same::<_, DefaultMode, Error>::new(&alloc);
+    let mut buf = musli_common::exports::allocator::buffer();
+    let alloc = musli_common::exports::allocator::new(&mut buf);
+    let cx = musli_common::exports::context::Same::<_, DefaultMode, Error>::new(&alloc);
     T::decode(&cx, value.decoder::<DEFAULT_OPTIONS>())
 }

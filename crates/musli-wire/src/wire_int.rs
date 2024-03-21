@@ -1,8 +1,8 @@
 use musli::Context;
+use musli_common::int::continuation as c;
+use musli_common::int::zigzag as zig;
+use musli_common::int::{Signed, Unsigned, UnsignedOps};
 
-use crate::int::continuation as c;
-use crate::int::zigzag as zig;
-use crate::int::{Signed, Unsigned, UnsignedOps};
 use crate::options::Options;
 use crate::reader::Reader;
 use crate::tag::{Kind, Tag, DATA_MASK};
@@ -44,7 +44,7 @@ where
                 }};
             }
 
-            crate::width_arm!(width, fixed)
+            musli_common::width_arm!(width, fixed)
         }
     }
 }
@@ -97,7 +97,7 @@ where
                 }};
             }
 
-            crate::width_arm!(width, fixed)
+            musli_common::width_arm!(width, fixed)
         }
     }
 }

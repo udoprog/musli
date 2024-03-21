@@ -12,6 +12,8 @@ use super::access::{Access, Shared};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
 
+type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a>>);
+
 /// A rich context which uses allocations and tracks the exact location of every
 /// error.
 ///
@@ -28,7 +30,7 @@ where
     access: Access,
     mark: Cell<usize>,
     alloc: &'a A,
-    error: UnsafeCell<Option<(Range<usize>, BufString<A::Buf<'a>>)>>,
+    error: UnsafeCell<Option<BufPair<'a, A>>>,
     path: UnsafeCell<FixedVec<Step<BufString<A::Buf<'a>>>, P>>,
     path_cap: Cell<usize>,
     include_type: bool,

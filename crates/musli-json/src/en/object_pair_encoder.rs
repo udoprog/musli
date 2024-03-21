@@ -1,6 +1,7 @@
 use musli::en::{MapEntryEncoder, StructFieldEncoder};
 use musli::Context;
-use musli_common::writer::Writer;
+
+use crate::writer::Writer;
 
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 

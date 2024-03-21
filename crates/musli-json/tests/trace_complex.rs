@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use musli::{Decode, Encode};
-use musli_common::allocator::{System, SystemBuffer};
-use musli_common::context::SystemContext;
+use musli_json::allocator::{System, SystemBuffer};
+use musli_json::context::SystemContext;
 
 #[derive(Encode)]
 enum InnerFrom {

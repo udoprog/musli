@@ -39,7 +39,7 @@ where
         self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
+            musli_common::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(())
@@ -54,7 +54,7 @@ where
         self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
+            musli_common::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(())
@@ -265,7 +265,7 @@ where
         self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
+            musli_common::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -298,7 +298,7 @@ where
         self.writer.write_byte(cx, tag.byte())?;
 
         if !embedded {
-            crate::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
+            musli_common::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -563,7 +563,7 @@ where
     writer.write_byte(cx, tag.byte())?;
 
     if !embedded {
-        crate::int::encode_usize::<_, _, F>(cx, writer, len)?;
+        musli_common::int::encode_usize::<_, _, F>(cx, writer, len)?;
     }
 
     Ok(())

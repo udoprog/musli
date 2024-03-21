@@ -5,9 +5,9 @@ use musli::en::{
     StructFieldEncoder, VariantEncoder,
 };
 use musli::{Buf, Context, Encode};
+use musli_common::int::continuation as c;
 use musli_storage::en::StorageEncoder;
 
-use crate::int::continuation as c;
 use crate::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use crate::options::Options;
 use crate::tag::{
@@ -531,7 +531,7 @@ where
     writer.write_byte(cx, tag.byte())?;
 
     if !embedded {
-        crate::int::encode_usize::<_, _, F>(cx, writer, len)?;
+        musli_common::int::encode_usize::<_, _, F>(cx, writer, len)?;
     }
 
     Ok(())

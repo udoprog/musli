@@ -266,7 +266,7 @@ where
         T: fmt::Display,
     {
         use core::fmt::Write;
-        use musli_common::buf::BufString;
+        use musli_common::exports::buf::BufString;
 
         let Some(buf) = self.cx.alloc() else {
             return Err(ser::Error::custom("Failed to allocate"));

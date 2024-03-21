@@ -44,7 +44,7 @@ impl fmt::Display for ErrorImpl {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-impl musli_common::context::Error for Error {
+impl crate::context::Error for Error {
     #[inline]
     fn custom<T>(error: T) -> Self
     where

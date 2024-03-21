@@ -42,7 +42,7 @@ use crate::parser::integer::{
 use crate::parser::{integer, string, Parser, StringReference, Token};
 
 #[cfg(feature = "musli-value")]
-const BUFFER_OPTIONS: musli_common::options::Options = musli_common::options::new().build();
+const BUFFER_OPTIONS: crate::options::Options = crate::options::new().build();
 
 /// A JSON decoder for Müsli.
 pub(crate) struct JsonDecoder<P> {

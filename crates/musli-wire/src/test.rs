@@ -45,6 +45,7 @@ where
 
 /// Roundtrip encode the given value.
 #[macro_export]
+#[doc(hidden)]
 macro_rules! rt {
     ($enum:ident :: $variant:ident $($tt:tt)?) => {
         $crate::rt!($enum, $enum :: $variant $($tt)*)

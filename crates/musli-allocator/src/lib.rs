@@ -45,9 +45,9 @@
 //! [Müsli]: <https://docs.rs/musli>
 //! [`std::alloc::System`]: https://doc.rust-lang.org/std/alloc/struct.System.html
 
-#![allow(clippy::type_complexity)]
 #![deny(missing_docs)]
 #![no_std]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 #[cfg_attr(test, macro_use)]
 #[cfg(feature = "std")]
@@ -62,6 +62,7 @@ mod tests;
 #[cfg(feature = "alloc")]
 mod system;
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub use self::system::{System, SystemBuffer};
 
 mod disabled;

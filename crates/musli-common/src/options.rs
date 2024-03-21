@@ -1,5 +1,3 @@
-//! Serialization options.
-
 /// Type encapsulating a static flavor of an encoding.
 pub struct OptionsBuilder(Options);
 
@@ -154,13 +152,13 @@ impl ByteOrder {
 macro_rules! width_arm {
     ($width:expr, $macro:path) => {
         match $width {
-            $crate::options::Width::U8 => {
+            $crate::exports::options::Width::U8 => {
                 $macro!(u8)
             }
-            $crate::options::Width::U16 => {
+            $crate::exports::options::Width::U16 => {
                 $macro!(u16)
             }
-            $crate::options::Width::U32 => {
+            $crate::exports::options::Width::U32 => {
                 $macro!(u32)
             }
             _ => {

@@ -11,9 +11,9 @@ macro_rules! encode_with_extensions {
             W: Writer,
             T: ?Sized + Encode<$mode>,
         {
-            let mut buf = musli_common::allocator::buffer();
-            let alloc = musli_common::allocator::new(&mut buf);
-            let cx = musli_common::context::Same::new(&alloc);
+            let mut buf = $crate::exports::allocator::buffer();
+            let alloc = $crate::exports::allocator::new(&mut buf);
+            let cx = $crate::exports::context::Same::new(&alloc);
             self.encode_with(&cx, writer, value)
         }
 
@@ -26,7 +26,7 @@ macro_rules! encode_with_extensions {
             W: io::Write,
             T: ?Sized + Encode<$mode>,
         {
-            let writer = $crate::wrap::wrap(write);
+            let writer = $crate::exports::wrap::wrap(write);
             self.encode(writer, value)
         }
 
@@ -65,9 +65,9 @@ macro_rules! encode_with_extensions {
         where
             T: ?Sized + Encode<$mode>,
         {
-            let mut buf = musli_common::allocator::buffer();
-            let alloc = musli_common::allocator::new(&mut buf);
-            let cx = musli_common::context::Same::new(&alloc);
+            let mut buf = $crate::exports::allocator::buffer();
+            let alloc = $crate::exports::allocator::new(&mut buf);
+            let cx = $crate::exports::context::Same::new(&alloc);
             self.to_fixed_bytes_with(&cx, value)
         }
 
@@ -102,9 +102,9 @@ macro_rules! encoding_from_slice_impls {
         where
             T: Decode<'de, $mode>,
         {
-            let mut buf = musli_common::allocator::buffer();
-            let alloc = musli_common::allocator::new(&mut buf);
-            let cx = musli_common::context::Same::new(&alloc);
+            let mut buf = $crate::exports::allocator::buffer();
+            let alloc = $crate::exports::allocator::new(&mut buf);
+            let cx = $crate::exports::context::Same::new(&alloc);
             self.from_slice_with(&cx, bytes)
         }
 
@@ -168,9 +168,9 @@ macro_rules! encoding_impls {
             R: Reader<'de>,
             T: Decode<'de, $mode>,
         {
-            let mut buf = musli_common::allocator::buffer();
-            let alloc = musli_common::allocator::new(&mut buf);
-            let cx = musli_common::context::Same::new(&alloc);
+            let mut buf = $crate::exports::allocator::buffer();
+            let alloc = $crate::exports::allocator::new(&mut buf);
+            let cx = $crate::exports::context::Same::new(&alloc);
             self.decode_with(&cx, reader)
         }
 

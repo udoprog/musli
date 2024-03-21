@@ -1,11 +1,12 @@
 use std::fmt;
 use std::vec::Vec;
 
-use crate::allocator;
-use crate::context;
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
 use crate::int::{Signed, Unsigned};
+
+use crate::context;
+use crate::exports::allocator;
 
 #[cfg(not(miri))]
 const ITER: usize = 10000;

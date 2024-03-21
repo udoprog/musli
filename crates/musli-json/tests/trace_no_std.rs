@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use musli::{Decode, Encode};
-use musli_common::allocator::{Stack, StackBuffer};
-use musli_common::context::StackContext;
+use musli_json::allocator::{Stack, StackBuffer};
+use musli_json::context::StackContext;
 
 #[derive(Encode)]
 struct From {

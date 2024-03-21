@@ -8,8 +8,9 @@ use musli::de::{
     SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::Context;
-use musli_common::options::Options;
-use musli_common::reader::Reader;
+
+use crate::options::Options;
+use crate::reader::Reader;
 
 /// A very simple decoder suitable for storage decoding.
 pub struct StorageDecoder<R, const F: Options> {

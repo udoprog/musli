@@ -4,7 +4,7 @@ use crate::endian::ByteOrder;
 use crate::error::IntoRepr;
 use crate::traits::ZeroCopy;
 
-/// The default [`Size`] in use by this crate.
+/// The default [`Size`] to use.
 pub type DefaultSize = u32;
 
 #[cfg(not(any(

@@ -95,6 +95,7 @@
 
 #![deny(missing_docs)]
 #![no_std]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -112,6 +113,8 @@ mod error;
 mod integer_encoding;
 pub mod tag;
 #[cfg(feature = "test")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
+#[doc(hidden)]
 #[macro_use]
 pub mod test;
 
@@ -119,12 +122,20 @@ pub mod test;
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[doc(inline)]
 pub use self::encoding::to_vec;
 #[cfg(feature = "std")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
+#[doc(inline)]
 pub use self::encoding::to_writer;
+#[doc(inline)]
 pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
+#[doc(inline)]
 pub use self::error::Error;
 #[cfg(feature = "test")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
+#[doc(hidden)]
 pub use self::test::{transcode, Typed};
 #[doc(inline)]
-pub use musli_common::*;
+pub use musli_common::exports::*;

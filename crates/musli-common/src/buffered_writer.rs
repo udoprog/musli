@@ -3,7 +3,7 @@
 
 use musli::{Buf, Context};
 
-use crate::fixed_bytes::FixedBytes;
+use crate::fixed::FixedBytes;
 use crate::writer::Writer;
 
 /// A writer which buffers `N` bytes inline.

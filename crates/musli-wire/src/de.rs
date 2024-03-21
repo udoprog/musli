@@ -8,11 +8,11 @@ use musli::de::{
     SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::Context;
-use musli_common::reader::{Limit, Reader};
+use musli_common::int::continuation as c;
 use musli_storage::de::StorageDecoder;
-use musli_storage::int::continuation as c;
 
 use crate::options::Options;
+use crate::reader::{Limit, Reader};
 use crate::tag::Kind;
 use crate::tag::Tag;
 
@@ -49,7 +49,7 @@ where
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+                    musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
                 };
 
                 self.reader.skip(cx, len)?;
@@ -58,7 +58,7 @@ where
                 let len = if let Some(len) = tag.data() {
                     len as usize
                 } else {
-                    crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+                    musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
                 };
 
                 for _ in 0..len {
@@ -86,7 +86,7 @@ where
             Kind::Sequence => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+                musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
             }),
             _ => Err(cx.message(Expected {
                 expected: Kind::Sequence,
@@ -130,7 +130,7 @@ where
             Kind::Prefix => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                crate::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
+                musli_common::int::decode_usize::<_, _, F>(cx, self.reader.borrow_mut())?
             }),
             Kind::Pack => {
                 let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
