@@ -1,7 +1,7 @@
 use musli::{Buf, Context};
 
 use crate::error::ErrorMessage;
-use crate::reader::{Parser, StringReference, Token};
+use crate::parser::{Parser, StringReference, Token};
 
 use lexical::parse_float_options::JSON;
 
@@ -49,7 +49,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
 
         self.skip(cx, 1)?;
         let out =
-            crate::reader::string::parse_string_slice_reader(cx, self, validate, start, scratch);
+            crate::parser::string::parse_string_slice_reader(cx, self, validate, start, scratch);
         out
     }
 

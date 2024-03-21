@@ -3,8 +3,8 @@
 use musli::mode::DefaultMode;
 
 use crate::error::Error;
-use crate::reader::integer::{parse_signed_full, parse_unsigned_full};
-use crate::reader::SliceParser;
+use crate::parser::integer::{parse_signed_full, parse_unsigned_full};
+use crate::parser::SliceParser;
 
 #[test]
 fn test_decode_exponent() {

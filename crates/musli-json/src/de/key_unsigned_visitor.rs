@@ -4,8 +4,8 @@ use core::marker;
 use musli::de::ValueVisitor;
 use musli::Context;
 
-use crate::reader::integer::Unsigned;
-use crate::reader::SliceParser;
+use crate::parser::integer::Unsigned;
+use crate::parser::SliceParser;
 
 use super::parse_unsigned;
 

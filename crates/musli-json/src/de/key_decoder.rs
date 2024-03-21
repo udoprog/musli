@@ -3,7 +3,7 @@ use core::fmt;
 use musli::de::{Decoder, NumberHint, SizeHint, TypeHint, ValueVisitor, Visitor};
 use musli::Context;
 
-use crate::reader::{Parser, Token};
+use crate::parser::{Parser, Token};
 
 use super::{
     JsonDecoder, JsonObjectDecoder, KeySignedVisitor, KeyUnsignedVisitor, StringReference,

@@ -1,5 +1,7 @@
 //! [`Parser`] trait and utilities used for musli-json.
 
+#![allow(clippy::module_inception)]
+
 pub(crate) mod integer;
 mod parser;
 mod slice_parser;

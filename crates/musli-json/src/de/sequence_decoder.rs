@@ -3,7 +3,7 @@ use core::mem;
 use musli::de::{PackDecoder, SequenceDecoder, SizeHint};
 use musli::Context;
 
-use crate::reader::{Parser, Token};
+use crate::parser::{Parser, Token};
 
 use super::JsonDecoder;
 

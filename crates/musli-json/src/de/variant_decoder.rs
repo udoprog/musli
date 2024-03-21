@@ -1,7 +1,7 @@
 use musli::de::VariantDecoder;
 use musli::Context;
 
-use crate::reader::{Parser, Token};
+use crate::parser::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder};
 

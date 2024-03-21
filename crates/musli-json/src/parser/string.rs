@@ -2,7 +2,7 @@
 
 use musli::{Buf, Context};
 
-use crate::reader::{Parser, SliceParser};
+use crate::parser::{Parser, SliceParser};
 
 // Copied and adapter form the serde-json project under the MIT and Apache 2.0
 // license.

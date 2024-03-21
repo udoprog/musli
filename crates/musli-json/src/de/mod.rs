@@ -32,14 +32,14 @@ use musli::de::{
 use musli::Context;
 
 #[cfg(not(feature = "parse-full"))]
-use crate::reader::integer::{
+use crate::parser::integer::{
     parse_signed_base as parse_signed, parse_unsigned_base as parse_unsigned,
 };
 #[cfg(feature = "parse-full")]
-use crate::reader::integer::{
+use crate::parser::integer::{
     parse_signed_full as parse_signed, parse_unsigned_full as parse_unsigned,
 };
-use crate::reader::{integer, string, Parser, StringReference, Token};
+use crate::parser::{integer, string, Parser, StringReference, Token};
 
 #[cfg(feature = "musli-value")]
 const BUFFER_OPTIONS: musli_common::options::Options = musli_common::options::new().build();

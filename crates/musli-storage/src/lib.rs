@@ -55,8 +55,8 @@
 //!
 //! ## Configuring
 //!
-//! To tweak the behavior of the storage format you can use the
-//! [Encoding] type:
+//! To tweak the behavior of the storage format you can use the [`Encoding`]
+//! type:
 //!
 //! ```rust
 //! use musli_storage::Encoding;
@@ -90,7 +90,8 @@
 //! [default encoding format]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 //! [musli-wire]: https://docs.rs/musli-wire
 //! [Müsli]: https://docs.rs/musli
-//! [Encoding]: https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
+//! [`Encoding`]:
+//!     https://docs.rs/musli-storage/latest/musli-storage/struct.Encoding.html
 
 #![deny(missing_docs)]
 #![no_std]
