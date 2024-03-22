@@ -46,7 +46,7 @@ jobs:
       - run: cargo +nightly run -p no-std-examples --example no-std-${{matrix.example}}
 
   fuzz:
-    needs: [test, each_package]
+    needs: [test, each_package, smoke]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
     - run: cargo run --release -p tests --features test --bin fuzz -- --random
 
   miri:
-    needs: [test, each_package]
+    needs: [test, each_package, smoke]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -85,6 +85,13 @@ jobs:
       if: matrix.package == 'musli-storage' || matrix.package == 'musli-wire' || matrix.package == 'musli-descriptive' || matrix.package == 'musli-json'
     - run: cargo build -p ${{matrix.package}} --no-default-features --features parse-full
       if: matrix.package == 'musli-json'
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cargo build --release -p tests --test big_model --features test
 
   clippy:
     runs-on: ubuntu-latest
