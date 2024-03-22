@@ -9,7 +9,7 @@ use super::Decoder;
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
-pub trait MapEntriesDecoder<'de, C: ?Sized + Context> {
+pub trait MapEntriesDecoder<'de, C: ?Sized + Context>: Sized {
     /// The decoder to use for a tuple field index.
     type DecodeMapEntryKey<'this>: Decoder<'de, C>
     where
@@ -41,5 +41,17 @@ pub trait MapEntriesDecoder<'de, C: ?Sized + Context> {
     fn skip_map_entry_value(&mut self, cx: &C) -> Result<bool, C::Error>;
 
     /// End pair decoding.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
+    #[inline]
+    fn end(mut self, cx: &C) -> Result<(), C::Error> {
+        loop {
+            let Some(item) = self.decode_map_entry_key(cx)? else {
+                break;
+            };
+
+            item.skip(cx)?;
+            self.skip_map_entry_value(cx)?;
+        }
+
+        Ok(())
+    }
 }

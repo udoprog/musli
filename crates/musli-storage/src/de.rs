@@ -321,11 +321,6 @@ where
         self.remaining -= 1;
         Ok(Some(StorageDecoder::new(self.decoder.reader.borrow_mut())))
     }
-
-    #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
-        Ok(())
-    }
 }
 
 #[musli::map_decoder]
@@ -357,11 +352,6 @@ where
 
         self.remaining -= 1;
         Ok(Some(StorageDecoder::new(self.decoder.reader.borrow_mut())))
-    }
-
-    #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
-        Ok(())
     }
 }
 
@@ -474,11 +464,6 @@ where
     #[inline]
     fn skip_map_entry_value(&mut self, _: &C) -> Result<bool, C::Error> {
         Ok(false)
-    }
-
-    #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
-        Ok(())
     }
 }
 

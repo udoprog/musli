@@ -77,6 +77,11 @@ where
     }
 
     #[inline]
+    fn skip(self, cx: &C) -> Result<(), C::Error> {
+        self.skip_any(cx)
+    }
+
+    #[inline]
     fn type_hint(&mut self, cx: &C) -> Result<TypeHint, C::Error> {
         JsonDecoder::new(self.parser.borrow_mut()).type_hint(cx)
     }

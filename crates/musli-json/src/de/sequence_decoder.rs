@@ -56,6 +56,10 @@ where
 
     #[inline]
     fn decode_next(&mut self, cx: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+        if self.terminated {
+            return Ok(None);
+        }
+
         let first = mem::take(&mut self.first);
 
         loop {
@@ -81,22 +85,6 @@ where
                 }
             }
         }
-    }
-
-    #[inline]
-    fn end(mut self, cx: &C) -> Result<(), C::Error> {
-        if !self.terminated {
-            let actual = self.parser.peek(cx)?;
-
-            if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.message(format_args!("Expected closing bracket, was {actual}")));
-            }
-
-            self.parser.skip(cx, 1)?;
-            self.terminated = true;
-        }
-
-        Ok(())
     }
 }
 

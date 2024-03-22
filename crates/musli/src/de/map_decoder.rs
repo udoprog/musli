@@ -1,14 +1,13 @@
 use crate::Context;
 
-use super::{Decode, MapEntriesDecoder, MapEntryDecoder, SizeHint};
+use super::{Decode, Decoder, MapEntriesDecoder, MapEntryDecoder, SizeHint};
 
 /// Trait governing how to decode a sequence of pairs.
-pub trait MapDecoder<'de, C: ?Sized + Context> {
+pub trait MapDecoder<'de, C: ?Sized + Context>: Sized {
     /// The decoder to use for a key.
     type DecodeEntry<'this>: MapEntryDecoder<'de, C>
     where
         Self: 'this;
-
     /// Decoder for a sequence of map pairs.
     type IntoMapEntries: MapEntriesDecoder<'de, C>;
 
@@ -30,7 +29,16 @@ pub trait MapDecoder<'de, C: ?Sized + Context> {
     ///
     /// If there are any remaining elements in the sequence of pairs, this
     /// indicates that they should be flushed.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
+    #[inline]
+    fn end(mut self, cx: &C) -> Result<(), C::Error> {
+        // Skip remaining elements.
+        while let Some(mut item) = self.decode_entry(cx)? {
+            item.decode_map_key(cx)?.skip(cx)?;
+            item.skip_map_value(cx)?;
+        }
+
+        Ok(())
+    }
 
     /// Decode the next map entry as a tuple.
     fn entry<K, V>(&mut self, cx: &C) -> Result<Option<(K, V)>, C::Error>

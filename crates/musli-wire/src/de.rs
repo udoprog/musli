@@ -183,6 +183,11 @@ where
     }
 
     #[inline]
+    fn skip(mut self, cx: &C) -> Result<(), C::Error> {
+        self.skip_any(cx)
+    }
+
+    #[inline]
     fn decode_unit(mut self, cx: &C) -> Result<(), C::Error> {
         self.skip_any(cx)?;
         Ok(())
@@ -474,16 +479,6 @@ where
         self.remaining -= 1;
         Ok(Some(WireDecoder::new(self.decoder.reader.borrow_mut())))
     }
-
-    #[inline]
-    fn end(mut self, cx: &C) -> Result<(), C::Error> {
-        // Skip remaining elements.
-        while let Some(mut item) = SequenceDecoder::decode_next(&mut self, cx)? {
-            item.skip_any(cx)?;
-        }
-
-        Ok(())
-    }
 }
 
 impl<'de, C, R, const F: Options> VariantDecoder<'de, C> for WireDecoder<R, F>
@@ -545,16 +540,6 @@ where
 
         self.remaining -= 1;
         Ok(Some(WireDecoder::new(self.decoder.reader.borrow_mut())))
-    }
-
-    #[inline]
-    fn end(mut self, cx: &C) -> Result<(), C::Error> {
-        // Skip remaining elements.
-        while let Some(mut item) = MapDecoder::decode_entry(&mut self, cx)? {
-            item.skip_any(cx)?;
-        }
-
-        Ok(())
     }
 }
 
@@ -673,17 +658,6 @@ where
     fn skip_map_entry_value(&mut self, cx: &C) -> Result<bool, C::Error> {
         self.decode_map_entry_value(cx)?.skip_any(cx)?;
         Ok(true)
-    }
-
-    #[inline]
-    fn end(mut self, cx: &C) -> Result<(), C::Error> {
-        while self.remaining > 0 {
-            self.remaining -= 1;
-            WireDecoder::<_, F>::new(self.decoder.reader.borrow_mut()).skip_any(cx)?;
-            self.decode_map_entry_value(cx)?.skip_any(cx)?;
-        }
-
-        Ok(())
     }
 }
 
