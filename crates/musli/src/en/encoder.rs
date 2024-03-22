@@ -1051,6 +1051,43 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         )))
     }
 
+    /// Encodes a pack using a closure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{SequenceEncoder};
+    ///
+    /// struct PackedStruct {
+    ///     field: u32,
+    ///     data: [u8; 128],
+    /// }
+    ///
+    /// impl<M> Encode<M> for PackedStruct {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         E: Encoder<C>,
+    ///     {
+    ///         encoder.encode_pack_fn(cx, |pack| {
+    ///             self.field.encode(cx, pack.encode_next(cx)?)?;
+    ///             self.data.encode(cx, pack.encode_next(cx)?)?;
+    ///             Ok(())
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_pack_fn<F>(self, cx: &C, f: F) -> Result<Self::Ok, C::Error>
+    where
+        F: FnOnce(&mut Self::EncodePack<'_>) -> Result<(), C::Error>,
+    {
+        let mut pack = self.encode_pack(cx)?;
+        f(&mut pack)?;
+        pack.end(cx)
+    }
+
     /// Encode a sequence with a known length `len`.
     ///
     /// A sequence encodes one element following another and must in some way
@@ -1102,6 +1139,41 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
             &expecting::Sequence,
             &ExpectingWrapper::new(self),
         )))
+    }
+
+    /// Encode a sequence using a closure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{SequenceEncoder};
+    /// # struct MyType { data: Vec<String> }
+    ///
+    /// impl<M> Encode<M> for MyType {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         E: Encoder<C>,
+    ///     {
+    ///         encoder.encode_sequence_fn(cx, self.data.len(), |seq| {
+    ///             for element in &self.data {
+    ///                 seq.push(cx, element)?;
+    ///             }
+    ///
+    ///             Ok(())
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_sequence_fn<F>(self, cx: &C, len: usize, f: F) -> Result<Self::Ok, C::Error>
+    where
+        F: FnOnce(&mut Self::EncodeSequence) -> Result<(), C::Error>,
+    {
+        let mut seq = self.encode_sequence(cx, len)?;
+        f(&mut seq)?;
+        seq.end(cx)
     }
 
     /// Encode a tuple with a known length `len`.
@@ -1187,6 +1259,43 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         )))
     }
 
+    /// Encode a map using a closure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{MapEncoder};
+    ///
+    /// struct Struct {
+    ///     name: String,
+    ///     age: u32
+    /// }
+    ///
+    /// impl<M> Encode<M> for Struct {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         E: Encoder<C>,
+    ///     {
+    ///         encoder.encode_map_fn(cx, 2, |map| {
+    ///             map.insert_entry(cx, "name", &self.name)?;
+    ///             map.insert_entry(cx, "age", self.age)?;
+    ///             Ok(())
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_map_fn<F>(self, cx: &C, len: usize, f: F) -> Result<Self::Ok, C::Error>
+    where
+        F: FnOnce(&mut Self::EncodeMap) -> Result<(), C::Error>,
+    {
+        let mut map = self.encode_map(cx, len)?;
+        f(&mut map)?;
+        map.end(cx)
+    }
+
     /// Encode a map through pairs with a known length `len`.
     ///
     /// # Examples
@@ -1260,6 +1369,43 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         )))
     }
 
+    /// Encode a struct using a closure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{StructEncoder};
+    ///
+    /// struct Struct {
+    ///     name: String,
+    ///     age: u32,
+    /// }
+    ///
+    /// impl<M> Encode<M> for Struct {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         E: Encoder<C>,
+    ///     {
+    ///         encoder.encode_struct_fn(cx, 2, |st| {
+    ///             st.insert_field(cx, "name", &self.name)?;
+    ///             st.insert_field(cx, "age", self.age)?;
+    ///             Ok(())
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_struct_fn<F>(self, cx: &C, fields: usize, f: F) -> Result<Self::Ok, C::Error>
+    where
+        F: FnOnce(&mut Self::EncodeStruct) -> Result<(), C::Error>,
+    {
+        let mut st = self.encode_struct(cx, fields)?;
+        f(&mut st)?;
+        st.end(cx)
+    }
+
     /// Encode a variant.
     ///
     /// # Examples
@@ -1322,6 +1468,63 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
         )))
     }
 
+    /// Encode a variant using a closure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Encode, Encoder};
+    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    ///
+    /// enum Enum {
+    ///     UnitVariant,
+    ///     TupleVariant(String),
+    ///     StructVariant {
+    ///         data: String,
+    ///         age: u32,
+    ///     }
+    /// }
+    ///
+    /// impl<M> Encode<M> for Enum {
+    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     where
+    ///         C: ?Sized + Context<Mode = M>,
+    ///         E: Encoder<C>,
+    ///     {
+    ///         match self {
+    ///             Enum::UnitVariant => {
+    ///                 encoder.encode_variant(cx)?.insert_variant(cx, "variant1", ())
+    ///             }
+    ///             Enum::TupleVariant(data) => {
+    ///                 encoder.encode_variant(cx)?.insert_variant(cx, "variant2", data)
+    ///             }
+    ///             Enum::StructVariant { data, age } => {
+    ///                 encoder.encode_variant_fn(cx, |variant| {
+    ///                     variant.encode_tag(cx)?.encode_string(cx, "variant3")?;
+    ///
+    ///                     variant.encode_value(cx)?.encode_struct_fn(cx, 2, |st| {
+    ///                         st.insert_field(cx, "data", data)?;
+    ///                         st.insert_field(cx, "age", age)?;
+    ///                         Ok(())
+    ///                     })?;
+    ///
+    ///                     Ok(())
+    ///                 })
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_variant_fn<F>(self, cx: &C, f: F) -> Result<Self::Ok, C::Error>
+    where
+        F: FnOnce(&mut Self::EncodeVariant) -> Result<(), C::Error>,
+    {
+        let mut variant = self.encode_variant(cx)?;
+        f(&mut variant)?;
+        variant.end(cx)
+    }
+
     /// Simplified encoding for a unit variant.
     ///
     /// # Examples
@@ -1361,11 +1564,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     #[inline]
     fn encode_unit_variant<T>(self, cx: &C, tag: &T) -> Result<Self::Ok, C::Error>
     where
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         let mut variant = self.encode_variant(cx)?;
         let t = variant.encode_tag(cx)?;
-        Encode::encode(tag, cx, t)?;
+        tag.encode(cx, t)?;
         let v = variant.encode_value(cx)?;
         v.encode_unit(cx)?;
         variant.end(cx)

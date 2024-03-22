@@ -276,7 +276,7 @@ where
     #[inline]
     fn encode_unit_variant<T>(self, cx: &C, tag: &T) -> Result<(), C::Error>
     where
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         let mut variant = self.encode_variant(cx)?;
         tag.encode(cx, variant.encode_tag(cx)?)?;

@@ -10,8 +10,8 @@ use crate::expander::{
     Data, EnumData, Expander, FieldData, Result, StructData, TagMethod, VariantData,
 };
 use crate::internals::attr::{DefaultTag, EnumTagging, Packing};
-use crate::internals::symbol::*;
 use crate::internals::tokens::Tokens;
+use crate::internals::ATTR;
 use crate::internals::{Ctxt, Expansion, Mode, Only};
 
 pub(crate) struct Build<'a> {
@@ -33,7 +33,7 @@ impl Build<'_> {
     pub(crate) fn encode_transparent_enum_diagnostics(&self, span: Span) {
         self.cx.error_span(
             span,
-            format_args!("#[{ATTR}({TRANSPARENT})] cannot be used to encode enums",),
+            format_args!("#[{ATTR}(transparent)] cannot be used to encode enums",),
         );
     }
 
@@ -42,7 +42,7 @@ impl Build<'_> {
     pub(crate) fn decode_packed_enum_diagnostics(&self, span: Span) {
         self.cx.error_span(
             span,
-            format_args!("#[{ATTR}({PACKED})] cannot be used to decode enums"),
+            format_args!("#[{ATTR}(packed)] cannot be used to decode enums"),
         );
     }
 
@@ -51,7 +51,7 @@ impl Build<'_> {
     pub(crate) fn packed_default_diagnostics(&self, span: Span) {
         self.cx.error_span(
             span,
-            format_args!("#[{ATTR}({DEFAULT})] fields cannot be used in an packed container",),
+            format_args!("#[{ATTR}(default)] fields cannot be used in an packed container",),
         );
     }
 
@@ -61,13 +61,13 @@ impl Build<'_> {
         if fields.is_empty() {
             self.cx.error_span(
                 span,
-                format_args!("#[{ATTR}({TRANSPARENT})] types must have a single field",),
+                format_args!("#[{ATTR}(transparent)] types must have a single field",),
             );
         } else {
             self.cx.error_span(
                 span,
                 format_args!(
-                    "#[{ATTR}({TRANSPARENT})] can only be used on types which have a single field",
+                    "#[{ATTR}(transparent)] can only be used on types which have a single field",
                 ),
             );
         }
@@ -90,7 +90,7 @@ impl Build<'_> {
                     self.cx.error_span(
                         span,
                         format_args!(
-                            "#[{ATTR}({TAG})] and #[{ATTR}({CONTENT})] are only supported on enums"
+                            "#[{ATTR}(tag)] and #[{ATTR}(content)] are only supported on enums"
                         ),
                     );
 
@@ -264,7 +264,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         match packing_span {
             Some((_, Packing::Tagged)) => (),
             Some(&(span, packing)) => {
-                e.cx.error_span(span, format_args!("#[{ATTR}({packing})] cannot be combined with #[{ATTR}({TAG})] or #[{ATTR}({CONTENT})]"));
+                e.cx.error_span(span, format_args!("#[{ATTR}({packing})] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
                 return Err(());
             }
             _ => (),
@@ -322,14 +322,14 @@ fn setup_variant<'a>(
         if !data.fields.is_empty() {
             e.cx.error_span(
                 data.span,
-                format_args!("#[{ATTR}({DEFAULT})] variant must be empty"),
+                format_args!("#[{ATTR}(default)] variant must be empty"),
             );
 
             false
         } else if fallback.is_some() {
             e.cx.error_span(
                 data.span,
-                format_args!("#[{ATTR}({DEFAULT})] only one fallback variant is supported",),
+                format_args!("#[{ATTR}(default)] only one fallback variant is supported",),
             );
 
             false
@@ -389,7 +389,7 @@ fn setup_field<'a>(
     let (tag, tag_method) = data.expand_tag(e, mode, default_field)?;
     tag_methods.insert(data.span, tag_method);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
-    let default_attr = data.attr.default_field(mode).map(|&(s, ())| s);
+    let default_attr = data.attr.is_default(mode).map(|&(s, ())| s);
 
     let member = match data.ident {
         Some(ident) => syn::Member::Named(ident.clone()),
@@ -502,7 +502,7 @@ impl<'a> TagMethods<'a> {
 
             if before == 1 && self.methods.len() > 1 {
                 self.cx
-                    .error_span(span, format_args!("#[{ATTR}({TAG})] conflicting tag kind"));
+                    .error_span(span, format_args!("#[{ATTR}(tag)] conflicting tag kind"));
             }
         }
     }

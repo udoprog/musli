@@ -17,6 +17,18 @@ pub trait StructEncoder<C: ?Sized + Context> {
     /// Finish encoding the struct.
     fn end(self, cx: &C) -> Result<Self::Ok, C::Error>;
 
+    /// Encode the next field using a closure.
+    #[inline]
+    fn encode_field_fn<F, O>(&mut self, cx: &C, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::EncodeField<'_>) -> Result<O, C::Error>,
+    {
+        let mut encoder = self.encode_field(cx)?;
+        let output = f(&mut encoder)?;
+        encoder.end(cx)?;
+        Ok(output)
+    }
+
     /// Insert a field immediately.
     #[inline]
     fn insert_field<F, V>(&mut self, cx: &C, field: F, value: V) -> Result<(), C::Error>

@@ -2,6 +2,7 @@
 
 use core::fmt;
 
+use crate::de::DecodeBytes;
 use crate::{Buf, Decode, Decoder};
 
 #[cfg(feature = "std")]
@@ -36,6 +37,15 @@ pub trait Context {
         D: Decoder<'de, Self>,
     {
         T::decode(self, decoder)
+    }
+
+    /// Decode the given input as bytes using the associated mode.
+    fn decode_bytes<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
+    where
+        T: DecodeBytes<'de, Self::Mode>,
+        D: Decoder<'de, Self>,
+    {
+        T::decode_bytes(self, decoder)
     }
 
     /// Allocate a buffer.

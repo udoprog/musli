@@ -59,7 +59,7 @@ where
         C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
-        T::encode_bytes(*self, cx, encoder)
+        (**self).encode_bytes(cx, encoder)
     }
 }
 
@@ -73,6 +73,6 @@ where
         C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
-        T::encode_bytes(*self, cx, encoder)
+        (**self).encode_bytes(cx, encoder)
     }
 }

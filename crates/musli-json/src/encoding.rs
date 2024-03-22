@@ -178,7 +178,7 @@ impl<M> Encoding<M> {
         W: Writer,
         T: ?Sized + Encode<M>,
     {
-        T::encode(value, cx, JsonEncoder::new(writer))
+        value.encode(cx, JsonEncoder::new(writer))
     }
 
     /// Encode the given value to a [`String`] using the current configuration.

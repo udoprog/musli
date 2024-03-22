@@ -93,7 +93,7 @@ macro_rules! declare {
                 C: ?Sized + Context<Mode = M>,
                 D: Decoder<'de, C>
             {
-                decoder.decode_pack_fn(cx, |cx, pack| {
+                decoder.decode_pack_fn(cx, |pack| {
                     let $ident0 = pack.next(cx)?;
                     $(let $ident = pack.next(cx)?;)*
                     Ok(Packed(($ident0, $($ident),*)))

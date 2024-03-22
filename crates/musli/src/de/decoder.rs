@@ -1201,7 +1201,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
-    ///         decoder.decode_pack_fn(cx, |cx, pack| Ok(Self {
+    ///         decoder.decode_pack_fn(cx, |pack| Ok(Self {
     ///             field: pack.next(cx)?,
     ///             data: pack.next(cx)?,
     ///         }))
@@ -1211,10 +1211,10 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn decode_pack_fn<F, O>(self, cx: &C, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&C, &mut Self::DecodePack) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
     {
         let mut pack = self.decode_pack(cx)?;
-        let result = f(cx, &mut pack)?;
+        let result = f(&mut pack)?;
         pack.end(cx)?;
         Ok(result)
     }
@@ -1299,7 +1299,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
-    ///         decoder.decode_sequence_fn(cx, |cx, seq| {
+    ///         decoder.decode_sequence_fn(cx, |seq| {
     ///             let mut data = Vec::new();
     ///
     ///             while let Some(decoder) = seq.decode_next(cx)? {
@@ -1314,10 +1314,10 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn decode_sequence_fn<F, O>(self, cx: &C, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&C, &mut Self::DecodeSequence) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
     {
         let mut sequence = self.decode_sequence(cx)?;
-        let result = f(cx, &mut sequence)?;
+        let result = f(&mut sequence)?;
         sequence.end(cx)?;
         Ok(result)
     }
@@ -1394,7 +1394,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
-    ///         decoder.decode_tuple_fn(cx, 2, |cx, tuple| {
+    ///         decoder.decode_tuple_fn(cx, 2, |tuple| {
     ///             Ok(Self(tuple.next(cx)?, tuple.next(cx)?))
     ///         })
     ///     }
@@ -1403,10 +1403,10 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn decode_tuple_fn<F, O>(self, cx: &C, len: usize, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&C, &mut Self::DecodeTuple) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
     {
         let mut tuple = self.decode_tuple(cx, len)?;
-        let result = f(cx, &mut tuple)?;
+        let result = f(&mut tuple)?;
         tuple.end(cx)?;
         Ok(result)
     }
@@ -1505,7 +1505,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ///         C: ?Sized + Context<Mode = M>,
     ///         D: Decoder<'de, C>,
     ///     {
-    ///         decoder.decode_map_fn(cx, |cx, map| {
+    ///         decoder.decode_map_fn(cx, |map| {
     ///             let mut data = HashMap::with_capacity(map.size_hint(cx).or_default());
     ///
     ///             while let Some((key, value)) = map.entry(cx)? {
@@ -1520,10 +1520,10 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn decode_map_fn<F, O>(self, cx: &C, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&C, &mut Self::DecodeMap) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
     {
         let mut map = self.decode_map(cx)?;
-        let result = f(cx, &mut map)?;
+        let result = f(&mut map)?;
         map.end(cx)?;
         Ok(result)
     }

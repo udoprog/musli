@@ -9,7 +9,7 @@ use syn::Token;
 
 use crate::expander::determine_tag_method;
 use crate::expander::TagMethod;
-use crate::internals::symbol::*;
+use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -240,7 +240,7 @@ impl TypeAttr {
         if let Some((_, krate)) = self.root.krate.any.as_ref() {
             krate.clone()
         } else {
-            let mut path = syn::Path::from(syn::Ident::new(&ATTR, Span::call_site()));
+            let mut path = syn::Path::from(syn::Ident::new(ATTR, Span::call_site()));
             path.leading_colon = Some(<Token![::]>::default());
             path
         }
@@ -251,7 +251,7 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
     let mut attr = TypeAttr::default();
 
     for a in attrs {
-        if a.path() != ATTR {
+        if !a.path().is_ident(ATTR) {
             continue;
         }
 
@@ -261,38 +261,38 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
         let result = a.parse_nested_meta(|meta| {
             // parse #[musli(mode = <path>)]
-            if meta.path == MODE {
+            if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
                 return Ok(());
             }
 
-            if meta.path == ENCODE_ONLY {
+            if meta.path.is_ident("encode_only") {
                 only = Some(Only::Encode);
                 return Ok(());
             }
 
-            if meta.path == DECODE_ONLY {
+            if meta.path.is_ident("decode_only") {
                 only = Some(Only::Decode);
                 return Ok(());
             }
 
             // parse #[musli(tag = <expr>)]
-            if meta.path == TAG {
+            if meta.path.is_ident("tag") {
                 meta.input.parse::<Token![=]>()?;
                 new.tag.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
             // parse #[musli(content = <expr>)]
-            if meta.path == CONTENT {
+            if meta.path.is_ident("content") {
                 meta.input.parse::<Token![=]>()?;
                 new.content.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
             // parse #[musli(crate = <path>)]
-            if meta.path == CRATE {
+            if meta.path.is_ident("crate") {
                 let path = if meta.input.parse::<Option<Token![=]>>()?.is_some() {
                     meta.input.parse()?
                 } else {
@@ -319,17 +319,17 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
             }
 
             // parse #[musli(default_variant = "..")]
-            if meta.path == DEFAULT_VARIANT_NAME {
+            if meta.path.is_ident("default_variant") {
                 meta.input.parse::<Token![=]>()?;
                 let string = meta.input.parse::<syn::LitStr>()?;
 
                 new.default_variant.push(match string.value().as_str() {
                     "index" => (meta.path.span(), DefaultTag::Index),
                     "name" => (meta.path.span(), DefaultTag::Name),
-                    _ => {
+                    value => {
                         return Err(syn::Error::new_spanned(
                             string,
-                            format_args!("#[{ATTR}({DEFAULT_VARIANT_NAME})] Bad value"),
+                            format_args!("#[{ATTR}(default_variant = {value:?})] Bad value, expected one of \"index\" or \"name\""),
                         ));
                     }
                 });
@@ -338,17 +338,17 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
             }
 
             // parse #[musli(default_field = "..")]
-            if meta.path == DEFAULT_FIELD_NAME {
+            if meta.path.is_ident("default_field") {
                 meta.input.parse::<Token![=]>()?;
                 let string = meta.input.parse::<syn::LitStr>()?;
 
                 new.default_field.push(match string.value().as_str() {
                     "index" => (meta.path.span(), DefaultTag::Index),
                     "name" => (meta.path.span(), DefaultTag::Name),
-                    _ => {
+                    value => {
                         return Err(syn::Error::new_spanned(
                             string,
-                            format_args!("#[{ATTR}({DEFAULT_FIELD_NAME})]: Bad value."),
+                            format_args!("#[{ATTR}(default_field = {value:?})]: Bad value, expected one of \"index\" or \"name\""),
                         ));
                     }
                 });
@@ -357,27 +357,27 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
             }
 
             // parse #[musli(bound = {..})]
-            if meta.path == BOUND {
+            if meta.path.is_ident("bound") {
                 meta.input.parse::<Token![=]>()?;
                 parse_bounds(&meta, &mut new.bounds)?;
                 return Ok(());
             }
 
             // parse #[musli(decode_bound = {..})]
-            if meta.path == DECODE_BOUND {
+            if meta.path.is_ident("decode_bound") {
                 meta.input.parse::<Token![=]>()?;
                 parse_bounds(&meta, &mut new.decode_bounds)?;
                 return Ok(());
             }
 
             // parse #[musli(packed)]
-            if meta.path == PACKED {
+            if meta.path.is_ident("packed") {
                 new.packing.push((meta.path.span(), Packing::Packed));
                 return Ok(());
             }
 
             // parse #[musli(transparent)]
-            if meta.path == TRANSPARENT {
+            if meta.path.is_ident("transparent") {
                 new.packing.push((meta.path.span(), Packing::Transparent));
                 return Ok(());
             }
@@ -451,7 +451,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
     let mut attr = VariantAttr::default();
 
     for a in attrs {
-        if a.path() != ATTR {
+        if !a.path().is_ident(ATTR) {
             continue;
         }
 
@@ -461,18 +461,18 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
         let result = a.parse_nested_meta(|meta| {
             // parse #[musli(mode = <path>)]
-            if meta.path == MODE {
+            if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
                 return Ok(());
             }
 
-            if meta.path == ENCODE_ONLY {
+            if meta.path.is_ident("encode_only") {
                 only = Some(Only::Encode);
                 return Ok(());
             }
 
-            if meta.path == DECODE_ONLY {
+            if meta.path.is_ident("decode_only") {
                 only = Some(Only::Decode);
                 return Ok(());
             }
@@ -493,30 +493,30 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             }
 
             // parse #[musli(rename = <expr>)]
-            if meta.path == RENAME {
+            if meta.path.is_ident("rename") {
                 meta.input.parse::<Token![=]>()?;
                 new.rename.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
             // parse #[musli(default)]
-            if meta.path == DEFAULT {
+            if meta.path.is_ident("default") {
                 new.default_attr_field.push((meta.path.span(), ()));
                 return Ok(());
             }
 
             // parse #[musli(default_field = "..")]
-            if meta.path == DEFAULT_FIELD_NAME {
+            if meta.path.is_ident("default_field") {
                 meta.input.parse::<Token![=]>()?;
                 let string = meta.input.parse::<syn::LitStr>()?;
 
                 new.default_field.push(match string.value().as_str() {
                     "index" => (meta.path.span(), DefaultTag::Index),
                     "name" => (meta.path.span(), DefaultTag::Name),
-                    _ => {
+                    value => {
                         return Err(syn::Error::new_spanned(
                             string,
-                            format_args!("#[{ATTR}({DEFAULT_FIELD_NAME})]: Bad value."),
+                            format_args!("#[{ATTR}(default_field = {value:?})]: Bad value, expected one of \"index\" or \"name\"."),
                         ));
                     }
                 });
@@ -525,13 +525,13 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             }
 
             // parse #[musli(packed)]
-            if meta.path == PACKED {
+            if meta.path.is_ident("packed") {
                 new.packing.push((meta.path.span(), Packing::Packed));
                 return Ok(());
             }
 
             // parse #[musli(transparent)]
-            if meta.path == TRANSPARENT {
+            if meta.path.is_ident("transparent") {
                 new.packing.push((meta.path.span(), Packing::Transparent));
                 return Ok(());
             }
@@ -571,7 +571,7 @@ layer! {
         /// Rename a field to the given literal.
         rename: syn::Expr,
         /// Use a default value for the field if it's not available.
-        default_field: (),
+        is_default: (),
         /// Use the alternate TraceDecode for the field.
         trace: (),
         /// Use the alternate EncodeBytes for the field.
@@ -615,7 +615,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
     let mut attr = Field::default();
 
     for a in attrs {
-        if a.path() != ATTR {
+        if !a.path().is_ident(ATTR) {
             continue;
         }
 
@@ -625,24 +625,24 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 
         let result = a.parse_nested_meta(|meta| {
             // parse #[musli(mode = <path>)]
-            if meta.path == MODE {
+            if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
                 return Ok(());
             }
 
-            if meta.path == ENCODE_ONLY {
+            if meta.path.is_ident("encode_only") {
                 only = Some(Only::Encode);
                 return Ok(());
             }
 
-            if meta.path == DECODE_ONLY {
+            if meta.path.is_ident("decode_only") {
                 only = Some(Only::Decode);
                 return Ok(());
             }
 
             // parse parse #[musli(with = <path>)]
-            if meta.path == WITH {
+            if meta.path.is_ident("with") {
                 meta.input.parse::<Token![=]>()?;
                 let mut path = meta.input.parse::<syn::Path>()?;
 
@@ -676,7 +676,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
             }
 
             // parse #[musli(skip_encoding_if = <path>)]
-            if meta.path == SKIP_ENCODING_IF {
+            if meta.path.is_ident("skip_encoding_if") {
                 meta.input.parse::<Token![=]>()?;
                 new.skip_encoding_if
                     .push((meta.path.span(), meta.input.parse()?));
@@ -684,15 +684,15 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
             }
 
             // parse #[musli(rename = <expr>)]
-            if meta.path == RENAME {
+            if meta.path.is_ident("rename") {
                 meta.input.parse::<Token![=]>()?;
                 new.rename.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
             // parse #[musli(default)]
-            if meta.path == DEFAULT {
-                new.default_field.push((meta.path.span(), ()));
+            if meta.path.is_ident("default") {
+                new.is_default.push((meta.path.span(), ()));
                 return Ok(());
             }
 

@@ -113,7 +113,7 @@ impl<'de, M> Decode<'de, M> for SocketAddrV4 {
         C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
-        decoder.decode_pack_fn(cx, |cx, pack| {
+        decoder.decode_pack_fn(cx, |pack| {
             Ok(SocketAddrV4::new(pack.next(cx)?, pack.next(cx)?))
         })
     }
@@ -142,7 +142,7 @@ impl<'de, M> Decode<'de, M> for SocketAddrV6 {
         C: ?Sized + Context,
         D: Decoder<'de, C>,
     {
-        decoder.decode_pack_fn(cx, |cx, pack| {
+        decoder.decode_pack_fn(cx, |pack| {
             Ok(Self::new(
                 pack.next(cx)?,
                 pack.next(cx)?,

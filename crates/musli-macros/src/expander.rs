@@ -3,8 +3,8 @@ use syn::spanned::Spanned;
 
 use crate::internals::attr::{self, DefaultTag, TypeAttr};
 use crate::internals::build::Build;
-use crate::internals::symbol::*;
 use crate::internals::tokens::Tokens;
+use crate::internals::ATTR;
 use crate::internals::{Ctxt, Expansion, Mode, Only};
 
 pub(crate) type Result<T, E = ()> = std::result::Result<T, E>;
@@ -233,7 +233,7 @@ pub(crate) trait Taggable {
                 e.cx.error_span(
                     self.span(),
                     format_args!(
-                        "#[{ATTR}({DEFAULT_FIELD_NAME} = \"name\")] is not supported with unnamed fields",
+                        "#[{ATTR}(default_field = \"name\")] is not supported on unnamed fields",
                     ),
                 );
                 return Err(());

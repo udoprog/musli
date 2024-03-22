@@ -3,8 +3,9 @@ pub(crate) mod build;
 mod ctxt;
 mod expansion;
 mod mode;
-pub(crate) mod symbol;
 pub(crate) mod tokens;
+
+pub(crate) const ATTR: &str = "musli";
 
 pub(crate) use self::attr::Only;
 pub(crate) use self::ctxt::Ctxt;

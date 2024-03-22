@@ -10,9 +10,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [features]
-default = ["std", "alloc"]
-std = ["musli?/std", "musli-wire?/std", "musli-storage?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "serde?/std"]
-alloc = ["musli?/alloc", "musli-wire?/alloc", "musli-storage?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
+default = ["std", "alloc", "test"]
+std = ["musli?/std", "musli-storage?/std", "musli-wire?/std", "musli-descriptive?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "serde?/std"]
+alloc = ["musli?/alloc", "musli-storage?/alloc", "musli-wire?/alloc", "musli-descriptive?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
 extra = ["rkyv", "dlhn", "serde_cbor"]
 full = ["rmp-serde", "bincode", "postcard", "musli-json", "serde_json", "bitcode", "bitcode-derive"]
 text = ["musli-json", "serde_json"]

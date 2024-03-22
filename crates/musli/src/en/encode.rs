@@ -74,7 +74,7 @@ where
         C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
-        T::encode(*self, cx, encoder)
+        (**self).encode(cx, encoder)
     }
 }
 
@@ -88,6 +88,6 @@ where
         C: ?Sized + Context<Mode = M>,
         E: Encoder<C>,
     {
-        T::encode(*self, cx, encoder)
+        (**self).encode(cx, encoder)
     }
 }

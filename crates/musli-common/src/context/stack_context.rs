@@ -131,12 +131,9 @@ where
     where
         T: fmt::Display,
     {
-        let Some(buf) = self.alloc.alloc() else {
-            return None;
-        };
-
+        let buf = self.alloc.alloc()?;
         let mut string = BufString::new(buf);
-        _ = write!(string, "{}", value);
+        write!(string, "{value}").ok()?;
         Some(string)
     }
 }
