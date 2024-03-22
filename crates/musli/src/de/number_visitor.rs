@@ -1,5 +1,5 @@
 use core::fmt;
-use core::marker;
+use core::marker::PhantomData;
 
 use crate::de::{Decoder, TypeHint};
 use crate::expecting::{self, Expecting};
@@ -20,7 +20,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u8(self, cx: &C, _: u8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned8,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -29,7 +29,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u16(self, cx: &C, _: u16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned16,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -38,7 +38,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u32(self, cx: &C, _: u32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -47,7 +47,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u64(self, cx: &C, _: u64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -56,7 +56,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u128(self, cx: &C, _: u128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Unsigned128,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -65,7 +65,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i8(self, cx: &C, _: i8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed8,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -74,7 +74,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i16(self, cx: &C, _: i16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed16,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -83,7 +83,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i32(self, cx: &C, _: i32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -92,7 +92,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i64(self, cx: &C, _: i64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -101,7 +101,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i128(self, cx: &C, _: i128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Signed128,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -110,7 +110,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_f32(self, cx: &C, _: f32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Float32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -119,7 +119,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_f64(self, cx: &C, _: f64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Float64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -128,7 +128,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_usize(self, cx: &C, _: usize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Usize,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -137,7 +137,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_isize(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Isize,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -146,7 +146,7 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     fn visit_bytes(self, cx: &C, _: &'de [u8]) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::Number,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -159,18 +159,22 @@ pub trait NumberVisitor<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &hint,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<'a, T, C: ?Sized>(T, marker::PhantomData<&'a C>);
+struct ExpectingWrapper<'a, T, C: ?Sized> {
+    inner: T,
+    _marker: PhantomData<&'a C>,
+}
 
 impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
     #[inline]
-    fn new(value: T) -> Self {
-        Self(value, marker::PhantomData)
+    fn new(value: &T) -> &Self {
+        // SAFETY: `ExpectingWrapper` is repr(transparent) over `T`.
+        unsafe { &*(value as *const T as *const Self) }
     }
 }
 
@@ -181,6 +185,6 @@ where
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expecting(f)
+        self.inner.expecting(f)
     }
 }

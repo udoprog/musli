@@ -1,6 +1,6 @@
 use core::borrow::Borrow;
 use core::fmt;
-use core::marker;
+use core::marker::PhantomData;
 
 use crate::de::{Decoder, TypeHint};
 use crate::expecting::{self, Expecting};
@@ -53,7 +53,7 @@ where
     fn visit_ref(self, cx: &C, _: &T) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -66,31 +66,33 @@ where
     {
         Err(cx.message(expecting::unsupported_type(
             &hint,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<'a, U, C: ?Sized, T>(U, marker::PhantomData<(&'a C, T)>)
-where
-    T: ?Sized;
+struct ExpectingWrapper<'a, T, C: ?Sized, I: ?Sized> {
+    inner: T,
+    _marker: PhantomData<(&'a C, &'a I)>,
+}
 
-impl<'a, U, C: ?Sized, T: ?Sized> ExpectingWrapper<'a, U, C, T> {
+impl<'a, T, C: ?Sized, U: ?Sized> ExpectingWrapper<'a, T, C, U> {
     #[inline]
-    fn new(value: U) -> Self {
-        Self(value, marker::PhantomData)
+    fn new(value: &T) -> &Self {
+        // SAFETY: `ExpectingWrapper` is repr(transparent) over `T`.
+        unsafe { &*(value as *const T as *const Self) }
     }
 }
 
-impl<'a, 'de, U, C, T> Expecting for ExpectingWrapper<'a, U, C, T>
+impl<'a, 'de, T, C, U> Expecting for ExpectingWrapper<'a, T, C, U>
 where
-    U: ValueVisitor<'de, C, T>,
+    T: ValueVisitor<'de, C, U>,
     C: ?Sized + Context,
-    T: ?Sized + ToOwned,
+    U: ?Sized + ToOwned,
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.expecting(f)
+        self.inner.expecting(f)
     }
 }

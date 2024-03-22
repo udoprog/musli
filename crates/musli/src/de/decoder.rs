@@ -46,7 +46,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(format_args!(
             "Context switch not supported, expected {}",
-            ExpectingWrapper::new(self).format()
+            ExpectingWrapper::new(&self).format()
         )))
     }
 
@@ -81,7 +81,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn skip(self, cx: &C) -> Result<(), C::Error> {
         Err(cx.message(format_args!(
             "Skipping is not supported, expected {}",
-            ExpectingWrapper::new(self).format()
+            ExpectingWrapper::new(&self).format()
         )))
     }
 
@@ -161,7 +161,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_buffer(self, cx: &C) -> Result<Self::DecodeBuffer, C::Error> {
         Err(cx.message(format_args!(
             "Decode buffering not supported, expected {}",
-            ExpectingWrapper::new(self).format()
+            ExpectingWrapper::new(&self).format()
         )))
     }
 
@@ -199,7 +199,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_unit(self, cx: &C) -> Result<(), C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unit,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -241,7 +241,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_bool(self, cx: &C) -> Result<bool, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bool,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -283,7 +283,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_char(self, cx: &C) -> Result<char, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Char,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -325,7 +325,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_u8(self, cx: &C) -> Result<u8, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned8,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -367,7 +367,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_u16(self, cx: &C) -> Result<u16, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned16,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -409,7 +409,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_u32(self, cx: &C) -> Result<u32, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -451,7 +451,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_u64(self, cx: &C) -> Result<u64, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -493,7 +493,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_u128(self, cx: &C) -> Result<u128, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned128,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -535,7 +535,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_i8(self, cx: &C) -> Result<i8, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed8,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -577,7 +577,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_i16(self, cx: &C) -> Result<i16, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed16,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -619,7 +619,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_i32(self, cx: &C) -> Result<i32, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -661,7 +661,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_i64(self, cx: &C) -> Result<i64, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -703,7 +703,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_i128(self, cx: &C) -> Result<i128, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed128,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -745,7 +745,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_usize(self, cx: &C) -> Result<usize, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Usize,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -787,7 +787,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_isize(self, cx: &C) -> Result<isize, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Isize,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -829,7 +829,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_f32(self, cx: &C) -> Result<f32, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -871,7 +871,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_f64(self, cx: &C) -> Result<f64, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -884,7 +884,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Number,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -926,7 +926,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_array<const N: usize>(self, cx: &C) -> Result<[u8; N], C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Array,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -994,7 +994,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bytes,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1062,7 +1062,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::String,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1108,7 +1108,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_option(self, cx: &C) -> Result<Option<Self::DecodeSome>, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1161,7 +1161,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_pack(self, cx: &C) -> Result<Self::DecodePack, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Pack,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1264,7 +1264,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_sequence(self, cx: &C) -> Result<Self::DecodeSequence, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Sequence,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1364,7 +1364,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     ) -> Result<Self::DecodeTuple, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Tuple,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1465,7 +1465,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_map(self, cx: &C) -> Result<Self::DecodeMap, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Map,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1597,7 +1597,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_struct(self, cx: &C, fields: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Struct,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1644,7 +1644,7 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     fn decode_variant(self, cx: &C) -> Result<Self::DecodeVariant, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -1659,22 +1659,21 @@ pub trait Decoder<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(format_args!(
             "Any type not supported, expected {}",
-            ExpectingWrapper::new(self).format()
+            ExpectingWrapper::new(&self).format()
         )))
     }
 }
 
+#[repr(transparent)]
 struct ExpectingWrapper<'a, T, C: ?Sized> {
     inner: T,
     _marker: PhantomData<&'a C>,
 }
 
 impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
-    fn new(inner: T) -> Self {
-        Self {
-            inner,
-            _marker: PhantomData,
-        }
+    fn new(inner: &T) -> &Self {
+        // Safety: `ExpectingWrapper` is repr(transparent) over `T`.
+        unsafe { &*(inner as *const T as *const Self) }
     }
 }
 

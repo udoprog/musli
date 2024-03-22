@@ -43,7 +43,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &hint,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -52,7 +52,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_unit(self, cx: &C) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unit,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -61,7 +61,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_bool(self, cx: &C, _: bool) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bool,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -70,7 +70,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_char(self, cx: &C, _: char) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Char,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -79,7 +79,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u8(self, cx: &C, _: u8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned8,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -88,7 +88,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u16(self, cx: &C, _: u16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned16,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -97,7 +97,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u32(self, cx: &C, _: u32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -106,7 +106,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u64(self, cx: &C, _: u64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -115,7 +115,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_u128(self, cx: &C, _: u128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned128,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -124,7 +124,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i8(self, cx: &C, _: i8) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed8,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -133,7 +133,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i16(self, cx: &C, _: i16) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed16,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -142,7 +142,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i32(self, cx: &C, _: i32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -151,7 +151,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i64(self, cx: &C, _: i64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -160,7 +160,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_i128(self, cx: &C, _: i128) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed128,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -169,7 +169,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_usize(self, cx: &C, _: usize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Usize,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -178,7 +178,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_isize(self, cx: &C, _: isize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Isize,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -187,7 +187,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_f32(self, cx: &C, _: f32) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float32,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -196,7 +196,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_f64(self, cx: &C, _: f64) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float64,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -208,7 +208,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -220,7 +220,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::SequenceWith(decoder.size_hint(cx)),
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -232,7 +232,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::MapWith(decoder.size_hint(cx)),
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -241,7 +241,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_string(self, cx: &C, hint: SizeHint) -> Result<Self::String, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::StringWith(hint),
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -250,7 +250,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_bytes(self, cx: &C, hint: SizeHint) -> Result<Self::Bytes, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::BytesWith(hint),
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -259,7 +259,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     fn visit_number(self, cx: &C, hint: NumberHint) -> Result<Self::Number, C::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::NumberWith(hint),
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 
@@ -271,27 +271,25 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
-            &ExpectingWrapper::new(self),
+            ExpectingWrapper::new(&self),
         )))
     }
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<'a, C: ?Sized, T> {
+struct ExpectingWrapper<'a, T, C: ?Sized> {
     inner: T,
     _marker: PhantomData<&'a C>,
 }
 
-impl<'a, C: ?Sized, T> ExpectingWrapper<'a, C, T> {
-    fn new(inner: T) -> Self {
-        Self {
-            inner,
-            _marker: PhantomData,
-        }
+impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
+    fn new(inner: &T) -> &Self {
+        // SAFETY: `ExpectingWrapper` is repr(transparent) over `T`.
+        unsafe { &*(inner as *const T as *const Self) }
     }
 }
 
-impl<'a, 'de, C, T> Expecting for ExpectingWrapper<'a, C, T>
+impl<'a, 'de, T, C> Expecting for ExpectingWrapper<'a, T, C>
 where
     C: ?Sized + Context,
     T: Visitor<'de, C>,
