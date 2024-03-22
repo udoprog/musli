@@ -1,9 +1,9 @@
 use crate::Context;
 
-use super::{SizeHint, StructFieldDecoder, StructFieldsDecoder};
+use super::{Decoder, SizeHint, StructFieldDecoder, StructFieldsDecoder};
 
 /// Trait governing how to decode fields in a struct.
-pub trait StructDecoder<'de, C: ?Sized + Context> {
+pub trait StructDecoder<'de, C: ?Sized + Context>: Sized {
     /// The decoder to use for a key.
     type DecodeField<'this>: StructFieldDecoder<'de, C>
     where
@@ -24,11 +24,18 @@ pub trait StructDecoder<'de, C: ?Sized + Context> {
     #[must_use = "Decoders must be consumed"]
     fn decode_field(&mut self, cx: &C) -> Result<Option<Self::DecodeField<'_>>, C::Error>;
 
-    /// End the pair decoder.
+    /// End the struct decoder.
     ///
     /// If there are any remaining elements in the sequence of pairs, this
     /// indicates that they should be flushed.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
+    fn end(mut self, cx: &C) -> Result<(), C::Error> {
+        while let Some(mut item) = self.decode_field(cx)? {
+            item.decode_field_name(cx)?.skip(cx)?;
+            item.skip_field_value(cx)?;
+        }
+
+        Ok(())
+    }
 
     /// Simplified decoding of a struct which has an expected `len` number of
     /// elements.

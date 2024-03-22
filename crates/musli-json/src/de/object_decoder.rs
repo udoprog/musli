@@ -123,6 +123,10 @@ where
         &mut self,
         cx: &C,
     ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
+        if self.completed {
+            return Ok(None);
+        }
+
         if !self.parse_map_key(cx)? {
             self.completed = true;
             return Ok(None);
@@ -157,18 +161,6 @@ where
         self.parser.skip(cx, 1)?;
         JsonDecoder::new(self.parser.borrow_mut()).skip_any(cx)?;
         Ok(true)
-    }
-
-    #[inline]
-    fn end(mut self, cx: &C) -> Result<(), C::Error> {
-        if !self.completed {
-            while self.parse_map_key(cx)? {
-                JsonKeyDecoder::new(self.parser.borrow_mut()).skip_any(cx)?;
-                self.skip_map_entry_value(cx)?;
-            }
-        }
-
-        Ok(())
     }
 }
 

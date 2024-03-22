@@ -3,7 +3,7 @@ use crate::Context;
 use super::{Decode, Decoder, SizeHint};
 
 /// Trait governing how to decode a sequence.
-pub trait SequenceDecoder<'de, C: ?Sized + Context> {
+pub trait SequenceDecoder<'de, C: ?Sized + Context>: Sized {
     /// The decoder for individual items.
     type DecodeNext<'this>: Decoder<'de, C>
     where
@@ -19,7 +19,14 @@ pub trait SequenceDecoder<'de, C: ?Sized + Context> {
     /// Stop decoding the current sequence.
     ///
     /// This is required to call after a sequence has finished decoding.
-    fn end(self, cx: &C) -> Result<(), C::Error>;
+    #[inline]
+    fn end(mut self, cx: &C) -> Result<(), C::Error> {
+        while let Some(item) = self.decode_next(cx)? {
+            item.skip(cx)?;
+        }
+
+        Ok(())
+    }
 
     /// Decode the next element of the given type.
     #[inline]
