@@ -59,5 +59,5 @@ where
     let mut buf = musli_common::exports::allocator::buffer();
     let alloc = musli_common::exports::allocator::new(&mut buf);
     let cx = musli_common::exports::context::Same::<_, DefaultMode, Error>::new(&alloc);
-    T::decode(&cx, value.decoder::<DEFAULT_OPTIONS>())
+    T::decode(&cx, value.decoder::<DEFAULT_OPTIONS, _>())
 }

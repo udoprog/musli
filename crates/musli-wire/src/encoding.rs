@@ -172,7 +172,7 @@ impl<M, const F: Options> Encoding<M, F> {
         }
     }
 
-    musli_common::encoding_impls!(M, WireEncoder::<_, F>::new, WireDecoder::<_, F>::new);
+    musli_common::encoding_impls!(M, WireEncoder::<_, F, _>::new, WireDecoder::<_, F, _>::new);
     musli_common::encoding_from_slice_impls!(M, WireDecoder::<_, F>::new);
 }
 

@@ -1,6 +1,5 @@
 use crate::en::Encoder;
 use crate::mode::DefaultMode;
-use crate::Context;
 
 /// Trait governing how a type is encoded as bytes.
 ///
@@ -24,7 +23,7 @@ use crate::Context;
 /// Implementing manually:
 ///
 /// ```
-/// use musli::{Context, Encode, Encoder};
+/// use musli::{Encode, Encoder};
 /// use musli::en::EncodeBytes;
 ///
 /// struct MyType {
@@ -32,10 +31,9 @@ use crate::Context;
 /// }
 ///
 /// impl<M> Encode<M> for MyType {
-///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
 ///     where
-///         C: ?Sized + Context<Mode = M>,
-///         E: Encoder<C>,
+///         E: Encoder,
 ///     {
 ///         self.data.encode_bytes(cx, encoder)
 ///     }
@@ -43,10 +41,9 @@ use crate::Context;
 /// ```
 pub trait EncodeBytes<M = DefaultMode> {
     /// Encode the given output as bytes.
-    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode_bytes<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>;
+        E: Encoder<Mode = M>;
 }
 
 impl<T, M> EncodeBytes<M> for &T
@@ -54,10 +51,9 @@ where
     T: ?Sized + EncodeBytes<M>,
 {
     #[inline]
-    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode_bytes<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         (**self).encode_bytes(cx, encoder)
     }
@@ -68,10 +64,9 @@ where
     T: ?Sized + EncodeBytes<M>,
 {
     #[inline]
-    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode_bytes<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         (**self).encode_bytes(cx, encoder)
     }

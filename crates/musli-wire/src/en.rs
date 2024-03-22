@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use musli::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder,
@@ -12,25 +13,27 @@ use crate::tag::{Kind, Tag, MAX_INLINE_LEN};
 use crate::writer::{BufWriter, Writer};
 
 /// A very simple encoder.
-pub struct WireEncoder<W, const F: Options> {
+pub struct WireEncoder<W, const F: Options, C: ?Sized> {
     writer: W,
+    _marker: PhantomData<C>,
 }
 
-impl<W, const F: Options> WireEncoder<W, F>
+impl<W, const F: Options, C> WireEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(writer: W) -> Self {
-        Self { writer }
+        Self {
+            writer,
+            _marker: PhantomData,
+        }
     }
 
     #[inline]
-    fn encode_map_len<C>(&mut self, cx: &C, len: usize) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn encode_map_len(&mut self, cx: &C, len: usize) -> Result<(), C::Error> {
         let Some(len) = len.checked_mul(2) else {
             return Err(cx.message("Map length overflow"));
         };
@@ -46,10 +49,7 @@ where
     }
 
     #[inline]
-    fn encode_tuple_len<C>(&mut self, cx: &C, len: usize) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn encode_tuple_len(&mut self, cx: &C, len: usize) -> Result<(), C::Error> {
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(cx, tag.byte())?;
 
@@ -61,31 +61,36 @@ where
     }
 }
 
-pub struct WirePackEncoder<W, B, const F: Options> {
+pub struct WirePackEncoder<W, B, const F: Options, C: ?Sized> {
     writer: W,
     buffer: BufWriter<B>,
+    _marker: PhantomData<C>,
 }
 
-impl<W, B, const F: Options> WirePackEncoder<W, B, F> {
+impl<W, B, const F: Options, C: ?Sized> WirePackEncoder<W, B, F, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(writer: W, buffer: B) -> Self {
         Self {
             writer,
             buffer: BufWriter::new(buffer),
+            _marker: PhantomData,
         }
     }
 }
 
 #[musli::encoder]
-impl<C, W, const F: Options> Encoder<C> for WireEncoder<W, F>
+impl<W, const F: Options, C> Encoder for WireEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
+    type Error = C::Error;
     type Ok = ();
-    type WithContext<U> = Self where U: Context;
-    type EncodePack<'this> = WirePackEncoder<W, C::Buf<'this>, F> where C: 'this;
+    type Mode = C::Mode;
+    type WithContext<U> = WireEncoder<W, F, U> where U: Context;
+    type EncodePack<'this> = WirePackEncoder<W, C::Buf<'this>, F, C> where C: 'this;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeTuple = Self;
@@ -101,7 +106,7 @@ where
     where
         U: Context,
     {
-        Ok(self)
+        Ok(WireEncoder::new(self.writer))
     }
 
     #[inline]
@@ -323,7 +328,7 @@ where
     {
         self.writer
             .write_byte(cx, Tag::new(Kind::Sequence, 2).byte())?;
-        tag.encode(cx, WireEncoder::<_, F>::new(self.writer.borrow_mut()))?;
+        tag.encode(cx, WireEncoder::<_, F, _>::new(self.writer.borrow_mut()))?;
         self.encode_tuple(cx, len)
     }
 
@@ -339,19 +344,20 @@ where
     {
         self.writer
             .write_byte(cx, Tag::new(Kind::Sequence, 2).byte())?;
-        tag.encode(cx, WireEncoder::<_, F>::new(self.writer.borrow_mut()))?;
+        tag.encode(cx, WireEncoder::<_, F, _>::new(self.writer.borrow_mut()))?;
         self.encode_struct(cx, len)
     }
 }
 
-impl<C, W, B, const F: Options> SequenceEncoder<C> for WirePackEncoder<W, B, F>
+impl<W, B, const F: Options, C> SequenceEncoder for WirePackEncoder<W, B, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
     B: Buf,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<&'this mut BufWriter<B>, F> where Self: 'this, B: Buf;
+    type EncodeNext<'this> = StorageEncoder<&'this mut BufWriter<B>, F, C> where Self: 'this, B: Buf;
 
     #[inline]
     fn encode_next(&mut self, _: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -395,13 +401,14 @@ where
     }
 }
 
-impl<C, W, const F: Options> SequenceEncoder<C> for WireEncoder<W, F>
+impl<W, const F: Options, C> SequenceEncoder for WireEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeNext<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self, _: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -414,13 +421,14 @@ where
     }
 }
 
-impl<C, W, const F: Options> MapEncoder<C> for WireEncoder<W, F>
+impl<W, const F: Options, C> MapEncoder for WireEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeEntry<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeEntry<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_entry(&mut self, _: &C) -> Result<Self::EncodeEntry<'_>, C::Error> {
@@ -433,14 +441,15 @@ where
     }
 }
 
-impl<C, W, const F: Options> MapEntriesEncoder<C> for WireEncoder<W, F>
+impl<W, const F: Options, C> MapEntriesEncoder for WireEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeMapEntryKey<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeMapEntryValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapEntryKey<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeMapEntryValue<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_map_entry_key(&mut self, _: &C) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
@@ -458,14 +467,15 @@ where
     }
 }
 
-impl<C, W, const F: Options> MapEntryEncoder<C> for WireEncoder<W, F>
+impl<W, const F: Options, C> MapEntryEncoder for WireEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeMapValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapKey<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeMapValue<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_map_key(&mut self, _: &C) -> Result<Self::EncodeMapKey<'_>, C::Error> {
@@ -483,13 +493,14 @@ where
     }
 }
 
-impl<C, W, const F: Options> StructEncoder<C> for WireEncoder<W, F>
+impl<W, const F: Options, C> StructEncoder for WireEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeField<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeField<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_field(&mut self, cx: &C) -> Result<Self::EncodeField<'_>, C::Error> {
@@ -502,14 +513,15 @@ where
     }
 }
 
-impl<C, W, const F: Options> StructFieldEncoder<C> for WireEncoder<W, F>
+impl<W, const F: Options, C> StructFieldEncoder for WireEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeFieldName<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeFieldValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeFieldName<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeFieldValue<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_field_name(&mut self, cx: &C) -> Result<Self::EncodeFieldName<'_>, C::Error> {
@@ -527,14 +539,15 @@ where
     }
 }
 
-impl<C, W, const F: Options> VariantEncoder<C> for WireEncoder<W, F>
+impl<W, const F: Options, C> VariantEncoder for WireEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeValue<'this> = WireEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeTag<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeValue<'this> = WireEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self, _: &C) -> Result<Self::EncodeTag<'_>, C::Error> {

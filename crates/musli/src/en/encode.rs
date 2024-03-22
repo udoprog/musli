@@ -24,17 +24,16 @@ pub use musli_macros::Encode;
 /// Implementing manually:
 ///
 /// ```
-/// use musli::{Context, Encode, Encoder};
+/// use musli::{Encode, Encoder};
 ///
 /// struct MyType {
 ///     data: [u8; 128],
 /// }
 ///
 /// impl<M> Encode<M> for MyType {
-///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
 ///     where
-///         C: ?Sized + Context<Mode = M>,
-///         E: Encoder<C>,
+///         E: Encoder<Mode = M>,
 ///     {
 ///         encoder.encode_array(cx, &self.data)
 ///     }
@@ -42,10 +41,9 @@ pub use musli_macros::Encode;
 /// ```
 pub trait Encode<M = DefaultMode> {
     /// Encode the given output.
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, <E::Cx as Context>::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>;
+        E: Encoder<Mode = M>;
 }
 
 /// Trait governing how types are encoded specifically for tracing.
@@ -58,10 +56,9 @@ pub trait Encode<M = DefaultMode> {
 /// [`fmt::Display`]: std::fmt::Display
 pub trait TraceEncode<M = DefaultMode> {
     /// Encode the given output.
-    fn trace_encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn trace_encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, <E::Cx as Context>::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>;
+        E: Encoder<Mode = M>;
 }
 
 impl<T, M> Encode<M> for &T
@@ -69,10 +66,9 @@ where
     T: ?Sized + Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         (**self).encode(cx, encoder)
     }
@@ -83,10 +79,9 @@ where
     T: ?Sized + Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         (**self).encode(cx, encoder)
     }

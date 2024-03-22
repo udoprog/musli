@@ -43,10 +43,9 @@ macro_rules! declare {
     (($ty0:ident, $ident0:ident) $(, ($ty:ident, $ident:ident))* $(,)?) => {
         impl<M, $ty0 $(, $ty)*> Encode<M> for ($ty0, $($ty),*) where $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
-            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
-                C: ?Sized + Context<Mode = M>,
-                E: Encoder<C>,
+                E: Encoder<Mode = M>,
             {
                 let mut pack = encoder.encode_tuple(cx, count!($ident0 $($ident)*))?;
                 let ($ident0, $($ident),*) = self;
@@ -58,10 +57,9 @@ macro_rules! declare {
 
         impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*) where $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
-            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+            fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
-                C: ?Sized + Context<Mode = M>,
-                D: Decoder<'de, C>
+                D: Decoder<'de, Mode = M>,
             {
                 let mut tuple = decoder.decode_tuple(cx, count!($ident0 $($ident)*))?;
                 let $ident0 = cx.decode(tuple.decode_next(cx)?)?;
@@ -73,10 +71,9 @@ macro_rules! declare {
 
         impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)> where $ty0: Encode<M>, $($ty: Encode<M>),* {
             #[inline]
-            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
-                C: ?Sized + Context<Mode = M>,
-                E: Encoder<C>,
+                E: Encoder<Mode = M>,
             {
                 let Packed(($ident0, $($ident),*)) = self;
                 let mut pack = encoder.encode_pack(cx)?;
@@ -88,10 +85,9 @@ macro_rules! declare {
 
         impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)> where $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
-            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+            fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
-                C: ?Sized + Context<Mode = M>,
-                D: Decoder<'de, C>
+                D: Decoder<'de, Mode = M>,
             {
                 decoder.decode_pack_fn(cx, |pack| {
                     let $ident0 = pack.next(cx)?;

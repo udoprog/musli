@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use musli::en::{
     Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, StructEncoder,
@@ -19,42 +20,52 @@ use crate::writer::{BufWriter, Writer};
 const VARIANT: Tag = Tag::from_mark(Mark::Variant);
 
 /// A very simple encoder.
-pub struct SelfEncoder<W, const F: Options> {
+pub struct SelfEncoder<W, const F: Options, C: ?Sized> {
     writer: W,
+    _marker: PhantomData<C>,
 }
 
-impl<W, const F: Options> SelfEncoder<W, F> {
+impl<W, const F: Options, C: ?Sized> SelfEncoder<W, F, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(writer: W) -> Self {
-        Self { writer }
+        Self {
+            writer,
+            _marker: PhantomData,
+        }
     }
 }
 
-pub struct SelfPackEncoder<W, B, const F: Options> {
+pub struct SelfPackEncoder<W, B, const F: Options, C: ?Sized> {
     writer: W,
     buffer: BufWriter<B>,
+    _marker: PhantomData<C>,
 }
 
-impl<W, B, const F: Options> SelfPackEncoder<W, B, F> {
+impl<W, B, const F: Options, C: ?Sized> SelfPackEncoder<W, B, F, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(writer: W, buffer: B) -> Self {
         Self {
             writer,
             buffer: BufWriter::new(buffer),
+            _marker: PhantomData,
         }
     }
 }
 
 #[musli::encoder]
-impl<C: ?Sized + Context, W, const F: Options> Encoder<C> for SelfEncoder<W, F>
+impl<W, const F: Options, C> Encoder for SelfEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
+    type Error = C::Error;
     type Ok = ();
-    type WithContext<U> = Self where U: Context;
-    type EncodePack<'this> = SelfPackEncoder<W, C::Buf<'this>, F> where C: 'this;
+    type Mode = C::Mode;
+    type WithContext<U> = SelfEncoder<W, F, U> where U: Context;
+    type EncodePack<'this> = SelfPackEncoder<W, C::Buf<'this>, F, C> where C: 'this;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeTuple = Self;
@@ -70,7 +81,7 @@ where
     where
         U: Context,
     {
-        Ok(self)
+        Ok(SelfEncoder::new(self.writer))
     }
 
     #[inline]
@@ -296,7 +307,7 @@ where
         T: ?Sized + Encode<C::Mode>,
     {
         self.writer.write_byte(cx, VARIANT.byte())?;
-        tag.encode(cx, SelfEncoder::<_, F>::new(self.writer.borrow_mut()))?;
+        tag.encode(cx, SelfEncoder::<_, F, _>::new(self.writer.borrow_mut()))?;
         self.encode_tuple(cx, len)
     }
 
@@ -311,18 +322,20 @@ where
         T: ?Sized + Encode<C::Mode>,
     {
         self.writer.write_byte(cx, VARIANT.byte())?;
-        tag.encode(cx, SelfEncoder::<_, F>::new(self.writer.borrow_mut()))?;
+        tag.encode(cx, SelfEncoder::<_, F, _>::new(self.writer.borrow_mut()))?;
         self.encode_struct(cx, len)
     }
 }
 
-impl<C: ?Sized + Context, W, B, const F: Options> SequenceEncoder<C> for SelfPackEncoder<W, B, F>
+impl<W, B, const F: Options, C> SequenceEncoder for SelfPackEncoder<W, B, F, C>
 where
     W: Writer,
     B: Buf,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<&'this mut BufWriter<B>, F> where Self: 'this;
+    type EncodeNext<'this> = StorageEncoder<&'this mut BufWriter<B>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self, _: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -366,12 +379,14 @@ where
     }
 }
 
-impl<C: ?Sized + Context, W, const F: Options> SequenceEncoder<C> for SelfEncoder<W, F>
+impl<W, const F: Options, C> SequenceEncoder for SelfEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeNext<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self, _: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -384,12 +399,14 @@ where
     }
 }
 
-impl<C: ?Sized + Context, W, const F: Options> MapEncoder<C> for SelfEncoder<W, F>
+impl<W, const F: Options, C> MapEncoder for SelfEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeEntry<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeEntry<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_entry(&mut self, _: &C) -> Result<Self::EncodeEntry<'_>, C::Error> {
@@ -402,13 +419,15 @@ where
     }
 }
 
-impl<C: ?Sized + Context, W, const F: Options> MapEntryEncoder<C> for SelfEncoder<W, F>
+impl<W, const F: Options, C> MapEntryEncoder for SelfEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeMapValue<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapKey<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeMapValue<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_map_key(&mut self, _: &C) -> Result<Self::EncodeMapKey<'_>, C::Error> {
@@ -426,13 +445,15 @@ where
     }
 }
 
-impl<C: ?Sized + Context, W, const F: Options> MapEntriesEncoder<C> for SelfEncoder<W, F>
+impl<W, const F: Options, C> MapEntriesEncoder for SelfEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeMapEntryKey<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeMapEntryValue<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapEntryKey<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeMapEntryValue<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_map_entry_key(&mut self, _: &C) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
@@ -450,12 +471,14 @@ where
     }
 }
 
-impl<C: ?Sized + Context, W, const F: Options> StructEncoder<C> for SelfEncoder<W, F>
+impl<W, const F: Options, C> StructEncoder for SelfEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeField<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeField<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_field(&mut self, cx: &C) -> Result<Self::EncodeField<'_>, C::Error> {
@@ -468,13 +491,15 @@ where
     }
 }
 
-impl<C: ?Sized + Context, W, const F: Options> StructFieldEncoder<C> for SelfEncoder<W, F>
+impl<W, const F: Options, C> StructFieldEncoder for SelfEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeFieldName<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeFieldValue<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeFieldName<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeFieldValue<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_field_name(&mut self, cx: &C) -> Result<Self::EncodeFieldName<'_>, C::Error> {
@@ -492,13 +517,15 @@ where
     }
 }
 
-impl<C: ?Sized + Context, W, const F: Options> VariantEncoder<C> for SelfEncoder<W, F>
+impl<W, const F: Options, C> VariantEncoder for SelfEncoder<W, F, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeValue<'this> = SelfEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeTag<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeValue<'this> = SelfEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self, _: &C) -> Result<Self::EncodeTag<'_>, C::Error> {
@@ -518,13 +545,14 @@ where
 
 /// Encode a length prefix.
 #[inline]
-fn encode_prefix<C: ?Sized + Context, W, const F: Options>(
+fn encode_prefix<C, W, const F: Options>(
     cx: &C,
     mut writer: W,
     kind: Kind,
     len: usize,
 ) -> Result<(), C::Error>
 where
+    C: ?Sized + Context,
     W: Writer,
 {
     let (tag, embedded) = Tag::with_len(kind, len);

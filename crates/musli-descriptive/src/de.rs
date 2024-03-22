@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -21,38 +22,44 @@ use crate::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, 
 const BUFFER_OPTIONS: crate::options::Options = crate::options::new().build();
 
 /// A very simple decoder.
-pub struct SelfDecoder<R, const F: Options> {
+pub struct SelfDecoder<R, const F: Options, C: ?Sized> {
     reader: R,
+    _marker: PhantomData<C>,
 }
 
-impl<R, const F: Options> SelfDecoder<R, F> {
+impl<R, const F: Options, C: ?Sized> SelfDecoder<R, F, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(reader: R) -> Self {
-        Self { reader }
+        Self {
+            reader,
+            _marker: PhantomData,
+        }
     }
 }
 
-pub struct SelfTupleDecoder<R, const F: Options> {
+pub struct SelfTupleDecoder<R, const F: Options, C: ?Sized> {
     reader: R,
+    _marker: PhantomData<C>,
 }
 
-impl<R, const F: Options> SelfTupleDecoder<R, F> {
+impl<R, const F: Options, C: ?Sized> SelfTupleDecoder<R, F, C> {
     #[inline]
     pub(crate) fn new(reader: R) -> Self {
-        Self { reader }
+        Self {
+            reader,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<'de, R, const F: Options> SelfDecoder<R, F>
+impl<'de, R, const F: Options, C> SelfDecoder<R, F, C>
 where
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
     /// Skip over any sequences of values.
-    pub(crate) fn skip_any<C>(&mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(crate) fn skip_any(&mut self, cx: &C) -> Result<(), C::Error> {
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
         match tag.kind() {
@@ -113,10 +120,7 @@ where
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_map<C>(mut self, cx: &C) -> Result<RemainingSelfDecoder<R, F>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn shared_decode_map(mut self, cx: &C) -> Result<RemainingSelfDecoder<R, F, C>, C::Error> {
         let pos = cx.mark();
         let len = self.decode_prefix(cx, Kind::Map, pos)?;
         Ok(RemainingSelfDecoder::new(len, self))
@@ -124,10 +128,7 @@ where
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_sequence<C>(mut self, cx: &C) -> Result<RemainingSelfDecoder<R, F>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn shared_decode_sequence(mut self, cx: &C) -> Result<RemainingSelfDecoder<R, F, C>, C::Error> {
         let pos = cx.mark();
         let len = self.decode_prefix(cx, Kind::Sequence, pos)?;
         Ok(RemainingSelfDecoder::new(len, self))
@@ -135,10 +136,7 @@ where
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_prefix<C>(&mut self, cx: &C, kind: Kind, mark: C::Mark) -> Result<usize, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn decode_prefix(&mut self, cx: &C, kind: Kind, mark: C::Mark) -> Result<usize, C::Error> {
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
         if tag.kind() != kind {
@@ -160,10 +158,7 @@ where
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_pack_length<C>(&mut self, cx: &C, start: C::Mark) -> Result<usize, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn decode_pack_length(&mut self, cx: &C, start: C::Mark) -> Result<usize, C::Error> {
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
 
         match tag.kind() {
@@ -189,26 +184,29 @@ where
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct RemainingSelfDecoder<R, const F: Options> {
+pub struct RemainingSelfDecoder<R, const F: Options, C: ?Sized> {
     remaining: usize,
-    decoder: SelfDecoder<R, F>,
+    decoder: SelfDecoder<R, F, C>,
 }
 
 #[musli::decoder]
-impl<'de, C, R, const F: Options> Decoder<'de, C> for SelfDecoder<R, F>
+impl<'de, R, const F: Options, C> Decoder<'de> for SelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type WithContext<U> = Self where U: Context;
+    type Cx = C;
+    type Error = C::Error;
+    type Mode = C::Mode;
+    type WithContext<U> = SelfDecoder<R, F, U> where U: Context;
     #[cfg(feature = "musli-value")]
-    type DecodeBuffer = musli_value::AsValueDecoder<BUFFER_OPTIONS>;
-    type DecodePack = SelfDecoder<Limit<R>, F>;
+    type DecodeBuffer = musli_value::AsValueDecoder<BUFFER_OPTIONS, C>;
+    type DecodePack = SelfDecoder<Limit<R>, F, C>;
     type DecodeSome = Self;
-    type DecodeSequence = RemainingSelfDecoder<R, F>;
-    type DecodeTuple = SelfTupleDecoder<R, F>;
-    type DecodeMap = RemainingSelfDecoder<R, F>;
-    type DecodeStruct = RemainingSelfDecoder<R, F>;
+    type DecodeSequence = RemainingSelfDecoder<R, F, C>;
+    type DecodeTuple = SelfTupleDecoder<R, F, C>;
+    type DecodeMap = RemainingSelfDecoder<R, F, C>;
+    type DecodeStruct = RemainingSelfDecoder<R, F, C>;
     type DecodeVariant = Self;
 
     #[inline]
@@ -216,7 +214,7 @@ where
     where
         U: Context,
     {
-        Ok(self)
+        Ok(SelfDecoder::new(self.reader))
     }
 
     #[inline]
@@ -745,12 +743,13 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> PackDecoder<'de, C> for SelfDecoder<Limit<R>, F>
+impl<'de, R, const F: Options, C> PackDecoder<'de> for SelfDecoder<Limit<R>, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeNext<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeNext<'this> = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
@@ -767,12 +766,13 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> PackDecoder<'de, C> for SelfTupleDecoder<R, F>
+impl<'de, R, const F: Options, C> PackDecoder<'de> for SelfTupleDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeNext<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeNext<'this> = SelfDecoder<R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
@@ -785,19 +785,20 @@ where
     }
 }
 
-impl<R, const F: Options> RemainingSelfDecoder<R, F> {
+impl<R, const F: Options, C: ?Sized> RemainingSelfDecoder<R, F, C> {
     #[inline]
-    fn new(remaining: usize, decoder: SelfDecoder<R, F>) -> Self {
+    fn new(remaining: usize, decoder: SelfDecoder<R, F, C>) -> Self {
         Self { remaining, decoder }
     }
 }
 
-impl<'de, C, R, const F: Options> SequenceDecoder<'de, C> for RemainingSelfDecoder<R, F>
+impl<'de, R, const F: Options, C> SequenceDecoder<'de> for RemainingSelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeNext<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeNext<'this> = SelfDecoder<R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -816,12 +817,13 @@ where
 }
 
 #[musli::map_decoder]
-impl<'de, C, R, const F: Options> MapDecoder<'de, C> for RemainingSelfDecoder<R, F>
+impl<'de, R, const F: Options, C> MapDecoder<'de> for RemainingSelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeEntry<'this> = SelfDecoder<R::Mut<'this>, F>
+    type Cx = C;
+    type DecodeEntry<'this> = SelfDecoder<R::Mut<'this>, F, C>
     where
         Self: 'this;
     type IntoMapEntries = Self;
@@ -847,15 +849,16 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> MapEntriesDecoder<'de, C> for RemainingSelfDecoder<R, F>
+impl<'de, R, const F: Options, C> MapEntriesDecoder<'de> for RemainingSelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeMapEntryKey<'this> = SelfDecoder<R::Mut<'this>, F>
+    type Cx = C;
+    type DecodeMapEntryKey<'this> = SelfDecoder<R::Mut<'this>, F, C>
     where
         Self: 'this;
-    type DecodeMapEntryValue<'this> = SelfDecoder<R::Mut<'this>, F>
+    type DecodeMapEntryValue<'this> = SelfDecoder<R::Mut<'this>, F, C>
     where
         Self: 'this;
 
@@ -884,15 +887,16 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> StructFieldsDecoder<'de, C> for RemainingSelfDecoder<R, F>
+impl<'de, R, const F: Options, C> StructFieldsDecoder<'de> for RemainingSelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeStructFieldName<'this> = SelfDecoder<R::Mut<'this>, F>
+    type Cx = C;
+    type DecodeStructFieldName<'this> = SelfDecoder<R::Mut<'this>, F, C>
     where
         Self: 'this;
-    type DecodeStructFieldValue<'this> = SelfDecoder<R::Mut<'this>, F>
+    type DecodeStructFieldValue<'this> = SelfDecoder<R::Mut<'this>, F, C>
     where
         Self: 'this;
 
@@ -928,12 +932,13 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> MapEntryDecoder<'de, C> for SelfDecoder<R, F>
+impl<'de, R, const F: Options, C> MapEntryDecoder<'de> for SelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeMapKey<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeMapKey<'this> = SelfDecoder<R::Mut<'this>, F, C> where Self: 'this;
     type DecodeMapValue = Self;
 
     #[inline]
@@ -954,12 +959,13 @@ where
 }
 
 #[musli::struct_decoder]
-impl<'de, C, R, const F: Options> StructDecoder<'de, C> for RemainingSelfDecoder<R, F>
+impl<'de, R, const F: Options, C> StructDecoder<'de> for RemainingSelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeField<'this> = SelfDecoder<R::Mut<'this>, F>
+    type Cx = C;
+    type DecodeField<'this> = SelfDecoder<R::Mut<'this>, F, C>
     where
         Self: 'this;
     type IntoStructFields = Self;
@@ -985,12 +991,13 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> StructFieldDecoder<'de, C> for SelfDecoder<R, F>
+impl<'de, R, const F: Options, C> StructFieldDecoder<'de> for SelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeFieldName<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeFieldName<'this> = SelfDecoder<R::Mut<'this>, F, C> where Self: 'this;
     type DecodeFieldValue = Self;
 
     #[inline]
@@ -1009,13 +1016,14 @@ where
     }
 }
 
-impl<'de, C, R, const F: Options> VariantDecoder<'de, C> for SelfDecoder<R, F>
+impl<'de, R, const F: Options, C> VariantDecoder<'de> for SelfDecoder<R, F, C>
 where
-    C: ?Sized + Context,
     R: Reader<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeTag<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
-    type DecodeVariant<'this> = SelfDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeTag<'this> = SelfDecoder<R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeVariant<'this> = SelfDecoder<R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self, _: &C) -> Result<Self::DecodeTag<'_>, C::Error> {
@@ -1029,7 +1037,7 @@ where
 
     #[inline]
     fn skip_value(&mut self, cx: &C) -> Result<bool, C::Error> {
-        SelfDecoder::<_, F>::new(self.reader.borrow_mut()).skip_any(cx)?;
+        self.skip_any(cx)?;
         Ok(true)
     }
 

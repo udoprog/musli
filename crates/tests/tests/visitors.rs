@@ -10,10 +10,9 @@ pub struct BytesReference<'de> {
 
 impl<'de, M> Decode<'de, M> for BytesReference<'de> {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         struct Visitor;
 
@@ -67,10 +66,9 @@ pub struct StringReference<'de> {
 
 impl<'de, M> Decode<'de, M> for StringReference<'de> {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         struct Visitor;
 
@@ -122,22 +120,22 @@ pub enum OwnedFn {
 }
 
 impl<'de, M> Decode<'de, M> for OwnedFn {
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_string(
             cx,
-            musli::utils::visit_owned_fn("A string variant for Enum", |cx: &C, variant: &str| {
-                match variant {
+            musli::utils::visit_owned_fn(
+                "A string variant for Enum",
+                |cx: &D::Cx, variant: &str| match variant {
                     "A" => Ok(OwnedFn::A),
                     "B" => Ok(OwnedFn::A),
                     other => {
                         Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}")))
                     }
-                }
-            }),
+                },
+            ),
         )
     }
 }

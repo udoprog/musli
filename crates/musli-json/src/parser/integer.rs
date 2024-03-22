@@ -216,10 +216,10 @@ where
 }
 
 /// Implementation to skip over a well-formed JSON number.
-pub(crate) fn skip_number<'de, C, P>(cx: &C, mut p: P) -> Result<(), C::Error>
+pub(crate) fn skip_number<'de, P, C>(cx: &C, mut p: P) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     p.skip_whitespace(cx)?;
 
@@ -269,8 +269,8 @@ where
 pub(crate) fn parse_unsigned_base<'de, T, C, P>(cx: &C, mut p: P) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     p.skip_whitespace(cx)?;
 
@@ -284,8 +284,8 @@ where
 pub(crate) fn parse_unsigned_full<'de, T, C, P>(cx: &C, mut p: P) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     p.skip_whitespace(cx)?;
 
@@ -368,8 +368,8 @@ where
 pub(crate) fn parse_signed_base<'de, T, C, P>(cx: &C, mut p: P) -> Result<T, C::Error>
 where
     T: Signed,
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     p.skip_whitespace(cx)?;
 
@@ -387,8 +387,8 @@ where
 pub(crate) fn parse_signed_full<'de, T, C, P>(cx: &C, mut p: P) -> Result<T, C::Error>
 where
     T: Signed,
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     p.skip_whitespace(cx)?;
 
@@ -406,8 +406,8 @@ where
 fn decode_unsigned_base<'de, T, C, P>(cx: &C, mut p: P, start: C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     let base = match p.read_byte(cx)? {
         b'0' => T::ZERO,
@@ -438,8 +438,8 @@ fn decode_unsigned_full<'de, T, C, P>(
 ) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     let base = decode_unsigned_base(cx, p.borrow_mut(), start)?;
 
@@ -486,10 +486,10 @@ where
 
 /// Decode an exponent.
 #[inline(always)]
-fn decode_exponent<'de, C, P>(cx: &C, mut p: P, start: C::Mark) -> Result<i32, C::Error>
+fn decode_exponent<'de, P, C>(cx: &C, mut p: P, start: C::Mark) -> Result<i32, C::Error>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     let mut is_negative = false;
     let mut e = 0u32;
@@ -520,8 +520,8 @@ where
 fn digit<'de, T, C, P>(cx: &C, out: T, mut p: P, start: C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     let Some(out) = out.checked_mul10() else {
         return Err(cx.marked_message(start, IntegerError::IntegerOverflow));
@@ -532,10 +532,10 @@ where
 
 /// Decode sequence of zeros.
 #[inline(always)]
-fn decode_zeros<'de, C, P>(cx: &C, mut p: P) -> Result<i32, C::Error>
+fn decode_zeros<'de, P, C>(cx: &C, mut p: P) -> Result<i32, C::Error>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     let mut count = 0i32;
 

@@ -26,17 +26,16 @@ pub use musli_macros::Decode;
 /// Implementing manually:
 ///
 /// ```
-/// use musli::{Context, Decode, Decoder};
+/// use musli::{Decode, Decoder};
 ///
 /// struct MyType {
 ///     data: [u8; 128],
 /// }
 ///
 /// impl<'de, M> Decode<'de, M> for MyType {
-///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
 ///     where
-///         C: ?Sized + Context<Mode = M>,
-///         D: Decoder<'de, C>,
+///         D: Decoder<'de>,
 ///     {
 ///         Ok(Self {
 ///             data: decoder.decode_array(cx)?,
@@ -46,10 +45,9 @@ pub use musli_macros::Decode;
 /// ```
 pub trait Decode<'de, M = DefaultMode>: Sized {
     /// Decode the given input.
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, <D::Cx as Context>::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>;
+        D: Decoder<'de, Mode = M>;
 }
 
 /// Trait governing how types are decoded specifically for tracing.
@@ -62,8 +60,7 @@ pub trait Decode<'de, M = DefaultMode>: Sized {
 /// [`fmt::Display`]: std::fmt::Display
 pub trait TraceDecode<'de, M = DefaultMode>: Sized {
     /// Decode the given input.
-    fn trace_decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn trace_decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>;
+        D: Decoder<'de, Mode = M>;
 }

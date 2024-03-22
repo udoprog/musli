@@ -14,6 +14,7 @@ mod variant_encoder;
 use self::variant_encoder::JsonVariantEncoder;
 
 use core::fmt;
+use core::marker::PhantomData;
 
 use musli::en::{Encoder, SequenceEncoder};
 use musli::{Context, Encode};
@@ -21,43 +22,50 @@ use musli::{Context, Encode};
 use crate::writer::Writer;
 
 /// A JSON encoder for Müsli.
-pub(crate) struct JsonEncoder<W> {
+pub(crate) struct JsonEncoder<W, C: ?Sized> {
     writer: W,
+    _marker: PhantomData<C>,
 }
 
-impl<W> JsonEncoder<W> {
+impl<W, C: ?Sized> JsonEncoder<W, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(writer: W) -> Self {
-        Self { writer }
+        Self {
+            writer,
+            _marker: PhantomData,
+        }
     }
 }
 
 #[musli::encoder]
-impl<C, W> Encoder<C> for JsonEncoder<W>
+impl<C, W> Encoder for JsonEncoder<W, C>
 where
     W: Writer,
     C: ?Sized + Context,
 {
+    type Cx = C;
+    type Error = C::Error;
     type Ok = ();
-    type WithContext<U> = Self where U: Context;
-    type EncodePack<'this> = JsonArrayEncoder<W> where C: 'this;
+    type Mode = C::Mode;
+    type WithContext<U> = JsonEncoder<W, U> where U: Context;
+    type EncodePack<'this> = JsonArrayEncoder<W, C> where C: 'this;
     type EncodeSome = Self;
-    type EncodeSequence = JsonArrayEncoder<W>;
-    type EncodeTuple = JsonArrayEncoder<W>;
-    type EncodeMap = JsonObjectEncoder<W>;
-    type EncodeMapEntries = JsonObjectEncoder<W>;
-    type EncodeStruct = JsonObjectEncoder<W>;
-    type EncodeVariant = JsonVariantEncoder<W>;
-    type EncodeTupleVariant = JsonArrayEncoder<W>;
-    type EncodeStructVariant = JsonObjectEncoder<W>;
+    type EncodeSequence = JsonArrayEncoder<W, C>;
+    type EncodeTuple = JsonArrayEncoder<W, C>;
+    type EncodeMap = JsonObjectEncoder<W, C>;
+    type EncodeMapEntries = JsonObjectEncoder<W, C>;
+    type EncodeStruct = JsonObjectEncoder<W, C>;
+    type EncodeVariant = JsonVariantEncoder<W, C>;
+    type EncodeTupleVariant = JsonArrayEncoder<W, C>;
+    type EncodeStructVariant = JsonObjectEncoder<W, C>;
 
     #[inline]
     fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
-        Ok(self)
+        Ok(JsonEncoder::new(self.writer))
     }
 
     #[inline]
@@ -201,7 +209,7 @@ where
         I: IntoIterator,
         I::Item: AsRef<[u8]>,
     {
-        let mut seq = JsonArrayEncoder::<_>::new(cx, self.writer)?;
+        let mut seq = JsonArrayEncoder::new(cx, self.writer)?;
 
         for bb in vectors {
             for &b in bb.as_ref() {

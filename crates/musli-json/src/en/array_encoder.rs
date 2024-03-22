@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 use core::mem::take;
 
 use musli::en::SequenceEncoder;
@@ -8,45 +9,44 @@ use crate::writer::Writer;
 use super::JsonEncoder;
 
 /// Encoder for a JSON array.
-pub(crate) struct JsonArrayEncoder<W> {
+pub(crate) struct JsonArrayEncoder<W, C: ?Sized> {
     first: bool,
     end: &'static [u8],
     writer: W,
+    _marker: PhantomData<C>,
 }
 
-impl<W> JsonArrayEncoder<W>
+impl<W, C> JsonArrayEncoder<W, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
     #[inline]
-    pub(super) fn new<C>(cx: &C, writer: W) -> Result<Self, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(super) fn new(cx: &C, writer: W) -> Result<Self, C::Error> {
         Self::with_end(cx, writer, b"]")
     }
 
     #[inline]
-    pub(super) fn with_end<C>(cx: &C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(super) fn with_end(cx: &C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'[')?;
 
         Ok(Self {
             first: true,
             end,
             writer,
+            _marker: PhantomData,
         })
     }
 }
 
-impl<C: ?Sized + Context, W> SequenceEncoder<C> for JsonArrayEncoder<W>
+impl<W, C> SequenceEncoder for JsonArrayEncoder<W, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = JsonEncoder<W::Mut<'this>>
+    type EncodeNext<'this> = JsonEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
 

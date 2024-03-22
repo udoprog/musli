@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 use core::mem;
 
 use musli::de::{MapDecoder, MapEntriesDecoder, SizeHint, StructDecoder, StructFieldsDecoder};
@@ -7,22 +8,21 @@ use crate::parser::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder, JsonObjectPairDecoder};
 
-pub(crate) struct JsonObjectDecoder<P> {
+pub(crate) struct JsonObjectDecoder<P, C: ?Sized> {
     first: bool,
     completed: bool,
     len: Option<usize>,
     parser: P,
+    _marker: PhantomData<C>,
 }
 
-impl<'de, P> JsonObjectDecoder<P>
+impl<'de, P, C> JsonObjectDecoder<P, C>
 where
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     #[inline]
-    pub(super) fn new<C>(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(super) fn new(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
         parser.skip_whitespace(cx)?;
 
         let actual = parser.peek(cx)?;
@@ -38,13 +38,11 @@ where
             completed: false,
             len,
             parser,
+            _marker: PhantomData,
         })
     }
 
-    fn parse_map_key<C>(&mut self, cx: &C) -> Result<bool, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn parse_map_key(&mut self, cx: &C) -> Result<bool, C::Error> {
         let first = mem::take(&mut self.first);
 
         loop {
@@ -73,12 +71,13 @@ where
 }
 
 #[musli::map_decoder]
-impl<'de, C, P> MapDecoder<'de, C> for JsonObjectDecoder<P>
+impl<'de, P, C> MapDecoder<'de> for JsonObjectDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeEntry<'this> = JsonObjectPairDecoder<P::Mut<'this>>
+    type Cx = C;
+    type DecodeEntry<'this> = JsonObjectPairDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
     type IntoMapEntries = Self;
@@ -108,15 +107,16 @@ where
     }
 }
 
-impl<'de, C, P> MapEntriesDecoder<'de, C> for JsonObjectDecoder<P>
+impl<'de, P, C> MapEntriesDecoder<'de> for JsonObjectDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeMapEntryKey<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type Cx = C;
+    type DecodeMapEntryKey<'this> = JsonKeyDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeMapEntryValue<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
+    type DecodeMapEntryValue<'this> = JsonDecoder<P::Mut<'this>, C> where Self: 'this;
 
     #[inline]
     fn decode_map_entry_key(
@@ -165,12 +165,13 @@ where
 }
 
 #[musli::struct_decoder]
-impl<'de, C, P> StructDecoder<'de, C> for JsonObjectDecoder<P>
+impl<'de, P, C> StructDecoder<'de> for JsonObjectDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeField<'this> = JsonObjectPairDecoder<P::Mut<'this>>
+    type Cx = C;
+    type DecodeField<'this> = JsonObjectPairDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
     type IntoStructFields = Self;
@@ -196,15 +197,16 @@ where
     }
 }
 
-impl<'de, C, P> StructFieldsDecoder<'de, C> for JsonObjectDecoder<P>
+impl<'de, P, C> StructFieldsDecoder<'de> for JsonObjectDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeStructFieldName<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type Cx = C;
+    type DecodeStructFieldName<'this> = JsonKeyDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeStructFieldValue<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
+    type DecodeStructFieldValue<'this> = JsonDecoder<P::Mut<'this>, C> where Self: 'this;
 
     #[inline]
     fn decode_struct_field_name(

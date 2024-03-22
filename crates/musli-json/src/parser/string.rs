@@ -286,10 +286,10 @@ pub(crate) fn decode_hex_val(val: u8) -> Option<u16> {
 }
 
 /// Specialized reader implementation from a slice.
-pub(crate) fn skip_string<'de, C, P>(cx: &C, mut p: P, validate: bool) -> Result<(), C::Error>
+pub(crate) fn skip_string<'de, P, C>(cx: &C, mut p: P, validate: bool) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     loop {
         while let Some(b) = p.peek_byte(cx)? {
@@ -320,10 +320,10 @@ where
 
 /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
 /// the previous byte read was a backslash.
-fn skip_escape<'de, C, P>(cx: &C, mut p: P, validate: bool) -> Result<(), C::Error>
+fn skip_escape<'de, P, C>(cx: &C, mut p: P, validate: bool) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     let start = cx.mark();
     let b = p.read_byte(cx)?;

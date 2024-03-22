@@ -9,14 +9,25 @@ use super::Decoder;
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
-pub trait MapEntriesDecoder<'de, C: ?Sized + Context>: Sized {
+pub trait MapEntriesDecoder<'de>: Sized {
+    /// Context associated with the decoder.
+    type Cx: ?Sized + Context;
     /// The decoder to use for a tuple field index.
-    type DecodeMapEntryKey<'this>: Decoder<'de, C>
+    type DecodeMapEntryKey<'this>: Decoder<
+        'de,
+        Cx = Self::Cx,
+        Error = <Self::Cx as Context>::Error,
+        Mode = <Self::Cx as Context>::Mode,
+    >
     where
         Self: 'this;
-
     /// The decoder to use for a tuple field value.
-    type DecodeMapEntryValue<'this>: Decoder<'de, C>
+    type DecodeMapEntryValue<'this>: Decoder<
+        'de,
+        Cx = Self::Cx,
+        Error = <Self::Cx as Context>::Error,
+        Mode = <Self::Cx as Context>::Mode,
+    >
     where
         Self: 'this;
 
@@ -27,22 +38,25 @@ pub trait MapEntriesDecoder<'de, C: ?Sized + Context>: Sized {
     #[must_use = "Decoders must be consumed"]
     fn decode_map_entry_key(
         &mut self,
-        cx: &C,
-    ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error>;
+        cx: &Self::Cx,
+    ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, <Self::Cx as Context>::Error>;
 
     /// Decode the value in the map.
     #[must_use = "Decoders must be consumed"]
-    fn decode_map_entry_value(&mut self, cx: &C)
-        -> Result<Self::DecodeMapEntryValue<'_>, C::Error>;
+    fn decode_map_entry_value(
+        &mut self,
+        cx: &Self::Cx,
+    ) -> Result<Self::DecodeMapEntryValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Indicate that the value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_map_entry_value(&mut self, cx: &C) -> Result<bool, C::Error>;
+    fn skip_map_entry_value(&mut self, cx: &Self::Cx)
+        -> Result<bool, <Self::Cx as Context>::Error>;
 
     /// End pair decoding.
     #[inline]
-    fn end(mut self, cx: &C) -> Result<(), C::Error> {
+    fn end(mut self, cx: &Self::Cx) -> Result<(), <Self::Cx as Context>::Error> {
         loop {
             let Some(item) = self.decode_map_entry_key(cx)? else {
                 break;

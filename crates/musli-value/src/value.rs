@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 #[cfg(feature = "alloc")]
 use alloc::borrow::ToOwned;
 #[cfg(feature = "alloc")]
@@ -82,13 +84,13 @@ impl Value {
     /// Construct a [AsValueDecoder] implementation out of this value which
     /// emits the specified error `E`.
     #[inline]
-    pub fn into_value_decoder<const F: Options>(self) -> AsValueDecoder<F> {
+    pub fn into_value_decoder<const F: Options, C: ?Sized>(self) -> AsValueDecoder<F, C> {
         AsValueDecoder::new(self)
     }
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<const F: Options>(&self) -> ValueDecoder<'_, F> {
+    pub(crate) fn decoder<const F: Options, C: ?Sized>(&self) -> ValueDecoder<'_, F, C> {
         ValueDecoder::new(self)
     }
 }
@@ -152,10 +154,9 @@ from!(f32, F32);
 from!(f64, F64);
 
 impl<M> Encode<M> for Number {
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         match self {
             Number::U8(n) => encoder.encode_u8(cx, *n),
@@ -304,7 +305,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     #[inline]
     fn visit_option<D>(self, cx: &C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Cx = C>,
     {
         match decoder {
             Some(decoder) => Ok(Value::Option(Some(Box::new(Value::decode(cx, decoder)?)))),
@@ -316,7 +317,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     #[inline]
     fn visit_sequence<D>(self, cx: &C, mut seq: D) -> Result<Self::Ok, C::Error>
     where
-        D: SequenceDecoder<'de, C>,
+        D: SequenceDecoder<'de, Cx = C>,
     {
         let mut out = Vec::with_capacity(seq.size_hint(cx).or_default());
 
@@ -332,7 +333,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     #[inline]
     fn visit_map<D>(self, cx: &C, mut map: D) -> Result<Self::Ok, C::Error>
     where
-        D: MapDecoder<'de, C>,
+        D: MapDecoder<'de, Cx = C>,
     {
         let mut out = Vec::with_capacity(map.size_hint(cx).or_default());
 
@@ -368,7 +369,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     #[inline]
     fn visit_variant<D>(self, cx: &C, mut variant: D) -> Result<Self::Ok, C::Error>
     where
-        D: VariantDecoder<'de, C>,
+        D: VariantDecoder<'de, Cx = C>,
     {
         let first = cx.decode(variant.decode_tag(cx)?)?;
         let second = cx.decode(variant.decode_value(cx)?)?;
@@ -378,10 +379,10 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 }
 
 impl<'de, M> Decode<'de, M> for Value {
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    #[inline]
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Mode = M>,
     {
         decoder.decode_any(cx, AnyVisitor)
     }
@@ -516,10 +517,9 @@ impl<'de, C: ?Sized + Context> NumberVisitor<'de, C> for ValueNumberVisitor {
 }
 
 impl<M> Encode<M> for Value {
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         match self {
             Value::Unit => encoder.encode_unit(cx),
@@ -570,20 +570,25 @@ impl<M> Encode<M> for Value {
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct AsValueDecoder<const F: Options> {
+pub struct AsValueDecoder<const F: Options, C: ?Sized> {
     value: Value,
+    _marker: PhantomData<C>,
 }
 
-impl<const F: Options> AsValueDecoder<F> {
+impl<const F: Options, C: ?Sized> AsValueDecoder<F, C> {
     /// Construct a new buffered value decoder.
     #[inline]
     pub fn new(value: Value) -> Self {
-        Self { value }
+        Self {
+            value,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<const F: Options, C: ?Sized + Context> AsDecoder<C> for AsValueDecoder<F> {
-    type Decoder<'this> = ValueDecoder<'this, F> where Self: 'this;
+impl<const F: Options, C: ?Sized + Context> AsDecoder for AsValueDecoder<F, C> {
+    type Cx = C;
+    type Decoder<'this> = ValueDecoder<'this, F, C> where Self: 'this;
 
     #[inline]
     fn as_decoder(&self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {

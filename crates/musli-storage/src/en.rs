@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use musli::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder,
@@ -12,30 +13,37 @@ use crate::writer::Writer;
 const DEFAULT_OPTIONS: options::Options = options::new().build();
 
 /// The alias for a [StorageEncoder] that is used for packs.
-pub type PackEncoder<W> = StorageEncoder<W, DEFAULT_OPTIONS>;
+pub type PackEncoder<W, C> = StorageEncoder<W, DEFAULT_OPTIONS, C>;
 
 /// A vaery simple encoder suitable for storage encoding.
-pub struct StorageEncoder<W, const F: Options> {
+pub struct StorageEncoder<W, const F: Options, C: ?Sized> {
     writer: W,
+    _marker: PhantomData<C>,
 }
 
-impl<W, const F: Options> StorageEncoder<W, F> {
+impl<W, const F: Options, C: ?Sized> StorageEncoder<W, F, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub fn new(writer: W) -> Self {
-        Self { writer }
+        Self {
+            writer,
+            _marker: PhantomData,
+        }
     }
 }
 
 #[musli::encoder]
-impl<W, const F: Options, C> Encoder<C> for StorageEncoder<W, F>
+impl<W, const F: Options, C> Encoder for StorageEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
+    type Error = C::Error;
     type Ok = ();
-    type WithContext<U> = Self where U: Context;
-    type EncodePack<'this> = Self where C: 'this;
+    type Mode = C::Mode;
+    type WithContext<U> = StorageEncoder<W, F, U> where U: Context;
+    type EncodePack<'this> = StorageEncoder<W, F, C> where Self::Cx: 'this;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeTuple = Self;
@@ -51,7 +59,7 @@ where
     where
         U: Context,
     {
-        Ok(self)
+        Ok(StorageEncoder::new(self.writer))
     }
 
     #[inline]
@@ -253,7 +261,7 @@ where
     where
         T: ?Sized + Encode<C::Mode>,
     {
-        let encoder = StorageEncoder::<_, F>::new(self.writer.borrow_mut());
+        let encoder = StorageEncoder::<_, F, _>::new(self.writer.borrow_mut());
         tag.encode(cx, encoder)?;
         Ok(self)
     }
@@ -268,20 +276,21 @@ where
     where
         T: ?Sized + Encode<C::Mode>,
     {
-        let encoder = StorageEncoder::<_, F>::new(self.writer.borrow_mut());
+        let encoder = StorageEncoder::<_, F, _>::new(self.writer.borrow_mut());
         tag.encode(cx, encoder)?;
         musli_common::int::encode_usize::<_, _, F>(cx, self.writer.borrow_mut(), len)?;
         Ok(self)
     }
 }
 
-impl<W, const F: Options, C> SequenceEncoder<C> for StorageEncoder<W, F>
+impl<W, const F: Options, C> SequenceEncoder for StorageEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeNext<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self, _: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -294,13 +303,14 @@ where
     }
 }
 
-impl<W, const F: Options, C> MapEncoder<C> for StorageEncoder<W, F>
+impl<W, const F: Options, C> MapEncoder for StorageEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeEntry<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeEntry<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_entry(&mut self, _: &C) -> Result<Self::EncodeEntry<'_>, C::Error> {
@@ -313,14 +323,15 @@ where
     }
 }
 
-impl<W, const F: Options, C> MapEntryEncoder<C> for StorageEncoder<W, F>
+impl<W, const F: Options, C> MapEntryEncoder for StorageEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeMapValue<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapKey<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeMapValue<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_map_key(&mut self, _: &C) -> Result<Self::EncodeMapKey<'_>, C::Error> {
@@ -338,14 +349,15 @@ where
     }
 }
 
-impl<W, const F: Options, C> MapEntriesEncoder<C> for StorageEncoder<W, F>
+impl<W, const F: Options, C> MapEntriesEncoder for StorageEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeMapEntryKey<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeMapEntryValue<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeMapEntryKey<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeMapEntryValue<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_map_entry_key(&mut self, _: &C) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
@@ -363,13 +375,14 @@ where
     }
 }
 
-impl<W, const F: Options, C> StructEncoder<C> for StorageEncoder<W, F>
+impl<W, const F: Options, C> StructEncoder for StorageEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeField<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeField<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_field(&mut self, cx: &C) -> Result<Self::EncodeField<'_>, C::Error> {
@@ -382,14 +395,15 @@ where
     }
 }
 
-impl<W, const F: Options, C> StructFieldEncoder<C> for StorageEncoder<W, F>
+impl<W, const F: Options, C> StructFieldEncoder for StorageEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeFieldName<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeFieldValue<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeFieldName<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeFieldValue<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_field_name(&mut self, cx: &C) -> Result<Self::EncodeFieldName<'_>, C::Error> {
@@ -407,14 +421,15 @@ where
     }
 }
 
-impl<W, const F: Options, C> VariantEncoder<C> for StorageEncoder<W, F>
+impl<W, const F: Options, C> VariantEncoder for StorageEncoder<W, F, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
-    type EncodeValue<'this> = StorageEncoder<W::Mut<'this>, F> where Self: 'this;
+    type EncodeTag<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
+    type EncodeValue<'this> = StorageEncoder<W::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self, _: &C) -> Result<Self::EncodeTag<'_>, C::Error> {

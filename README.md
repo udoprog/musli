@@ -126,10 +126,9 @@ struct MyType {
 }
 
 impl<'de, M> Decode<'de, M> for MyType {
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Mode = M>,
     {
         let mut seq = decoder.decode_sequence(cx)?;
         let mut data = Vec::with_capacity(seq.size_hint(cx).or_default());

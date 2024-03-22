@@ -613,20 +613,18 @@
 //! }
 //!
 //! mod module {
-//!     use musli::{Context, Decoder, Encoder};
+//!     use musli::{Decoder, Encoder};
 //!
 //!     use super::Field;
 //!
-//!     pub fn encode<C, E>(field: &Field, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+//!     pub fn encode<E>(field: &Field, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
 //!     where
-//!         C: ?Sized + Context,
-//!         E: Encoder<C>,
+//!         E: Encoder,
 //! # { todo!() }
 //!
-//!     pub fn decode<'de, C, D>(cx: &C, decoder: D) -> Result<Field, C::Error>
+//!     pub fn decode<'de, D>(cx: &D::Cx, decoder: D) -> Result<Field, D::Error>
 //!     where
-//!         C: ?Sized + Context,
-//!         D: Decoder<'de, C>,
+//!         D: Decoder<'de>,
 //! # { todo!() }
 //! }
 //! # }
@@ -650,20 +648,18 @@
 //! }
 //!
 //! mod module {
-//!     use musli::{Context, Decoder, Encoder};
+//!     use musli::{Decoder, Encoder};
 //!
 //!     use super::Field;
 //!
-//!     pub fn encode<C, E, T>(field: &Field<T>, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+//!     pub fn encode<E, T>(field: &Field<T>, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
 //!     where
-//!         C: ?Sized + Context,
-//!         E: Encoder<C>,
+//!         E: Encoder,
 //! # { todo!() }
 //!
-//!     pub fn decode<'de, C, D, T>(cx: &C, decoder: D) -> Result<Field<T>, C::Error>
+//!     pub fn decode<'de, D, T>(cx: &D::Cx, decoder: D) -> Result<Field<T>, D::Error>
 //!     where
-//!         C: ?Sized + Context,
-//!         D: Decoder<'de, C>,
+//!         D: Decoder<'de>,
 //! # { todo!() }
 //! }
 //! # }
@@ -691,18 +687,16 @@
 //!
 //!     use super::CustomUuid;
 //!
-//!     pub fn encode<C, E>(uuid: &CustomUuid, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+//!     pub fn encode<E>(uuid: &CustomUuid, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
 //!     where
-//!         C: ?Sized + Context,
-//!         E: Encoder<C>,
+//!         E: Encoder,
 //!     {
 //!         uuid.0.encode(cx, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, C, D>(cx: &C, decoder: D) -> Result<CustomUuid, C::Error>
+//!     pub fn decode<'de, D>(cx: &D::Cx, decoder: D) -> Result<CustomUuid, D::Error>
 //!     where
-//!         C: ?Sized + Context,
-//!         D: Decoder<'de, C>,
+//!         D: Decoder<'de>,
 //!     {
 //!         Ok(CustomUuid(cx.decode(decoder)?))
 //!     }
@@ -714,20 +708,18 @@
 //!
 //!     use musli::{Context, Decode, Decoder, Encode, Encoder};
 //!
-//!     pub fn encode<C, E, T>(set: &HashSet<T>, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+//!     pub fn encode<E, T>(set: &HashSet<T>, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
 //!     where
-//!         C: ?Sized + Context,
-//!         E: Encoder<C>,
-//!         T: Encode<C::Mode> + Eq + Hash,
+//!         E: Encoder,
+//!         T: Encode<E::Mode> + Eq + Hash,
 //!     {
 //!         HashSet::<T>::encode(set, cx, encoder)
 //!     }
 //!
-//!     pub fn decode<'de, C, D, T>(cx: &C, decoder: D) -> Result<HashSet<T>, C::Error>
+//!     pub fn decode<'de, D, T>(cx: &D::Cx, decoder: D) -> Result<HashSet<T>, D::Error>
 //!     where
-//!         C: ?Sized + Context,
-//!         D: Decoder<'de, C>,
-//!         T: Decode<'de, C::Mode> + Eq + Hash,
+//!         D: Decoder<'de>,
+//!         T: Decode<'de, D::Mode> + Eq + Hash,
 //!     {
 //!         cx.decode(decoder)
 //!     }

@@ -1,18 +1,23 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use musli::en::Encoder;
 use musli::Context;
 
 use crate::writer::Writer;
 
-pub(crate) struct JsonObjectKeyEncoder<W> {
+pub(crate) struct JsonObjectKeyEncoder<W, C: ?Sized> {
     writer: W,
+    _marker: PhantomData<C>,
 }
 
-impl<W> JsonObjectKeyEncoder<W> {
+impl<W, C: ?Sized> JsonObjectKeyEncoder<W, C> {
     #[inline]
     pub(super) fn new(writer: W) -> Self {
-        Self { writer }
+        Self {
+            writer,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -28,19 +33,23 @@ macro_rules! format_integer {
 }
 
 #[musli::encoder]
-impl<C: ?Sized + Context, W> Encoder<C> for JsonObjectKeyEncoder<W>
+impl<W, C> Encoder for JsonObjectKeyEncoder<W, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
+    type Error = C::Error;
     type Ok = ();
-    type WithContext<U> = Self where U: Context;
+    type Mode = C::Mode;
+    type WithContext<U> = JsonObjectKeyEncoder<W, U> where U: Context;
 
     #[inline]
     fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
-        Ok(self)
+        Ok(JsonObjectKeyEncoder::new(self.writer))
     }
 
     #[inline]

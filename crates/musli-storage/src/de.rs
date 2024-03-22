@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -13,15 +14,19 @@ use crate::options::Options;
 use crate::reader::Reader;
 
 /// A very simple decoder suitable for storage decoding.
-pub struct StorageDecoder<R, const F: Options> {
+pub struct StorageDecoder<R, const F: Options, C: ?Sized> {
     reader: R,
+    _marker: PhantomData<C>,
 }
 
-impl<R, const F: Options> StorageDecoder<R, F> {
+impl<R, const F: Options, C: ?Sized> StorageDecoder<R, F, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub fn new(reader: R) -> Self {
-        Self { reader }
+        Self {
+            reader,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -30,23 +35,26 @@ impl<R, const F: Options> StorageDecoder<R, F> {
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct LimitedStorageDecoder<R, const F: Options> {
+pub struct LimitedStorageDecoder<R, const F: Options, C: ?Sized> {
     remaining: usize,
-    decoder: StorageDecoder<R, F>,
+    decoder: StorageDecoder<R, F, C>,
 }
 
 #[musli::decoder]
-impl<'de, R, const F: Options, C: ?Sized + Context> Decoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> Decoder<'de> for StorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type WithContext<U> = Self where U: Context;
+    type Cx = C;
+    type Error = C::Error;
+    type Mode = C::Mode;
+    type WithContext<U> = StorageDecoder<R, F, U> where U: Context;
     type DecodePack = Self;
     type DecodeSome = Self;
-    type DecodeSequence = LimitedStorageDecoder<R, F>;
+    type DecodeSequence = LimitedStorageDecoder<R, F, C>;
     type DecodeTuple = Self;
-    type DecodeMap = LimitedStorageDecoder<R, F>;
-    type DecodeStruct = LimitedStorageDecoder<R, F>;
+    type DecodeMap = LimitedStorageDecoder<R, F, C>;
+    type DecodeStruct = LimitedStorageDecoder<R, F, C>;
     type DecodeVariant = Self;
 
     #[inline]
@@ -54,7 +62,7 @@ where
     where
         U: Context,
     {
-        Ok(self)
+        Ok(StorageDecoder::new(self.reader))
     }
 
     #[inline]
@@ -266,11 +274,12 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C: ?Sized + Context> PackDecoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> PackDecoder<'de> for StorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeNext<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeNext<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn decode_next(&mut self, _: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
@@ -283,26 +292,25 @@ where
     }
 }
 
-impl<'de, R, const F: Options> LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C> LimitedStorageDecoder<R, F, C>
 where
+    C: ?Sized + Context,
     R: Reader<'de>,
 {
     #[inline]
-    fn new<C>(cx: &C, mut decoder: StorageDecoder<R, F>) -> Result<Self, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn new(cx: &C, mut decoder: StorageDecoder<R, F, C>) -> Result<Self, C::Error> {
         let remaining = musli_common::int::decode_usize::<_, _, F>(cx, &mut decoder.reader)?;
         Ok(Self { remaining, decoder })
     }
 }
 
-impl<'de, R, const F: Options, C: ?Sized + Context> SequenceDecoder<'de, C>
-    for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> SequenceDecoder<'de>
+    for LimitedStorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeNext<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeNext<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self, _: &C) -> SizeHint {
@@ -321,12 +329,13 @@ where
 }
 
 #[musli::map_decoder]
-impl<'de, R, const F: Options, C: ?Sized + Context> MapDecoder<'de, C>
-    for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> MapDecoder<'de>
+    for LimitedStorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeEntry<'this> = StorageDecoder<R::Mut<'this>, F>
+    type Cx = C;
+    type DecodeEntry<'this> = StorageDecoder<R::Mut<'this>, F, C>
     where
         Self: 'this;
     type IntoMapEntries = Self;
@@ -352,11 +361,12 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C: ?Sized + Context> MapEntryDecoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> MapEntryDecoder<'de> for StorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeMapKey<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeMapKey<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
     type DecodeMapValue = Self;
 
     #[inline]
@@ -376,12 +386,13 @@ where
 }
 
 #[musli::struct_decoder]
-impl<'de, R, const F: Options, C: ?Sized + Context> StructDecoder<'de, C>
-    for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> StructDecoder<'de>
+    for LimitedStorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeField<'this> = StorageDecoder<R::Mut<'this>, F>
+    type Cx = C;
+    type DecodeField<'this> = StorageDecoder<R::Mut<'this>, F, C>
     where
         Self: 'this;
 
@@ -408,12 +419,13 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C: ?Sized + Context> StructFieldDecoder<'de, C>
-    for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> StructFieldDecoder<'de>
+    for StorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeFieldName<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeFieldName<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
     type DecodeFieldValue = Self;
 
     #[inline]
@@ -432,13 +444,14 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C: ?Sized + Context> MapEntriesDecoder<'de, C>
-    for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> MapEntriesDecoder<'de>
+    for LimitedStorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeMapEntryKey<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
-    type DecodeMapEntryValue<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeMapEntryKey<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeMapEntryValue<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn decode_map_entry_key(
@@ -464,13 +477,14 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C: ?Sized + Context> StructFieldsDecoder<'de, C>
-    for LimitedStorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> StructFieldsDecoder<'de>
+    for LimitedStorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeStructFieldName<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
-    type DecodeStructFieldValue<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeStructFieldName<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeStructFieldValue<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn decode_struct_field_name(
@@ -504,12 +518,13 @@ where
     }
 }
 
-impl<'de, R, const F: Options, C: ?Sized + Context> VariantDecoder<'de, C> for StorageDecoder<R, F>
+impl<'de, R, const F: Options, C: ?Sized + Context> VariantDecoder<'de> for StorageDecoder<R, F, C>
 where
     R: Reader<'de>,
 {
-    type DecodeTag<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
-    type DecodeVariant<'this> = StorageDecoder<R::Mut<'this>, F> where Self: 'this;
+    type Cx = C;
+    type DecodeTag<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeVariant<'this> = StorageDecoder<R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self, _: &C) -> Result<Self::DecodeTag<'_>, C::Error> {

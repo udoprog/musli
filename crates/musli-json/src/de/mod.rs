@@ -20,6 +20,7 @@ mod variant_decoder;
 use self::variant_decoder::JsonVariantDecoder;
 
 use core::fmt;
+use core::marker::PhantomData;
 use core::str;
 
 #[cfg(feature = "alloc")]
@@ -45,25 +46,27 @@ use crate::parser::{integer, string, Parser, StringReference, Token};
 const BUFFER_OPTIONS: crate::options::Options = crate::options::new().build();
 
 /// A JSON decoder for Müsli.
-pub(crate) struct JsonDecoder<P> {
+pub(crate) struct JsonDecoder<P, C: ?Sized> {
     parser: P,
+    _marker: PhantomData<C>,
 }
 
-impl<'de, P> JsonDecoder<P>
+impl<'de, P, C> JsonDecoder<P, C>
 where
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(parser: P) -> Self {
-        Self { parser }
+        Self {
+            parser,
+            _marker: PhantomData,
+        }
     }
 
     /// Skip over any values.
-    pub(crate) fn skip_any<C>(mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(crate) fn skip_any(mut self, cx: &C) -> Result<(), C::Error> {
         let start = cx.mark();
         let actual = self.parser.peek(cx)?;
 
@@ -101,53 +104,47 @@ where
     }
 
     #[inline]
-    fn parse_true<C>(mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn parse_true(mut self, cx: &C) -> Result<(), C::Error> {
         self.parser.parse_exact(cx, "true")
     }
 
     #[inline]
-    fn parse_false<C>(mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn parse_false(mut self, cx: &C) -> Result<(), C::Error> {
         self.parser.parse_exact(cx, "false")
     }
 
     #[inline]
-    fn parse_null<C>(mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn parse_null(mut self, cx: &C) -> Result<(), C::Error> {
         self.parser.parse_exact(cx, "null")
     }
 }
 
 #[musli::decoder]
-impl<'de, C, P> Decoder<'de, C> for JsonDecoder<P>
+impl<'de, P, C> Decoder<'de> for JsonDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type WithContext<U> = Self where U: Context;
+    type Cx = C;
+    type Error = C::Error;
+    type Mode = C::Mode;
+    type WithContext<U> = JsonDecoder<P, U> where U: Context;
     #[cfg(feature = "musli-value")]
-    type DecodeBuffer = musli_value::AsValueDecoder<BUFFER_OPTIONS>;
-    type DecodePack = JsonSequenceDecoder<P>;
-    type DecodeSequence = JsonSequenceDecoder<P>;
-    type DecodeTuple = JsonSequenceDecoder<P>;
-    type DecodeMap = JsonObjectDecoder<P>;
-    type DecodeSome = JsonDecoder<P>;
-    type DecodeStruct = JsonObjectDecoder<P>;
-    type DecodeVariant = JsonVariantDecoder<P>;
+    type DecodeBuffer = musli_value::AsValueDecoder<BUFFER_OPTIONS, C>;
+    type DecodePack = JsonSequenceDecoder<P, C>;
+    type DecodeSequence = JsonSequenceDecoder<P, C>;
+    type DecodeTuple = JsonSequenceDecoder<P, C>;
+    type DecodeMap = JsonObjectDecoder<P, C>;
+    type DecodeSome = JsonDecoder<P, C>;
+    type DecodeStruct = JsonObjectDecoder<P, C>;
+    type DecodeVariant = JsonVariantDecoder<P, C>;
 
     #[inline]
     fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
-        Ok(self)
+        Ok(JsonDecoder::new(self.parser))
     }
 
     #[inline]

@@ -5,7 +5,6 @@
 use core::fmt;
 use core::mem;
 
-use musli::Context;
 use musli::{Decode, Decoder};
 
 /// Data masked into the data type.
@@ -146,10 +145,9 @@ impl fmt::Debug for Tag {
 
 impl<'de, M> Decode<'de, M> for Tag {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Mode = M>,
     {
         Ok(Self::from_byte(decoder.decode_u8(cx)?))
     }
