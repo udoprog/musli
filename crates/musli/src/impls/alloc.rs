@@ -589,7 +589,8 @@ impl<M> Encode<M> for OsStr {
 
         let mut variant = encoder.encode_variant(cx)?;
         PlatformTag::Unix.encode(cx, variant.encode_tag(cx)?)?;
-        self.as_bytes().encode(cx, variant.encode_value(cx)?)?;
+        self.as_bytes()
+            .encode_bytes(cx, variant.encode_value(cx)?)?;
         variant.end(cx)
     }
 
@@ -619,7 +620,7 @@ impl<M> Encode<M> for OsStr {
             }
         }
 
-        buf.as_slice().encode(cx, variant.encode_value(cx)?)?;
+        buf.as_slice().encode_bytes(cx, variant.encode_value(cx)?)?;
         variant.end(cx)
     }
 }

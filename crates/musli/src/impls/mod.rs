@@ -322,7 +322,7 @@ where
         for value in self {
             cx.enter_sequence_index(index);
             let encoder = seq.encode_next(cx)?;
-            T::encode(value, cx, encoder)?;
+            value.encode(cx, encoder)?;
             cx.leave_sequence_index();
             index = index.wrapping_add(index);
         }

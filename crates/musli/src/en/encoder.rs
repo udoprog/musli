@@ -1361,11 +1361,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     #[inline]
     fn encode_unit_variant<T>(self, cx: &C, tag: &T) -> Result<Self::Ok, C::Error>
     where
-        T: Encode<C::Mode>,
+        T: ?Sized + Encode<C::Mode>,
     {
         let mut variant = self.encode_variant(cx)?;
         let t = variant.encode_tag(cx)?;
-        Encode::encode(tag, cx, t)?;
+        tag.encode(cx, t)?;
         let v = variant.encode_value(cx)?;
         v.encode_unit(cx)?;
         variant.end(cx)
