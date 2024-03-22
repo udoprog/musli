@@ -362,20 +362,19 @@ where
             #[cfg(feature = "alloc")]
             #[inline]
             fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
-                let string =
-                    musli_common::str::from_utf8_owned(bytes).map_err(|err| cx.custom(err))?;
+                let string = musli_common::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8(bytes).map_err(|err| cx.custom(err))?;
+                let string = musli_common::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8(bytes).map_err(|err| cx.custom(err))?;
+                let string = musli_common::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
             }
         }

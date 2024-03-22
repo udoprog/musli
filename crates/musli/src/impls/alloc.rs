@@ -195,9 +195,9 @@ cow! {
     Encode::encode,
     Decode::decode,
     CStr, [u8], decode_bytes, cx,
-    |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(|error| cx.custom(error))?),
-    |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(|error| cx.custom(error))?),
-    |reference| Cow::Owned(CStr::from_bytes_with_nul(reference).map_err(|error| cx.custom(error))?.to_owned())
+    |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(cx.map())?),
+    |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(cx.map())?),
+    |reference| Cow::Owned(CStr::from_bytes_with_nul(reference).map_err(cx.map())?.to_owned())
 }
 
 cow! {
@@ -461,7 +461,7 @@ impl<'de, M> Decode<'de, M> for CString {
 
             #[inline]
             fn visit_owned(self, cx: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
-                CString::from_vec_with_nul(value).map_err(|error| cx.custom(error))
+                CString::from_vec_with_nul(value).map_err(cx.map())
             }
 
             #[inline]
@@ -472,7 +472,7 @@ impl<'de, M> Decode<'de, M> for CString {
             #[inline]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(CStr::from_bytes_with_nul(bytes)
-                    .map_err(|error| cx.custom(error))?
+                    .map_err(cx.map())?
                     .to_owned())
             }
         }

@@ -495,7 +495,7 @@ impl<'de, M> Decode<'de, M> for &'de CStr {
         D: Decoder<'de, C>,
     {
         let bytes = cx.decode(decoder)?;
-        CStr::from_bytes_with_nul(bytes).map_err(|error| cx.custom(error))
+        CStr::from_bytes_with_nul(bytes).map_err(cx.map())
     }
 }
 
