@@ -13,7 +13,6 @@ struct Ctxt<'a> {
     ctx_var: &'a Ident,
     decoder_var: &'a Ident,
     tag_var: &'a Ident,
-    c_param: &'a syn::Ident,
     trace: bool,
     trace_body: bool,
 }
@@ -24,14 +23,12 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     let ctx_var = e.cx.ident("ctx");
     let root_decoder_var = e.cx.ident("decoder");
     let tag_var = e.cx.ident("tag");
-    let c_param = e.cx.type_with_span("C", Span::call_site());
     let d_param = e.cx.type_with_span("D", Span::call_site());
 
     let cx = Ctxt {
         ctx_var: &ctx_var,
         decoder_var: &root_decoder_var,
         tag_var: &tag_var,
-        c_param: &c_param,
         trace: true,
         trace_body: true,
     };
@@ -90,10 +87,9 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         #[allow(clippy::let_unit_value)]
         impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
-            fn decode<#c_param, #d_param>(#ctx_var: &#c_param, #root_decoder_var: #d_param) -> #core_result<Self, <#c_param as #context_t>::Error>
+            fn decode<#d_param>(#ctx_var: &#d_param::Cx, #root_decoder_var: #d_param) -> #core_result<Self, <#d_param::Cx as #context_t>::Error>
             where
-                #c_param: ?Sized + #context_t<Mode = #mode_ident>,
-                #d_param: #decoder_t<#lt, #c_param>
+                #d_param: #decoder_t<#lt, Mode = #mode_ident>,
             {
                 #body
             }
@@ -118,7 +114,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         ctx_var,
         tag_var,
         decoder_var,
-        c_param,
         ..
     } = *cx;
 
@@ -168,11 +163,11 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let mut fallback = match en.fallback {
         Some(ident) => {
             quote! {{
-                if !#variant_decoder_t::<#c_param>::skip_value(&mut #variant_decoder_var, #ctx_var)? {
+                if !#variant_decoder_t::skip_value(&mut #variant_decoder_var, #ctx_var)? {
                     return #result_err(#context_t::invalid_variant_tag(#ctx_var, #type_name, #variant_tag_var));
                 }
 
-                #variant_decoder_t::<#c_param>::end(#variant_decoder_var, #ctx_var)?;
+                #variant_decoder_t::end(#variant_decoder_var, #ctx_var)?;
                 Self::#ident {}
             }}
         }
@@ -207,7 +202,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             });
 
             decode_tag = quote! {
-                #decoder_t::<#c_param>::decode_string(#variant_decoder_var, #ctx_var, #visit_owned_fn("a string variant tag", |#ctx_var, string: &str| {
+                #decoder_t::decode_string(#variant_decoder_var, #ctx_var, #visit_owned_fn("a string variant tag", |#ctx_var, string: &str| {
                     #result_ok(match string {
                         #(#arms,)*
                         string => {
@@ -296,11 +291,11 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     #enter
 
                     let #output_var = {
-                        let #body_decoder_var = #variant_decoder_t::<#c_param>::decode_value(&mut #variant_decoder_var, #ctx_var)?;
+                        let #body_decoder_var = #variant_decoder_t::decode_value(&mut #variant_decoder_var, #ctx_var)?;
                         #decode
                     };
 
-                    #variant_decoder_t::<#c_param>::end(#variant_decoder_var, #ctx_var)?;
+                    #variant_decoder_t::end(#variant_decoder_var, #ctx_var)?;
                     #leave
                     #output_var
                 }
@@ -323,12 +318,12 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             #output_enum
 
             #enter
-            let mut #variant_decoder_var = #decoder_t::<#c_param>::decode_variant(#decoder_var, #ctx_var)?;
+            let mut #variant_decoder_var = #decoder_t::decode_variant(#decoder_var, #ctx_var)?;
 
             #variant_alloc
 
             let #variant_tag_var #name_type = {
-                let mut #variant_decoder_var = #variant_decoder_t::<#c_param>::decode_tag(&mut #variant_decoder_var, #ctx_var)?;
+                let mut #variant_decoder_var = #variant_decoder_t::decode_tag(&mut #variant_decoder_var, #ctx_var)?;
                 #decode_tag
             };
 
@@ -367,7 +362,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 Some(quote! {
                     #tag_pattern => {
                         #enter
-                        let #buffer_decoder_var = #as_decoder_t::<#c_param>::as_decoder(&#buffer_var, #ctx_var)?;
+                        let #buffer_decoder_var = #as_decoder_t::as_decoder(&#buffer_var, #ctx_var)?;
                         let #variant_output_var = #decode;
                         #leave
                         #variant_output_var
@@ -398,7 +393,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     });
 
                     let decode_outcome = quote! {
-                        #decoder_t::<#c_param>::decode_string(decoder, #ctx_var, #visit_owned_fn("a string field tag", |#ctx_var, string: &str| {
+                        #decoder_t::decode_string(decoder, #ctx_var, #visit_owned_fn("a string field tag", |#ctx_var, string: &str| {
                             #result_ok(match string {
                                 #field_tag => Outcome::Tag,
                                 string => {
@@ -415,13 +410,13 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     decode_match = quote! {
                         match #decode_outcome {
                             Outcome::Tag => {
-                                break #struct_field_decoder_t::<#c_param>::decode_field_value(#entry_var, #ctx_var)?;
+                                break #struct_field_decoder_t::decode_field_value(#entry_var, #ctx_var)?;
                             }
                             Outcome::AllocErr => {
                                 return #result_err(#context_t::alloc_failed(#ctx_var));
                             }
                             Outcome::Err => {
-                                if !#struct_field_decoder_t::<#c_param>::skip_field_value(#entry_var, #ctx_var)? {
+                                if !#struct_field_decoder_t::skip_field_value(#entry_var, #ctx_var)? {
                                     return #result_err(#context_t::invalid_field_string_tag(#ctx_var, #type_name, #field_alloc_var));
                                 }
                             }
@@ -434,10 +429,10 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     decode_match = quote! {
                         match #decode_t_decode(#ctx_var, decoder)? {
                             #field_tag => {
-                                break #struct_field_decoder_t::<#c_param>::decode_field_value(#entry_var, #ctx_var)?;
+                                break #struct_field_decoder_t::decode_field_value(#entry_var, #ctx_var)?;
                             }
                             field => {
-                                if !#struct_field_decoder_t::<#c_param>::skip_field_value(#entry_var, #ctx_var)? {
+                                if !#struct_field_decoder_t::skip_field_value(#entry_var, #ctx_var)? {
                                     return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, field));
                                 }
                             }
@@ -463,17 +458,17 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 #outcome_enum
 
                 #enter
-                let #buffer_var = #decoder_t::<#c_param>::decode_buffer(#decoder_var, #ctx_var)?;
-                let st = #as_decoder_t::<#c_param>::as_decoder(&#buffer_var, #ctx_var)?;
-                let mut st = #decoder_t::<#c_param>::decode_struct(st, #ctx_var, None)?;
+                let #buffer_var = #decoder_t::decode_buffer(#decoder_var, #ctx_var)?;
+                let st = #as_decoder_t::as_decoder(&#buffer_var, #ctx_var)?;
+                let mut st = #decoder_t::decode_struct(st, #ctx_var, None)?;
 
                 let #variant_tag_var #name_type = {
                     let #variant_decoder_var = loop {
-                        let #option_some(mut #entry_var) = #struct_decoder_t::<#c_param>::decode_field(&mut st, #ctx_var)? else {
+                        let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(&mut st, #ctx_var)? else {
                             return #result_err(#context_t::missing_variant_field(#ctx_var, #type_name, #field_tag));
                         };
 
-                        let decoder = #struct_field_decoder_t::<#c_param>::decode_field_name(&mut #entry_var, #ctx_var)?;
+                        let decoder = #struct_field_decoder_t::decode_field_name(&mut #entry_var, #ctx_var)?;
 
                         #field_alloc
                         #decode_match
@@ -483,7 +478,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     #decode_tag
                 };
 
-                #struct_decoder_t::<#c_param>::end(st, #ctx_var)?;
+                #struct_decoder_t::end(st, #ctx_var)?;
 
                 let #output_var = match #variant_tag_var {
                     #(#patterns,)*
@@ -553,7 +548,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     });
 
                     decode_match = quote! {
-                        let outcome = #decoder_t::<#c_param>::decode_string(decoder, #ctx_var, #visit_owned_fn("a string field tag", |#ctx_var, string: &str| {
+                        let outcome = #decoder_t::decode_string(decoder, #ctx_var, #visit_owned_fn("a string field tag", |#ctx_var, string: &str| {
                             #result_ok(match string {
                                 #tag => Outcome::Tag,
                                 #content => Outcome::Content,
@@ -569,7 +564,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
                         match outcome {
                             Outcome::Tag => {
-                                let #variant_decoder_var = #struct_field_decoder_t::<#c_param>::decode_field_value(#entry_var, #ctx_var)?;
+                                let #variant_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var, #ctx_var)?;
                                 #variant_alloc
                                 #tag_var = #option_some(#decode_tag);
                             }
@@ -578,7 +573,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                     return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, #tag));
                                 };
 
-                                let #body_decoder_var = #struct_field_decoder_t::<#c_param>::decode_field_value(#entry_var, #ctx_var)?;
+                                let #body_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var, #ctx_var)?;
 
                                 break #result_ok(match #variant_tag_var {
                                     #(#patterns,)*
@@ -589,7 +584,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                 return #result_err(#context_t::alloc_failed(#ctx_var));
                             }
                             Outcome::Err => {
-                                if !#struct_field_decoder_t::<#c_param>::skip_field_value(#entry_var, #ctx_var)? {
+                                if !#struct_field_decoder_t::skip_field_value(#entry_var, #ctx_var)? {
                                     return #result_err(#context_t::invalid_field_string_tag(#ctx_var, #type_name, #field_alloc_var));
                                 }
                             }
@@ -602,7 +597,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     decode_match = quote! {
                         match #decode_t_decode(#ctx_var, decoder)? {
                             #tag => {
-                                let #variant_decoder_var = #struct_field_decoder_t::<#c_param>::decode_field_value(#entry_var, #ctx_var)?;
+                                let #variant_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var, #ctx_var)?;
                                 #variant_alloc
                                 #tag_var = #option_some(#decode_tag);
                             }
@@ -611,7 +606,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                     return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, #tag));
                                 };
 
-                                let #body_decoder_var = #struct_field_decoder_t::<#c_param>::decode_field_value(#entry_var, #ctx_var)?;
+                                let #body_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var, #ctx_var)?;
 
                                 break #result_ok(match #variant_tag_var {
                                     #(#patterns,)*
@@ -619,7 +614,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                 });
                             }
                             field => {
-                                if !#struct_field_decoder_t::<#c_param>::skip_field_value(#entry_var, #ctx_var)? {
+                                if !#struct_field_decoder_t::skip_field_value(#entry_var, #ctx_var)? {
                                     return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, field));
                                 }
                             }
@@ -645,21 +640,21 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 #outcome_enum
 
                 #enter
-                let mut #struct_decoder_var = #decoder_t::<#c_param>::decode_struct(#decoder_var, #ctx_var, None)?;
+                let mut #struct_decoder_var = #decoder_t::decode_struct(#decoder_var, #ctx_var, None)?;
                 let mut #tag_var = #option_none;
 
                 let #output_var = loop {
-                    let #option_some(mut #entry_var) = #struct_decoder_t::<#c_param>::decode_field(&mut #struct_decoder_var, #ctx_var)? else {
+                    let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(&mut #struct_decoder_var, #ctx_var)? else {
                         return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, "other"));
                     };
 
-                    let decoder = #struct_field_decoder_t::<#c_param>::decode_field_name(&mut #entry_var, #ctx_var)?;
+                    let decoder = #struct_field_decoder_t::decode_field_name(&mut #entry_var, #ctx_var)?;
 
                     #field_alloc
                     #decode_match
                 };
 
-                #struct_decoder_t::<#c_param>::end(#struct_decoder_var, #ctx_var)?;
+                #struct_decoder_t::end(#struct_decoder_var, #ctx_var)?;
                 #leave
                 #output_var
             }})
@@ -701,7 +696,6 @@ fn decode_tagged(
         ctx_var,
         decoder_var,
         tag_var,
-        c_param,
         ..
     } = *cx;
 
@@ -820,7 +814,7 @@ fn decode_tagged(
             });
 
             decode_tag = quote! {
-                #decoder_t::<#c_param>::decode_string(#struct_decoder_var, #ctx_var, #visit_owned_fn("a string variant tag", |#ctx_var, string: &str| {
+                #decoder_t::decode_string(#struct_decoder_var, #ctx_var, #visit_owned_fn("a string variant tag", |#ctx_var, string: &str| {
                     #result_ok(match string {
                         #(#patterns,)*
                         string => {
@@ -871,7 +865,7 @@ fn decode_tagged(
     }
 
     let skip_field = quote! {
-        #struct_field_decoder_t::<#c_param>::skip_field_value(#struct_decoder_var, #ctx_var)?
+        #struct_field_decoder_t::skip_field_value(#struct_decoder_var, #ctx_var)?
     };
 
     let unsupported = match variant_tag {
@@ -919,7 +913,7 @@ fn decode_tagged(
                 quote! {
                     #pattern_var => {
                         #enter
-                        let #struct_decoder_var = #struct_field_decoder_t::<#c_param>::decode_field_value(#struct_decoder_var, #ctx_var)?;
+                        let #struct_decoder_var = #struct_field_decoder_t::decode_field_value(#struct_decoder_var, #ctx_var)?;
                         #decode
                         #leave
                     }
@@ -934,7 +928,7 @@ fn decode_tagged(
     tag_stmt.init = Some(syn::LocalInit {
         eq_token: <Token![=]>::default(),
         expr: Box::new(syn::Expr::Verbatim(quote! {{
-            let #struct_decoder_var = #struct_field_decoder_t::<#c_param>::decode_field_name(&mut #struct_decoder_var, #ctx_var)?;
+            let #struct_decoder_var = #struct_field_decoder_t::decode_field_name(&mut #struct_decoder_var, #ctx_var)?;
             #decode_tag
         }})),
         diverge: None,
@@ -965,15 +959,15 @@ fn decode_tagged(
         #(#decls)*
 
         #enter
-        let mut type_decoder = #decoder_t::<#c_param>::decode_struct(#decoder_var, #ctx_var, Some(#fields_len))?;
+        let mut type_decoder = #decoder_t::decode_struct(#decoder_var, #ctx_var, Some(#fields_len))?;
 
-        while let #option_some(mut #struct_decoder_var) = #struct_decoder_t::<#c_param>::decode_field(&mut type_decoder, #ctx_var)? {
+        while let #option_some(mut #struct_decoder_var) = #struct_decoder_t::decode_field(&mut type_decoder, #ctx_var)? {
             #field_alloc
             #tag_stmt
             #body
         }
 
-        #struct_decoder_t::<#c_param>::end(type_decoder, #ctx_var)?;
+        #struct_decoder_t::end(type_decoder, #ctx_var)?;
         #leave
         #path { #assigns }
     }})
@@ -1030,7 +1024,6 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
     let Ctxt {
         decoder_var,
         ctx_var,
-        c_param,
         ..
     } = *cx;
 
@@ -1056,7 +1049,7 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
 
         assign.push(quote! {
             #member: {
-                let field_decoder = #pack_decoder_t::<#c_param>::decode_next(&mut unpack, #ctx_var)?;
+                let field_decoder = #pack_decoder_t::decode_next(&mut unpack, #ctx_var)?;
                 #decode_path(#ctx_var, field_decoder)?
             }
         });
@@ -1082,9 +1075,9 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
 
     Ok(quote! {{
         #enter
-        let mut unpack = #decoder_t::<#c_param>::decode_pack(#decoder_var, #ctx_var)?;
+        let mut unpack = #decoder_t::decode_pack(#decoder_var, #ctx_var)?;
         let #output_var = #path { #(#assign),* };
-        #pack_decoder_t::<#c_param>::end(unpack, #ctx_var)?;
+        #pack_decoder_t::end(unpack, #ctx_var)?;
         #leave
         #output_var
     }})

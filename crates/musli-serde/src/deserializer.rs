@@ -10,25 +10,30 @@ use serde::de;
 #[cfg(feature = "alloc")]
 use alloc::string::String;
 
-pub struct Deserializer<'a, C: ?Sized, D> {
-    cx: &'a C,
+pub struct Deserializer<'de, 'a, D>
+where
+    D: Decoder<'de>,
+{
+    cx: &'a D::Cx,
     decoder: D,
 }
 
-impl<'a, C: ?Sized, D> Deserializer<'a, C, D> {
+impl<'de, 'a, D> Deserializer<'de, 'a, D>
+where
+    D: Decoder<'de>,
+{
     /// Construct a new deserializer out of a decoder.
-    pub fn new(cx: &'a C, decoder: D) -> Self {
+    pub fn new(cx: &'a D::Cx, decoder: D) -> Self {
         Self { cx, decoder }
     }
 }
 
-impl<'de, 'a, C, D> de::Deserializer<'de> for Deserializer<'a, C, D>
+impl<'de, 'a, D> de::Deserializer<'de> for Deserializer<'de, 'a, D>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
-    D: Decoder<'de, C>,
+    D: Decoder<'de>,
+    <D::Cx as Context>::Error: de::Error,
 {
-    type Error = C::Error;
+    type Error = <D::Cx as Context>::Error;
 
     #[inline]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -342,14 +347,20 @@ where
     }
 }
 
-struct TupleAccess<'a, C: ?Sized, D> {
-    cx: &'a C,
+struct TupleAccess<'de, 'a, D>
+where
+    D: PackDecoder<'de>,
+{
+    cx: &'a D::Cx,
     decoder: &'a mut D,
     remaining: usize,
 }
 
-impl<'a, C: ?Sized, D> TupleAccess<'a, C, D> {
-    fn new(cx: &'a C, decoder: &'a mut D, len: usize) -> Self {
+impl<'de, 'a, D> TupleAccess<'de, 'a, D>
+where
+    D: PackDecoder<'de>,
+{
+    fn new(cx: &'a D::Cx, decoder: &'a mut D, len: usize) -> Self {
         TupleAccess {
             cx,
             decoder,
@@ -358,13 +369,12 @@ impl<'a, C: ?Sized, D> TupleAccess<'a, C, D> {
     }
 }
 
-impl<'de, 'a, C, D> de::SeqAccess<'de> for TupleAccess<'a, C, D>
+impl<'de, 'a, D> de::SeqAccess<'de> for TupleAccess<'de, 'a, D>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
-    D: PackDecoder<'de, C>,
+    D: PackDecoder<'de>,
+    <D::Cx as Context>::Error: de::Error,
 {
-    type Error = C::Error;
+    type Error = <D::Cx as Context>::Error;
 
     #[inline]
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
@@ -387,15 +397,21 @@ where
         Some(self.remaining)
     }
 }
-struct StructAccess<'a, C: ?Sized, D> {
-    cx: &'a C,
+struct StructAccess<'de, 'a, D>
+where
+    D: StructFieldsDecoder<'de>,
+{
+    cx: &'a D::Cx,
     decoder: &'a mut D,
     remaining: usize,
 }
 
-impl<'a, C: ?Sized, D> StructAccess<'a, C, D> {
+impl<'de, 'a, D> StructAccess<'de, 'a, D>
+where
+    D: StructFieldsDecoder<'de>,
+{
     #[inline]
-    fn new(cx: &'a C, decoder: &'a mut D, fields: &'static [&'static str]) -> Self {
+    fn new(cx: &'a D::Cx, decoder: &'a mut D, fields: &'static [&'static str]) -> Self {
         StructAccess {
             cx,
             decoder,
@@ -404,13 +420,12 @@ impl<'a, C: ?Sized, D> StructAccess<'a, C, D> {
     }
 }
 
-impl<'de, 'a, C, D> de::MapAccess<'de> for StructAccess<'a, C, D>
+impl<'de, 'a, D> de::MapAccess<'de> for StructAccess<'de, 'a, D>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
-    D: StructFieldsDecoder<'de, C>,
+    D: StructFieldsDecoder<'de>,
+    <D::Cx as Context>::Error: de::Error,
 {
-    type Error = C::Error;
+    type Error = <D::Cx as Context>::Error;
 
     #[inline]
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -484,24 +499,29 @@ where
     }
 }
 
-struct SeqAccess<'a, C: ?Sized, D> {
-    cx: &'a C,
+struct SeqAccess<'de, 'a, D>
+where
+    D: SequenceDecoder<'de>,
+{
+    cx: &'a D::Cx,
     decoder: &'a mut D,
 }
 
-impl<'a, C: ?Sized, D> SeqAccess<'a, C, D> {
-    fn new(cx: &'a C, decoder: &'a mut D) -> Self {
+impl<'de, 'a, D> SeqAccess<'de, 'a, D>
+where
+    D: SequenceDecoder<'de>,
+{
+    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
         Self { cx, decoder }
     }
 }
 
-impl<'de, 'a, C, D> de::SeqAccess<'de> for SeqAccess<'a, C, D>
+impl<'de, 'a, D> de::SeqAccess<'de> for SeqAccess<'de, 'a, D>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
-    D: SequenceDecoder<'de, C>,
+    D: SequenceDecoder<'de>,
+    <D::Cx as Context>::Error: de::Error,
 {
-    type Error = C::Error;
+    type Error = <D::Cx as Context>::Error;
 
     #[inline]
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
@@ -525,24 +545,29 @@ where
     }
 }
 
-struct MapAccess<'a, C: ?Sized, D: ?Sized> {
-    cx: &'a C,
+struct MapAccess<'de, 'a, D: ?Sized>
+where
+    D: MapEntriesDecoder<'de>,
+{
+    cx: &'a D::Cx,
     decoder: &'a mut D,
 }
 
-impl<'a, C: ?Sized, D: ?Sized> MapAccess<'a, C, D> {
-    fn new(cx: &'a C, decoder: &'a mut D) -> Self {
+impl<'de, 'a, D: ?Sized> MapAccess<'de, 'a, D>
+where
+    D: MapEntriesDecoder<'de>,
+{
+    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
         Self { cx, decoder }
     }
 }
 
-impl<'de, 'a, C, D: ?Sized> de::MapAccess<'de> for MapAccess<'a, C, D>
+impl<'de, 'a, D: ?Sized> de::MapAccess<'de> for MapAccess<'de, 'a, D>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
-    D: MapEntriesDecoder<'de, C>,
+    D: MapEntriesDecoder<'de>,
+    <D::Cx as Context>::Error: de::Error,
 {
-    type Error = C::Error;
+    type Error = <D::Cx as Context>::Error;
 
     #[inline]
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -632,27 +657,27 @@ where
     }
 
     #[inline]
-    fn visit_u8(self, _: &C, v: u8) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u8(self, _: &C, v: u8) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u8(v)
     }
 
     #[inline]
-    fn visit_u16(self, _: &C, v: u16) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u16(self, _: &C, v: u16) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u16(v)
     }
 
     #[inline]
-    fn visit_u32(self, _: &C, v: u32) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u32(self, _: &C, v: u32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u32(v)
     }
 
     #[inline]
-    fn visit_u64(self, _: &C, v: u64) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u64(self, _: &C, v: u64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u64(v)
     }
 
     #[inline]
-    fn visit_u128(self, _: &C, v: u128) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_u128(self, _: &C, v: u128) -> Result<Self::Ok, C::Error> {
         // Serde's 128-bit support is very broken, so just try to avoid it if we can.
         // See: https://github.com/serde-rs/serde/issues/2576
         if let Ok(v) = u64::try_from(v) {
@@ -663,27 +688,27 @@ where
     }
 
     #[inline]
-    fn visit_i8(self, _: &C, v: i8) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i8(self, _: &C, v: i8) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i8(v)
     }
 
     #[inline]
-    fn visit_i16(self, _: &C, v: i16) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i16(self, _: &C, v: i16) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i16(v)
     }
 
     #[inline]
-    fn visit_i32(self, _: &C, v: i32) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i32(self, _: &C, v: i32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i32(v)
     }
 
     #[inline]
-    fn visit_i64(self, _: &C, v: i64) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i64(self, _: &C, v: i64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i64(v)
     }
 
     #[inline]
-    fn visit_i128(self, _: &C, v: i128) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_i128(self, _: &C, v: i128) -> Result<Self::Ok, C::Error> {
         // Serde's 128-bit support is very broken, so just try to avoid it if we can.
         // See: https://github.com/serde-rs/serde/issues/2576
         if let Ok(v) = i64::try_from(v) {
@@ -694,12 +719,12 @@ where
     }
 
     #[inline]
-    fn visit_f32(self, _: &C, v: f32) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_f32(self, _: &C, v: f32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_f32(v)
     }
 
     #[inline]
-    fn visit_f64(self, _: &C, v: f64) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_f64(self, _: &C, v: f64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_f64(v)
     }
 
@@ -722,29 +747,34 @@ where
     }
 
     #[inline]
-    fn visit_bytes(self, _: &C, v: &'de [u8]) -> Result<Self::Ok, <C as Context>::Error> {
+    fn visit_bytes(self, _: &C, v: &'de [u8]) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_bytes(v)
     }
 }
 
-struct EnumAccess<'a, C: ?Sized, D> {
-    cx: &'a C,
+struct EnumAccess<'de, 'a, D>
+where
+    D: VariantDecoder<'de>,
+{
+    cx: &'a D::Cx,
     decoder: D,
 }
 
-impl<'a, C: ?Sized, D> EnumAccess<'a, C, D> {
-    fn new(cx: &'a C, decoder: D) -> Self {
+impl<'de, 'a, D> EnumAccess<'de, 'a, D>
+where
+    D: VariantDecoder<'de>,
+{
+    fn new(cx: &'a D::Cx, decoder: D) -> Self {
         Self { cx, decoder }
     }
 }
 
-impl<'a, 'de, C, D> de::VariantAccess<'de> for EnumAccess<'a, C, D>
+impl<'de, 'a, D> de::VariantAccess<'de> for EnumAccess<'de, 'a, D>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
-    D: VariantDecoder<'de, C>,
+    D: VariantDecoder<'de>,
+    <D::Cx as Context>::Error: de::Error,
 {
-    type Error = C::Error;
+    type Error = <D::Cx as Context>::Error;
 
     #[inline]
     fn unit_variant(mut self) -> Result<(), Self::Error> {
@@ -797,13 +827,12 @@ where
     }
 }
 
-impl<'a, 'de, C, D> de::EnumAccess<'de> for EnumAccess<'a, C, D>
+impl<'de, 'a, D> de::EnumAccess<'de> for EnumAccess<'de, 'a, D>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
-    D: VariantDecoder<'de, C>,
+    D: VariantDecoder<'de>,
+    <D::Cx as Context>::Error: de::Error,
 {
-    type Error = C::Error;
+    type Error = <D::Cx as Context>::Error;
     type Variant = Self;
 
     #[inline]
@@ -953,7 +982,7 @@ where
     #[inline]
     fn visit_option<D>(self, cx: &C, v: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Cx = C>,
     {
         match v {
             Some(v) => self.visitor.visit_some(Deserializer::new(cx, v)),
@@ -964,7 +993,7 @@ where
     #[inline]
     fn visit_sequence<D>(self, cx: &C, mut decoder: D) -> Result<Self::Ok, C::Error>
     where
-        D: SequenceDecoder<'de, C>,
+        D: SequenceDecoder<'de, Cx = C>,
     {
         let value = self.visitor.visit_seq(SeqAccess::new(cx, &mut decoder))?;
         decoder.end(cx)?;
@@ -974,7 +1003,7 @@ where
     #[inline]
     fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        D: MapDecoder<'de, C>,
+        D: MapDecoder<'de, Cx = C>,
     {
         let mut map_decoder = decoder.into_map_entries(cx)?;
         let value = self

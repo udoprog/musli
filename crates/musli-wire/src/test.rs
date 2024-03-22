@@ -30,10 +30,9 @@ impl<'de, M, T> Decode<'de, M> for Typed<T>
 where
     T: Decode<'de, M>,
 {
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Mode = M>,
     {
         let mut unpack = decoder.decode_pack(cx)?;
         let tag = cx.decode(unpack.decode_next(cx)?)?;

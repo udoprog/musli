@@ -6,6 +6,8 @@ use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::Token;
 
+const U_PARAM: &str = "__U";
+
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Ty {
     /// `str`.
@@ -16,13 +18,20 @@ pub(super) enum Ty {
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Extra {
+    /// `type Type = Never;`
     None,
+    /// `type Error = <Self::Cx as Context>::Error;`
+    Error,
+    /// `type Mode = <Self::Cx as Context>::Mode;`
+    Mode,
     Context,
     This,
     Visitor(Ty),
 }
 
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
+    ("Error", Extra::Error),
+    ("Mode", Extra::Mode),
     ("WithContext", Extra::Context),
     ("EncodeSome", Extra::None),
     ("EncodePack", Extra::This),
@@ -37,6 +46,8 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
 ];
 
 pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
+    ("Error", Extra::Error),
+    ("Mode", Extra::Mode),
     ("WithContext", Extra::Context),
     ("DecodeBuffer", Extra::None),
     ("DecodeSome", Extra::None),
@@ -58,6 +69,12 @@ pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("Number", Extra::None),
 ];
 
+#[derive(Clone, Copy)]
+pub(super) enum Kind {
+    SelfCx,
+    GenericCx,
+}
+
 pub(super) struct Types {
     item_impl: syn::ItemImpl,
 }
@@ -76,8 +93,9 @@ impl Types {
         mut self,
         what: &str,
         types: &[(&str, Extra)],
-        arguments: &[&str],
+        argument: Option<&str>,
         hint: &str,
+        kind: Kind,
     ) -> syn::Result<TokenStream> {
         let mut missing = types
             .iter()
@@ -139,16 +157,29 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: self.never_type(arguments, extra)?,
+                path: self.never_type(argument, extra, kind)?,
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
         }
 
         for (ident, extra) in missing {
-            let generics = match extra {
+            let ty;
+            let generics;
+
+            match extra {
+                Extra::Mode => {
+                    ty = syn::parse_quote!(<Self::Cx as ::musli::context::Context>::Mode);
+
+                    generics = syn::Generics::default();
+                }
+                Extra::Error => {
+                    ty = syn::parse_quote!(<Self::Cx as ::musli::context::Context>::Error);
+
+                    generics = syn::Generics::default();
+                }
                 Extra::Context => {
-                    let c_param = syn::Ident::new("__C", Span::call_site());
+                    let u_param = syn::Ident::new(U_PARAM, Span::call_site());
 
                     let mut where_clause = syn::WhereClause {
                         where_token: <Token![where]>::default(),
@@ -157,36 +188,32 @@ impl Types {
 
                     where_clause
                         .predicates
-                        .push(syn::parse_quote!(#c_param: ::musli::context::Context));
+                        .push(syn::parse_quote!(#u_param: ::musli::context::Context));
 
                     let mut params = Punctuated::default();
 
                     params.push(syn::GenericParam::Type(syn::TypeParam {
                         attrs: Vec::new(),
-                        ident: c_param,
+                        ident: u_param,
                         colon_token: None,
                         bounds: Punctuated::default(),
                         eq_token: None,
                         default: None,
                     }));
 
-                    syn::Generics {
+                    ty = syn::Type::Path(syn::TypePath {
+                        qself: None,
+                        path: self.never_type(argument, extra, kind)?,
+                    });
+
+                    generics = syn::Generics {
                         lt_token: Some(<Token![<]>::default()),
                         params,
                         gt_token: Some(<Token![>]>::default()),
                         where_clause: Some(where_clause),
-                    }
+                    };
                 }
                 Extra::This => {
-                    let mut it = self.item_impl.generics.type_params();
-
-                    let Some(syn::TypeParam { ident: c_param, .. }) = it.next() else {
-                        return Err(syn::Error::new_spanned(
-                            &self.item_impl.generics,
-                            "Missing generic parameter in associated type (usually `C`)",
-                        ));
-                    };
-
                     let this_lifetime = syn::Lifetime::new("'this", Span::call_site());
 
                     let mut where_clause = syn::WhereClause {
@@ -196,7 +223,7 @@ impl Types {
 
                     where_clause
                         .predicates
-                        .push(syn::parse_quote!(#c_param: #this_lifetime));
+                        .push(syn::parse_quote!(Self::Cx: #this_lifetime));
 
                     let mut params = Punctuated::default();
 
@@ -207,17 +234,27 @@ impl Types {
                         bounds: Punctuated::default(),
                     }));
 
-                    syn::Generics {
+                    ty = syn::Type::Path(syn::TypePath {
+                        qself: None,
+                        path: self.never_type(argument, extra, kind)?,
+                    });
+
+                    generics = syn::Generics {
                         lt_token: Some(<Token![<]>::default()),
                         params,
                         gt_token: Some(<Token![>]>::default()),
                         where_clause: Some(where_clause),
-                    }
+                    };
                 }
-                _ => syn::Generics::default(),
-            };
+                _ => {
+                    ty = syn::Type::Path(syn::TypePath {
+                        qself: None,
+                        path: self.never_type(argument, extra, kind)?,
+                    });
 
-            let never = self.never_type(arguments, extra)?;
+                    generics = syn::Generics::default();
+                }
+            };
 
             let ty = syn::ImplItemType {
                 attrs: Vec::new(),
@@ -227,10 +264,7 @@ impl Types {
                 ident,
                 generics,
                 eq_token: <Token![=]>::default(),
-                ty: syn::Type::Path(syn::TypePath {
-                    qself: None,
-                    path: never.clone(),
-                }),
+                ty,
                 semi_token: <Token![;]>::default(),
             };
 
@@ -257,7 +291,12 @@ impl Types {
         Ok(self.item_impl.into_token_stream())
     }
 
-    fn never_type(&self, arguments: &[&str], extra: Extra) -> syn::Result<syn::Path> {
+    fn never_type(
+        &self,
+        argument: Option<&str>,
+        extra: Extra,
+        kind: Kind,
+    ) -> syn::Result<syn::Path> {
         let mut never = syn::Path {
             leading_colon: None,
             segments: Punctuated::default(),
@@ -277,15 +316,17 @@ impl Types {
 
             let mut args = Punctuated::default();
 
-            for &arg in arguments {
+            if let Some(arg) = argument {
                 args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
                     qself: None,
                     path: self_type(arg),
                 })));
+            } else {
+                args.push(syn::parse_quote!(()));
             }
 
-            if let Extra::Visitor(ty) = extra {
-                match ty {
+            match extra {
+                Extra::Visitor(ty) => match ty {
                     Ty::Str => {
                         args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
                             qself: None,
@@ -313,7 +354,18 @@ impl Types {
                             },
                         )));
                     }
+                },
+                Extra::Context => {
+                    let u_param = syn::Ident::new(U_PARAM, Span::call_site());
+                    args.push(syn::parse_quote!(#u_param));
                 }
+                Extra::None | Extra::This => match kind {
+                    Kind::SelfCx => {
+                        args.push(syn::parse_quote!(Self::Cx));
+                    }
+                    Kind::GenericCx => {}
+                },
+                _ => {}
             }
 
             if !args.is_empty() {

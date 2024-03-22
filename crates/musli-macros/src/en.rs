@@ -11,7 +11,6 @@ use crate::internals::tokens::Tokens;
 struct Ctxt<'a> {
     ctx_var: &'a syn::Ident,
     encoder_var: &'a syn::Ident,
-    c_param: &'a syn::Ident,
     trace: bool,
 }
 
@@ -22,18 +21,15 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let encoder_var = e.cx.ident("encoder");
     let ctx_var = e.cx.ident("ctx");
-    let c_param = e.cx.type_with_span("C", Span::call_site());
     let e_param = e.cx.type_with_span("E", Span::call_site());
 
     let cx = Ctxt {
         ctx_var: &ctx_var,
         encoder_var: &encoder_var,
-        c_param: &c_param,
         trace: true,
     };
 
     let Tokens {
-        context_t,
         core_result,
         encode_t,
         encoder_t,
@@ -68,10 +64,9 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         #[automatically_derived]
         impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
-            fn encode<#c_param, #e_param>(&self, #ctx_var: &#c_param, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t<#c_param>>::Ok, <#c_param as #context_t>::Error>
+            fn encode<#e_param>(&self, #ctx_var: &#e_param::Cx, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t>::Ok, <#e_param as #encoder_t>::Error>
             where
-                #c_param: ?Sized + #context_t<Mode = #mode_ident>,
-                #e_param: #encoder_t<#c_param>,
+                #e_param: #encoder_t<Mode = #mode_ident>,
             {
                 #body
             }
@@ -84,7 +79,6 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
     let Ctxt {
         ctx_var,
         encoder_var,
-        c_param,
         ..
     } = *cx;
 
@@ -138,7 +132,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
             encode = quote! {{
                 #enter
                 #(#decls)*
-                let #output_var = #encoder_t::<#c_param>::encode_struct_fn(#encoder_var, #ctx_var, #len, |#encoder_var| {
+                let #output_var = #encoder_t::encode_struct_fn(#encoder_var, #ctx_var, #len, |#encoder_var| {
                     #(#encoders)*
                     #result_ok(())
                 })?;
@@ -151,7 +145,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
 
             encode = quote! {{
                 #enter
-                let #output_var = #encoder_t::<#c_param>::encode_pack_fn(#encoder_var, #ctx_var, |#pack_var| {
+                let #output_var = #encoder_t::encode_pack_fn(#encoder_var, #ctx_var, |#pack_var| {
                     #(#decls)*
                     #(#encoders)*
                     #result_ok(())
@@ -179,7 +173,6 @@ fn insert_fields(
     let Ctxt {
         ctx_var,
         encoder_var,
-        c_param,
         ..
     } = *cx;
 
@@ -239,10 +232,10 @@ fn insert_fields(
                 encode = quote! {
                     #enter
 
-                    #struct_encoder_t::<#c_param>::encode_field_fn(#encoder_var, #ctx_var, |#pair_encoder_var| {
-                        let #field_encoder_var = #struct_field_encoder_t::<#c_param>::encode_field_name(#pair_encoder_var, #ctx_var)?;
+                    #struct_encoder_t::encode_field_fn(#encoder_var, #ctx_var, |#pair_encoder_var| {
+                        let #field_encoder_var = #struct_field_encoder_t::encode_field_name(#pair_encoder_var, #ctx_var)?;
                         #encode_t_encode(&#tag, #ctx_var, #field_encoder_var)?;
-                        let #value_encoder_var = #struct_field_encoder_t::<#c_param>::encode_field_value(#pair_encoder_var, #ctx_var)?;
+                        let #value_encoder_var = #struct_field_encoder_t::encode_field_value(#pair_encoder_var, #ctx_var)?;
                         #encode_path(#access, #ctx_var, #value_encoder_var)?;
                         #result_ok(())
                     })?;
@@ -253,7 +246,7 @@ fn insert_fields(
             Packing::Packed => {
                 encode = quote! {
                     #enter
-                    let #sequence_decoder_next_var = #sequence_encoder_t::<#c_param>::encode_next(#pack_var, #ctx_var)?;
+                    let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(#pack_var, #ctx_var)?;
                     #encode_path(#access, #ctx_var, #sequence_decoder_next_var)?;
                     #leave
                 };
@@ -336,7 +329,6 @@ fn encode_variant(
     let Ctxt {
         ctx_var,
         encoder_var,
-        c_param,
         ..
     } = *cx;
 
@@ -371,7 +363,7 @@ fn encode_variant(
                     let decls = tests.iter().map(|t| &t.decl);
 
                     encode = quote! {{
-                        #encoder_t::<#c_param>::encode_pack_fn(#encoder_var, #ctx_var, |#pack_var| {
+                        #encoder_t::encode_pack_fn(#encoder_var, #ctx_var, |#pack_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result_ok(())
@@ -383,7 +375,7 @@ fn encode_variant(
                     let len = length_test(v.st.fields.len(), &tests);
 
                     encode = quote! {{
-                        #encoder_t::<#c_param>::encode_struct_fn(#encoder_var, #ctx_var, #len, |#encoder_var| {
+                        #encoder_t::encode_struct_fn(#encoder_var, #ctx_var, #len, |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result_ok(())
@@ -399,11 +391,11 @@ fn encode_variant(
                 let tag_encoder = b.cx.ident("tag_encoder");
 
                 encode = quote! {{
-                    #encoder_t::<#c_param>::encode_variant_fn(#encoder_var, #ctx_var, |#variant_encoder| {
-                        let #tag_encoder = #variant_encoder_t::<#c_param>::encode_tag(#variant_encoder, #ctx_var)?;
+                    #encoder_t::encode_variant_fn(#encoder_var, #ctx_var, |#variant_encoder| {
+                        let #tag_encoder = #variant_encoder_t::encode_tag(#variant_encoder, #ctx_var)?;
                         #encode_t_encode(&#tag, #ctx_var, #tag_encoder)?;
 
-                        let #encoder_var = #variant_encoder_t::<#c_param>::encode_value(#variant_encoder, #ctx_var)?;
+                        let #encoder_var = #variant_encoder_t::encode_value(#variant_encoder, #ctx_var)?;
                         #encode;
                         #result_ok(())
                     })?
@@ -420,8 +412,8 @@ fn encode_variant(
                 let decls = tests.iter().map(|t| &t.decl);
 
                 encode = quote! {{
-                    #encoder_t::<#c_param>::encode_struct_fn(#encoder_var, #ctx_var, 0, |#encoder_var| {
-                        #struct_encoder_t::<#c_param>::insert_field(#encoder_var, #ctx_var, #field_tag, #tag)?;
+                    #encoder_t::encode_struct_fn(#encoder_var, #ctx_var, 0, |#encoder_var| {
+                        #struct_encoder_t::insert_field(#encoder_var, #ctx_var, #field_tag, #tag)?;
                         #(#decls)*
                         #(#encoders)*
                         #result_ok(())
@@ -447,16 +439,16 @@ fn encode_variant(
                 let content_tag = b.cx.ident("content_tag");
 
                 encode = quote! {{
-                    #encoder_t::<#c_param>::encode_struct_fn(#encoder_var, #ctx_var, 2, |#struct_encoder| {
-                        #struct_encoder_t::<#c_param>::insert_field(#struct_encoder, #ctx_var, &#field_tag, #tag)?;
+                    #encoder_t::encode_struct_fn(#encoder_var, #ctx_var, 2, |#struct_encoder| {
+                        #struct_encoder_t::insert_field(#struct_encoder, #ctx_var, &#field_tag, #tag)?;
 
-                        #struct_encoder_t::<#c_param>::encode_field_fn(#struct_encoder, #ctx_var, |#pair| {
-                            let #content_tag = #struct_field_encoder_t::<#c_param>::encode_field_name(#pair, #ctx_var)?;
+                        #struct_encoder_t::encode_field_fn(#struct_encoder, #ctx_var, |#pair| {
+                            let #content_tag = #struct_field_encoder_t::encode_field_name(#pair, #ctx_var)?;
                             #encode_t_encode(&#content, #ctx_var, #content_tag)?;
 
-                            let #content_struct = #struct_field_encoder_t::<#c_param>::encode_field_value(#pair, #ctx_var)?;
+                            let #content_struct = #struct_field_encoder_t::encode_field_value(#pair, #ctx_var)?;
 
-                            #encoder_t::<#c_param>::encode_struct_fn(#content_struct, #ctx_var, #len, |#encoder_var| {
+                            #encoder_t::encode_struct_fn(#content_struct, #ctx_var, #len, |#encoder_var| {
                                 #(#decls)*
                                 #(#encoders)*
                                 #result_ok(())

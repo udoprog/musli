@@ -1,7 +1,6 @@
 #![allow(unused_variables)]
 
 use core::fmt;
-use core::marker::PhantomData;
 
 use crate::expecting::{self, Expecting};
 use crate::Context;
@@ -11,37 +10,43 @@ use super::{
 };
 
 /// Trait governing how the encoder works.
-pub trait Encoder<C: ?Sized + Context>: Sized {
+pub trait Encoder: Sized {
+    /// Context associated with the encoder.
+    type Cx: ?Sized + Context<Error = Self::Error, Mode = Self::Mode>;
     /// The type returned by the encoder. For [Encode] implementations ensures
     /// that they are used correctly, since only functions returned by the
     /// [Encoder] is capable of returning this value.
     type Ok;
+    /// Error associated with encoding.
+    type Error;
+    /// Mode associated with encoding.
+    type Mode;
     /// Constructed [`Encoder`] with a different context.
-    type WithContext<U>: Encoder<U, Ok = Self::Ok>
+    type WithContext<U>: Encoder<Cx = U, Ok = Self::Ok, Error = U::Error, Mode = U::Mode>
     where
         U: Context;
     /// A simple pack that packs a sequence of elements.
-    type EncodePack<'this>: SequenceEncoder<C, Ok = Self::Ok>
+    type EncodePack<'this>: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>
     where
-        C: 'this;
+        Self::Cx: 'this;
     /// Encoder returned when encoding an optional value which is present.
-    type EncodeSome: Encoder<C, Ok = Self::Ok>;
+    type EncodeSome: Encoder<Cx = Self::Cx, Ok = Self::Ok, Error = Self::Error, Mode = Self::Mode>;
     /// The type of a sequence encoder.
-    type EncodeSequence: SequenceEncoder<C, Ok = Self::Ok>;
+    type EncodeSequence: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// The type of a tuple encoder.
-    type EncodeTuple: SequenceEncoder<C, Ok = Self::Ok>;
+    type EncodeTuple: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// The type of a map encoder.
-    type EncodeMap: MapEncoder<C, Ok = Self::Ok>;
+    type EncodeMap: MapEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Streaming encoder for map pairs.
-    type EncodeMapEntries: MapEntriesEncoder<C, Ok = Self::Ok>;
+    type EncodeMapEntries: MapEntriesEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Encoder that can encode a struct.
-    type EncodeStruct: StructEncoder<C, Ok = Self::Ok>;
+    type EncodeStruct: StructEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Encoder for a struct variant.
-    type EncodeVariant: VariantEncoder<C, Ok = Self::Ok>;
+    type EncodeVariant: VariantEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Specialized encoder for a tuple variant.
-    type EncodeTupleVariant: SequenceEncoder<C, Ok = Self::Ok>;
+    type EncodeTupleVariant: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Specialized encoder for a struct variant.
-    type EncodeStructVariant: StructEncoder<C, Ok = Self::Ok>;
+    type EncodeStructVariant: StructEncoder<Cx = Self::Cx, Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::encoder]`][crate::encoder] attribute
@@ -50,7 +55,10 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     type __UseMusliEncoderAttributeMacro;
 
     /// Construct an encoder with a different context.
-    fn with_context<U>(self, cx: &C) -> Result<Self::WithContext<U>, C::Error>
+    fn with_context<U>(
+        self,
+        cx: &Self::Cx,
+    ) -> Result<Self::WithContext<U>, <Self::Cx as Context>::Error>
     where
         U: Context,
     {
@@ -80,21 +88,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct UnitStruct;
     ///
     /// impl<M> Encode<M> for UnitStruct {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_unit(cx)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_unit(self, cx: &C) -> Result<Self::Ok, C::Error> {
+    fn encode_unit(self, cx: &Self::Cx) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unit,
             ExpectingWrapper::new(&self),
@@ -120,21 +127,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: bool }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_bool(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_bool(self, cx: &C, v: bool) -> Result<Self::Ok, C::Error> {
+    fn encode_bool(self, cx: &Self::Cx, v: bool) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bool,
             ExpectingWrapper::new(&self),
@@ -160,21 +166,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: char }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_char(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_char(self, cx: &C, v: char) -> Result<Self::Ok, C::Error> {
+    fn encode_char(self, cx: &Self::Cx, v: char) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Char,
             ExpectingWrapper::new(&self),
@@ -200,21 +205,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: u8 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_u8(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u8(self, cx: &C, v: u8) -> Result<Self::Ok, C::Error> {
+    fn encode_u8(self, cx: &Self::Cx, v: u8) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned8,
             ExpectingWrapper::new(&self),
@@ -240,21 +244,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: u16 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_u16(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u16(self, cx: &C, v: u16) -> Result<Self::Ok, C::Error> {
+    fn encode_u16(self, cx: &Self::Cx, v: u16) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned16,
             ExpectingWrapper::new(&self),
@@ -280,21 +283,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: u32 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_u32(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u32(self, cx: &C, v: u32) -> Result<Self::Ok, C::Error> {
+    fn encode_u32(self, cx: &Self::Cx, v: u32) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned32,
             ExpectingWrapper::new(&self),
@@ -320,21 +322,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: u64 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_u64(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u64(self, cx: &C, v: u64) -> Result<Self::Ok, C::Error> {
+    fn encode_u64(self, cx: &Self::Cx, v: u64) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned64,
             ExpectingWrapper::new(&self),
@@ -360,21 +361,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: u128 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_u128(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_u128(self, cx: &C, v: u128) -> Result<Self::Ok, C::Error> {
+    fn encode_u128(self, cx: &Self::Cx, v: u128) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Unsigned128,
             ExpectingWrapper::new(&self),
@@ -400,21 +400,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: i8 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_i8(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i8(self, cx: &C, v: i8) -> Result<Self::Ok, C::Error> {
+    fn encode_i8(self, cx: &Self::Cx, v: i8) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed8,
             ExpectingWrapper::new(&self),
@@ -440,21 +439,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: i16 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_i16(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i16(self, cx: &C, v: i16) -> Result<Self::Ok, C::Error> {
+    fn encode_i16(self, cx: &Self::Cx, v: i16) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed16,
             ExpectingWrapper::new(&self),
@@ -480,21 +478,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: i32 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_i32(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i32(self, cx: &C, v: i32) -> Result<Self::Ok, C::Error> {
+    fn encode_i32(self, cx: &Self::Cx, v: i32) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed32,
             ExpectingWrapper::new(&self),
@@ -520,21 +517,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: i64 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_i64(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i64(self, cx: &C, v: i64) -> Result<Self::Ok, C::Error> {
+    fn encode_i64(self, cx: &Self::Cx, v: i64) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed64,
             ExpectingWrapper::new(&self),
@@ -560,21 +556,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: i128 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_i128(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_i128(self, cx: &C, v: i128) -> Result<Self::Ok, C::Error> {
+    fn encode_i128(self, cx: &Self::Cx, v: i128) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Signed128,
             ExpectingWrapper::new(&self),
@@ -600,21 +595,24 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: usize }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_usize(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_usize(self, cx: &C, v: usize) -> Result<Self::Ok, C::Error> {
+    fn encode_usize(
+        self,
+        cx: &Self::Cx,
+        v: usize,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Usize,
             ExpectingWrapper::new(&self),
@@ -640,21 +638,24 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: isize }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_isize(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_isize(self, cx: &C, v: isize) -> Result<Self::Ok, C::Error> {
+    fn encode_isize(
+        self,
+        cx: &Self::Cx,
+        v: isize,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Isize,
             ExpectingWrapper::new(&self),
@@ -680,21 +681,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: f32 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_f32(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_f32(self, cx: &C, v: f32) -> Result<Self::Ok, C::Error> {
+    fn encode_f32(self, cx: &Self::Cx, v: f32) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float32,
             ExpectingWrapper::new(&self),
@@ -720,21 +720,20 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: f64 }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_f64(cx, self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_f64(self, cx: &C, v: f64) -> Result<Self::Ok, C::Error> {
+    fn encode_f64(self, cx: &Self::Cx, v: f64) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Float64,
             ExpectingWrapper::new(&self),
@@ -760,21 +759,24 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: [u8; 128] }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_array(cx, &self.data)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_array<const N: usize>(self, cx: &C, array: &[u8; N]) -> Result<Self::Ok, C::Error> {
+    fn encode_array<const N: usize>(
+        self,
+        cx: &Self::Cx,
+        array: &[u8; N],
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Array,
             ExpectingWrapper::new(&self),
@@ -801,21 +803,24 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: Vec<u8> }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_bytes(cx, self.data.as_slice())
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_bytes(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn encode_bytes(
+        self,
+        cx: &Self::Cx,
+        bytes: &[u8],
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Bytes,
             ExpectingWrapper::new(&self),
@@ -851,15 +856,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # use std::collections::VecDeque;
     /// # struct MyType { data: VecDeque<u8> }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         let (first, second) = self.data.as_slices();
     ///         encoder.encode_bytes_vectored(cx, self.data.len(), [first, second])
@@ -867,7 +871,12 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_bytes_vectored<I>(self, cx: &C, len: usize, vectors: I) -> Result<Self::Ok, C::Error>
+    fn encode_bytes_vectored<I>(
+        self,
+        cx: &Self::Cx,
+        len: usize,
+        vectors: I,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         I: IntoIterator,
         I::Item: AsRef<[u8]>,
@@ -897,21 +906,24 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: String }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_string(cx, self.data.as_str())
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_string(self, cx: &C, string: &str) -> Result<Self::Ok, C::Error> {
+    fn encode_string(
+        self,
+        cx: &Self::Cx,
+        string: &str,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::String,
             ExpectingWrapper::new(&self),
@@ -937,14 +949,13 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: Option<String> }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
@@ -958,7 +969,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_some(self, cx: &C) -> Result<Self::EncodeSome, C::Error> {
+    fn encode_some(self, cx: &Self::Cx) -> Result<Self::EncodeSome, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             ExpectingWrapper::new(&self),
@@ -984,14 +995,13 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// # struct MyType { data: Option<String> }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         match &self.data {
     ///             Some(data) => {
@@ -1005,7 +1015,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_none(self, cx: &C) -> Result<Self::Ok, C::Error> {
+    fn encode_none(self, cx: &Self::Cx) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
             ExpectingWrapper::new(&self),
@@ -1022,7 +1032,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{SequenceEncoder};
     ///
     /// struct PackedStruct {
@@ -1031,10 +1041,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     ///
     /// impl<M> Encode<M> for PackedStruct {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         let mut pack = encoder.encode_pack(cx)?;
     ///         self.field.encode(cx, pack.encode_next(cx)?)?;
@@ -1044,7 +1053,10 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_pack(self, cx: &C) -> Result<Self::EncodePack<'_>, C::Error> {
+    fn encode_pack(
+        self,
+        cx: &Self::Cx,
+    ) -> Result<Self::EncodePack<'_>, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Pack,
             ExpectingWrapper::new(&self),
@@ -1056,7 +1068,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{SequenceEncoder};
     ///
     /// struct PackedStruct {
@@ -1065,10 +1077,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     ///
     /// impl<M> Encode<M> for PackedStruct {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_pack_fn(cx, |pack| {
     ///             self.field.encode(cx, pack.encode_next(cx)?)?;
@@ -1079,9 +1090,13 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_pack_fn<F>(self, cx: &C, f: F) -> Result<Self::Ok, C::Error>
+    fn encode_pack_fn<F>(
+        self,
+        cx: &Self::Cx,
+        f: F,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::EncodePack<'_>) -> Result<(), C::Error>,
+        F: FnOnce(&mut Self::EncodePack<'_>) -> Result<(), <Self::Cx as Context>::Error>,
     {
         let mut pack = self.encode_pack(cx)?;
         f(&mut pack)?;
@@ -1113,15 +1128,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{SequenceEncoder};
     /// # struct MyType { data: Vec<String> }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         let mut seq = encoder.encode_sequence(cx, self.data.len())?;
     ///
@@ -1134,7 +1148,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_sequence(self, cx: &C, len: usize) -> Result<Self::EncodeSequence, C::Error> {
+    fn encode_sequence(
+        self,
+        cx: &Self::Cx,
+        len: usize,
+    ) -> Result<Self::EncodeSequence, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Sequence,
             ExpectingWrapper::new(&self),
@@ -1146,15 +1164,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{SequenceEncoder};
     /// # struct MyType { data: Vec<String> }
     ///
     /// impl<M> Encode<M> for MyType {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_sequence_fn(cx, self.data.len(), |seq| {
     ///             for element in &self.data {
@@ -1167,9 +1184,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_sequence_fn<F>(self, cx: &C, len: usize, f: F) -> Result<Self::Ok, C::Error>
+    fn encode_sequence_fn<F>(
+        self,
+        cx: &Self::Cx,
+        len: usize,
+        f: F,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::EncodeSequence) -> Result<(), C::Error>,
+        F: FnOnce(&mut Self::EncodeSequence) -> Result<(), <Self::Cx as Context>::Error>,
     {
         let mut seq = self.encode_sequence(cx, len)?;
         f(&mut seq)?;
@@ -1189,16 +1211,15 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{SequenceEncoder};
     ///
     /// struct PackedTuple(u32, [u8; 128]);
     ///
     /// impl<M> Encode<M> for PackedTuple {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         let mut tuple = encoder.encode_tuple(cx, 2)?;
     ///         self.0.encode(cx, tuple.encode_next(cx)?)?;
@@ -1208,7 +1229,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple(self, cx: &C, len: usize) -> Result<Self::EncodeTuple, C::Error> {
+    fn encode_tuple(
+        self,
+        cx: &Self::Cx,
+        len: usize,
+    ) -> Result<Self::EncodeTuple, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Tuple,
             ExpectingWrapper::new(&self),
@@ -1234,15 +1259,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{MapEncoder};
     /// # struct Struct { name: String, age: u32 }
     ///
     /// impl<M> Encode<M> for Struct {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         let mut map = encoder.encode_map(cx, 2)?;
     ///         map.insert_entry(cx, "name", &self.name)?;
@@ -1252,7 +1276,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_map(self, cx: &C, len: usize) -> Result<Self::EncodeMap, C::Error> {
+    fn encode_map(
+        self,
+        cx: &Self::Cx,
+        len: usize,
+    ) -> Result<Self::EncodeMap, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Map,
             ExpectingWrapper::new(&self),
@@ -1264,7 +1292,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{MapEncoder};
     ///
     /// struct Struct {
@@ -1273,10 +1301,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     ///
     /// impl<M> Encode<M> for Struct {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_map_fn(cx, 2, |map| {
     ///             map.insert_entry(cx, "name", &self.name)?;
@@ -1287,9 +1314,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_map_fn<F>(self, cx: &C, len: usize, f: F) -> Result<Self::Ok, C::Error>
+    fn encode_map_fn<F>(
+        self,
+        cx: &Self::Cx,
+        len: usize,
+        f: F,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::EncodeMap) -> Result<(), C::Error>,
+        F: FnOnce(&mut Self::EncodeMap) -> Result<(), <Self::Cx as Context>::Error>,
     {
         let mut map = self.encode_map(cx, len)?;
         f(&mut map)?;
@@ -1301,7 +1333,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{MapEntriesEncoder};
     ///
     /// struct Struct {
@@ -1310,10 +1342,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     ///
     /// impl<M> Encode<M> for Struct {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         let mut m = encoder.encode_map_entries(cx, 2)?;
     ///
@@ -1328,7 +1359,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_map_entries(self, cx: &C, len: usize) -> Result<Self::EncodeMapEntries, C::Error> {
+    fn encode_map_entries(
+        self,
+        cx: &Self::Cx,
+        len: usize,
+    ) -> Result<Self::EncodeMapEntries, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::MapPairs,
             ExpectingWrapper::new(&self),
@@ -1340,7 +1375,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{StructEncoder};
     ///
     /// struct Struct {
@@ -1349,10 +1384,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     ///
     /// impl<M> Encode<M> for Struct {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         let mut st = encoder.encode_struct(cx, 2)?;
     ///         st.insert_field(cx, "name", &self.name)?;
@@ -1362,7 +1396,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_struct(self, cx: &C, fields: usize) -> Result<Self::EncodeStruct, C::Error> {
+    fn encode_struct(
+        self,
+        cx: &Self::Cx,
+        fields: usize,
+    ) -> Result<Self::EncodeStruct, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Struct,
             ExpectingWrapper::new(&self),
@@ -1374,7 +1412,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{StructEncoder};
     ///
     /// struct Struct {
@@ -1383,10 +1421,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     ///
     /// impl<M> Encode<M> for Struct {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         encoder.encode_struct_fn(cx, 2, |st| {
     ///             st.insert_field(cx, "name", &self.name)?;
@@ -1397,9 +1434,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_struct_fn<F>(self, cx: &C, fields: usize, f: F) -> Result<Self::Ok, C::Error>
+    fn encode_struct_fn<F>(
+        self,
+        cx: &Self::Cx,
+        fields: usize,
+        f: F,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::EncodeStruct) -> Result<(), C::Error>,
+        F: FnOnce(&mut Self::EncodeStruct) -> Result<(), <Self::Cx as Context>::Error>,
     {
         let mut st = self.encode_struct(cx, fields)?;
         f(&mut st)?;
@@ -1427,15 +1469,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
     /// # enum Enum { UnitVariant, TupleVariant(String), StructVariant { data: String, age: u32 } }
     ///
     /// impl<M> Encode<M> for Enum {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         let mut variant = encoder.encode_variant(cx)?;
     ///
@@ -1461,7 +1502,10 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_variant(self, cx: &C) -> Result<Self::EncodeVariant, C::Error> {
+    fn encode_variant(
+        self,
+        cx: &Self::Cx,
+    ) -> Result<Self::EncodeVariant, <Self::Cx as Context>::Error> {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
             ExpectingWrapper::new(&self),
@@ -1473,7 +1517,7 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// # Examples
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
     ///
     /// enum Enum {
@@ -1486,10 +1530,9 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     ///
     /// impl<M> Encode<M> for Enum {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
@@ -1516,9 +1559,13 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_variant_fn<F>(self, cx: &C, f: F) -> Result<Self::Ok, C::Error>
+    fn encode_variant_fn<F>(
+        self,
+        cx: &Self::Cx,
+        f: F,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::EncodeVariant) -> Result<(), C::Error>,
+        F: FnOnce(&mut Self::EncodeVariant) -> Result<(), <Self::Cx as Context>::Error>,
     {
         let mut variant = self.encode_variant(cx)?;
         f(&mut variant)?;
@@ -1543,15 +1590,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
     /// # enum Enum { UnitVariant }
     ///
     /// impl<M> Encode<M> for Enum {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
@@ -1562,9 +1608,13 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_unit_variant<T>(self, cx: &C, tag: &T) -> Result<Self::Ok, C::Error>
+    fn encode_unit_variant<T>(
+        self,
+        cx: &Self::Cx,
+        tag: &T,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
     {
         let mut variant = self.encode_variant(cx)?;
         let t = variant.encode_tag(cx)?;
@@ -1592,15 +1642,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
     /// # enum Enum { TupleVariant(String) }
     ///
     /// impl<M> Encode<M> for Enum {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         match self {
     ///             Enum::TupleVariant(data) => {
@@ -1615,12 +1664,12 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     #[inline]
     fn encode_tuple_variant<T>(
         self,
-        cx: &C,
+        cx: &Self::Cx,
         tag: &T,
         fields: usize,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+    ) -> Result<Self::EncodeTupleVariant, <Self::Cx as Context>::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::TupleVariant,
@@ -1649,15 +1698,14 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     /// Implementing manually:
     ///
     /// ```
-    /// use musli::{Context, Encode, Encoder};
+    /// use musli::{Encode, Encoder};
     /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
     /// # enum Enum { StructVariant { data: String, age: u32 } }
     ///
     /// impl<M> Encode<M> for Enum {
-    ///     fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
-    ///         C: ?Sized + Context<Mode = M>,
-    ///         E: Encoder<C>,
+    ///         E: Encoder,
     ///     {
     ///         match self {
     ///             Enum::StructVariant { data, age } => {
@@ -1673,12 +1721,12 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
     #[inline]
     fn encode_struct_variant<T>(
         self,
-        cx: &C,
+        cx: &Self::Cx,
         tag: &T,
         fields: usize,
-    ) -> Result<Self::EncodeStructVariant, C::Error>
+    ) -> Result<Self::EncodeStructVariant, <Self::Cx as Context>::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::StructVariant,
@@ -1688,12 +1736,11 @@ pub trait Encoder<C: ?Sized + Context>: Sized {
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<'a, T, C: ?Sized> {
+struct ExpectingWrapper<T> {
     inner: T,
-    _marker: PhantomData<&'a C>,
 }
 
-impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
+impl<T> ExpectingWrapper<T> {
     #[inline]
     const fn new(value: &T) -> &Self {
         // SAFETY: `ExpectingWrapper` is repr(transparent) over `T`.
@@ -1701,10 +1748,9 @@ impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
     }
 }
 
-impl<'a, T, C> Expecting for ExpectingWrapper<'a, T, C>
+impl<T> Expecting for ExpectingWrapper<T>
 where
-    T: Encoder<C>,
-    C: ?Sized + Context,
+    T: Encoder,
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

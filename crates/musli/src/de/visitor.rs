@@ -39,7 +39,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     /// or the underlying format doesn't know which type to decode.
     fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &hint,
@@ -204,7 +204,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn visit_option<D>(self, cx: &C, _: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
@@ -216,7 +216,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn visit_sequence<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
     where
-        D: SequenceDecoder<'de, C>,
+        D: SequenceDecoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::SequenceWith(decoder.size_hint(cx)),
@@ -226,9 +226,9 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
 
     /// Indicates that the visited type is a map.
     #[inline]
-    fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, <D::Cx as Context>::Error>
     where
-        D: MapDecoder<'de, C>,
+        D: MapDecoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::MapWith(decoder.size_hint(cx)),
@@ -267,7 +267,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn visit_variant<D>(self, cx: &C, _: D) -> Result<Self::Ok, C::Error>
     where
-        D: VariantDecoder<'de, C>,
+        D: VariantDecoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,

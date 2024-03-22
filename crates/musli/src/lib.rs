@@ -128,10 +128,9 @@
 //! }
 //!
 //! impl<'de, M> Decode<'de, M> for MyType {
-//!     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+//!     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
 //!     where
-//!         C: ?Sized + Context<Mode = M>,
-//!         D: Decoder<'de, C>,
+//!         D: Decoder<'de, Mode = M>,
 //!     {
 //!         let mut seq = decoder.decode_sequence(cx)?;
 //!         let mut data = Vec::with_capacity(seq.size_hint(cx).or_default());
@@ -442,23 +441,26 @@ pub use self::en::{Encode, Encoder};
 ///
 /// ```
 /// use std::fmt;
+/// use std::marker::PhantomData;
 ///
 /// use musli::Context;
 /// use musli::en::Encoder;
 ///
-/// struct MyEncoder<'a> {
+/// struct MyEncoder<'a, C: ?Sized> {
 ///     value: &'a mut Option<u32>,
+///     _marker: PhantomData<C>,
 /// }
 ///
 /// #[musli::encoder]
-/// impl<C: ?Sized + Context> Encoder<C> for MyEncoder<'_> {
+/// impl<C: ?Sized + Context> Encoder for MyEncoder<'_, C> {
+///     type Cx = C;
 ///     type Ok = ();
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn encode_u32(self, cx: &C, value: u32) -> Result<(), C::Error> {
+///     fn encode_u32(self, cx: &C, value: u32) -> Result<(), Self::Error> {
 ///         *self.value = Some(value);
 ///         Ok(())
 ///     }
@@ -481,19 +483,24 @@ pub use musli_macros::encoder;
 ///
 /// ```
 /// use std::fmt;
+/// use std::marker::PhantomData;
 ///
 /// use musli::Context;
 /// use musli::de::Decoder;
 ///
-/// struct MyDecoder;
+/// struct MyDecoder<C: ?Sized> {
+///     _marker: PhantomData<C>,
+/// }
 ///
 /// #[musli::decoder]
-/// impl<C: ?Sized + Context> Decoder<'_, C> for MyDecoder {
+/// impl<C: ?Sized + Context> Decoder<'_> for MyDecoder<C> {
+///     type Cx = C;
+///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32(self, _: &C) -> Result<u32, C::Error> {
+///     fn decode_u32(self, _: &C) -> Result<u32, Self::Error> {
 ///         Ok(42)
 ///     }
 /// }
@@ -543,7 +550,8 @@ pub use musli_macros::struct_decoder;
 /// # Examples
 ///
 /// ```
-/// use core::fmt;
+/// use std::fmt;
+/// use std::marker::PhantomData;
 ///
 /// use musli::Context;
 /// use musli::de::Visitor;

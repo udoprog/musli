@@ -6,10 +6,9 @@ use crate::Context;
 
 impl<M> Encode<M> for Ipv4Addr {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         encoder.encode_array(cx, &self.octets())
     }
@@ -17,10 +16,9 @@ impl<M> Encode<M> for Ipv4Addr {
 
 impl<'de, M> Decode<'de, M> for Ipv4Addr {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_array::<4>(cx).map(Ipv4Addr::from)
     }
@@ -28,10 +26,9 @@ impl<'de, M> Decode<'de, M> for Ipv4Addr {
 
 impl<M> Encode<M> for Ipv6Addr {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         encoder.encode_array(cx, &self.octets())
     }
@@ -39,10 +36,9 @@ impl<M> Encode<M> for Ipv6Addr {
 
 impl<'de, M> Decode<'de, M> for Ipv6Addr {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_array::<16>(cx).map(Ipv6Addr::from)
     }
@@ -57,10 +53,9 @@ enum IpAddrTag {
 
 impl<M> Encode<M> for IpAddr {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         let variant = encoder.encode_variant(cx)?;
 
@@ -73,10 +68,9 @@ impl<M> Encode<M> for IpAddr {
 
 impl<'de, M> Decode<'de, M> for IpAddr {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         let mut variant = decoder.decode_variant(cx)?;
 
@@ -94,10 +88,9 @@ impl<'de, M> Decode<'de, M> for IpAddr {
 
 impl<M> Encode<M> for SocketAddrV4 {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         let mut pack = encoder.encode_pack(cx)?;
         pack.push(cx, self.ip())?;
@@ -108,10 +101,9 @@ impl<M> Encode<M> for SocketAddrV4 {
 
 impl<'de, M> Decode<'de, M> for SocketAddrV4 {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_pack_fn(cx, |pack| {
             Ok(SocketAddrV4::new(pack.next(cx)?, pack.next(cx)?))
@@ -121,10 +113,9 @@ impl<'de, M> Decode<'de, M> for SocketAddrV4 {
 
 impl<M> Encode<M> for SocketAddrV6 {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         let mut pack = encoder.encode_pack(cx)?;
         pack.push(cx, self.ip())?;
@@ -137,10 +128,9 @@ impl<M> Encode<M> for SocketAddrV6 {
 
 impl<'de, M> Decode<'de, M> for SocketAddrV6 {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_pack_fn(cx, |pack| {
             Ok(Self::new(
@@ -162,10 +152,9 @@ enum SocketAddrTag {
 
 impl<M> Encode<M> for SocketAddr {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         let variant = encoder.encode_variant(cx)?;
 
@@ -178,10 +167,9 @@ impl<M> Encode<M> for SocketAddr {
 
 impl<'de, M> Decode<'de, M> for SocketAddr {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         let mut variant = decoder.decode_variant(cx)?;
 

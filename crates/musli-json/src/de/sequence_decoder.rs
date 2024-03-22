@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 use core::mem;
 
 use musli::de::{PackDecoder, SequenceDecoder, SizeHint};
@@ -7,22 +8,21 @@ use crate::parser::{Parser, Token};
 
 use super::JsonDecoder;
 
-pub(crate) struct JsonSequenceDecoder<P> {
+pub(crate) struct JsonSequenceDecoder<P, C: ?Sized> {
     len: Option<usize>,
     first: bool,
     parser: P,
     terminated: bool,
+    _marker: PhantomData<C>,
 }
 
-impl<'de, P> JsonSequenceDecoder<P>
+impl<'de, P, C> JsonSequenceDecoder<P, C>
 where
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     #[inline]
-    pub(crate) fn new<C>(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(crate) fn new(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBracket) {
@@ -36,16 +36,18 @@ where
             first: true,
             parser,
             terminated: false,
+            _marker: PhantomData,
         })
     }
 }
 
-impl<'de, C, P> SequenceDecoder<'de, C> for JsonSequenceDecoder<P>
+impl<'de, P, C> SequenceDecoder<'de> for JsonSequenceDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeNext<'this> = JsonDecoder<P::Mut<'this>>
+    type Cx = C;
+    type DecodeNext<'this> = JsonDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -88,12 +90,13 @@ where
     }
 }
 
-impl<'de, C, P> PackDecoder<'de, C> for JsonSequenceDecoder<P>
+impl<'de, P, C> PackDecoder<'de> for JsonSequenceDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeNext<'this> = JsonDecoder<P::Mut<'this>>
+    type Cx = C;
+    type DecodeNext<'this> = JsonDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
 

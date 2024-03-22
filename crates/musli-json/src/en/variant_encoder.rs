@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use musli::en::VariantEncoder;
 use musli::Context;
 
@@ -6,33 +8,37 @@ use crate::writer::Writer;
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 
 /// A JSON variant encoder.
-pub(crate) struct JsonVariantEncoder<W> {
+pub(crate) struct JsonVariantEncoder<W, C: ?Sized> {
     writer: W,
+    _marker: PhantomData<C>,
 }
 
-impl<W> JsonVariantEncoder<W>
+impl<W, C> JsonVariantEncoder<W, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
     #[inline]
-    pub(super) fn new<C>(cx: &C, mut writer: W) -> Result<Self, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(super) fn new(cx: &C, mut writer: W) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'{')?;
-        Ok(Self { writer })
+        Ok(Self {
+            writer,
+            _marker: PhantomData,
+        })
     }
 }
 
-impl<C: ?Sized + Context, W> VariantEncoder<C> for JsonVariantEncoder<W>
+impl<W, C> VariantEncoder for JsonVariantEncoder<W, C>
 where
     W: Writer,
+    C: ?Sized + Context,
 {
+    type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = JsonObjectKeyEncoder<W::Mut<'this>>
+    type EncodeTag<'this> = JsonObjectKeyEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeValue<'this> = JsonEncoder<W::Mut<'this>>
+    type EncodeValue<'this> = JsonEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
 

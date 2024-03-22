@@ -62,7 +62,7 @@ where
     #[inline]
     fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &hint,

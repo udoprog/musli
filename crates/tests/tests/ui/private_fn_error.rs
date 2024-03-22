@@ -7,22 +7,20 @@ struct Struct {
 }
 
 mod array {
-    use musli::{Context, Encoder, Decoder};
+    use musli::{Encoder, Decoder};
 
     #[inline]
-    fn encode<C, E, T, const N: usize>(this: &[T; N], cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E, T, const N: usize>(this: &[T; N], cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         todo!()
     }
 
     #[inline]
-    fn decode<'de, C, D, T, const N: usize>(cx: &C, decoder: D) -> Result<[T; N], C::Error>
+    fn decode<'de, D, T, const N: usize>(cx: &D::Cx, decoder: D) -> Result<[T; N], D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         todo!()
     }

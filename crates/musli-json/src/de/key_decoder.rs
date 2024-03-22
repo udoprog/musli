@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use musli::de::{Decoder, NumberHint, SizeHint, TypeHint, ValueVisitor, Visitor};
 use musli::Context;
@@ -10,37 +11,39 @@ use super::{
 };
 
 /// A JSON object key decoder for Müsli.
-pub(crate) struct JsonKeyDecoder<P> {
+pub(crate) struct JsonKeyDecoder<P, C: ?Sized> {
     parser: P,
+    _marker: PhantomData<C>,
 }
 
-impl<'de, P> JsonKeyDecoder<P>
+impl<'de, P, C> JsonKeyDecoder<P, C>
 where
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     #[inline]
-    pub(super) fn skip_any<C>(self, cx: &C) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(super) fn skip_any(self, cx: &C) -> Result<(), C::Error> {
         JsonDecoder::new(self.parser).skip_any(cx)
     }
 }
 
-impl<'de, P> JsonKeyDecoder<P>
+impl<'de, P, C> JsonKeyDecoder<P, C>
 where
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(parser: P) -> Self {
-        Self { parser }
+        Self {
+            parser,
+            _marker: PhantomData,
+        }
     }
 
     #[inline]
-    fn decode_escaped_bytes<C, V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_escaped_bytes<V>(mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: ?Sized + Context,
         V: ValueVisitor<'de, C, [u8]>,
     {
         let Some(mut scratch) = cx.alloc() else {
@@ -55,20 +58,23 @@ where
 }
 
 #[musli::decoder]
-impl<'de, C, P> Decoder<'de, C> for JsonKeyDecoder<P>
+impl<'de, P, C> Decoder<'de> for JsonKeyDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type WithContext<U> = Self where U: Context;
-    type DecodeStruct = JsonObjectDecoder<P>;
+    type Cx = C;
+    type Error = C::Error;
+    type Mode = C::Mode;
+    type WithContext<U> = JsonKeyDecoder<P, U> where U: Context;
+    type DecodeStruct = JsonObjectDecoder<P, C>;
 
     #[inline]
     fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
-        Ok(self)
+        Ok(JsonKeyDecoder::new(self.parser))
     }
 
     #[inline]

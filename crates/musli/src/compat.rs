@@ -3,7 +3,6 @@
 
 use crate::de::{Decode, DecodeBytes, Decoder, SequenceDecoder};
 use crate::en::{Encode, EncodeBytes, Encoder, SequenceEncoder};
-use crate::Context;
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
@@ -22,20 +21,18 @@ impl<T> Sequence<T> {
 
 impl<M> Encode<M> for Sequence<()> {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         encoder.encode_sequence(cx, 0)?.end(cx)
     }
 }
 
 impl<'de, M> Decode<'de, M> for Sequence<()> {
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         let seq = decoder.decode_sequence(cx)?;
         seq.end(cx)?;
@@ -54,7 +51,7 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
 /// # Examples
 ///
 /// ```
-/// use musli::{Context, Decode, Decoder};
+/// use musli::{Decode, Decoder};
 /// use musli::compat::Bytes;
 ///
 /// struct Struct {
@@ -62,10 +59,9 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
 /// }
 ///
 /// impl<'de, M> Decode<'de, M> for Struct {
-///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
 ///     where
-///         C: ?Sized + Context<Mode = M>,
-///         D: Decoder<'de, C>,
+///         D: Decoder<'de, Mode = M>,
 ///     {
 ///         let Bytes(field) = Decode::decode(cx, decoder)?;
 ///
@@ -107,7 +103,7 @@ where
 /// # Examples
 ///
 /// ```
-/// use musli::{Context, Decode, Decoder};
+/// use musli::{Decode, Decoder};
 /// use musli::compat::Packed;
 ///
 /// struct Struct {
@@ -116,10 +112,9 @@ where
 /// }
 ///
 /// impl<'de, M> Decode<'de, M> for Struct {
-///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
 ///     where
-///         C: ?Sized + Context<Mode = M>,
-///         D: Decoder<'de, C>,
+///         D: Decoder<'de, Mode = M>,
 ///     {
 ///         let Packed((field, field2)) = Decode::decode(cx, decoder)?;
 ///

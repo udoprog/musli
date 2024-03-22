@@ -20,10 +20,9 @@ use crate::Context;
 
 impl<M> Encode<M> for () {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         encoder.encode_unit(cx)
     }
@@ -31,10 +30,9 @@ impl<M> Encode<M> for () {
 
 impl<'de, M> Decode<'de, M> for () {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_unit(cx)
     }
@@ -42,20 +40,18 @@ impl<'de, M> Decode<'de, M> for () {
 
 impl<T, M> Encode<M> for marker::PhantomData<T> {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         encoder.encode_unit(cx)
     }
 }
 
 impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T> {
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_unit(cx)?;
         Ok(marker::PhantomData)
@@ -67,10 +63,9 @@ macro_rules! atomic_impl {
         $(
             #[cfg(target_has_atomic = $size)]
             impl<'de, M> Decode<'de, M> for core::sync::atomic::$ty {
-                fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+                fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
-                    C: ?Sized + Context,
-                    D: Decoder<'de, C>,
+                    D: Decoder<'de>,
                 {
                     cx.decode(decoder).map(Self::new)
                 }
@@ -89,20 +84,18 @@ macro_rules! non_zero {
     ($ty:ty) => {
         impl<M> Encode<M> for $ty {
             #[inline]
-            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
-                C: ?Sized + Context,
-                E: Encoder<C>,
+                E: Encoder,
             {
                 self.get().encode(cx, encoder)
             }
         }
 
         impl<'de, M> Decode<'de, M> for $ty {
-            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+            fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
-                C: ?Sized + Context,
-                D: Decoder<'de, C>,
+                D: Decoder<'de>,
             {
                 let value = cx.decode(decoder)?;
 
@@ -154,10 +147,9 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         let mut seq = encoder.encode_sequence(cx, N)?;
 
@@ -171,10 +163,9 @@ where
 
 impl<'de, M, const N: usize> Decode<'de, M> for [u8; N] {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_array(cx)
     }
@@ -184,10 +175,9 @@ macro_rules! impl_number {
     ($ty:ty, $read:ident, $write:ident) => {
         impl<M> Encode<M> for $ty {
             #[inline]
-            fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+            fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
-                C: ?Sized + Context,
-                E: Encoder<C>,
+                E: Encoder,
             {
                 encoder.$write(cx, *self)
             }
@@ -195,10 +185,9 @@ macro_rules! impl_number {
 
         impl<'de, M> Decode<'de, M> for $ty {
             #[inline]
-            fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+            fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
-                C: ?Sized + Context,
-                D: Decoder<'de, C>,
+                D: Decoder<'de>,
             {
                 decoder.$read(cx)
             }
@@ -208,10 +197,9 @@ macro_rules! impl_number {
 
 impl<M> Encode<M> for bool {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         encoder.encode_bool(cx, *self)
     }
@@ -219,10 +207,9 @@ impl<M> Encode<M> for bool {
 
 impl<'de, M> Decode<'de, M> for bool {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_bool(cx)
     }
@@ -230,10 +217,9 @@ impl<'de, M> Decode<'de, M> for bool {
 
 impl<M> Encode<M> for char {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         encoder.encode_char(cx, *self)
     }
@@ -241,10 +227,9 @@ impl<M> Encode<M> for char {
 
 impl<'de, M> Decode<'de, M> for char {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_char(cx)
     }
@@ -267,10 +252,9 @@ impl_number!(f64, decode_f64, encode_f64);
 
 impl<M> Encode<M> for str {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         encoder.encode_string(cx, self)
     }
@@ -278,10 +262,9 @@ impl<M> Encode<M> for str {
 
 impl<'de, M> Decode<'de, M> for &'de str {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         struct Visitor;
 
@@ -310,10 +293,9 @@ impl<M, T> Encode<M> for [T]
 where
     T: Encode<M>,
 {
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         let mut seq = encoder.encode_sequence(cx, self.len())?;
 
@@ -333,10 +315,9 @@ where
 
 impl<'de, M> Decode<'de, M> for &'de [u8] {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         struct Visitor;
 
@@ -366,10 +347,9 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         match self {
             Some(value) => value.encode(cx, encoder.encode_some(cx)?),
@@ -383,10 +363,9 @@ where
     T: Decode<'de, M>,
 {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Mode = M>,
     {
         if let Some(decoder) = decoder.decode_option(cx)? {
             Ok(Some(cx.decode(decoder)?))
@@ -409,10 +388,9 @@ where
     U: Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         let variant = encoder.encode_variant(cx)?;
 
@@ -429,10 +407,9 @@ where
     U: Decode<'de, M>,
 {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Mode = M>,
     {
         let mut variant = decoder.decode_variant(cx)?;
 
@@ -453,10 +430,9 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         self.0.encode(cx, encoder)
     }
@@ -467,10 +443,9 @@ where
     T: Decode<'de, M>,
 {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>,
+        D: Decoder<'de, Mode = M>,
     {
         Ok(Wrapping(cx.decode(decoder)?))
     }
@@ -478,10 +453,9 @@ where
 
 impl<M> Encode<M> for CStr {
     #[inline]
-    fn encode<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context,
-        E: Encoder<C>,
+        E: Encoder,
     {
         encoder.encode_bytes(cx, self.to_bytes_with_nul())
     }
@@ -489,10 +463,9 @@ impl<M> Encode<M> for CStr {
 
 impl<'de, M> Decode<'de, M> for &'de CStr {
     #[inline]
-    fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         let bytes = cx.decode(decoder)?;
         CStr::from_bytes_with_nul(bytes).map_err(cx.map())
@@ -501,10 +474,9 @@ impl<'de, M> Decode<'de, M> for &'de CStr {
 
 impl<M> EncodeBytes<M> for [u8] {
     #[inline]
-    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode_bytes<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         encoder.encode_bytes(cx, self)
     }
@@ -512,10 +484,9 @@ impl<M> EncodeBytes<M> for [u8] {
 
 impl<const N: usize, M> EncodeBytes<M> for [u8; N] {
     #[inline]
-    fn encode_bytes<C, E>(&self, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+    fn encode_bytes<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        E: Encoder<C>,
+        E: Encoder<Mode = M>,
     {
         encoder.encode_array(cx, self)
     }
@@ -523,10 +494,9 @@ impl<const N: usize, M> EncodeBytes<M> for [u8; N] {
 
 impl<'de, M> DecodeBytes<'de, M> for &'de [u8] {
     #[inline]
-    fn decode_bytes<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         Decode::decode(cx, decoder)
     }
@@ -534,10 +504,9 @@ impl<'de, M> DecodeBytes<'de, M> for &'de [u8] {
 
 impl<'de, M, const N: usize> DecodeBytes<'de, M> for [u8; N] {
     #[inline]
-    fn decode_bytes<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        C: ?Sized + Context,
-        D: Decoder<'de, C>,
+        D: Decoder<'de>,
     {
         decoder.decode_array(cx)
     }

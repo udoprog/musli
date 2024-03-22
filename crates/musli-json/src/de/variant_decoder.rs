@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use musli::de::VariantDecoder;
 use musli::Context;
 
@@ -5,19 +7,18 @@ use crate::parser::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder};
 
-pub(crate) struct JsonVariantDecoder<P> {
+pub(crate) struct JsonVariantDecoder<P, C: ?Sized> {
     parser: P,
+    _marker: PhantomData<C>,
 }
 
-impl<'de, P> JsonVariantDecoder<P>
+impl<'de, P, C> JsonVariantDecoder<P, C>
 where
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
     #[inline]
-    pub(crate) fn new<C>(cx: &C, mut parser: P) -> Result<Self, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    pub(crate) fn new(cx: &C, mut parser: P) -> Result<Self, C::Error> {
         parser.skip_whitespace(cx)?;
 
         let actual = parser.peek(cx)?;
@@ -27,19 +28,23 @@ where
         }
 
         parser.skip(cx, 1)?;
-        Ok(Self { parser })
+        Ok(Self {
+            parser,
+            _marker: PhantomData,
+        })
     }
 }
 
-impl<'de, C, P> VariantDecoder<'de, C> for JsonVariantDecoder<P>
+impl<'de, P, C> VariantDecoder<'de> for JsonVariantDecoder<P, C>
 where
-    C: ?Sized + Context,
     P: Parser<'de>,
+    C: ?Sized + Context,
 {
-    type DecodeTag<'this> = JsonKeyDecoder<P::Mut<'this>>
+    type Cx = C;
+    type DecodeTag<'this> = JsonKeyDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeVariant<'this> = JsonDecoder<P::Mut<'this>> where Self: 'this;
+    type DecodeVariant<'this> = JsonDecoder<P::Mut<'this>, C> where Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self, _: &C) -> Result<Self::DecodeTag<'_>, C::Error> {

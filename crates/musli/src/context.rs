@@ -34,7 +34,7 @@ pub trait Context {
     fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
-        D: Decoder<'de, Self>,
+        D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
     {
         T::decode(self, decoder)
     }
@@ -43,7 +43,7 @@ pub trait Context {
     fn decode_bytes<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
     where
         T: DecodeBytes<'de, Self::Mode>,
-        D: Decoder<'de, Self>,
+        D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
     {
         T::decode_bytes(self, decoder)
     }

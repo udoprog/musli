@@ -103,10 +103,9 @@ where
 
 /// Encode the given serde value `T` to the given [Encoder] using the serde
 /// compatibility layer.
-pub fn encode<C, E, T>(value: &T, cx: &C, encoder: E) -> Result<E::Ok, C::Error>
+pub fn encode<E, T>(value: &T, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
 where
-    C: ?Sized + Context,
-    E: Encoder<C>,
+    E: Encoder,
     T: Serialize,
 {
     let encoder = encoder.with_context(cx)?;
@@ -136,10 +135,9 @@ where
 
 /// Decode the given serde value `T` from the given [Decoder] using the serde
 /// compatibility layer.
-pub fn decode<'de, C, D, T>(cx: &C, decoder: D) -> Result<T, C::Error>
+pub fn decode<'de, D, T>(cx: &D::Cx, decoder: D) -> Result<T, D::Error>
 where
-    C: ?Sized + Context,
-    D: Decoder<'de, C>,
+    D: Decoder<'de>,
     T: Deserialize<'de>,
 {
     let decoder = decoder.with_context(cx)?;

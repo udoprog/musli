@@ -81,8 +81,9 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "decoder",
         types::DECODER_TYPES,
-        &[],
+        None,
         "__UseMusliDecoderAttributeMacro",
+        types::Kind::SelfCx,
     ) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
@@ -105,8 +106,9 @@ pub fn map_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "map_decoder",
         types::MAP_DECODER_TYPES,
-        &[],
+        None,
         "__UseMusliMapDecoderAttributeMacro",
+        types::Kind::SelfCx,
     ) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
@@ -129,8 +131,9 @@ pub fn struct_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "struct_decoder",
         types::STRUCT_DECODER_TYPES,
-        &[],
+        None,
         "__UseMusliStructDecoderAttributeMacro",
+        types::Kind::SelfCx,
     ) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
@@ -153,8 +156,9 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "encoder",
         types::ENCODER_TYPES,
-        &["Ok"],
+        Some("Ok"),
         "__UseMusliEncoderAttributeMacro",
+        types::Kind::SelfCx,
     ) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
@@ -177,8 +181,9 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     match input.expand(
         "visitor",
         types::VISITOR_TYPES,
-        &["Ok"],
+        Some("Ok"),
         "__UseMusliVisitorAttributeMacro",
+        types::Kind::GenericCx,
     ) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),

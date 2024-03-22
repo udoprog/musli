@@ -148,7 +148,7 @@ impl<M, const F: Options> Encoding<M, F> {
         }
     }
 
-    musli_common::encoding_impls!(M, SelfEncoder::<_, F>::new, SelfDecoder::<_, F>::new);
+    musli_common::encoding_impls!(M, SelfEncoder::<_, F, _>::new, SelfDecoder::<_, F, _>::new);
     musli_common::encoding_from_slice_impls!(M, SelfDecoder::<_, F>::new);
 }
 

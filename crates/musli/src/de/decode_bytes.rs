@@ -24,7 +24,7 @@ use crate::Context;
 /// Implementing manually:
 ///
 /// ```
-/// use musli::{Context, Decode, Decoder};
+/// use musli::{Decode, Decoder};
 /// use musli::de::DecodeBytes;
 ///
 /// struct MyType {
@@ -32,10 +32,9 @@ use crate::Context;
 /// }
 ///
 /// impl<'de, M> Decode<'de, M> for MyType {
-///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
 ///     where
-///         C: ?Sized + Context<Mode = M>,
-///         D: Decoder<'de, C>,
+///         D: Decoder<'de>,
 ///     {
 ///         Ok(Self {
 ///             data: DecodeBytes::decode_bytes(cx, decoder)?,
@@ -45,8 +44,7 @@ use crate::Context;
 /// ```
 pub trait DecodeBytes<'de, M = DefaultMode>: Sized {
     /// Decode the given input as bytes.
-    fn decode_bytes<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+    fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, <D::Cx as Context>::Error>
     where
-        C: ?Sized + Context<Mode = M>,
-        D: Decoder<'de, C>;
+        D: Decoder<'de, Mode = M>;
 }

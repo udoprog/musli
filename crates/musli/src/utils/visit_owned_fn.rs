@@ -21,12 +21,11 @@ use crate::Context;
 /// }
 ///
 /// impl<'de, M> Decode<'de, M> for Enum {
-///     fn decode<C, D>(cx: &C, decoder: D) -> Result<Self, C::Error>
+///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
 ///     where
-///         C: ?Sized + Context,
-///         D: Decoder<'de, C>,
+///         D: Decoder<'de>,
 ///     {
-///         decoder.decode_string(cx, musli::utils::visit_owned_fn("A string variant for Enum", |cx: &C, variant: &str| {
+///         decoder.decode_string(cx, musli::utils::visit_owned_fn("A string variant for Enum", |cx: &D::Cx, variant: &str| {
 ///             match variant {
 ///                 "A" => Ok(Enum::A),
 ///                 "B" => Ok(Enum::A),
