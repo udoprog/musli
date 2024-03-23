@@ -35,8 +35,8 @@ Add the following to your `Cargo.toml` using the [format](#formats) you want
 to use:
 
 ```toml
-musli = "0.0.101"
-musli-wire = "0.0.101"
+musli = "0.0.102"
+musli-wire = "0.0.102"
 ```
 
 <br>
@@ -130,14 +130,14 @@ impl<'de, M> Decode<'de, M> for MyType {
     where
         D: Decoder<'de, Mode = M>,
     {
-        let mut seq = decoder.decode_sequence(cx)?;
-        let mut data = Vec::with_capacity(seq.size_hint(cx).or_default());
+        let mut seq = decoder.decode_sequence()?;
+        let mut data = Vec::with_capacity(seq.size_hint().or_default());
 
-        while let Some(decoder) = seq.decode_next(cx)? {
-            data.push(cx.decode(decoder)?);
+        while let Some(decoder) = seq.decode_next()? {
+            data.push(decoder.decode()?);
         }
 
-        seq.end(cx)?;
+        seq.end()?;
 
         Ok(Self {
             data
