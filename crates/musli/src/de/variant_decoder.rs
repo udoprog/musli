@@ -30,23 +30,17 @@ pub trait VariantDecoder<'de> {
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "Decoders must be consumed"]
-    fn decode_tag(
-        &mut self,
-        cx: &Self::Cx,
-    ) -> Result<Self::DecodeTag<'_>, <Self::Cx as Context>::Error>;
+    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, <Self::Cx as Context>::Error>;
 
     /// Decode the second value in the pair..
     #[must_use = "Decoders must be consumed"]
-    fn decode_value(
-        &mut self,
-        cx: &Self::Cx,
-    ) -> Result<Self::DecodeVariant<'_>, <Self::Cx as Context>::Error>;
+    fn decode_value(&mut self) -> Result<Self::DecodeVariant<'_>, <Self::Cx as Context>::Error>;
 
     /// Indicate that the second value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_value(&mut self, cx: &Self::Cx) -> Result<bool, <Self::Cx as Context>::Error>;
+    fn skip_value(&mut self) -> Result<bool, <Self::Cx as Context>::Error>;
 
     /// End the pair decoder.
-    fn end(self, cx: &Self::Cx) -> Result<(), <Self::Cx as Context>::Error>;
+    fn end(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

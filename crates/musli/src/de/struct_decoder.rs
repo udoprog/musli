@@ -19,24 +19,26 @@ pub trait StructDecoder<'de>: Sized {
     #[doc(hidden)]
     type __UseMusliStructDecoderAttributeMacro;
 
+    /// Access the context associated with the decoder.
+    fn cx(&self) -> &Self::Cx;
+
     /// Get a size hint of known remaining fields.
-    fn size_hint(&self, cx: &Self::Cx) -> SizeHint;
+    fn size_hint(&self) -> SizeHint;
 
     /// Decode the next field.
     #[must_use = "Decoders must be consumed"]
     fn decode_field(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Option<Self::DecodeField<'_>>, <Self::Cx as Context>::Error>;
 
     /// End the struct decoder.
     ///
     /// If there are any remaining elements in the sequence of pairs, this
     /// indicates that they should be flushed.
-    fn end(mut self, cx: &Self::Cx) -> Result<(), <Self::Cx as Context>::Error> {
-        while let Some(mut item) = self.decode_field(cx)? {
-            item.decode_field_name(cx)?.skip(cx)?;
-            item.skip_field_value(cx)?;
+    fn end(mut self) -> Result<(), <Self::Cx as Context>::Error> {
+        while let Some(mut item) = self.decode_field()? {
+            item.decode_field_name()?.skip()?;
+            item.skip_field_value()?;
         }
 
         Ok(())
@@ -51,13 +53,12 @@ pub trait StructDecoder<'de>: Sized {
     ///
     /// The size of a struct might therefore change from one session to another.
     #[inline]
-    fn into_struct_fields(
-        self,
-        cx: &Self::Cx,
-    ) -> Result<Self::IntoStructFields, <Self::Cx as Context>::Error>
+    fn into_struct_fields(self) -> Result<Self::IntoStructFields, <Self::Cx as Context>::Error>
     where
         Self: Sized,
     {
-        Err(cx.message("Decoder does not support StructPairs decoding"))
+        Err(self
+            .cx()
+            .message("Decoder does not support StructPairs decoding"))
     }
 }

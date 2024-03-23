@@ -38,7 +38,7 @@ pub use musli_macros::Decode;
 ///         D: Decoder<'de>,
 ///     {
 ///         Ok(Self {
-///             data: decoder.decode_array(cx)?,
+///             data: decoder.decode_array()?,
 ///         })
 ///     }
 /// }

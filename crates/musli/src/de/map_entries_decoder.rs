@@ -38,32 +38,29 @@ pub trait MapEntriesDecoder<'de>: Sized {
     #[must_use = "Decoders must be consumed"]
     fn decode_map_entry_key(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, <Self::Cx as Context>::Error>;
 
     /// Decode the value in the map.
     #[must_use = "Decoders must be consumed"]
     fn decode_map_entry_value(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Self::DecodeMapEntryValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Indicate that the value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_map_entry_value(&mut self, cx: &Self::Cx)
-        -> Result<bool, <Self::Cx as Context>::Error>;
+    fn skip_map_entry_value(&mut self) -> Result<bool, <Self::Cx as Context>::Error>;
 
     /// End pair decoding.
     #[inline]
-    fn end(mut self, cx: &Self::Cx) -> Result<(), <Self::Cx as Context>::Error> {
+    fn end(mut self) -> Result<(), <Self::Cx as Context>::Error> {
         loop {
-            let Some(item) = self.decode_map_entry_key(cx)? else {
+            let Some(item) = self.decode_map_entry_key()? else {
                 break;
             };
 
-            item.skip(cx)?;
-            self.skip_map_entry_value(cx)?;
+            item.skip()?;
+            self.skip_map_entry_value()?;
         }
 
         Ok(())

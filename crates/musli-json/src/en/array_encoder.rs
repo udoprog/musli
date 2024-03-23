@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use core::mem::take;
 
 use musli::en::SequenceEncoder;
@@ -9,58 +8,58 @@ use crate::writer::Writer;
 use super::JsonEncoder;
 
 /// Encoder for a JSON array.
-pub(crate) struct JsonArrayEncoder<W, C: ?Sized> {
+pub(crate) struct JsonArrayEncoder<'a, W, C: ?Sized> {
+    cx: &'a C,
     first: bool,
     end: &'static [u8],
     writer: W,
-    _marker: PhantomData<C>,
 }
 
-impl<W, C> JsonArrayEncoder<W, C>
+impl<'a, W, C> JsonArrayEncoder<'a, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
 {
     #[inline]
-    pub(super) fn new(cx: &C, writer: W) -> Result<Self, C::Error> {
+    pub(super) fn new(cx: &'a C, writer: W) -> Result<Self, C::Error> {
         Self::with_end(cx, writer, b"]")
     }
 
     #[inline]
-    pub(super) fn with_end(cx: &C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
+    pub(super) fn with_end(cx: &'a C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'[')?;
 
         Ok(Self {
+            cx,
             first: true,
             end,
             writer,
-            _marker: PhantomData,
         })
     }
 }
 
-impl<W, C> SequenceEncoder for JsonArrayEncoder<W, C>
+impl<'a, W, C> SequenceEncoder for JsonArrayEncoder<'a, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = JsonEncoder<W::Mut<'this>, C>
+    type EncodeNext<'this> = JsonEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_next(&mut self, cx: &C) -> Result<Self::EncodeNext<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         if !take(&mut self.first) {
-            self.writer.write_byte(cx, b',')?;
+            self.writer.write_byte(self.cx, b',')?;
         }
 
-        Ok(JsonEncoder::new(self.writer.borrow_mut()))
+        Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end(mut self, cx: &C) -> Result<Self::Ok, C::Error> {
-        self.writer.write_bytes(cx, self.end)
+    fn end(mut self) -> Result<Self::Ok, C::Error> {
+        self.writer.write_bytes(self.cx, self.end)
     }
 }

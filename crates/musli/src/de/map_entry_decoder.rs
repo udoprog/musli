@@ -28,20 +28,14 @@ pub trait MapEntryDecoder<'de> {
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "Decoders must be consumed"]
-    fn decode_map_key(
-        &mut self,
-        cx: &Self::Cx,
-    ) -> Result<Self::DecodeMapKey<'_>, <Self::Cx as Context>::Error>;
+    fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, <Self::Cx as Context>::Error>;
 
     /// Decode the second value in the pair..
     #[must_use = "Decoders must be consumed"]
-    fn decode_map_value(
-        self,
-        cx: &Self::Cx,
-    ) -> Result<Self::DecodeMapValue, <Self::Cx as Context>::Error>;
+    fn decode_map_value(self) -> Result<Self::DecodeMapValue, <Self::Cx as Context>::Error>;
 
     /// Indicate that the second value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_map_value(self, cx: &Self::Cx) -> Result<bool, <Self::Cx as Context>::Error>;
+    fn skip_map_value(self) -> Result<bool, <Self::Cx as Context>::Error>;
 }

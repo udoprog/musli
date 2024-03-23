@@ -17,22 +17,20 @@ pub trait SequenceDecoder<'de>: Sized {
         Self: 'this;
 
     /// Get a size hint of known remaining elements.
-    fn size_hint(&self, cx: &Self::Cx) -> SizeHint;
+    fn size_hint(&self) -> SizeHint;
 
     /// Decode the next element.
     #[must_use = "Decoders must be consumed"]
-    fn decode_next(
-        &mut self,
-        cx: &Self::Cx,
-    ) -> Result<Option<Self::DecodeNext<'_>>, <Self::Cx as Context>::Error>;
+    fn decode_next(&mut self)
+        -> Result<Option<Self::DecodeNext<'_>>, <Self::Cx as Context>::Error>;
 
     /// Stop decoding the current sequence.
     ///
     /// This is required to call after a sequence has finished decoding.
     #[inline]
-    fn end(mut self, cx: &Self::Cx) -> Result<(), <Self::Cx as Context>::Error> {
-        while let Some(item) = self.decode_next(cx)? {
-            item.skip(cx)?;
+    fn end(mut self) -> Result<(), <Self::Cx as Context>::Error> {
+        while let Some(item) = self.decode_next()? {
+            item.skip()?;
         }
 
         Ok(())
@@ -40,15 +38,15 @@ pub trait SequenceDecoder<'de>: Sized {
 
     /// Decode the next element of the given type.
     #[inline]
-    fn next<T>(&mut self, cx: &Self::Cx) -> Result<Option<T>, <Self::Cx as Context>::Error>
+    fn next<T>(&mut self) -> Result<Option<T>, <Self::Cx as Context>::Error>
     where
         Self: Sized,
         T: Decode<'de, <Self::Cx as Context>::Mode>,
     {
-        let Some(decoder) = self.decode_next(cx)? else {
+        let Some(decoder) = self.decode_next()? else {
             return Ok(None);
         };
 
-        Ok(Some(T::decode(cx, decoder)?))
+        Ok(Some(decoder.decode()?))
     }
 }

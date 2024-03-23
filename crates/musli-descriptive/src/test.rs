@@ -34,10 +34,10 @@ where
     where
         D: Decoder<'de, Mode = M>,
     {
-        let mut unpack = decoder.decode_pack(cx)?;
-        let tag = cx.decode(unpack.decode_next(cx)?)?;
-        let value = cx.decode(unpack.decode_next(cx)?)?;
-        unpack.end(cx)?;
+        let mut unpack = decoder.decode_pack()?;
+        let tag = cx.decode(unpack.decode_next()?)?;
+        let value = cx.decode(unpack.decode_next()?)?;
+        unpack.end()?;
         Ok(Self { tag, value })
     }
 }

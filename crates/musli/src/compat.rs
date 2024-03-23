@@ -21,21 +21,21 @@ impl<T> Sequence<T> {
 
 impl<M> Encode<M> for Sequence<()> {
     #[inline]
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
-        encoder.encode_sequence(cx, 0)?.end(cx)
+        encoder.encode_sequence(0)?.end()
     }
 }
 
 impl<'de, M> Decode<'de, M> for Sequence<()> {
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        let seq = decoder.decode_sequence(cx)?;
-        seq.end(cx)?;
+        let seq = decoder.decode_sequence()?;
+        seq.end()?;
         Ok(Self(()))
     }
 }

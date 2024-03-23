@@ -17,5 +17,5 @@ pub trait AsDecoder {
         Self: 'this;
 
     /// Borrow self as a new decoder.
-    fn as_decoder(&self, cx: &Self::Cx) -> Result<Self::Decoder<'_>, <Self::Cx as Context>::Error>;
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, <Self::Cx as Context>::Error>;
 }

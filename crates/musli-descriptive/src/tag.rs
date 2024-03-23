@@ -222,10 +222,10 @@ impl fmt::Debug for Tag {
 
 impl<'de, M> Decode<'de, M> for Tag {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
-        Ok(Self::from_byte(decoder.decode_u8(cx)?))
+        Ok(Self::from_byte(decoder.decode_u8()?))
     }
 }

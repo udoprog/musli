@@ -29,26 +29,19 @@ pub trait VariantEncoder {
 
     /// Return the encoder for the first element in the variant.
     #[must_use = "Encoders must be consumed"]
-    fn encode_tag(
-        &mut self,
-        cx: &Self::Cx,
-    ) -> Result<Self::EncodeTag<'_>, <Self::Cx as Context>::Error>;
+    fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, <Self::Cx as Context>::Error>;
 
     /// Return encoder for the second element in the variant.
     #[must_use = "Encoders must be consumed"]
-    fn encode_value(
-        &mut self,
-        cx: &Self::Cx,
-    ) -> Result<Self::EncodeValue<'_>, <Self::Cx as Context>::Error>;
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, <Self::Cx as Context>::Error>;
 
     /// End the variant encoder.
-    fn end(self, cx: &Self::Cx) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn end(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert the variant immediately.
     #[inline]
     fn insert_variant<T, V>(
         mut self,
-        cx: &Self::Cx,
         tag: T,
         value: V,
     ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
@@ -57,8 +50,8 @@ pub trait VariantEncoder {
         T: Encode<<Self::Cx as Context>::Mode>,
         V: Encode<<Self::Cx as Context>::Mode>,
     {
-        tag.encode(cx, self.encode_tag(cx)?)?;
-        value.encode(cx, self.encode_value(cx)?)?;
-        self.end(cx)
+        self.encode_tag()?.encode(tag)?;
+        self.encode_value()?.encode(value)?;
+        self.end()
     }
 }

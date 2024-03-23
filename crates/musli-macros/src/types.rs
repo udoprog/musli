@@ -25,7 +25,6 @@ pub(super) enum Extra {
     /// `type Mode = <Self::Cx as Context>::Mode;`
     Mode,
     Context,
-    This,
     Visitor(Ty),
 }
 
@@ -34,7 +33,7 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
     ("Mode", Extra::Mode),
     ("WithContext", Extra::Context),
     ("EncodeSome", Extra::None),
-    ("EncodePack", Extra::This),
+    ("EncodePack", Extra::None),
     ("EncodeSequence", Extra::None),
     ("EncodeTuple", Extra::None),
     ("EncodeMap", Extra::None),
@@ -181,20 +180,20 @@ impl Types {
                 Extra::Context => {
                     let u_param = syn::Ident::new(U_PARAM, Span::call_site());
 
-                    let mut where_clause = syn::WhereClause {
-                        where_token: <Token![where]>::default(),
-                        predicates: Punctuated::default(),
-                    };
-
-                    where_clause
-                        .predicates
-                        .push(syn::parse_quote!(#u_param: ::musli::context::Context));
-
                     let mut params = Punctuated::default();
+
+                    let this_lifetime = syn::Lifetime::new("'this", Span::call_site());
+
+                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
+                        attrs: Vec::new(),
+                        lifetime: this_lifetime.clone(),
+                        colon_token: None,
+                        bounds: Punctuated::default(),
+                    }));
 
                     params.push(syn::GenericParam::Type(syn::TypeParam {
                         attrs: Vec::new(),
-                        ident: u_param,
+                        ident: u_param.clone(),
                         colon_token: None,
                         bounds: Punctuated::default(),
                         eq_token: None,
@@ -206,38 +205,14 @@ impl Types {
                         path: self.never_type(argument, extra, kind)?,
                     });
 
-                    generics = syn::Generics {
-                        lt_token: Some(<Token![<]>::default()),
-                        params,
-                        gt_token: Some(<Token![>]>::default()),
-                        where_clause: Some(where_clause),
-                    };
-                }
-                Extra::This => {
-                    let this_lifetime = syn::Lifetime::new("'this", Span::call_site());
-
                     let mut where_clause = syn::WhereClause {
                         where_token: <Token![where]>::default(),
                         predicates: Punctuated::default(),
                     };
 
-                    where_clause
-                        .predicates
-                        .push(syn::parse_quote!(Self::Cx: #this_lifetime));
-
-                    let mut params = Punctuated::default();
-
-                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
-                        attrs: Vec::new(),
-                        lifetime: this_lifetime,
-                        colon_token: None,
-                        bounds: Punctuated::default(),
-                    }));
-
-                    ty = syn::Type::Path(syn::TypePath {
-                        qself: None,
-                        path: self.never_type(argument, extra, kind)?,
-                    });
+                    where_clause.predicates.push(
+                        syn::parse_quote!(#u_param: #this_lifetime + ::musli::context::Context),
+                    );
 
                     generics = syn::Generics {
                         lt_token: Some(<Token![<]>::default()),
@@ -359,7 +334,7 @@ impl Types {
                     let u_param = syn::Ident::new(U_PARAM, Span::call_site());
                     args.push(syn::parse_quote!(#u_param));
                 }
-                Extra::None | Extra::This => match kind {
+                Extra::None => match kind {
                     Kind::SelfCx => {
                         args.push(syn::parse_quote!(Self::Cx));
                     }
