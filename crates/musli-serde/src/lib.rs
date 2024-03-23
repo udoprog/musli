@@ -32,6 +32,8 @@
 //! }
 //! ```
 
+#![no_std]
+
 #[cfg(feature = "std")]
 extern crate std;
 
@@ -122,8 +124,8 @@ where
         Err(error) => error,
     };
 
-    if let error::SerdeError::Custom(message) = error {
-        return Err(cx.inner.message(message));
+    if let Some(error) = error.report(cx.inner) {
+        return Err(error);
     }
 
     let Some(error) = cx.error.borrow_mut().take() else {
@@ -154,8 +156,8 @@ where
         Err(error) => error,
     };
 
-    if let error::SerdeError::Custom(message) = error {
-        return Err(cx.inner.message(message));
+    if let Some(error) = error.report(cx.inner) {
+        return Err(error);
     }
 
     let Some(error) = cx.error.borrow_mut().take() else {

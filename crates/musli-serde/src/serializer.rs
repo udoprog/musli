@@ -1,4 +1,3 @@
-#[cfg(any(feature = "std", feature = "alloc"))]
 use core::fmt;
 
 use musli::en::{
@@ -261,7 +260,6 @@ where
     }
 
     #[inline]
-    #[cfg(any(feature = "std", feature = "alloc"))]
     fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
         T: fmt::Display,
