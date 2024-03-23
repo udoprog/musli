@@ -1606,6 +1606,75 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
+    /// Decode a struct which has an expected `len` number of elements using a
+    /// closure.
+    ///
+    /// The `len` indicates how many fields the decoder is *expecting* depending
+    /// on how many fields are present in the underlying struct being decoded,
+    /// butit should only be considered advisory.
+    ///
+    /// The size of a struct might therefore change from one session to another.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{StructDecoder, StructFieldDecoder};
+    ///
+    /// struct Struct {
+    ///     string: String,
+    ///     integer: u32,
+    /// }
+    ///
+    /// impl<'de, M> Decode<'de, M> for Struct {
+    ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         decoder.decode_struct_fn(None, |st| {
+    ///             let mut string = None;
+    ///             let mut integer = None;
+    ///
+    ///             while let Some(mut field) = st.decode_field()? {
+    ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
+    ///                 let tag: String = cx.decode(field.decode_field_name()?)?;
+    ///
+    ///                 match tag.as_str() {
+    ///                     "string" => {
+    ///                         string = Some(cx.decode(field.decode_field_value()?)?);
+    ///                     }
+    ///                     "integer" => {
+    ///                         integer = Some(cx.decode(field.decode_field_value()?)?);
+    ///                     }
+    ///                     tag => {
+    ///                         return Err(cx.invalid_field_tag("Struct", tag))
+    ///                     }
+    ///                 }
+    ///             }
+    ///
+    ///             Ok(Self {
+    ///                 string: string.ok_or_else(|| cx.expected_tag("Struct", "string"))?,
+    ///                 integer: integer.ok_or_else(|| cx.expected_tag("Struct", "integer"))?,
+    ///             })
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_struct_fn<F, O>(
+        self,
+        fields: Option<usize>,
+        f: F,
+    ) -> Result<O, <Self::Cx as Context>::Error>
+    where
+        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, <Self::Cx as Context>::Error>,
+    {
+        let mut st = self.decode_struct(fields)?;
+        let result = f(&mut st)?;
+        st.end()?;
+        Ok(result)
+    }
+
     /// Return a decoder for a variant.
     ///
     /// # Examples
