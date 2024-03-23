@@ -11,15 +11,13 @@ macro_rules! implement {
         {
             #[inline]
             #[allow(unused_mut)]
-            fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
-                let mut tuple = encoder.encode_tuple(cx, $count)?;
-                $(
-                self.$field.encode(cx, tuple.encode_next(cx)?)?;
-                )*
-                tuple.end(cx)
+                let mut tuple = encoder.encode_tuple($count)?;
+                $(tuple.encode_next()?.encode(&self.$field)?;)*
+                tuple.end()
             }
         }
 
@@ -46,13 +44,13 @@ macro_rules! implement_new {
             T: Encode<M>,
         {
             #[inline]
-            fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
-                let mut tuple = encoder.encode_tuple(cx, $count)?;
-                $(self.$field().encode(cx, tuple.encode_next(cx)?)?;)*
-                tuple.end(cx)
+                let mut tuple = encoder.encode_tuple($count)?;
+                $(tuple.encode_next()?.encode(self.$field())?;)*
+                tuple.end()
             }
         }
 

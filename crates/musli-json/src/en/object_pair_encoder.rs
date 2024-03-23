@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use musli::en::{MapEntryEncoder, StructFieldEncoder};
 use musli::Context;
 
@@ -8,80 +6,76 @@ use crate::writer::Writer;
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 
 /// Encoder for a JSON object pair.
-pub(crate) struct JsonObjectPairEncoder<W, C: ?Sized> {
+pub(crate) struct JsonObjectPairEncoder<'a, W, C: ?Sized> {
+    cx: &'a C,
     empty: bool,
     writer: W,
-    _marker: PhantomData<C>,
 }
 
-impl<W, C: ?Sized> JsonObjectPairEncoder<W, C> {
+impl<'a, W, C: ?Sized> JsonObjectPairEncoder<'a, W, C> {
     #[inline]
-    pub(super) const fn new(empty: bool, writer: W) -> Self {
-        Self {
-            empty,
-            writer,
-            _marker: PhantomData,
-        }
+    pub(super) const fn new(cx: &'a C, empty: bool, writer: W) -> Self {
+        Self { cx, empty, writer }
     }
 }
 
-impl<W, C> MapEntryEncoder for JsonObjectPairEncoder<W, C>
+impl<'a, W, C> MapEntryEncoder for JsonObjectPairEncoder<'a, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = JsonObjectKeyEncoder<W::Mut<'this>, C>
+    type EncodeMapKey<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeMapValue<'this> = JsonEncoder<W::Mut<'this>, C> where Self: 'this;
+    type EncodeMapValue<'this> = JsonEncoder<'a, W::Mut<'this>, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_key(&mut self, cx: &C) -> Result<Self::EncodeMapKey<'_>, C::Error> {
+    fn encode_map_key(&mut self) -> Result<Self::EncodeMapKey<'_>, C::Error> {
         if !self.empty {
-            self.writer.write_byte(cx, b',')?;
+            self.writer.write_byte(self.cx, b',')?;
         }
 
-        Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
+        Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn encode_map_value(&mut self, cx: &C) -> Result<Self::EncodeMapValue<'_>, C::Error> {
-        self.writer.write_byte(cx, b':')?;
-        Ok(JsonEncoder::new(self.writer.borrow_mut()))
+    fn encode_map_value(&mut self) -> Result<Self::EncodeMapValue<'_>, C::Error> {
+        self.writer.write_byte(self.cx, b':')?;
+        Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end(self, _: &C) -> Result<Self::Ok, C::Error> {
+    fn end(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
 
-impl<W, C> StructFieldEncoder for JsonObjectPairEncoder<W, C>
+impl<'a, W, C> StructFieldEncoder for JsonObjectPairEncoder<'a, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeFieldName<'this> = JsonObjectKeyEncoder<W::Mut<'this>, C>
+    type EncodeFieldName<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeFieldValue<'this> = JsonEncoder<W::Mut<'this>, C> where Self: 'this;
+    type EncodeFieldValue<'this> = JsonEncoder<'a, W::Mut<'this>, C> where Self: 'this;
 
     #[inline]
-    fn encode_field_name(&mut self, cx: &C) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        self.encode_map_key(cx)
+    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
+        self.encode_map_key()
     }
 
     #[inline]
-    fn encode_field_value(&mut self, cx: &C) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        self.encode_map_value(cx)
+    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
+        self.encode_map_value()
     }
 
     #[inline]
-    fn end(self, cx: &C) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::end(self, cx)
+    fn end(self) -> Result<Self::Ok, C::Error> {
+        MapEntryEncoder::end(self)
     }
 }

@@ -38,24 +38,19 @@ pub trait StructFieldsDecoder<'de> {
     #[must_use = "Decoders must be consumed"]
     fn decode_struct_field_name(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Self::DecodeStructFieldName<'_>, <Self::Cx as Context>::Error>;
 
     /// Decode the second value in the pair..
     #[must_use = "Decoders must be consumed"]
     fn decode_struct_field_value(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Self::DecodeStructFieldValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Indicate that the second value should be skipped.
     ///
     /// The boolean returned indicates if the value was skipped or not.
-    fn skip_struct_field_value(
-        &mut self,
-        cx: &Self::Cx,
-    ) -> Result<bool, <Self::Cx as Context>::Error>;
+    fn skip_struct_field_value(&mut self) -> Result<bool, <Self::Cx as Context>::Error>;
 
     /// End pair decoding.
-    fn end(self, cx: &Self::Cx) -> Result<(), <Self::Cx as Context>::Error>;
+    fn end(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

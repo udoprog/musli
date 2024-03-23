@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 #[cfg(feature = "alloc")]
 use alloc::borrow::ToOwned;
 #[cfg(feature = "alloc")]
@@ -84,14 +82,20 @@ impl Value {
     /// Construct a [AsValueDecoder] implementation out of this value which
     /// emits the specified error `E`.
     #[inline]
-    pub fn into_value_decoder<const F: Options, C: ?Sized>(self) -> AsValueDecoder<F, C> {
-        AsValueDecoder::new(self)
+    pub fn into_value_decoder<const F: Options, C: ?Sized>(
+        self,
+        cx: &C,
+    ) -> AsValueDecoder<'_, F, C> {
+        AsValueDecoder::new(cx, self)
     }
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<const F: Options, C: ?Sized>(&self) -> ValueDecoder<'_, F, C> {
-        ValueDecoder::new(self)
+    pub(crate) fn decoder<'a, 'de, const F: Options, C: ?Sized>(
+        &'de self,
+        cx: &'a C,
+    ) -> ValueDecoder<'a, 'de, F, C> {
+        ValueDecoder::new(cx, self)
     }
 }
 
@@ -154,25 +158,25 @@ from!(f32, F32);
 from!(f64, F64);
 
 impl<M> Encode<M> for Number {
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         match self {
-            Number::U8(n) => encoder.encode_u8(cx, *n),
-            Number::U16(n) => encoder.encode_u16(cx, *n),
-            Number::U32(n) => encoder.encode_u32(cx, *n),
-            Number::U64(n) => encoder.encode_u64(cx, *n),
-            Number::U128(n) => encoder.encode_u128(cx, *n),
-            Number::I8(n) => encoder.encode_i8(cx, *n),
-            Number::I16(n) => encoder.encode_i16(cx, *n),
-            Number::I32(n) => encoder.encode_i32(cx, *n),
-            Number::I64(n) => encoder.encode_i64(cx, *n),
-            Number::I128(n) => encoder.encode_i128(cx, *n),
-            Number::Usize(n) => encoder.encode_usize(cx, *n),
-            Number::Isize(n) => encoder.encode_isize(cx, *n),
-            Number::F32(n) => encoder.encode_f32(cx, *n),
-            Number::F64(n) => encoder.encode_f64(cx, *n),
+            Number::U8(n) => encoder.encode_u8(*n),
+            Number::U16(n) => encoder.encode_u16(*n),
+            Number::U32(n) => encoder.encode_u32(*n),
+            Number::U64(n) => encoder.encode_u64(*n),
+            Number::U128(n) => encoder.encode_u128(*n),
+            Number::I8(n) => encoder.encode_i8(*n),
+            Number::I16(n) => encoder.encode_i16(*n),
+            Number::I32(n) => encoder.encode_i32(*n),
+            Number::I64(n) => encoder.encode_i64(*n),
+            Number::I128(n) => encoder.encode_i128(*n),
+            Number::Usize(n) => encoder.encode_usize(*n),
+            Number::Isize(n) => encoder.encode_isize(*n),
+            Number::F32(n) => encoder.encode_f32(*n),
+            Number::F64(n) => encoder.encode_f64(*n),
         }
     }
 }
@@ -315,35 +319,35 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_sequence<D>(self, cx: &C, mut seq: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, _: &C, mut seq: D) -> Result<Self::Ok, C::Error>
     where
         D: SequenceDecoder<'de, Cx = C>,
     {
-        let mut out = Vec::with_capacity(seq.size_hint(cx).or_default());
+        let mut out = Vec::with_capacity(seq.size_hint().or_default());
 
-        while let Some(item) = seq.next(cx)? {
+        while let Some(item) = seq.next()? {
             out.push(item);
         }
 
-        seq.end(cx)?;
+        seq.end()?;
         Ok(Value::Sequence(out))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_map<D>(self, cx: &C, mut map: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, _: &C, mut map: D) -> Result<Self::Ok, C::Error>
     where
         D: MapDecoder<'de, Cx = C>,
     {
-        let mut out = Vec::with_capacity(map.size_hint(cx).or_default());
+        let mut out = Vec::with_capacity(map.size_hint().or_default());
 
-        while let Some(mut entry) = map.decode_entry(cx)? {
-            let first = Value::decode(cx, entry.decode_map_key(cx)?)?;
-            let second = Value::decode(cx, entry.decode_map_value(cx)?)?;
+        while let Some(mut entry) = map.decode_entry()? {
+            let first = entry.decode_map_key()?.decode()?;
+            let second = entry.decode_map_value()?.decode()?;
             out.push((first, second));
         }
 
-        map.end(cx)?;
+        map.end()?;
         Ok(Value::Map(out))
     }
 
@@ -367,24 +371,24 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_variant<D>(self, cx: &C, mut variant: D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<D>(self, _: &C, mut variant: D) -> Result<Self::Ok, C::Error>
     where
         D: VariantDecoder<'de, Cx = C>,
     {
-        let first = cx.decode(variant.decode_tag(cx)?)?;
-        let second = cx.decode(variant.decode_value(cx)?)?;
-        variant.end(cx)?;
+        let first = variant.decode_tag()?.decode()?;
+        let second = variant.decode_value()?.decode()?;
+        variant.end()?;
         Ok(Value::Variant(Box::new((first, second))))
     }
 }
 
 impl<'de, M> Decode<'de, M> for Value {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
-        decoder.decode_any(cx, AnyVisitor)
+        decoder.decode_any(AnyVisitor)
     }
 }
 
@@ -517,81 +521,74 @@ impl<'de, C: ?Sized + Context> NumberVisitor<'de, C> for ValueNumberVisitor {
 }
 
 impl<M> Encode<M> for Value {
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         match self {
-            Value::Unit => encoder.encode_unit(cx),
-            Value::Bool(b) => encoder.encode_bool(cx, *b),
-            Value::Char(c) => encoder.encode_char(cx, *c),
-            Value::Number(n) => n.encode(cx, encoder),
+            Value::Unit => encoder.encode_unit(),
+            Value::Bool(b) => encoder.encode_bool(*b),
+            Value::Char(c) => encoder.encode_char(*c),
+            Value::Number(n) => encoder.encode(n),
             #[cfg(feature = "alloc")]
-            Value::Bytes(bytes) => encoder.encode_bytes(cx, bytes),
+            Value::Bytes(bytes) => encoder.encode_bytes(bytes),
             #[cfg(feature = "alloc")]
-            Value::String(string) => encoder.encode_string(cx, string),
+            Value::String(string) => encoder.encode_string(string),
             #[cfg(feature = "alloc")]
             Value::Sequence(values) => {
-                let mut sequence = encoder.encode_sequence(cx, values.len())?;
+                let mut sequence = encoder.encode_sequence(values.len())?;
 
                 for value in values {
-                    let next = sequence.encode_next(cx)?;
-                    value.encode(cx, next)?;
+                    sequence.encode_next()?.encode(value)?;
                 }
 
-                sequence.end(cx)
+                sequence.end()
             }
             #[cfg(feature = "alloc")]
             Value::Map(values) => {
-                let mut map = encoder.encode_map(cx, values.len())?;
+                let mut map = encoder.encode_map(values.len())?;
 
                 for (first, second) in values {
-                    map.insert_entry(cx, first, second)?;
+                    map.insert_entry(first, second)?;
                 }
 
-                map.end(cx)
+                map.end()
             }
             #[cfg(feature = "alloc")]
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;
-                let encoder = encoder.encode_variant(cx)?;
-                encoder.insert_variant(cx, tag, variant)
+                let encoder = encoder.encode_variant()?;
+                encoder.insert_variant(tag, variant)
             }
             #[cfg(feature = "alloc")]
             Value::Option(option) => match option {
-                Some(value) => {
-                    let encoder = encoder.encode_some(cx)?;
-                    value.encode(cx, encoder)
-                }
-                None => encoder.encode_none(cx),
+                Some(value) => encoder.encode_some()?.encode(&**value),
+                None => encoder.encode_none(),
             },
         }
     }
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct AsValueDecoder<const F: Options, C: ?Sized> {
+pub struct AsValueDecoder<'a, const F: Options, C: ?Sized> {
+    cx: &'a C,
     value: Value,
-    _marker: PhantomData<C>,
 }
 
-impl<const F: Options, C: ?Sized> AsValueDecoder<F, C> {
+impl<'a, const F: Options, C: ?Sized> AsValueDecoder<'a, F, C> {
     /// Construct a new buffered value decoder.
     #[inline]
-    pub fn new(value: Value) -> Self {
-        Self {
-            value,
-            _marker: PhantomData,
-        }
+    pub fn new(cx: &'a C, value: Value) -> Self {
+        Self { cx, value }
     }
 }
 
-impl<const F: Options, C: ?Sized + Context> AsDecoder for AsValueDecoder<F, C> {
+impl<'a, const F: Options, C: ?Sized + Context> AsDecoder for AsValueDecoder<'a, F, C> {
     type Cx = C;
-    type Decoder<'this> = ValueDecoder<'this, F, C> where Self: 'this;
+    type Decoder<'this> = ValueDecoder<'a, 'this, F, C> where Self: 'this;
 
     #[inline]
-    fn as_decoder(&self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
-        Ok(self.value.decoder())
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {
+        Ok(self.value.decoder(self.cx))
     }
 }

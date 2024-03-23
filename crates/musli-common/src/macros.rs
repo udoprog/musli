@@ -142,7 +142,7 @@ macro_rules! encoding_impls {
             W: Writer,
             T: ?Sized + Encode<$mode>,
         {
-            T::encode(value, cx, $encoder_new(writer))
+            T::encode(value, cx, $encoder_new(cx, writer))
         }
 
         /// Decode the given type `T` from the given [Reader] using the current
@@ -157,7 +157,7 @@ macro_rules! encoding_impls {
             R: Reader<'de>,
             T: Decode<'de, $mode>,
         {
-            T::decode(cx, $decoder_new(reader))
+            T::decode(cx, $decoder_new(cx, reader))
         }
 
         /// Decode the given type `T` from the given [Reader] using the current

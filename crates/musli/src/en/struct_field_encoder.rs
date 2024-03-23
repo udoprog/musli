@@ -31,24 +31,21 @@ pub trait StructFieldEncoder {
     #[must_use = "Encoders must be consumed"]
     fn encode_field_name(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Self::EncodeFieldName<'_>, <Self::Cx as Context>::Error>;
 
     /// Return encoder for the field value in the struct.
     #[must_use = "Encoders must be consumed"]
     fn encode_field_value(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Self::EncodeFieldValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Stop encoding this field.
-    fn end(self, cx: &Self::Cx) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn end(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert the pair immediately.
     #[inline]
     fn insert_field<N, V>(
         mut self,
-        cx: &Self::Cx,
         name: N,
         value: V,
     ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
@@ -57,8 +54,8 @@ pub trait StructFieldEncoder {
         N: Encode<<Self::Cx as Context>::Mode>,
         V: Encode<<Self::Cx as Context>::Mode>,
     {
-        name.encode(cx, self.encode_field_name(cx)?)?;
-        value.encode(cx, self.encode_field_value(cx)?)?;
-        self.end(cx)
+        self.encode_field_name()?.encode(name)?;
+        self.encode_field_value()?.encode(value)?;
+        self.end()
     }
 }

@@ -1,13 +1,12 @@
 use core::fmt;
-use core::marker::PhantomData;
 use core::slice;
 
 #[cfg(feature = "alloc")]
 use musli::de::ValueVisitor;
 use musli::de::{
-    AsDecoder, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint, PackDecoder,
-    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, TypeHint,
-    VariantDecoder, Visitor,
+    AsDecoder, Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint,
+    PackDecoder, SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder,
+    TypeHint, VariantDecoder, Visitor,
 };
 use musli::Context;
 use musli_storage::de::StorageDecoder;
@@ -19,54 +18,56 @@ use crate::value::{Number, Value};
 use crate::AsValueDecoder;
 
 /// Encoder for a single value.
-pub struct ValueDecoder<'de, const F: Options, C: ?Sized> {
+pub struct ValueDecoder<'a, 'de, const F: Options, C: ?Sized> {
+    cx: &'a C,
     value: &'de Value,
-    _marker: PhantomData<C>,
 }
 
-impl<'de, const F: Options, C: ?Sized> ValueDecoder<'de, F, C> {
+impl<'a, 'de, const F: Options, C: ?Sized> ValueDecoder<'a, 'de, F, C> {
     #[inline]
-    pub(crate) const fn new(value: &'de Value) -> Self {
-        Self {
-            value,
-            _marker: PhantomData,
-        }
+    pub(crate) const fn new(cx: &'a C, value: &'de Value) -> Self {
+        Self { cx, value }
     }
 }
 
 macro_rules! ensure {
-    ($self:expr, $cx:expr, $hint:ident, $ident:ident $tt:tt, $pat:pat => $block:expr) => {
+    ($self:expr, $hint:ident, $ident:ident $tt:tt, $pat:pat => $block:expr) => {
         match $self.value {
             $pat => $block,
             value => {
                 let $hint = value.type_hint();
-                return Err($cx.message(ErrorMessage::$ident $tt));
+                return Err($self.cx.message(ErrorMessage::$ident $tt));
             }
         }
     };
 }
 
 #[musli::decoder]
-impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de> for ValueDecoder<'de, F, C> {
+impl<'a, 'de, C: ?Sized + Context, const F: Options> Decoder<'de> for ValueDecoder<'a, 'de, F, C> {
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<U> = ValueDecoder<'de, F, U> where U: Context;
-    type DecodeBuffer = AsValueDecoder<F, C>;
+    type WithContext<'this, U> = ValueDecoder<'this, 'de, F, U> where U: 'this + Context;
+    type DecodeBuffer = AsValueDecoder<'a, F, C>;
     type DecodeSome = Self;
-    type DecodePack = StorageDecoder<SliceReader<'de>, F, C>;
-    type DecodeSequence = IterValueDecoder<'de, F, C>;
-    type DecodeTuple = IterValueDecoder<'de, F, C>;
-    type DecodeMap = IterValuePairsDecoder<'de, F, C>;
-    type DecodeStruct = IterValuePairsDecoder<'de, F, C>;
-    type DecodeVariant = IterValueVariantDecoder<'de, F, C>;
+    type DecodePack = StorageDecoder<'a, SliceReader<'de>, F, C>;
+    type DecodeSequence = IterValueDecoder<'a, 'de, F, C>;
+    type DecodeTuple = IterValueDecoder<'a, 'de, F, C>;
+    type DecodeMap = IterValuePairsDecoder<'a, 'de, F, C>;
+    type DecodeStruct = IterValuePairsDecoder<'a, 'de, F, C>;
+    type DecodeVariant = IterValueVariantDecoder<'a, 'de, F, C>;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
+    fn cx(&self) -> &Self::Cx {
+        self.cx
+    }
+
+    #[inline]
+    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
     where
         U: Context,
     {
-        Ok(ValueDecoder::new(self.value))
+        Ok(ValueDecoder::new(cx, self.value))
     }
 
     #[inline]
@@ -75,620 +76,629 @@ impl<'de, C: ?Sized + Context, const F: Options> Decoder<'de> for ValueDecoder<'
     }
 
     #[inline]
-    fn type_hint(&mut self, _: &C) -> Result<TypeHint, C::Error> {
+    fn decode<T>(self) -> Result<T, C::Error>
+    where
+        T: Decode<'de, Self::Mode>,
+    {
+        T::decode(self.cx, self)
+    }
+
+    #[inline]
+    fn type_hint(&mut self) -> Result<TypeHint, C::Error> {
         Ok(self.value.type_hint())
     }
 
     #[inline]
-    fn decode_buffer(self, _: &C) -> Result<Self::DecodeBuffer, C::Error> {
-        Ok(AsValueDecoder::new(self.value.clone()))
+    fn decode_buffer(self) -> Result<Self::DecodeBuffer, C::Error> {
+        Ok(AsValueDecoder::new(self.cx, self.value.clone()))
     }
 
     #[inline]
-    fn decode_unit(self, cx: &C) -> Result<(), C::Error> {
-        ensure!(self, cx, hint, ExpectedUnit(hint), Value::Unit => Ok(()))
+    fn decode_unit(self) -> Result<(), C::Error> {
+        ensure!(self, hint, ExpectedUnit(hint), Value::Unit => Ok(()))
     }
 
     #[inline]
-    fn decode_bool(self, cx: &C) -> Result<bool, C::Error> {
-        ensure!(self, cx, hint, ExpectedBool(hint), Value::Bool(b) => Ok(*b))
+    fn decode_bool(self) -> Result<bool, C::Error> {
+        ensure!(self, hint, ExpectedBool(hint), Value::Bool(b) => Ok(*b))
     }
 
     #[inline]
-    fn decode_char(self, cx: &C) -> Result<char, C::Error> {
-        ensure!(self, cx, hint, ExpectedChar(hint), Value::Char(c) => Ok(*c))
+    fn decode_char(self) -> Result<char, C::Error> {
+        ensure!(self, hint, ExpectedChar(hint), Value::Char(c) => Ok(*c))
     }
 
     #[inline]
-    fn decode_u8(self, cx: &C) -> Result<u8, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => {
-            u8::from_number(n).map_err(cx.map_message())
+    fn decode_u8(self) -> Result<u8, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => {
+            u8::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_u16(self, cx: &C) -> Result<u16, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => {
-            u16::from_number(n).map_err(cx.map_message())
+    fn decode_u16(self) -> Result<u16, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => {
+            u16::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_u32(self, cx: &C) -> Result<u32, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => {
-            u32::from_number(n).map_err(cx.map_message())
+    fn decode_u32(self) -> Result<u32, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => {
+            u32::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_u64(self, cx: &C) -> Result<u64, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => {
-            u64::from_number(n).map_err(cx.map_message())
+    fn decode_u64(self) -> Result<u64, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => {
+            u64::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_u128(self, cx: &C) -> Result<u128, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => {
-            u128::from_number(n).map_err(cx.map_message())
+    fn decode_u128(self) -> Result<u128, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => {
+            u128::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_i8(self, cx: &C) -> Result<i8, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => {
-            i8::from_number(n).map_err(cx.map_message())
+    fn decode_i8(self) -> Result<i8, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => {
+            i8::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_i16(self, cx: &C) -> Result<i16, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => {
-            i16::from_number(n).map_err(cx.map_message())
+    fn decode_i16(self) -> Result<i16, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => {
+            i16::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_i32(self, cx: &C) -> Result<i32, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => {
-            i32::from_number(n).map_err(cx.map_message())
+    fn decode_i32(self) -> Result<i32, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => {
+            i32::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_i64(self, cx: &C) -> Result<i64, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => {
-            i64::from_number(n).map_err(cx.map_message())
+    fn decode_i64(self) -> Result<i64, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => {
+            i64::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_i128(self, cx: &C) -> Result<i128, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => {
-            i128::from_number(n).map_err(cx.map_message())
+    fn decode_i128(self) -> Result<i128, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => {
+            i128::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_usize(self, cx: &C) -> Result<usize, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => {
-            usize::from_number(n).map_err(cx.map_message())
+    fn decode_usize(self) -> Result<usize, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => {
+            usize::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_isize(self, cx: &C) -> Result<isize, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => {
-            isize::from_number(n).map_err(cx.map_message())
+    fn decode_isize(self) -> Result<isize, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => {
+            isize::from_number(n).map_err(self.cx.map_message())
         })
     }
 
     #[inline]
-    fn decode_f32(self, cx: &C) -> Result<f32, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::F32, hint), Value::Number(Number::F32(n)) => Ok(*n))
+    fn decode_f32(self) -> Result<f32, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::F32, hint), Value::Number(Number::F32(n)) => Ok(*n))
     }
 
     #[inline]
-    fn decode_f64(self, cx: &C) -> Result<f64, C::Error> {
-        ensure!(self, cx, hint, ExpectedNumber(NumberHint::F64, hint), Value::Number(Number::F64(n)) => Ok(*n))
+    fn decode_f64(self) -> Result<f64, C::Error> {
+        ensure!(self, hint, ExpectedNumber(NumberHint::F64, hint), Value::Number(Number::F64(n)) => Ok(*n))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_array<const N: usize>(self, cx: &C) -> Result<[u8; N], C::Error> {
-        ensure!(self, cx, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
-            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| cx.message(ErrorMessage::ArrayOutOfBounds))
+    fn decode_array<const N: usize>(self) -> Result<[u8; N], C::Error> {
+        ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
+            <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| self.cx.message(ErrorMessage::ArrayOutOfBounds))
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_bytes<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: ValueVisitor<'de, C, [u8]>,
     {
-        ensure!(self, cx, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
-            visitor.visit_borrowed(cx, bytes)
+        ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
+            visitor.visit_borrowed(self.cx, bytes)
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_string<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: ValueVisitor<'de, C, str>,
     {
-        ensure!(self, cx, hint, ExpectedString(hint), Value::String(string) => {
-            visitor.visit_borrowed(cx, string)
+        ensure!(self, hint, ExpectedString(hint), Value::String(string) => {
+            visitor.visit_borrowed(self.cx, string)
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_option(self, cx: &C) -> Result<Option<Self::DecodeSome>, C::Error> {
-        ensure!(self, cx, hint, ExpectedOption(hint), Value::Option(option) => {
-            Ok(option.as_ref().map(|some| ValueDecoder::new(some)))
+    fn decode_option(self) -> Result<Option<Self::DecodeSome>, C::Error> {
+        ensure!(self, hint, ExpectedOption(hint), Value::Option(option) => {
+            Ok(option.as_ref().map(|some| ValueDecoder::new(self.cx, some)))
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_pack(self, cx: &C) -> Result<Self::DecodePack, C::Error> {
-        ensure!(self, cx, hint, ExpectedPack(hint), Value::Bytes(pack) => {
-            Ok(StorageDecoder::new(SliceReader::new(pack)))
+    fn decode_pack(self) -> Result<Self::DecodePack, C::Error> {
+        ensure!(self, hint, ExpectedPack(hint), Value::Bytes(pack) => {
+            Ok(StorageDecoder::new(self.cx, SliceReader::new(pack)))
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_sequence(self, cx: &C) -> Result<Self::DecodeSequence, C::Error> {
-        ensure!(self, cx, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
-            Ok(IterValueDecoder::new(sequence))
+    fn decode_sequence(self) -> Result<Self::DecodeSequence, C::Error> {
+        ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
+            Ok(IterValueDecoder::new(self.cx, sequence))
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_tuple(self, cx: &C, _: usize) -> Result<Self::DecodeTuple, C::Error> {
-        ensure!(self, cx, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
-            Ok(IterValueDecoder::new(sequence))
+    fn decode_tuple(self, _: usize) -> Result<Self::DecodeTuple, C::Error> {
+        ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
+            Ok(IterValueDecoder::new(self.cx, sequence))
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_map(self, cx: &C) -> Result<Self::DecodeMap, C::Error> {
-        ensure!(self, cx, hint, ExpectedMap(hint), Value::Map(map) => {
-            Ok(IterValuePairsDecoder::new(map))
+    fn decode_map(self) -> Result<Self::DecodeMap, C::Error> {
+        ensure!(self, hint, ExpectedMap(hint), Value::Map(map) => {
+            Ok(IterValuePairsDecoder::new(self.cx, map))
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_struct(self, cx: &C, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
-        ensure!(self, cx, hint, ExpectedMap(hint), Value::Map(st) => {
-            Ok(IterValuePairsDecoder::new(st))
+    fn decode_struct(self, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
+        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
+            Ok(IterValuePairsDecoder::new(self.cx, st))
         })
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_variant(self, cx: &C) -> Result<Self::DecodeVariant, C::Error> {
-        ensure!(self, cx, hint, ExpectedVariant(hint), Value::Variant(st) => {
-            Ok(IterValueVariantDecoder::new(st))
+    fn decode_variant(self) -> Result<Self::DecodeVariant, C::Error> {
+        ensure!(self, hint, ExpectedVariant(hint), Value::Variant(st) => {
+            Ok(IterValueVariantDecoder::new(self.cx, st))
         })
     }
 
     #[inline]
-    fn decode_any<V>(self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_any<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: Visitor<'de, Self::Cx>,
     {
         match self.value {
-            Value::Unit => visitor.visit_unit(cx),
-            Value::Bool(value) => visitor.visit_bool(cx, *value),
-            Value::Char(value) => visitor.visit_char(cx, *value),
+            Value::Unit => visitor.visit_unit(self.cx),
+            Value::Bool(value) => visitor.visit_bool(self.cx, *value),
+            Value::Char(value) => visitor.visit_char(self.cx, *value),
             Value::Number(number) => match number {
-                Number::U8(value) => visitor.visit_u8(cx, *value),
-                Number::U16(value) => visitor.visit_u16(cx, *value),
-                Number::U32(value) => visitor.visit_u32(cx, *value),
-                Number::U64(value) => visitor.visit_u64(cx, *value),
-                Number::U128(value) => visitor.visit_u128(cx, *value),
-                Number::I8(value) => visitor.visit_i8(cx, *value),
-                Number::I16(value) => visitor.visit_i16(cx, *value),
-                Number::I32(value) => visitor.visit_i32(cx, *value),
-                Number::I64(value) => visitor.visit_i64(cx, *value),
-                Number::I128(value) => visitor.visit_i128(cx, *value),
-                Number::Usize(value) => visitor.visit_usize(cx, *value),
-                Number::Isize(value) => visitor.visit_isize(cx, *value),
-                Number::F32(value) => visitor.visit_f32(cx, *value),
-                Number::F64(value) => visitor.visit_f64(cx, *value),
+                Number::U8(value) => visitor.visit_u8(self.cx, *value),
+                Number::U16(value) => visitor.visit_u16(self.cx, *value),
+                Number::U32(value) => visitor.visit_u32(self.cx, *value),
+                Number::U64(value) => visitor.visit_u64(self.cx, *value),
+                Number::U128(value) => visitor.visit_u128(self.cx, *value),
+                Number::I8(value) => visitor.visit_i8(self.cx, *value),
+                Number::I16(value) => visitor.visit_i16(self.cx, *value),
+                Number::I32(value) => visitor.visit_i32(self.cx, *value),
+                Number::I64(value) => visitor.visit_i64(self.cx, *value),
+                Number::I128(value) => visitor.visit_i128(self.cx, *value),
+                Number::Usize(value) => visitor.visit_usize(self.cx, *value),
+                Number::Isize(value) => visitor.visit_isize(self.cx, *value),
+                Number::F32(value) => visitor.visit_f32(self.cx, *value),
+                Number::F64(value) => visitor.visit_f64(self.cx, *value),
             },
             #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => {
-                let visitor = visitor.visit_bytes(cx, SizeHint::Exact(bytes.len()))?;
-                visitor.visit_borrowed(cx, bytes)
+                let visitor = visitor.visit_bytes(self.cx, SizeHint::Exact(bytes.len()))?;
+                visitor.visit_borrowed(self.cx, bytes)
             }
             #[cfg(feature = "alloc")]
             Value::String(string) => {
-                let visitor = visitor.visit_string(cx, SizeHint::Exact(string.len()))?;
-                visitor.visit_borrowed(cx, string)
+                let visitor = visitor.visit_string(self.cx, SizeHint::Exact(string.len()))?;
+                visitor.visit_borrowed(self.cx, string)
             }
             #[cfg(feature = "alloc")]
             Value::Sequence(values) => {
-                visitor.visit_sequence(cx, IterValueDecoder::<F, _>::new(values))
+                visitor.visit_sequence(self.cx, IterValueDecoder::<F, _>::new(self.cx, values))
             }
             #[cfg(feature = "alloc")]
-            Value::Map(values) => visitor.visit_map(cx, IterValuePairsDecoder::<F, _>::new(values)),
-            #[cfg(feature = "alloc")]
-            Value::Variant(variant) => {
-                visitor.visit_variant(cx, IterValueVariantDecoder::<F, _>::new(variant))
+            Value::Map(values) => {
+                visitor.visit_map(self.cx, IterValuePairsDecoder::<F, _>::new(self.cx, values))
             }
+            #[cfg(feature = "alloc")]
+            Value::Variant(variant) => visitor.visit_variant(
+                self.cx,
+                IterValueVariantDecoder::<F, _>::new(self.cx, variant),
+            ),
             #[cfg(feature = "alloc")]
             Value::Option(option) => visitor.visit_option(
-                cx,
+                self.cx,
                 option
                     .as_ref()
-                    .map(|value| ValueDecoder::<F, _>::new(value)),
+                    .map(|value| ValueDecoder::<F, _>::new(self.cx, value)),
             ),
         }
     }
 }
 
-impl<'a, C: ?Sized + Context, const F: Options> AsDecoder for ValueDecoder<'a, F, C> {
+impl<'a, 'de, C: ?Sized + Context, const F: Options> AsDecoder for ValueDecoder<'a, 'de, F, C> {
     type Cx = C;
-    type Decoder<'this> = ValueDecoder<'this, F, C> where Self: 'this;
+    type Decoder<'this> = ValueDecoder<'a, 'this, F, C> where Self: 'this;
 
     #[inline]
-    fn as_decoder(&self, _: &C) -> Result<Self::Decoder<'_>, C::Error> {
-        Ok(ValueDecoder::new(self.value))
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {
+        Ok(ValueDecoder::new(self.cx, self.value))
     }
 }
 
 /// A decoder over a simple value iterator.
 
-pub struct IterValueDecoder<'de, const F: Options, C: ?Sized> {
+pub struct IterValueDecoder<'a, 'de, const F: Options, C: ?Sized> {
+    cx: &'a C,
     iter: slice::Iter<'de, Value>,
-    _marker: PhantomData<C>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'de, const F: Options, C: ?Sized> IterValueDecoder<'de, F, C> {
+impl<'a, 'de, const F: Options, C: ?Sized> IterValueDecoder<'a, 'de, F, C> {
     #[inline]
-    fn new(values: &'de [Value]) -> Self {
+    fn new(cx: &'a C, values: &'de [Value]) -> Self {
         Self {
+            cx,
             iter: values.iter(),
-            _marker: PhantomData,
         }
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> PackDecoder<'de> for IterValueDecoder<'de, F, C> {
+impl<'a, 'de, C: ?Sized + Context, const F: Options> PackDecoder<'de>
+    for IterValueDecoder<'a, 'de, F, C>
+{
     type Cx = C;
-    type DecodeNext<'this> = ValueDecoder<'de, F, C>
+    type DecodeNext<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
 
     #[inline]
-    fn decode_next(&mut self, cx: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
         match self.iter.next() {
-            Some(value) => Ok(ValueDecoder::new(value)),
-            None => Err(cx.message(ErrorMessage::ExpectedPackValue)),
+            Some(value) => Ok(ValueDecoder::new(self.cx, value)),
+            None => Err(self.cx.message(ErrorMessage::ExpectedPackValue)),
         }
     }
 
     #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
+    fn end(self) -> Result<(), C::Error> {
         Ok(())
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> SequenceDecoder<'de>
-    for IterValueDecoder<'de, F, C>
+impl<'a, 'de, C: ?Sized + Context, const F: Options> SequenceDecoder<'de>
+    for IterValueDecoder<'a, 'de, F, C>
 {
     type Cx = C;
-    type DecodeNext<'this> = ValueDecoder<'de, F, C>
+    type DecodeNext<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self, _: &C) -> SizeHint {
+    fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.iter.size_hint().1)
     }
 
     #[inline]
-    fn decode_next(&mut self, _: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         match self.iter.next() {
-            Some(value) => Ok(Some(ValueDecoder::new(value))),
+            Some(value) => Ok(Some(ValueDecoder::new(self.cx, value))),
             None => Ok(None),
         }
     }
 
     #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
+    fn end(self) -> Result<(), C::Error> {
         Ok(())
     }
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairsDecoder<'de, const F: Options, C: ?Sized> {
+pub struct IterValuePairsDecoder<'a, 'de, const F: Options, C: ?Sized> {
+    cx: &'a C,
     iter: slice::Iter<'de, (Value, Value)>,
-    _marker: PhantomData<C>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'de, const F: Options, C: ?Sized> IterValuePairsDecoder<'de, F, C> {
+impl<'a, 'de, const F: Options, C: ?Sized> IterValuePairsDecoder<'a, 'de, F, C> {
     #[inline]
-    fn new(values: &'de [(Value, Value)]) -> Self {
+    fn new(cx: &'a C, values: &'de [(Value, Value)]) -> Self {
         Self {
+            cx,
             iter: values.iter(),
-            _marker: PhantomData,
         }
     }
 }
 
 #[musli::map_decoder]
-impl<'de, C: ?Sized + Context, const F: Options> MapDecoder<'de>
-    for IterValuePairsDecoder<'de, F, C>
+impl<'a, 'de, C: ?Sized + Context, const F: Options> MapDecoder<'de>
+    for IterValuePairsDecoder<'a, 'de, F, C>
 {
     type Cx = C;
-    type DecodeEntry<'this> = IterValuePairDecoder<'de, F, C>
+    type DecodeEntry<'this> = IterValuePairDecoder<'a, 'de, F, C>
     where
         Self: 'this;
     type IntoMapEntries = Self;
 
     #[inline]
-    fn size_hint(&self, _: &C) -> SizeHint {
+    fn cx(&self) -> &Self::Cx {
+        self.cx
+    }
+
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.iter.size_hint().1)
     }
 
     #[inline]
-    fn into_map_entries(self, _: &C) -> Result<Self::IntoMapEntries, C::Error> {
+    fn into_map_entries(self) -> Result<Self::IntoMapEntries, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn decode_entry(&mut self, _: &C) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
-        Ok(self.iter.next().map(IterValuePairDecoder::new))
+    fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
+        let Some(value) = self.iter.next() else {
+            return Ok(None);
+        };
+
+        Ok(Some(IterValuePairDecoder::new(self.cx, value)))
     }
 
     #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
+    fn end(self) -> Result<(), C::Error> {
         Ok(())
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> MapEntriesDecoder<'de>
-    for IterValuePairsDecoder<'de, F, C>
+impl<'a, 'de, C: ?Sized + Context, const F: Options> MapEntriesDecoder<'de>
+    for IterValuePairsDecoder<'a, 'de, F, C>
 {
     type Cx = C;
-    type DecodeMapEntryKey<'this> = ValueDecoder<'de, F, C>
+    type DecodeMapEntryKey<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
-    type DecodeMapEntryValue<'this> = ValueDecoder<'de, F, C> where Self: 'this;
+    type DecodeMapEntryValue<'this> = ValueDecoder<'a, 'de, F, C> where Self: 'this;
 
     #[inline]
-    fn decode_map_entry_key(
-        &mut self,
-        _: &C,
-    ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
+    fn decode_map_entry_key(&mut self) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
         let Some((name, _)) = self.iter.clone().next() else {
             return Ok(None);
         };
 
-        Ok(Some(ValueDecoder::new(name)))
+        Ok(Some(ValueDecoder::new(self.cx, name)))
     }
 
     #[inline]
-    fn decode_map_entry_value(
-        &mut self,
-        cx: &C,
-    ) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
+    fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
-            return Err(cx.message(ErrorMessage::ExpectedMapValue));
+            return Err(self.cx.message(ErrorMessage::ExpectedMapValue));
         };
 
-        Ok(ValueDecoder::new(value))
+        Ok(ValueDecoder::new(self.cx, value))
     }
 
     #[inline]
-    fn skip_map_entry_value(&mut self, _: &C) -> Result<bool, C::Error> {
+    fn skip_map_entry_value(&mut self) -> Result<bool, C::Error> {
         Ok(true)
     }
 
     #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
+    fn end(self) -> Result<(), C::Error> {
         Ok(())
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> MapEntryDecoder<'de>
-    for IterValuePairDecoder<'de, F, C>
+impl<'a, 'de, C: ?Sized + Context, const F: Options> MapEntryDecoder<'de>
+    for IterValuePairDecoder<'a, 'de, F, C>
 {
     type Cx = C;
-    type DecodeMapKey<'this> = ValueDecoder<'de, F, C>
+    type DecodeMapKey<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
-    type DecodeMapValue = ValueDecoder<'de, F, C>;
+    type DecodeMapValue = ValueDecoder<'a, 'de, F, C>;
 
     #[inline]
-    fn decode_map_key(&mut self, _: &C) -> Result<Self::DecodeMapKey<'_>, C::Error> {
-        Ok(ValueDecoder::new(&self.pair.0))
+    fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, C::Error> {
+        Ok(ValueDecoder::new(self.cx, &self.pair.0))
     }
 
     #[inline]
-    fn decode_map_value(self, _: &C) -> Result<Self::DecodeMapValue, C::Error> {
-        Ok(ValueDecoder::new(&self.pair.1))
+    fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
+        Ok(ValueDecoder::new(self.cx, &self.pair.1))
     }
 
     #[inline]
-    fn skip_map_value(self, _: &C) -> Result<bool, C::Error> {
+    fn skip_map_value(self) -> Result<bool, C::Error> {
         Ok(true)
     }
 }
 
 #[musli::struct_decoder]
-impl<'de, C: ?Sized + Context, const F: Options> StructDecoder<'de>
-    for IterValuePairsDecoder<'de, F, C>
+impl<'a, 'de, C: ?Sized + Context, const F: Options> StructDecoder<'de>
+    for IterValuePairsDecoder<'a, 'de, F, C>
 {
     type Cx = C;
-    type DecodeField<'this> = IterValuePairDecoder<'de, F, C>
+    type DecodeField<'this> = IterValuePairDecoder<'a, 'de, F, C>
     where
         Self: 'this;
     type IntoStructFields = Self;
 
     #[inline]
-    fn size_hint(&self, cx: &C) -> SizeHint {
-        MapDecoder::size_hint(self, cx)
+    fn cx(&self) -> &Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn into_struct_fields(self, _: &C) -> Result<Self::IntoStructFields, C::Error> {
+    fn size_hint(&self) -> SizeHint {
+        MapDecoder::size_hint(self)
+    }
+
+    #[inline]
+    fn into_struct_fields(self) -> Result<Self::IntoStructFields, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn decode_field(&mut self, cx: &C) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
-        MapDecoder::decode_entry(self, cx)
+    fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
+        MapDecoder::decode_entry(self)
     }
 
     #[inline]
-    fn end(self, cx: &C) -> Result<(), C::Error> {
-        MapDecoder::end(self, cx)
+    fn end(self) -> Result<(), C::Error> {
+        MapDecoder::end(self)
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> StructFieldsDecoder<'de>
-    for IterValuePairsDecoder<'de, F, C>
+impl<'a, 'de, C: ?Sized + Context, const F: Options> StructFieldsDecoder<'de>
+    for IterValuePairsDecoder<'a, 'de, F, C>
 {
     type Cx = C;
-    type DecodeStructFieldName<'this> = ValueDecoder<'de, F, C>
+    type DecodeStructFieldName<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
-    type DecodeStructFieldValue<'this> = ValueDecoder<'de, F, C> where Self: 'this;
+    type DecodeStructFieldValue<'this> = ValueDecoder<'a, 'de, F, C> where Self: 'this;
 
     #[inline]
-    fn decode_struct_field_name(
-        &mut self,
-        cx: &C,
-    ) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
+    fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
         let Some((name, _)) = self.iter.clone().next() else {
-            return Err(cx.message(ErrorMessage::ExpectedFieldName));
+            return Err(self.cx.message(ErrorMessage::ExpectedFieldName));
         };
 
-        Ok(ValueDecoder::new(name))
+        Ok(ValueDecoder::new(self.cx, name))
     }
 
     #[inline]
-    fn decode_struct_field_value(
-        &mut self,
-        cx: &C,
-    ) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
+    fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
-            return Err(cx.message(ErrorMessage::ExpectedFieldValue));
+            return Err(self.cx.message(ErrorMessage::ExpectedFieldValue));
         };
 
-        Ok(ValueDecoder::new(value))
+        Ok(ValueDecoder::new(self.cx, value))
     }
 
     #[inline]
-    fn skip_struct_field_value(&mut self, _: &C) -> Result<bool, C::Error> {
+    fn skip_struct_field_value(&mut self) -> Result<bool, C::Error> {
         Ok(self.iter.next().is_some())
     }
 
     #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
+    fn end(self) -> Result<(), C::Error> {
         Ok(())
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> StructFieldDecoder<'de>
-    for IterValuePairDecoder<'de, F, C>
+impl<'a, 'de, C: ?Sized + Context, const F: Options> StructFieldDecoder<'de>
+    for IterValuePairDecoder<'a, 'de, F, C>
 {
     type Cx = C;
-    type DecodeFieldName<'this> = ValueDecoder<'de, F, C>
+    type DecodeFieldName<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
 
-    type DecodeFieldValue = ValueDecoder<'de, F, C>;
+    type DecodeFieldValue = ValueDecoder<'a, 'de, F, C>;
 
     #[inline]
-    fn decode_field_name(&mut self, cx: &C) -> Result<Self::DecodeFieldName<'_>, C::Error> {
-        MapEntryDecoder::decode_map_key(self, cx)
+    fn decode_field_name(&mut self) -> Result<Self::DecodeFieldName<'_>, C::Error> {
+        MapEntryDecoder::decode_map_key(self)
     }
 
     #[inline]
-    fn decode_field_value(self, cx: &C) -> Result<Self::DecodeFieldValue, C::Error> {
-        MapEntryDecoder::decode_map_value(self, cx)
+    fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
+        MapEntryDecoder::decode_map_value(self)
     }
 
     #[inline]
-    fn skip_field_value(self, cx: &C) -> Result<bool, C::Error> {
-        MapEntryDecoder::skip_map_value(self, cx)
+    fn skip_field_value(self) -> Result<bool, C::Error> {
+        MapEntryDecoder::skip_map_value(self)
     }
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairDecoder<'de, const F: Options, C: ?Sized> {
+pub struct IterValuePairDecoder<'a, 'de, const F: Options, C: ?Sized> {
+    cx: &'a C,
     pair: &'de (Value, Value),
-    _marker: PhantomData<C>,
 }
 
-impl<'de, const F: Options, C: ?Sized> IterValuePairDecoder<'de, F, C> {
+impl<'a, 'de, const F: Options, C: ?Sized> IterValuePairDecoder<'a, 'de, F, C> {
     #[inline]
-    const fn new(pair: &'de (Value, Value)) -> Self {
-        Self {
-            pair,
-            _marker: PhantomData,
-        }
+    const fn new(cx: &'a C, pair: &'de (Value, Value)) -> Self {
+        Self { cx, pair }
     }
 }
 
 /// A decoder over a simple value pair as a variant.
-pub struct IterValueVariantDecoder<'de, const F: Options, C: ?Sized> {
+pub struct IterValueVariantDecoder<'a, 'de, const F: Options, C: ?Sized> {
+    cx: &'a C,
     pair: &'de (Value, Value),
-    _marker: PhantomData<C>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'de, const F: Options, C: ?Sized> IterValueVariantDecoder<'de, F, C> {
+impl<'a, 'de, const F: Options, C: ?Sized> IterValueVariantDecoder<'a, 'de, F, C> {
     #[inline]
-    const fn new(pair: &'de (Value, Value)) -> Self {
-        Self {
-            pair,
-            _marker: PhantomData,
-        }
+    const fn new(cx: &'a C, pair: &'de (Value, Value)) -> Self {
+        Self { cx, pair }
     }
 }
 
-impl<'de, C: ?Sized + Context, const F: Options> VariantDecoder<'de>
-    for IterValueVariantDecoder<'de, F, C>
+impl<'a, 'de, C: ?Sized + Context, const F: Options> VariantDecoder<'de>
+    for IterValueVariantDecoder<'a, 'de, F, C>
 {
     type Cx = C;
-    type DecodeTag<'this> = ValueDecoder<'de, F, C>
+    type DecodeTag<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
-    type DecodeVariant<'this> = ValueDecoder<'de, F, C>
+    type DecodeVariant<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
 
     #[inline]
-    fn decode_tag(&mut self, _: &C) -> Result<Self::DecodeTag<'_>, C::Error> {
-        Ok(ValueDecoder::new(&self.pair.0))
+    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
+        Ok(ValueDecoder::new(self.cx, &self.pair.0))
     }
 
     #[inline]
-    fn decode_value(&mut self, _: &C) -> Result<Self::DecodeVariant<'_>, C::Error> {
-        Ok(ValueDecoder::new(&self.pair.1))
+    fn decode_value(&mut self) -> Result<Self::DecodeVariant<'_>, C::Error> {
+        Ok(ValueDecoder::new(self.cx, &self.pair.1))
     }
 
     #[inline]
-    fn skip_value(&mut self, _: &C) -> Result<bool, C::Error> {
+    fn skip_value(&mut self) -> Result<bool, C::Error> {
         Ok(true)
     }
 
     #[inline]
-    fn end(self, _: &C) -> Result<(), C::Error> {
+    fn end(self) -> Result<(), C::Error> {
         Ok(())
     }
 }

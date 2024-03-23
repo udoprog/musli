@@ -35,7 +35,7 @@ pub use musli_macros::Encode;
 ///     where
 ///         E: Encoder<Mode = M>,
 ///     {
-///         encoder.encode_array(cx, &self.data)
+///         encoder.encode_array(&self.data)
 ///     }
 /// }
 /// ```

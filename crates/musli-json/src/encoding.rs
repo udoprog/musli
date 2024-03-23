@@ -11,8 +11,8 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::io;
 
-use musli::de::Decode;
-use musli::en::Encode;
+use musli::de::{Decode, Decoder};
+use musli::en::{Encode, Encoder};
 use musli::mode::DefaultMode;
 use musli::Context;
 
@@ -178,7 +178,7 @@ impl<M> Encoding<M> {
         W: Writer,
         T: ?Sized + Encode<M>,
     {
-        value.encode(cx, JsonEncoder::new(writer))
+        JsonEncoder::new(cx, writer).encode(value)
     }
 
     /// Encode the given value to a [`String`] using the current configuration.
@@ -206,7 +206,7 @@ impl<M> Encoding<M> {
         T: ?Sized + Encode<M>,
     {
         let mut data = Vec::with_capacity(128);
-        T::encode(value, cx, JsonEncoder::new(&mut data))?;
+        JsonEncoder::new(cx, &mut data).encode(value)?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }
@@ -237,7 +237,7 @@ impl<M> Encoding<M> {
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
-        T::decode(cx, JsonDecoder::new(parser))
+        JsonDecoder::new(cx, parser).decode()
     }
 
     /// Decode the given type `T` from the given string using the current
@@ -288,8 +288,7 @@ impl<M> Encoding<M> {
         C: ?Sized + Context<Mode = M>,
         T: Decode<'de, M>,
     {
-        let reader = SliceParser::new(bytes);
-        T::decode(cx, JsonDecoder::new(reader))
+        JsonDecoder::new(cx, SliceParser::new(bytes)).decode()
     }
 
     musli_common::encode_with_extensions!(M);

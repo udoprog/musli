@@ -37,33 +37,26 @@ pub trait MapEntriesEncoder {
     #[must_use = "Encoders must be consumed"]
     fn encode_map_entry_key(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Self::EncodeMapEntryKey<'_>, <Self::Cx as Context>::Error>;
 
     /// Return encoder for value in the entry.
     #[must_use = "Encoders must be consumed"]
     fn encode_map_entry_value(
         &mut self,
-        cx: &Self::Cx,
     ) -> Result<Self::EncodeMapEntryValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Stop encoding this pair.
-    fn end(self, cx: &Self::Cx) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn end(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert_entry<K, V>(
-        &mut self,
-        cx: &Self::Cx,
-        key: K,
-        value: V,
-    ) -> Result<(), <Self::Cx as Context>::Error>
+    fn insert_entry<K, V>(&mut self, key: K, value: V) -> Result<(), <Self::Cx as Context>::Error>
     where
         K: Encode<<Self::Cx as Context>::Mode>,
         V: Encode<<Self::Cx as Context>::Mode>,
     {
-        key.encode(cx, self.encode_map_entry_key(cx)?)?;
-        value.encode(cx, self.encode_map_entry_value(cx)?)?;
+        self.encode_map_entry_key()?.encode(key)?;
+        self.encode_map_entry_value()?.encode(value)?;
         Ok(())
     }
 }

@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use musli::en::VariantEncoder;
 use musli::Context;
 
@@ -8,53 +6,50 @@ use crate::writer::Writer;
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 
 /// A JSON variant encoder.
-pub(crate) struct JsonVariantEncoder<W, C: ?Sized> {
+pub(crate) struct JsonVariantEncoder<'a, W, C: ?Sized> {
+    cx: &'a C,
     writer: W,
-    _marker: PhantomData<C>,
 }
 
-impl<W, C> JsonVariantEncoder<W, C>
+impl<'a, W, C> JsonVariantEncoder<'a, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
 {
     #[inline]
-    pub(super) fn new(cx: &C, mut writer: W) -> Result<Self, C::Error> {
+    pub(super) fn new(cx: &'a C, mut writer: W) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'{')?;
-        Ok(Self {
-            writer,
-            _marker: PhantomData,
-        })
+        Ok(Self { cx, writer })
     }
 }
 
-impl<W, C> VariantEncoder for JsonVariantEncoder<W, C>
+impl<'a, W, C> VariantEncoder for JsonVariantEncoder<'a, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = JsonObjectKeyEncoder<W::Mut<'this>, C>
+    type EncodeTag<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeValue<'this> = JsonEncoder<W::Mut<'this>, C>
+    type EncodeValue<'this> = JsonEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_tag(&mut self, _: &C) -> Result<Self::EncodeTag<'_>, C::Error> {
-        Ok(JsonObjectKeyEncoder::new(self.writer.borrow_mut()))
+    fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
+        Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn encode_value(&mut self, cx: &C) -> Result<Self::EncodeValue<'_>, C::Error> {
-        self.writer.write_byte(cx, b':')?;
-        Ok(JsonEncoder::new(self.writer.borrow_mut()))
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+        self.writer.write_byte(self.cx, b':')?;
+        Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn end(mut self, cx: &C) -> Result<Self::Ok, C::Error> {
-        self.writer.write_byte(cx, b'}')
+    fn end(mut self) -> Result<Self::Ok, C::Error> {
+        self.writer.write_byte(self.cx, b'}')
     }
 }

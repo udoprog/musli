@@ -41,7 +41,7 @@ impl<M> Encode<M> for String {
 
 impl<'de, M> Decode<'de, M> for String {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
@@ -74,7 +74,7 @@ impl<'de, M> Decode<'de, M> for String {
             }
         }
 
-        decoder.decode_string(cx, Visitor)
+        decoder.decode_string(Visitor)
     }
 }
 
@@ -125,7 +125,7 @@ macro_rules! cow {
 
         impl<'de, M> $decode<'de, M> for Cow<'de, $ty> {
             #[inline]
-            fn $decode_fn<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn $decode_fn<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
@@ -170,7 +170,7 @@ macro_rules! cow {
                     }
                 }
 
-                decoder.$decode_method(cx, Visitor)
+                decoder.$decode_method(Visitor)
             }
         }
     };
@@ -221,19 +221,18 @@ macro_rules! sequence {
             where
                 E: Encoder<Mode = M>,
             {
-                let mut seq = encoder.encode_sequence($cx, self.len())?;
+                let mut seq = encoder.encode_sequence(self.len())?;
 
                 let mut index = 0;
 
                 for value in self {
                     $cx.enter_sequence_index(index);
-                    let encoder = seq.encode_next($cx)?;
-                    value.encode($cx, encoder)?;
+                    seq.push(value)?;
                     $cx.leave_sequence_index();
                     index = index.wrapping_add(1);
                 }
 
-                seq.end($cx)
+                seq.end()
             }
         }
 
@@ -247,19 +246,19 @@ macro_rules! sequence {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                let mut $access = decoder.decode_sequence($cx)?;
+                let mut $access = decoder.decode_sequence()?;
                 let mut out = $factory;
 
                 let mut index = 0;
 
-                while let Some(value) = $access.decode_next($cx)? {
+                while let Some(value) = $access.decode_next()? {
                     $cx.enter_sequence_index(index);
                     out.$insert(T::decode($cx, value)?);
                     $cx.leave_sequence_index();
                     index = index.wrapping_add(1);
                 }
 
-                $access.end($cx)?;
+                $access.end()?;
                 Ok(out)
             }
         }
@@ -271,14 +270,14 @@ sequence!(
     Vec<T>,
     push,
     seq,
-    Vec::with_capacity(size_hint::cautious(seq.size_hint(cx)))
+    Vec::with_capacity(size_hint::cautious(seq.size_hint()))
 );
 sequence!(
     cx,
     VecDeque<T>,
     push_back,
     seq,
-    VecDeque::with_capacity(size_hint::cautious(seq.size_hint(cx)))
+    VecDeque::with_capacity(size_hint::cautious(seq.size_hint()))
 );
 #[cfg(feature = "std")]
 sequence!(
@@ -286,14 +285,14 @@ sequence!(
     HashSet<T: Eq + Hash, S: BuildHasher + Default>,
     insert,
     seq,
-    HashSet::with_capacity_and_hasher(size_hint::cautious(seq.size_hint(cx)), S::default())
+    HashSet::with_capacity_and_hasher(size_hint::cautious(seq.size_hint()), S::default())
 );
 sequence!(
     cx,
     BinaryHeap<T: Ord>,
     push,
     seq,
-    BinaryHeap::with_capacity(size_hint::cautious(seq.size_hint(cx)))
+    BinaryHeap::with_capacity(size_hint::cautious(seq.size_hint()))
 );
 
 macro_rules! map {
@@ -314,16 +313,16 @@ macro_rules! map {
             where
                 E: Encoder<Mode = M>,
             {
-                let mut map = encoder.encode_map($cx, self.len())?;
+                let mut map = encoder.encode_map(self.len())?;
 
                 for (k, v) in self {
-                    let mut entry = map.encode_entry($cx)?;
-                    k.encode($cx, entry.encode_map_key($cx)?)?;
-                    v.encode($cx, entry.encode_map_value($cx)?)?;
-                    entry.end($cx)?;
+                    let mut entry = map.encode_entry()?;
+                    entry.encode_map_key()?.encode(k)?;
+                    entry.encode_map_value()?.encode(v)?;
+                    entry.end()?;
                 }
 
-                map.end($cx)
+                map.end()
             }
         }
 
@@ -338,18 +337,18 @@ macro_rules! map {
             where
                 E: Encoder<Mode = M>,
             {
-                let mut map = encoder.encode_map($cx, self.len())?;
+                let mut map = encoder.encode_map(self.len())?;
 
                 for (k, v) in self {
                     $cx.enter_map_key(k);
-                    let mut entry = map.encode_entry($cx)?;
-                    k.encode($cx, entry.encode_map_key($cx)?)?;
-                    v.encode($cx, entry.encode_map_value($cx)?)?;
-                    entry.end($cx)?;
+                    let mut entry = map.encode_entry()?;
+                    entry.encode_map_key()?.encode(k)?;
+                    entry.encode_map_value()?.encode(v)?;
+                    entry.end()?;
                     $cx.leave_map_key();
                 }
 
-                map.end($cx)
+                map.end()
             }
         }
 
@@ -364,10 +363,10 @@ macro_rules! map {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_map_fn($cx, |$access| {
+                decoder.decode_map_fn(|$access| {
                     let mut out = $with_capacity;
 
-                    while let Some((key, value)) = $access.entry($cx)? {
+                    while let Some((key, value)) = $access.entry()? {
                         out.insert(key, value);
                     }
 
@@ -387,13 +386,13 @@ macro_rules! map {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_map_fn($cx, |$access| {
+                decoder.decode_map_fn(|$access| {
                     let mut out = $with_capacity;
 
-                    while let Some(mut entry) = $access.decode_entry($cx)? {
-                        let key = $cx.decode(entry.decode_map_key($cx)?)?;
+                    while let Some(mut entry) = $access.decode_entry()? {
+                        let key = $cx.decode(entry.decode_map_key()?)?;
                         $cx.enter_map_key(&key);
-                        let value = $cx.decode(entry.decode_map_value($cx)?)?;
+                        let value = $cx.decode(entry.decode_map_value()?)?;
                         out.insert(key, value);
                         $cx.leave_map_key();
                     }
@@ -405,30 +404,30 @@ macro_rules! map {
     }
 }
 
-map!(cx, BTreeMap<K: Ord, V>, map, BTreeMap::new());
+map!(_cx, BTreeMap<K: Ord, V>, map, BTreeMap::new());
 
 #[cfg(feature = "std")]
 #[cfg_attr(doc_cfg, doc(feature = "std"))]
 map!(
-    cx,
+    _cx,
     HashMap<K: Eq + Hash, V, S: BuildHasher + Default>,
     map,
-    HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint(cx)), S::default())
+    HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default())
 );
 
 impl<M> Encode<M> for CString {
     #[inline]
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        encoder.encode_bytes(cx, self.to_bytes_with_nul())
+        encoder.encode_bytes(self.to_bytes_with_nul())
     }
 }
 
 impl<'de, M> Decode<'de, M> for CString {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
@@ -463,7 +462,7 @@ impl<'de, M> Decode<'de, M> for CString {
             }
         }
 
-        decoder.decode_bytes(cx, Visitor)
+        decoder.decode_bytes(Visitor)
     }
 }
 
@@ -566,11 +565,10 @@ impl<M> Encode<M> for OsStr {
 
         use crate::en::VariantEncoder;
 
-        let mut variant = encoder.encode_variant(cx)?;
-        PlatformTag::Unix.encode(cx, variant.encode_tag(cx)?)?;
-        self.as_bytes()
-            .encode_bytes(cx, variant.encode_value(cx)?)?;
-        variant.end(cx)
+        let mut variant = encoder.encode_variant()?;
+        PlatformTag::Unix.encode(cx, variant.encode_tag()?)?;
+        self.as_bytes().encode_bytes(cx, variant.encode_value()?)?;
+        variant.end()
     }
 
     #[cfg(windows)]
@@ -583,8 +581,8 @@ impl<M> Encode<M> for OsStr {
         use crate::Buf;
         use std::os::windows::ffi::OsStrExt;
 
-        let mut variant = encoder.encode_variant(cx)?;
-        let tag = variant.encode_tag(cx)?;
+        let mut variant = encoder.encode_variant()?;
+        let tag = variant.encode_tag()?;
 
         PlatformTag::Windows.encode(cx, tag)?;
 
@@ -598,8 +596,8 @@ impl<M> Encode<M> for OsStr {
             }
         }
 
-        buf.as_slice().encode_bytes(cx, variant.encode_value(cx)?)?;
-        variant.end(cx)
+        buf.as_slice().encode_bytes(cx, variant.encode_value()?)?;
+        variant.end()
     }
 }
 
@@ -625,10 +623,8 @@ impl<'de, M> Decode<'de, M> for OsString {
     {
         use crate::de::VariantDecoder;
 
-        let mut variant = decoder.decode_variant(cx)?;
-
-        let tag = variant.decode_tag(cx)?;
-        let tag = cx.decode(tag)?;
+        let mut variant = decoder.decode_variant()?;
+        let tag = variant.decode_tag()?.decode()?;
 
         match tag {
             #[cfg(not(unix))]
@@ -637,8 +633,8 @@ impl<'de, M> Decode<'de, M> for OsString {
             PlatformTag::Unix => {
                 use std::os::unix::ffi::OsStringExt;
 
-                let bytes = cx.decode(variant.decode_value(cx)?)?;
-                variant.end(cx)?;
+                let bytes = variant.decode_value()?.decode()?;
+                variant.end()?;
                 Ok(OsString::from_vec(bytes))
             }
             #[cfg(not(windows))]
@@ -676,9 +672,8 @@ impl<'de, M> Decode<'de, M> for OsString {
                     }
                 }
 
-                let value = variant.decode_value(cx)?;
-                let os_string = value.decode_bytes(cx, Visitor)?;
-                variant.end(cx)?;
+                let os_string = variant.decode_value()?.decode_bytes(Visitor)?;
+                variant.end()?;
                 Ok(os_string)
             }
         }
@@ -713,28 +708,27 @@ impl<M> Encode<M> for PathBuf {
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<'de, M> Decode<'de, M> for PathBuf {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        let string: OsString = cx.decode(decoder)?;
-        Ok(PathBuf::from(string))
+        Ok(PathBuf::from(decoder.decode::<OsString>()?))
     }
 }
 
 impl<M> EncodeBytes<M> for Vec<u8> {
     #[inline]
-    fn encode_bytes<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
-        encoder.encode_bytes(cx, self.as_slice())
+        encoder.encode_bytes(self.as_slice())
     }
 }
 
 impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
     #[inline]
-    fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode_bytes<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
@@ -762,18 +756,18 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
             }
         }
 
-        decoder.decode_bytes(cx, Visitor)
+        decoder.decode_bytes(Visitor)
     }
 }
 
 impl<M> EncodeBytes<M> for VecDeque<u8> {
     #[inline]
-    fn encode_bytes<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         let (first, second) = self.as_slices();
-        encoder.encode_bytes_vectored(cx, self.len(), &[first, second])
+        encoder.encode_bytes_vectored(self.len(), &[first, second])
     }
 }
 

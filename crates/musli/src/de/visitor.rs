@@ -219,7 +219,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
         D: SequenceDecoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
-            &expecting::SequenceWith(decoder.size_hint(cx)),
+            &expecting::SequenceWith(decoder.size_hint()),
             ExpectingWrapper::new(&self),
         )))
     }
@@ -231,7 +231,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
         D: MapDecoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
-            &expecting::MapWith(decoder.size_hint(cx)),
+            &expecting::MapWith(decoder.size_hint()),
             ExpectingWrapper::new(&self),
         )))
     }

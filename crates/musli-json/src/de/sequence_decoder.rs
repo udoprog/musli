@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use core::mem;
 
 use musli::de::{PackDecoder, SequenceDecoder, SizeHint};
@@ -8,21 +7,21 @@ use crate::parser::{Parser, Token};
 
 use super::JsonDecoder;
 
-pub(crate) struct JsonSequenceDecoder<P, C: ?Sized> {
+pub(crate) struct JsonSequenceDecoder<'a, P, C: ?Sized> {
+    cx: &'a C,
     len: Option<usize>,
     first: bool,
     parser: P,
     terminated: bool,
-    _marker: PhantomData<C>,
 }
 
-impl<'de, P, C> JsonSequenceDecoder<P, C>
+impl<'a, 'de, P, C> JsonSequenceDecoder<'a, P, C>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
     #[inline]
-    pub(crate) fn new(cx: &C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
+    pub(crate) fn new(cx: &'a C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBracket) {
@@ -32,32 +31,32 @@ where
         parser.skip(cx, 1)?;
 
         Ok(Self {
+            cx,
             len,
             first: true,
             parser,
             terminated: false,
-            _marker: PhantomData,
         })
     }
 }
 
-impl<'de, P, C> SequenceDecoder<'de> for JsonSequenceDecoder<P, C>
+impl<'a, 'de, P, C> SequenceDecoder<'de> for JsonSequenceDecoder<'a, P, C>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeNext<'this> = JsonDecoder<P::Mut<'this>, C>
+    type DecodeNext<'this> = JsonDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn size_hint(&self, _: &C) -> SizeHint {
+    fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.len)
     }
 
     #[inline]
-    fn decode_next(&mut self, cx: &C) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.terminated {
             return Ok(None);
         }
@@ -65,23 +64,23 @@ where
         let first = mem::take(&mut self.first);
 
         loop {
-            let token = self.parser.peek(cx)?;
+            let token = self.parser.peek(self.cx)?;
 
             if token.is_value() {
-                return Ok(Some(JsonDecoder::new(self.parser.borrow_mut())));
+                return Ok(Some(JsonDecoder::new(self.cx, self.parser.borrow_mut())));
             }
 
             match token {
                 Token::Comma if !first => {
-                    self.parser.skip(cx, 1)?;
+                    self.parser.skip(self.cx, 1)?;
                 }
                 Token::CloseBracket => {
-                    self.parser.skip(cx, 1)?;
+                    self.parser.skip(self.cx, 1)?;
                     self.terminated = true;
                     return Ok(None);
                 }
                 _ => {
-                    return Err(cx.message(format_args!(
+                    return Err(self.cx.message(format_args!(
                         "Expected value or closing bracket `]`, but found {token}"
                     )));
                 }
@@ -90,41 +89,41 @@ where
     }
 }
 
-impl<'de, P, C> PackDecoder<'de> for JsonSequenceDecoder<P, C>
+impl<'a, 'de, P, C> PackDecoder<'de> for JsonSequenceDecoder<'a, P, C>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeNext<'this> = JsonDecoder<P::Mut<'this>, C>
+    type DecodeNext<'this> = JsonDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn decode_next(&mut self, cx: &C) -> Result<Self::DecodeNext<'_>, C::Error> {
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
         let first = mem::take(&mut self.first);
 
         loop {
-            let token = self.parser.peek(cx)?;
+            let token = self.parser.peek(self.cx)?;
 
             if token.is_value() {
-                return Ok(JsonDecoder::new(self.parser.borrow_mut()));
+                return Ok(JsonDecoder::new(self.cx, self.parser.borrow_mut()));
             }
 
             match token {
                 Token::Comma if !first => {
-                    self.parser.skip(cx, 1)?;
+                    self.parser.skip(self.cx, 1)?;
                 }
                 Token::CloseBracket => {
-                    self.parser.skip(cx, 1)?;
+                    self.parser.skip(self.cx, 1)?;
                     self.terminated = true;
 
-                    return Err(
-                        cx.message(format_args!("Encountered short array, but found {token}"))
-                    );
+                    return Err(self
+                        .cx
+                        .message(format_args!("Encountered short array, but found {token}")));
                 }
                 _ => {
-                    return Err(cx.message(format_args!(
+                    return Err(self.cx.message(format_args!(
                         "Expected value or closing bracket `]`, but found {token}"
                     )));
                 }
@@ -133,15 +132,17 @@ where
     }
 
     #[inline]
-    fn end(mut self, cx: &C) -> Result<(), C::Error> {
+    fn end(mut self) -> Result<(), C::Error> {
         if !self.terminated {
-            let actual = self.parser.peek(cx)?;
+            let actual = self.parser.peek(self.cx)?;
 
             if !matches!(actual, Token::CloseBracket) {
-                return Err(cx.message(format_args!("Expected closing bracket, was {actual}")));
+                return Err(self
+                    .cx
+                    .message(format_args!("Expected closing bracket, was {actual}")));
             }
 
-            self.parser.skip(cx, 1)?;
+            self.parser.skip(self.cx, 1)?;
             self.terminated = true;
         }
 

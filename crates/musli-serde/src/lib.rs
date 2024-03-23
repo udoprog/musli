@@ -108,12 +108,12 @@ where
     E: Encoder,
     T: Serialize,
 {
-    let encoder = encoder.with_context(cx)?;
-
     let cx = SerdeContext {
         error: RefCell::new(None),
         inner: cx,
     };
+
+    let encoder = encoder.with_context(&cx)?;
 
     let serializer = Serializer::new(&cx, encoder);
 
@@ -140,12 +140,12 @@ where
     D: Decoder<'de>,
     T: Deserialize<'de>,
 {
-    let decoder = decoder.with_context(cx)?;
-
     let cx = SerdeContext {
         error: RefCell::new(None),
         inner: cx,
     };
+
+    let decoder = decoder.with_context(&cx)?;
 
     let deserializer = Deserializer::new(&cx, decoder);
 

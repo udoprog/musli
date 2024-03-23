@@ -14,7 +14,6 @@ mod variant_encoder;
 use self::variant_encoder::JsonVariantEncoder;
 
 use core::fmt;
-use core::marker::PhantomData;
 
 use musli::en::{Encoder, SequenceEncoder};
 use musli::{Context, Encode};
@@ -22,24 +21,21 @@ use musli::{Context, Encode};
 use crate::writer::Writer;
 
 /// A JSON encoder for Müsli.
-pub(crate) struct JsonEncoder<W, C: ?Sized> {
+pub(crate) struct JsonEncoder<'a, W, C: ?Sized> {
+    cx: &'a C,
     writer: W,
-    _marker: PhantomData<C>,
 }
 
-impl<W, C: ?Sized> JsonEncoder<W, C> {
+impl<'a, W, C: ?Sized> JsonEncoder<'a, W, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(writer: W) -> Self {
-        Self {
-            writer,
-            _marker: PhantomData,
-        }
+    pub(crate) fn new(cx: &'a C, writer: W) -> Self {
+        Self { cx, writer }
     }
 }
 
 #[musli::encoder]
-impl<C, W> Encoder for JsonEncoder<W, C>
+impl<'a, C, W> Encoder for JsonEncoder<'a, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
@@ -48,24 +44,29 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<U> = JsonEncoder<W, U> where U: Context;
-    type EncodePack<'this> = JsonArrayEncoder<W, C> where C: 'this;
+    type WithContext<'this, U> = JsonEncoder<'this, W, U> where U: 'this + Context;
+    type EncodePack = JsonArrayEncoder<'a, W, C>;
     type EncodeSome = Self;
-    type EncodeSequence = JsonArrayEncoder<W, C>;
-    type EncodeTuple = JsonArrayEncoder<W, C>;
-    type EncodeMap = JsonObjectEncoder<W, C>;
-    type EncodeMapEntries = JsonObjectEncoder<W, C>;
-    type EncodeStruct = JsonObjectEncoder<W, C>;
-    type EncodeVariant = JsonVariantEncoder<W, C>;
-    type EncodeTupleVariant = JsonArrayEncoder<W, C>;
-    type EncodeStructVariant = JsonObjectEncoder<W, C>;
+    type EncodeSequence = JsonArrayEncoder<'a, W, C>;
+    type EncodeTuple = JsonArrayEncoder<'a, W, C>;
+    type EncodeMap = JsonObjectEncoder<'a, W, C>;
+    type EncodeMapEntries = JsonObjectEncoder<'a, W, C>;
+    type EncodeStruct = JsonObjectEncoder<'a, W, C>;
+    type EncodeVariant = JsonVariantEncoder<'a, W, C>;
+    type EncodeTupleVariant = JsonArrayEncoder<'a, W, C>;
+    type EncodeStructVariant = JsonObjectEncoder<'a, W, C>;
 
     #[inline]
-    fn with_context<U>(self, _: &C) -> Result<Self::WithContext<U>, C::Error>
+    fn cx(&self) -> &C {
+        self.cx
+    }
+
+    #[inline]
+    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
     where
         U: Context,
     {
-        Ok(JsonEncoder::new(self.writer))
+        Ok(JsonEncoder::new(cx, self.writer))
     }
 
     #[inline]
@@ -74,232 +75,254 @@ where
     }
 
     #[inline]
-    fn encode_unit(mut self, cx: &C) -> Result<Self::Ok, C::Error> {
-        self.writer.write_bytes(cx, b"null")
+    fn encode<T>(self, value: T) -> Result<Self::Ok, Self::Error>
+    where
+        T: Encode<Self::Mode>,
+    {
+        value.encode(self.cx, self)
     }
 
     #[inline]
-    fn encode_bool(mut self, cx: &C, value: bool) -> Result<Self::Ok, C::Error> {
+    fn encode_unit(mut self) -> Result<Self::Ok, C::Error> {
+        self.writer.write_bytes(self.cx, b"null")
+    }
+
+    #[inline]
+    fn encode_bool(mut self, value: bool) -> Result<Self::Ok, C::Error> {
         self.writer
-            .write_bytes(cx, if value { b"true" } else { b"false" })
+            .write_bytes(self.cx, if value { b"true" } else { b"false" })
     }
 
     #[inline]
-    fn encode_char(mut self, cx: &C, value: char) -> Result<Self::Ok, C::Error> {
+    fn encode_char(mut self, value: char) -> Result<Self::Ok, C::Error> {
         encode_string(
-            cx,
+            self.cx,
             self.writer.borrow_mut(),
             value.encode_utf8(&mut [0, 0, 0, 0]).as_bytes(),
         )
     }
 
     #[inline]
-    fn encode_u8(mut self, cx: &C, value: u8) -> Result<Self::Ok, C::Error> {
+    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u16(mut self, cx: &C, value: u16) -> Result<Self::Ok, C::Error> {
+    fn encode_u16(mut self, value: u16) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u32(mut self, cx: &C, value: u32) -> Result<Self::Ok, C::Error> {
+    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u64(mut self, cx: &C, value: u64) -> Result<Self::Ok, C::Error> {
+    fn encode_u64(mut self, value: u64) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u128(mut self, cx: &C, value: u128) -> Result<Self::Ok, C::Error> {
+    fn encode_u128(mut self, value: u128) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i8(mut self, cx: &C, value: i8) -> Result<Self::Ok, C::Error> {
+    fn encode_i8(mut self, value: i8) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i16(mut self, cx: &C, value: i16) -> Result<Self::Ok, C::Error> {
+    fn encode_i16(mut self, value: i16) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i32(mut self, cx: &C, value: i32) -> Result<Self::Ok, C::Error> {
+    fn encode_i32(mut self, value: i32) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i64(mut self, cx: &C, value: i64) -> Result<Self::Ok, C::Error> {
+    fn encode_i64(mut self, value: i64) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i128(mut self, cx: &C, value: i128) -> Result<Self::Ok, C::Error> {
+    fn encode_i128(mut self, value: i128) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_usize(mut self, cx: &C, value: usize) -> Result<Self::Ok, C::Error> {
+    fn encode_usize(mut self, value: usize) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_isize(mut self, cx: &C, value: isize) -> Result<Self::Ok, C::Error> {
+    fn encode_isize(mut self, value: isize) -> Result<Self::Ok, C::Error> {
         let mut buffer = itoa::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_f32(mut self, cx: &C, value: f32) -> Result<Self::Ok, C::Error> {
+    fn encode_f32(mut self, value: f32) -> Result<Self::Ok, C::Error> {
         let mut buffer = ryu::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_f64(mut self, cx: &C, value: f64) -> Result<Self::Ok, C::Error> {
+    fn encode_f64(mut self, value: f64) -> Result<Self::Ok, C::Error> {
         let mut buffer = ryu::Buffer::new();
-        self.writer.write_bytes(cx, buffer.format(value).as_bytes())
+        self.writer
+            .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_array<const N: usize>(self, cx: &C, bytes: &[u8; N]) -> Result<Self::Ok, C::Error> {
-        self.encode_bytes(cx, bytes)
+    fn encode_array<const N: usize>(self, bytes: &[u8; N]) -> Result<Self::Ok, C::Error> {
+        self.encode_bytes(bytes)
     }
 
     #[inline]
-    fn encode_bytes(mut self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         let mut buf = itoa::Buffer::new();
         let mut it = bytes.iter();
         let last = it.next_back();
 
-        self.writer.write_byte(cx, b'[')?;
+        self.writer.write_byte(self.cx, b'[')?;
 
         for b in it {
-            self.writer.write_bytes(cx, buf.format(*b).as_bytes())?;
-            self.writer.write_byte(cx, b',')?;
+            self.writer
+                .write_bytes(self.cx, buf.format(*b).as_bytes())?;
+            self.writer.write_byte(self.cx, b',')?;
         }
 
         if let Some(b) = last {
-            self.writer.write_bytes(cx, buf.format(*b).as_bytes())?;
+            self.writer
+                .write_bytes(self.cx, buf.format(*b).as_bytes())?;
         }
 
-        self.writer.write_byte(cx, b']')?;
+        self.writer.write_byte(self.cx, b']')?;
         Ok(())
     }
 
     #[inline]
-    fn encode_bytes_vectored<I>(self, cx: &C, _: usize, vectors: I) -> Result<Self::Ok, C::Error>
+    fn encode_bytes_vectored<I>(self, _: usize, vectors: I) -> Result<Self::Ok, C::Error>
     where
         I: IntoIterator,
         I::Item: AsRef<[u8]>,
     {
-        let mut seq = JsonArrayEncoder::new(cx, self.writer)?;
+        let mut seq = JsonArrayEncoder::new(self.cx, self.writer)?;
 
         for bb in vectors {
             for &b in bb.as_ref() {
-                seq.push(cx, b)?;
+                seq.push(b)?;
             }
         }
 
-        seq.end(cx)
+        seq.end()
     }
 
     #[inline]
-    fn encode_string(mut self, cx: &C, string: &str) -> Result<Self::Ok, C::Error> {
-        encode_string(cx, self.writer.borrow_mut(), string.as_bytes())
+    fn encode_string(mut self, string: &str) -> Result<Self::Ok, C::Error> {
+        encode_string(self.cx, self.writer.borrow_mut(), string.as_bytes())
     }
 
     #[inline]
-    fn encode_some(self, _: &C) -> Result<Self::EncodeSome, C::Error> {
+    fn encode_some(self) -> Result<Self::EncodeSome, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn encode_none(self, cx: &C) -> Result<Self::Ok, C::Error> {
-        self.encode_unit(cx)
+    fn encode_none(self) -> Result<Self::Ok, C::Error> {
+        self.encode_unit()
     }
 
     #[inline]
-    fn encode_pack(self, cx: &C) -> Result<Self::EncodePack<'_>, C::Error> {
-        JsonArrayEncoder::new(cx, self.writer)
+    fn encode_pack(self) -> Result<Self::EncodePack, C::Error> {
+        JsonArrayEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_sequence(self, cx: &C, _: usize) -> Result<Self::EncodeSequence, C::Error> {
-        JsonArrayEncoder::new(cx, self.writer)
+    fn encode_sequence(self, _: usize) -> Result<Self::EncodeSequence, C::Error> {
+        JsonArrayEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_tuple(self, cx: &C, _: usize) -> Result<Self::EncodeTuple, C::Error> {
-        JsonArrayEncoder::new(cx, self.writer)
+    fn encode_tuple(self, _: usize) -> Result<Self::EncodeTuple, C::Error> {
+        JsonArrayEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_map(self, cx: &C, _: usize) -> Result<Self::EncodeMap, C::Error> {
-        JsonObjectEncoder::new(cx, self.writer)
+    fn encode_map(self, _: usize) -> Result<Self::EncodeMap, C::Error> {
+        JsonObjectEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_map_entries(self, cx: &C, _: usize) -> Result<Self::EncodeMapEntries, C::Error> {
-        JsonObjectEncoder::new(cx, self.writer)
+    fn encode_map_entries(self, _: usize) -> Result<Self::EncodeMapEntries, C::Error> {
+        JsonObjectEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_struct(self, cx: &C, _: usize) -> Result<Self::EncodeStruct, C::Error> {
-        JsonObjectEncoder::new(cx, self.writer)
+    fn encode_struct(self, _: usize) -> Result<Self::EncodeStruct, C::Error> {
+        JsonObjectEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_variant(self, cx: &C) -> Result<Self::EncodeVariant, C::Error> {
-        JsonVariantEncoder::new(cx, self.writer)
+    fn encode_variant(self) -> Result<Self::EncodeVariant, C::Error> {
+        JsonVariantEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
     fn encode_tuple_variant<T>(
         mut self,
-        cx: &C,
         tag: &T,
         _: usize,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
-        self.writer.write_byte(cx, b'{')?;
-        tag.encode(cx, JsonObjectKeyEncoder::new(self.writer.borrow_mut()))?;
-        self.writer.write_byte(cx, b':')?;
-        JsonArrayEncoder::with_end(cx, self.writer, b"]}")
+        self.writer.write_byte(self.cx, b'{')?;
+        JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        self.writer.write_byte(self.cx, b':')?;
+        JsonArrayEncoder::with_end(self.cx, self.writer, b"]}")
     }
 
     #[inline]
     fn encode_struct_variant<T>(
         mut self,
-        cx: &C,
         tag: &T,
         _: usize,
     ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
-        self.writer.write_byte(cx, b'{')?;
-        tag.encode(cx, JsonObjectKeyEncoder::new(self.writer.borrow_mut()))?;
-        self.writer.write_byte(cx, b':')?;
-        JsonObjectEncoder::with_end(cx, self.writer, b"}}")
+        self.writer.write_byte(self.cx, b'{')?;
+        JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        self.writer.write_byte(self.cx, b':')?;
+        JsonObjectEncoder::with_end(self.cx, self.writer, b"}}")
     }
 }
 

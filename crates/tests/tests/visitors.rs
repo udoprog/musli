@@ -10,7 +10,7 @@ pub struct BytesReference<'de> {
 
 impl<'de, M> Decode<'de, M> for BytesReference<'de> {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
@@ -34,7 +34,7 @@ impl<'de, M> Decode<'de, M> for BytesReference<'de> {
         }
 
         Ok(Self {
-            data: decoder.decode_bytes(cx, Visitor)?,
+            data: decoder.decode_bytes(Visitor)?,
         })
     }
 }
@@ -66,7 +66,7 @@ pub struct StringReference<'de> {
 
 impl<'de, M> Decode<'de, M> for StringReference<'de> {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
@@ -90,7 +90,7 @@ impl<'de, M> Decode<'de, M> for StringReference<'de> {
         }
 
         Ok(Self {
-            data: decoder.decode_string(cx, Visitor)?,
+            data: decoder.decode_string(Visitor)?,
         })
     }
 }
@@ -124,19 +124,16 @@ impl<'de, M> Decode<'de, M> for OwnedFn {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_string(
-            cx,
-            musli::utils::visit_owned_fn(
-                "A string variant for Enum",
-                |cx: &D::Cx, variant: &str| match variant {
-                    "A" => Ok(OwnedFn::A),
-                    "B" => Ok(OwnedFn::A),
-                    other => {
-                        Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}")))
-                    }
-                },
-            ),
-        )
+        decoder.decode_string(musli::utils::visit_owned_fn(
+            "A string variant for Enum",
+            |variant: &str| match variant {
+                "A" => Ok(OwnedFn::A),
+                "B" => Ok(OwnedFn::A),
+                other => {
+                    Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}")))
+                }
+            },
+        ))
     }
 }
 

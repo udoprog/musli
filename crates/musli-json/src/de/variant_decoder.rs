@@ -1,24 +1,22 @@
-use core::marker::PhantomData;
-
-use musli::de::VariantDecoder;
+use musli::de::{Decoder, VariantDecoder};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder};
 
-pub(crate) struct JsonVariantDecoder<P, C: ?Sized> {
+pub(crate) struct JsonVariantDecoder<'a, P, C: ?Sized> {
+    cx: &'a C,
     parser: P,
-    _marker: PhantomData<C>,
 }
 
-impl<'de, P, C> JsonVariantDecoder<P, C>
+impl<'a, 'de, P, C> JsonVariantDecoder<'a, P, C>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
     #[inline]
-    pub(crate) fn new(cx: &C, mut parser: P) -> Result<Self, C::Error> {
+    pub(crate) fn new(cx: &'a C, mut parser: P) -> Result<Self, C::Error> {
         parser.skip_whitespace(cx)?;
 
         let actual = parser.peek(cx)?;
@@ -28,57 +26,58 @@ where
         }
 
         parser.skip(cx, 1)?;
-        Ok(Self {
-            parser,
-            _marker: PhantomData,
-        })
+
+        Ok(Self { cx, parser })
     }
 }
 
-impl<'de, P, C> VariantDecoder<'de> for JsonVariantDecoder<P, C>
+impl<'a, 'de, P, C> VariantDecoder<'de> for JsonVariantDecoder<'a, P, C>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeTag<'this> = JsonKeyDecoder<P::Mut<'this>, C>
+    type DecodeTag<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeVariant<'this> = JsonDecoder<P::Mut<'this>, C> where Self: 'this;
+    type DecodeVariant<'this> = JsonDecoder<'a, P::Mut<'this>, C> where Self: 'this;
 
     #[inline]
-    fn decode_tag(&mut self, _: &C) -> Result<Self::DecodeTag<'_>, C::Error> {
-        Ok(JsonKeyDecoder::new(self.parser.borrow_mut()))
+    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
+        Ok(JsonKeyDecoder::new(self.cx, self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn decode_value(&mut self, cx: &C) -> Result<Self::DecodeVariant<'_>, C::Error> {
-        let actual = self.parser.peek(cx)?;
+    fn decode_value(&mut self) -> Result<Self::DecodeVariant<'_>, C::Error> {
+        let actual = self.parser.peek(self.cx)?;
 
         if !matches!(actual, Token::Colon) {
-            return Err(cx.message(format_args!("Expected colon, was {actual}")));
+            return Err(self
+                .cx
+                .message(format_args!("Expected colon, was {actual}")));
         }
 
-        self.parser.skip(cx, 1)?;
-        Ok(JsonDecoder::new(self.parser.borrow_mut()))
+        self.parser.skip(self.cx, 1)?;
+        Ok(JsonDecoder::new(self.cx, self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn skip_value(&mut self, cx: &C) -> Result<bool, C::Error> {
-        let this = self.decode_value(cx)?;
-        JsonDecoder::new(this.parser).skip_any(cx)?;
+    fn skip_value(&mut self) -> Result<bool, C::Error> {
+        self.decode_value()?.skip()?;
         Ok(true)
     }
 
     #[inline]
-    fn end(mut self, cx: &C) -> Result<(), C::Error> {
-        let actual = self.parser.peek(cx)?;
+    fn end(mut self) -> Result<(), C::Error> {
+        let actual = self.parser.peek(self.cx)?;
 
         if !matches!(actual, Token::CloseBrace) {
-            return Err(cx.message(format_args!("Expected closing brace, was {actual}")));
+            return Err(self
+                .cx
+                .message(format_args!("Expected closing brace, was {actual}")));
         }
 
-        self.parser.skip(cx, 1)?;
+        self.parser.skip(self.cx, 1)?;
         Ok(())
     }
 }
