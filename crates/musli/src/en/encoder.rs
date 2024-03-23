@@ -922,7 +922,7 @@ pub trait Encoder: Sized {
 
     /// Encode a value that implements [`Display`] as a string.
     ///
-    /// [`Display`]: std::fmt::Display
+    /// [`Display`]: fmt::Display
     ///
     /// # Examples
     ///
