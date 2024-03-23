@@ -467,25 +467,26 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 #enter
                 let #buffer_var = #decoder_t::decode_buffer(#decoder_var)?;
                 let st = #as_decoder_t::as_decoder(&#buffer_var)?;
-                let mut st = #decoder_t::decode_struct(st, None)?;
 
-                let #variant_tag_var #name_type = {
-                    let #variant_decoder_var = loop {
-                        let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(&mut st)? else {
-                            return #result_err(#context_t::missing_variant_field(#ctx_var, #type_name, #field_tag));
+                let #variant_tag_var = #decoder_t::decode_struct_fn(st, None, |st| {
+                    let #variant_tag_var #name_type = {
+                        let #variant_decoder_var = loop {
+                            let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(st)? else {
+                                return #result_err(#context_t::missing_variant_field(#ctx_var, #type_name, #field_tag));
+                            };
+
+                            let decoder = #struct_field_decoder_t::decode_field_name(&mut #entry_var)?;
+
+                            #field_alloc
+                            #decode_match
                         };
 
-                        let decoder = #struct_field_decoder_t::decode_field_name(&mut #entry_var)?;
-
-                        #field_alloc
-                        #decode_match
+                        #variant_alloc
+                        #decode_tag
                     };
 
-                    #variant_alloc
-                    #decode_tag
-                };
-
-                #struct_decoder_t::end(st)?;
+                    #result_ok(#variant_tag_var)
+                })?;
 
                 let #output_var = match #variant_tag_var {
                     #(#patterns,)*
@@ -647,23 +648,24 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 #outcome_enum
 
                 #enter
-                let mut #struct_decoder_var = #decoder_t::decode_struct(#decoder_var, None)?;
-                let mut #tag_var = #option_none;
 
-                let #output_var = loop {
-                    let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(&mut #struct_decoder_var)? else {
-                        return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, "other"));
+                #decoder_t::decode_struct_fn(#decoder_var, None, |#struct_decoder_var| {
+                    let mut #tag_var = #option_none;
+
+                    let #output_var = loop {
+                        let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(#struct_decoder_var)? else {
+                            return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, "other"));
+                        };
+
+                        let decoder = #struct_field_decoder_t::decode_field_name(&mut #entry_var)?;
+
+                        #field_alloc
+                        #decode_match
                     };
 
-                    let decoder = #struct_field_decoder_t::decode_field_name(&mut #entry_var)?;
-
-                    #field_alloc
-                    #decode_match
-                };
-
-                #struct_decoder_t::end(#struct_decoder_var)?;
-                #leave
-                #output_var
+                    #leave
+                    #result_ok(#output_var)
+                })?
             }})
         }
     }
@@ -966,17 +968,16 @@ fn decode_tagged(
         #(#decls)*
 
         #enter
-        let mut type_decoder = #decoder_t::decode_struct(#decoder_var, Some(#fields_len))?;
+        #decoder_t::decode_struct_fn(#decoder_var, Some(#fields_len), |type_decoder| {
+            while let #option_some(mut #struct_decoder_var) = #struct_decoder_t::decode_field(type_decoder)? {
+                #field_alloc
+                #tag_stmt
+                #body
+            }
 
-        while let #option_some(mut #struct_decoder_var) = #struct_decoder_t::decode_field(&mut type_decoder)? {
-            #field_alloc
-            #tag_stmt
-            #body
-        }
-
-        #struct_decoder_t::end(type_decoder)?;
-        #leave
-        #path { #assigns }
+            #leave
+            #result_ok(#path { #assigns })
+        })?
     }})
 }
 
