@@ -29,6 +29,10 @@ pub trait Context {
     type Buf<'this>: Buf
     where
         Self: 'this;
+    /// An allocated buffer containing a valid string.
+    type BufString<'this>: AsRef<str>
+    where
+        Self: 'this;
 
     /// Decode the given input using the associated mode.
     fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
@@ -50,6 +54,13 @@ pub trait Context {
 
     /// Allocate a buffer.
     fn alloc(&self) -> Option<Self::Buf<'_>>;
+
+    /// Collect and allocate a string from a [`Display`] implementation.
+    ///
+    /// [`Display`]: fmt::Display
+    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    where
+        T: ?Sized + fmt::Display;
 
     /// Generate a map function which maps an error using the `custom` function.
     fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_

@@ -54,6 +54,8 @@ use serde::{Deserialize, Serialize};
 use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
+use musli_common::exports::buf::{self, BufString};
+
 struct SerdeContext<'a, C>
 where
     C: ?Sized + Context,
@@ -69,8 +71,10 @@ where
     type Mode = C::Mode;
     type Error = error::SerdeError;
     type Mark = C::Mark;
-
     type Buf<'this> = C::Buf<'this>
+    where
+        Self: 'this;
+    type BufString<'this> = BufString<C::Buf<'this>>
     where
         Self: 'this;
 
@@ -82,6 +86,14 @@ where
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.inner.alloc()
+    }
+
+    #[inline]
+    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        buf::collect_string(self, value)
     }
 
     #[inline]

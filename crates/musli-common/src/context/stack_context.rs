@@ -5,7 +5,7 @@ use core::ops::Range;
 
 use musli::{Allocator, Context};
 
-use crate::buf::BufString;
+use crate::buf::{self, BufString};
 use crate::fixed::FixedVec;
 
 use super::access::{Access, Shared};
@@ -23,9 +23,9 @@ type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a>>);
 ///   indicator is used instead.
 /// * The `S` parameter indicates the maximum size in bytes (UTF-8) of a stored
 ///   map key.
-pub struct StackContext<'a, const P: usize, A: ?Sized, M>
+pub struct StackContext<'a, const P: usize, A, M>
 where
-    A: Allocator,
+    A: ?Sized + Allocator,
 {
     access: Access,
     mark: Cell<usize>,
@@ -37,9 +37,9 @@ where
     _marker: PhantomData<M>,
 }
 
-impl<'a, A: ?Sized, M> StackContext<'a, 16, A, M>
+impl<'a, A, M> StackContext<'a, 16, A, M>
 where
-    A: Allocator,
+    A: ?Sized + Allocator,
 {
     /// Construct a new context which uses allocations to a fixed number of
     /// diagnostics.
@@ -52,9 +52,9 @@ where
     }
 }
 
-impl<'a, const P: usize, A: ?Sized, M> StackContext<'a, P, A, M>
+impl<'a, const P: usize, A, M> StackContext<'a, P, A, M>
 where
-    A: Allocator,
+    A: ?Sized + Allocator,
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
@@ -140,16 +140,25 @@ where
 
 impl<'a, const V: usize, A, M> Context for StackContext<'a, V, A, M>
 where
-    A: Allocator,
+    A: ?Sized + Allocator,
 {
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
     type Buf<'this> = A::Buf<'this> where Self: 'this;
+    type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
 
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
+    }
+
+    #[inline]
+    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        buf::collect_string(self, value)
     }
 
     #[inline]

@@ -1,14 +1,45 @@
-use core::fmt;
+use core::fmt::{self, Write};
 use core::ops::Deref;
 use core::str;
 
-use musli::Buf;
+use musli::{Buf, Context};
 
 use crate::fixed::CapacityError;
 
 /// A string wrapped around a context buffer.
 pub struct BufString<B> {
     buf: B,
+}
+
+/// Collect a string into a string buffer.
+pub fn collect_string<C, T>(cx: &C, value: T) -> Result<BufString<C::Buf<'_>>, C::Error>
+where
+    C: ?Sized + Context,
+    T: fmt::Display,
+{
+    let Some(buf) = cx.alloc() else {
+        return Err(cx.message("Failed to allocate"));
+    };
+
+    let mut string = BufString::new(buf);
+
+    if write!(string, "{value}").is_err() {
+        return Err(cx.message("Failed to write to string"));
+    }
+
+    Ok(string)
+}
+
+/// Try to collect a string into a string buffer.
+pub fn try_collect_string<C, T>(cx: &C, value: T) -> Option<BufString<C::Buf<'_>>>
+where
+    C: ?Sized + Context,
+    T: fmt::Display,
+{
+    let buf = cx.alloc()?;
+    let mut string = BufString::new(buf);
+    write!(string, "{value}").ok()?;
+    Some(string)
 }
 
 impl<B> BufString<B>

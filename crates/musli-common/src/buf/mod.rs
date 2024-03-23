@@ -1,2 +1,2 @@
 mod buf_string;
-pub use self::buf_string::BufString;
+pub use self::buf_string::{collect_string, try_collect_string, BufString};

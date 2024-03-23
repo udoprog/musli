@@ -11,6 +11,7 @@ use musli::{Allocator, Context};
 use super::access::{self, Access};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
+use crate::buf::{self, BufString};
 
 type BufTriplet<E> = (Vec<Step<String>>, Range<usize>, E);
 
@@ -103,10 +104,19 @@ where
     type Error = ErrorMarker;
     type Mark = usize;
     type Buf<'this> = A::Buf<'this> where Self: 'this;
+    type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
 
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
+    }
+
+    #[inline]
+    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        buf::collect_string(self, value)
     }
 
     #[inline]

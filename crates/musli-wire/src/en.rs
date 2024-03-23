@@ -172,6 +172,15 @@ where
     }
 
     #[inline]
+    fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        let buf = self.cx.collect_string(value)?;
+        self.encode_string(buf.as_ref())
+    }
+
+    #[inline]
     fn encode_usize(mut self, value: usize) -> Result<Self::Ok, C::Error> {
         crate::wire_int::encode_length::<_, _, F>(self.cx, self.writer.borrow_mut(), value)
     }

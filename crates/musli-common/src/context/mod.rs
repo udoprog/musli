@@ -16,6 +16,8 @@ use musli::context::StdError;
 use musli::mode::DefaultMode;
 use musli::{Allocator, Context};
 
+use crate::buf::{self, BufString};
+
 #[cfg(feature = "alloc")]
 pub use self::system_context::SystemContext;
 
@@ -74,10 +76,19 @@ where
     type Error = E;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
+    type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
 
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
+    }
+
+    #[inline]
+    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        buf::collect_string(self, value)
     }
 
     #[inline]
@@ -160,10 +171,19 @@ where
     type Error = ErrorMarker;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
+    type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
 
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
+    }
+
+    #[inline]
+    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        buf::collect_string(self, value)
     }
 
     #[inline]
@@ -221,10 +241,19 @@ where
     type Error = ErrorMarker;
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
+    type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
 
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
+    }
+
+    #[inline]
+    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        buf::collect_string(self, value)
     }
 
     #[inline]

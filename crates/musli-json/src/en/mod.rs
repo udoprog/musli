@@ -251,6 +251,15 @@ where
     }
 
     #[inline]
+    fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        let buf = self.cx.collect_string(value)?;
+        self.encode_string(buf.as_ref())
+    }
+
+    #[inline]
     fn encode_some(self) -> Result<Self::EncodeSome, C::Error> {
         Ok(self)
     }

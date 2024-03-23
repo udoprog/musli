@@ -1,3 +1,5 @@
+use core::fmt;
+
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
@@ -257,6 +259,15 @@ where
     fn encode_string(self, string: &str) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::String(string.into()));
         Ok(())
+    }
+
+    #[inline]
+    fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        let buf = self.cx.collect_string(value)?;
+        self.encode_string(buf.as_ref())
     }
 
     #[cfg(feature = "alloc")]

@@ -920,6 +920,39 @@ pub trait Encoder: Sized {
         )))
     }
 
+    /// Encode a value that implements [`Display`] as a string.
+    ///
+    /// [`Display`]: std::fmt::Display
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Encode, Encoder};
+    ///
+    /// struct MyType {
+    ///     data: String,
+    /// }
+    ///
+    /// impl<M> Encode<M> for MyType {
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder,
+    ///     {
+    ///         encoder.collect_string(self.data.as_str())
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        Err(self.cx().message(expecting::unsupported_type(
+            &expecting::CollectString,
+            ExpectingWrapper::new(&self),
+        )))
+    }
+
     /// Encode an optional value that is present.
     ///
     /// # Examples

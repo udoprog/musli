@@ -130,4 +130,13 @@ where
     fn encode_string(self, string: &str) -> Result<Self::Ok, C::Error> {
         super::encode_string(self.cx, self.writer, string.as_bytes())
     }
+
+    #[inline]
+    fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    where
+        T: ?Sized + fmt::Display,
+    {
+        let buf = self.cx.collect_string(value)?;
+        self.encode_string(buf.as_ref())
+    }
 }
