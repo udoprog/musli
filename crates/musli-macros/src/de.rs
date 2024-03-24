@@ -5,6 +5,7 @@ use syn::spanned::Spanned;
 use syn::Token;
 
 use crate::expander::{Result, TagMethod};
+use crate::internals::apply;
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
 use crate::internals::tokens::Tokens;
@@ -163,11 +164,10 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let mut fallback = match en.fallback {
         Some(ident) => {
             quote! {{
-                if !#variant_decoder_t::skip_value(&mut #variant_decoder_var)? {
+                if !#variant_decoder_t::skip_value(#variant_decoder_var)? {
                     return #result_err(#context_t::invalid_variant_tag(#ctx_var, #type_name, #variant_tag_var));
                 }
 
-                #variant_decoder_t::end(#variant_decoder_var)?;
                 Self::#ident {}
             }}
         }
@@ -291,11 +291,10 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     #enter
 
                     let #output_var = {
-                        let #body_decoder_var = #variant_decoder_t::decode_value(&mut #variant_decoder_var)?;
+                        let #body_decoder_var = #variant_decoder_t::decode_value(#variant_decoder_var)?;
                         #decode
                     };
 
-                    #variant_decoder_t::end(#variant_decoder_var)?;
                     #leave
                     #output_var
                 }
@@ -316,24 +315,26 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
         return Ok(quote! {{
             #output_enum
-
             #enter
-            let mut #variant_decoder_var = #decoder_t::decode_variant(#decoder_var)?;
 
-            #variant_alloc
+            let #output_var = #decoder_t::decode_variant_fn(#decoder_var, |#variant_decoder_var| {
+                #variant_alloc
 
-            let #variant_tag_var #name_type = {
-                let mut #variant_decoder_var = #variant_decoder_t::decode_tag(&mut #variant_decoder_var)?;
-                #decode_tag
-            };
+                let #variant_tag_var #name_type = {
+                    let mut #variant_decoder_var = #variant_decoder_t::decode_tag(#variant_decoder_var)?;
+                    #decode_tag
+                };
 
-            let #output_var = match #variant_tag_var {
-                #(#patterns,)*
-                #fallback
-            };
+                let #output_var = match #variant_tag_var {
+                    #(#patterns,)*
+                    #fallback
+                };
+
+                #result_ok(#output_var)
+            })?;
 
             #leave
-            #result_ok(#output_var)
+            Ok(#output_var)
         }});
     };
 
@@ -1044,7 +1045,6 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
 
     let type_name = &st_.name;
     let output_var = e.cx.ident("output");
-    let pack = e.cx.ident("pack");
 
     let mut assign = Vec::new();
 
@@ -1056,11 +1056,13 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
         let (_, decode_path) = &f.decode_path;
         let member = &f.member;
 
-        assign.push(quote! {
-            #member: {
-                let field_decoder = #pack_decoder_t::decode_next(&mut #pack)?;
-                #decode_path(#ctx_var, field_decoder)?
-            }
+        assign.push(move |ident: &syn::Ident, tokens: &mut TokenStream| {
+            tokens.extend(quote! {
+                #member: {
+                    let field_decoder = #pack_decoder_t::decode_next(#ident)?;
+                    #decode_path(#ctx_var, field_decoder)?
+                }
+            })
         });
     }
 
@@ -1082,11 +1084,14 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
         }
     });
 
+    let pack = e.cx.ident("pack");
+    let assign = apply::iter(assign, &pack);
+
     Ok(quote! {{
         #enter
-        let mut #pack = #decoder_t::decode_pack(#decoder_var)?;
-        let #output_var = #path { #(#assign),* };
-        #pack_decoder_t::end(#pack)?;
+        let #output_var = #decoder_t::decode_pack_fn(#decoder_var, |#pack| {
+            Ok(#path { #(#assign),* })
+        })?;
         #leave
         #output_var
     }})
