@@ -175,7 +175,7 @@ pub trait Decoder<'de>: Sized {
     ///             }))?;
     ///
     ///             if found {
-    ///                 break cx.decode(e.decode_map_value()?)?;
+    ///                 break e.decode_map_value()?.decode()?;
     ///             }
     ///         };
     ///
@@ -183,7 +183,7 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         match discriminant {
     ///             0 => Ok(MyVariantType::Variant1),
-    ///             1 => Ok(MyVariantType::Variant2(cx.decode(buffer.as_decoder()?)?)),
+    ///             1 => Ok(MyVariantType::Variant2(buffer.as_decoder()?.decode()?)),
     ///             other => Err(cx.invalid_variant_tag("MyVariantType", other)),
     ///         }
     ///     }
@@ -1105,7 +1105,7 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         let data = if let Some(decoder) = decoder.decode_option()? {
-    ///             Some(cx.decode(decoder)?)
+    ///             Some(decoder.decode()?)
     ///         } else {
     ///             None
     ///         };
@@ -1259,7 +1259,7 @@ pub trait Decoder<'de>: Sized {
     ///         let mut data = Vec::new();
     ///
     ///         while let Some(decoder) = seq.decode_next()? {
-    ///             data.push(cx.decode(decoder)?);
+    ///             data.push(decoder.decode()?);
     ///         }
     ///
     ///         seq.end()?;
@@ -1310,7 +1310,7 @@ pub trait Decoder<'de>: Sized {
     ///             let mut data = Vec::new();
     ///
     ///             while let Some(decoder) = seq.decode_next()? {
-    ///                 data.push(cx.decode(decoder)?);
+    ///                 data.push(decoder.decode()?);
     ///             }
     ///
     ///             Ok(Self { data })
@@ -1355,8 +1355,8 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut tuple = decoder.decode_tuple(2)?;
-    ///         let string = cx.decode(tuple.decode_next()?)?;
-    ///         let integer = cx.decode(tuple.decode_next()?)?;
+    ///         let string = tuple.decode_next()?.decode()?;
+    ///         let integer = tuple.decode_next()?.decode()?;
     ///         tuple.end()?;
     ///         Ok(Self(string, integer))
     ///     }
@@ -1452,8 +1452,8 @@ pub trait Decoder<'de>: Sized {
     ///         let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
     ///         while let Some(mut entry) = map.decode_entry()? {
-    ///             let key = cx.decode(entry.decode_map_key()?)?;
-    ///             let value = cx.decode(entry.decode_map_value()?)?;
+    ///             let key = entry.decode_map_key()?.decode()?;
+    ///             let value = entry.decode_map_value()?.decode()?;
     ///             data.insert(key, value);
     ///         }
     ///
@@ -1571,14 +1571,14 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         while let Some(mut field) = st.decode_field()? {
     ///             // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///             let tag: String = cx.decode(field.decode_field_name()?)?;
+    ///             let tag: String = field.decode_field_name()?.decode()?;
     ///
     ///             match tag.as_str() {
     ///                 "string" => {
-    ///                     string = Some(cx.decode(field.decode_field_value()?)?);
+    ///                     string = Some(field.decode_field_value()?.decode()?);
     ///                 }
     ///                 "integer" => {
-    ///                     integer = Some(cx.decode(field.decode_field_value()?)?);
+    ///                     integer = Some(field.decode_field_value()?.decode()?);
     ///                 }
     ///                 tag => {
     ///                     return Err(cx.invalid_field_tag("Struct", tag))
@@ -1637,14 +1637,14 @@ pub trait Decoder<'de>: Sized {
     ///
     ///             while let Some(mut field) = st.decode_field()? {
     ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///                 let tag: String = cx.decode(field.decode_field_name()?)?;
+    ///                 let tag: String = field.decode_field_name()?.decode()?;
     ///
     ///                 match tag.as_str() {
     ///                     "string" => {
-    ///                         string = Some(cx.decode(field.decode_field_value()?)?);
+    ///                         string = Some(field.decode_field_value()?.decode()?);
     ///                     }
     ///                     "integer" => {
-    ///                         integer = Some(cx.decode(field.decode_field_value()?)?);
+    ///                         integer = Some(field.decode_field_value()?.decode()?);
     ///                     }
     ///                     tag => {
     ///                         return Err(cx.invalid_field_tag("Struct", tag))
@@ -1694,14 +1694,14 @@ pub trait Decoder<'de>: Sized {
     ///         D: Decoder<'de>,
     ///     {
     ///         let mut variant = decoder.decode_variant()?;
-    ///         let tag = cx.decode(variant.decode_tag()?)?;
+    ///         let tag = variant.decode_tag()?.decode()?;
     ///
     ///         let this = match tag {
     ///             0 => {
-    ///                 Self::Variant1(cx.decode(variant.decode_value()?)?)
+    ///                 Self::Variant1(variant.decode_value()?.decode()?)
     ///             }
     ///             1 => {
-    ///                 Self::Variant2(cx.decode(variant.decode_value()?)?)
+    ///                 Self::Variant2(variant.decode_value()?.decode()?)
     ///             }
     ///             tag => {
     ///                 return Err(cx.invalid_variant_tag("Enum", tag));
@@ -1719,6 +1719,53 @@ pub trait Decoder<'de>: Sized {
             &expecting::Variant,
             ExpectingWrapper::new(&self),
         )))
+    }
+
+    /// Decode a variant using a closure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Decode};
+    /// use musli::de::{Decoder, VariantDecoder};
+    ///
+    /// enum Enum {
+    ///     Variant1(u32),
+    ///     Variant2(String),
+    /// }
+    ///
+    /// impl<'de, M> Decode<'de, M> for Enum {
+    ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         decoder.decode_variant_fn(|variant| {
+    ///             let tag = variant.decode_tag()?.decode()?;
+    ///
+    ///             Ok(match tag {
+    ///                 0 => {
+    ///                     Self::Variant1(variant.decode_value()?.decode()?)
+    ///                 }
+    ///                 1 => {
+    ///                     Self::Variant2(variant.decode_value()?.decode()?)
+    ///                 }
+    ///                 tag => {
+    ///                     return Err(cx.invalid_variant_tag("Enum", tag));
+    ///                 }
+    ///             })
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_variant_fn<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    where
+        F: FnOnce(&mut Self::DecodeVariant) -> Result<O, <Self::Cx as Context>::Error>,
+    {
+        let mut variant = self.decode_variant()?;
+        let result = f(&mut variant)?;
+        variant.end()?;
+        Ok(result)
     }
 
     /// Decode dynamically through a [`Visitor`].

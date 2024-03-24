@@ -251,10 +251,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_sequence()?;
-        let value = visitor.visit_seq(SeqAccess::new(self.cx, &mut decoder))?;
-        decoder.end()?;
-        Ok(value)
+        self.decoder
+            .decode_sequence_fn(|d| visitor.visit_seq(SeqAccess::new(self.cx, d)))
     }
 
     #[inline]
@@ -262,10 +260,9 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut tuple = self.decoder.decode_tuple(len)?;
-        let value = visitor.visit_seq(TupleAccess::new(self.cx, &mut tuple, len))?;
-        tuple.end()?;
-        Ok(value)
+        self.decoder.decode_tuple_fn(len, |d| {
+            visitor.visit_seq(TupleAccess::new(self.cx, d, len))
+        })
     }
 
     #[inline]
@@ -793,9 +790,9 @@ where
         V: de::Visitor<'de>,
     {
         let decoder = self.decoder.decode_value()?;
-        let mut tuple = decoder.decode_tuple(len)?;
-        let value = visitor.visit_seq(TupleAccess::new(self.cx, &mut tuple, len))?;
-        tuple.end()?;
+        let value = decoder.decode_tuple_fn(len, |tuple| {
+            visitor.visit_seq(TupleAccess::new(self.cx, tuple, len))
+        })?;
         self.decoder.end()?;
         Ok(value)
     }

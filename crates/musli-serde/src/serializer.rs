@@ -3,7 +3,7 @@ use core::fmt;
 use musli::en::{
     MapEntriesEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
 };
-use musli::{Context, Encode, Encoder};
+use musli::{Context, Encoder};
 
 use serde::ser::{self, Serialize};
 
@@ -411,11 +411,11 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.encode_field()?;
-        field.encode_field_name()?.encode(self.field)?;
-        value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
-        field.end()?;
-        Ok(())
+        self.encoder.encode_field_fn(|field| {
+            field.encode_field_name()?.encode(self.field)?;
+            value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
+            Ok(())
+        })
     }
 
     #[inline]
@@ -556,11 +556,11 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.encode_field()?;
-        key.encode(self.cx, field.encode_field_name()?)?;
-        value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
-        field.end()?;
-        Ok(())
+        self.encoder.encode_field_fn(|field| {
+            field.encode_field_name()?.encode(key)?;
+            value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
+            Ok(())
+        })
     }
 
     #[inline]

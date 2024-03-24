@@ -1250,6 +1250,47 @@ pub trait Encoder: Sized {
         )))
     }
 
+    /// Encode a tuple with a known length `len` using a closure.
+    ///
+    /// This is almost identical to [Encoder::encode_sequence] except that we
+    /// know that we are encoding a fixed-length container of length `len`, and
+    /// assuming the size of that container doesn't change in size it can be
+    /// decoded using [Decoder::decode_tuple] again without the underlying
+    /// format having to encode the size of the container.
+    ///
+    /// [Decoder::decode_tuple]: crate::de::Decoder::decode_tuple
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Encode, Encoder};
+    /// use musli::en::{SequenceEncoder};
+    ///
+    /// struct PackedTuple(u32, [u8; 128]);
+    ///
+    /// impl<M> Encode<M> for PackedTuple {
+    ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder,
+    ///     {
+    ///         encoder.encode_tuple_fn(2, |tuple| {
+    ///             tuple.encode_next()?.encode(self.0)?;
+    ///             tuple.encode_next()?.encode(&self.1)?;
+    ///             Ok(())
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_tuple_fn<F>(self, len: usize, f: F) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    where
+        F: FnOnce(&mut Self::EncodeTuple) -> Result<(), <Self::Cx as Context>::Error>,
+    {
+        let mut tuple = self.encode_tuple(len)?;
+        f(&mut tuple)?;
+        tuple.end()
+    }
+
     /// Encode a map with a known length `len`.
     ///
     /// # Examples

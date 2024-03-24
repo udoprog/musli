@@ -698,7 +698,7 @@
 //!     where
 //!         D: Decoder<'de>,
 //!     {
-//!         Ok(CustomUuid(cx.decode(decoder)?))
+//!         Ok(CustomUuid(decoder.decode()?))
 //!     }
 //! }
 //!
@@ -713,7 +713,7 @@
 //!         E: Encoder,
 //!         T: Encode<E::Mode> + Eq + Hash,
 //!     {
-//!         HashSet::<T>::encode(set, cx, encoder)
+//!         encoder.encode(set)
 //!     }
 //!
 //!     pub fn decode<'de, D, T>(cx: &D::Cx, decoder: D) -> Result<HashSet<T>, D::Error>
@@ -721,7 +721,7 @@
 //!         D: Decoder<'de>,
 //!         T: Decode<'de, D::Mode> + Eq + Hash,
 //!     {
-//!         cx.decode(decoder)
+//!         decoder.decode()
 //!     }
 //! }
 //! # }

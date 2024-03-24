@@ -80,12 +80,11 @@ impl<'de, M> Decode<'de, M> for String {
 
 impl<'de, M> Decode<'de, M> for Box<str> {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
-        let string: String = cx.decode(decoder)?;
-        Ok(string.into())
+        Ok(decoder.decode::<String>()?.into())
     }
 }
 
@@ -94,12 +93,11 @@ where
     T: Decode<'de, M>,
 {
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
-        let vec: Vec<T> = cx.decode(decoder)?;
-        Ok(Box::from(vec))
+        Ok(decoder.decode::<Vec<T>>()?.into())
     }
 }
 
@@ -221,18 +219,18 @@ macro_rules! sequence {
             where
                 E: Encoder<Mode = M>,
             {
-                let mut seq = encoder.encode_sequence(self.len())?;
+                encoder.encode_sequence_fn(self.len(), |seq| {
+                    let mut index = 0;
 
-                let mut index = 0;
+                    for value in self {
+                        $cx.enter_sequence_index(index);
+                        seq.push(value)?;
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
 
-                for value in self {
-                    $cx.enter_sequence_index(index);
-                    seq.push(value)?;
-                    $cx.leave_sequence_index();
-                    index = index.wrapping_add(1);
-                }
-
-                seq.end()
+                    Ok(())
+                })
             }
         }
 
@@ -246,20 +244,20 @@ macro_rules! sequence {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                let mut $access = decoder.decode_sequence()?;
-                let mut out = $factory;
+                decoder.decode_sequence_fn(|$access| {
+                    let mut out = $factory;
 
-                let mut index = 0;
+                    let mut index = 0;
 
-                while let Some(value) = $access.decode_next()? {
-                    $cx.enter_sequence_index(index);
-                    out.$insert(T::decode($cx, value)?);
-                    $cx.leave_sequence_index();
-                    index = index.wrapping_add(1);
-                }
+                    while let Some(value) = $access.decode_next()? {
+                        $cx.enter_sequence_index(index);
+                        out.$insert(T::decode($cx, value)?);
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
 
-                $access.end()?;
-                Ok(out)
+                    Ok(out)
+                })
             }
         }
     }
@@ -313,16 +311,16 @@ macro_rules! map {
             where
                 E: Encoder<Mode = M>,
             {
-                let mut map = encoder.encode_map(self.len())?;
+                encoder.encode_map_fn(self.len(), |map| {
+                    for (k, v) in self {
+                        let mut entry = map.encode_entry()?;
+                        entry.encode_map_key()?.encode(k)?;
+                        entry.encode_map_value()?.encode(v)?;
+                        entry.end()?;
+                    }
 
-                for (k, v) in self {
-                    let mut entry = map.encode_entry()?;
-                    entry.encode_map_key()?.encode(k)?;
-                    entry.encode_map_value()?.encode(v)?;
-                    entry.end()?;
-                }
-
-                map.end()
+                    Ok(())
+                })
             }
         }
 
@@ -337,18 +335,18 @@ macro_rules! map {
             where
                 E: Encoder<Mode = M>,
             {
-                let mut map = encoder.encode_map(self.len())?;
+                encoder.encode_map_fn(self.len(), |map| {
+                    for (k, v) in self {
+                        $cx.enter_map_key(k);
+                        let mut entry = map.encode_entry()?;
+                        entry.encode_map_key()?.encode(k)?;
+                        entry.encode_map_value()?.encode(v)?;
+                        entry.end()?;
+                        $cx.leave_map_key();
+                    }
 
-                for (k, v) in self {
-                    $cx.enter_map_key(k);
-                    let mut entry = map.encode_entry()?;
-                    entry.encode_map_key()?.encode(k)?;
-                    entry.encode_map_value()?.encode(v)?;
-                    entry.end()?;
-                    $cx.leave_map_key();
-                }
-
-                map.end()
+                    Ok(())
+                })
             }
         }
 
@@ -390,9 +388,9 @@ macro_rules! map {
                     let mut out = $with_capacity;
 
                     while let Some(mut entry) = $access.decode_entry()? {
-                        let key = $cx.decode(entry.decode_map_key()?)?;
+                        let key = entry.decode_map_key()?.decode()?;
                         $cx.enter_map_key(&key);
-                        let value = $cx.decode(entry.decode_map_value()?)?;
+                        let value = entry.decode_map_value()?.decode()?;
                         out.insert(key, value);
                         $cx.leave_map_key();
                     }
@@ -487,11 +485,11 @@ macro_rules! smart_pointer {
                 T: Decode<'de, M>,
             {
                 #[inline]
-                fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+                fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
                 {
-                    Ok($ty::new(cx.decode(decoder)?))
+                    Ok($ty::new(decoder.decode()?))
                 }
             }
 
