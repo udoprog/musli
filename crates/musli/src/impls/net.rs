@@ -90,10 +90,11 @@ impl<M> Encode<M> for SocketAddrV4 {
     where
         E: Encoder,
     {
-        let mut pack = encoder.encode_pack()?;
-        pack.push(self.ip())?;
-        pack.push(self.port())?;
-        pack.end()
+        encoder.encode_pack_fn(|pack| {
+            pack.push(self.ip())?;
+            pack.push(self.port())?;
+            Ok(())
+        })
     }
 }
 
@@ -113,12 +114,13 @@ impl<M> Encode<M> for SocketAddrV6 {
     where
         E: Encoder,
     {
-        let mut pack = encoder.encode_pack()?;
-        pack.push(self.ip())?;
-        pack.push(self.port())?;
-        pack.push(self.flowinfo())?;
-        pack.push(self.scope_id())?;
-        pack.end()
+        encoder.encode_pack_fn(|pack| {
+            pack.push(self.ip())?;
+            pack.push(self.port())?;
+            pack.push(self.flowinfo())?;
+            pack.push(self.scope_id())?;
+            Ok(())
+        })
     }
 }
 

@@ -3,7 +3,6 @@
 use crate::compat::Packed;
 use crate::de::{Decode, Decoder, PackDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder};
-use crate::Context;
 
 macro_rules! count {
     (_) => { 1 };
@@ -57,13 +56,13 @@ macro_rules! declare {
 
         impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*) where $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
             #[inline]
-            fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
                 let mut tuple = decoder.decode_tuple(count!($ident0 $($ident)*))?;
-                let $ident0 = cx.decode(tuple.decode_next()?)?;
-                $(let $ident = cx.decode(tuple.decode_next()?)?;)*
+                let $ident0 = tuple.decode_next()?.decode()?;
+                $(let $ident = tuple.decode_next()?.decode()?;)*
                 tuple.end()?;
                 Ok(($ident0, $($ident),*))
             }

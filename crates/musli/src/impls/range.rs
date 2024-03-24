@@ -1,7 +1,7 @@
 use core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 
 use crate::en::SequenceEncoder;
-use crate::{Context, Decode, Decoder, Encode, Encoder};
+use crate::{Decode, Decoder, Encode, Encoder};
 
 macro_rules! implement {
     ($ty:ident $(<$type:ident>)? { $($field:ident),* }, $count:expr) => {
@@ -10,14 +10,15 @@ macro_rules! implement {
             $($type: Encode<M>,)*
         {
             #[inline]
-            #[allow(unused_mut)]
+            #[allow(unused)]
             fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
-                let mut tuple = encoder.encode_tuple($count)?;
-                $(tuple.encode_next()?.encode(&self.$field)?;)*
-                tuple.end()
+                encoder.encode_tuple_fn($count, |tuple| {
+                    $(tuple.encode_next()?.encode(&self.$field)?;)*
+                    Ok(())
+                })
             }
         }
 
@@ -26,11 +27,11 @@ macro_rules! implement {
             $($type: Decode<'de, M>,)*
         {
             #[inline]
-            fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
-                let ($($field,)*) = cx.decode(decoder)?;
+                let ($($field,)*) = decoder.decode()?;
                 Ok($ty { $($field,)* })
             }
         }
@@ -48,9 +49,10 @@ macro_rules! implement_new {
             where
                 E: Encoder<Mode = M>,
             {
-                let mut tuple = encoder.encode_tuple($count)?;
-                $(tuple.encode_next()?.encode(self.$field())?;)*
-                tuple.end()
+                encoder.encode_tuple_fn($count, |tuple| {
+                    $(tuple.encode_next()?.encode(self.$field())?;)*
+                    Ok(())
+                })
             }
         }
 

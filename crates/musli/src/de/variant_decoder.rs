@@ -16,7 +16,7 @@ pub trait VariantDecoder<'de> {
     where
         Self: 'this;
     /// The decoder to use for the variant value.
-    type DecodeVariant<'this>: Decoder<
+    type DecodeValue<'this>: Decoder<
         'de,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
@@ -34,7 +34,7 @@ pub trait VariantDecoder<'de> {
 
     /// Decode the second value in the pair..
     #[must_use = "Decoders must be consumed"]
-    fn decode_value(&mut self) -> Result<Self::DecodeVariant<'_>, <Self::Cx as Context>::Error>;
+    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Indicate that the second value should be skipped.
     ///

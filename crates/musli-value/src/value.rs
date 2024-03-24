@@ -307,12 +307,12 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_option<D>(self, cx: &C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<D>(self, _: &C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Cx = C>,
+        D: Decoder<'de, Cx = C, Error = C::Error>,
     {
         match decoder {
-            Some(decoder) => Ok(Value::Option(Some(Box::new(Value::decode(cx, decoder)?)))),
+            Some(decoder) => Ok(Value::Option(Some(Box::new(decoder.decode::<Value>()?)))),
             None => Ok(Value::Option(None)),
         }
     }
@@ -535,25 +535,21 @@ impl<M> Encode<M> for Value {
             #[cfg(feature = "alloc")]
             Value::String(string) => encoder.encode_string(string),
             #[cfg(feature = "alloc")]
-            Value::Sequence(values) => {
-                let mut sequence = encoder.encode_sequence(values.len())?;
-
+            Value::Sequence(values) => encoder.encode_sequence_fn(values.len(), |sequence| {
                 for value in values {
                     sequence.encode_next()?.encode(value)?;
                 }
 
-                sequence.end()
-            }
+                Ok(())
+            }),
             #[cfg(feature = "alloc")]
-            Value::Map(values) => {
-                let mut map = encoder.encode_map(values.len())?;
-
+            Value::Map(values) => encoder.encode_map_fn(values.len(), |map| {
                 for (first, second) in values {
                     map.insert_entry(first, second)?;
                 }
 
-                map.end()
-            }
+                Ok(())
+            }),
             #[cfg(feature = "alloc")]
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;

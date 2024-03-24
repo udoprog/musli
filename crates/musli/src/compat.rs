@@ -1,8 +1,8 @@
 //! Wrapper types which ensures that a given field is encoded or decoded as a
 //! certain kind of value.
 
-use crate::de::{Decode, DecodeBytes, Decoder, SequenceDecoder};
-use crate::en::{Encode, EncodeBytes, Encoder, SequenceEncoder};
+use crate::de::{Decode, DecodeBytes, Decoder};
+use crate::en::{Encode, EncodeBytes, Encoder};
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
@@ -25,7 +25,7 @@ impl<M> Encode<M> for Sequence<()> {
     where
         E: Encoder<Mode = M>,
     {
-        encoder.encode_sequence(0)?.end()
+        encoder.encode_sequence_fn(0, |_| Ok(()))
     }
 }
 
@@ -34,9 +34,7 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
     where
         D: Decoder<'de>,
     {
-        let seq = decoder.decode_sequence()?;
-        seq.end()?;
-        Ok(Self(()))
+        decoder.decode_sequence_fn(|_| Ok(Self(())))
     }
 }
 

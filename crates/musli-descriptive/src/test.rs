@@ -4,7 +4,6 @@ use core::fmt::Debug;
 
 use musli::de::PackDecoder;
 use musli::mode::DefaultMode;
-use musli::Context;
 use musli::{Decode, Decoder, Encode};
 
 use crate::tag::Tag;
@@ -30,15 +29,15 @@ impl<'de, M, T> Decode<'de, M> for Typed<T>
 where
     T: Decode<'de, M>,
 {
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
-        let mut unpack = decoder.decode_pack()?;
-        let tag = cx.decode(unpack.decode_next()?)?;
-        let value = cx.decode(unpack.decode_next()?)?;
-        unpack.end()?;
-        Ok(Self { tag, value })
+        decoder.decode_pack_fn(|pack| {
+            let tag = pack.decode_next()?.decode()?;
+            let value = pack.decode_next()?.decode()?;
+            Ok(Self { tag, value })
+        })
     }
 }
 

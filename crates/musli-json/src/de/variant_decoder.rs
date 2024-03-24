@@ -40,7 +40,7 @@ where
     type DecodeTag<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeVariant<'this> = JsonDecoder<'a, P::Mut<'this>, C> where Self: 'this;
+    type DecodeValue<'this> = JsonDecoder<'a, P::Mut<'this>, C> where Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
@@ -48,7 +48,7 @@ where
     }
 
     #[inline]
-    fn decode_value(&mut self) -> Result<Self::DecodeVariant<'_>, C::Error> {
+    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         let actual = self.parser.peek(self.cx)?;
 
         if !matches!(actual, Token::Colon) {

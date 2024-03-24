@@ -64,11 +64,11 @@ macro_rules! atomic_impl {
         $(
             #[cfg(target_has_atomic = $size)]
             impl<'de, M> Decode<'de, M> for core::sync::atomic::$ty {
-                fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+                fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de>,
                 {
-                    cx.decode(decoder).map(Self::new)
+                    decoder.decode().map(Self::new)
                 }
             }
         )*
@@ -152,13 +152,13 @@ where
     where
         E: Encoder<Mode = M>,
     {
-        let mut seq = encoder.encode_sequence(N)?;
+        encoder.encode_sequence_fn(N, |seq| {
+            for value in self.iter() {
+                seq.encode_next()?.encode(value)?;
+            }
 
-        for value in self.iter() {
-            seq.encode_next()?.encode(value)?;
-        }
-
-        seq.end()
+            Ok(())
+        })
     }
 }
 
@@ -467,7 +467,7 @@ impl<'de, M> Decode<'de, M> for &'de CStr {
     where
         D: Decoder<'de>,
     {
-        let bytes = cx.decode(decoder)?;
+        let bytes = decoder.decode()?;
         CStr::from_bytes_with_nul(bytes).map_err(cx.map())
     }
 }

@@ -39,7 +39,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     /// or the underlying format doesn't know which type to decode.
     fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Cx = C>,
+        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode>,
     {
         Err(cx.message(expecting::unsupported_type(
             &hint,
@@ -204,7 +204,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     #[inline]
     fn visit_option<D>(self, cx: &C, _: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Cx = C>,
+        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,

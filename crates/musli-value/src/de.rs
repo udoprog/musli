@@ -678,7 +678,7 @@ impl<'a, 'de, C: ?Sized + Context, const F: Options> VariantDecoder<'de>
     type DecodeTag<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
-    type DecodeVariant<'this> = ValueDecoder<'a, 'de, F, C>
+    type DecodeValue<'this> = ValueDecoder<'a, 'de, F, C>
     where
         Self: 'this;
 
@@ -688,7 +688,7 @@ impl<'a, 'de, C: ?Sized + Context, const F: Options> VariantDecoder<'de>
     }
 
     #[inline]
-    fn decode_value(&mut self) -> Result<Self::DecodeVariant<'_>, C::Error> {
+    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         Ok(ValueDecoder::new(self.cx, &self.pair.1))
     }
 

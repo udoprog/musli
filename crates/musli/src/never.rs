@@ -259,7 +259,7 @@ impl<'de, C: ?Sized + Context> StructFieldsDecoder<'de> for Never<(), C> {
 impl<'de, C: ?Sized + Context> VariantDecoder<'de> for Never<(), C> {
     type Cx = C;
     type DecodeTag<'this> = Self where Self: 'this;
-    type DecodeVariant<'this> = Self where Self: 'this;
+    type DecodeValue<'this> = Self where Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
@@ -267,7 +267,7 @@ impl<'de, C: ?Sized + Context> VariantDecoder<'de> for Never<(), C> {
     }
 
     #[inline]
-    fn decode_value(&mut self) -> Result<Self::DecodeVariant<'_>, C::Error> {
+    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         match self._never {}
     }
 

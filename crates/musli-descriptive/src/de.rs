@@ -1050,7 +1050,7 @@ where
 {
     type Cx = C;
     type DecodeTag<'this> = SelfDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
-    type DecodeVariant<'this> = SelfDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeValue<'this> = SelfDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
@@ -1058,7 +1058,7 @@ where
     }
 
     #[inline]
-    fn decode_value(&mut self) -> Result<Self::DecodeVariant<'_>, C::Error> {
+    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         Ok(SelfDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
