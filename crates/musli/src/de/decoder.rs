@@ -1571,7 +1571,7 @@ pub trait Decoder<'de>: Sized {
     ///
     ///         while let Some(mut field) = st.decode_field()? {
     ///             // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///             let tag: String = field.decode_field_name()?.decode()?;
+    ///             let tag = field.decode_field_name()?.decode::<String>()?;
     ///
     ///             match tag.as_str() {
     ///                 "string" => {
@@ -1581,7 +1581,7 @@ pub trait Decoder<'de>: Sized {
     ///                     integer = Some(field.decode_field_value()?.decode()?);
     ///                 }
     ///                 tag => {
-    ///                     return Err(cx.invalid_field_tag("Struct", tag))
+    ///                     return Err(cx.invalid_field_tag("Struct", tag));
     ///                 }
     ///             }
     ///         }
@@ -1637,7 +1637,7 @@ pub trait Decoder<'de>: Sized {
     ///
     ///             while let Some(mut field) = st.decode_field()? {
     ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///                 let tag: String = field.decode_field_name()?.decode()?;
+    ///                 let tag = field.decode_field_name()?.decode::<String>()?;
     ///
     ///                 match tag.as_str() {
     ///                     "string" => {
@@ -1647,7 +1647,7 @@ pub trait Decoder<'de>: Sized {
     ///                         integer = Some(field.decode_field_value()?.decode()?);
     ///                     }
     ///                     tag => {
-    ///                         return Err(cx.invalid_field_tag("Struct", tag))
+    ///                         return Err(cx.invalid_field_tag("Struct", tag));
     ///                     }
     ///                 }
     ///             }
@@ -1742,17 +1742,17 @@ pub trait Decoder<'de>: Sized {
     ///         decoder.decode_variant_fn(|variant| {
     ///             let tag = variant.decode_tag()?.decode()?;
     ///
-    ///             Ok(match tag {
+    ///             match tag {
     ///                 0 => {
-    ///                     Self::Variant1(variant.decode_value()?.decode()?)
+    ///                     Ok(Self::Variant1(variant.decode_value()?.decode()?))
     ///                 }
     ///                 1 => {
-    ///                     Self::Variant2(variant.decode_value()?.decode()?)
+    ///                     Ok(Self::Variant2(variant.decode_value()?.decode()?))
     ///                 }
     ///                 tag => {
-    ///                     return Err(cx.invalid_variant_tag("Enum", tag));
+    ///                     Err(cx.invalid_variant_tag("Enum", tag))
     ///                 }
-    ///             })
+    ///             }
     ///         })
     ///     }
     /// }
