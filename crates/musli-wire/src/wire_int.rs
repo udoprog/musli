@@ -10,7 +10,7 @@ use crate::writer::Writer;
 
 /// Governs how usize lengths are encoded into a [Writer].
 #[inline]
-pub(crate) fn encode_length<C, W, const F: Options>(
+pub(crate) fn encode_length<C, W, const OPT: Options>(
     cx: &C,
     mut writer: W,
     value: usize,
@@ -19,7 +19,7 @@ where
     C: ?Sized + Context,
     W: Writer,
 {
-    match crate::options::length::<F>() {
+    match crate::options::length::<OPT>() {
         crate::options::Integer::Variable => {
             if value.is_smaller_than(DATA_MASK) {
                 writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
@@ -29,8 +29,8 @@ where
             }
         }
         _ => {
-            let bo = crate::options::byteorder::<F>();
-            let width = crate::options::length_width::<F>();
+            let bo = crate::options::byteorder::<OPT>();
+            let width = crate::options::length_width::<OPT>();
             let bytes = 1u8 << width as u8;
             writer.write_byte(cx, Tag::new(Kind::Prefix, bytes).byte())?;
 
@@ -51,7 +51,7 @@ where
 
 /// Governs how usize lengths are decoded from a [Reader].
 #[inline]
-pub(crate) fn decode_length<'de, C, R, const F: Options>(
+pub(crate) fn decode_length<'de, C, R, const OPT: Options>(
     cx: &C,
     mut reader: R,
 ) -> Result<usize, C::Error>
@@ -59,7 +59,7 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    match crate::options::length::<F>() {
+    match crate::options::length::<OPT>() {
         crate::options::Integer::Variable => {
             let tag = Tag::from_byte(reader.read_byte(cx)?);
 
@@ -74,8 +74,8 @@ where
             }
         }
         _ => {
-            let bo = crate::options::byteorder::<F>();
-            let width = crate::options::length_width::<F>();
+            let bo = crate::options::byteorder::<OPT>();
+            let width = crate::options::length_width::<OPT>();
 
             let bytes = 1u8 << width as u8;
             let tag = Tag::from_byte(reader.read_byte(cx)?);
@@ -104,7 +104,7 @@ where
 
 /// Governs how unsigned integers are encoded into a [Writer].
 #[inline]
-pub(crate) fn encode_unsigned<C, W, T, const F: Options>(
+pub(crate) fn encode_unsigned<C, W, T, const OPT: Options>(
     cx: &C,
     mut writer: W,
     value: T,
@@ -114,7 +114,7 @@ where
     W: Writer,
     T: UnsignedOps,
 {
-    match crate::options::integer::<F>() {
+    match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => {
             if value.is_smaller_than(DATA_MASK) {
                 writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
@@ -124,7 +124,7 @@ where
             }
         }
         _ => {
-            let bo = crate::options::byteorder::<F>();
+            let bo = crate::options::byteorder::<OPT>();
             writer.write_byte(cx, Tag::new(Kind::Prefix, T::BYTES).byte())?;
             value.write_bytes(cx, writer, bo)
         }
@@ -133,7 +133,7 @@ where
 
 /// Governs how unsigned integers are decoded from a [Reader].
 #[inline]
-pub(crate) fn decode_unsigned<'de, C, R, T, const F: Options>(
+pub(crate) fn decode_unsigned<'de, C, R, T, const OPT: Options>(
     cx: &C,
     mut reader: R,
 ) -> Result<T, C::Error>
@@ -142,7 +142,7 @@ where
     R: Reader<'de>,
     T: UnsignedOps,
 {
-    match crate::options::integer::<F>() {
+    match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => {
             let tag = Tag::from_byte(reader.read_byte(cx)?);
 
@@ -157,7 +157,7 @@ where
             }
         }
         _ => {
-            let bo = crate::options::byteorder::<F>();
+            let bo = crate::options::byteorder::<OPT>();
 
             if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::BYTES) {
                 return Err(cx.message("Expected fixed integer"));
@@ -170,7 +170,7 @@ where
 
 /// Governs how signed integers are encoded into a [Writer].
 #[inline]
-pub(crate) fn encode_signed<C, W, T, const F: Options>(
+pub(crate) fn encode_signed<C, W, T, const OPT: Options>(
     cx: &C,
     writer: W,
     value: T,
@@ -182,12 +182,12 @@ where
     T::Unsigned: UnsignedOps,
 {
     let value = zig::encode(value);
-    encode_unsigned::<C, W, T::Unsigned, F>(cx, writer, value)
+    encode_unsigned::<C, W, T::Unsigned, OPT>(cx, writer, value)
 }
 
 /// Governs how signed integers are decoded from a [Reader].
 #[inline]
-pub(crate) fn decode_signed<'de, C, R, T, const F: Options>(
+pub(crate) fn decode_signed<'de, C, R, T, const OPT: Options>(
     cx: &C,
     reader: R,
 ) -> Result<T, C::Error>
@@ -197,6 +197,6 @@ where
     T: Signed,
     T::Unsigned: UnsignedOps,
 {
-    let value = decode_unsigned::<C, R, T::Unsigned, F>(cx, reader)?;
+    let value = decode_unsigned::<C, R, T::Unsigned, OPT>(cx, reader)?;
     Ok(zig::decode(value))
 }

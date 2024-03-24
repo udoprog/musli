@@ -24,18 +24,6 @@ pub trait SequenceDecoder<'de>: Sized {
     fn decode_next(&mut self)
         -> Result<Option<Self::DecodeNext<'_>>, <Self::Cx as Context>::Error>;
 
-    /// Stop decoding the current sequence.
-    ///
-    /// This is required to call after a sequence has finished decoding.
-    #[inline]
-    fn end(mut self) -> Result<(), <Self::Cx as Context>::Error> {
-        while let Some(item) = self.decode_next()? {
-            item.skip()?;
-        }
-
-        Ok(())
-    }
-
     /// Decode the next element of the given type.
     #[inline]
     fn next<T>(&mut self) -> Result<Option<T>, <Self::Cx as Context>::Error>

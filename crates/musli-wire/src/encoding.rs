@@ -100,7 +100,7 @@ where
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = DefaultMode, const F: Options = DEFAULT_OPTIONS> {
+pub struct Encoding<M = DefaultMode, const OPT: Options = DEFAULT_OPTIONS> {
     _marker: marker::PhantomData<M>,
 }
 
@@ -146,9 +146,9 @@ impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
     }
 }
 
-impl<M, const F: Options> Encoding<M, F> {
+impl<M, const OPT: Options> Encoding<M, OPT> {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T, F> {
+    pub const fn with_mode<T>(self) -> Encoding<T, OPT> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -172,15 +172,19 @@ impl<M, const F: Options> Encoding<M, F> {
         }
     }
 
-    musli_common::encoding_impls!(M, WireEncoder::<_, F, _>::new, WireDecoder::<_, F, _>::new);
+    musli_common::encoding_impls!(
+        M,
+        WireEncoder::<_, OPT, _>::new,
+        WireDecoder::<_, OPT, _>::new
+    );
     musli_common::encoding_from_slice_impls!(M, WireDecoder::<_, F>::new);
 }
 
-impl<M, const F: Options> Clone for Encoding<M, F> {
+impl<M, const OPT: Options> Clone for Encoding<M, OPT> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<M, const F: Options> Copy for Encoding<M, F> {}
+impl<M, const OPT: Options> Copy for Encoding<M, OPT> {}

@@ -1,7 +1,8 @@
 use core::fmt;
 
 use musli::en::{
-    MapEntriesEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, VariantEncoder,
+    MapEntriesEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, TupleEncoder,
+    VariantEncoder,
 };
 use musli::{Context, Encoder};
 
@@ -34,9 +35,9 @@ where
     type Error = <E::Cx as Context>::Error;
 
     type SerializeSeq = SerializeSeq<'a, E::EncodeSequence>;
-    type SerializeTuple = SerializeSeq<'a, E::EncodeTuple>;
+    type SerializeTuple = SerializeTuple<'a, E::EncodeTuple>;
     type SerializeTupleStruct = SerializeTupleStruct<'a, E::EncodeStruct>;
-    type SerializeTupleVariant = SerializeSeq<'a, E::EncodeTupleVariant>;
+    type SerializeTupleVariant = SerializeTuple<'a, E::EncodeTupleVariant>;
     type SerializeMap = SerializeMap<'a, E::EncodeMapEntries>;
     type SerializeStruct = SerializeStruct<'a, E::EncodeStruct>;
     type SerializeStructVariant = SerializeStructVariant<'a, E::EncodeStructVariant>;
@@ -200,7 +201,7 @@ where
     #[inline]
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         let encoder = self.encoder.encode_tuple(len)?;
-        Ok(SerializeSeq::new(self.cx, encoder))
+        Ok(SerializeTuple::new(self.cx, encoder))
     }
 
     #[inline]
@@ -222,7 +223,7 @@ where
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         let encoder = self.encoder.encode_tuple_variant(variant_name, len)?;
-        Ok(SerializeSeq::new(self.cx, encoder))
+        Ok(SerializeTuple::new(self.cx, encoder))
     }
 
     #[inline]
@@ -287,7 +288,7 @@ where
     let mut variant = encoder.encode_variant()?;
     variant_tag.serialize(Serializer::new(cx, variant.encode_tag()?))?;
     let output = f(variant.encode_value()?)?;
-    variant.end()?;
+    variant.end_variant()?;
     Ok(output)
 }
 
@@ -321,21 +322,38 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.encode_next()?;
+        let encoder = self.encoder.encode_element()?;
         value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end()
+        self.encoder.end_sequence()
     }
 }
 
-impl<'a, E> ser::SerializeTuple for SerializeSeq<'a, E>
+pub struct SerializeTuple<'a, E>
+where
+    E: TupleEncoder,
+{
+    cx: &'a E::Cx,
+    encoder: E,
+}
+
+impl<'a, E> SerializeTuple<'a, E>
+where
+    E: TupleEncoder,
+{
+    fn new(cx: &'a E::Cx, encoder: E) -> Self {
+        Self { cx, encoder }
+    }
+}
+
+impl<'a, E> ser::SerializeTuple for SerializeTuple<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
-    E: SequenceEncoder,
+    E: TupleEncoder,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -345,19 +363,21 @@ where
     where
         T: ser::Serialize,
     {
-        ser::SerializeSeq::serialize_element(self, value)
+        let encoder = self.encoder.encode_tuple_field()?;
+        value.serialize(Serializer::new(self.cx, encoder))?;
+        Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        ser::SerializeSeq::end(self)
+        self.encoder.end_tuple()
     }
 }
 
-impl<'a, E> ser::SerializeTupleVariant for SerializeSeq<'a, E>
+impl<'a, E> ser::SerializeTupleVariant for SerializeTuple<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
-    E: SequenceEncoder,
+    E: TupleEncoder,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -367,12 +387,12 @@ where
     where
         T: ser::Serialize,
     {
-        ser::SerializeSeq::serialize_element(self, value)
+        ser::SerializeTuple::serialize_element(self, value)
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        ser::SerializeSeq::end(self)
+        ser::SerializeTuple::end(self)
     }
 }
 
@@ -411,7 +431,7 @@ where
     where
         T: ser::Serialize,
     {
-        self.encoder.encode_field_fn(|field| {
+        self.encoder.encode_struct_field_fn(|field| {
             field.encode_field_name()?.encode(self.field)?;
             value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
             Ok(())
@@ -420,7 +440,7 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end()
+        self.encoder.end_struct()
     }
 }
 
@@ -471,7 +491,7 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end()
+        self.encoder.end_map_entries()
     }
 }
 
@@ -509,16 +529,16 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.encode_field()?;
+        let mut field = self.encoder.encode_struct_field()?;
         field.encode_field_name()?.encode(key)?;
         value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
-        field.end()?;
+        field.end_field()?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end()
+        self.encoder.end_struct()
     }
 }
 
@@ -556,7 +576,7 @@ where
     where
         T: ser::Serialize,
     {
-        self.encoder.encode_field_fn(|field| {
+        self.encoder.encode_struct_field_fn(|field| {
             field.encode_field_name()?.encode(key)?;
             value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
             Ok(())
@@ -565,6 +585,6 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end()
+        self.encoder.end_struct()
     }
 }

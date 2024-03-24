@@ -16,9 +16,7 @@ where
     C: ?Sized + Context,
 {
     #[inline]
-    pub(crate) fn new(cx: &'a C, mut parser: P) -> Result<Self, C::Error> {
-        parser.skip_whitespace(cx)?;
-
+    pub(super) fn new(cx: &'a C, mut parser: P) -> Result<Self, C::Error> {
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
@@ -26,8 +24,21 @@ where
         }
 
         parser.skip(cx, 1)?;
-
         Ok(Self { cx, parser })
+    }
+
+    #[inline]
+    pub(super) fn end(mut self) -> Result<(), C::Error> {
+        let actual = self.parser.peek(self.cx)?;
+
+        if !matches!(actual, Token::CloseBrace) {
+            return Err(self.cx.message(format_args!(
+                "Expected closing brace for variant, was {actual}"
+            )));
+        }
+
+        self.parser.skip(self.cx, 1)?;
+        Ok(())
     }
 }
 
@@ -65,19 +76,5 @@ where
     fn skip_value(&mut self) -> Result<bool, C::Error> {
         self.decode_value()?.skip()?;
         Ok(true)
-    }
-
-    #[inline]
-    fn end(mut self) -> Result<(), C::Error> {
-        let actual = self.parser.peek(self.cx)?;
-
-        if !matches!(actual, Token::CloseBrace) {
-            return Err(self
-                .cx
-                .message(format_args!("Expected closing brace, was {actual}")));
-        }
-
-        self.parser.skip(self.cx, 1)?;
-        Ok(())
     }
 }

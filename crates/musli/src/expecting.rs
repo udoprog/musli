@@ -138,6 +138,7 @@ expect! {
     pub(crate) Bytes("bytes");
     pub(crate) Array("array");
     pub(crate) Map("map");
+    pub(crate) MapEntries("map entries");
     pub(crate) Option("option");
     pub(crate) Tuple("tuple");
     pub(crate) Sequence("sequence");

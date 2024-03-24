@@ -42,12 +42,12 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntry<'this> = JsonObjectPairEncoder<'a, W::Mut<'this>, C>
+    type EncodeMapEntry<'this> = JsonObjectPairEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
+    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
         self.len += 1;
 
         Ok(JsonObjectPairEncoder::new(
@@ -58,7 +58,7 @@ where
     }
 
     #[inline]
-    fn end(mut self) -> Result<Self::Ok, C::Error> {
+    fn end_map(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_bytes(self.cx, self.end)
     }
 }
@@ -92,7 +92,7 @@ where
     }
 
     #[inline]
-    fn end(mut self) -> Result<Self::Ok, C::Error> {
+    fn end_map_entries(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, b'}')
     }
 }
@@ -104,17 +104,17 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeField<'this> = JsonObjectPairEncoder<'a, W::Mut<'this>, C>
+    type EncodeStructField<'this> = JsonObjectPairEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_field(&mut self) -> Result<Self::EncodeField<'_>, C::Error> {
-        MapEncoder::encode_entry(self)
+    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
+        MapEncoder::encode_map_entry(self)
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, C::Error> {
-        MapEncoder::end(self)
+    fn end_struct(self) -> Result<Self::Ok, C::Error> {
+        MapEncoder::end_map(self)
     }
 }

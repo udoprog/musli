@@ -6,10 +6,12 @@ use crate::expecting::{self, Expecting};
 use crate::Context;
 
 use super::{
-    Encode, MapEncoder, MapEntriesEncoder, SequenceEncoder, StructEncoder, VariantEncoder,
+    Encode, MapEncoder, MapEntriesEncoder, PackEncoder, SequenceEncoder, StructEncoder,
+    TupleEncoder, VariantEncoder,
 };
 
 /// Trait governing how the encoder works.
+#[must_use = "Encoders must be consumed through one of its encode_* methods"]
 pub trait Encoder: Sized {
     /// Context associated with the encoder.
     type Cx: ?Sized + Context<Error = Self::Error, Mode = Self::Mode>;
@@ -26,13 +28,13 @@ pub trait Encoder: Sized {
     where
         U: 'this + Context;
     /// A simple pack that packs a sequence of elements.
-    type EncodePack: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodePack: PackEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Encoder returned when encoding an optional value which is present.
     type EncodeSome: Encoder<Cx = Self::Cx, Ok = Self::Ok, Error = Self::Error, Mode = Self::Mode>;
     /// The type of a sequence encoder.
     type EncodeSequence: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// The type of a tuple encoder.
-    type EncodeTuple: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeTuple: TupleEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// The type of a map encoder.
     type EncodeMap: MapEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Streaming encoder for map pairs.
@@ -42,7 +44,7 @@ pub trait Encoder: Sized {
     /// Encoder for a struct variant.
     type EncodeVariant: VariantEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Specialized encoder for a tuple variant.
-    type EncodeTupleVariant: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeTupleVariant: TupleEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Specialized encoder for a struct variant.
     type EncodeStructVariant: StructEncoder<Cx = Self::Cx, Ok = Self::Ok>;
 
@@ -1056,7 +1058,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{SequenceEncoder};
+    /// use musli::en::PackEncoder;
     ///
     /// struct PackedStruct {
     ///     field: u32,
@@ -1069,9 +1071,9 @@ pub trait Encoder: Sized {
     ///         E: Encoder,
     ///     {
     ///         let mut pack = encoder.encode_pack()?;
-    ///         pack.encode_next()?.encode(self.field)?;
-    ///         pack.encode_next()?.encode(self.data)?;
-    ///         pack.end()
+    ///         pack.encode_packed()?.encode(self.field)?;
+    ///         pack.encode_packed()?.encode(self.data)?;
+    ///         pack.end_pack()
     ///     }
     /// }
     /// ```
@@ -1089,7 +1091,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{SequenceEncoder};
+    /// use musli::en::PackEncoder;
     ///
     /// struct PackedStruct {
     ///     field: u32,
@@ -1102,8 +1104,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder,
     ///     {
     ///         encoder.encode_pack_fn(|pack| {
-    ///             pack.encode_next()?.encode(self.field)?;
-    ///             pack.encode_next()?.encode(&self.data)?;
+    ///             pack.encode_packed()?.encode(self.field)?;
+    ///             pack.encode_packed()?.encode(&self.data)?;
     ///             Ok(())
     ///         })
     ///     }
@@ -1116,7 +1118,7 @@ pub trait Encoder: Sized {
     {
         let mut pack = self.encode_pack()?;
         f(&mut pack)?;
-        pack.end()
+        pack.end_pack()
     }
 
     /// Encode a sequence with a known length `len`.
@@ -1145,7 +1147,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{SequenceEncoder};
+    /// use musli::en::SequenceEncoder;
     /// # struct MyType { data: Vec<String> }
     ///
     /// impl<M> Encode<M> for MyType {
@@ -1159,7 +1161,7 @@ pub trait Encoder: Sized {
     ///             seq.push(element)?;
     ///         }
     ///
-    ///         seq.end()
+    ///         seq.end_sequence()
     ///     }
     /// }
     /// ```
@@ -1180,7 +1182,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{SequenceEncoder};
+    /// use musli::en::SequenceEncoder;
     /// # struct MyType { data: Vec<String> }
     ///
     /// impl<M> Encode<M> for MyType {
@@ -1209,7 +1211,7 @@ pub trait Encoder: Sized {
     {
         let mut seq = self.encode_sequence(len)?;
         f(&mut seq)?;
-        seq.end()
+        seq.end_sequence()
     }
 
     /// Encode a tuple with a known length `len`.
@@ -1226,7 +1228,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{SequenceEncoder};
+    /// use musli::en::TupleEncoder;
     ///
     /// struct PackedTuple(u32, [u8; 128]);
     ///
@@ -1236,9 +1238,9 @@ pub trait Encoder: Sized {
     ///         E: Encoder,
     ///     {
     ///         let mut tuple = encoder.encode_tuple(2)?;
-    ///         tuple.encode_next()?.encode(self.0)?;
-    ///         tuple.encode_next()?.encode(&self.1)?;
-    ///         tuple.end()
+    ///         tuple.encode_tuple_field()?.encode(self.0)?;
+    ///         tuple.encode_tuple_field()?.encode(&self.1)?;
+    ///         tuple.end_tuple()
     ///     }
     /// }
     /// ```
@@ -1264,7 +1266,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{SequenceEncoder};
+    /// use musli::en::TupleEncoder;
     ///
     /// struct PackedTuple(u32, [u8; 128]);
     ///
@@ -1274,8 +1276,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder,
     ///     {
     ///         encoder.encode_tuple_fn(2, |tuple| {
-    ///             tuple.encode_next()?.encode(self.0)?;
-    ///             tuple.encode_next()?.encode(&self.1)?;
+    ///             tuple.encode_tuple_field()?.encode(self.0)?;
+    ///             tuple.encode_tuple_field()?.encode(&self.1)?;
     ///             Ok(())
     ///         })
     ///     }
@@ -1288,7 +1290,7 @@ pub trait Encoder: Sized {
     {
         let mut tuple = self.encode_tuple(len)?;
         f(&mut tuple)?;
-        tuple.end()
+        tuple.end_tuple()
     }
 
     /// Encode a map with a known length `len`.
@@ -1311,7 +1313,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{MapEncoder};
+    /// use musli::en::MapEncoder;
     /// # struct Struct { name: String, age: u32 }
     ///
     /// impl<M> Encode<M> for Struct {
@@ -1322,7 +1324,7 @@ pub trait Encoder: Sized {
     ///         let mut map = encoder.encode_map(2)?;
     ///         map.insert_entry("name", &self.name)?;
     ///         map.insert_entry("age", self.age)?;
-    ///         map.end()
+    ///         map.end_map()
     ///     }
     /// }
     /// ```
@@ -1340,7 +1342,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{MapEncoder};
+    /// use musli::en::MapEncoder;
     ///
     /// struct Struct {
     ///     name: String,
@@ -1367,7 +1369,7 @@ pub trait Encoder: Sized {
     {
         let mut map = self.encode_map(len)?;
         f(&mut map)?;
-        map.end()
+        map.end_map()
     }
 
     /// Encode a map through pairs with a known length `len`.
@@ -1376,7 +1378,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{MapEntriesEncoder};
+    /// use musli::en::MapEntriesEncoder;
     ///
     /// struct Struct {
     ///     name: String,
@@ -1396,7 +1398,7 @@ pub trait Encoder: Sized {
     ///         // Key and value encoding as a stream.
     ///         m.encode_map_entry_key()?.encode("age")?;
     ///         m.encode_map_entry_value()?.encode(self.age)?;
-    ///         m.end()
+    ///         m.end_map_entries()
     ///     }
     /// }
     /// ```
@@ -1417,7 +1419,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{StructEncoder};
+    /// use musli::en::StructEncoder;
     ///
     /// struct Struct {
     ///     name: String,
@@ -1430,9 +1432,9 @@ pub trait Encoder: Sized {
     ///         E: Encoder,
     ///     {
     ///         let mut st = encoder.encode_struct(2)?;
-    ///         st.insert_field("name", &self.name)?;
-    ///         st.insert_field("age", self.age)?;
-    ///         st.end()
+    ///         st.insert_struct_field("name", &self.name)?;
+    ///         st.insert_struct_field("age", self.age)?;
+    ///         st.end_struct()
     ///     }
     /// }
     /// ```
@@ -1453,7 +1455,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{StructEncoder};
+    /// use musli::en::StructEncoder;
     ///
     /// struct Struct {
     ///     name: String,
@@ -1466,8 +1468,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder,
     ///     {
     ///         encoder.encode_struct_fn(2, |st| {
-    ///             st.insert_field("name", &self.name)?;
-    ///             st.insert_field("age", self.age)?;
+    ///             st.insert_struct_field("name", &self.name)?;
+    ///             st.insert_struct_field("age", self.age)?;
     ///             Ok(())
     ///         })
     ///     }
@@ -1484,7 +1486,7 @@ pub trait Encoder: Sized {
     {
         let mut st = self.encode_struct(fields)?;
         f(&mut st)?;
-        st.end()
+        st.end_struct()
     }
 
     /// Encode a variant.
@@ -1509,7 +1511,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// use musli::en::{VariantEncoder, TupleEncoder, StructEncoder};
     /// # enum Enum { UnitVariant, TupleVariant(String), StructVariant { data: String, age: u32 } }
     ///
     /// impl<M> Encode<M> for Enum {
@@ -1521,20 +1523,26 @@ pub trait Encoder: Sized {
     ///
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 variant.insert_variant("variant1", ())
+    ///                 variant.insert_variant("UnitVariant", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 variant.insert_variant("variant2", data)
+    ///                 variant.encode_tag()?.encode_string("TupleVariant")?;
+    ///
+    ///                 let mut tuple = variant.encode_value()?.encode_tuple(1)?;
+    ///                 tuple.push_tuple_field(data)?;
+    ///                 tuple.end_tuple()?;
+    ///
+    ///                 variant.end_variant()
     ///             }
     ///             Enum::StructVariant { data, age } => {
-    ///                 variant.encode_tag()?.encode_string("variant3")?;
+    ///                 variant.encode_tag()?.encode_string("StructVariant")?;
     ///
     ///                 let mut st = variant.encode_value()?.encode_struct(2)?;
-    ///                 st.insert_field("data", data)?;
-    ///                 st.insert_field("age", age)?;
-    ///                 st.end()?;
+    ///                 st.insert_struct_field("data", data)?;
+    ///                 st.insert_struct_field("age", age)?;
+    ///                 st.end_struct()?;
     ///
-    ///                 variant.end()
+    ///                 variant.end_variant()
     ///             }
     ///         }
     ///     }
@@ -1554,7 +1562,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// use musli::en::{VariantEncoder, TupleEncoder, StructEncoder};
     ///
     /// enum Enum {
     ///     UnitVariant,
@@ -1575,15 +1583,24 @@ pub trait Encoder: Sized {
     ///                 encoder.encode_variant()?.insert_variant("variant1", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
-    ///                 encoder.encode_variant()?.insert_variant("variant2", data)
+    ///                 encoder.encode_variant_fn(|variant| {
+    ///                     variant.encode_tag()?.encode("TupleVariant")?;
+    ///
+    ///                     variant.encode_value()?.encode_tuple_fn(1, |tuple| {
+    ///                         tuple.push_tuple_field(data)?;
+    ///                         Ok(())
+    ///                     })?;
+    ///
+    ///                     Ok(())
+    ///                 })
     ///             }
     ///             Enum::StructVariant { data, age } => {
     ///                 encoder.encode_variant_fn(|variant| {
-    ///                     variant.encode_tag()?.encode_string("variant3")?;
+    ///                     variant.encode_tag()?.encode("variant3")?;
     ///
     ///                     variant.encode_value()?.encode_struct_fn(2, |st| {
-    ///                         st.insert_field("data", data)?;
-    ///                         st.insert_field("age", age)?;
+    ///                         st.insert_struct_field("data", data)?;
+    ///                         st.insert_struct_field("age", age)?;
     ///                         Ok(())
     ///                     })?;
     ///
@@ -1601,7 +1618,7 @@ pub trait Encoder: Sized {
     {
         let mut variant = self.encode_variant()?;
         f(&mut variant)?;
-        variant.end()
+        variant.end_variant()
     }
 
     /// Simplified encoding for a unit variant.
@@ -1633,7 +1650,7 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::UnitVariant => {
-    ///                 encoder.encode_unit_variant(&"variant1")
+    ///                 encoder.encode_unit_variant("variant1")
     ///             }
     ///         }
     ///     }
@@ -1644,10 +1661,11 @@ pub trait Encoder: Sized {
     where
         T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
     {
-        let mut variant = self.encode_variant()?;
-        variant.encode_tag()?.encode(tag)?;
-        variant.encode_value()?.encode_unit()?;
-        variant.end()
+        self.encode_variant_fn(|variant| {
+            variant.encode_tag()?.encode(tag)?;
+            variant.encode_value()?.encode_unit()?;
+            Ok(())
+        })
     }
 
     /// Simplified encoding for a tuple variant.
@@ -1669,7 +1687,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// use musli::en::TupleEncoder;
     /// # enum Enum { TupleVariant(String) }
     ///
     /// impl<M> Encode<M> for Enum {
@@ -1679,9 +1697,9 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::TupleVariant(data) => {
-    ///                 let mut variant = encoder.encode_tuple_variant(&"variant2", 1)?;
-    ///                 variant.push(data)?;
-    ///                 variant.end()
+    ///                 let mut variant = encoder.encode_tuple_variant("variant2", 1)?;
+    ///                 variant.push_tuple_field(data)?;
+    ///                 variant.end_tuple()
     ///             }
     ///         }
     ///     }
@@ -1724,7 +1742,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// use musli::en::StructEncoder;
     /// # enum Enum { StructVariant { data: String, age: u32 } }
     ///
     /// impl<M> Encode<M> for Enum {
@@ -1734,10 +1752,10 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::StructVariant { data, age } => {
-    ///                 let mut variant = encoder.encode_struct_variant(&"variant3", 2)?;
-    ///                 variant.insert_field("data", data)?;
-    ///                 variant.insert_field("age", age)?;
-    ///                 variant.end()
+    ///                 let mut variant = encoder.encode_struct_variant("variant3", 2)?;
+    ///                 variant.insert_struct_field("data", data)?;
+    ///                 variant.insert_struct_field("age", age)?;
+    ///                 variant.end_struct()
     ///             }
     ///         }
     ///     }

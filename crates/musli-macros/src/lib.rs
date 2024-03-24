@@ -92,56 +92,6 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
-pub fn map_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attr = proc_macro2::TokenStream::from(attr);
-
-    if !attr.is_empty() {
-        return syn::Error::new_spanned(attr, "Arguments not supported")
-            .to_compile_error()
-            .into();
-    }
-
-    let input = syn::parse_macro_input!(input as types::Types);
-
-    match input.expand(
-        "map_decoder",
-        types::MAP_DECODER_TYPES,
-        None,
-        "__UseMusliMapDecoderAttributeMacro",
-        types::Kind::SelfCx,
-    ) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-
-/// Please refer to the main [musli documentation](https://docs.rs/musli/).
-#[proc_macro_attribute]
-pub fn struct_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attr = proc_macro2::TokenStream::from(attr);
-
-    if !attr.is_empty() {
-        return syn::Error::new_spanned(attr, "Arguments not supported")
-            .to_compile_error()
-            .into();
-    }
-
-    let input = syn::parse_macro_input!(input as types::Types);
-
-    match input.expand(
-        "struct_decoder",
-        types::STRUCT_DECODER_TYPES,
-        None,
-        "__UseMusliStructDecoderAttributeMacro",
-        types::Kind::SelfCx,
-    ) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-
-/// Please refer to the main [musli documentation](https://docs.rs/musli/).
-#[proc_macro_attribute]
 pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = proc_macro2::TokenStream::from(attr);
 

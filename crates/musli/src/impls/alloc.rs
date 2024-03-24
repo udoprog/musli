@@ -29,6 +29,9 @@ use crate::en::{
 use crate::internal::size_hint;
 use crate::Context;
 
+#[cfg(feature = "std")]
+use super::PlatformTag;
+
 impl<M> Encode<M> for String {
     #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -244,7 +247,7 @@ macro_rules! sequence {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_sequence_fn(|$access| {
+                decoder.decode_sequence(|$access| {
                     let mut out = $factory;
 
                     let mut index = 0;
@@ -313,10 +316,7 @@ macro_rules! map {
             {
                 encoder.encode_map_fn(self.len(), |map| {
                     for (k, v) in self {
-                        let mut entry = map.encode_entry()?;
-                        entry.encode_map_key()?.encode(k)?;
-                        entry.encode_map_value()?.encode(v)?;
-                        entry.end()?;
+                        map.insert_entry(k, v)?;
                     }
 
                     Ok(())
@@ -338,10 +338,10 @@ macro_rules! map {
                 encoder.encode_map_fn(self.len(), |map| {
                     for (k, v) in self {
                         $cx.enter_map_key(k);
-                        let mut entry = map.encode_entry()?;
+                        let mut entry = map.encode_map_entry()?;
                         entry.encode_map_key()?.encode(k)?;
                         entry.encode_map_value()?.encode(v)?;
-                        entry.end()?;
+                        entry.end_map_entry()?;
                         $cx.leave_map_key();
                     }
 
@@ -361,7 +361,7 @@ macro_rules! map {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_map_fn(|$access| {
+                decoder.decode_map(|$access| {
                     let mut out = $with_capacity;
 
                     while let Some((key, value)) = $access.entry()? {
@@ -384,7 +384,7 @@ macro_rules! map {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_map_fn(|$access| {
+                decoder.decode_map(|$access| {
                     let mut out = $with_capacity;
 
                     while let Some(mut entry) = $access.decode_entry()? {
@@ -542,20 +542,12 @@ macro_rules! smart_pointer {
 
 smart_pointer!(Box, Arc, Rc);
 
-#[cfg(feature = "std")]
-#[derive(Encode, Decode)]
-#[musli(crate)]
-enum PlatformTag {
-    Unix,
-    Windows,
-}
-
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<M> Encode<M> for OsStr {
     #[cfg(unix)]
     #[inline]
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -563,10 +555,11 @@ impl<M> Encode<M> for OsStr {
 
         use crate::en::VariantEncoder;
 
-        let mut variant = encoder.encode_variant()?;
-        PlatformTag::Unix.encode(cx, variant.encode_tag()?)?;
-        self.as_bytes().encode_bytes(cx, variant.encode_value()?)?;
-        variant.end()
+        encoder.encode_variant_fn(|variant| {
+            variant.encode_tag()?.encode(PlatformTag::Unix)?;
+            variant.encode_value()?.encode_bytes(self.as_bytes())?;
+            Ok(())
+        })
     }
 
     #[cfg(windows)]
@@ -575,27 +568,27 @@ impl<M> Encode<M> for OsStr {
     where
         E: Encoder,
     {
-        use crate::en::VariantEncoder;
-        use crate::Buf;
         use std::os::windows::ffi::OsStrExt;
 
-        let mut variant = encoder.encode_variant()?;
-        let tag = variant.encode_tag()?;
+        use crate::en::VariantEncoder;
+        use crate::Buf;
 
-        PlatformTag::Windows.encode(cx, tag)?;
+        encoder.encode_variant_fn(|variant| {
+            variant.encode_tag()?.encode(PlatformTag::Windows)?;
 
-        let Some(mut buf) = cx.alloc() else {
-            return Err(cx.message("Failed to allocate buffer"));
-        };
+            let Some(mut buf) = cx.alloc() else {
+                return Err(cx.message("Failed to allocate buffer"));
+            };
 
-        for w in self.encode_wide() {
-            if !buf.write(&w.to_le_bytes()) {
-                return Err(cx.message("Failed to write to buffer"));
+            for w in self.encode_wide() {
+                if !buf.write(&w.to_le_bytes()) {
+                    return Err(cx.message("Failed to write to buffer"));
+                }
             }
-        }
 
-        buf.as_slice().encode_bytes(cx, variant.encode_value()?)?;
-        variant.end()
+            variant.encode_value()?.encode_bytes(buf.as_slice())?;
+            Ok(())
+        })
     }
 }
 
@@ -603,11 +596,11 @@ impl<M> Encode<M> for OsStr {
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<M> Encode<M> for OsString {
     #[inline]
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
-        self.as_os_str().encode(cx, encoder)
+        encoder.encode(self.as_os_str())
     }
 }
 
@@ -621,60 +614,56 @@ impl<'de, M> Decode<'de, M> for OsString {
     {
         use crate::de::VariantDecoder;
 
-        let mut variant = decoder.decode_variant()?;
-        let tag = variant.decode_tag()?.decode()?;
+        decoder.decode_variant(|variant| {
+            let tag = variant.decode_tag()?.decode::<PlatformTag>()?;
 
-        match tag {
-            #[cfg(not(unix))]
-            PlatformTag::Unix => Err(cx.message("Unsupported OsString::Unix variant")),
-            #[cfg(unix)]
-            PlatformTag::Unix => {
-                use std::os::unix::ffi::OsStringExt;
+            match tag {
+                #[cfg(not(unix))]
+                PlatformTag::Unix => Err(cx.message("Unsupported OsString::Unix variant")),
+                #[cfg(unix)]
+                PlatformTag::Unix => {
+                    use std::os::unix::ffi::OsStringExt;
+                    Ok(OsString::from_vec(variant.decode_value()?.decode()?))
+                }
+                #[cfg(not(windows))]
+                PlatformTag::Windows => Err(cx.message("Unsupported OsString::Windows variant")),
+                #[cfg(windows)]
+                PlatformTag::Windows => {
+                    use std::os::windows::ffi::OsStringExt;
 
-                let bytes = variant.decode_value()?.decode()?;
-                variant.end()?;
-                Ok(OsString::from_vec(bytes))
-            }
-            #[cfg(not(windows))]
-            PlatformTag::Windows => Err(cx.message("Unsupported OsString::Windows variant")),
-            #[cfg(windows)]
-            PlatformTag::Windows => {
-                use std::os::windows::ffi::OsStringExt;
+                    struct Visitor;
 
-                struct Visitor;
+                    impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+                    where
+                        C: ?Sized + Context,
+                    {
+                        type Ok = OsString;
 
-                impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
-                where
-                    C: ?Sized + Context,
-                {
-                    type Ok = OsString;
-
-                    #[inline]
-                    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                        write!(f, "a literal byte reference")
-                    }
-
-                    #[inline]
-                    fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-                        let mut buf = Vec::with_capacity(bytes.len() / 2);
-
-                        for pair in bytes.chunks_exact(2) {
-                            let &[a, b] = pair else {
-                                continue;
-                            };
-
-                            buf.push(u16::from_le_bytes([a, b]));
+                        #[inline]
+                        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                            write!(f, "a literal byte reference")
                         }
 
-                        Ok(OsString::from_wide(&buf))
-                    }
-                }
+                        #[inline]
+                        fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+                            let mut buf = Vec::with_capacity(bytes.len() / 2);
 
-                let os_string = variant.decode_value()?.decode_bytes(Visitor)?;
-                variant.end()?;
-                Ok(os_string)
+                            for pair in bytes.chunks_exact(2) {
+                                let &[a, b] = pair else {
+                                    continue;
+                                };
+
+                                buf.push(u16::from_le_bytes([a, b]));
+                            }
+
+                            Ok(OsString::from_wide(&buf))
+                        }
+                    }
+
+                    variant.decode_value()?.decode_bytes(Visitor)
+                }
             }
-        }
+        })
     }
 }
 

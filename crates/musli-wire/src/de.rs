@@ -1,11 +1,13 @@
 use core::fmt;
+use core::mem::take;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 use musli::de::{
     Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder, SequenceDecoder,
-    SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, ValueVisitor, VariantDecoder,
+    SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, TupleDecoder, ValueVisitor,
+    VariantDecoder,
 };
 use musli::Context;
 use musli_common::int::continuation as c;
@@ -17,12 +19,16 @@ use crate::tag::Kind;
 use crate::tag::Tag;
 
 /// A very simple decoder.
-pub struct WireDecoder<'a, R, const F: Options, C: ?Sized> {
+pub struct WireDecoder<'a, R, const OPT: Options, C: ?Sized> {
     cx: &'a C,
     reader: R,
 }
 
-impl<'a, R, const F: Options, C: ?Sized> WireDecoder<'a, R, F, C> {
+impl<'a, 'de, R, const OPT: Options, C> WireDecoder<'a, R, OPT, C>
+where
+    R: Reader<'de>,
+    C: ?Sized + Context,
+{
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(cx: &'a C, reader: R) -> Self {
@@ -30,43 +36,68 @@ impl<'a, R, const F: Options, C: ?Sized> WireDecoder<'a, R, F, C> {
     }
 }
 
-impl<'a, 'de, R, const F: Options, C> WireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> WireDecoder<'a, Limit<R>, OPT, C>
+where
+    C: ?Sized + Context,
+    R: Reader<'de>,
+{
+    #[inline]
+    fn end(mut self) -> Result<(), C::Error> {
+        if self.reader.remaining() > 0 {
+            self.reader.skip(self.cx, self.reader.remaining())?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a, 'de, R, const OPT: Options, C> WireDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
     C: ?Sized + Context,
 {
     /// Skip over any sequences of values.
-    pub(crate) fn skip_any(&mut self) -> Result<(), C::Error> {
-        let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
+    pub(crate) fn skip_any(mut self) -> Result<(), C::Error> {
+        let mut remaining = 1;
 
-        match tag.kind() {
-            Kind::Pack => {
-                let len = 2usize.pow(tag.data_raw() as u32);
-                self.reader.skip(self.cx, len)?;
-            }
-            Kind::Prefix => {
-                let len = if let Some(len) = tag.data() {
-                    len as usize
-                } else {
-                    musli_common::int::decode_usize::<_, _, F>(self.cx, self.reader.borrow_mut())?
-                };
+        while remaining > 0 {
+            remaining -= 1;
 
-                self.reader.skip(self.cx, len)?;
-            }
-            Kind::Sequence => {
-                let len = if let Some(len) = tag.data() {
-                    len as usize
-                } else {
-                    musli_common::int::decode_usize::<_, _, F>(self.cx, self.reader.borrow_mut())?
-                };
+            let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
-                for _ in 0..len {
-                    self.skip_any()?;
+            match tag.kind() {
+                Kind::Pack => {
+                    let len = 2usize.pow(tag.data_raw() as u32);
+                    self.reader.skip(self.cx, len)?;
                 }
-            }
-            Kind::Continuation => {
-                if tag.data().is_none() {
-                    let _ = c::decode::<_, _, u128>(self.cx, self.reader.borrow_mut())?;
+                Kind::Prefix => {
+                    let len = if let Some(len) = tag.data() {
+                        len as usize
+                    } else {
+                        musli_common::int::decode_usize::<_, _, OPT>(
+                            self.cx,
+                            self.reader.borrow_mut(),
+                        )?
+                    };
+
+                    self.reader.skip(self.cx, len)?;
+                }
+                Kind::Sequence => {
+                    let len = if let Some(len) = tag.data() {
+                        len as usize
+                    } else {
+                        musli_common::int::decode_usize::<_, _, OPT>(
+                            self.cx,
+                            self.reader.borrow_mut(),
+                        )?
+                    };
+
+                    remaining += len;
+                }
+                Kind::Continuation => {
+                    if tag.data().is_none() {
+                        let _ = c::decode::<_, _, u128>(self.cx, self.reader.borrow_mut())?;
+                    }
                 }
             }
         }
@@ -82,7 +113,7 @@ where
             Kind::Sequence => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                musli_common::int::decode_usize::<_, _, F>(self.cx, self.reader.borrow_mut())?
+                musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
             _ => Err(self.cx.message(Expected {
                 expected: Kind::Sequence,
@@ -95,16 +126,16 @@ where
     #[inline]
     fn shared_decode_pair_sequence(
         mut self,
-    ) -> Result<RemainingWireDecoder<'a, R, F, C>, C::Error> {
+    ) -> Result<RemainingWireDecoder<'a, R, OPT, C>, C::Error> {
         let len = self.decode_sequence_len()?;
-        Ok(RemainingWireDecoder::new(len / 2, self))
+        Ok(RemainingWireDecoder::new(self.cx, self.reader, len / 2))
     }
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_sequence(mut self) -> Result<RemainingWireDecoder<'a, R, F, C>, C::Error> {
+    fn shared_decode_sequence(mut self) -> Result<RemainingWireDecoder<'a, R, OPT, C>, C::Error> {
         let len = self.decode_sequence_len()?;
-        Ok(RemainingWireDecoder::new(len, self))
+        Ok(RemainingWireDecoder::new(self.cx, self.reader, len))
     }
 
     /// Decode the length of a prefix.
@@ -116,7 +147,7 @@ where
             Kind::Prefix => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                musli_common::int::decode_usize::<_, _, F>(self.cx, self.reader.borrow_mut())?
+                musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
             Kind::Pack => {
                 let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
@@ -135,13 +166,56 @@ where
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct RemainingWireDecoder<'a, R, const F: Options, C: ?Sized> {
+pub struct RemainingWireDecoder<'a, R, const OPT: Options, C: ?Sized> {
+    cx: &'a C,
+    reader: R,
     remaining: usize,
-    decoder: WireDecoder<'a, R, F, C>,
+}
+
+impl<'a, 'de, R, const OPT: Options, C> RemainingWireDecoder<'a, R, OPT, C>
+where
+    C: ?Sized + Context,
+    R: Reader<'de>,
+{
+    #[inline]
+    fn new(cx: &'a C, reader: R, remaining: usize) -> Self {
+        Self {
+            cx,
+            reader,
+            remaining,
+        }
+    }
+
+    #[inline]
+    fn skip_sequence_remaining(mut self) -> Result<(), C::Error> {
+        loop {
+            let Some(value) = SequenceDecoder::decode_next(&mut self)? else {
+                break;
+            };
+
+            value.skip()?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn skip_remaining_entries(mut self) -> Result<(), C::Error> {
+        loop {
+            let Some(value) = self.decode_map_entry_key()? else {
+                break;
+            };
+
+            value.skip()?;
+            self.skip_map_entry_value()?;
+        }
+
+        Ok(())
+    }
 }
 
 #[musli::decoder]
-impl<'a, 'de, R, const F: Options, C> Decoder<'de> for WireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> Decoder<'de> for WireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
@@ -149,13 +223,15 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U> = WireDecoder<'this, R, F, U> where U: 'this + Context;
-    type DecodePack = WireDecoder<'a, Limit<R>, F, C>;
+    type WithContext<'this, U> = WireDecoder<'this, R, OPT, U> where U: 'this + Context;
+    type DecodePack = WireDecoder<'a, Limit<R>, OPT, C>;
     type DecodeSome = Self;
-    type DecodeSequence = RemainingWireDecoder<'a, R, F, C>;
-    type DecodeTuple = TupleWireDecoder<'a, R, F, C>;
-    type DecodeMap = RemainingWireDecoder<'a, R, F, C>;
-    type DecodeStruct = RemainingWireDecoder<'a, R, F, C>;
+    type DecodeSequence = RemainingWireDecoder<'a, R, OPT, C>;
+    type DecodeTuple = RemainingWireDecoder<'a, R, OPT, C>;
+    type DecodeMap = RemainingWireDecoder<'a, R, OPT, C>;
+    type DecodeMapEntries = RemainingWireDecoder<'a, R, OPT, C>;
+    type DecodeStruct = RemainingWireDecoder<'a, R, OPT, C>;
+    type DecodeStructFields = RemainingWireDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
     #[inline]
@@ -185,21 +261,26 @@ where
     }
 
     #[inline]
-    fn skip(mut self) -> Result<(), C::Error> {
+    fn skip(self) -> Result<(), C::Error> {
         self.skip_any()
     }
 
     #[inline]
-    fn decode_unit(mut self) -> Result<(), C::Error> {
-        self.skip_any()?;
-        Ok(())
+    fn decode_unit(self) -> Result<(), C::Error> {
+        self.skip()
     }
 
     #[inline]
-    fn decode_pack(mut self) -> Result<Self::DecodePack, C::Error> {
+    fn decode_pack<F, O>(mut self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
+    {
         let mark = self.cx.mark();
         let len = self.decode_len(mark)?;
-        Ok(WireDecoder::new(self.cx, self.reader.limit(len)))
+        let mut decoder = WireDecoder::new(self.cx, self.reader.limit(len));
+        let output = f(&mut decoder)?;
+        decoder.end()?;
+        Ok(output)
     }
 
     #[inline]
@@ -299,27 +380,27 @@ where
 
     #[inline]
     fn decode_u8(self) -> Result<u8, C::Error> {
-        crate::wire_int::decode_unsigned::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_u16(self) -> Result<u16, C::Error> {
-        crate::wire_int::decode_unsigned::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_u32(self) -> Result<u32, C::Error> {
-        crate::wire_int::decode_unsigned::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_u64(self) -> Result<u64, C::Error> {
-        crate::wire_int::decode_unsigned::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_u128(self) -> Result<u128, C::Error> {
-        crate::wire_int::decode_unsigned::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
@@ -329,27 +410,27 @@ where
 
     #[inline]
     fn decode_i16(self) -> Result<i16, C::Error> {
-        crate::wire_int::decode_signed::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_i32(self) -> Result<i32, C::Error> {
-        crate::wire_int::decode_signed::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_i64(self) -> Result<i64, C::Error> {
-        crate::wire_int::decode_signed::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_i128(self) -> Result<i128, C::Error> {
-        crate::wire_int::decode_signed::<_, _, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_usize(self) -> Result<usize, C::Error> {
-        crate::wire_int::decode_length::<_, _, F>(self.cx, self.reader)
+        crate::wire_int::decode_length::<_, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
@@ -389,35 +470,72 @@ where
     }
 
     #[inline]
-    fn decode_sequence(self) -> Result<Self::DecodeSequence, C::Error> {
-        self.shared_decode_sequence()
+    fn decode_sequence<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    where
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, <Self::Cx as Context>::Error>,
+    {
+        let mut decoder = self.shared_decode_sequence()?;
+        let output = f(&mut decoder)?;
+        decoder.skip_sequence_remaining()?;
+        Ok(output)
     }
 
     #[inline]
-    fn decode_tuple(mut self, len: usize) -> Result<Self::DecodeTuple, C::Error> {
-        let actual = self.decode_sequence_len()?;
+    fn decode_tuple<F, O>(self, len: usize, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
+    {
+        let mut decoder = self.shared_decode_sequence()?;
 
-        if len != actual {
-            return Err(self.cx.message(format_args!(
-                "tuple length mismatch: len: {len}, actual: {actual}"
+        if len != decoder.remaining {
+            return Err(decoder.cx.message(format_args!(
+                "Tuple length mismatch: len: {len}, actual: {}",
+                decoder.remaining
             )));
         }
 
-        Ok(TupleWireDecoder::new(self.cx, self.reader, len))
+        let output = f(&mut decoder)?;
+        decoder.skip_sequence_remaining()?;
+        Ok(output)
     }
 
     #[inline]
-    fn decode_map(self) -> Result<Self::DecodeMap, C::Error> {
+    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+    {
+        let mut decoder = self.shared_decode_pair_sequence()?;
+        let output = f(&mut decoder)?;
+        decoder.skip_remaining_entries()?;
+        Ok(output)
+    }
+
+    #[inline]
+    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
         self.shared_decode_pair_sequence()
     }
 
     #[inline]
-    fn decode_struct(self, _: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
+    fn decode_struct<F, O>(self, _: Option<usize>, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
+    {
+        let mut decoder = self.shared_decode_pair_sequence()?;
+        let output = f(&mut decoder)?;
+        decoder.skip_remaining_entries()?;
+        Ok(output)
+    }
+
+    #[inline]
+    fn decode_struct_fields(self, _: Option<usize>) -> Result<Self::DecodeStructFields, C::Error> {
         self.shared_decode_pair_sequence()
     }
 
     #[inline]
-    fn decode_variant(mut self) -> Result<Self::DecodeVariant, C::Error> {
+    fn decode_variant<F, O>(mut self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeVariant) -> Result<O, C::Error>,
+    {
         let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
         if tag != Tag::new(Kind::Sequence, 2) {
@@ -427,47 +545,31 @@ where
             }));
         }
 
-        Ok(self)
+        f(&mut self)
     }
 }
 
-impl<'a, 'de, R, const F: Options, C> PackDecoder<'de> for WireDecoder<'a, Limit<R>, F, C>
+impl<'a, 'de, R, const OPT: Options, C> PackDecoder<'de> for WireDecoder<'a, Limit<R>, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeNext<'this> = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, F, C> where Self: 'this;
+    type DecodeNext<'this> = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
-
-    #[inline]
-    fn end(mut self) -> Result<(), C::Error> {
-        if self.reader.remaining() > 0 {
-            self.reader.skip(self.cx, self.reader.remaining())?;
-        }
-
-        Ok(())
-    }
 }
 
-impl<'a, R, const F: Options, C: ?Sized> RemainingWireDecoder<'a, R, F, C> {
-    #[inline]
-    fn new(remaining: usize, decoder: WireDecoder<'a, R, F, C>) -> Self {
-        Self { remaining, decoder }
-    }
-}
-
-impl<'a, 'de, R, const F: Options, C> SequenceDecoder<'de> for RemainingWireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> SequenceDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeNext<'this> = WireDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeNext<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -481,21 +583,53 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(WireDecoder::new(
-            self.decoder.cx,
-            self.decoder.reader.borrow_mut(),
-        )))
+        Ok(Some(WireDecoder::new(self.cx, self.reader.borrow_mut())))
     }
 }
 
-impl<'a, 'de, R, const F: Options, C> VariantDecoder<'de> for WireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> PackDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeTag<'this> = WireDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
-    type DecodeValue<'this> = WireDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeNext<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+
+    #[inline]
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
+        if self.remaining == 0 {
+            return Err(self
+                .cx
+                .message(format_args!("No more tuple elements to decode")));
+        }
+
+        self.remaining -= 1;
+        Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
+    }
+}
+
+impl<'a, 'de, R, const OPT: Options, C> TupleDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
+where
+    C: ?Sized + Context,
+    R: Reader<'de>,
+{
+    type Cx = C;
+    type DecodeNext<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+
+    #[inline]
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
+        PackDecoder::decode_next(self)
+    }
+}
+
+impl<'a, 'de, R, const OPT: Options, C> VariantDecoder<'de> for WireDecoder<'a, R, OPT, C>
+where
+    C: ?Sized + Context,
+    R: Reader<'de>,
+{
+    type Cx = C;
+    type DecodeTag<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeValue<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
@@ -509,41 +643,25 @@ where
 
     #[inline]
     fn skip_value(&mut self) -> Result<bool, C::Error> {
-        self.skip_any()?;
+        self.decode_value()?.skip()?;
         Ok(true)
-    }
-
-    #[inline]
-    fn end(self) -> Result<(), C::Error> {
-        Ok(())
     }
 }
 
-#[musli::map_decoder]
-impl<'a, 'de, R, const F: Options, C> MapDecoder<'de> for RemainingWireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> MapDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeEntry<'this> = WireDecoder<'a, R::Mut<'this>, F, C>
+    type DecodeEntry<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type IntoMapEntries = Self;
-
-    #[inline]
-    fn cx(&self) -> &C {
-        self.decoder.cx
-    }
+    type DecodeRemainingEntries<'this> = RemainingWireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::Exact(self.remaining)
-    }
-
-    #[inline]
-    fn into_map_entries(self) -> Result<Self::IntoMapEntries, C::Error> {
-        Ok(self)
     }
 
     #[inline]
@@ -553,20 +671,26 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(WireDecoder::new(
-            self.decoder.cx,
-            self.decoder.reader.borrow_mut(),
-        )))
+        Ok(Some(WireDecoder::new(self.cx, self.reader.borrow_mut())))
+    }
+
+    #[inline]
+    fn decode_remaining_entries(&mut self) -> Result<Self::DecodeRemainingEntries<'_>, C::Error> {
+        Ok(RemainingWireDecoder::new(
+            self.cx,
+            self.reader.borrow_mut(),
+            take(&mut self.remaining),
+        ))
     }
 }
 
-impl<'a, 'de, R, const F: Options, C> MapEntryDecoder<'de> for WireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> MapEntryDecoder<'de> for WireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeMapKey<'this> = WireDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeMapKey<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
     type DecodeMapValue = Self;
 
     #[inline]
@@ -580,28 +704,21 @@ where
     }
 
     #[inline]
-    fn skip_map_value(mut self) -> Result<bool, C::Error> {
-        self.skip_any()?;
+    fn skip_map_value(self) -> Result<bool, C::Error> {
+        self.decode_map_value()?.skip()?;
         Ok(true)
     }
 }
 
-#[musli::struct_decoder]
-impl<'a, 'de, R, const F: Options, C> StructDecoder<'de> for RemainingWireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> StructDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeField<'this> = WireDecoder<'a, R::Mut<'this>, F, C>
+    type DecodeField<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type IntoStructFields = Self;
-
-    #[inline]
-    fn cx(&self) -> &C {
-        self.decoder.cx
-    }
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -609,28 +726,18 @@ where
     }
 
     #[inline]
-    fn into_struct_fields(self) -> Result<Self::IntoStructFields, C::Error> {
-        Ok(self)
-    }
-
-    #[inline]
     fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
         MapDecoder::decode_entry(self)
     }
-
-    #[inline]
-    fn end(self) -> Result<(), C::Error> {
-        MapDecoder::end(self)
-    }
 }
 
-impl<'a, 'de, R, const F: Options, C> StructFieldDecoder<'de> for WireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> StructFieldDecoder<'de> for WireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeFieldName<'this> = WireDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
+    type DecodeFieldName<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
     type DecodeFieldValue = Self;
 
     #[inline]
@@ -649,16 +756,17 @@ where
     }
 }
 
-impl<'a, 'de, R, const F: Options, C> MapEntriesDecoder<'de> for RemainingWireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> MapEntriesDecoder<'de>
+    for RemainingWireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeMapEntryKey<'this> = WireDecoder<'a, R::Mut<'this>, F, C>
+    type DecodeMapEntryKey<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type DecodeMapEntryValue<'this> = WireDecoder<'a, R::Mut<'this>, F, C>
+    type DecodeMapEntryValue<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -669,79 +777,65 @@ where
         }
 
         self.remaining -= 1;
-        Ok(Some(WireDecoder::new(
-            self.decoder.cx,
-            self.decoder.reader.borrow_mut(),
-        )))
+        Ok(Some(WireDecoder::new(self.cx, self.reader.borrow_mut())))
     }
 
     #[inline]
     fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
-        Ok(WireDecoder::new(
-            self.decoder.cx,
-            self.decoder.reader.borrow_mut(),
-        ))
+        Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
     fn skip_map_entry_value(&mut self) -> Result<bool, C::Error> {
-        self.decode_map_entry_value()?.skip_any()?;
+        self.decode_map_entry_value()?.skip()?;
         Ok(true)
+    }
+
+    #[inline]
+    fn end_map_entries(self) -> Result<(), C::Error> {
+        self.skip_remaining_entries()?;
+        Ok(())
     }
 }
 
-impl<'a, 'de, R, const F: Options, C> StructFieldsDecoder<'de> for RemainingWireDecoder<'a, R, F, C>
+impl<'a, 'de, R, const OPT: Options, C> StructFieldsDecoder<'de>
+    for RemainingWireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeStructFieldName<'this> = WireDecoder<'a, R::Mut<'this>, F, C>
+    type DecodeStructFieldName<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type DecodeStructFieldValue<'this> = WireDecoder<'a, R::Mut<'this>, F, C>
+    type DecodeStructFieldValue<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
     fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
-        if self.remaining == 0 {
-            return Err(self
-                .decoder
-                .cx
-                .message("Ran out of struct fields to decode"));
-        }
+        let cx = self.cx;
 
-        self.remaining -= 1;
-        Ok(WireDecoder::new(
-            self.decoder.cx,
-            self.decoder.reader.borrow_mut(),
-        ))
+        let Some(decoder) = Self::decode_map_entry_key(self)? else {
+            return Err(cx.message("Ran out of fields to decode"));
+        };
+
+        Ok(decoder)
     }
 
     #[inline]
     fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
-        Ok(WireDecoder::new(
-            self.decoder.cx,
-            self.decoder.reader.borrow_mut(),
-        ))
+        Self::decode_map_entry_value(self)
     }
 
     #[inline]
     fn skip_struct_field_value(&mut self) -> Result<bool, C::Error> {
-        self.decode_struct_field_value()?.skip_any()?;
-        Ok(true)
+        Self::skip_map_entry_value(self)
     }
 
     #[inline]
-    fn end(mut self) -> Result<(), C::Error> {
-        while self.remaining > 0 {
-            self.remaining -= 1;
-            self.decode_struct_field_name()?.skip_any()?;
-            self.decode_struct_field_value()?.skip_any()?;
-        }
-
-        Ok(())
+    fn end_struct_fields(self) -> Result<(), C::Error> {
+        Self::end_map_entries(self)
     }
 }
 
@@ -799,55 +893,5 @@ impl fmt::Display for BadLength {
         let Self { actual, expected } = *self;
 
         write!(f, "Bad length, got {actual} but expect {expected}")
-    }
-}
-
-/// A tuple wire decoder.
-pub struct TupleWireDecoder<'a, R, const F: Options, C: ?Sized> {
-    cx: &'a C,
-    reader: R,
-    remaining: usize,
-}
-
-impl<'a, R, const F: Options, C: ?Sized> TupleWireDecoder<'a, R, F, C> {
-    /// Construct a new fixed width message encoder.
-    #[inline]
-    pub(crate) fn new(cx: &'a C, reader: R, remaining: usize) -> Self {
-        Self {
-            cx,
-            reader,
-            remaining,
-        }
-    }
-}
-
-impl<'a, 'de, R, const F: Options, C> PackDecoder<'de> for TupleWireDecoder<'a, R, F, C>
-where
-    C: ?Sized + Context,
-    R: Reader<'de>,
-{
-    type Cx = C;
-    type DecodeNext<'this> = WireDecoder<'a, R::Mut<'this>, F, C> where Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        if self.remaining == 0 {
-            return Err(self
-                .cx
-                .message(format_args!("No more tuple elements to decode")));
-        }
-
-        self.remaining -= 1;
-        Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-
-    #[inline]
-    fn end(mut self) -> Result<(), C::Error> {
-        while self.remaining > 0 {
-            WireDecoder::<_, F, _>::new(self.cx, self.reader.borrow_mut()).skip_any()?;
-            self.remaining -= 1;
-        }
-
-        Ok(())
     }
 }

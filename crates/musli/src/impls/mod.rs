@@ -18,6 +18,15 @@ use crate::de::{Decode, DecodeBytes, Decoder, ValueVisitor, VariantDecoder};
 use crate::en::{Encode, EncodeBytes, Encoder, SequenceEncoder, VariantEncoder};
 use crate::Context;
 
+/// Platform tag used by certain platform-specific implementations.
+#[cfg(feature = "std")]
+#[derive(Encode, Decode)]
+#[musli(crate)]
+enum PlatformTag {
+    Unix,
+    Windows,
+}
+
 impl<M> Encode<M> for () {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -154,7 +163,7 @@ where
     {
         encoder.encode_sequence_fn(N, |seq| {
             for value in self.iter() {
-                seq.encode_next()?.encode(value)?;
+                seq.encode_element()?.encode(value)?;
             }
 
             Ok(())
@@ -298,18 +307,18 @@ where
     where
         E: Encoder<Mode = M>,
     {
-        let mut seq = encoder.encode_sequence(self.len())?;
+        encoder.encode_sequence_fn(self.len(), |seq| {
+            let mut index = 0;
 
-        let mut index = 0;
+            for value in self {
+                cx.enter_sequence_index(index);
+                seq.encode_element()?.encode(value)?;
+                cx.leave_sequence_index();
+                index = index.wrapping_add(index);
+            }
 
-        for value in self {
-            cx.enter_sequence_index(index);
-            seq.encode_next()?.encode(value)?;
-            cx.leave_sequence_index();
-            index = index.wrapping_add(index);
-        }
-
-        seq.end()
+            Ok(())
+        })
     }
 }
 
@@ -411,17 +420,14 @@ where
     where
         D: Decoder<'de, Mode = M>,
     {
-        let mut variant = decoder.decode_variant()?;
+        decoder.decode_variant(|variant| {
+            let tag = variant.decode_tag()?.decode()?;
 
-        let tag = variant.decode_tag()?.decode()?;
-
-        let this = match tag {
-            ResultTag::Ok => Ok(variant.decode_value()?.decode()?),
-            ResultTag::Err => Err(variant.decode_value()?.decode()?),
-        };
-
-        variant.end()?;
-        Ok(this)
+            Ok(match tag {
+                ResultTag::Ok => Ok(variant.decode_value()?.decode()?),
+                ResultTag::Err => Err(variant.decode_value()?.decode()?),
+            })
+        })
     }
 }
 

@@ -34,7 +34,7 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_sequence_fn(|_| Ok(Self(())))
+        decoder.decode_sequence(|_| Ok(Self(())))
     }
 }
 

@@ -33,7 +33,7 @@ where
     where
         D: Decoder<'de, Mode = M>,
     {
-        decoder.decode_pack_fn(|pack| {
+        decoder.decode_pack(|pack| {
             let tag = pack.decode_next()?.decode()?;
             let value = pack.decode_next()?.decode()?;
             Ok(Self { tag, value })

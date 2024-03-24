@@ -40,7 +40,7 @@ pub trait StructFieldEncoder {
     ) -> Result<Self::EncodeFieldValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Stop encoding this field.
-    fn end(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn end_field(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert the pair immediately.
     #[inline]
@@ -56,6 +56,6 @@ pub trait StructFieldEncoder {
     {
         self.encode_field_name()?.encode(name)?;
         self.encode_field_value()?.encode(value)?;
-        self.end()
+        self.end_field()
     }
 }

@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 use crate::de::{Decode, Decoder, PackDecoder, VariantDecoder};
-use crate::en::{Encode, Encoder, SequenceEncoder, VariantEncoder};
+use crate::en::{Encode, Encoder, PackEncoder, VariantEncoder};
 
 impl<M> Encode<M> for Ipv4Addr {
     #[inline]
@@ -71,16 +71,14 @@ impl<'de, M> Decode<'de, M> for IpAddr {
     where
         D: Decoder<'de>,
     {
-        let mut variant = decoder.decode_variant()?;
-        let tag = variant.decode_tag()?.decode()?;
+        decoder.decode_variant(|variant| {
+            let tag = variant.decode_tag()?.decode()?;
 
-        let this = match tag {
-            IpAddrTag::Ipv4 => Self::V4(variant.decode_value()?.decode()?),
-            IpAddrTag::Ipv6 => Self::V6(variant.decode_value()?.decode()?),
-        };
-
-        variant.end()?;
-        Ok(this)
+            Ok(match tag {
+                IpAddrTag::Ipv4 => Self::V4(variant.decode_value()?.decode()?),
+                IpAddrTag::Ipv6 => Self::V6(variant.decode_value()?.decode()?),
+            })
+        })
     }
 }
 
@@ -104,7 +102,7 @@ impl<'de, M> Decode<'de, M> for SocketAddrV4 {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_pack_fn(|p| Ok(SocketAddrV4::new(p.next()?, p.next()?)))
+        decoder.decode_pack(|p| Ok(SocketAddrV4::new(p.next()?, p.next()?)))
     }
 }
 
@@ -130,7 +128,7 @@ impl<'de, M> Decode<'de, M> for SocketAddrV6 {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_pack_fn(|p| Ok(Self::new(p.next()?, p.next()?, p.next()?, p.next()?)))
+        decoder.decode_pack(|p| Ok(Self::new(p.next()?, p.next()?, p.next()?, p.next()?)))
     }
 }
 
@@ -162,15 +160,13 @@ impl<'de, M> Decode<'de, M> for SocketAddr {
     where
         D: Decoder<'de>,
     {
-        let mut variant = decoder.decode_variant()?;
-        let tag = variant.decode_tag()?.decode()?;
+        decoder.decode_variant(|variant| {
+            let tag = variant.decode_tag()?.decode()?;
 
-        let this = match tag {
-            SocketAddrTag::V4 => Self::V4(variant.decode_value()?.decode()?),
-            SocketAddrTag::V6 => Self::V6(variant.decode_value()?.decode()?),
-        };
-
-        variant.end()?;
-        Ok(this)
+            Ok(match tag {
+                SocketAddrTag::V4 => Self::V4(variant.decode_value()?.decode()?),
+                SocketAddrTag::V6 => Self::V6(variant.decode_value()?.decode()?),
+            })
+        })
     }
 }

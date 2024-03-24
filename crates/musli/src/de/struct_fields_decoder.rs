@@ -52,5 +52,5 @@ pub trait StructFieldsDecoder<'de> {
     fn skip_struct_field_value(&mut self) -> Result<bool, <Self::Cx as Context>::Error>;
 
     /// End pair decoding.
-    fn end(self) -> Result<(), <Self::Cx as Context>::Error>;
+    fn end_struct_fields(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

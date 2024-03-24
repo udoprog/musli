@@ -28,6 +28,12 @@ pub use self::encoder::Encoder;
 mod sequence_encoder;
 pub use self::sequence_encoder::SequenceEncoder;
 
+mod tuple_encoder;
+pub use self::tuple_encoder::TupleEncoder;
+
+mod pack_encoder;
+pub use self::pack_encoder::PackEncoder;
+
 mod map_encoder;
 pub use self::map_encoder::MapEncoder;
 

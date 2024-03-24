@@ -14,6 +14,9 @@ pub const fn new() -> OptionsBuilder {
 ///
 /// Note: despite being made up of a primitive type, this cannot be serialized
 /// and correctly re-used.
+///
+/// Making assumptions about its layout might lead to unspecified behavior
+/// during encoding. Only use this type through the provided API.
 pub type Options = u128;
 
 const BYTEORDER_BIT: Options = 0;
@@ -56,16 +59,16 @@ impl OptionsBuilder {
 }
 
 #[doc(hidden)]
-pub const fn integer<const F: Options>() -> Integer {
-    match (F >> INTEGER_BIT) & 0b1 {
+pub const fn integer<const OPT: Options>() -> Integer {
+    match (OPT >> INTEGER_BIT) & 0b1 {
         0 => Integer::Variable,
         _ => Integer::Fixed,
     }
 }
 
 #[doc(hidden)]
-pub const fn float<const F: Options>() -> Float {
-    match (F >> FLOAT_BIT) & 0b11 {
+pub const fn float<const OPT: Options>() -> Float {
+    match (OPT >> FLOAT_BIT) & 0b11 {
         0 => Float::Integer,
         1 => Float::Variable,
         _ => Float::Fixed,
@@ -73,16 +76,16 @@ pub const fn float<const F: Options>() -> Float {
 }
 
 #[doc(hidden)]
-pub const fn length<const F: Options>() -> Integer {
-    match (F >> LENGTH_BIT) & 0b1 {
+pub const fn length<const OPT: Options>() -> Integer {
+    match (OPT >> LENGTH_BIT) & 0b1 {
         0 => Integer::Variable,
         _ => Integer::Fixed,
     }
 }
 
 #[doc(hidden)]
-pub const fn length_width<const F: Options>() -> Width {
-    match (F >> LENGTH_WIDTH_BIT) & 0b11 {
+pub const fn length_width<const OPT: Options>() -> Width {
+    match (OPT >> LENGTH_WIDTH_BIT) & 0b11 {
         0 => Width::U8,
         1 => Width::U16,
         2 => Width::U32,
@@ -91,8 +94,8 @@ pub const fn length_width<const F: Options>() -> Width {
 }
 
 #[doc(hidden)]
-pub const fn byteorder<const F: Options>() -> ByteOrder {
-    match (F >> BYTEORDER_BIT) & 0b1 {
+pub const fn byteorder<const OPT: Options>() -> ByteOrder {
+    match (OPT >> BYTEORDER_BIT) & 0b1 {
         0 => ByteOrder::LittleEndian,
         _ => ByteOrder::BigEndian,
     }

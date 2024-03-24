@@ -54,13 +54,11 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("DecodeSequence", Extra::None),
     ("DecodeTuple", Extra::None),
     ("DecodeMap", Extra::None),
+    ("DecodeMapEntries", Extra::None),
     ("DecodeStruct", Extra::None),
+    ("DecodeStructFields", Extra::None),
     ("DecodeVariant", Extra::None),
 ];
-
-pub(super) const MAP_DECODER_TYPES: &[(&str, Extra)] = &[("IntoMapEntries", Extra::None)];
-
-pub(super) const STRUCT_DECODER_TYPES: &[(&str, Extra)] = &[("IntoStructFields", Extra::None)];
 
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("String", Extra::Visitor(Ty::Str)),

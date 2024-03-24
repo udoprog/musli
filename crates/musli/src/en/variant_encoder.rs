@@ -3,6 +3,7 @@ use crate::Context;
 use super::{Encode, Encoder};
 
 /// Trait governing how to encode a variant.
+#[must_use = "Must call end_variant to finish encoding"]
 pub trait VariantEncoder {
     /// Context associated with the encoder.
     type Cx: ?Sized + Context;
@@ -36,7 +37,7 @@ pub trait VariantEncoder {
     fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, <Self::Cx as Context>::Error>;
 
     /// End the variant encoder.
-    fn end(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn end_variant(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert the variant immediately.
     #[inline]
@@ -52,6 +53,6 @@ pub trait VariantEncoder {
     {
         self.encode_tag()?.encode(tag)?;
         self.encode_value()?.encode(value)?;
-        self.end()
+        self.end_variant()
     }
 }

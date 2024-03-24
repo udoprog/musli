@@ -15,11 +15,11 @@ use crate::no_std::ToOwned;
 use crate::de::{
     AsDecoder, Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberVisitor,
     PackDecoder, SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder,
-    ValueVisitor, VariantDecoder,
+    TupleDecoder, ValueVisitor, VariantDecoder,
 };
 use crate::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder,
-    StructEncoder, StructFieldEncoder, VariantEncoder,
+    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
+    StructEncoder, StructFieldEncoder, TupleEncoder, VariantEncoder,
 };
 use crate::{Buf, Context};
 
@@ -108,8 +108,10 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     type DecodeSequence = Self;
     type DecodeTuple = Self;
     type DecodeMap = Self;
+    type DecodeMapEntries = Self;
     type DecodeSome = Self;
     type DecodeStruct = Self;
+    type DecodeStructFields = Self;
     type DecodeVariant = Self;
     type __UseMusliDecoderAttributeMacro = ();
 
@@ -192,7 +194,7 @@ impl<'de, C: ?Sized + Context> MapEntriesDecoder<'de> for Never<(), C> {
     }
 
     #[inline]
-    fn end(self) -> Result<(), C::Error> {
+    fn end_map_entries(self) -> Result<(), C::Error> {
         match self._never {}
     }
 }
@@ -200,14 +202,6 @@ impl<'de, C: ?Sized + Context> MapEntriesDecoder<'de> for Never<(), C> {
 impl<'de, C: ?Sized + Context> StructDecoder<'de> for Never<(), C> {
     type Cx = C;
     type DecodeField<'this> = Self where Self: 'this;
-    type IntoStructFields = Self;
-
-    type __UseMusliStructDecoderAttributeMacro = ();
-
-    #[inline]
-    fn cx(&self) -> &Self::Cx {
-        match self._never {}
-    }
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -215,17 +209,7 @@ impl<'de, C: ?Sized + Context> StructDecoder<'de> for Never<(), C> {
     }
 
     #[inline]
-    fn into_struct_fields(self) -> Result<Self::IntoStructFields, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
     fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn end(self) -> Result<(), C::Error> {
         match self._never {}
     }
 }
@@ -251,7 +235,7 @@ impl<'de, C: ?Sized + Context> StructFieldsDecoder<'de> for Never<(), C> {
     }
 
     #[inline]
-    fn end(self) -> Result<(), C::Error> {
+    fn end_struct_fields(self) -> Result<(), C::Error> {
         match self._never {}
     }
 }
@@ -275,24 +259,12 @@ impl<'de, C: ?Sized + Context> VariantDecoder<'de> for Never<(), C> {
     fn skip_value(&mut self) -> Result<bool, C::Error> {
         match self._never {}
     }
-
-    #[inline]
-    fn end(self) -> Result<(), C::Error> {
-        match self._never {}
-    }
 }
 
 impl<'de, C: ?Sized + Context> MapDecoder<'de> for Never<(), C> {
     type Cx = C;
     type DecodeEntry<'this> = Self where Self: 'this;
-    type IntoMapEntries = Self;
-
-    type __UseMusliMapDecoderAttributeMacro = ();
-
-    #[inline]
-    fn cx(&self) -> &Self::Cx {
-        match self._never {}
-    }
+    type DecodeRemainingEntries<'this> = Self where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -305,12 +277,9 @@ impl<'de, C: ?Sized + Context> MapDecoder<'de> for Never<(), C> {
     }
 
     #[inline]
-    fn end(self) -> Result<(), C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn into_map_entries(self) -> Result<Self::IntoMapEntries, C::Error> {
+    fn decode_remaining_entries(
+        &mut self,
+    ) -> Result<Self::DecodeRemainingEntries<'_>, <Self::Cx as Context>::Error> {
         match self._never {}
     }
 }
@@ -349,11 +318,6 @@ impl<'de, C: ?Sized + Context> SequenceDecoder<'de> for Never<(), C> {
     fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         match self._never {}
     }
-
-    #[inline]
-    fn end(self) -> Result<(), C::Error> {
-        match self._never {}
-    }
 }
 
 impl<'de, C: ?Sized + Context> PackDecoder<'de> for Never<(), C> {
@@ -364,9 +328,14 @@ impl<'de, C: ?Sized + Context> PackDecoder<'de> for Never<(), C> {
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
         match self._never {}
     }
+}
+
+impl<'de, C: ?Sized + Context> TupleDecoder<'de> for Never<(), C> {
+    type Cx = C;
+    type DecodeNext<'this> = Self where Self: 'this;
 
     #[inline]
-    fn end(self) -> Result<(), C::Error> {
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
         match self._never {}
     }
 }
@@ -436,18 +405,50 @@ where
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
+impl<O: 'static, C: ?Sized + Context> PackEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeNext<'this> = Self where Self: 'this;
+    type EncodePacked<'this> = Self where Self: 'this;
 
     #[inline]
-    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
+    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, C::Error> {
+    fn end_pack(self) -> Result<Self::Ok, C::Error> {
+        match self._never {}
+    }
+}
+
+impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
+    type Cx = C;
+    type Ok = O;
+    type EncodeElement<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end_sequence(self) -> Result<Self::Ok, C::Error> {
+        match self._never {}
+    }
+}
+
+impl<O: 'static, C: ?Sized + Context> TupleEncoder for Never<O, C> {
+    type Cx = C;
+    type Ok = O;
+    type EncodeTupleField<'this> = Self where Self: 'this;
+
+    #[inline]
+    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn end_tuple(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }
@@ -455,14 +456,14 @@ impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
 impl<O: 'static, C: ?Sized + Context> MapEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeEntry<'this> = Self where Self: 'this;
+    type EncodeMapEntry<'this> = Self where Self: 'this;
 
     #[inline]
-    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
+    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
         match self._never {}
     }
 
-    fn end(self) -> Result<Self::Ok, C::Error> {
+    fn end_map(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }
@@ -484,7 +485,7 @@ impl<O: 'static, C: ?Sized + Context> MapEntryEncoder for Never<O, C> {
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, C::Error> {
+    fn end_map_entry(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }
@@ -506,7 +507,7 @@ impl<O: 'static, C: ?Sized + Context> MapEntriesEncoder for Never<O, C> {
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, C::Error> {
+    fn end_map_entries(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }
@@ -514,14 +515,14 @@ impl<O: 'static, C: ?Sized + Context> MapEntriesEncoder for Never<O, C> {
 impl<O: 'static, C: ?Sized + Context> StructEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeField<'this> = Self where Self: 'this;
+    type EncodeStructField<'this> = Self where Self: 'this;
 
     #[inline]
-    fn encode_field(&mut self) -> Result<Self::EncodeField<'_>, C::Error> {
+    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
         match self._never {}
     }
 
-    fn end(self) -> Result<Self::Ok, C::Error> {
+    fn end_struct(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }
@@ -543,7 +544,7 @@ impl<O: 'static, C: ?Sized + Context> StructFieldEncoder for Never<O, C> {
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, C::Error> {
+    fn end_field(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }
@@ -565,7 +566,7 @@ impl<O: 'static, C: ?Sized + Context> VariantEncoder for Never<O, C> {
     }
 
     #[inline]
-    fn end(self) -> Result<Self::Ok, C::Error> {
+    fn end_variant(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }

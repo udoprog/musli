@@ -1,8 +1,8 @@
 use core::fmt;
 
 use musli::de::{
-    Decoder, MapDecoder, MapEntriesDecoder, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
-    StructFieldsDecoder, VariantDecoder, Visitor,
+    Decoder, MapDecoder, MapEntriesDecoder, SequenceDecoder, SizeHint, StructFieldsDecoder,
+    TupleDecoder, VariantDecoder, Visitor,
 };
 use musli::Context;
 use serde::de;
@@ -252,7 +252,7 @@ where
         V: de::Visitor<'de>,
     {
         self.decoder
-            .decode_sequence_fn(|d| visitor.visit_seq(SeqAccess::new(self.cx, d)))
+            .decode_sequence(|d| visitor.visit_seq(SeqAccess::new(self.cx, d)))
     }
 
     #[inline]
@@ -260,7 +260,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.decoder.decode_tuple_fn(len, |d| {
+        self.decoder.decode_tuple(len, |d| {
             visitor.visit_seq(TupleAccess::new(self.cx, d, len))
         })
     }
@@ -283,9 +283,9 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_map()?.into_map_entries()?;
+        let mut decoder = self.decoder.decode_map_entries()?;
         let output = visitor.visit_map(MapAccess::new(self.cx, &mut decoder))?;
-        decoder.end()?;
+        decoder.end_map_entries()?;
         Ok(output)
     }
 
@@ -299,12 +299,9 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self
-            .decoder
-            .decode_struct(Some(fields.len()))?
-            .into_struct_fields()?;
+        let mut decoder = self.decoder.decode_struct_fields(Some(fields.len()))?;
         let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields))?;
-        decoder.end()?;
+        decoder.end_struct_fields()?;
         Ok(output)
     }
 
@@ -318,8 +315,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let decoder = self.decoder.decode_variant()?;
-        visitor.visit_enum(EnumAccess::new(self.cx, decoder))
+        self.decoder
+            .decode_variant(|decoder| visitor.visit_enum(EnumAccess::new(self.cx, decoder)))
     }
 
     #[inline]
@@ -342,7 +339,7 @@ where
 
 struct TupleAccess<'de, 'a, D>
 where
-    D: PackDecoder<'de>,
+    D: TupleDecoder<'de>,
 {
     cx: &'a D::Cx,
     decoder: &'a mut D,
@@ -351,7 +348,7 @@ where
 
 impl<'de, 'a, D> TupleAccess<'de, 'a, D>
 where
-    D: PackDecoder<'de>,
+    D: TupleDecoder<'de>,
 {
     fn new(cx: &'a D::Cx, decoder: &'a mut D, len: usize) -> Self {
         TupleAccess {
@@ -364,7 +361,7 @@ where
 
 impl<'de, 'a, D> de::SeqAccess<'de> for TupleAccess<'de, 'a, D>
 where
-    D: PackDecoder<'de>,
+    D: TupleDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
 {
     type Error = <D::Cx as Context>::Error;
@@ -750,14 +747,14 @@ where
     D: VariantDecoder<'de>,
 {
     cx: &'a D::Cx,
-    decoder: D,
+    decoder: &'a mut D,
 }
 
 impl<'de, 'a, D> EnumAccess<'de, 'a, D>
 where
     D: VariantDecoder<'de>,
 {
-    fn new(cx: &'a D::Cx, decoder: D) -> Self {
+    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
         Self { cx, decoder }
     }
 }
@@ -770,36 +767,31 @@ where
     type Error = <D::Cx as Context>::Error;
 
     #[inline]
-    fn unit_variant(mut self) -> Result<(), Self::Error> {
+    fn unit_variant(self) -> Result<(), Self::Error> {
         self.decoder.decode_value()?.decode_unit()
     }
 
     #[inline]
-    fn newtype_variant_seed<T>(mut self, seed: T) -> Result<T::Value, Self::Error>
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        let value = seed.deserialize(Deserializer::new(self.cx, self.decoder.decode_value()?))?;
-        self.decoder.end()?;
-        Ok(value)
+        seed.deserialize(Deserializer::new(self.cx, self.decoder.decode_value()?))
     }
 
     #[inline]
-    fn tuple_variant<V>(mut self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        let decoder = self.decoder.decode_value()?;
-        let value = decoder.decode_tuple_fn(len, |tuple| {
+        self.decoder.decode_value()?.decode_tuple(len, |tuple| {
             visitor.visit_seq(TupleAccess::new(self.cx, tuple, len))
-        })?;
-        self.decoder.end()?;
-        Ok(value)
+        })
     }
 
     #[inline]
     fn struct_variant<V>(
-        mut self,
+        self,
         fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
@@ -807,12 +799,9 @@ where
         V: de::Visitor<'de>,
     {
         let decoder = self.decoder.decode_value()?;
-        let mut st = decoder
-            .decode_struct(Some(fields.len()))?
-            .into_struct_fields()?;
+        let mut st = decoder.decode_struct_fields(Some(fields.len()))?;
         let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
-        st.end()?;
-        self.decoder.end()?;
+        st.end_struct_fields()?;
         Ok(value)
     }
 }
@@ -826,7 +815,7 @@ where
     type Variant = Self;
 
     #[inline]
-    fn variant_seed<V>(mut self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
     where
         V: de::DeserializeSeed<'de>,
     {
@@ -981,25 +970,23 @@ where
     }
 
     #[inline]
-    fn visit_sequence<D>(self, cx: &C, mut decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, cx: &C, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: SequenceDecoder<'de, Cx = C>,
     {
-        let value = self.visitor.visit_seq(SeqAccess::new(cx, &mut decoder))?;
-        decoder.end()?;
-        Ok(value)
+        self.visitor.visit_seq(SeqAccess::new(cx, decoder))
     }
 
     #[inline]
-    fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, cx: &C, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: MapDecoder<'de, Cx = C>,
     {
-        let mut map_decoder = decoder.into_map_entries()?;
+        let mut map_decoder = decoder.decode_remaining_entries()?;
         let value = self
             .visitor
             .visit_map(MapAccess::new(cx, &mut map_decoder))?;
-        map_decoder.end()?;
+        map_decoder.end_map_entries()?;
         Ok(value)
     }
 
