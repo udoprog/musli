@@ -26,8 +26,8 @@ use core::str;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, Decoder, MapDecoder, MapEntryDecoder, NumberHint, NumberVisitor, SequenceDecoder,
-    SizeHint, TypeHint, ValueVisitor, Visitor,
+    Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, TypeHint, ValueVisitor,
+    Visitor,
 };
 use musli::Context;
 
@@ -67,25 +67,8 @@ where
         let actual = self.parser.peek(self.cx)?;
 
         match actual {
-            Token::OpenBrace => {
-                let mut object = JsonObjectDecoder::new(self.cx, None, self.parser)?;
-
-                while let Some(mut pair) = object.decode_entry()? {
-                    pair.decode_map_key()?.skip()?;
-                    pair.skip_map_value()?;
-                }
-
-                Ok(())
-            }
-            Token::OpenBracket => {
-                let mut seq = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
-
-                while let Some(item) = SequenceDecoder::decode_next(&mut seq)? {
-                    item.skip_any()?;
-                }
-
-                Ok(())
-            }
+            Token::OpenBrace => self.decode_map(|_| Ok(())),
+            Token::OpenBracket => self.decode_sequence(|_| Ok(())),
             Token::Null => self.parse_null(),
             Token::True => self.parse_true(),
             Token::False => self.parse_false(),
@@ -133,8 +116,10 @@ where
     type DecodeSequence = JsonSequenceDecoder<'a, P, C>;
     type DecodeTuple = JsonSequenceDecoder<'a, P, C>;
     type DecodeMap = JsonObjectDecoder<'a, P, C>;
+    type DecodeMapEntries = JsonObjectDecoder<'a, P, C>;
     type DecodeSome = JsonDecoder<'a, P, C>;
     type DecodeStruct = JsonObjectDecoder<'a, P, C>;
+    type DecodeStructFields = JsonObjectDecoder<'a, P, C>;
     type DecodeVariant = JsonVariantDecoder<'a, P, C>;
 
     #[inline]
@@ -164,6 +149,12 @@ where
     }
 
     #[inline]
+    fn skip(self) -> Result<(), C::Error> {
+        self.skip_any()?;
+        Ok(())
+    }
+
+    #[inline]
     fn type_hint(&mut self) -> Result<TypeHint, C::Error> {
         Ok(match self.parser.peek(self.cx)? {
             Token::OpenBrace => TypeHint::Map(SizeHint::Any),
@@ -187,7 +178,7 @@ where
 
     #[inline]
     fn decode_unit(self) -> Result<(), C::Error> {
-        self.skip_any()
+        self.skip()
     }
 
     #[inline]
@@ -305,28 +296,30 @@ where
     fn decode_array<const N: usize>(self) -> Result<[u8; N], C::Error> {
         let cx = self.cx;
         let mark = cx.mark();
-        let mut seq = self.decode_sequence()?;
-        let mut bytes = [0; N];
-        let mut index = 0;
 
-        while let Some(item) = SequenceDecoder::decode_next(&mut seq)? {
-            if index <= N {
-                bytes[index] = item.decode_u8()?;
+        self.decode_sequence(|seq| {
+            let mut bytes = [0; N];
+            let mut index = 0;
+
+            while let Some(item) = seq.decode_next()? {
+                if index <= N {
+                    bytes[index] = item.decode_u8()?;
+                }
+
+                index += 1;
             }
 
-            index += 1;
-        }
+            if index != N {
+                return Err(cx.marked_message(
+                    mark,
+                    format_args!(
+                        "Array with length {index} does not have the expected {N} number of elements"
+                    ),
+                ));
+            }
 
-        if index != N {
-            return Err(cx.marked_message(
-                mark,
-                format_args!(
-                    "Array with length {index} does not have the expected {N} number of elements"
-                ),
-            ));
-        }
-
-        Ok(bytes)
+            Ok(bytes)
+        })
     }
 
     #[inline]
@@ -344,14 +337,16 @@ where
         V: ValueVisitor<'de, C, [u8]>,
     {
         let cx = self.cx;
-        let mut seq = self.decode_sequence()?;
-        let mut bytes = Vec::with_capacity(seq.size_hint().or_default());
 
-        while let Some(item) = SequenceDecoder::decode_next(&mut seq)? {
-            bytes.push(item.decode_u8()?);
-        }
+        self.decode_sequence(|seq| {
+            let mut bytes = Vec::with_capacity(seq.size_hint().or_default());
 
-        visitor.visit_owned(cx, bytes)
+            while let Some(item) = seq.decode_next()? {
+                bytes.push(item.decode_u8()?);
+            }
+
+            visitor.visit_owned(cx, bytes)
+        })
     }
 
     #[inline]
@@ -380,33 +375,82 @@ where
     }
 
     #[inline]
-    fn decode_pack(self) -> Result<Self::DecodePack, C::Error> {
-        JsonSequenceDecoder::new(self.cx, None, self.parser)
+    fn decode_pack<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.skip_sequence_remaining()?;
+        Ok(output)
     }
 
     #[inline]
-    fn decode_sequence(self) -> Result<Self::DecodeSequence, C::Error> {
-        JsonSequenceDecoder::new(self.cx, None, self.parser)
+    fn decode_sequence<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.skip_sequence_remaining()?;
+        Ok(output)
     }
 
     #[inline]
-    fn decode_tuple(self, len: usize) -> Result<Self::DecodeTuple, C::Error> {
-        JsonSequenceDecoder::new(self.cx, Some(len), self.parser)
+    fn decode_tuple<F, O>(self, len: usize, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonSequenceDecoder::new(self.cx, Some(len), self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.skip_sequence_remaining()?;
+        Ok(output)
     }
 
     #[inline]
-    fn decode_map(self) -> Result<Self::DecodeMap, C::Error> {
+    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.skip_object_remaining()?;
+        Ok(output)
+    }
+
+    #[inline]
+    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
         JsonObjectDecoder::new(self.cx, None, self.parser)
     }
 
     #[inline]
-    fn decode_struct(self, len: Option<usize>) -> Result<Self::DecodeStruct, C::Error> {
+    fn decode_struct<F, O>(self, len: Option<usize>, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonObjectDecoder::new(self.cx, len, self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.skip_object_remaining()?;
+        Ok(output)
+    }
+
+    #[inline]
+    fn decode_struct_fields(
+        self,
+        len: Option<usize>,
+    ) -> Result<Self::DecodeStructFields, C::Error> {
         JsonObjectDecoder::new(self.cx, len, self.parser)
     }
 
     #[inline]
-    fn decode_variant(self) -> Result<Self::DecodeVariant, C::Error> {
-        JsonVariantDecoder::new(self.cx, self.parser)
+    fn decode_variant<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeVariant) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonVariantDecoder::new(self.cx, self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.end()?;
+        Ok(output)
     }
 
     #[inline]
@@ -415,16 +459,11 @@ where
         V: Visitor<'de, C>,
     {
         let cx = self.cx;
-        self.parser.skip_whitespace(cx)?;
 
         match self.parser.peek(cx)? {
-            Token::OpenBrace => {
-                let decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
-                visitor.visit_map(cx, decoder)
-            }
+            Token::OpenBrace => self.decode_map(|decoder| visitor.visit_map(cx, decoder)),
             Token::OpenBracket => {
-                let decoder = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
-                visitor.visit_sequence(cx, decoder)
+                self.decode_sequence(|decoder| visitor.visit_sequence(cx, decoder))
             }
             Token::String => {
                 let visitor = visitor.visit_string(cx, SizeHint::Any)?;

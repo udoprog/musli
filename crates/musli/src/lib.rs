@@ -132,17 +132,14 @@
 //!     where
 //!         D: Decoder<'de, Mode = M>,
 //!     {
-//!         let mut seq = decoder.decode_sequence()?;
-//!         let mut data = Vec::with_capacity(seq.size_hint().or_default());
+//!         decoder.decode_sequence(|seq| {
+//!             let mut data = Vec::with_capacity(seq.size_hint().or_default());
 //!
-//!         while let Some(decoder) = seq.decode_next()? {
-//!             data.push(decoder.decode()?);
-//!         }
+//!             while let Some(decoder) = seq.decode_next()? {
+//!                 data.push(decoder.decode()?);
+//!             }
 //!
-//!         seq.end()?;
-//!
-//!         Ok(Self {
-//!             data
+//!             Ok(Self { data })
 //!         })
 //!     }
 //! }
@@ -527,33 +524,6 @@ pub use musli_macros::encoder;
 /// ```
 #[doc(inline)]
 pub use musli_macros::decoder;
-
-/// This is an attribute macro that must be used when implementing
-/// [`MapDecoder`].
-///
-/// It is required to use because a [`MapDecoder`] implementation might
-/// introduce new associated types in the future, and this is [not yet
-/// supported] on a language level in Rust. So this attribute macro polyfills
-/// any missing types automatically.
-///
-/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
-///
-/// [`MapDecoder`]: crate::de::MapDecoder
-#[doc(inline)]
-pub use musli_macros::map_decoder;
-
-/// This is an attribute macro that must be used when implementing
-/// [`StructDecoder`].
-///
-/// It is required to use because a [`StructDecoder`] implementation might
-/// introduce new associated types in the future, and this is [not yet
-/// supported] on a language level in Rust. So this attribute macro polyfills
-/// any missing types automatically.
-///
-/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
-/// [`StructDecoder`]: crate::de::StructDecoder
-#[doc(inline)]
-pub use musli_macros::struct_decoder;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`Visitor`].

@@ -317,7 +317,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             #output_enum
             #enter
 
-            let #output_var = #decoder_t::decode_variant_fn(#decoder_var, |#variant_decoder_var| {
+            let #output_var = #decoder_t::decode_variant(#decoder_var, |#variant_decoder_var| {
                 #variant_alloc
 
                 let #variant_tag_var #name_type = {
@@ -469,7 +469,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 let #buffer_var = #decoder_t::decode_buffer(#decoder_var)?;
                 let st = #as_decoder_t::as_decoder(&#buffer_var)?;
 
-                let #variant_tag_var = #decoder_t::decode_struct_fn(st, None, |st| {
+                let #variant_tag_var = #decoder_t::decode_struct(st, None, |st| {
                     let #variant_tag_var #name_type = {
                         let #variant_decoder_var = loop {
                             let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(st)? else {
@@ -650,7 +650,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
                 #enter
 
-                #decoder_t::decode_struct_fn(#decoder_var, None, |#struct_decoder_var| {
+                #decoder_t::decode_struct(#decoder_var, None, |#struct_decoder_var| {
                     let mut #tag_var = #option_none;
 
                     let #output_var = loop {
@@ -969,7 +969,7 @@ fn decode_tagged(
         #(#decls)*
 
         #enter
-        #decoder_t::decode_struct_fn(#decoder_var, Some(#fields_len), |type_decoder| {
+        #decoder_t::decode_struct(#decoder_var, Some(#fields_len), |type_decoder| {
             while let #option_some(mut #struct_decoder_var) = #struct_decoder_t::decode_field(type_decoder)? {
                 #field_alloc
                 #tag_stmt
@@ -1089,7 +1089,7 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
 
     Ok(quote! {{
         #enter
-        let #output_var = #decoder_t::decode_pack_fn(#decoder_var, |#pack| {
+        let #output_var = #decoder_t::decode_pack(#decoder_var, |#pack| {
             Ok(#path { #(#assign),* })
         })?;
         #leave

@@ -178,8 +178,8 @@ fn insert_fields(
 
     let Tokens {
         context_t,
+        pack_encoder_t,
         result_ok,
-        sequence_encoder_t,
         struct_encoder_t,
         struct_field_encoder_t,
         ..
@@ -232,7 +232,7 @@ fn insert_fields(
                 encode = quote! {
                     #enter
 
-                    #struct_encoder_t::encode_field_fn(#encoder_var, |#pair_encoder_var| {
+                    #struct_encoder_t::encode_struct_field_fn(#encoder_var, |#pair_encoder_var| {
                         let #field_encoder_var = #struct_field_encoder_t::encode_field_name(#pair_encoder_var)?;
                         #encode_t_encode(&#tag, #ctx_var, #field_encoder_var)?;
                         let #value_encoder_var = #struct_field_encoder_t::encode_field_value(#pair_encoder_var)?;
@@ -246,7 +246,7 @@ fn insert_fields(
             Packing::Packed => {
                 encode = quote! {
                     #enter
-                    let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(#pack_var)?;
+                    let #sequence_decoder_next_var = #pack_encoder_t::encode_packed(#pack_var)?;
                     #encode_path(#access, #ctx_var, #sequence_decoder_next_var)?;
                     #leave
                 };
@@ -413,7 +413,7 @@ fn encode_variant(
 
                 encode = quote! {{
                     #encoder_t::encode_struct_fn(#encoder_var, 0, |#encoder_var| {
-                        #struct_encoder_t::insert_field(#encoder_var, #field_tag, #tag)?;
+                        #struct_encoder_t::insert_struct_field(#encoder_var, #field_tag, #tag)?;
                         #(#decls)*
                         #(#encoders)*
                         #result_ok(())
@@ -440,9 +440,9 @@ fn encode_variant(
 
                 encode = quote! {{
                     #encoder_t::encode_struct_fn(#encoder_var, 2, |#struct_encoder| {
-                        #struct_encoder_t::insert_field(#struct_encoder, &#field_tag, #tag)?;
+                        #struct_encoder_t::insert_struct_field(#struct_encoder, &#field_tag, #tag)?;
 
-                        #struct_encoder_t::encode_field_fn(#struct_encoder, |#pair| {
+                        #struct_encoder_t::encode_struct_field_fn(#struct_encoder, |#pair| {
                             let #content_tag = #struct_field_encoder_t::encode_field_name(#pair)?;
                             #encode_t_encode(&#content, #ctx_var, #content_tag)?;
 

@@ -9,7 +9,7 @@ use crate::writer::Writer;
 
 /// Governs how unsigned integers are encoded into a [Writer].
 #[inline]
-pub fn encode_unsigned<C, W, T, const F: Options>(
+pub fn encode_unsigned<C, W, T, const OPT: Options>(
     cx: &C,
     writer: W,
     value: T,
@@ -19,10 +19,10 @@ where
     W: Writer,
     T: Unsigned + UnsignedOps,
 {
-    match crate::options::integer::<F>() {
+    match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => c::encode(cx, writer, value),
         _ => {
-            let bo = crate::options::byteorder::<F>();
+            let bo = crate::options::byteorder::<OPT>();
             value.write_bytes(cx, writer, bo)
         }
     }
@@ -31,7 +31,7 @@ where
 /// Decode an unsigned value from the specified reader using the configuration
 /// passed in through `F`.
 #[inline]
-pub fn decode_unsigned<'de, C, R, T: UnsignedOps, const F: Options>(
+pub fn decode_unsigned<'de, C, R, T: UnsignedOps, const OPT: Options>(
     cx: &C,
     reader: R,
 ) -> Result<T, C::Error>
@@ -40,10 +40,10 @@ where
     R: Reader<'de>,
     T: Unsigned,
 {
-    match crate::options::integer::<F>() {
+    match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => c::decode(cx, reader),
         _ => {
-            let bo = crate::options::byteorder::<F>();
+            let bo = crate::options::byteorder::<OPT>();
             T::read_bytes(cx, reader, bo)
         }
     }
@@ -51,17 +51,21 @@ where
 
 /// Governs how signed integers are encoded into a [Writer].
 #[inline]
-pub fn encode_signed<C, W, T, const F: Options>(cx: &C, writer: W, value: T) -> Result<(), C::Error>
+pub fn encode_signed<C, W, T, const OPT: Options>(
+    cx: &C,
+    writer: W,
+    value: T,
+) -> Result<(), C::Error>
 where
     C: ?Sized + Context,
     W: Writer,
     T: Signed,
     T::Unsigned: UnsignedOps,
 {
-    match crate::options::integer::<F>() {
+    match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => c::encode(cx, writer, zig::encode(value)),
         _ => {
-            let bo = crate::options::byteorder::<F>();
+            let bo = crate::options::byteorder::<OPT>();
             value.unsigned().write_bytes(cx, writer, bo)
         }
     }
@@ -69,20 +73,20 @@ where
 
 /// Governs how signed integers are decoded from a [Reader].
 #[inline]
-pub fn decode_signed<'de, C, R, T, const F: Options>(cx: &C, reader: R) -> Result<T, C::Error>
+pub fn decode_signed<'de, C, R, T, const OPT: Options>(cx: &C, reader: R) -> Result<T, C::Error>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
     T: Signed,
     T::Unsigned: UnsignedOps,
 {
-    match crate::options::integer::<F>() {
+    match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => {
             let value: T::Unsigned = c::decode(cx, reader)?;
             Ok(zig::decode(value))
         }
         _ => {
-            let bo = crate::options::byteorder::<F>();
+            let bo = crate::options::byteorder::<OPT>();
             Ok(T::Unsigned::read_bytes(cx, reader, bo)?.signed())
         }
     }
@@ -90,15 +94,19 @@ where
 
 /// Governs how usize lengths are encoded into a [Writer].
 #[inline]
-pub fn encode_usize<C, W, const F: Options>(cx: &C, writer: W, value: usize) -> Result<(), C::Error>
+pub fn encode_usize<C, W, const OPT: Options>(
+    cx: &C,
+    writer: W,
+    value: usize,
+) -> Result<(), C::Error>
 where
     C: ?Sized + Context,
     W: Writer,
 {
-    match crate::options::length::<F>() {
+    match crate::options::length::<OPT>() {
         crate::options::Integer::Variable => c::encode(cx, writer, value),
         _ => {
-            let bo = crate::options::byteorder::<F>();
+            let bo = crate::options::byteorder::<OPT>();
             macro_rules! fixed {
                 ($ty:ty) => {{
                     let Ok(value) = <$ty>::try_from(value) else {
@@ -109,22 +117,22 @@ where
                 }};
             }
 
-            crate::width_arm!(crate::options::length_width::<F>(), fixed)
+            crate::width_arm!(crate::options::length_width::<OPT>(), fixed)
         }
     }
 }
 
 /// Governs how usize lengths are decoded from a [Reader].
 #[inline]
-pub fn decode_usize<'de, C, R, const F: Options>(cx: &C, reader: R) -> Result<usize, C::Error>
+pub fn decode_usize<'de, C, R, const OPT: Options>(cx: &C, reader: R) -> Result<usize, C::Error>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    match crate::options::length::<F>() {
+    match crate::options::length::<OPT>() {
         crate::options::Integer::Variable => c::decode(cx, reader),
         _ => {
-            let bo = crate::options::byteorder::<F>();
+            let bo = crate::options::byteorder::<OPT>();
 
             macro_rules! fixed {
                 ($ty:ty) => {{
@@ -138,7 +146,7 @@ where
                 }};
             }
 
-            crate::width_arm!(crate::options::length_width::<F>(), fixed)
+            crate::width_arm!(crate::options::length_width::<OPT>(), fixed)
         }
     }
 }

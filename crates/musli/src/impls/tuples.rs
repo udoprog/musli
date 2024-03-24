@@ -1,8 +1,8 @@
 //! Implementations for variously lengthed tuples.
 
 use crate::compat::Packed;
-use crate::de::{Decode, Decoder, PackDecoder};
-use crate::en::{Encode, Encoder, SequenceEncoder};
+use crate::de::{Decode, Decoder, PackDecoder, TupleDecoder};
+use crate::en::{Encode, Encoder, PackEncoder, TupleEncoder};
 
 macro_rules! count {
     (_) => { 1 };
@@ -46,11 +46,12 @@ macro_rules! declare {
             where
                 E: Encoder<Mode = M>,
             {
-                let mut pack = encoder.encode_tuple(count!($ident0 $($ident)*))?;
-                let ($ident0, $($ident),*) = self;
-                pack.encode_next()?.encode($ident0)?;
-                $(pack.encode_next()?.encode($ident)?;)*
-                pack.end()
+                encoder.encode_tuple_fn(count!($ident0 $($ident)*), |tuple| {
+                    let ($ident0, $($ident),*) = self;
+                    tuple.encode_tuple_field()?.encode($ident0)?;
+                    $(tuple.encode_tuple_field()?.encode($ident)?;)*
+                    Ok(())
+                })
             }
         }
 
@@ -60,11 +61,11 @@ macro_rules! declare {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                let mut tuple = decoder.decode_tuple(count!($ident0 $($ident)*))?;
-                let $ident0 = tuple.decode_next()?.decode()?;
-                $(let $ident = tuple.decode_next()?.decode()?;)*
-                tuple.end()?;
-                Ok(($ident0, $($ident),*))
+                decoder.decode_tuple(count!($ident0 $($ident)*), |tuple| {
+                    let $ident0 = tuple.decode_next()?.decode()?;
+                    $(let $ident = tuple.decode_next()?.decode()?;)*
+                    Ok(($ident0, $($ident),*))
+                })
             }
         }
 
@@ -75,10 +76,11 @@ macro_rules! declare {
                 E: Encoder<Mode = M>,
             {
                 let Packed(($ident0, $($ident),*)) = self;
-                let mut pack = encoder.encode_pack()?;
-                pack.encode_next()?.encode($ident0)?;
-                $(pack.encode_next()?.encode($ident)?;)*
-                pack.end()
+                encoder.encode_pack_fn(|pack| {
+                    pack.encode_packed()?.encode($ident0)?;
+                    $(pack.encode_packed()?.encode($ident)?;)*
+                    Ok(())
+                })
             }
         }
 
@@ -88,7 +90,7 @@ macro_rules! declare {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_pack_fn(|pack| {
+                decoder.decode_pack(|pack| {
                     let $ident0 = pack.next()?;
                     $(let $ident = pack.next()?;)*
                     Ok(Packed(($ident0, $($ident),*)))

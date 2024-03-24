@@ -82,19 +82,19 @@ impl Value {
     /// Construct a [AsValueDecoder] implementation out of this value which
     /// emits the specified error `E`.
     #[inline]
-    pub fn into_value_decoder<const F: Options, C: ?Sized>(
+    pub fn into_value_decoder<const OPT: Options, C: ?Sized>(
         self,
         cx: &C,
-    ) -> AsValueDecoder<'_, F, C> {
+    ) -> AsValueDecoder<'_, OPT, C> {
         AsValueDecoder::new(cx, self)
     }
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<'a, 'de, const F: Options, C: ?Sized>(
+    pub(crate) fn decoder<'a, 'de, const OPT: Options, C: ?Sized>(
         &'de self,
         cx: &'a C,
-    ) -> ValueDecoder<'a, 'de, F, C> {
+    ) -> ValueDecoder<'a, 'de, OPT, C> {
         ValueDecoder::new(cx, self)
     }
 }
@@ -319,7 +319,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_sequence<D>(self, _: &C, mut seq: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, _: &C, seq: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: SequenceDecoder<'de, Cx = C>,
     {
@@ -329,13 +329,12 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
             out.push(item);
         }
 
-        seq.end()?;
         Ok(Value::Sequence(out))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_map<D>(self, _: &C, mut map: D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, _: &C, map: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: MapDecoder<'de, Cx = C>,
     {
@@ -347,7 +346,6 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
             out.push((first, second));
         }
 
-        map.end()?;
         Ok(Value::Map(out))
     }
 
@@ -371,13 +369,12 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_variant<D>(self, _: &C, mut variant: D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<D>(self, _: &C, variant: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: VariantDecoder<'de, Cx = C>,
     {
         let first = variant.decode_tag()?.decode()?;
         let second = variant.decode_value()?.decode()?;
-        variant.end()?;
         Ok(Value::Variant(Box::new((first, second))))
     }
 }
@@ -537,7 +534,7 @@ impl<M> Encode<M> for Value {
             #[cfg(feature = "alloc")]
             Value::Sequence(values) => encoder.encode_sequence_fn(values.len(), |sequence| {
                 for value in values {
-                    sequence.encode_next()?.encode(value)?;
+                    sequence.encode_element()?.encode(value)?;
                 }
 
                 Ok(())
@@ -566,12 +563,12 @@ impl<M> Encode<M> for Value {
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct AsValueDecoder<'a, const F: Options, C: ?Sized> {
+pub struct AsValueDecoder<'a, const OPT: Options, C: ?Sized> {
     cx: &'a C,
     value: Value,
 }
 
-impl<'a, const F: Options, C: ?Sized> AsValueDecoder<'a, F, C> {
+impl<'a, const OPT: Options, C: ?Sized> AsValueDecoder<'a, OPT, C> {
     /// Construct a new buffered value decoder.
     #[inline]
     pub fn new(cx: &'a C, value: Value) -> Self {
@@ -579,9 +576,9 @@ impl<'a, const F: Options, C: ?Sized> AsValueDecoder<'a, F, C> {
     }
 }
 
-impl<'a, const F: Options, C: ?Sized + Context> AsDecoder for AsValueDecoder<'a, F, C> {
+impl<'a, const OPT: Options, C: ?Sized + Context> AsDecoder for AsValueDecoder<'a, OPT, C> {
     type Cx = C;
-    type Decoder<'this> = ValueDecoder<'a, 'this, F, C> where Self: 'this;
+    type Decoder<'this> = ValueDecoder<'a, 'this, OPT, C> where Self: 'this;
 
     #[inline]
     fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {

@@ -1,6 +1,6 @@
 use core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 
-use crate::en::SequenceEncoder;
+use crate::en::TupleEncoder;
 use crate::{Decode, Decoder, Encode, Encoder};
 
 macro_rules! implement {
@@ -16,7 +16,7 @@ macro_rules! implement {
                 E: Encoder<Mode = M>,
             {
                 encoder.encode_tuple_fn($count, |tuple| {
-                    $(tuple.encode_next()?.encode(&self.$field)?;)*
+                    $(tuple.encode_tuple_field()?.encode(&self.$field)?;)*
                     Ok(())
                 })
             }
@@ -50,7 +50,7 @@ macro_rules! implement_new {
                 E: Encoder<Mode = M>,
             {
                 encoder.encode_tuple_fn($count, |tuple| {
-                    $(tuple.encode_next()?.encode(self.$field())?;)*
+                    $(tuple.encode_tuple_field()?.encode(self.$field())?;)*
                     Ok(())
                 })
             }

@@ -61,12 +61,6 @@ impl Token {
         }
     }
 
-    /// Test if token is a string.
-    #[inline]
-    pub(crate) fn is_string(&self) -> bool {
-        matches!(self, Token::String)
-    }
-
     #[inline]
     pub(crate) fn is_value(&self) -> bool {
         (*self as u8) & VAL_BIT != 0

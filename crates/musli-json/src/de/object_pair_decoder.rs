@@ -1,4 +1,4 @@
-use musli::de::{MapEntryDecoder, StructFieldDecoder};
+use musli::de::{Decoder, MapEntryDecoder, StructFieldDecoder};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -48,17 +48,8 @@ where
     }
 
     #[inline]
-    fn skip_map_value(mut self) -> Result<bool, C::Error> {
-        let actual = self.parser.peek(self.cx)?;
-
-        if !matches!(actual, Token::Colon) {
-            return Err(self
-                .cx
-                .message(format_args!("Expected colon `:`, was {actual}")));
-        }
-
-        self.parser.skip(self.cx, 1)?;
-        JsonDecoder::new(self.cx, self.parser.borrow_mut()).skip_any()?;
+    fn skip_map_value(self) -> Result<bool, C::Error> {
+        self.decode_map_value()?.skip()?;
         Ok(true)
     }
 }

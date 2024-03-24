@@ -9,36 +9,42 @@ pub trait StructEncoder {
     /// Result type of the encoder.
     type Ok;
     /// Encoder for the next struct field.
-    type EncodeField<'this>: StructFieldEncoder<Cx = Self::Cx, Ok = Self::Ok>
+    type EncodeStructField<'this>: StructFieldEncoder<Cx = Self::Cx, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Encode the next field.
-    fn encode_field(&mut self) -> Result<Self::EncodeField<'_>, <Self::Cx as Context>::Error>;
+    fn encode_struct_field(
+        &mut self,
+    ) -> Result<Self::EncodeStructField<'_>, <Self::Cx as Context>::Error>;
 
     /// Finish encoding the struct.
-    fn end(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn end_struct(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Encode the next field using a closure.
     #[inline]
-    fn encode_field_fn<F, O>(&mut self, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn encode_struct_field_fn<F, O>(&mut self, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::EncodeField<'_>) -> Result<O, <Self::Cx as Context>::Error>,
+        F: FnOnce(&mut Self::EncodeStructField<'_>) -> Result<O, <Self::Cx as Context>::Error>,
     {
-        let mut encoder = self.encode_field()?;
+        let mut encoder = self.encode_struct_field()?;
         let output = f(&mut encoder)?;
-        encoder.end()?;
+        encoder.end_field()?;
         Ok(output)
     }
 
     /// Insert a field immediately.
     #[inline]
-    fn insert_field<F, V>(&mut self, field: F, value: V) -> Result<(), <Self::Cx as Context>::Error>
+    fn insert_struct_field<F, V>(
+        &mut self,
+        field: F,
+        value: V,
+    ) -> Result<(), <Self::Cx as Context>::Error>
     where
         F: Encode<<Self::Cx as Context>::Mode>,
         V: Encode<<Self::Cx as Context>::Mode>,
     {
-        self.encode_field()?.insert_field(field, value)?;
+        self.encode_struct_field()?.insert_field(field, value)?;
         Ok(())
     }
 }

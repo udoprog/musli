@@ -5,9 +5,7 @@ use musli::Context;
 
 use crate::parser::{Parser, Token};
 
-use super::{
-    JsonDecoder, JsonObjectDecoder, KeySignedVisitor, KeyUnsignedVisitor, StringReference,
-};
+use super::{JsonDecoder, KeySignedVisitor, KeyUnsignedVisitor, StringReference};
 
 /// A JSON object key decoder for Müsli.
 pub(crate) struct JsonKeyDecoder<'a, P, C: ?Sized> {
@@ -24,11 +22,6 @@ where
     #[inline]
     pub(crate) fn new(cx: &'a C, parser: P) -> Self {
         Self { cx, parser }
-    }
-
-    #[inline]
-    pub(super) fn skip_any(self) -> Result<(), C::Error> {
-        JsonDecoder::new(self.cx, self.parser).skip_any()
     }
 
     #[inline]
@@ -57,7 +50,6 @@ where
     type Error = C::Error;
     type Mode = C::Mode;
     type WithContext<'this, U> = JsonKeyDecoder<'this, P, U> where U: 'this + Context;
-    type DecodeStruct = JsonObjectDecoder<'a, P, C>;
 
     #[inline]
     fn cx(&self) -> &Self::Cx {
@@ -87,7 +79,7 @@ where
 
     #[inline]
     fn skip(self) -> Result<(), C::Error> {
-        self.skip_any()
+        JsonDecoder::new(self.cx, self.parser).skip()
     }
 
     #[inline]

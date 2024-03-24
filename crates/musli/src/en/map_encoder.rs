@@ -9,15 +9,17 @@ pub trait MapEncoder {
     /// Result type of the encoder.
     type Ok;
     /// Encode the next pair.
-    type EncodeEntry<'this>: MapEntryEncoder<Cx = Self::Cx, Ok = Self::Ok>
+    type EncodeMapEntry<'this>: MapEntryEncoder<Cx = Self::Cx, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Encode the next pair.
-    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, <Self::Cx as Context>::Error>;
+    fn encode_map_entry(
+        &mut self,
+    ) -> Result<Self::EncodeMapEntry<'_>, <Self::Cx as Context>::Error>;
 
     /// Finish encoding pairs.
-    fn end(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn end_map(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert a pair immediately.
     #[inline]
@@ -27,7 +29,7 @@ pub trait MapEncoder {
         F: Encode<<Self::Cx as Context>::Mode>,
         S: Encode<<Self::Cx as Context>::Mode>,
     {
-        self.encode_entry()?.insert_entry(key, value)?;
+        self.encode_map_entry()?.insert_entry(key, value)?;
         Ok(())
     }
 }

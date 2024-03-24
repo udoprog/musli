@@ -40,7 +40,4 @@ pub trait VariantDecoder<'de> {
     ///
     /// The boolean returned indicates if the value was skipped or not.
     fn skip_value(&mut self) -> Result<bool, <Self::Cx as Context>::Error>;
-
-    /// End the pair decoder.
-    fn end(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

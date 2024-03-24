@@ -242,7 +242,7 @@ where
             }
         }
 
-        seq.end()
+        seq.end_sequence()
     }
 
     #[inline]

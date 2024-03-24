@@ -43,6 +43,9 @@ pub use self::number_visitor::NumberVisitor;
 mod pack_decoder;
 pub use self::pack_decoder::PackDecoder;
 
+mod tuple_decoder;
+pub use self::tuple_decoder::TupleDecoder;
+
 mod sequence_decoder;
 pub use self::sequence_decoder::SequenceDecoder;
 

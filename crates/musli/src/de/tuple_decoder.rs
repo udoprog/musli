@@ -2,11 +2,11 @@ use crate::Context;
 
 use super::{Decode, Decoder};
 
-/// A pack that can construct decoders.
-pub trait PackDecoder<'de> {
+/// A decoder for tuples.
+pub trait TupleDecoder<'de> {
     /// Context associated with the decoder.
     type Cx: ?Sized + Context;
-    /// The encoder to use for the pack.
+    /// The encoder to use for the tuple element.
     type DecodeNext<'this>: Decoder<
         'de,
         Cx = Self::Cx,

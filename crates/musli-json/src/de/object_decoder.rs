@@ -1,18 +1,22 @@
-use core::mem;
+use core::mem::{replace, take};
 
-use musli::de::{MapDecoder, MapEntriesDecoder, SizeHint, StructDecoder, StructFieldsDecoder};
+use musli::de::{
+    Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, SizeHint, StructDecoder,
+    StructFieldsDecoder,
+};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
 
 use super::{JsonDecoder, JsonKeyDecoder, JsonObjectPairDecoder};
 
+#[must_use = "Must call skip_object_remaining to complete decoding"]
 pub(crate) struct JsonObjectDecoder<'a, P, C: ?Sized> {
     cx: &'a C,
     first: bool,
-    completed: bool,
     len: Option<usize>,
     parser: P,
+    finalized: bool,
 }
 
 impl<'a, 'de, P, C> JsonObjectDecoder<'a, P, C>
@@ -20,10 +24,23 @@ where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
+    pub(super) fn new_in(
+        cx: &'a C,
+        first: bool,
+        len: Option<usize>,
+        parser: P,
+    ) -> Result<Self, C::Error> {
+        Ok(Self {
+            cx,
+            first,
+            len,
+            parser,
+            finalized: false,
+        })
+    }
+
     #[inline]
     pub(super) fn new(cx: &'a C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
-        parser.skip_whitespace(cx)?;
-
         let actual = parser.peek(cx)?;
 
         if !matches!(actual, Token::OpenBrace) {
@@ -35,28 +52,30 @@ where
         Ok(Self {
             cx,
             first: true,
-            completed: false,
             len,
             parser,
+            finalized: false,
         })
     }
 
     fn parse_map_key(&mut self) -> Result<bool, C::Error> {
-        let first = mem::take(&mut self.first);
+        if self.finalized {
+            return Ok(false);
+        }
+
+        let first = take(&mut self.first);
 
         loop {
             let token = self.parser.peek(self.cx)?;
 
-            if token.is_string() {
-                return Ok(true);
-            }
-
             match token {
+                Token::String => {
+                    return Ok(true);
+                }
                 Token::Comma if !first => {
                     self.parser.skip(self.cx, 1)?;
                 }
                 Token::CloseBrace => {
-                    self.parser.skip(self.cx, 1)?;
                     return Ok(false);
                 }
                 token => {
@@ -67,9 +86,34 @@ where
             }
         }
     }
+
+    /// Parse end of object.
+    #[inline]
+    pub(super) fn skip_object_remaining(mut self) -> Result<(), C::Error> {
+        // Someone else is responsible for finalizing this decoder.
+        if self.finalized {
+            return Ok(());
+        }
+
+        while let Some(mut entry) = self.decode_entry()? {
+            entry.decode_map_key()?.skip()?;
+            entry.skip_map_value()?;
+        }
+
+        let actual = self.parser.peek(self.cx)?;
+
+        if !matches!(actual, Token::CloseBrace) {
+            return Err(self
+                .cx
+                .message(format_args!("Expected closing brace `}}`, was {actual}")));
+        }
+
+        self.parser.skip(self.cx, 1)?;
+        self.finalized = true;
+        Ok(())
+    }
 }
 
-#[musli::map_decoder]
 impl<'a, 'de, P, C> MapDecoder<'de> for JsonObjectDecoder<'a, P, C>
 where
     P: Parser<'de>,
@@ -79,21 +123,13 @@ where
     type DecodeEntry<'this> = JsonObjectPairDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type IntoMapEntries = Self;
-
-    #[inline]
-    fn cx(&self) -> &Self::Cx {
-        self.cx
-    }
+    type DecodeRemainingEntries<'this> = JsonObjectDecoder<'a, P::Mut<'this>, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.len)
-    }
-
-    #[inline]
-    fn into_map_entries(self) -> Result<Self::IntoMapEntries, C::Error> {
-        Ok(self)
     }
 
     #[inline]
@@ -109,8 +145,16 @@ where
     }
 
     #[inline]
-    fn end(self) -> Result<(), C::Error> {
-        Ok(())
+    fn decode_remaining_entries(
+        &mut self,
+    ) -> Result<Self::DecodeRemainingEntries<'_>, <Self::Cx as Context>::Error> {
+        if replace(&mut self.finalized, true) {
+            return Err(self
+                .cx
+                .message("Cannot decode remaining entries after finalizing"));
+        }
+
+        JsonObjectDecoder::new_in(self.cx, self.first, self.len, self.parser.borrow_mut())
     }
 }
 
@@ -127,12 +171,7 @@ where
 
     #[inline]
     fn decode_map_entry_key(&mut self) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
-        if self.completed {
-            return Ok(None);
-        }
-
         if !self.parse_map_key()? {
-            self.completed = true;
             return Ok(None);
         }
 
@@ -155,21 +194,16 @@ where
 
     #[inline]
     fn skip_map_entry_value(&mut self) -> Result<bool, C::Error> {
-        let actual = self.parser.peek(self.cx)?;
-
-        if !matches!(actual, Token::Colon) {
-            return Err(self
-                .cx
-                .message(format_args!("Expected colon `:`, was {actual}")));
-        }
-
-        self.parser.skip(self.cx, 1)?;
-        JsonDecoder::new(self.cx, self.parser.borrow_mut()).skip_any()?;
+        self.decode_map_entry_value()?.skip()?;
         Ok(true)
+    }
+
+    #[inline]
+    fn end_map_entries(self) -> Result<(), C::Error> {
+        self.skip_object_remaining()
     }
 }
 
-#[musli::struct_decoder]
 impl<'a, 'de, P, C> StructDecoder<'de> for JsonObjectDecoder<'a, P, C>
 where
     P: Parser<'de>,
@@ -179,12 +213,6 @@ where
     type DecodeField<'this> = JsonObjectPairDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type IntoStructFields = Self;
-
-    #[inline]
-    fn cx(&self) -> &Self::Cx {
-        self.cx
-    }
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -192,18 +220,8 @@ where
     }
 
     #[inline]
-    fn into_struct_fields(self) -> Result<Self::IntoStructFields, C::Error> {
-        Ok(self)
-    }
-
-    #[inline]
     fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
         MapDecoder::decode_entry(self)
-    }
-
-    #[inline]
-    fn end(self) -> Result<(), C::Error> {
-        MapDecoder::end(self)
     }
 }
 
@@ -220,36 +238,27 @@ where
 
     #[inline]
     fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
-        if !self.parse_map_key()? {
-            return Err(self
-                .cx
-                .message("Expected map key, but found closing brace `}`"));
-        }
+        let cx = self.cx;
 
-        Ok(JsonKeyDecoder::new(self.cx, self.parser.borrow_mut()))
+        let Some(decoder) = self.decode_map_entry_key()? else {
+            return Err(cx.message("Expected struct field"));
+        };
+
+        Ok(decoder)
     }
 
     #[inline]
     fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
-        let actual = self.parser.peek(self.cx)?;
-
-        if !matches!(actual, Token::Colon) {
-            return Err(self
-                .cx
-                .message(format_args!("Expected colon `:`, was {actual}")));
-        }
-
-        self.parser.skip(self.cx, 1)?;
-        Ok(JsonDecoder::new(self.cx, self.parser.borrow_mut()))
+        self.decode_map_entry_value()
     }
 
     #[inline]
     fn skip_struct_field_value(&mut self) -> Result<bool, C::Error> {
-        MapEntriesDecoder::skip_map_entry_value(self)
+        self.skip_map_entry_value()
     }
 
     #[inline]
-    fn end(self) -> Result<(), C::Error> {
-        MapEntriesDecoder::end(self)
+    fn end_struct_fields(self) -> Result<(), C::Error> {
+        self.end_map_entries()
     }
 }

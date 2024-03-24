@@ -9,6 +9,7 @@ use super::Decoder;
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
+#[must_use = "Must call end_map_entries to complete decoding"]
 pub trait MapEntriesDecoder<'de>: Sized {
     /// Context associated with the decoder.
     type Cx: ?Sized + Context;
@@ -51,18 +52,6 @@ pub trait MapEntriesDecoder<'de>: Sized {
     /// The boolean returned indicates if the value was skipped or not.
     fn skip_map_entry_value(&mut self) -> Result<bool, <Self::Cx as Context>::Error>;
 
-    /// End pair decoding.
-    #[inline]
-    fn end(mut self) -> Result<(), <Self::Cx as Context>::Error> {
-        loop {
-            let Some(item) = self.decode_map_entry_key()? else {
-                break;
-            };
-
-            item.skip()?;
-            self.skip_map_entry_value()?;
-        }
-
-        Ok(())
-    }
+    /// End entries decoding.
+    fn end_map_entries(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

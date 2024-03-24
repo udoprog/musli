@@ -214,9 +214,9 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
 
     /// Indicates that the visited type is a sequence.
     #[inline]
-    fn visit_sequence<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, cx: &C, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
-        D: SequenceDecoder<'de, Cx = C>,
+        D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::SequenceWith(decoder.size_hint()),
@@ -226,9 +226,9 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
 
     /// Indicates that the visited type is a map.
     #[inline]
-    fn visit_map<D>(self, cx: &C, decoder: D) -> Result<Self::Ok, <D::Cx as Context>::Error>
+    fn visit_map<D>(self, cx: &C, decoder: &mut D) -> Result<Self::Ok, <D::Cx as Context>::Error>
     where
-        D: MapDecoder<'de, Cx = C>,
+        D: ?Sized + MapDecoder<'de, Cx = C>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::MapWith(decoder.size_hint()),
@@ -265,7 +265,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
 
     /// Indicates that the visited type is a variant.
     #[inline]
-    fn visit_variant<D>(self, cx: &C, _: D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<D>(self, cx: &C, _: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: VariantDecoder<'de, Cx = C>,
     {
