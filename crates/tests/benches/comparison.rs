@@ -56,7 +56,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     ($b:expr, $framework:ident, $buf:ident) => {{
                         $buf.with(|mut state| {
                             state.reset($size_hint, &$name);
-                            let data = state.encode(&$name).unwrap();
+                            let mut data = state.encode(&$name).unwrap();
                             $b.iter(move || data.decode::<$ty>().unwrap());
                         });
                     }};
@@ -70,7 +70,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         $buf.with(|mut state| {
                             $b.iter(|| {
                                 state.reset($size_hint, &$name);
-                                let out = state.encode(&$name).unwrap();
+                                let mut out = state.encode(&$name).unwrap();
                                 let actual = out.decode::<$ty>().unwrap();
                                 debug_assert_eq!(actual, $name);
                                 black_box(actual);

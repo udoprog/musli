@@ -182,12 +182,19 @@ pub mod derive_bitcode {
         Buffer::new()
     }
 
-    pub fn reset<T>(buf: &mut Buffer, value: &T)
+    #[provider]
+    pub fn decode_buf() -> Buffer {
+        Buffer::new()
+    }
+
+    pub fn reset<T>(buf: &mut Buffer, decode_buf: &mut Buffer, value: &T)
     where
-        T: Encode,
+        for<'de> T: Encode + Decode<'de>,
     {
         // Encode a value of the given type to "warm up" the buffer.
-        _ = buf.encode(value);
+        let encoded = buf.encode(value);
+        // Decode the same value to "warm up" the decode buffer.
+        decode_buf.decode::<T>(encoded).unwrap();
     }
 
     pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
@@ -197,10 +204,10 @@ pub mod derive_bitcode {
         Ok(buf.encode(value))
     }
 
-    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, bitcode::Error>
+    pub fn decode<'buf, T>(decode_buf: &mut Buffer, buf: &'buf [u8]) -> Result<T, bitcode::Error>
     where
         for<'de> T: Decode<'de>,
     {
-        bitcode::decode(buf)
+        decode_buf.decode(buf)
     }
 }

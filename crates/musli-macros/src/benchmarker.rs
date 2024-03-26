@@ -62,10 +62,23 @@ impl Benchmarker {
         let mut encode_fn = None;
         let mut decode_fn = None;
         let mut new_content = Vec::new();
+        let mut providers = Vec::new();
 
         for item in content {
             match item {
                 syn::Item::Fn(mut f) => {
+                    let attrs = function_attrs(&mut f.attrs)?;
+
+                    if attrs.is_provider {
+                        let ty = match &f.sig.output {
+                            syn::ReturnType::Type(_, ty) => (**ty).clone(),
+                            _ => syn::parse_quote!(()),
+                        };
+
+                        providers.push(Provider { f, ty });
+                        continue;
+                    }
+
                     if f.sig.ident == "buffer" {
                         buffer_fn = Some(f);
                         continue;
@@ -155,33 +168,54 @@ impl Benchmarker {
             None => syn::parse_quote!('__buf),
         };
 
-        new_content.push(syn::parse_quote! {
-            #decode_fn
-        });
+        if let Some(decode_fn) = public_decode_mangling(&decode_fn, &decode_args) {
+            new_content.push(syn::parse_quote! {
+                #decode_fn
+            });
+        } else {
+            new_content.push(syn::parse_quote! {
+                #decode_fn
+            });
+        }
 
         let buffer_ty = match buffer_fn.as_ref().map(|f| &f.sig.output) {
             Some(syn::ReturnType::Type(_, ty)) => *ty.clone(),
             _ => syn::parse_quote!(()),
         };
 
+        let provider_field = providers.iter().map(|p| &p.f.sig.ident);
+        let provider_ty = providers.iter().map(|p| &p.ty);
+
         new_content.push(syn::parse_quote! {
             #visibility struct Benchmarker {
                 buffer: #buffer_ty,
+                #(#provider_field: #provider_ty,)*
             }
         });
+
+        let provider_field = providers.iter().map(|p| &p.f.sig.ident);
+        let provider_ty = providers.iter().map(|p| &p.ty);
 
         new_content.push(syn::parse_quote! {
             #visibility struct State<#type_lt> {
                 buffer: &#type_lt mut #buffer_ty,
+                #(#provider_field: &#type_lt mut #provider_ty,)*
             }
         });
+
+        let provider_field = providers.iter().map(|p| &p.f.sig.ident);
+        let provider_ty = providers.iter().map(|p| &p.ty);
 
         new_content.push(syn::parse_quote! {
             #visibility struct EncodeState<#type_lt> {
                 buffer: #encode_return,
+                #(#provider_field: &#type_lt mut #provider_ty,)*
                 _marker: ::core::marker::PhantomData<&#type_lt ()>,
             }
         });
+
+        let provider_field = providers.iter().map(|p| &p.f.sig.ident);
+        let provider_fns = providers.iter().map(|p| &p.f);
 
         if let Some(buffer_fn) = buffer_fn {
             let buffer_fn_call = &buffer_fn.sig.ident;
@@ -190,9 +224,11 @@ impl Benchmarker {
                 #[inline(always)]
                 #visibility fn new() -> Benchmarker {
                     #buffer_fn
+                    #(#provider_fns)*
 
                     Benchmarker {
-                        buffer: #buffer_fn_call()
+                        buffer: #buffer_fn_call(),
+                        #(#provider_field: #provider_field(),)*
                     }
                 }
             });
@@ -201,11 +237,14 @@ impl Benchmarker {
                 #[inline(always)]
                 #visibility fn new() -> Benchmarker {
                     Benchmarker {
-                        buffer: ()
+                        buffer: (),
+                        #(#provider_field: #provider_field(),)*
                     }
                 }
             });
         }
+
+        let provider_field = providers.iter().map(|p| &p.f.sig.ident);
 
         new_content.push(syn::parse_quote! {
             impl Benchmarker {
@@ -216,6 +255,7 @@ impl Benchmarker {
                 {
                     inner(State {
                         buffer: &mut self.buffer,
+                        #(#provider_field: &mut self.#provider_field,)*
                     })
                 }
             }
@@ -247,6 +287,7 @@ impl Benchmarker {
 
         let encode_inner = &encode_fn.sig.ident;
         let encode_args = convert_arguments(encode_args, ReferenceType::Encode);
+        let (provided_field, provided_expr) = convert_provided(&providers);
 
         let mut encode_item_fn = encode_fn.clone();
         encode_item_fn.sig.generics = encode_generics;
@@ -258,6 +299,7 @@ impl Benchmarker {
 
                 Ok(EncodeState {
                     buffer: #encode_inner(#encode_args)?,
+                    #(#provided_field: #provided_expr,)*
                     _marker: ::core::marker::PhantomData,
                 })
             }
@@ -275,7 +317,7 @@ impl Benchmarker {
         let decode_inner = &decode_fn.sig.ident;
         let mut decode_item_fn = decode_fn.clone();
 
-        decode_item_fn.sig.inputs = syn::parse_quote!(&self);
+        decode_item_fn.sig.inputs = syn::parse_quote!(&mut self);
         decode_item_fn.sig.generics = mangle_decode_lifetimes(&decode_fn, lifetime.as_ref());
         decode_item_fn.block = syn::parse_quote! {
             {
@@ -351,12 +393,12 @@ fn convert_arguments(
 
     for a in arguments {
         match a {
-            Argument::Buffer(span) => match reference {
+            Argument::Buffer(ident) => match reference {
                 ReferenceType::Encode => {
-                    output.push(syn::parse_quote_spanned! { span.span() => self.buffer });
+                    output.push(syn::parse_quote_spanned! { ident.span() => self.buffer });
                 }
                 ReferenceType::Decode => {
-                    output.push(syn::parse_quote_spanned! { span.span() => &self.buffer });
+                    output.push(syn::parse_quote_spanned! { ident.span() => &self.buffer });
                 }
             },
             Argument::Value(value) => {
@@ -365,10 +407,36 @@ fn convert_arguments(
             Argument::SizeHint(size_hint) => {
                 output.push(syn::parse_quote! { #size_hint });
             }
+            Argument::Provided(ident) => match reference {
+                ReferenceType::Encode => {
+                    output.push(syn::parse_quote_spanned! { ident.span() => &mut self.#ident });
+                }
+                ReferenceType::Decode => {
+                    output.push(syn::parse_quote_spanned! { ident.span() => &mut self.#ident });
+                }
+            },
         }
     }
 
     output
+}
+
+struct Provider {
+    f: syn::ItemFn,
+    ty: syn::Type,
+}
+
+fn convert_provided(providers: &[Provider]) -> (Vec<syn::Ident>, Vec<syn::Expr>) {
+    let mut fields = Vec::new();
+    let mut exprs = Vec::new();
+
+    for p in providers {
+        let ident = &p.f.sig.ident;
+        fields.push(ident.clone());
+        exprs.push(syn::parse_quote! { &mut self.#ident });
+    }
+
+    (fields, exprs)
 }
 
 /// Extract lifetimes in encode function calls so they can be moved to the struct definition.
@@ -505,16 +573,16 @@ fn argument_attrs(
         if let syn::Pat::Ident(ident) = &*ty.pat {
             let ident = &ident.ident;
 
-            if ident.to_string().starts_with("buf") {
+            if ident == "buf" || ident == "buffer" {
                 argument = Some(Argument::Buffer(ident.clone()));
-            }
-
-            if ident == "size_hint" && size_hint {
-                argument = Some(Argument::SizeHint(ident.clone()));
-            }
-
-            if ident == "value" {
+            } else if ident == "size_hint" {
+                if size_hint {
+                    argument = Some(Argument::SizeHint(ident.clone()));
+                }
+            } else if ident == "value" {
                 argument = Some(Argument::Value(ident.clone()));
+            } else {
+                argument = Some(Argument::Provided(ident.clone()));
             }
         }
     }
@@ -528,10 +596,33 @@ fn argument_attrs(
     Ok(())
 }
 
+#[derive(Default)]
+struct FunctionAttrs {
+    is_provider: bool,
+}
+
+fn function_attrs(attrs: &mut Vec<syn::Attribute>) -> syn::Result<FunctionAttrs> {
+    let mut output = FunctionAttrs::default();
+    let mut new_attrs = Vec::with_capacity(attrs.len());
+
+    for attr in attrs.drain(..) {
+        if attr.path().is_ident("provider") {
+            output.is_provider = true;
+            continue;
+        }
+
+        new_attrs.push(attr);
+    }
+
+    *attrs = new_attrs;
+    Ok(output)
+}
+
 enum Argument {
     Buffer(syn::Ident),
     Value(syn::Ident),
     SizeHint(syn::Ident),
+    Provided(syn::Ident),
 }
 
 fn unpack_output_result(ret: &syn::ReturnType) -> Option<(&syn::Type, &syn::Type)> {
@@ -567,4 +658,53 @@ fn unpack_output_result(ret: &syn::ReturnType) -> Option<(&syn::Type, &syn::Type
     };
 
     Some((a, b))
+}
+
+fn public_decode_mangling(item_fn: &syn::ItemFn, arguments: &[Argument]) -> Option<syn::ItemFn> {
+    if arguments.is_empty() {
+        return None;
+    }
+
+    let mut new_inputs = Punctuated::new();
+    let mut inner_arguments = Punctuated::<syn::Expr, syn::Token![,]>::new();
+
+    for (a, i) in arguments.iter().zip(&item_fn.sig.inputs) {
+        match a {
+            Argument::Provided(ident) => {
+                inner_arguments.push(syn::parse_quote!(&mut b.#ident));
+                continue;
+            }
+            Argument::Buffer(..) => {}
+            _ => {
+                return None;
+            }
+        }
+
+        new_inputs.push(i.clone());
+
+        let syn::FnArg::Typed(ty) = i else {
+            return None;
+        };
+
+        let syn::Pat::Ident(syn::PatIdent { ident, .. }) = &*ty.pat else {
+            return None;
+        };
+
+        inner_arguments.push(syn::parse_quote!(#ident));
+    }
+
+    let inner_fn_ident = &item_fn.sig.ident;
+
+    let mut outer_fn = item_fn.clone();
+    outer_fn.sig.inputs = new_inputs;
+    outer_fn.block = syn::parse_quote! {
+        {
+            #item_fn
+
+            let mut b = new();
+            #inner_fn_ident(#inner_arguments)
+        }
+    };
+
+    Some(outer_fn)
 }
