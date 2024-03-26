@@ -469,6 +469,11 @@ where
     W: ?Sized + Write,
 {
     let output = root.join("images");
+
+    if !output.is_dir() {
+        fs::create_dir(&output).with_context(|| anyhow!("{}", output.display()))?;
+    }
+
     let target_dir = root.join("target");
 
     let bins = build_bench(report)?;

@@ -32,8 +32,8 @@ musli = { path = "../musli", version = "0.0.104", default-features = false }
 musli-common = { path = "../musli-common", version = "0.0.104", default-features = false }
 musli-value = { path = "../musli-value", version = "0.0.104", default-features = false, optional = true }
 
-itoa = "1.0.9"
-ryu = "1.0.15"
+itoa = "1.0.10"
+ryu = "1.0.17"
 lexical = { version = "6.1.1", default-features = false, features = ["parse-floats"] }
 
 [dev-dependencies]
