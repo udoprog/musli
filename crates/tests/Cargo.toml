@@ -46,8 +46,8 @@ postcard = ["dep:postcard", "serde"]
 rkyv = ["dep:rkyv", "std", "model-no-usize", "model-no-map-string-key", "model-no-tuple", "model-no-cstring"]
 serde_cbor = ["dep:serde_cbor", "serde", "model-no-128", "model-no-map"]
 dlhn = ["dep:dlhn", "serde", "model-no-128", "model-no-map"]
-bitcode = ["dep:bitcode", "serde", "simdutf8"]
-bitcode-derive = ["dep:bitcode", "bitcode?/derive", "simdutf8", "model-no-cstring"]
+bitcode = ["dep:bitcode", "serde"]
+bitcode-derive = ["dep:bitcode", "bitcode?/derive", "model-no-cstring"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.104", default-features = false, optional = true, features = ["alloc"] }
