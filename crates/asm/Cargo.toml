@@ -14,4 +14,4 @@ zerocopy = ["dep:zerocopy", "tests/zerocopy"]
 tests = { path = "../tests", default-features = false, features = ["std"] }
 
 musli-zerocopy = { path = "../musli-zerocopy", optional = true }
-zerocopy = { version = "0.7.11", default-features = false, optional = true, features = ["byteorder", "derive"] }
+zerocopy = { version = "0.7.32", default-features = false, optional = true, features = ["byteorder", "derive"] }

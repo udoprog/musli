@@ -29,6 +29,6 @@ musli-zerocopy-macros = { version = "=0.0.104", path = "../musli-zerocopy-macros
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 
 [dev-dependencies]
-anyhow = "1.0.75"
-trybuild = "1.0.85"
+anyhow = "1.0.81"
+trybuild = "1.0.90"
 musli-zerocopy-macros = { version = "=0.0.104", path = "../musli-zerocopy-macros", features = ["sneaky-fields"] }
