@@ -120,13 +120,17 @@ struct CompilerMessage {
 
 #[derive(Default, Parser)]
 struct ArgsReport {
+    /// The output directory to write results into.
+    #[arg(long)]
+    output: Option<PathBuf>,
     /// Filter to pass to benchmarks when running them.
     #[arg(short = 'f', long)]
     filter: Option<String>,
     /// Run benchmarks.
-    #[arg(short, long)]
+    #[arg(long)]
     bench: bool,
     /// Run `--quick` benchmarks.
+    #[arg(long)]
     quick: bool,
     /// Reference graphics from the given branch.
     #[arg(long)]
@@ -184,14 +188,13 @@ fn main() -> Result<()> {
     let manifest: Manifest =
         toml::from_str(&reports).with_context(|| anyhow!("{}", reports_path.display()))?;
 
-    let images = root.join("benchmarks-new").join("images");
-
-    if !images.is_dir() {
-        fs::create_dir_all(&images).with_context(|| anyhow!("{}", images.display()))?;
-    }
-
     match command {
         Cmd::Report(a) => {
+            let output = match &a.output {
+                Some(output) => output.to_owned(),
+                None => root.join("benchmarks-new"),
+            };
+
             let branch = a.branch.as_deref().unwrap_or(manifest.branch.as_str());
 
             let mut built_reports = Vec::new();
@@ -207,7 +210,7 @@ fn main() -> Result<()> {
                 println!("Building: {}", report.title);
 
                 let (size_set, group_plots) =
-                    build_report(&a, &manifest, report, &root, a.bench, a.filter.as_deref())?;
+                    build_report(&a, &manifest, report, &output, a.bench, a.filter.as_deref())?;
 
                 size_sets.push((report, size_set));
                 built_reports.push((report, group_plots));
@@ -323,7 +326,7 @@ fn main() -> Result<()> {
                 writeln!(o, "[{title}]: {href}")?;
             }
 
-            let report = root.join("benchmarks.md");
+            let report = output.join("benchmarks.md");
 
             println!("Writing: {}", report.display());
             fs::write(&report, o.as_bytes())?;
@@ -431,13 +434,16 @@ fn build_report<'a>(
     a: &ArgsReport,
     manifest: &'a Manifest,
     report: &Report,
-    root: &Path,
+    output: &Path,
     run_bench: bool,
     filter: Option<&str>,
 ) -> Result<ReportPairs<'a>> {
-    let output = root.join("benchmarks-new");
     let criterion_output = output.join(format!("criterion-{}", report.id));
     let images = output.join("images");
+
+    if !images.is_dir() {
+        fs::create_dir_all(&images).with_context(|| anyhow!("{}", images.display()))?;
+    }
 
     let bins = build_bench(manifest, report)?;
 
