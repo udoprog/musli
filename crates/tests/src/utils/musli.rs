@@ -1,4 +1,5 @@
 #[cfg(feature = "musli-json")]
+#[crate::benchmarker]
 pub mod musli_json {
     use alloc::vec::Vec;
 
@@ -8,35 +9,32 @@ pub mod musli_json {
 
     const ENCODING: Encoding = Encoding::new();
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buffer: &mut Vec<u8>) {
+        buffer.clear();
+    }
 
-        pub fn reset<T>(&mut self, _size_hint: usize, _value: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(buffer: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Encode,
+    {
+        ENCODING.encode(&mut *buffer, value)?;
+        Ok(buffer)
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
-        where
-            T: Encode,
-        {
-            ENCODING.encode(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, Error>
-        where
-            T: Decode<'buf>,
-        {
-            ENCODING.from_slice(self.buffer)
-        }
+    pub fn decode<'buf, T>(buffer: &'buf [u8]) -> Result<T, Error>
+    where
+        T: Decode<'buf>,
+    {
+        ENCODING.from_slice(buffer)
     }
 }
 
 #[cfg(feature = "musli-storage")]
+#[crate::benchmarker]
 pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
@@ -51,35 +49,32 @@ pub mod musli_storage_packed {
     const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
     const ENCODING: Encoding<Packed, OPTIONS> = Encoding::new().with_options().with_mode();
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _size_hint: usize, _value: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Encode<Packed>,
+    {
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf)
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
-        where
-            T: Encode<Packed>,
-        {
-            ENCODING.encode(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, Error>
-        where
-            T: Decode<'buf, Packed>,
-        {
-            ENCODING.from_slice(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
+    where
+        T: Decode<'buf, Packed>,
+    {
+        ENCODING.from_slice(buf)
     }
 }
 
 #[cfg(feature = "musli-storage")]
+#[crate::benchmarker]
 pub mod musli_storage {
     use alloc::vec::Vec;
 
@@ -92,35 +87,32 @@ pub mod musli_storage {
     const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
     const ENCODING: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Encode,
+    {
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf)
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
-        where
-            T: Encode,
-        {
-            ENCODING.encode(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, Error>
-        where
-            T: Decode<'buf>,
-        {
-            ENCODING.from_slice(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
+    where
+        T: Decode<'buf>,
+    {
+        ENCODING.from_slice(buf)
     }
 }
 
 #[cfg(feature = "musli-wire")]
+#[crate::benchmarker]
 pub mod musli_wire {
     use alloc::vec::Vec;
 
@@ -131,35 +123,32 @@ pub mod musli_wire {
 
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Encode,
+    {
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf.as_slice())
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
-        where
-            T: Encode,
-        {
-            ENCODING.encode(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, Error>
-        where
-            T: Decode<'buf>,
-        {
-            ENCODING.from_slice(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
+    where
+        T: Decode<'buf>,
+    {
+        ENCODING.from_slice(buf)
     }
 }
 
 #[cfg(feature = "musli-descriptive")]
+#[crate::benchmarker]
 pub mod musli_descriptive {
     use alloc::vec::Vec;
 
@@ -170,65 +159,48 @@ pub mod musli_descriptive {
 
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Encode,
+    {
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf)
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
-        where
-            T: Encode,
-        {
-            ENCODING.encode(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, Error>
-        where
-            T: Decode<'buf>,
-        {
-            ENCODING.from_slice(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
+    where
+        T: Decode<'buf>,
+    {
+        ENCODING.from_slice(buf)
     }
 }
 
 #[cfg(feature = "musli-value")]
+#[crate::benchmarker(not_bytes)]
 pub mod musli_value {
     use ::musli_value::Value;
     use musli::{Decode, Encode};
 
-    benchmarker! {
-        'buf {@nolen}
-
-        pub fn buffer() -> () {}
-
-        pub fn reset<T>(&mut self, _: usize, _: &T) {}
-
-        pub fn encode<T>(&mut self, value: &T) -> Result<Value, musli_value::Error>
-        where
-            T: Encode,
-        {
-            musli_value::encode(value)
-        }
-
-        pub fn decode<T>(&self) -> Result<T, musli_value::Error>
-        where
-            for<'a> T: Decode<'a>,
-        {
-            musli_value::decode(&self.buffer)
-        }
+    pub fn encode<T>(value: &T) -> Result<Value, musli_value::Error>
+    where
+        T: Encode,
+    {
+        musli_value::encode(value)
     }
 
-    impl EncodeState<'_> {
-        pub fn as_bytes(&self) -> Option<&[u8]> {
-            None
-        }
+    pub fn decode<T>(buf: &Value) -> Result<T, musli_value::Error>
+    where
+        for<'a> T: Decode<'a>,
+    {
+        musli_value::decode(buf)
     }
 }
 
@@ -268,10 +240,12 @@ pub mod musli_zerocopy {
 
     impl<'buf> DecodeState<'buf> {
         #[inline(always)]
+        #[allow(clippy::len_without_is_empty)]
         pub fn len(&self) -> usize {
             self.buf.len()
         }
 
+        #[inline(always)]
         pub fn as_bytes(&self) -> Option<&'buf [u8]> {
             Some(&self.buf[..])
         }

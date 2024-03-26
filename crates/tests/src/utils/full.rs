@@ -1,218 +1,206 @@
 #[cfg(feature = "serde_json")]
+#[crate::benchmarker]
 pub mod serde_json {
     use alloc::vec::Vec;
 
     use serde::{Deserialize, Serialize};
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(
+        buf: &'buf mut Vec<u8>,
+        value: &T,
+    ) -> Result<&'buf [u8], serde_json::Error>
+    where
+        T: Serialize,
+    {
+        serde_json::to_writer(&mut *buf, value)?;
+        Ok(buf)
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], serde_json::Error>
-        where
-            T: Serialize,
-        {
-            serde_json::to_writer(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, serde_json::Error>
-        where
-            T: Deserialize<'buf>,
-        {
-            serde_json::from_slice(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, serde_json::Error>
+    where
+        T: Deserialize<'buf>,
+    {
+        serde_json::from_slice(buf)
     }
 }
 
 #[cfg(feature = "bincode")]
+#[crate::benchmarker]
 pub mod serde_bincode {
     use alloc::vec::Vec;
 
     use serde::{Deserialize, Serialize};
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], bincode::Error>
+    where
+        T: Serialize,
+    {
+        bincode::serialize_into(&mut *buf, value)?;
+        Ok(buf.as_slice())
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], bincode::Error>
-        where
-            T: Serialize,
-        {
-            bincode::serialize_into(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, bincode::Error>
-        where
-            T: Deserialize<'buf>,
-        {
-            bincode::deserialize(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, bincode::Error>
+    where
+        T: Deserialize<'buf>,
+    {
+        bincode::deserialize(buf)
     }
 }
 
 #[cfg(feature = "serde_cbor")]
+#[crate::benchmarker]
 pub mod serde_cbor {
     use alloc::vec::Vec;
 
     use serde::{Deserialize, Serialize};
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(
+        buf: &'buf mut Vec<u8>,
+        value: &T,
+    ) -> Result<&'buf [u8], serde_cbor::Error>
+    where
+        T: Serialize,
+    {
+        serde_cbor::to_writer(&mut *buf, value)?;
+        Ok(buf.as_slice())
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], serde_cbor::Error>
-        where
-            T: Serialize,
-        {
-            serde_cbor::to_writer(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, serde_cbor::Error>
-        where
-            T: Deserialize<'buf>,
-        {
-            serde_cbor::from_slice(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, serde_cbor::Error>
+    where
+        T: Deserialize<'buf>,
+    {
+        serde_cbor::from_slice(buf)
     }
 }
 
 #[cfg(feature = "postcard")]
+#[crate::benchmarker]
 pub mod postcard {
     use alloc::vec::Vec;
 
     use serde::{Deserialize, Serialize};
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::new()
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::new()
+    pub fn reset<T>(buf: &mut Vec<u8>, size_hint: usize, value: &T)
+    where
+        T: Serialize,
+    {
+        if buf.len() < size_hint {
+            buf.resize(size_hint, 0);
         }
 
-        pub fn reset<T>(&mut self, size_hint: usize, value: &T)
-        where
-            T: Serialize,
-        {
-            if self.buffer.len() < size_hint {
-                self.buffer.resize(size_hint, 0);
-            }
-
-            // Figure out the size of the buffer to use. Don't worry, anything we do
-            // in `reset` doesn't count towards benchmarking.
-            while let Err(error) = postcard::to_slice(value, self.buffer) {
-                match error {
-                    postcard::Error::SerializeBufferFull => {
-                        let new_size = (self.buffer.len() as f32 * 1.5f32) as usize;
-                        self.buffer.resize(new_size, 0);
-                    }
-                    error => {
-                        panic!("{}", error)
-                    }
+        // Figure out the size of the buffer to use. Don't worry, anything we do
+        // in `reset` doesn't count towards benchmarking.
+        while let Err(error) = postcard::to_slice(value, buf) {
+            match error {
+                postcard::Error::SerializeBufferFull => {
+                    let new_size = (buf.len() as f32 * 1.5f32) as usize;
+                    buf.resize(new_size, 0);
+                }
+                error => {
+                    panic!("{}", error)
                 }
             }
         }
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], postcard::Error>
-        where
-            T: Serialize,
-        {
-            let buf = postcard::to_slice(value, self.buffer)?;
-            Ok(buf)
-        }
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], postcard::Error>
+    where
+        T: Serialize,
+    {
+        Ok(postcard::to_slice(value, buf)?)
+    }
 
-        pub fn decode<T>(&self) -> Result<T, postcard::Error>
-        where
-            T: Deserialize<'buf>,
-        {
-            postcard::from_bytes(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, postcard::Error>
+    where
+        T: Deserialize<'buf>,
+    {
+        postcard::from_bytes(buf)
     }
 }
 
 /// Bitcode lives in here with two variants, one using serde and another using
 /// its own derives.
 #[cfg(all(feature = "bitcode", feature = "serde"))]
+#[crate::benchmarker]
 pub mod serde_bitcode {
-    use bitcode::Buffer;
+    use alloc::vec::Vec;
+
     use serde::{Deserialize, Serialize};
 
-    benchmarker! {
-        'buf
+    pub fn encode<T>(value: &T) -> Result<Vec<u8>, bitcode::Error>
+    where
+        T: Serialize,
+    {
+        bitcode::serialize(value)
+    }
 
-        pub fn buffer() -> Buffer {
-            Buffer::with_capacity(4096)
-        }
-
-        pub fn reset<T>(&mut self, _: usize, _: &T) {}
-
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], bitcode::Error>
-        where
-            T: Serialize,
-        {
-            self.buffer.serialize(value)
-        }
-
-        pub fn decode<T>(&self) -> Result<T, bitcode::Error>
-        where
-            for<'de> T: Deserialize<'de>,
-        {
-            bitcode::deserialize(self.buffer)
-        }
+    pub fn decode<T>(buf: &[u8]) -> Result<T, bitcode::Error>
+    where
+        for<'de> T: Deserialize<'de>,
+    {
+        bitcode::deserialize(buf)
     }
 }
 
 /// Bitcode lives in here with two variants, one using serde and another using
 /// its own derives.
 #[cfg(feature = "bitcode-derive")]
+#[crate::benchmarker]
 pub mod derive_bitcode {
     use bitcode::Buffer;
     use bitcode::{Decode, Encode};
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Buffer {
+        Buffer::new()
+    }
 
-        pub fn buffer() -> Buffer {
-            Buffer::with_capacity(4096)
-        }
+    pub fn reset<T>(buf: &mut Buffer, value: &T)
+    where
+        T: Encode,
+    {
+        // Encode a value of the given type to "warm up" the buffer.
+        _ = buf.encode(value);
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {}
+    pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
+    where
+        T: Encode,
+    {
+        Ok(buf.encode(value))
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], bitcode::Error>
-        where
-            T: Encode,
-        {
-            self.buffer.encode(value)
-        }
-
-        pub fn decode<T>(&self) -> Result<T, bitcode::Error>
-        where
-            T: Decode,
-        {
-            bitcode::decode(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, bitcode::Error>
+    where
+        for<'de> T: Decode<'de>,
+    {
+        bitcode::decode(buf)
     }
 }

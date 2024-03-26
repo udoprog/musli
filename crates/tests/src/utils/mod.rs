@@ -1,8 +1,3 @@
-#![allow(clippy::len_without_is_empty)]
-
-#[macro_use]
-mod macros;
-
 #[allow(unused_imports)]
 pub use self::full::*;
 mod full;

@@ -1,6 +1,7 @@
 /// This one lives here because it doesn't support serialization of maps with
 /// other than string keys, and 128-bit numerical types.
 #[cfg(feature = "dlhn")]
+#[crate::benchmarker]
 pub mod serde_dlhn {
     use alloc::vec::Vec;
 
@@ -8,34 +9,32 @@ pub mod serde_dlhn {
     use dlhn::ser::Serializer;
     use serde::{Deserialize, Serialize};
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(
+        buf: &'buf mut Vec<u8>,
+        value: &T,
+    ) -> Result<&'buf [u8], dlhn::ser::Error>
+    where
+        T: Serialize,
+    {
+        let mut serializer = Serializer::new(&mut *buf);
+        value.serialize(&mut serializer)?;
+        Ok(buf)
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], dlhn::ser::Error>
-        where
-            T: Serialize,
-        {
-            let mut serializer = Serializer::new(&mut *self.buffer);
-            value.serialize(&mut serializer)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, dlhn::de::Error>
-        where
-            for<'de> T: Deserialize<'de>,
-        {
-            let mut buffer = self.buffer;
-            let mut deserializer = Deserializer::new(&mut buffer);
-            T::deserialize(&mut deserializer)
-        }
+    pub fn decode<T>(mut buf: &[u8]) -> Result<T, dlhn::de::Error>
+    where
+        for<'de> T: Deserialize<'de>,
+    {
+        let mut deserializer = Deserializer::new(&mut buf);
+        T::deserialize(&mut deserializer)
     }
 }
 
@@ -162,40 +161,41 @@ pub mod rkyv {
 
 /// RMP lacks support for certain numerical types.
 #[cfg(feature = "rmp-serde")]
+#[crate::benchmarker]
 pub mod serde_rmp {
     use alloc::vec::Vec;
 
     use serde::{Deserialize, Serialize};
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(
+        buf: &'buf mut Vec<u8>,
+        value: &T,
+    ) -> Result<&'buf [u8], rmp_serde::encode::Error>
+    where
+        T: Serialize,
+    {
+        rmp_serde::encode::write(&mut *buf, value)?;
+        Ok(buf)
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], rmp_serde::encode::Error>
-        where
-            T: Serialize,
-        {
-            rmp_serde::encode::write(&mut *self.buffer, value)?;
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, rmp_serde::decode::Error>
-        where
-            T: Deserialize<'buf>,
-        {
-            rmp_serde::from_slice(self.buffer)
-        }
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, rmp_serde::decode::Error>
+    where
+        T: Deserialize<'buf>,
+    {
+        rmp_serde::from_slice(buf)
     }
 }
 
 #[cfg(feature = "zerocopy")]
+#[crate::benchmarker]
 pub mod zerocopy {
     use core::fmt;
 
@@ -213,30 +213,26 @@ pub mod zerocopy {
         }
     }
 
-    benchmarker! {
-        'buf
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
 
-        pub fn buffer() -> Vec<u8> {
-            Vec::with_capacity(4096)
-        }
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
 
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.buffer.clear();
-        }
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: AsBytes,
+    {
+        buf.extend_from_slice(value.as_bytes());
+        Ok(buf.as_slice())
+    }
 
-        pub fn encode<T>(&mut self, value: &T) -> Result<&'buf [u8], Error>
-        where
-            T: AsBytes,
-        {
-            self.buffer.extend_from_slice(value.as_bytes());
-            Ok(self.buffer.as_slice())
-        }
-
-        pub fn decode<T>(&self) -> Result<T, Error>
-        where
-            T: FromBytes,
-        {
-            T::read_from(self.buffer).ok_or(Error)
-        }
+    pub fn decode<'buf, T>(buf: &[u8]) -> Result<T, Error>
+    where
+        T: FromBytes,
+    {
+        T::read_from(buf).ok_or(Error)
     }
 }

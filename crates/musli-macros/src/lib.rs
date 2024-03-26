@@ -13,6 +13,8 @@
 
 use proc_macro::TokenStream;
 
+#[cfg(feature = "test")]
+mod benchmarker;
 mod de;
 mod en;
 mod expander;
@@ -168,4 +170,16 @@ pub fn derive_generate(input: TokenStream) -> TokenStream {
     }
 
     stream.into()
+}
+
+#[cfg(feature = "test")]
+#[proc_macro_attribute]
+pub fn benchmarker(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attrs = syn::parse_macro_input!(attr as benchmarker::Attributes);
+    let input = syn::parse_macro_input!(input as benchmarker::Benchmarker);
+
+    match input.expand(&attrs) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
 }
