@@ -15,7 +15,7 @@ use rand::distributions::Standard;
 pub use musli_macros::Generate;
 
 #[cfg(feature = "std")]
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// Random number generator.
 pub struct Rng {
@@ -163,6 +163,91 @@ where
 
         for _ in 0..cap {
             map.insert(K::generate(rng), V::generate(rng));
+        }
+
+        map
+    }
+}
+
+#[cfg(feature = "std")]
+impl<K> Generate for HashSet<K>
+where
+    K: Eq + Hash,
+    K: Generate,
+{
+    #[inline]
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
+        Self::generate_range(rng, MAP_RANGE)
+    }
+
+    fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
+    where
+        T: rand::Rng,
+    {
+        let mut map = HashSet::new();
+
+        for _ in 0..rng.gen_range(range) {
+            map.insert(K::generate(rng));
+        }
+
+        map
+    }
+}
+
+#[cfg(feature = "std")]
+impl<K, V> Generate for BTreeMap<K, V>
+where
+    K: Eq + Ord,
+    K: Generate,
+    V: Generate,
+{
+    #[inline]
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
+        Self::generate_range(rng, MAP_RANGE)
+    }
+
+    fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
+    where
+        T: rand::Rng,
+    {
+        let mut map = BTreeMap::new();
+
+        for _ in 0..rng.gen_range(range) {
+            map.insert(K::generate(rng), V::generate(rng));
+        }
+
+        map
+    }
+}
+
+#[cfg(feature = "std")]
+impl<K> Generate for BTreeSet<K>
+where
+    K: Ord,
+    K: Generate,
+{
+    #[inline]
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
+        Self::generate_range(rng, MAP_RANGE)
+    }
+
+    fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
+    where
+        T: rand::Rng,
+    {
+        let mut map = BTreeSet::new();
+
+        for _ in 0..rng.gen_range(range) {
+            map.insert(K::generate(rng));
         }
 
         map

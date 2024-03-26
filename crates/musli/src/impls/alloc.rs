@@ -5,7 +5,7 @@ use core::hash::{BuildHasher, Hash};
 
 use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
-use alloc::collections::{BTreeMap, BinaryHeap, VecDeque};
+use alloc::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 use alloc::ffi::CString;
 use alloc::rc::Rc;
 use alloc::string::String;
@@ -280,6 +280,7 @@ sequence!(
     seq,
     VecDeque::with_capacity(size_hint::cautious(seq.size_hint()))
 );
+sequence!(cx, BTreeSet<T: Ord>, insert, seq, BTreeSet::new());
 #[cfg(feature = "std")]
 sequence!(
     cx,

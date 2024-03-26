@@ -33,6 +33,7 @@ model-no-usize = []
 model-no-cstring = []
 model-no-map = ["model-no-map-string-key"]
 model-no-map-string-key = ["model-no-map"]
+model-no-btree = []
 model-no-vec = []
 model-no-tuple = []
 model-no-128 = []
@@ -46,7 +47,7 @@ rkyv = ["dep:rkyv", "std", "model-no-usize", "model-no-map-string-key", "model-n
 serde_cbor = ["dep:serde_cbor", "serde", "model-no-128", "model-no-map"]
 dlhn = ["dep:dlhn", "serde", "model-no-128", "model-no-map"]
 bitcode = ["dep:bitcode", "serde", "simdutf8"]
-bitcode-derive = ["dep:bitcode", "bitcode?/derive", "simdutf8"]
+bitcode-derive = ["dep:bitcode", "bitcode?/derive", "simdutf8", "model-no-cstring"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.104", default-features = false, optional = true, features = ["alloc"] }

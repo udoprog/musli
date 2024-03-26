@@ -1,5 +1,8 @@
 #[cfg(not(feature = "model-no-map"))]
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+#[cfg(not(feature = "model-no-btree"))]
+use std::collections::{BTreeMap, BTreeSet};
 
 use core::ops::Range;
 
@@ -153,6 +156,14 @@ pub struct Allocated {
     string: String,
     #[cfg_attr(feature = "musli", musli(bytes))]
     bytes: Vec<u8>,
+    #[cfg(not(feature = "model-no-map"))]
+    number_map: HashMap<u32, u64>,
+    #[cfg(not(feature = "model-no-map"))]
+    number_set: HashSet<u32>,
+    #[cfg(not(feature = "model-no-btree"))]
+    number_btree: BTreeMap<u32, u64>,
+    #[cfg(not(feature = "model-no-btree"))]
+    number_btree_set: BTreeSet<u32>,
     #[cfg(not(feature = "model-no-cstring"))]
     c_string: CString,
 }
@@ -271,7 +282,7 @@ pub struct LargeStruct {
     #[cfg(not(feature = "model-no-map-string-key"))]
     string_keys: HashMap<String, u64>,
     #[cfg(not(feature = "model-no-map"))]
-    number_keys: HashMap<u32, u64>,
+    number_map: HashMap<u32, u64>,
     #[cfg(not(feature = "model-no-tuple"))]
     number_vec: Vec<(u32, u64)>,
 }
