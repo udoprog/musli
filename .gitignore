@@ -2,3 +2,4 @@
 /*.svg
 /perf.data*
 /Cargo.lock
+/benchmarks/

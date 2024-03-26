@@ -28,8 +28,6 @@ const LINKS: &[Link] = &[
     },
 ];
 
-const KINDS: &[(&str, &str)] = &[("dec", "Decode a type"), ("enc", "Encode a type")];
-
 #[derive(Clone, Copy)]
 struct Link {
     title: &'static str,
@@ -43,13 +41,29 @@ struct Group {
 }
 
 #[derive(Debug, Deserialize)]
+struct Kind {
+    id: String,
+    description: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct Manifest {
     #[serde(default)]
+    header: Vec<String>,
+    #[serde(default)]
     common: Vec<String>,
+    url: String,
+    branch: String,
+    #[serde(default)]
+    kinds: Vec<Kind>,
     #[serde(default)]
     groups: Vec<Group>,
     #[serde(default)]
     reports: Vec<Report>,
+    #[serde(default)]
+    crate_footnotes: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    footnotes: HashMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -168,18 +182,44 @@ fn main() -> Result<()> {
     let manifest: Manifest =
         toml::from_str(&reports).with_context(|| anyhow!("{}", reports_path.display()))?;
 
+    let images = root.join("benchmarks-new").join("images");
+
+    if !images.is_dir() {
+        fs::create_dir_all(&images).with_context(|| anyhow!("{}", images.display()))?;
+    }
+
     match command {
         Cmd::Report(a) => {
+            let branch = a.branch.as_deref().unwrap_or(manifest.branch.as_str());
+
+            let mut built_reports = Vec::new();
+            let mut size_sets = Vec::new();
+
+            for report in &manifest.reports {
+                if let Some(do_report) = args.report.as_deref() {
+                    if do_report != report.id {
+                        continue;
+                    }
+                }
+
+                println!("Building: {}", report.title);
+
+                let (size_set, group_plots) =
+                    build_report(&manifest, report, &root, a.bench, a.filter.as_deref())?;
+
+                size_sets.push((report, size_set));
+                built_reports.push((report, group_plots));
+            }
+
             let mut o = String::new();
 
             writeln!(o, "# Benchmarks and size comparisons")?;
             writeln!(o)?;
 
-            writeln!(
-                o,
-                "> The following are the results of preliminary benchmarking and should be"
-            )?;
-            writeln!(o, "> taken with a big grain of 🧂.")?;
+            for line in &manifest.header {
+                writeln!(o, "> {line}")?;
+            }
+
             writeln!(o)?;
 
             writeln!(
@@ -199,8 +239,18 @@ fn main() -> Result<()> {
 
             writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
 
-            for Report { title, link, .. } in &manifest.reports {
-                writeln!(o, "- [{title}](#{link})")?;
+            for (
+                Report {
+                    id, title, link, ..
+                },
+                _,
+            ) in &built_reports
+            {
+                writeln!(
+                    o,
+                    "- [{title}](#{link}) ([Full criterion report]({url}/criterion-{id}/report/))",
+                    url = manifest.url
+                )?;
             }
 
             writeln!(o)?;
@@ -210,17 +260,7 @@ fn main() -> Result<()> {
                 "Below you'll also find [Size comparisons](#size-comparisons)."
             )?;
 
-            let mut size_sets = Vec::new();
-
-            for report in &manifest.reports {
-                if let Some(do_report) = args.report.as_deref() {
-                    if do_report != report.id {
-                        continue;
-                    }
-                }
-
-                println!("Building: {}", report.title);
-
+            for (report, group_plots) in &built_reports {
                 writeln!(o, "# {}", report.title)?;
 
                 writeln!(o)?;
@@ -241,18 +281,37 @@ fn main() -> Result<()> {
                 }
 
                 writeln!(o)?;
-
-                let size_set = build_report(
-                    &manifest,
-                    &mut o,
-                    report,
-                    &root,
-                    a.bench,
-                    a.filter.as_deref(),
-                    a.branch.as_deref().unwrap_or("main"),
+                writeln!(
+                    o,
+                    "[Full criterion report]({url}/criterion-{id}/report/)",
+                    url = manifest.url,
+                    id = report.id
                 )?;
+                writeln!(o)?;
 
-                size_sets.push((report, size_set));
+                for (Group { id: group, .. }, plots) in group_plots {
+                    let kinds = manifest
+                        .kinds
+                        .iter()
+                        .map(|Kind { id, description }| format!("`{id}` - {description}"))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+
+                    write!(o, "`{group}`: {kinds}.")?;
+
+                    writeln!(o)?;
+                    writeln!(o)?;
+
+                    for plot in plots {
+                        writeln!(
+                            o,
+                            "<img style=\"background-color: white;\" src=\"{REPO}/{branch}/benchmarks/images/{plot}\">"
+                        )?;
+                        writeln!(o)?;
+                    }
+                }
+
+                writeln!(o)?;
             }
 
             size_comparisons(&manifest, &mut o, size_sets)?;
@@ -363,29 +422,18 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_report<W>(
-    manifest: &Manifest,
-    o: &mut W,
+type ReportPairs<'a> = (Vec<SizeSet>, Vec<(&'a Group, Vec<String>)>);
+
+fn build_report<'a>(
+    manifest: &'a Manifest,
     report: &Report,
     root: &Path,
     run_bench: bool,
     filter: Option<&str>,
-    branch: &str,
-) -> Result<Vec<SizeSet>>
-where
-    W: ?Sized + Write,
-{
-    let output = root.join("images");
-
-    if !output.is_dir() {
-        fs::create_dir(&output).with_context(|| anyhow!("{}", output.display()))?;
-    }
-
-    let target_dir = root.join("target");
-
-    let criterion_home = target_dir.join(format!("criterion-{}", report.id));
-
-    let comparison_env = [(OsStr::new("CRITERION_HOME"), criterion_home.as_os_str())];
+) -> Result<ReportPairs<'a>> {
+    let output = root.join("benchmarks-new");
+    let criterion_output = output.join(format!("criterion-{}", report.id));
+    let images = output.join("images");
 
     let bins = build_bench(manifest, report)?;
 
@@ -400,56 +448,41 @@ where
             args.push(filter);
         }
 
+        let comparison_env = [(OsStr::new("CRITERION_HOME"), criterion_output.as_os_str())];
         run_path(&bins.comparison, &args, &comparison_env[..])?;
     }
 
-    for Group { id: group, .. } in &manifest.groups {
+    if !criterion_output.is_dir() {
+        fs::create_dir_all(&criterion_output)
+            .with_context(|| anyhow!("{}", criterion_output.display()))?;
+    }
+
+    let mut output_plots = Vec::new();
+
+    for g @ Group { id: group, .. } in &manifest.groups {
         if !report.only.is_empty() && !report.only.iter().any(|o| *o == *group) {
             continue;
         }
 
         let mut plots = Vec::new();
 
-        for (kind, _) in KINDS {
-            let name = format!("{kind}_{group}_{}.svg", report.id);
-
-            let criterion_dir = criterion_home
+        for Kind { id: kind, .. } in &manifest.kinds {
+            let from = criterion_output
                 .join(format!("{kind}_{group}"))
-                .join("report");
+                .join("report")
+                .join("violin.svg");
 
-            let from = criterion_dir.join("violin.svg");
-            let to = output.join(&name);
-
-            if run_bench {
-                copy_svg(&from, &to)
-                    .with_context(|| anyhow!("{}: {}", report.id, from.display()))?;
-            }
-
+            let name = format!("{kind}_{group}_{}.svg", report.id);
+            let to = images.join(&name);
+            copy_svg(&from, to).with_context(|| anyhow!("{}: {}", report.id, from.display()))?;
             plots.push(name);
         }
 
-        let kinds = KINDS
-            .iter()
-            .map(|(k, d)| format!("`{k}` - {d}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        write!(o, "`{group}`: {kinds}.")?;
-
-        writeln!(o)?;
-        writeln!(o)?;
-
-        for plot in &plots {
-            writeln!(
-                o,
-                "<img style=\"background-color: white;\" src=\"{REPO}/{branch}/images/{plot}\">"
-            )?;
-            writeln!(o)?;
-        }
+        output_plots.push((g, plots));
     }
 
     let size_sets = collect_size_sets(&bins.fuzz)?;
-    Ok(size_sets)
+    Ok((size_sets, output_plots))
 }
 
 fn size_comparisons<W>(
@@ -486,20 +519,6 @@ where
     writeln!(o, "> ranges.")?;
 
     writeln!(o)?;
-
-    let mut footnotes = HashMap::new();
-    footnotes.insert("[^incomplete]", "These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result.");
-    footnotes.insert("[^i128]", "Lacks 128-bit support.");
-
-    let mut crate_footnotes = HashMap::new();
-
-    crate_footnotes.insert("musli_json", "[^incomplete]");
-    crate_footnotes.insert("rkyv", "[^incomplete]");
-    crate_footnotes.insert("serde_bitcode", "[^i128]");
-    crate_footnotes.insert("serde_cbor", "[^i128]");
-    crate_footnotes.insert("serde_dlhn", "[^i128]");
-    crate_footnotes.insert("serde_json", "[^incomplete]");
-    crate_footnotes.insert("derive_bitcode", "[^i128]");
 
     for (Report { title, .. }, size_sets) in size_sets {
         if size_sets.is_empty() {
@@ -546,14 +565,19 @@ where
         let mut used_footnotes = BTreeSet::new();
 
         for framework in rows {
-            let footnote = match crate_footnotes.get(framework.as_str()).copied() {
-                Some(footnote) => {
-                    used_footnotes.insert(footnote);
-                    footnote
+            let footnotes = match manifest.crate_footnotes.get(framework.as_str()) {
+                Some(footnotes) => {
+                    used_footnotes.extend(footnotes);
+                    &footnotes[..]
                 }
-                None => "",
+                None => &[],
             };
 
+            let footnote = footnotes
+                .iter()
+                .map(|f| format!("[^{f}]"))
+                .collect::<Vec<_>>()
+                .join("");
             write!(o, "| {framework}{footnote} |")?;
 
             for &suite in columns.iter() {
@@ -586,11 +610,11 @@ where
 
         if !used_footnotes.is_empty() {
             for footnote in used_footnotes {
-                let Some(note) = footnotes.get(footnote) else {
+                let Some(note) = manifest.footnotes.get(footnote) else {
                     continue;
                 };
 
-                writeln!(o, "{footnote}: {note}")?;
+                writeln!(o, "[^{footnote}]: {note}")?;
             }
 
             writeln!(o)?;
@@ -602,8 +626,11 @@ where
     Ok(())
 }
 
-fn copy_svg(from: &Path, to: &Path) -> Result<()> {
+fn copy_svg(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<()> {
     use std::io::Write;
+
+    let from = from.as_ref();
+    let to = to.as_ref();
 
     println!("copy: {} -> {}", from.display(), to.display());
 

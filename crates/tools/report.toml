@@ -1,5 +1,21 @@
+header = [
+    "The following are the results of preliminary benchmarking and should be",
+    "taken with a big grain of 🧂.",
+]
+
+url = "https://udoprog.github.io/musli/benchmarks"
+branch = "gh-pages"
+
 # features expected to be common to all.
 common = ["no-rt", "std", "alloc"]
+
+[[kinds]]
+id = "dec"
+description = "Decode a type"
+
+[[kinds]]
+id = "enc"
+description = "Encode a type"
 
 [[groups]]
 id = "primitives"
@@ -112,7 +128,7 @@ expected = []
 only = ["primpacked"]
 
 [[reports]]
-id = "bitcode derive"
+id = "bitcode-derive"
 title = "Bitcode derive"
 link = "bitcode-derive"
 description = [
@@ -128,3 +144,16 @@ features = [
 expected = [
     "musli", "model-no-cstring",
 ]
+
+[footnotes]
+incomplete = "These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result."
+i128 = "Lacks 128-bit support."
+
+[crate_footnotes]
+musli_json = ["incomplete"]
+rkyv = ["incomplete"]
+serde_bitcode = []
+serde_cbor = ["i128"]
+serde_dlhn = ["i128"]
+serde_json = ["incomplete"]
+derive_bitcode = []
