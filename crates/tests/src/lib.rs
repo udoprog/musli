@@ -12,6 +12,8 @@ extern crate std;
 /// Default random seed to use.
 pub const RNG_SEED: u64 = 2718281828459045235;
 
+pub use musli_macros::benchmarker;
+
 #[macro_export]
 macro_rules! miri {
     ($($(#[$($meta:meta)*])* $vis:vis const $ident:ident: $value_ty:ty = $range:expr, $miri:expr;)*) => {
