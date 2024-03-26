@@ -13,104 +13,6 @@ use serde::{Deserialize, Serialize};
 
 const REPO: &str = "https://raw.githubusercontent.com/udoprog/musli";
 
-const COMMON: &[&str] = &["no-rt", "std", "alloc"];
-
-const REPORTS: &[Report] = &[
-    Report {
-        id: "full",
-        title: "Full features",
-        link: "full-features",
-        description: &[
-            "These frameworks provide a fair comparison against Müsli on various areas since",
-            "they support the same set of features in what types of data they can represent.",
-        ],
-        features: &[
-            "musli-wire",
-            "musli-descriptive",
-            "musli-storage",
-            "musli-value",
-            "bincode",
-            "rmp-serde",
-            "postcard",
-            "bitcode",
-            "bitcode-derive",
-            "simdutf8",
-        ],
-        expected: &[
-            "musli", "serde"
-        ],
-        only: &[],
-    },
-    Report {
-        id: "text",
-        title: "Text-based formats",
-        link: "text-based-formats",
-        description: &[
-            "These are text-based formats, which support the full feature set of this test suite.",
-        ],
-        features: &[
-            "musli-json",
-            "serde_json",
-            "simdutf8",
-        ],
-        expected: &[
-            "musli", "serde",
-        ],
-        only: &[],
-    },
-    Report {
-        id: "fewer",
-        title: "Fewer features",
-        link: "fewer-features",
-        description: &[
-            "This is a suite where support for 128-bit integers and maps are disabled.",
-            "Usually because the underlying framework lacks support for them.",
-        ],
-        features: &[
-            "musli-wire",
-            "musli-descriptive",
-            "musli-storage",
-            "musli-value",
-            "serde_cbor",
-            // "dlhn", # broken
-            "simdutf8",
-        ],
-        expected: &[
-            "musli", "serde",
-            "model-no-128", "model-no-map", "model-no-map-string-key"
-        ],
-        only: &[],
-    },
-    Report {
-        id: "zerocopy-rkyv",
-        link: "müsli-vs-rkyv",
-        description: &[
-            "Comparison between [`musli-zerocopy`] and [`rkyv`].",
-            "",
-            "Note that `musli-zerocopy` only supports the `primitives` benchmark.",
-        ],
-        title: "Müsli vs rkyv",
-        features: &["musli-zerocopy", "rkyv"],
-        expected: &[
-            "model-no-cstring", "model-no-map", "model-no-map-string-key", "model-no-tuple", "model-no-usize"
-        ],
-        only: &["primitives", "primpacked"],
-    },
-    Report {
-        id: "zerocopy-zerocopy",
-        link: "müsli-vs-zerocopy",
-        description: &[
-            "Compares [`musli-zerocopy`] with [`zerocopy`].",
-            "",
-            "Note that `zerocopy` only supports packed primitives, so we're only comparing with that suite.",
-        ],
-        title: "Müsli vs zerocopy",
-        features: &["musli-zerocopy", "zerocopy"],
-        expected: &[],
-        only: &["primpacked"],
-    },
-];
-
 const LINKS: &[Link] = &[
     Link {
         title: "`rkyv`",
@@ -128,50 +30,41 @@ const LINKS: &[Link] = &[
 
 const KINDS: &[(&str, &str)] = &[("dec", "Decode a type"), ("enc", "Encode a type")];
 
-const GROUPS: &[Group] = &[
-    Group {
-        id: "primitives",
-        description: "which is a small object containing one of each primitive type and a string and a byte array.",
-    },
-    Group {
-        id: "primpacked",
-        description: "Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries.",
-    },
-    Group {
-        id: "medium_enum",
-        description: "A moderately sized enum with many field variations.",
-    },
-    Group {
-        id: "large",
-        description: "A really big and complex struct.",
-    },
-    Group {
-        id: "allocated",
-        description: "A sparse struct which contains fairly plain allocated data like strings and vectors.",
-    },
-];
-
 #[derive(Clone, Copy)]
 struct Link {
     title: &'static str,
     href: &'static str,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Deserialize)]
 struct Group {
-    id: &'static str,
-    description: &'static str,
+    id: String,
+    description: String,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Deserialize)]
+struct Manifest {
+    #[serde(default)]
+    common: Vec<String>,
+    #[serde(default)]
+    groups: Vec<Group>,
+    #[serde(default)]
+    reports: Vec<Report>,
+}
+
+#[derive(Debug, Deserialize)]
 struct Report {
-    id: &'static str,
-    description: &'static [&'static str],
-    title: &'static str,
-    link: &'static str,
-    features: &'static [&'static str],
-    expected: &'static [&'static str],
-    only: &'static [&'static str],
+    id: String,
+    #[serde(default)]
+    description: Vec<String>,
+    title: String,
+    link: String,
+    #[serde(default)]
+    features: Vec<String>,
+    #[serde(default)]
+    expected: Vec<String>,
+    #[serde(default)]
+    only: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -270,6 +163,11 @@ fn main() -> Result<()> {
 
     let command = args.command.unwrap_or_default();
 
+    let reports_path = root.join("crates").join("tools").join("report.toml");
+    let reports = fs::read_to_string(&reports_path)?;
+    let manifest: Manifest =
+        toml::from_str(&reports).with_context(|| anyhow!("{}", reports_path.display()))?;
+
     match command {
         Cmd::Report(a) => {
             let mut o = String::new();
@@ -292,7 +190,7 @@ fn main() -> Result<()> {
 
             for Group {
                 id, description, ..
-            } in GROUPS
+            } in &manifest.groups
             {
                 writeln!(o, "- `{id}` {description}")?;
             }
@@ -301,7 +199,7 @@ fn main() -> Result<()> {
 
             writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
 
-            for Report { title, link, .. } in REPORTS {
+            for Report { title, link, .. } in &manifest.reports {
                 writeln!(o, "- [{title}](#{link})")?;
             }
 
@@ -314,7 +212,7 @@ fn main() -> Result<()> {
 
             let mut size_sets = Vec::new();
 
-            for report in REPORTS {
+            for report in &manifest.reports {
                 if let Some(do_report) = args.report.as_deref() {
                     if do_report != report.id {
                         continue;
@@ -338,13 +236,14 @@ fn main() -> Result<()> {
                     writeln!(o)?;
                 }
 
-                for &line in report.description.iter() {
+                for line in &report.description {
                     writeln!(o, "{line}")?;
                 }
 
                 writeln!(o)?;
 
                 let size_set = build_report(
+                    &manifest,
                     &mut o,
                     report,
                     &root,
@@ -353,10 +252,10 @@ fn main() -> Result<()> {
                     a.branch.as_deref().unwrap_or("main"),
                 )?;
 
-                size_sets.push((*report, size_set));
+                size_sets.push((report, size_set));
             }
 
-            size_comparisons(&mut o, size_sets)?;
+            size_comparisons(&manifest, &mut o, size_sets)?;
 
             for Link { title, href } in LINKS {
                 writeln!(o, "[{title}]: {href}")?;
@@ -376,7 +275,7 @@ fn main() -> Result<()> {
 
             let mut builds = Vec::new();
 
-            for report in REPORTS {
+            for report in &manifest.reports {
                 if let Some(do_report) = args.report.as_deref() {
                     if do_report != report.id {
                         continue;
@@ -384,8 +283,9 @@ fn main() -> Result<()> {
                 }
 
                 let build = build_tests(
-                    report.features,
-                    report.expected,
+                    &manifest,
+                    &report.features,
+                    &report.expected,
                     "clippy",
                     &[],
                     &remaining[..],
@@ -429,15 +329,21 @@ fn main() -> Result<()> {
 
             let mut builds = Vec::new();
 
-            for report in REPORTS {
+            for report in &manifest.reports {
                 if let Some(do_report) = args.report.as_deref() {
                     if do_report != report.id {
                         continue;
                     }
                 }
 
-                let build =
-                    build_tests(report.features, report.expected, "build", &[], &remaining)?;
+                let build = build_tests(
+                    &manifest,
+                    &report.features,
+                    &report.expected,
+                    "build",
+                    &[],
+                    &remaining,
+                )?;
 
                 builds.push(build);
             }
@@ -458,6 +364,7 @@ fn main() -> Result<()> {
 }
 
 fn build_report<W>(
+    manifest: &Manifest,
     o: &mut W,
     report: &Report,
     root: &Path,
@@ -476,7 +383,7 @@ where
 
     let target_dir = root.join("target");
 
-    let bins = build_bench(report)?;
+    let bins = build_bench(manifest, report)?;
 
     if run_bench {
         run_path(&bins.comparison, &[])?;
@@ -490,7 +397,7 @@ where
 
         args.extend([
             "--save-baseline",
-            report.id,
+            &report.id,
             "--measurement-time",
             "0.5",
             "--warm-up-time",
@@ -499,8 +406,8 @@ where
         run_path(&bins.comparison, &args)?;
     }
 
-    for Group { id: group, .. } in GROUPS {
-        if !report.only.is_empty() && !report.only.contains(group) {
+    for Group { id: group, .. } in &manifest.groups {
+        if !report.only.is_empty() && !report.only.iter().any(|o| *o == *group) {
             continue;
         }
 
@@ -549,7 +456,11 @@ where
     Ok(size_sets)
 }
 
-fn size_comparisons<W>(o: &mut W, size_sets: Vec<(Report, Vec<SizeSet>)>) -> Result<()>
+fn size_comparisons<W>(
+    manifest: &Manifest,
+    o: &mut W,
+    size_sets: Vec<(&Report, Vec<SizeSet>)>,
+) -> Result<()>
 where
     W: Write,
 {
@@ -561,7 +472,7 @@ where
 
     for Group {
         id, description, ..
-    } in GROUPS
+    } in &manifest.groups
     {
         writeln!(o, "- {description} (`{id}`)")?;
     }
@@ -770,8 +681,9 @@ struct Build {
 }
 
 fn build_tests<C, S>(
-    features: &[&str],
-    expected: &[&str],
+    manifest: &Manifest,
+    features: &[String],
+    expected: &[String],
     command: C,
     head: &[S],
     remaining: &[S],
@@ -791,10 +703,11 @@ where
     child.arg("--message-format=json");
     child.stdout(Stdio::piped());
 
-    let features_argument = COMMON
+    let features_argument = manifest
+        .common
         .iter()
-        .chain(features)
-        .copied()
+        .chain(features.iter())
+        .map(String::as_str)
         .collect::<Vec<_>>()
         .join(",");
 
@@ -827,19 +740,23 @@ where
             "compiler-artifact" => {
                 let a: CompilerArtifact = serde_json::from_value(line.extra.clone())?;
 
-                let Some((head, _)) = a.package_id.split_once(' ') else {
+                let Some((_, last)) = a.package_id.rsplit_once('/') else {
                     continue;
                 };
 
-                if head != "tests" {
+                let Some((package_name, _)) = last.rsplit_once('#') else {
+                    continue;
+                };
+
+                if package_name != "tests" {
                     continue;
                 }
 
                 let mut expected = features
                     .iter()
                     .chain(expected)
-                    .chain(COMMON)
-                    .map(|s| (*s).to_owned())
+                    .chain(manifest.common.iter())
+                    .cloned()
                     .collect::<BTreeSet<_>>();
 
                 let mut unexpected = BTreeSet::new();
@@ -884,10 +801,11 @@ where
 }
 
 /// Build benchmarks.
-fn build_bench(report: &Report) -> Result<Build> {
+fn build_bench(manifest: &Manifest, report: &Report) -> Result<Build> {
     let build = build_tests(
-        report.features,
-        report.expected,
+        manifest,
+        &report.features,
+        &report.expected,
         "build",
         &["--release", "--benches"],
         &[],
@@ -916,7 +834,9 @@ fn build_bench(report: &Report) -> Result<Build> {
         bail!("Command failed: {}", build.status.success());
     }
 
-    let fuzz = build.bin("bin", "fuzz").context("missing fuzz")?;
+    let fuzz = build
+        .bin("bin", "fuzz")
+        .with_context(|| anyhow!("missing fuzz in {build:?}"))?;
     let comparison = build
         .bin("bench", "comparison")
         .context("missing comparison")?;

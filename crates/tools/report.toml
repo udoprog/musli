@@ -1,0 +1,130 @@
+# features expected to be common to all.
+common = ["no-rt", "std", "alloc"]
+
+[[groups]]
+id = "primitives"
+description = "which is a small object containing one of each primitive type and a string and a byte array."
+
+[[groups]]
+id = "primpacked"
+description = "Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries."
+
+[[groups]]
+id = "medium_enum"
+description = "A moderately sized enum with many field variations."
+
+[[groups]]
+id = "large"
+description = "A really big and complex struct."
+
+[[groups]]
+id = "allocated"
+description = "A sparse struct which contains fairly plain allocated data like strings and vectors."
+
+[[reports]]
+id = "full"
+title = "Full features"
+link = "full-features"
+description = [
+    "These frameworks provide a fair comparison against Müsli on various areas since",
+    "they support the same set of features in what types of data they can represent.",
+]
+features = [
+    "musli-wire",
+    "musli-descriptive",
+    "musli-storage",
+    "musli-value",
+    "bincode",
+    "rmp-serde",
+    "postcard",
+    "bitcode",
+    "simdutf8",
+]
+expected = [
+    "musli", "serde"
+]
+
+[[reports]]
+id = "text"
+title = "Text-based formats"
+link = "text-based-formats"
+description = [
+    "These are text-based formats, which support the full feature set of this test suite.",
+]
+features = [
+    "musli-json",
+    "serde_json",
+    "simdutf8",
+]
+expected = [
+    "musli", "serde",
+]
+
+[[reports]]
+id = "fewer"
+title = "Fewer features"
+link = "fewer-features"
+description = [
+    "This is a suite where support for 128-bit integers and maps are disabled.",
+    "Usually because the underlying framework lacks support for them.",
+]
+features = [
+    "musli-wire",
+    "musli-descriptive",
+    "musli-storage",
+    "musli-value",
+    "serde_cbor",
+    # broken
+    # "dlhn",
+    "simdutf8",
+]
+expected = [
+    "musli", "serde",
+    "model-no-128", "model-no-map", "model-no-map-string-key"
+]
+
+[[reports]]
+id = "zerocopy-rkyv"
+title = "Müsli vs rkyv"
+link = "müsli-vs-rkyv"
+description = [
+    "Comparison between [`musli-zerocopy`] and [`rkyv`].",
+    "",
+    "Note that `musli-zerocopy` only supports the `primitives` benchmark.",
+]
+features = ["musli-zerocopy", "rkyv"]
+expected = [
+    "model-no-cstring", "model-no-map", "model-no-map-string-key", "model-no-tuple", "model-no-usize"
+]
+only = ["primitives", "primpacked"]
+
+[[reports]]
+id = "zerocopy-zerocopy"
+link = "müsli-vs-zerocopy"
+description = [
+    "Compares [`musli-zerocopy`] with [`zerocopy`].",
+    "",
+    "Note that `zerocopy` only supports packed primitives, so we're only comparing with that suite.",
+]
+title = "Müsli vs zerocopy"
+features = ["musli-zerocopy", "zerocopy"]
+expected = []
+only = ["primpacked"]
+
+[[reports]]
+id = "bitcode derive"
+title = "Bitcode derive"
+link = "bitcode-derive"
+description = [
+    "Uses a custom derive-based framework which does not support everything Müsli and serde does.",
+]
+features = [
+    "musli-wire",
+    "musli-descriptive",
+    "musli-storage",
+    "musli-value",
+    "bitcode-derive",
+]
+expected = [
+    "musli", "model-no-cstring",
+]
