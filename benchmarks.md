@@ -22,8 +22,6 @@ The following are one section for each kind of benchmark we perform. They range 
 Below you'll also find [Size comparisons](#size-comparisons).
 # Full features
 
-> **Missing features:** `musli`, `serde`
-
 These frameworks provide a fair comparison against Müsli on various areas since
 they support the same set of features in what types of data they can represent.
 
@@ -62,8 +60,6 @@ they support the same set of features in what types of data they can represent.
 
 # Text-based formats
 
-> **Missing features:** `musli`, `serde`
-
 These are text-based formats, which support the full feature set of this test suite.
 
 [Full criterion report](https://udoprog.github.io/musli/benchmarks/criterion-text/report/)
@@ -101,7 +97,7 @@ These are text-based formats, which support the full feature set of this test su
 
 # Fewer features
 
-> **Missing features:** `musli`, `serde`, `model-no-128`, `model-no-map`, `model-no-map-string-key`
+> **Missing features:** `128`, `map`, `map-string-key`
 
 This is a suite where support for 128-bit integers and maps are disabled.
 Usually because the underlying framework lacks support for them.
@@ -141,7 +137,7 @@ Usually because the underlying framework lacks support for them.
 
 # Müsli vs rkyv
 
-> **Missing features:** `model-no-cstring`, `model-no-map`, `model-no-map-string-key`, `model-no-tuple`, `model-no-usize`
+> **Missing features:** `cstring`, `map`, `map-string-key`, `tuple`, `usize`
 
 Comparison between [`musli-zerocopy`] and [`rkyv`].
 
@@ -179,7 +175,7 @@ Note that `zerocopy` only supports packed primitives, so we're only comparing wi
 
 # Bitcode derive
 
-> **Missing features:** `musli`, `model-no-cstring`
+> **Missing features:** `cstring`
 
 Uses a custom derive-based framework which does not support everything Müsli and serde does.
 
