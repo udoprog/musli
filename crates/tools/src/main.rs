@@ -383,27 +383,24 @@ where
 
     let target_dir = root.join("target");
 
+    let criterion_home = target_dir.join(format!("criterion-{}", report.id));
+
+    let comparison_env = [(OsStr::new("CRITERION_HOME"), criterion_home.as_os_str())];
+
     let bins = build_bench(manifest, report)?;
 
     if run_bench {
-        run_path(&bins.comparison, &[])?;
+        // Just test the binaries.
+        run_path(&bins.comparison, &[], &[])?;
 
-        let mut args = vec!["--bench"];
+        let mut args = vec!["--bench", "--quick"];
 
         if let Some(filter) = filter {
             args.push("--");
             args.push(filter);
         }
 
-        args.extend([
-            "--save-baseline",
-            &report.id,
-            "--measurement-time",
-            "0.5",
-            "--warm-up-time",
-            "0.1",
-        ]);
-        run_path(&bins.comparison, &args)?;
+        run_path(&bins.comparison, &args, &comparison_env[..])?;
     }
 
     for Group { id: group, .. } in &manifest.groups {
@@ -416,8 +413,7 @@ where
         for (kind, _) in KINDS {
             let name = format!("{kind}_{group}_{}.svg", report.id);
 
-            let criterion_dir = target_dir
-                .join("criterion")
+            let criterion_dir = criterion_home
                 .join(format!("{kind}_{group}"))
                 .join("report");
 
@@ -629,14 +625,18 @@ fn copy_svg(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
-fn run_path(path: &Path, args: &[&str]) -> Result<()> {
+fn run_path(path: &Path, args: &[&str], env: &[(&OsStr, &OsStr)]) -> Result<()> {
     let mut command = Command::new(path);
 
     for arg in args {
         command.arg(arg);
     }
 
-    print_command(&command);
+    for (key, value) in env {
+        command.env(*key, *value);
+    }
+
+    print_command(&command, env);
 
     let status = command.status()?;
 
@@ -718,7 +718,7 @@ where
         child.args(remaining);
     }
 
-    print_command(&child);
+    print_command(&child, &[]);
 
     let mut child = child.spawn()?;
 
@@ -843,7 +843,7 @@ fn build_bench(manifest: &Manifest, report: &Report) -> Result<Build> {
     Ok(Build { fuzz, comparison })
 }
 
-fn print_command(child: &Command) {
+fn print_command(child: &Command, env: &[(&OsStr, &OsStr)]) {
     let program = child.get_program().to_string_lossy();
 
     let args = child
@@ -852,7 +852,15 @@ fn print_command(child: &Command) {
         .collect::<Vec<_>>()
         .join(" ");
 
-    println!("{program} {args}");
+    let mut e = String::new();
+
+    if !env.is_empty() {
+        for (key, value) in env {
+            _ = write!(e, "{}={} ", key.to_string_lossy(), value.to_string_lossy());
+        }
+    }
+
+    println!("{e}{program} {args}");
 }
 
 /// Collect size sets from the fuzz command.
@@ -860,7 +868,7 @@ fn collect_size_sets(path: &Path) -> Result<Vec<SizeSet>> {
     let mut child = Command::new(path);
     child.stdout(Stdio::piped());
     child.arg("--size");
-    print_command(&child);
+    print_command(&child, &[]);
 
     let mut child = child.spawn()?;
 
