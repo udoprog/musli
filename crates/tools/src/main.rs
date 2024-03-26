@@ -126,6 +126,8 @@ struct ArgsReport {
     /// Run benchmarks.
     #[arg(short, long)]
     bench: bool,
+    /// Run `--quick` benchmarks.
+    quick: bool,
     /// Reference graphics from the given branch.
     #[arg(long)]
     branch: Option<String>,
@@ -205,7 +207,7 @@ fn main() -> Result<()> {
                 println!("Building: {}", report.title);
 
                 let (size_set, group_plots) =
-                    build_report(&manifest, report, &root, a.bench, a.filter.as_deref())?;
+                    build_report(&a, &manifest, report, &root, a.bench, a.filter.as_deref())?;
 
                 size_sets.push((report, size_set));
                 built_reports.push((report, group_plots));
@@ -265,14 +267,15 @@ fn main() -> Result<()> {
 
                 writeln!(o)?;
 
-                if !report.expected.is_empty() {
-                    let features = report
-                        .expected
-                        .iter()
-                        .map(|f| format!("`{f}`"))
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    writeln!(o, "> **Missing features:** {features}")?;
+                let missing = report
+                    .expected
+                    .iter()
+                    .flat_map(|f| f.strip_prefix("model-no-"))
+                    .map(|f| format!("`{f}`"))
+                    .collect::<Vec<_>>();
+
+                if !missing.is_empty() {
+                    writeln!(o, "> **Missing features:** {}", missing.join(", "))?;
                     writeln!(o)?;
                 }
 
@@ -425,6 +428,7 @@ fn main() -> Result<()> {
 type ReportPairs<'a> = (Vec<SizeSet>, Vec<(&'a Group, Vec<String>)>);
 
 fn build_report<'a>(
+    a: &ArgsReport,
     manifest: &'a Manifest,
     report: &Report,
     root: &Path,
@@ -441,7 +445,11 @@ fn build_report<'a>(
         // Just test the binaries.
         run_path(&bins.comparison, &[], &[])?;
 
-        let mut args = vec!["--bench", "--quick"];
+        let mut args = vec!["--bench"];
+
+        if a.quick {
+            args.push("--quick");
+        }
 
         if let Some(filter) = filter {
             args.push("--");
