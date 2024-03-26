@@ -93,22 +93,6 @@ macro_rules! rt {
     }};
 }
 
-#[macro_export]
-macro_rules! musli_zerocopy_call {
-    ($call:path) => {
-    };
-
-    ($call:path, primitives, $ty:ty, $size_hint:expr $(, $tt:tt)*) => {
-        $call!(musli_value, musli_value_buf, primitives, $ty, $size_hint);
-        $crate::musli_zerocopy_call!($call $(, $tt)*);
-    };
-
-    // Ignore others.
-    ($call:path, $name:ident, $ty:ty, $size_hint:expr $(, $tt:tt)*) => {
-        $crate::musli_zerocopy_call!($call $(, $tt)*);
-    };
-}
-
 /// Call the given macro with the existing feature matrix.
 #[macro_export]
 macro_rules! feature_matrix {

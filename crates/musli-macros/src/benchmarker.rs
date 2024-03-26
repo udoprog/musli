@@ -556,6 +556,11 @@ fn argument_attrs(
     };
 
     for attr in ty.attrs.drain(..) {
+        if attr.path().is_ident("value") {
+            argument = Some(Argument::Value(ident.clone()));
+            continue;
+        }
+
         if attr.path().is_ident("buffer") {
             argument = Some(Argument::Buffer(ident.clone()));
             continue;
