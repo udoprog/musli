@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
@@ -486,6 +486,8 @@ fn build_report<'a>(
                 .join("report")
                 .join("violin.svg");
 
+            ensure!(from.is_file(), "Missing {}", from.display());
+
             let name = format!("{kind}_{group}_{}.svg", report.id);
             let to = images.join(&name);
             copy_svg(&from, to).with_context(|| anyhow!("{}: {}", report.id, from.display()))?;
@@ -681,10 +683,7 @@ fn run_path(path: &Path, args: &[&str], env: &[(&OsStr, &OsStr)]) -> Result<()> 
 
     let status = command.status()?;
 
-    if !status.success() {
-        bail!("Command failed: {status}")
-    }
-
+    ensure!(status.success(), "Command failed: {status}");
     Ok(())
 }
 
@@ -924,10 +923,7 @@ fn collect_size_sets(path: &Path) -> Result<Vec<SizeSet>> {
 
     let status = child.wait()?;
 
-    if !status.success() {
-        bail!("Command failed: {}", status.success());
-    }
-
+    ensure!(status.success(), "Command failed: {}", status.success());
     Ok(size_sets)
 }
 
