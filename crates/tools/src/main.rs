@@ -355,10 +355,9 @@ fn main() -> Result<()> {
                 writeln!(o, "[{title}]: {href}")?;
             }
 
-            let report = output.join("benchmarks.md");
-
+            let report = output.join("index.md");
             println!("Writing: {}", report.display());
-            fs::write(&report, o.as_bytes())?;
+            fs::write(report, o.as_bytes())?;
         }
         Cmd::Clippy(a) => {
             let mut remaining = Vec::new();
