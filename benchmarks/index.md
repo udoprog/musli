@@ -29,9 +29,16 @@ they support the same set of features in what types of data they can represent.
 
 `primitives`: `dec` - Decode a type, `enc` - Encode a type.
 
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primitives_full.svg">
-
-<img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primitives_full.svg">
+<table>
+<tr>
+<td>
+    <a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primitives_full.svg">
+        <img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primitives_full.svg">
+    </a>
+</td>
+<td><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primitives_full.svg"></td>
+</tr>
+</table>
 
 `primpacked`: `dec` - Decode a type, `enc` - Encode a type.
 
