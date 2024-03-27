@@ -200,6 +200,8 @@ fn main() -> Result<()> {
             let mut built_reports = Vec::new();
             let mut size_sets = Vec::new();
 
+            let mut bins = Vec::new();
+
             for report in &manifest.reports {
                 if let Some(do_report) = args.report.as_deref() {
                     if do_report != report.id {
@@ -207,13 +209,40 @@ fn main() -> Result<()> {
                     }
                 }
 
-                println!("Building: {}", report.title);
+                bins.push(Bins::build(&manifest, report)?);
+            }
 
-                let (size_set, group_plots) =
-                    build_report(&a, &manifest, report, &output, a.bench, a.filter.as_deref())?;
+            let mut errored = Vec::new();
 
-                size_sets.push((report, size_set));
-                built_reports.push((report, group_plots));
+            for bins in &mut bins {
+                println!("Building: {}", bins.report.title);
+
+                match build_report(&a, bins, &output, a.bench, a.filter.as_deref()) {
+                    Ok(group_plots) => {
+                        built_reports.push((bins.report, group_plots));
+                    }
+                    Err(error) => {
+                        errored.push((bins.report, error));
+                    }
+                }
+            }
+
+            if !errored.is_empty() {
+                for (report, error) in &errored {
+                    println!("Failed to build report: {}", report.title);
+
+                    for error in error.chain() {
+                        println!("Caused by: {error}");
+                    }
+                }
+
+                bail!("{} builds failed", errored.len());
+            }
+
+            for bins in &mut bins {
+                println!("Sizing: {}", bins.report.title);
+                let size_set = collect_size_sets(bins.fuzz()).context("Collecting size sets")?;
+                size_sets.push((bins.report, size_set));
             }
 
             let mut o = String::new();
@@ -431,67 +460,48 @@ fn main() -> Result<()> {
 struct Bins<'a> {
     manifest: &'a Manifest,
     report: &'a Report,
-    fuzz: Option<PathBuf>,
-    comparison: Option<PathBuf>,
+    fuzz: PathBuf,
+    comparison: PathBuf,
 }
 
 impl<'a> Bins<'a> {
-    fn new(manifest: &'a Manifest, report: &'a Report) -> Self {
-        Self {
+    fn build(manifest: &'a Manifest, report: &'a Report) -> Result<Self> {
+        let built = build_bench(manifest, report).context("Failed to build benches")?;
+
+        Ok(Self {
             manifest,
             report,
-            fuzz: None,
-            comparison: None,
-        }
+            fuzz: built.fuzz,
+            comparison: built.comparison,
+        })
     }
 
-    fn build(&mut self) -> Result<()> {
-        if self.fuzz.is_some() && self.comparison.is_some() {
-            return Ok(());
-        }
-
-        let built = build_bench(self.manifest, self.report).context("Failed to build benches")?;
-
-        self.fuzz = Some(built.fuzz);
-        self.comparison = Some(built.comparison);
-        Ok(())
+    fn fuzz(&mut self) -> &Path {
+        &self.fuzz
     }
 
-    fn fuzz(&mut self) -> Result<&Path> {
-        self.build()?;
-        self.fuzz.as_deref().context("Missing `fuzz` binary")
-    }
-
-    fn comparison(&mut self) -> Result<&Path> {
-        self.build()?;
-        self.comparison
-            .as_deref()
-            .context("Missing `comparison` binary")
+    fn comparison(&mut self) -> &Path {
+        &self.comparison
     }
 }
 
-type ReportPairs<'a> = (Vec<SizeSet>, Vec<(&'a Group, Vec<String>)>);
-
 fn build_report<'a>(
     a: &ArgsReport,
-    manifest: &'a Manifest,
-    report: &Report,
+    bins: &mut Bins<'a>,
     output: &Path,
     run_bench: bool,
     filter: Option<&str>,
-) -> Result<ReportPairs<'a>> {
-    let criterion_output = output.join(format!("criterion-{}", report.id));
+) -> Result<Vec<(&'a Group, Vec<String>)>> {
+    let criterion_output = output.join(format!("criterion-{}", bins.report.id));
     let images = output.join("images");
 
     if !images.is_dir() {
         fs::create_dir_all(&images).with_context(|| anyhow!("{}", images.display()))?;
     }
 
-    let mut bins = Bins::new(manifest, report);
-
     if run_bench {
         // Just test the binaries.
-        run_path(bins.comparison()?, &[], &[])?;
+        run_path(bins.comparison(), &[], &[])?;
 
         let mut args = vec!["--bench"];
 
@@ -505,7 +515,7 @@ fn build_report<'a>(
         }
 
         let comparison_env = [(OsStr::new("CRITERION_HOME"), criterion_output.as_os_str())];
-        run_path(bins.comparison()?, &args, &comparison_env[..])?;
+        run_path(bins.comparison(), &args, &comparison_env[..])?;
     }
 
     if !criterion_output.is_dir() {
@@ -515,14 +525,14 @@ fn build_report<'a>(
 
     let mut output_plots = Vec::new();
 
-    for g @ Group { id: group, .. } in &manifest.groups {
-        if !report.only.is_empty() && !report.only.iter().any(|o| *o == *group) {
+    for g @ Group { id: group, .. } in &bins.manifest.groups {
+        if !bins.report.only.is_empty() && !bins.report.only.iter().any(|o| *o == *group) {
             continue;
         }
 
         let mut plots = Vec::new();
 
-        for Kind { id: kind, .. } in &manifest.kinds {
+        for Kind { id: kind, .. } in &bins.manifest.kinds {
             let from = criterion_output
                 .join(format!("{kind}_{group}"))
                 .join("report")
@@ -530,17 +540,17 @@ fn build_report<'a>(
 
             ensure!(from.is_file(), "Missing {}", from.display());
 
-            let name = format!("{kind}_{group}_{}.svg", report.id);
+            let name = format!("{kind}_{group}_{}.svg", bins.report.id);
             let to = images.join(&name);
-            copy_svg(&from, to).with_context(|| anyhow!("{}: {}", report.id, from.display()))?;
+            copy_svg(&from, to)
+                .with_context(|| anyhow!("{}: {}", bins.report.id, from.display()))?;
             plots.push(name);
         }
 
         output_plots.push((g, plots));
     }
 
-    let size_sets = collect_size_sets(bins.fuzz()?)?;
-    Ok((size_sets, output_plots))
+    Ok(output_plots)
 }
 
 fn size_comparisons<W>(
