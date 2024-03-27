@@ -245,6 +245,7 @@ Each test suite serializes a collection of values, which have all been randomly 
 | - | - | - | - | - | - |
 | musli_json[^incomplete] | <a title="samples: 500, min: 308, max: 322, stddev: 2.370359466410104">315.41 ± 2.37</a> | <a title="samples: 500, min: 326, max: 343, stddev: 2.9921657708088594">335.29 ± 2.99</a> | <a title="samples: 10, min: 49474, max: 132961, stddev: 27917.641499417536">104410.10 ± 27917.64</a> | <a title="samples: 100, min: 1825, max: 8048, stddev: 1309.343993418078">5204.37 ± 1309.34</a> | <a title="samples: 500, min: 8, max: 374, stddev: 130.1708978074593">80.56 ± 130.17</a> |
 | serde_json[^incomplete] | <a title="samples: 500, min: 428, max: 442, stddev: 2.370359466410104">435.41 ± 2.37</a> | <a title="samples: 500, min: 443, max: 460, stddev: 2.9921657708088594">452.29 ± 2.99</a> | <a title="samples: 10, min: 58290, max: 151281, stddev: 29868.570850477598">114993.50 ± 29868.57</a> | <a title="samples: 100, min: 1883, max: 8106, stddev: 1309.3415809482265">5262.38 ± 1309.34</a> | <a title="samples: 500, min: 9, max: 507, stddev: 176.6225341342379">107.79 ± 176.62</a> |
+
 [^incomplete]: These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result.
 
 
@@ -257,6 +258,7 @@ Each test suite serializes a collection of values, which have all been randomly 
 | musli_storage_packed | <a title="samples: 500, min: 63, max: 67, stddev: 0.7069257386741584">65.98 ± 0.71</a> | <a title="samples: 500, min: 81, max: 84, stddev: 0.7482539675805259">83.05 ± 0.75</a> | <a title="samples: 10, min: 11785, max: 35243, stddev: 8224.133459520219">21109.20 ± 8224.13</a> | <a title="samples: 100, min: 408, max: 1655, stddev: 333.45055105667467">1047.50 ± 333.45</a> | <a title="samples: 500, min: 2, max: 122, stddev: 36.834142639676045">26.96 ± 36.83</a> |
 | musli_wire | <a title="samples: 500, min: 96, max: 106, stddev: 1.7524143345681649">101.86 ± 1.75</a> | <a title="samples: 500, min: 102, max: 111, stddev: 1.7655310815729104">106.83 ± 1.77</a> | <a title="samples: 10, min: 18110, max: 55370, stddev: 13175.128890830632">33125.10 ± 13175.13</a> | <a title="samples: 100, min: 534, max: 2264, stddev: 460.5688304694533">1413.82 ± 460.57</a> | <a title="samples: 500, min: 3, max: 128, stddev: 48.062208188971134">34.99 ± 48.06</a> |
 | serde_cbor[^i128] | <a title="samples: 500, min: 210, max: 213, stddev: 0.5346961754117986">212.69 ± 0.53</a> | <a title="samples: 500, min: 218, max: 222, stddev: 0.847610759724064">221.17 ± 0.85</a> | <a title="samples: 10, min: 21951, max: 68937, stddev: 14937.52257404152">39216.50 ± 14937.52</a> | <a title="samples: 100, min: 560, max: 2065, stddev: 392.00111874840366">1324.73 ± 392.00</a> | <a title="samples: 500, min: 8, max: 250, stddev: 86.93208604422198">61.70 ± 86.93</a> |
+
 [^i128]: Lacks 128-bit support.
 
 
@@ -266,6 +268,7 @@ Each test suite serializes a collection of values, which have all been randomly 
 | - | - | - | - | - | - |
 | musli_zerocopy | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 500, min: 80, max: 80, stddev: 0">80.00 ± 0.00</a> | - | - | - |
 | rkyv[^incomplete] | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 500, min: 80, max: 80, stddev: 0">80.00 ± 0.00</a> | <a title="samples: 10, min: 6352, max: 19424, stddev: 3868.9313459920686">13947.20 ± 3868.93</a> | <a title="samples: 100, min: 440, max: 2152, stddev: 432.9606430150437">1286.96 ± 432.96</a> | <a title="samples: 500, min: 128, max: 256, stddev: 30.415154117643404">139.52 ± 30.42</a> |
+
 [^incomplete]: These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result.
 
 
