@@ -198,9 +198,12 @@ struct Args {
 
 fn main() -> Result<()> {
     let root =
-        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").context("missing `CARGO_MANIFEST_DIR`")?)
-            .join("..")
-            .join("..");
+        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").context("missing `CARGO_MANIFEST_DIR`")?);
+
+    let root = root
+        .parent()
+        .and_then(|p| p.parent())
+        .context("Missing root directory")?;
 
     let args = Args::try_parse()?;
 
