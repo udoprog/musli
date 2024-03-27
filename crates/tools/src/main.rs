@@ -677,6 +677,8 @@ where
         }
 
         if !used_footnotes.is_empty() {
+            writeln!(o)?;
+
             for footnote in used_footnotes {
                 let Some(note) = manifest.footnotes.get(footnote) else {
                     continue;
@@ -684,8 +686,6 @@ where
 
                 writeln!(o, "[^{footnote}]: {note}")?;
             }
-
-            writeln!(o)?;
         }
 
         writeln!(o)?;
