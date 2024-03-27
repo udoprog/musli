@@ -340,34 +340,8 @@ fn main() -> Result<()> {
 
             for (bins @ Bins { report, .. }, group_plots) in &built_reports {
                 writeln!(o, "### {}", report.title)?;
+                render_preamble(&mut o, &manifest, report)?;
 
-                writeln!(o)?;
-
-                let missing = report
-                    .expected
-                    .iter()
-                    .flat_map(|f| f.strip_prefix("no-"))
-                    .collect::<Vec<_>>();
-
-                if !missing.is_empty() {
-                    writeln!(o, "> **Missing features:**")?;
-
-                    for feature in missing {
-                        if let Some(description) = manifest.missing_features.get(feature) {
-                            writeln!(o, "> - `{feature}` - {description}")?;
-                        } else {
-                            writeln!(o, "> - `{feature}`")?;
-                        }
-                    }
-
-                    writeln!(o)?;
-                }
-
-                for line in &report.description {
-                    writeln!(o, "{line}")?;
-                }
-
-                writeln!(o)?;
                 writeln!(o, "**More:**")?;
                 writeln!(o)?;
                 writeln!(
@@ -793,6 +767,40 @@ fn build_report<'a>(
     Ok(output_plots)
 }
 
+fn render_preamble<W>(o: &mut W, manifest: &Manifest, report: &Report) -> Result<()>
+where
+    W: Write,
+{
+    writeln!(o)?;
+
+    let missing = report
+        .expected
+        .iter()
+        .flat_map(|f| f.strip_prefix("no-"))
+        .collect::<Vec<_>>();
+
+    if !missing.is_empty() {
+        writeln!(o, "> **Missing features:**")?;
+
+        for feature in missing {
+            if let Some(description) = manifest.missing_features.get(feature) {
+                writeln!(o, "> - `{feature}` - {description}")?;
+            } else {
+                writeln!(o, "> - `{feature}`")?;
+            }
+        }
+
+        writeln!(o)?;
+    }
+
+    for line in &report.description {
+        writeln!(o, "{line}")?;
+    }
+
+    writeln!(o)?;
+    Ok(())
+}
+
 fn size_comparisons<'a, W>(
     o: &mut W,
     manifest: &'a Manifest,
@@ -829,13 +837,13 @@ where
 
     writeln!(o)?;
 
-    for (Report { title, .. }, size_sets) in size_sets {
+    for (report, size_sets) in size_sets {
         if size_sets.is_empty() {
             continue;
         }
 
-        writeln!(o, "#### {title} sizes")?;
-        writeln!(o)?;
+        writeln!(o, "#### {} sizes", report.title)?;
+        render_preamble(o, manifest, report)?;
 
         let mut columns = Vec::new();
         let mut rows = BTreeSet::new();
