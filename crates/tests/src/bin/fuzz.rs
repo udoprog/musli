@@ -259,20 +259,17 @@ fn main() -> Result<()> {
                         };
 
                         for var in &$name {
-                            buf.with(|mut state| {
-                                state.reset($size_hint, var);
+                            let mut state = buf.state();
+                            state.reset($size_hint, var);
 
-                                match state.encode(var) {
-                                    Ok(value) => {
-                                        set.samples.push(value.len() as i64);
-                                    }
-                                    Err(error) => {
-                                        writeln!(o, "{name}: error during encode: {error}")?;
-                                    }
+                            match state.encode(var) {
+                                Ok(value) => {
+                                    set.samples.push(value.len() as i64);
                                 }
-
-                                Ok::<_, anyhow::Error>(())
-                            })?;
+                                Err(error) => {
+                                    writeln!(o, "{name}: error during encode: {error}")?;
+                                }
+                            }
                         }
 
                         size_sets.push(set);
@@ -306,56 +303,49 @@ fn main() -> Result<()> {
                             }
 
                             for (index, var) in $name.iter().enumerate() {
-                                let break_outer = buf.with(|mut state| {
-                                    state.reset($size_hint, var);
+                                let mut state = buf.state();
+                                state.reset($size_hint, var);
 
-                                    #[allow(unused_mut)]
-                                    let mut out = match state.encode(var) {
-                                        Ok(value) => value,
-                                        Err(error) => {
-                                            write!(o, "E")?;
-                                            writeln!(o)?;
-                                            writeln!(o, "{index}: error during encode: {error}")?;
-                                            return Ok(true);
-                                        }
-                                    };
-
-                                    if let Some(bytes) = out.as_bytes() {
-                                        if save {
-                                            save_decode(&mut o, &root, verbose, bytes, format_args!("{index}_{}", stringify!($framework)))?;
-                                        }
-                                    }
-
-                                    let actual = match out.decode::<$ty>() {
-                                        Ok(value) => value,
-                                        Err(error) => {
-                                            write!(o, "E")?;
-                                            writeln!(o)?;
-                                            writeln!(o, "{index}: error during decode: {error}")?;
-
-                                            if let Some(bytes) = out.as_bytes() {
-                                                let path = root.join("target").join(format!("{}_error.bin", stringify!($framework)));
-                                                fs::write(&path, bytes).with_context(|| path.display().to_string())?;
-                                                writeln!(o, "{index}: failing structure written to {}", path.display())?;
-                                            }
-
-                                            return Ok(true);
-                                        }
-                                    };
-
-                                    if actual != *var {
-                                        write!(o, "C")?;
+                                #[allow(unused_mut)]
+                                let mut out = match state.encode(var) {
+                                    Ok(value) => value,
+                                    Err(error) => {
+                                        write!(o, "E")?;
                                         writeln!(o)?;
-                                        writeln!(o, "{name}: model mismatch: {} struct {index}", stringify!($name))?;
-                                        writeln!(o, "  Actual: {actual:?}")?;
-                                        writeln!(o, "Expected: {var:?}")?;
-                                        return Ok(true);
+                                        writeln!(o, "{index}: error during encode: {error}")?;
+                                        break 'outer;
                                     }
+                                };
 
-                                    Ok::<_, anyhow::Error>(false)
-                                })?;
+                                if let Some(bytes) = out.as_bytes() {
+                                    if save {
+                                        save_decode(&mut o, &root, verbose, bytes, format_args!("{index}_{}", stringify!($framework)))?;
+                                    }
+                                }
 
-                                if break_outer {
+                                let actual = match out.decode::<$ty>() {
+                                    Ok(value) => value,
+                                    Err(error) => {
+                                        write!(o, "E")?;
+                                        writeln!(o)?;
+                                        writeln!(o, "{index}: error during decode: {error}")?;
+
+                                        if let Some(bytes) = out.as_bytes() {
+                                            let path = root.join("target").join(format!("{}_error.bin", stringify!($framework)));
+                                            fs::write(&path, bytes).with_context(|| path.display().to_string())?;
+                                            writeln!(o, "{index}: failing structure written to {}", path.display())?;
+                                        }
+
+                                        break 'outer;
+                                    }
+                                };
+
+                                if actual != *var {
+                                    write!(o, "C")?;
+                                    writeln!(o)?;
+                                    writeln!(o, "{name}: model mismatch: {} struct {index}", stringify!($name))?;
+                                    writeln!(o, "  Actual: {actual:?}")?;
+                                    writeln!(o, "Expected: {var:?}")?;
                                     break 'outer;
                                 }
                             }
@@ -371,7 +361,7 @@ fn main() -> Result<()> {
 
     #[allow(unused)]
     macro_rules! test {
-        ($base:ident, $buf:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {{
+        ($base:ident $(, $name:ident, $ty:ty, $size_hint:expr)*) => {{
             random!($base $(, $name, $ty, $size_hint)*);
             size!($base $(, $name, $ty, $size_hint)*);
             run!($base $(, $name, $ty, $size_hint)*);

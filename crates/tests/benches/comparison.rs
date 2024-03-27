@@ -11,40 +11,84 @@ use tests::utils;
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rng = tests::rng();
 
+    macro_rules! for_each {
+        ($name:ident, $call:ident) => {{
+            #[allow(unused)]
+            macro_rules! inner {
+                ($framework:ident) => {{
+                    tests::if_supported! {
+                        $framework, $name, {
+                            $call!($framework)
+                        }
+                    }
+                }};
+            }
+
+            tests::feature_matrix!(inner);
+        }};
+    }
+
     macro_rules! group {
         ($group_name:expr, $name:ident, $it:ident) => {{
             #[allow(unused)]
             let mut g = c.benchmark_group($group_name);
 
             #[allow(unused)]
-            macro_rules! bench {
-                ($framework:ident, $buf:ident) => {{
+            macro_rules! inner {
+                ($framework:ident) => {{
                     tests::if_supported! {
                         $framework, $name, {
-                            let mut $buf = utils::$framework::new();
-                            g.bench_function(stringify!($framework), |b| $it!(b, $framework, $buf));
+                            g.bench_function(stringify!($framework), |b| $it!(b, $framework));
                         }
                     }
                 }};
             }
 
-            tests::feature_matrix!(bench);
+            tests::feature_matrix!(inner);
         }};
     }
 
     macro_rules! setup {
         ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
             $({
-                let $name: $ty = Generate::generate(&mut rng);
+                let mut values = Vec::<$ty>::new();
+                Generate::generate_in(&mut rng, &mut values);
+
+                macro_rules! check {
+                    ($framework:ident) => {{
+                        let mut frameworks = Vec::with_capacity(values.len());
+
+                        for _ in &values {
+                            frameworks.push(utils::$framework::new());
+                        }
+
+                        for (index, (value, framework)) in values.iter().zip(&mut frameworks).enumerate() {
+                            let mut state = framework.state();
+                            state.reset($size_hint, value);
+                            let mut out = state.encode(value).unwrap();
+                            let actual = out.decode::<$ty>().unwrap();
+                            assert_eq!(actual, *value, "{} / {}: roundtrip encoding of value[{index}] should be equal", stringify!($framework), stringify!($name));
+                        }
+                    }}
+                }
+
+                for_each!($name, check);
 
                 #[allow(unused)]
                 macro_rules! it {
-                    ($b:expr, $framework:ident, $buf:ident) => {{
-                        $buf.with(|mut state| {
-                            $b.iter(|| {
-                                state.reset($size_hint, &$name);
-                                let _ = black_box(state.encode(&$name).unwrap());
-                            });
+                    ($b:expr, $framework:ident) => {{
+                        let mut frameworks = Vec::with_capacity(values.len());
+
+                        for _ in &values {
+                            frameworks.push(utils::$framework::new());
+                        }
+
+                        $b.iter(|| {
+                            for (value, framework) in values.iter().zip(&mut frameworks) {
+                                let mut state = framework.state();
+                                state.reset($size_hint, value);
+                                black_box(state.encode(value).unwrap());
+                            }
                         });
                     }};
                 }
@@ -53,12 +97,30 @@ fn criterion_benchmark(c: &mut Criterion) {
 
                 #[allow(unused)]
                 macro_rules! it {
-                    ($b:expr, $framework:ident, $buf:ident) => {{
-                        $buf.with(|mut state| {
-                            state.reset($size_hint, &$name);
-                            #[allow(unused_mut)]
-                            let mut data = state.encode(&$name).unwrap();
-                            $b.iter(move || data.decode::<$ty>().unwrap());
+                    ($b:expr, $framework:ident) => {{
+                        let mut frameworks = Vec::with_capacity(values.len());
+
+                        for _ in &values {
+                            frameworks.push(utils::$framework::new());
+                        }
+
+                        let mut states = Vec::with_capacity(values.len());
+
+                        for framework in &mut frameworks {
+                            states.push(framework.state());
+                        }
+
+                        let mut inputs = Vec::with_capacity(values.len());
+
+                        for (value, state) in values.iter().zip(&mut states) {
+                            state.reset($size_hint, value);
+                            inputs.push(state.encode(value).unwrap());
+                        }
+
+                        $b.iter(move || {
+                            for data in &mut inputs {
+                                black_box(data.decode::<$ty>().unwrap());
+                            }
                         });
                     }};
                 }
@@ -67,16 +129,23 @@ fn criterion_benchmark(c: &mut Criterion) {
 
                 #[allow(unused)]
                 macro_rules! it {
-                    ($b:expr, $framework:ident, $buf:ident) => {{
-                        $buf.with(|mut state| {
-                            $b.iter(|| {
-                                state.reset($size_hint, &$name);
-                                let mut out = state.encode(&$name).unwrap();
-                                let actual = out.decode::<$ty>().unwrap();
-                                debug_assert_eq!(actual, $name);
+                    ($b:expr, $framework:ident) => {{
+                        let mut frameworks = Vec::with_capacity(values.len());
+
+                        for _ in &values {
+                            frameworks.push(utils::$framework::new());
+                        }
+
+                        $b.iter(|| {
+                            for (value, framework) in values.iter().zip(&mut frameworks) {
+                                let mut state = framework.state();
+                                state.reset($size_hint, value);
+                                let mut out = black_box(state.encode(value).unwrap());
+                                let actual = black_box(out.decode::<$ty>().unwrap());
+                                debug_assert_eq!(actual, *value);
                                 black_box(actual);
-                            });
-                        })
+                            }
+                        });
                     }};
                 }
 

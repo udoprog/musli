@@ -40,7 +40,7 @@ description = "Tried to achieve the same goal as `primitives`, but with a packed
 
 [[groups]]
 id = "medium_enum"
-description = "A moderately sized enum with many field variations."
+description = "A moderately sized enum with every kind of supported variant."
 
 [[groups]]
 id = "large"

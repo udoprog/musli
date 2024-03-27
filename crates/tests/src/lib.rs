@@ -98,41 +98,41 @@ macro_rules! rt {
 macro_rules! feature_matrix {
     ($call:path $(, $($tt:tt)*)?) => {
         #[cfg(feature = "serde_json")]
-        $call!(serde_json, serde_json_buf $(, $($tt)*)*);
+        $call!(serde_json $(, $($tt)*)*);
         #[cfg(feature = "bincode")]
-        $call!(serde_bincode, serde_bincode_buf $(, $($tt)*)*);
+        $call!(serde_bincode $(, $($tt)*)*);
         #[cfg(feature = "rmp-serde")]
-        $call!(serde_rmp, serde_rmp_buf $(, $($tt)*)*);
+        $call!(serde_rmp $(, $($tt)*)*);
         #[cfg(feature = "musli-json")]
-        $call!(musli_json, musli_json_buf $(, $($tt)*)*);
+        $call!(musli_json $(, $($tt)*)*);
         #[cfg(feature = "musli-wire")]
-        $call!(musli_wire, musli_wire_buf $(, $($tt)*)*);
+        $call!(musli_wire $(, $($tt)*)*);
         #[cfg(feature = "musli-descriptive")]
-        $call!(musli_descriptive, musli_descriptive_buf $(, $($tt)*)*);
+        $call!(musli_descriptive $(, $($tt)*)*);
         #[cfg(feature = "musli-storage")]
-        $call!(musli_storage, musli_storage_buf $(, $($tt)*)*);
+        $call!(musli_storage $(, $($tt)*)*);
         #[cfg(feature = "musli-storage")]
-        $call!(musli_storage_packed, musli_storage_packed_buf $(, $($tt)*)*);
+        $call!(musli_storage_packed $(, $($tt)*)*);
         #[cfg(feature = "musli-value")]
-        $call!(musli_value, musli_value_buf $(, $($tt)*)*);
+        $call!(musli_value $(, $($tt)*)*);
         #[cfg(feature = "musli-zerocopy")]
-        $call!(musli_zerocopy, musli_zerocopy_buf $(, $($tt)*)*);
+        $call!(musli_zerocopy $(, $($tt)*)*);
         #[cfg(feature = "zerocopy")]
-        $call!(zerocopy, zerocopy_buf $(, $($tt)*)*);
+        $call!(zerocopy $(, $($tt)*)*);
         #[cfg(feature = "dlhn")]
-        $call!(serde_dlhn, serde_dlhn_buf $(, $($tt)*)*);
+        $call!(serde_dlhn $(, $($tt)*)*);
         #[cfg(feature = "serde_cbor")]
-        $call!(serde_cbor, serde_cbor_buf $(, $($tt)*)*);
+        $call!(serde_cbor $(, $($tt)*)*);
         #[cfg(all(feature = "bitcode", feature = "serde"))]
-        $call!(serde_bitcode, serde_bitcode_buf $(, $($tt)*)*);
+        $call!(serde_bitcode $(, $($tt)*)*);
         #[cfg(feature = "bitcode-derive")]
-        $call!(derive_bitcode, derive_bitcode_buf $(, $($tt)*)*);
+        $call!(derive_bitcode $(, $($tt)*)*);
         #[cfg(feature = "rkyv")]
-        $call!(rkyv, rkyv_buf $(, $($tt)*)*);
+        $call!(rkyv $(, $($tt)*)*);
         #[cfg(feature = "postcard")]
-        $call!(postcard, postcard_buf $(, $($tt)*)*);
+        $call!(postcard $(, $($tt)*)*);
         #[cfg(feature = "bson")]
-        $call!(bson, bson_buf $(, $($tt)*)*);
+        $call!(bson $(, $($tt)*)*);
     };
 }
 

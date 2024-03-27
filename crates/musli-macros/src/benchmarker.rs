@@ -249,14 +249,11 @@ impl Benchmarker {
         new_content.push(syn::parse_quote! {
             impl Benchmarker {
                 #[inline(always)]
-                pub fn with<I, O>(&mut self, inner: I) -> O
-                where
-                    I: FnOnce(State<'_>) -> O
-                {
-                    inner(State {
+                pub fn state(&mut self) -> State<'_> {
+                    State {
                         buffer: &mut self.buffer,
                         #(#provider_field: &mut self.#provider_field,)*
-                    })
+                    }
                 }
             }
         });

@@ -267,6 +267,8 @@ fn main() -> Result<()> {
 
             if !a.no_size {
                 for bins in &bins {
+                    sanity_check(&bins.bins.fuzz()?).context("Sanity check failed")?;
+
                     println!("Sizing: {}", bins.report.title);
                     let size_set =
                         collect_size_sets(&bins.bins.fuzz()?).context("Collecting size sets")?;
@@ -1122,6 +1124,16 @@ fn print_command(child: &Command, env: &[(&OsStr, &OsStr)]) {
     }
 
     println!("{e}{program} {args}");
+}
+
+/// This ensures that the roundtrip encoding is correct.
+fn sanity_check(path: &Path) -> Result<()> {
+    let mut child = Command::new(path);
+    child.args(["--iter", "1"]);
+    print_command(&child, &[]);
+    let status = child.status()?;
+    ensure!(status.success(), "Command failed: {}", status.success());
+    Ok(())
 }
 
 /// Collect size sets from the fuzz command.

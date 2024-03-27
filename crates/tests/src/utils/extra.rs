@@ -85,14 +85,11 @@ pub mod rkyv {
     }
 
     impl Benchmarker {
-        pub fn with<T, O>(&mut self, runner: T) -> O
-        where
-            T: FnOnce(State<'_, '_>) -> O,
-        {
-            runner(State {
+        pub fn state(&mut self) -> State<'_, '_> {
+            State {
                 serialize_buffer: &mut self.serialize_buffer,
                 serialize_scratch: &mut self.serialize_scratch,
-            })
+            }
         }
     }
 
