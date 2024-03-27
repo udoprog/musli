@@ -158,7 +158,6 @@ expected = [
 ]
 
 [[reports]]
-skip = true
 id = "bson"
 title = "BSON serialization"
 link = "bson"
