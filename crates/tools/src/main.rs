@@ -859,7 +859,7 @@ where
         write!(o, "| **framework** |")?;
 
         for suite in &columns {
-            write!(o, " **{suite}** |")?;
+            write!(o, " `{suite}` |")?;
         }
 
         writeln!(o)?;
@@ -885,7 +885,8 @@ where
                 .map(|f| format!("[^{f}]"))
                 .collect::<Vec<_>>()
                 .join("");
-            write!(o, "| {framework}{footnote} |")?;
+
+            write!(o, "| `{framework}`{footnote} |")?;
 
             for &suite in columns.iter() {
                 let Some(mut set) = index
