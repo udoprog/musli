@@ -833,7 +833,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>4.44μs</b> ± 4.90ns</td>
 <td>4.43μs &mdash; 4.45μs</td>
@@ -861,7 +861,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>1.35μs</b> ± 1.68ns</td>
 <td>1.34μs &mdash; 1.35μs</td>
@@ -890,7 +890,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>4.76μs</b> ± 4.21ns</td>
 <td>4.75μs &mdash; 4.77μs</td>
@@ -918,7 +918,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>1.38μs</b> ± 1.83ns</td>
 <td>1.38μs &mdash; 1.39μs</td>
@@ -947,7 +947,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>217.17ns</b> ± 0.29ns</td>
 <td>216.68ns &mdash; 217.81ns</td>
@@ -975,7 +975,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>78.20ns</b> ± 0.10ns</td>
 <td>78.02ns &mdash; 78.41ns</td>
@@ -1004,7 +1004,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>911.58μs</b> ± 935.58ns</td>
 <td>909.92μs &mdash; 913.56μs</td>
@@ -1032,7 +1032,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>347.57μs</b> ± 455.02ns</td>
 <td>346.83μs &mdash; 348.58μs</td>
@@ -1061,7 +1061,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>27.10μs</b> ± 26.85ns</td>
 <td>27.05μs &mdash; 27.15μs</td>
@@ -1089,7 +1089,7 @@ These are text-based formats, which support the full feature set of this test su
 </tr>
 <tr>
 <td>
-<code>serde_json</code>
+`serde_json`[^incomplete]
 </td>
 <td><b>6.42μs</b> ± 7.25ns</td>
 <td>6.41μs &mdash; 6.43μs</td>
