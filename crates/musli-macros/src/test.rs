@@ -13,6 +13,7 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
     let generate = syn::Ident::new("Generate", Span::call_site());
 
     let ident = &input.ident;
+    let mut generate_in = None;
 
     let out = match &input.data {
         syn::Data::Struct(st) => {
@@ -26,6 +27,7 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
         }
         syn::Data::Enum(en) => {
             let mut variants = Vec::new();
+            let mut values = Vec::new();
             let mut totals = Vec::new();
             let mut count = 0usize;
 
@@ -55,13 +57,28 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
                 let fields = build_fields(cx, &variant.fields, &rng, &generate)?;
                 let variant = &variant.ident;
 
+                let value = quote!(#ident::#variant {
+                    #(#fields,)*
+                });
+
                 variants.push(quote! {
                     #(#attrs)*
-                    #n => #ident::#variant {
-                        #(#fields,)*
+                    #n => #value
+                });
+
+                values.push(quote! {
+                    #(#attrs)*
+                    {
+                        __out.push(#value);
                     }
-                })
+                });
             }
+
+            generate_in = Some(quote! {
+                fn generate_in<__R>(#rng: &mut __R, __out: &mut Vec<Self>) where __R: rand::Rng {
+                    #(#values)*
+                }
+            });
 
             quote! {
                 let mut total = #count;
@@ -100,9 +117,11 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
 
     Ok(quote! {
         impl #impl_generics #generate for #ident #type_generics #where_generics {
-            fn generate<__T>(#rng: &mut __T) -> Self where __T: rand::Rng {
+            fn generate<__R>(#rng: &mut __R) -> Self where __R: rand::Rng {
                 #out
             }
+
+            #generate_in
         }
     })
 }

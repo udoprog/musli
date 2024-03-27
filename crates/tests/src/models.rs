@@ -246,18 +246,23 @@ impl PartialEq<Tuples> for &Tuples {
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed))]
 pub enum MediumEnum {
-    #[cfg_attr(feature = "musli", musli(transparent))]
-    String(String),
-    #[cfg_attr(feature = "musli", musli(transparent))]
-    Numbered(u64),
+    #[cfg(not(feature = "no-empty"))]
+    Empty,
     EmptyTuple(),
-    NamedEmpty {},
-    Named {
+    #[cfg_attr(feature = "musli", musli(transparent))]
+    #[cfg(not(feature = "no-newtype"))]
+    NewType(u64),
+    Tuple(u64, u64),
+    #[cfg_attr(feature = "musli", musli(transparent))]
+    #[cfg(not(feature = "no-newtype"))]
+    NewTypeString(String),
+    TupleString(String, Vec<u8>),
+    Struct {
         a: u32,
         primitives: Primitives,
         b: u64,
     },
-    Unnamed,
+    EmptyStruct {},
 }
 
 #[cfg(feature = "rkyv")]

@@ -13,7 +13,8 @@ common = ["no-rt", "std", "alloc"]
 u64 = "Format is limited to the bounds of signed 64-bit integers."
 map = "Maps are not supported."
 "128" = "128-bit integers are not supported."
-newtype = "Newtype or empty structs or variants are not supported."
+newtype = "Newtype variants are not supported."
+empty = "Empty variants are not supported."
 string-set = "String sets like `HashSet<String>` are not supported."
 string-key = "Maps with strings as keys like `HashMap<String, T>` are not supported."
 number-key = "Maps with numerical keys like `HashMap<u32, T>` are not supported."
@@ -157,7 +158,6 @@ expected = [
 ]
 
 [[reports]]
-skip = true
 id = "bson"
 title = "BSON serialization"
 link = "bson"
@@ -171,7 +171,7 @@ features = [
     "bson",
 ]
 expected = [
-    "musli", "no-128", "no-u64", "no-newtype"
+    "musli", "no-128", "no-u64", "no-empty", "no-newtype"
 ]
 
 [footnotes]

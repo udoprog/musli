@@ -46,7 +46,7 @@ impl Rng {
         let mut out = Vec::with_capacity(count);
 
         for _ in 0..count {
-            out.push(self.next());
+            T::generate_in(self, &mut out);
         }
 
         out
@@ -96,6 +96,14 @@ pub trait Generate: Sized {
         R: rand::Rng,
     {
         Self::generate(rng)
+    }
+
+    /// Generate a value of the given type into the specified collections.
+    fn generate_in<R>(rng: &mut R, out: &mut Vec<Self>)
+    where
+        R: rand::Rng,
+    {
+        out.push(Self::generate(rng));
     }
 }
 
