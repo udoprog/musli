@@ -326,7 +326,7 @@ fn main() -> Result<()> {
 
                 writeln!(
                     o,
-                    "- [**{title}**](#{link}) ([Full report]({url}/criterion-{id}/report/))",
+                    "- [**{title}**](#{link}) ([Full report 📓]({url}/criterion-{id}/report/), [Sizes](#{link}-sizes))",
                     url = manifest.url
                 )?;
             }
@@ -368,12 +368,15 @@ fn main() -> Result<()> {
                 }
 
                 writeln!(o)?;
+                writeln!(o, "**More:**")?;
+                writeln!(o)?;
                 writeln!(
                     o,
-                    "[Full report]({url}/criterion-{id}/report/)",
+                    "* [Full report 📓]({url}/criterion-{id}/report/)",
                     url = manifest.url,
                     id = report.id
                 )?;
+                writeln!(o, "* [Sizes](#{link}-sizes)", link = report.link)?;
                 writeln!(o)?;
 
                 for (group, plots) in group_plots {
@@ -407,7 +410,8 @@ fn main() -> Result<()> {
 
                         writeln!(o, "</table>")?;
 
-                        writeln!(o, "| Group | Mean | Interval")?;
+                        writeln!(o)?;
+                        writeln!(o, "| Group | Mean | Interval |")?;
                         writeln!(o, "|-|-|-|")?;
 
                         let mut estimates = Vec::new();
@@ -454,6 +458,8 @@ fn main() -> Result<()> {
                                 timing(interval.upper_bound),
                             )?;
                         }
+
+                        writeln!(o)?;
                     }
 
                     writeln!(o)?;
@@ -812,7 +818,7 @@ where
             continue;
         }
 
-        writeln!(o, "#### {title}")?;
+        writeln!(o, "#### {title} sizes")?;
         writeln!(o)?;
 
         let mut columns = Vec::new();

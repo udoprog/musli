@@ -159,7 +159,7 @@ expected = [
 
 [[reports]]
 id = "bson"
-title = "BSON serialization"
+title = "BSON"
 link = "bson"
 description = [
     "Specific comparison to BSON, because the format is limited in capabilities.",
