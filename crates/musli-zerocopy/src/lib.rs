@@ -46,10 +46,9 @@
 //!   SwissTable implementation.
 //!
 //! Finally if you're interested in the performance of `musli-zerocopy` you
-//! should go to
-//! [`benchmarks.md`](https://github.com/udoprog/musli/blob/main/benchmarks.md).
-//! I will be extending this suite with more zero-copy types, but for now we
-//! have a clear lead in the use cases I've tested it for.
+//! should go to [`benchmarks`]. I will be extending this suite with more
+//! zero-copy types, but for now we have a clear lead in the use cases I've
+//! tested it for.
 //!
 //! This is because:
 //! * Zero-copy doesn't incur a deserialization overhead if done correctly. You
@@ -502,11 +501,11 @@
 //! <br>
 //!
 //! [`aligned_buf(bytes, align)`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+//! [`benchmarks`]: https://udoprog.github.io/musli/benchmarks/
 //! [`ByteOrder`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.ByteOrder.html
 //! [`hashbrown` crate]: https://docs.rs/phf
 //! [`OwnedBuf::with_size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_size
 //! [`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
-//! [`with_byte_order::<E>()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_byte_order
 //! [`phf` crate]: https://docs.rs/phf
 //! [`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
 //! [`Ref`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
@@ -515,6 +514,7 @@
 //! [`requested()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
 //! [`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 //! [`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
+//! [`with_byte_order::<E>()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_byte_order
 //! [`ZeroCopy`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.ZeroCopy.html
 //! [derive]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
 //! [ref-u32]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html

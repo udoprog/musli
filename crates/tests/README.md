@@ -18,7 +18,7 @@ cargo run -p tools -- --bench --force
 > **Note:** `--force` will overwriting existing violing plots.
 
 This will ensure that only crates with comparable feature sets are grouped
-together, and at the end generate a `benchmarks.md` report.
+together, and at the end generate a `benchmarks-new/index.md` report.
 
 <br>
 
