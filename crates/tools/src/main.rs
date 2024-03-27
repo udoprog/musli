@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 use std::env;
+use std::env::consts::EXE_SUFFIX;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Write;
 use std::fs::{self, File};
@@ -209,7 +210,11 @@ fn main() -> Result<()> {
                     }
                 }
 
-                bins.push(Bins::build(&manifest, report)?);
+                bins.push(Bins::new(&manifest, report)?);
+            }
+
+            for bins in &mut bins {
+                bins.build()?;
             }
 
             let mut errored = Vec::new();
@@ -241,7 +246,7 @@ fn main() -> Result<()> {
 
             for bins in &mut bins {
                 println!("Sizing: {}", bins.report.title);
-                let size_set = collect_size_sets(bins.fuzz()).context("Collecting size sets")?;
+                let size_set = collect_size_sets(bins.fuzz()?).context("Collecting size sets")?;
                 size_sets.push((bins.report, size_set));
             }
 
@@ -459,28 +464,69 @@ fn main() -> Result<()> {
 struct Bins<'a> {
     manifest: &'a Manifest,
     report: &'a Report,
-    fuzz: PathBuf,
-    comparison: PathBuf,
+    fuzz: Option<PathBuf>,
+    comparison: Option<PathBuf>,
 }
 
 impl<'a> Bins<'a> {
-    fn build(manifest: &'a Manifest, report: &'a Report) -> Result<Self> {
-        let built = build_bench(manifest, report).context("Failed to build benches")?;
-
+    fn new(manifest: &'a Manifest, report: &'a Report) -> Result<Self> {
         Ok(Self {
             manifest,
             report,
-            fuzz: built.fuzz,
-            comparison: built.comparison,
+            fuzz: None,
+            comparison: None,
         })
     }
 
-    fn fuzz(&mut self) -> &Path {
-        &self.fuzz
+    fn build(&mut self) -> Result<()> {
+        fn shuffle(base: &str, id: &str, path: &mut PathBuf) -> Result<()> {
+            let to = path.with_file_name(format!("{base}-{id}{}", EXE_SUFFIX));
+            std::fs::rename(&*path, &to)
+                .with_context(|| anyhow!("{} to {}", path.display(), to.display()))?;
+            *path = to;
+            Ok(())
+        }
+
+        if self.fuzz.is_some() && self.comparison.is_some() {
+            return Ok(());
+        }
+
+        let mut built =
+            build_bench(self.manifest, self.report).context("Building bench binaries")?;
+
+        shuffle("comparison", &self.report.id, &mut built.comparison)?;
+        shuffle("fuzz", &self.report.id, &mut built.fuzz)?;
+
+        println!("Comparison: {}", built.comparison.display());
+        println!("Fuzz: {}", built.fuzz.display());
+
+        self.fuzz = Some(built.fuzz);
+        self.comparison = Some(built.comparison);
+        Ok(())
     }
 
-    fn comparison(&mut self) -> &Path {
-        &self.comparison
+    fn fuzz(&mut self) -> Result<&Path> {
+        self.build()?;
+        self.fuzz.as_deref().context("Missing `fuzz` binary")
+    }
+
+    fn comparison(&mut self) -> Result<&Path> {
+        self.build()?;
+        self.comparison
+            .as_deref()
+            .context("Missing `comparison` binary")
+    }
+}
+
+impl<'a> Drop for Bins<'a> {
+    fn drop(&mut self) {
+        if let Some(fuzz) = self.fuzz.take() {
+            _ = fs::remove_file(fuzz);
+        }
+
+        if let Some(comparison) = self.comparison.take() {
+            _ = fs::remove_file(comparison);
+        }
     }
 }
 
@@ -500,7 +546,7 @@ fn build_report<'a>(
 
     if run_bench {
         // Just test the binaries.
-        run_path(bins.comparison(), &[], &[])?;
+        run_path(bins.comparison()?, &[], &[])?;
 
         let mut args = vec!["--bench"];
 
@@ -514,7 +560,7 @@ fn build_report<'a>(
         }
 
         let comparison_env = [(OsStr::new("CRITERION_HOME"), criterion_output.as_os_str())];
-        run_path(bins.comparison(), &args, &comparison_env[..])?;
+        run_path(bins.comparison()?, &args, &comparison_env[..])?;
     }
 
     if !criterion_output.is_dir() {
