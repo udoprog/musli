@@ -1,7 +1,9 @@
+use std::cell::{Ref, RefCell};
 use std::collections::{BTreeSet, HashMap};
 use std::env;
 use std::env::consts::EXE_SUFFIX;
 use std::ffi::{OsStr, OsString};
+use std::fmt;
 use std::fmt::Write;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
@@ -11,6 +13,23 @@ use std::process::{Command, ExitStatus, Stdio};
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
+
+struct Paths {
+    criterion_output: PathBuf,
+    images: PathBuf,
+}
+
+impl Paths {
+    fn new(output: &Path, id: &str) -> Self {
+        let images = output.join("images");
+        let criterion_output = output.join(format!("criterion-{id}"));
+
+        Self {
+            criterion_output,
+            images,
+        }
+    }
+}
 
 const REPO: &str = "https://raw.githubusercontent.com/udoprog/musli";
 
@@ -133,6 +152,9 @@ struct ArgsReport {
     /// Run `--quick` benchmarks.
     #[arg(long)]
     quick: bool,
+    /// Skip size comparisons.
+    #[arg(long)]
+    no_size: bool,
     /// Reference graphics from the given branch.
     #[arg(long)]
     branch: Option<String>,
@@ -193,7 +215,7 @@ fn main() -> Result<()> {
         Cmd::Report(a) => {
             let output = match &a.output {
                 Some(output) => output.to_owned(),
-                None => root.join("benchmarks-new"),
+                None => root.join("benchmarks"),
             };
 
             let branch = a.branch.as_deref().unwrap_or(manifest.branch.as_str());
@@ -210,21 +232,17 @@ fn main() -> Result<()> {
                     }
                 }
 
-                bins.push(Bins::new(&manifest, report)?);
-            }
-
-            for bins in &mut bins {
-                bins.build()?;
+                bins.push(Bins::new(&output, &manifest, report)?);
             }
 
             let mut errored = Vec::new();
 
-            for bins in &mut bins {
+            for bins in &bins {
                 println!("Building: {}", bins.report.title);
 
-                match build_report(&a, bins, &output, a.bench, a.filter.as_deref()) {
+                match build_report(&a, bins, a.bench, a.filter.as_deref()) {
                     Ok(group_plots) => {
-                        built_reports.push((bins.report, group_plots));
+                        built_reports.push((bins, group_plots));
                     }
                     Err(error) => {
                         errored.push((bins.report, error));
@@ -244,10 +262,13 @@ fn main() -> Result<()> {
                 bail!("{} builds failed", errored.len());
             }
 
-            for bins in &mut bins {
-                println!("Sizing: {}", bins.report.title);
-                let size_set = collect_size_sets(bins.fuzz()?).context("Collecting size sets")?;
-                size_sets.push((bins.report, size_set));
+            if !a.no_size {
+                for bins in &bins {
+                    println!("Sizing: {}", bins.report.title);
+                    let size_set =
+                        collect_size_sets(&bins.bins.fuzz()?).context("Collecting size sets")?;
+                    size_sets.push((bins.report, size_set));
+                }
             }
 
             let mut o = String::new();
@@ -260,34 +281,34 @@ fn main() -> Result<()> {
             }
 
             writeln!(o)?;
-
-            writeln!(
-                o,
-                "Summary of the different kinds of benchmarks we support."
-            )?;
+            writeln!(o, "Identifiers which are used in tests:")?;
             writeln!(o)?;
+
+            for Kind {
+                id, description, ..
+            } in &manifest.kinds
+            {
+                writeln!(o, "- `{id}` - {description}")?;
+            }
 
             for Group {
                 id, description, ..
             } in &manifest.groups
             {
-                writeln!(o, "- `{id}` {description}")?;
+                writeln!(o, "- `{id}` - {description}")?;
             }
 
             writeln!(o)?;
-
             writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
 
-            for (
-                Report {
+            for (bins, _) in &built_reports {
+                let Report {
                     id, title, link, ..
-                },
-                _,
-            ) in &built_reports
-            {
+                } = bins.report;
+
                 writeln!(
                     o,
-                    "- [{title}](#{link}) ([Full criterion report]({url}/criterion-{id}/report/))",
+                    "- [**{title}**](#{link}) ([Full report]({url}/criterion-{id}/report/))",
                     url = manifest.url
                 )?;
             }
@@ -296,11 +317,11 @@ fn main() -> Result<()> {
 
             writeln!(
                 o,
-                "Below you'll also find [Size comparisons](#size-comparisons)."
+                "Below you'll also find [size comparisons](#size-comparisons)."
             )?;
 
-            for (report, group_plots) in &built_reports {
-                writeln!(o, "# {}", report.title)?;
+            for (bins @ Bins { report, .. }, group_plots) in &built_reports {
+                writeln!(o, "### {}", report.title)?;
 
                 writeln!(o)?;
 
@@ -323,32 +344,93 @@ fn main() -> Result<()> {
                 writeln!(o)?;
                 writeln!(
                     o,
-                    "[Full criterion report]({url}/criterion-{id}/report/)",
+                    "[Full report]({url}/criterion-{id}/report/)",
                     url = manifest.url,
                     id = report.id
                 )?;
                 writeln!(o)?;
 
-                for (Group { id: group, .. }, plots) in group_plots {
-                    let kinds = manifest
-                        .kinds
-                        .iter()
-                        .map(|Kind { id, description }| format!("`{id}` - {description}"))
-                        .collect::<Vec<_>>()
-                        .join(", ");
+                for (group, plots) in group_plots {
+                    for kind in &manifest.kinds {
+                        let outcome = bins
+                            .paths
+                            .criterion_output
+                            .join(format!("{}_{}", kind.id, group.id));
 
-                    write!(o, "`{group}`: {kinds}.")?;
-
-                    writeln!(o)?;
-                    writeln!(o)?;
-
-                    for plot in plots {
+                        writeln!(o, "<table>")?;
+                        writeln!(o, "<tr>")?;
                         writeln!(
                             o,
-                            "<img style=\"background-color: white;\" src=\"{REPO}/{branch}/benchmarks/images/{plot}\">"
+                            "<th colspan=\"3\"><code>{}</code> / <code>{}</code></th>",
+                            kind.id, group.id
                         )?;
-                        writeln!(o)?;
+                        writeln!(o, "</tr>")?;
+
+                        if let Some(plot) = plots.get(kind.id.as_str()) {
+                            writeln!(o, "<tr>")?;
+                            let url = format!("{REPO}/{branch}/benchmarks/images/{plot}");
+
+                            writeln!(o, "<td colspan=\"3\">")?;
+                            write!(o, "<a href=\"{url}\">")?;
+                            write!(o, "<img style=\"background-color: white;\" src=\"{url}\">")?;
+                            write!(o, "</a>")?;
+                            writeln!(o, "</td>")?;
+
+                            writeln!(o, "</tr>")?;
+                        }
+
+                        writeln!(o, "<tr>")?;
+                        writeln!(o, "<th>Group</th>")?;
+                        writeln!(o, "<th>Mean</th>")?;
+                        writeln!(o, "<th>Interval</th>")?;
+                        writeln!(o, "</tr>")?;
+
+                        let mut estimates = Vec::new();
+
+                        for e in fs::read_dir(&outcome)? {
+                            let e = e?;
+                            let p = e.path();
+
+                            let Some(file_name) = p.file_name().and_then(|f| f.to_str()) else {
+                                continue;
+                            };
+
+                            if file_name == "report" {
+                                continue;
+                            }
+
+                            let bytes = fs::read(p.join("new").join("estimates.json"))?;
+                            let data: Estimates = serde_json::from_slice(&bytes)?;
+                            estimates.push((file_name.to_owned(), data));
+                        }
+
+                        estimates.sort_by(|a, b| a.0.cmp(&b.0));
+
+                        for (file_name, data) in estimates {
+                            let mean = &data.mean;
+                            let interval = &mean.confidence_interval;
+
+                            writeln!(o, "<tr>")?;
+                            writeln!(o, "<td><code>{file_name}</code></td>")?;
+                            writeln!(
+                                o,
+                                "<td><b>{}</b> ± {}</td>",
+                                timing(mean.point_estimate),
+                                timing(mean.standard_error),
+                            )?;
+                            writeln!(
+                                o,
+                                "<td>{} &mdash; {}</td>",
+                                timing(interval.lower_bound),
+                                timing(interval.upper_bound),
+                            )?;
+                            writeln!(o, "</tr>")?;
+                        }
+
+                        writeln!(o, "</table>")?;
                     }
+
+                    writeln!(o)?;
                 }
 
                 writeln!(o)?;
@@ -461,24 +543,15 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-struct Bins<'a> {
-    manifest: &'a Manifest,
+struct InteriorBins<'a> {
     report: &'a Report,
-    fuzz: Option<PathBuf>,
-    comparison: Option<PathBuf>,
+    manifest: &'a Manifest,
+    fuzz: RefCell<Option<PathBuf>>,
+    comparison: RefCell<Option<PathBuf>>,
 }
 
-impl<'a> Bins<'a> {
-    fn new(manifest: &'a Manifest, report: &'a Report) -> Result<Self> {
-        Ok(Self {
-            manifest,
-            report,
-            fuzz: None,
-            comparison: None,
-        })
-    }
-
-    fn build(&mut self) -> Result<()> {
+impl<'a> InteriorBins<'a> {
+    fn build(&self) -> Result<()> {
         fn shuffle(base: &str, id: &str, path: &mut PathBuf) -> Result<()> {
             let to = path.with_file_name(format!("{base}-{id}{}", EXE_SUFFIX));
             std::fs::rename(&*path, &to)
@@ -487,7 +560,7 @@ impl<'a> Bins<'a> {
             Ok(())
         }
 
-        if self.fuzz.is_some() && self.comparison.is_some() {
+        if self.fuzz.borrow().is_some() && self.comparison.borrow().is_some() {
             return Ok(());
         }
 
@@ -500,25 +573,27 @@ impl<'a> Bins<'a> {
         println!("Comparison: {}", built.comparison.display());
         println!("Fuzz: {}", built.fuzz.display());
 
-        self.fuzz = Some(built.fuzz);
-        self.comparison = Some(built.comparison);
+        *self.fuzz.borrow_mut() = Some(built.fuzz);
+        *self.comparison.borrow_mut() = Some(built.comparison);
         Ok(())
     }
 
-    fn fuzz(&mut self) -> Result<&Path> {
+    fn fuzz(&self) -> Result<Ref<'_, Path>> {
         self.build()?;
-        self.fuzz.as_deref().context("Missing `fuzz` binary")
+        Ref::filter_map(self.fuzz.borrow(), |f| f.as_deref())
+            .ok()
+            .context("Missing `fuzz` binary")
     }
 
-    fn comparison(&mut self) -> Result<&Path> {
+    fn comparison(&self) -> Result<Ref<'_, Path>> {
         self.build()?;
-        self.comparison
-            .as_deref()
+        Ref::filter_map(self.comparison.borrow(), |f| f.as_deref())
+            .ok()
             .context("Missing `comparison` binary")
     }
 }
 
-impl<'a> Drop for Bins<'a> {
+impl<'a> Drop for InteriorBins<'a> {
     fn drop(&mut self) {
         if let Some(fuzz) = self.fuzz.take() {
             _ = fs::remove_file(fuzz);
@@ -530,23 +605,43 @@ impl<'a> Drop for Bins<'a> {
     }
 }
 
+struct Bins<'a> {
+    report: &'a Report,
+    manifest: &'a Manifest,
+    bins: InteriorBins<'a>,
+    paths: Paths,
+}
+
+impl<'a> Bins<'a> {
+    fn new(output: &'a Path, manifest: &'a Manifest, report: &'a Report) -> Result<Self> {
+        Ok(Self {
+            report,
+            manifest,
+            bins: InteriorBins {
+                report,
+                manifest,
+                fuzz: RefCell::new(None),
+                comparison: RefCell::new(None),
+            },
+            paths: Paths::new(output, &report.id),
+        })
+    }
+}
+
 fn build_report<'a>(
     a: &ArgsReport,
-    bins: &mut Bins<'a>,
-    output: &Path,
+    bins: &Bins<'a>,
     run_bench: bool,
     filter: Option<&str>,
-) -> Result<Vec<(&'a Group, Vec<String>)>> {
-    let criterion_output = output.join(format!("criterion-{}", bins.report.id));
-    let images = output.join("images");
-
-    if !images.is_dir() {
-        fs::create_dir_all(&images).with_context(|| anyhow!("{}", images.display()))?;
+) -> Result<Vec<(&'a Group, HashMap<&'a str, String>)>> {
+    if !bins.paths.images.is_dir() {
+        fs::create_dir_all(&bins.paths.images)
+            .with_context(|| anyhow!("{}", bins.paths.images.display()))?;
     }
 
     if run_bench {
         // Just test the binaries.
-        run_path(bins.comparison()?, &[], &[])?;
+        run_path(&bins.bins.comparison()?, &[], &[])?;
 
         let mut args = vec!["--bench"];
 
@@ -559,13 +654,16 @@ fn build_report<'a>(
             args.push(filter);
         }
 
-        let comparison_env = [(OsStr::new("CRITERION_HOME"), criterion_output.as_os_str())];
-        run_path(bins.comparison()?, &args, &comparison_env[..])?;
+        let comparison_env = [(
+            OsStr::new("CRITERION_HOME"),
+            bins.paths.criterion_output.as_os_str(),
+        )];
+        run_path(&bins.bins.comparison()?, &args, &comparison_env[..])?;
     }
 
-    if !criterion_output.is_dir() {
-        fs::create_dir_all(&criterion_output)
-            .with_context(|| anyhow!("{}", criterion_output.display()))?;
+    if !bins.paths.criterion_output.is_dir() {
+        fs::create_dir_all(&bins.paths.criterion_output)
+            .with_context(|| anyhow!("{}", bins.paths.criterion_output.display()))?;
     }
 
     let mut output_plots = Vec::new();
@@ -575,10 +673,12 @@ fn build_report<'a>(
             continue;
         }
 
-        let mut plots = Vec::new();
+        let mut plots = HashMap::new();
 
         for Kind { id: kind, .. } in &bins.manifest.kinds {
-            let from = criterion_output
+            let from = bins
+                .paths
+                .criterion_output
                 .join(format!("{kind}_{group}"))
                 .join("report")
                 .join("violin.svg");
@@ -586,10 +686,10 @@ fn build_report<'a>(
             ensure!(from.is_file(), "Missing {}", from.display());
 
             let name = format!("{kind}_{group}_{}.svg", bins.report.id);
-            let to = images.join(&name);
+            let to = bins.paths.images.join(&name);
             copy_svg(&from, to)
                 .with_context(|| anyhow!("{}: {}", bins.report.id, from.display()))?;
-            plots.push(name);
+            plots.insert(kind.as_str(), name);
         }
 
         output_plots.push((g, plots));
@@ -1024,9 +1124,65 @@ fn collect_size_sets(path: &Path) -> Result<Vec<SizeSet>> {
     Ok(size_sets)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct SizeSet {
     framework: String,
     suite: String,
     samples: Vec<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+struct Estimates {
+    mean: Sample,
+    median: Sample,
+    median_abs_dev: Sample,
+    slope: Sample,
+    std_dev: Sample,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+struct ConfidenceInterval {
+    confidence_level: f64,
+    lower_bound: f64,
+    upper_bound: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct Sample {
+    confidence_interval: ConfidenceInterval,
+    point_estimate: f64,
+    standard_error: f64,
+}
+
+struct Timing(f64);
+
+fn timing(timing: f64) -> Timing {
+    Timing(timing)
+}
+
+impl fmt::Display for Timing {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut v = self.0;
+
+        if v < 1000.0 {
+            return write!(f, "{v:.2}ns");
+        }
+
+        v /= 1000.0;
+
+        if v < 1000.0 {
+            return write!(f, "{v:.2}μs");
+        }
+
+        v /= 1000.0;
+
+        if v < 1000.0 {
+            return write!(f, "{v:.2}ms");
+        }
+
+        v /= 1000.0;
+        write!(f, "{v:.2}s")
+    }
 }

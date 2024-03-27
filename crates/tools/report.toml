@@ -11,15 +11,15 @@ common = ["no-rt", "std", "alloc"]
 
 [[kinds]]
 id = "dec"
-description = "Decode a type"
+description = "Decode a type."
 
 [[kinds]]
 id = "enc"
-description = "Encode a type"
+description = "Encode a type."
 
 [[groups]]
 id = "primitives"
-description = "which is a small object containing one of each primitive type and a string and a byte array."
+description = "A small object containing one of each primitive type and a string and a byte array."
 
 [[groups]]
 id = "primpacked"
