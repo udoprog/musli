@@ -326,7 +326,7 @@ fn main() -> Result<()> {
 
                 writeln!(
                     o,
-                    "- [**{title}**](#{link}) ([Full report 📓]({url}/criterion-{id}/report/), [Sizes](#{link}-sizes))",
+                    "- [**{title}**](#{link}) ([Report 📓]({url}/criterion-{id}/report/), [Sizes](#{link}-sizes))",
                     url = manifest.url
                 )?;
             }
@@ -372,7 +372,7 @@ fn main() -> Result<()> {
                 writeln!(o)?;
                 writeln!(
                     o,
-                    "* [Full report 📓]({url}/criterion-{id}/report/)",
+                    "* [Report 📓]({url}/criterion-{id}/report/)",
                     url = manifest.url,
                     id = report.id
                 )?;
@@ -388,11 +388,18 @@ fn main() -> Result<()> {
 
                         writeln!(o, "<table>")?;
                         writeln!(o, "<tr>")?;
+                        writeln!(o, "<th colspan=\"3\">")?;
+                        writeln!(o, "<code>{}/{}/{}</code>", report.id, kind.id, group.id)?;
+                        writeln!(o, "<br />")?;
                         writeln!(
                             o,
-                            "<th colspan=\"3\"><code>{}</code> / <code>{}</code></th>",
-                            kind.id, group.id
+                            "<a href=\"{url}/criterion-{id}/{kind}_{group}/report/\">Report 📓</a>",
+                            url = manifest.url,
+                            id = report.id,
+                            kind = kind.id,
+                            group = group.id,
                         )?;
+                        writeln!(o, "</th>")?;
                         writeln!(o, "</tr>")?;
 
                         if let Some(plot) = plots.get(kind.id.as_str()) {
@@ -411,8 +418,8 @@ fn main() -> Result<()> {
                         writeln!(o, "</table>")?;
 
                         writeln!(o)?;
-                        writeln!(o, "| Group | Mean | Interval |")?;
-                        writeln!(o, "|-|-|-|")?;
+                        writeln!(o, "| Group | Mean | Interval | Link |")?;
+                        writeln!(o, "|-|-|-|-|")?;
 
                         let mut estimates = Vec::new();
 
@@ -439,7 +446,7 @@ fn main() -> Result<()> {
                             let mean = &data.mean;
                             let interval = &mean.confidence_interval;
 
-                            write!(o, "| `{file_name}`")?;
+                            write!(o, "| `{}/{}/{file_name}`", kind.id, group.id)?;
 
                             if let Some(footnotes) = manifest.crate_footnotes.get(&file_name) {
                                 used_footnotes.extend(footnotes);
@@ -449,13 +456,22 @@ fn main() -> Result<()> {
                                 }
                             }
 
-                            writeln!(
+                            write!(
                                 o,
-                                " | **{}** ± {} | {} &mdash; {} |",
+                                " | **{}** ± {} | {} &mdash; {}",
                                 timing(mean.point_estimate),
                                 timing(mean.standard_error),
                                 timing(interval.lower_bound),
                                 timing(interval.upper_bound),
+                            )?;
+
+                            writeln!(
+                                o,
+                                " | [Report 📓]({url}/criterion-{id}/{kind}_{group}/{file_name}/report/) |",
+                                url = manifest.url,
+                                id = report.id,
+                                kind = kind.id,
+                                group = group.id,
                             )?;
                         }
 
