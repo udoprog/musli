@@ -18,7 +18,7 @@ string-set = "String sets like `HashSet<String>` are not supported."
 string-key = "Maps with strings as keys like `HashMap<String, T>` are not supported."
 number-key = "Maps with numerical keys like `HashMap<u32, T>` are not supported."
 tuple = "Tuples like `(u32, u32)` are not supported."
-cstring = "`CString` is not supported."
+cstring = "`CString`'s are not supported."
 usize = "`usize` and `isize` types are not supported."
 
 [[kinds]]

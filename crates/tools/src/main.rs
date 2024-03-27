@@ -422,18 +422,14 @@ fn main() -> Result<()> {
 
                             writeln!(o, "<tr>")?;
                             writeln!(o, "<td>")?;
-                            writeln!(o, "<code>{file_name}</code>")?;
+                            write!(o, "<code>{file_name}</code>")?;
 
                             if let Some(footnotes) = manifest.crates_footnotes.get(&file_name) {
                                 used_footnotes.extend(footnotes);
 
-                                let footnotes = footnotes
-                                    .iter()
-                                    .map(|f| format!("[^{f}]"))
-                                    .collect::<Vec<_>>()
-                                    .join("");
-
-                                writeln!(o, "{footnotes}")?;
+                                for footnote in footnotes {
+                                    write!(o, "[^{footnote}]")?;
+                                }
                             }
 
                             writeln!(o, "</td>")?;
