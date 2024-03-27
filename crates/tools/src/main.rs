@@ -66,7 +66,7 @@ struct Manifest {
     #[serde(default)]
     reports: Vec<Report>,
     #[serde(default)]
-    crates_footnotes: HashMap<String, Vec<String>>,
+    crate_footnotes: HashMap<String, Vec<String>>,
     #[serde(default)]
     size_footnotes: HashMap<String, Vec<String>>,
     #[serde(default)]
@@ -136,6 +136,9 @@ struct ArgsReport {
     /// The output directory to write results into.
     #[arg(long)]
     output: Option<PathBuf>,
+    /// Custom path to write index output.
+    #[arg(long)]
+    index_output: Option<PathBuf>,
     /// Filter to pass to benchmarks when running them.
     #[arg(short = 'f', long)]
     filter: Option<String>,
@@ -389,11 +392,10 @@ fn main() -> Result<()> {
                             writeln!(o, "</tr>")?;
                         }
 
-                        writeln!(o, "<tr>")?;
-                        writeln!(o, "<th>Group</th>")?;
-                        writeln!(o, "<th>Mean</th>")?;
-                        writeln!(o, "<th>Interval</th>")?;
-                        writeln!(o, "</tr>")?;
+                        writeln!(o, "</table>")?;
+
+                        writeln!(o, "| Group | Mean | Interval")?;
+                        writeln!(o, "|-|-|-|")?;
 
                         let mut estimates = Vec::new();
 
@@ -420,11 +422,9 @@ fn main() -> Result<()> {
                             let mean = &data.mean;
                             let interval = &mean.confidence_interval;
 
-                            writeln!(o, "<tr>")?;
-                            writeln!(o, "<td>")?;
-                            write!(o, "<code>{file_name}</code>")?;
+                            write!(o, "| `{file_name}`")?;
 
-                            if let Some(footnotes) = manifest.crates_footnotes.get(&file_name) {
+                            if let Some(footnotes) = manifest.crate_footnotes.get(&file_name) {
                                 used_footnotes.extend(footnotes);
 
                                 for footnote in footnotes {
@@ -432,23 +432,15 @@ fn main() -> Result<()> {
                                 }
                             }
 
-                            writeln!(o, "</td>")?;
                             writeln!(
                                 o,
-                                "<td><b>{}</b> ± {}</td>",
+                                " | **{}** ± {} | {} &mdash; {} |",
                                 timing(mean.point_estimate),
                                 timing(mean.standard_error),
-                            )?;
-                            writeln!(
-                                o,
-                                "<td>{} &mdash; {}</td>",
                                 timing(interval.lower_bound),
                                 timing(interval.upper_bound),
                             )?;
-                            writeln!(o, "</tr>")?;
                         }
-
-                        writeln!(o, "</table>")?;
                     }
 
                     writeln!(o)?;
@@ -475,7 +467,11 @@ fn main() -> Result<()> {
                 writeln!(o, "[{title}]: {href}")?;
             }
 
-            let report = output.join("index.md");
+            let report = match &a.index_output {
+                Some(report) => report.clone(),
+                None => output.join("index.md"),
+            };
+
             println!("Writing: {}", report.display());
             fs::write(report, o.as_bytes())?;
         }

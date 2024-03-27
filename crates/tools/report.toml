@@ -158,6 +158,7 @@ expected = [
 ]
 
 [[reports]]
+skip = true
 id = "bson"
 title = "BSON serialization"
 link = "bson"
@@ -178,9 +179,11 @@ expected = [
 incomplete = "These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result."
 i128 = "Lacks 128-bit support."
 bson = "BSON does not support serializing directly in-place [without patches](https://github.com/mongodb/bson-rust/pull/328). As a result it is expected to be much slower."
+musli_value = "`musli-value` is a heap-allocated, in-memory format. Deserialization is expected to be as fast as a dynamic in-memory structure can be traversed, but serialization requires a lot of allocations. It is only included for reference."
 
 [crate_footnotes]
 bson = ["bson"]
+musli_value = ["musli_value"]
 
 [size_footnotes]
 musli_json = ["incomplete"]
