@@ -39,7 +39,7 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
                         attrs.push(a.clone());
 
                         if let syn::Meta::List(list) = &a.meta {
-                            all.push(list.clone());
+                            all.push(list.tokens.clone());
                         }
                     }
                 }
