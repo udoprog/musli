@@ -171,7 +171,7 @@ features = [
     "bson",
 ]
 expected = [
-    "musli", "no-128", "no-u64", "no-empty", "no-newtype"
+    "musli", "serde", "no-128", "no-u64", "no-empty", "no-newtype", "no-number-key"
 ]
 
 [footnotes]
