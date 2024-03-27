@@ -1398,6 +1398,9 @@ Each test suite serializes a collection of values, which have all been randomly 
 
 #### Full features sizes
 
+These frameworks provide a fair comparison against Müsli on various areas since
+they support the same set of features in what types of data they can represent.
+
 | **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` |
 | - | - | - | - | - | - |
 | `musli_descriptive` | <a title="samples: 500, min: 154, max: 164, stddev: 1.5621574824581534">159.89 ± 1.56</a> | <a title="samples: 500, min: 161, max: 170, stddev: 1.5612764008976794">165.80 ± 1.56</a> | <a title="samples: 10, min: 22219, max: 66506, stddev: 11024.160833823134">49227.10 ± 11024.16</a> | <a title="samples: 100, min: 361, max: 948, stddev: 114.7006761096028">647.93 ± 114.70</a> | <a title="samples: 4000, min: 4, max: 191, stddev: 64.94385785767209">53.81 ± 64.94</a> |
@@ -1411,12 +1414,21 @@ Each test suite serializes a collection of values, which have all been randomly 
 
 #### Text-based formats sizes
 
+These are text-based formats, which support the full feature set of this test suite.
+
 | **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` |
 | - | - | - | - | - | - |
 | `musli_json`[^incomplete] | <a title="samples: 500, min: 308, max: 322, stddev: 2.370359466410104">315.41 ± 2.37</a> | <a title="samples: 500, min: 326, max: 343, stddev: 2.9921657708088594">335.29 ± 2.99</a> | <a title="samples: 10, min: 37853, max: 127140, stddev: 22814.18436170796">93162.10 ± 22814.18</a> | <a title="samples: 100, min: 532, max: 1130, stddev: 118.61131649214592">832.66 ± 118.61</a> | <a title="samples: 4000, min: 8, max: 374, stddev: 115.65740907281904">86.17 ± 115.66</a> |
 | `serde_json`[^incomplete] | <a title="samples: 500, min: 428, max: 442, stddev: 2.370359466410104">435.41 ± 2.37</a> | <a title="samples: 500, min: 443, max: 460, stddev: 2.9921657708088594">452.29 ± 2.99</a> | <a title="samples: 10, min: 42978, max: 136779, stddev: 24197.177306661204">102095.30 ± 24197.18</a> | <a title="samples: 100, min: 633, max: 1231, stddev: 118.61131649214592">933.66 ± 118.61</a> | <a title="samples: 4000, min: 7, max: 508, stddev: 155.60660260232385">107.17 ± 155.61</a> |
 
 #### Fewer features sizes
+
+> **Missing features:**
+> - `128` - 128-bit integers are not supported.
+> - `map` - Maps are not supported.
+
+This is a suite where support for 128-bit integers and maps are disabled.
+Usually because the underlying framework lacks support for them.
 
 | **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` |
 | - | - | - | - | - | - |
@@ -1428,6 +1440,17 @@ Each test suite serializes a collection of values, which have all been randomly 
 
 #### Müsli vs rkyv sizes
 
+> **Missing features:**
+> - `cstring` - `CString`'s are not supported.
+> - `string-key` - Maps with strings as keys like `HashMap<String, T>` are not supported.
+> - `string-set` - String sets like `HashSet<String>` are not supported.
+> - `tuple` - Tuples like `(u32, u32)` are not supported.
+> - `usize` - `usize` and `isize` types are not supported.
+
+Comparison between [`musli-zerocopy`] and [`rkyv`].
+
+Note that `musli-zerocopy` only supports the `primitives` benchmark.
+
 | **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` |
 | - | - | - | - | - | - |
 | `musli_zerocopy` | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 500, min: 80, max: 80, stddev: 0">80.00 ± 0.00</a> | - | - | - |
@@ -1435,12 +1458,21 @@ Each test suite serializes a collection of values, which have all been randomly 
 
 #### Müsli vs zerocopy sizes
 
+Compares [`musli-zerocopy`] with [`zerocopy`].
+
+Note that `zerocopy` only supports packed primitives, so we're only comparing with that suite.
+
 | **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` |
 | - | - | - | - | - | - |
 | `musli_zerocopy` | <a title="samples: 500, min: 112, max: 112, stddev: 0">112.00 ± 0.00</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | - | - | - |
 | `zerocopy` | - | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | - | - | - |
 
 #### Bitcode derive sizes
+
+> **Missing features:**
+> - `cstring` - `CString`'s are not supported.
+
+Uses a custom derive-based framework which does not support everything Müsli and serde does.
 
 | **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` |
 | - | - | - | - | - | - |
@@ -1451,6 +1483,15 @@ Each test suite serializes a collection of values, which have all been randomly 
 | `musli_wire` | <a title="samples: 500, min: 137, max: 147, stddev: 1.7739210805444463">143.30 ± 1.77</a> | <a title="samples: 500, min: 143, max: 153, stddev: 1.8691292090168572">148.43 ± 1.87</a> | <a title="samples: 10, min: 20849, max: 61965, stddev: 10213.501348705056">45860.00 ± 10213.50</a> | <a title="samples: 100, min: 350, max: 912, stddev: 111.85884140290388">627.14 ± 111.86</a> | <a title="samples: 4000, min: 3, max: 179, stddev: 59.46716043119924">49.31 ± 59.47</a> |
 
 #### BSON sizes
+
+> **Missing features:**
+> - `128` - 128-bit integers are not supported.
+> - `u64` - Format is limited to the bounds of signed 64-bit integers.
+> - `empty` - Empty variants are not supported.
+> - `newtype` - Newtype variants are not supported.
+> - `number-key` - Maps with numerical keys like `HashMap<u32, T>` are not supported.
+
+Specific comparison to BSON, because the format is limited in capabilities.
 
 | **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` |
 | - | - | - | - | - | - |
