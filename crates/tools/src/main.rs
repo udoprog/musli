@@ -148,6 +148,9 @@ struct ArgsReport {
     /// Run `--quick` benchmarks.
     #[arg(long)]
     quick: bool,
+    /// Build new and clean up test binaries after running.
+    #[arg(long)]
+    clean: bool,
     /// Skip size comparisons.
     #[arg(long)]
     no_size: bool,
@@ -201,6 +204,8 @@ fn main() -> Result<()> {
         .and_then(|p| p.parent())
         .context("Missing root directory")?;
 
+    let target = root.join("target");
+
     let args = Args::try_parse()?;
 
     let command = args.command.unwrap_or_default();
@@ -235,10 +240,18 @@ fn main() -> Result<()> {
                     }
                 }
 
-                bins.push(Bins::new(&output, &manifest, report)?);
+                bins.push(Bins::new(&output, &target, &manifest, report, a.clean)?);
             }
 
             let mut errored = Vec::new();
+
+            for bins in &bins {
+                println!("Sanity checking: {}", bins.report.title);
+
+                sanity_check(&bins.bins.fuzz()?).context("Sanity check failed")?;
+                // Test benches binaries.
+                run_path(&bins.bins.comparison()?, &[], &[])?;
+            }
 
             for bins in &bins {
                 println!("Building: {}", bins.report.title);
@@ -267,8 +280,6 @@ fn main() -> Result<()> {
 
             if !a.no_size {
                 for bins in &bins {
-                    sanity_check(&bins.bins.fuzz()?).context("Sanity check failed")?;
-
                     println!("Sizing: {}", bins.report.title);
                     let size_set =
                         collect_size_sets(&bins.bins.fuzz()?).context("Collecting size sets")?;
@@ -583,19 +594,20 @@ fn main() -> Result<()> {
 }
 
 struct InteriorBins<'a> {
+    binaries: PathBuf,
     report: &'a Report,
     manifest: &'a Manifest,
+    clean: bool,
     fuzz: RefCell<Option<PathBuf>>,
     comparison: RefCell<Option<PathBuf>>,
 }
 
 impl<'a> InteriorBins<'a> {
     fn build(&self) -> Result<()> {
-        fn shuffle(base: &str, id: &str, path: &mut PathBuf) -> Result<()> {
-            let to = path.with_file_name(format!("{base}-{id}{}", EXE_SUFFIX));
-            std::fs::rename(&*path, &to)
+        fn shuffle(path: &mut PathBuf, to: &Path) -> Result<()> {
+            fs::rename(&*path, to)
                 .with_context(|| anyhow!("{} to {}", path.display(), to.display()))?;
-            *path = to;
+            *path = to.to_owned();
             Ok(())
         }
 
@@ -603,17 +615,32 @@ impl<'a> InteriorBins<'a> {
             return Ok(());
         }
 
-        let mut built =
-            build_bench(self.manifest, self.report).context("Building bench binaries")?;
+        if !self.binaries.is_dir() {
+            fs::create_dir_all(&self.binaries)
+                .with_context(|| anyhow!("{}", self.binaries.display()))?;
+        }
 
-        shuffle("comparison", &self.report.id, &mut built.comparison)?;
-        shuffle("fuzz", &self.report.id, &mut built.fuzz)?;
+        let to_comparison = self
+            .binaries
+            .join(format!("comparison-{}{}", self.report.id, EXE_SUFFIX));
 
-        println!("Comparison: {}", built.comparison.display());
-        println!("Fuzz: {}", built.fuzz.display());
+        let to_fuzz = self
+            .binaries
+            .join(format!("fuzz-{}{}", self.report.id, EXE_SUFFIX));
 
-        *self.fuzz.borrow_mut() = Some(built.fuzz);
-        *self.comparison.borrow_mut() = Some(built.comparison);
+        if self.clean || !(to_comparison.is_file() && to_fuzz.is_file()) {
+            let mut built =
+                build_bench(self.manifest, self.report).context("Building bench binaries")?;
+
+            shuffle(&mut built.comparison, &to_comparison)?;
+            shuffle(&mut built.fuzz, &to_fuzz)?;
+        }
+
+        println!("Comparison: {}", to_comparison.display());
+        println!("Fuzz: {}", to_fuzz.display());
+
+        *self.comparison.borrow_mut() = Some(to_comparison);
+        *self.fuzz.borrow_mut() = Some(to_fuzz);
         Ok(())
     }
 
@@ -634,12 +661,14 @@ impl<'a> InteriorBins<'a> {
 
 impl<'a> Drop for InteriorBins<'a> {
     fn drop(&mut self) {
-        if let Some(fuzz) = self.fuzz.take() {
-            _ = fs::remove_file(fuzz);
-        }
+        if self.clean {
+            if let Some(fuzz) = self.fuzz.take() {
+                _ = fs::remove_file(fuzz);
+            }
 
-        if let Some(comparison) = self.comparison.take() {
-            _ = fs::remove_file(comparison);
+            if let Some(comparison) = self.comparison.take() {
+                _ = fs::remove_file(comparison);
+            }
         }
     }
 }
@@ -652,13 +681,21 @@ struct Bins<'a> {
 }
 
 impl<'a> Bins<'a> {
-    fn new(output: &'a Path, manifest: &'a Manifest, report: &'a Report) -> Result<Self> {
+    fn new(
+        output: &'a Path,
+        target: &'a Path,
+        manifest: &'a Manifest,
+        report: &'a Report,
+        clean: bool,
+    ) -> Result<Self> {
         Ok(Self {
             report,
             manifest,
             bins: InteriorBins {
+                binaries: target.join("tools"),
                 report,
                 manifest,
+                clean,
                 fuzz: RefCell::new(None),
                 comparison: RefCell::new(None),
             },
@@ -679,9 +716,6 @@ fn build_report<'a>(
     }
 
     if run_bench {
-        // Just test the binaries.
-        run_path(&bins.bins.comparison()?, &[], &[])?;
-
         let mut args = vec!["--bench"];
 
         if a.quick {
