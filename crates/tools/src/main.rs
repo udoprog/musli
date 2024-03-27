@@ -428,6 +428,48 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+struct Bins<'a> {
+    manifest: &'a Manifest,
+    report: &'a Report,
+    fuzz: Option<PathBuf>,
+    comparison: Option<PathBuf>,
+}
+
+impl<'a> Bins<'a> {
+    fn new(manifest: &'a Manifest, report: &'a Report) -> Self {
+        Self {
+            manifest,
+            report,
+            fuzz: None,
+            comparison: None,
+        }
+    }
+
+    fn build(&mut self) -> Result<()> {
+        if self.fuzz.is_some() && self.comparison.is_some() {
+            return Ok(());
+        }
+
+        let built = build_bench(self.manifest, self.report).context("Failed to build benches")?;
+
+        self.fuzz = Some(built.fuzz);
+        self.comparison = Some(built.comparison);
+        Ok(())
+    }
+
+    fn fuzz(&mut self) -> Result<&Path> {
+        self.build()?;
+        self.fuzz.as_deref().context("Missing `fuzz` binary")
+    }
+
+    fn comparison(&mut self) -> Result<&Path> {
+        self.build()?;
+        self.comparison
+            .as_deref()
+            .context("Missing `comparison` binary")
+    }
+}
+
 type ReportPairs<'a> = (Vec<SizeSet>, Vec<(&'a Group, Vec<String>)>);
 
 fn build_report<'a>(
@@ -445,11 +487,11 @@ fn build_report<'a>(
         fs::create_dir_all(&images).with_context(|| anyhow!("{}", images.display()))?;
     }
 
-    let bins = build_bench(manifest, report)?;
+    let mut bins = Bins::new(manifest, report);
 
     if run_bench {
         // Just test the binaries.
-        run_path(&bins.comparison, &[], &[])?;
+        run_path(bins.comparison()?, &[], &[])?;
 
         let mut args = vec!["--bench"];
 
@@ -463,7 +505,7 @@ fn build_report<'a>(
         }
 
         let comparison_env = [(OsStr::new("CRITERION_HOME"), criterion_output.as_os_str())];
-        run_path(&bins.comparison, &args, &comparison_env[..])?;
+        run_path(bins.comparison()?, &args, &comparison_env[..])?;
     }
 
     if !criterion_output.is_dir() {
@@ -497,7 +539,7 @@ fn build_report<'a>(
         output_plots.push((g, plots));
     }
 
-    let size_sets = collect_size_sets(&bins.fuzz)?;
+    let size_sets = collect_size_sets(bins.fuzz()?)?;
     Ok((size_sets, output_plots))
 }
 
