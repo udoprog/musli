@@ -56,6 +56,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     ($b:expr, $framework:ident, $buf:ident) => {{
                         $buf.with(|mut state| {
                             state.reset($size_hint, &$name);
+                            #[allow(unused_mut)]
                             let mut data = state.encode(&$name).unwrap();
                             $b.iter(move || data.decode::<$ty>().unwrap());
                         });

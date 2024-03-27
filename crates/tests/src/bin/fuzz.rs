@@ -309,6 +309,7 @@ fn main() -> Result<()> {
                                 let break_outer = buf.with(|mut state| {
                                     state.reset($size_hint, var);
 
+                                    #[allow(unused_mut)]
                                     let mut out = match state.encode(var) {
                                         Ok(value) => value,
                                         Err(error) => {

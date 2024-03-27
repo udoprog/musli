@@ -146,6 +146,28 @@ pub mod postcard {
     }
 }
 
+#[cfg(all(feature = "bson", feature = "serde"))]
+#[crate::benchmarker]
+pub mod bson {
+    use alloc::vec::Vec;
+
+    use serde::{Deserialize, Serialize};
+
+    pub fn encode<T>(value: &T) -> Result<Vec<u8>, bson::ser::Error>
+    where
+        T: Serialize,
+    {
+        bson::to_vec(value)
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<T, bson::de::Error>
+    where
+        for<'de> T: Deserialize<'de>,
+    {
+        bson::from_slice(buf)
+    }
+}
+
 /// Bitcode lives in here with two variants, one using serde and another using
 /// its own derives.
 #[cfg(all(feature = "bitcode", feature = "serde"))]

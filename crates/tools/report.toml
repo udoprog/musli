@@ -9,6 +9,18 @@ branch = "gh-pages"
 # features expected to be common to all.
 common = ["no-rt", "std", "alloc"]
 
+[missing_features]
+u64 = "Format is limited to the bounds of signed 64-bit integers."
+map = "Maps are not supported."
+"128" = "128-bit integers are not supported."
+newtype = "Newtype or empty structs or variants are not supported."
+string-set = "String sets like `HashSet<String>` are not supported."
+string-key = "Maps with strings as keys like `HashMap<String, T>` are not supported."
+number-key = "Maps with numerical keys like `HashMap<u32, T>` are not supported."
+tuple = "Tuples like `(u32, u32)` are not supported."
+cstring = "`CString` is not supported."
+usize = "`usize` and `isize` types are not supported."
+
 [[kinds]]
 id = "dec"
 description = "Decode a type."
@@ -96,7 +108,7 @@ features = [
 ]
 expected = [
     "musli", "serde",
-    "model-no-128", "model-no-map", "model-no-map-string-key"
+    "no-128", "no-map",
 ]
 
 [[reports]]
@@ -110,7 +122,7 @@ description = [
 ]
 features = ["musli-zerocopy", "rkyv"]
 expected = [
-    "model-no-cstring", "model-no-map", "model-no-map-string-key", "model-no-tuple", "model-no-usize"
+    "no-cstring", "no-string-key", "no-string-set", "no-tuple", "no-usize"
 ]
 only = ["primitives", "primpacked"]
 
@@ -138,18 +150,39 @@ features = [
     "musli-wire",
     "musli-descriptive",
     "musli-storage",
-    "musli-value",
     "bitcode-derive",
 ]
 expected = [
-    "musli", "model-no-cstring",
+    "musli", "no-cstring",
+]
+
+[[reports]]
+skip = true
+id = "bson"
+title = "BSON serialization"
+link = "bson"
+description = [
+    "Specific comparison to BSON, because the format is limited in capabilities.",
+]
+features = [
+    "musli-wire",
+    "musli-descriptive",
+    "musli-storage",
+    "bson",
+]
+expected = [
+    "musli", "no-128", "no-u64", "no-newtype"
 ]
 
 [footnotes]
 incomplete = "These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result."
 i128 = "Lacks 128-bit support."
+bson = "BSON does not support serializing directly in-place [without patches](https://github.com/mongodb/bson-rust/pull/328). As a result it is expected to be much slower."
 
 [crate_footnotes]
+bson = ["bson"]
+
+[size_footnotes]
 musli_json = ["incomplete"]
 rkyv = ["incomplete"]
 serde_bitcode = []
@@ -157,3 +190,15 @@ serde_cbor = ["i128"]
 serde_dlhn = ["i128"]
 serde_json = ["incomplete"]
 derive_bitcode = []
+
+[[links]]
+title = "`rkyv`"
+href = "https://docs.rs/rkyv"
+
+[[links]]
+title = "`zerocopy`"
+href = "https://docs.rs/zerocopy"
+
+[[links]]
+title = "`musli-zerocopy`"
+href = "https://docs.rs/musli-zerocopy"

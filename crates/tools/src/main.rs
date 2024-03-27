@@ -33,25 +33,10 @@ impl Paths {
 
 const REPO: &str = "https://raw.githubusercontent.com/udoprog/musli";
 
-const LINKS: &[Link] = &[
-    Link {
-        title: "`rkyv`",
-        href: "https://docs.rs/rkyv",
-    },
-    Link {
-        title: "`zerocopy`",
-        href: "https://docs.rs/zerocopy",
-    },
-    Link {
-        title: "`musli-zerocopy`",
-        href: "https://docs.rs/musli-zerocopy",
-    },
-];
-
-#[derive(Clone, Copy)]
+#[derive(Debug, Deserialize)]
 struct Link {
-    title: &'static str,
-    href: &'static str,
+    title: String,
+    href: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -81,14 +66,22 @@ struct Manifest {
     #[serde(default)]
     reports: Vec<Report>,
     #[serde(default)]
-    crate_footnotes: HashMap<String, Vec<String>>,
+    crates_footnotes: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    size_footnotes: HashMap<String, Vec<String>>,
     #[serde(default)]
     footnotes: HashMap<String, String>,
+    #[serde(default)]
+    links: Vec<Link>,
+    #[serde(default)]
+    missing_features: HashMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct Report {
     id: String,
+    #[serde(default)]
+    skip: bool,
     #[serde(default)]
     description: Vec<String>,
     title: String,
@@ -229,6 +222,10 @@ fn main() -> Result<()> {
             let mut bins = Vec::new();
 
             for report in &manifest.reports {
+                if report.skip {
+                    continue;
+                }
+
                 if let Some(do_report) = args.report.as_deref() {
                     if do_report != report.id {
                         continue;
@@ -273,6 +270,8 @@ fn main() -> Result<()> {
                     size_sets.push((bins.report, size_set));
                 }
             }
+
+            let mut used_footnotes = BTreeSet::new();
 
             let mut o = String::new();
 
@@ -331,12 +330,20 @@ fn main() -> Result<()> {
                 let missing = report
                     .expected
                     .iter()
-                    .flat_map(|f| f.strip_prefix("model-no-"))
-                    .map(|f| format!("`{f}`"))
+                    .flat_map(|f| f.strip_prefix("no-"))
                     .collect::<Vec<_>>();
 
                 if !missing.is_empty() {
-                    writeln!(o, "> **Missing features:** {}", missing.join(", "))?;
+                    writeln!(o, "> **Missing features:**")?;
+
+                    for feature in missing {
+                        if let Some(description) = manifest.missing_features.get(feature) {
+                            writeln!(o, "> - `{feature}` - {description}")?;
+                        } else {
+                            writeln!(o, "> - `{feature}`")?;
+                        }
+                    }
+
                     writeln!(o)?;
                 }
 
@@ -414,7 +421,22 @@ fn main() -> Result<()> {
                             let interval = &mean.confidence_interval;
 
                             writeln!(o, "<tr>")?;
-                            writeln!(o, "<td><code>{file_name}</code></td>")?;
+                            writeln!(o, "<td>")?;
+                            writeln!(o, "<code>{file_name}</code>")?;
+
+                            if let Some(footnotes) = manifest.crates_footnotes.get(&file_name) {
+                                used_footnotes.extend(footnotes);
+
+                                let footnotes = footnotes
+                                    .iter()
+                                    .map(|f| format!("[^{f}]"))
+                                    .collect::<Vec<_>>()
+                                    .join("");
+
+                                writeln!(o, "{footnotes}")?;
+                            }
+
+                            writeln!(o, "</td>")?;
                             writeln!(
                                 o,
                                 "<td><b>{}</b> ± {}</td>",
@@ -439,9 +461,21 @@ fn main() -> Result<()> {
                 writeln!(o)?;
             }
 
-            size_comparisons(&manifest, &mut o, size_sets)?;
+            size_comparisons(&mut o, &manifest, size_sets, &mut used_footnotes)?;
 
-            for Link { title, href } in LINKS {
+            if !used_footnotes.is_empty() {
+                writeln!(o)?;
+
+                for footnote in used_footnotes {
+                    let Some(note) = manifest.footnotes.get(footnote) else {
+                        continue;
+                    };
+
+                    writeln!(o, "[^{footnote}]: {note}")?;
+                }
+            }
+
+            for Link { title, href } in &manifest.links {
                 writeln!(o, "[{title}]: {href}")?;
             }
 
@@ -459,6 +493,10 @@ fn main() -> Result<()> {
             let mut builds = Vec::new();
 
             for report in &manifest.reports {
+                if report.skip {
+                    continue;
+                }
+
                 if let Some(do_report) = args.report.as_deref() {
                     if do_report != report.id {
                         continue;
@@ -513,6 +551,10 @@ fn main() -> Result<()> {
             let mut builds = Vec::new();
 
             for report in &manifest.reports {
+                if report.skip {
+                    continue;
+                }
+
                 if let Some(do_report) = args.report.as_deref() {
                     if do_report != report.id {
                         continue;
@@ -701,10 +743,11 @@ fn build_report<'a>(
     Ok(output_plots)
 }
 
-fn size_comparisons<W>(
-    manifest: &Manifest,
+fn size_comparisons<'a, W>(
     o: &mut W,
+    manifest: &'a Manifest,
     size_sets: Vec<(&Report, Vec<SizeSet>)>,
+    used_footnotes: &mut BTreeSet<&'a String>,
 ) -> Result<()>
 where
     W: Write,
@@ -778,10 +821,8 @@ where
 
         writeln!(o)?;
 
-        let mut used_footnotes = BTreeSet::new();
-
         for framework in rows {
-            let footnotes = match manifest.crate_footnotes.get(framework.as_str()) {
+            let footnotes = match manifest.size_footnotes.get(framework.as_str()) {
                 Some(footnotes) => {
                     used_footnotes.extend(footnotes);
                     &footnotes[..]
@@ -822,18 +863,6 @@ where
             }
 
             writeln!(o)?;
-        }
-
-        if !used_footnotes.is_empty() {
-            writeln!(o)?;
-
-            for footnote in used_footnotes {
-                let Some(note) = manifest.footnotes.get(footnote) else {
-                    continue;
-                };
-
-                writeln!(o, "[^{footnote}]: {note}")?;
-            }
         }
 
         writeln!(o)?;

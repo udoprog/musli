@@ -131,6 +131,8 @@ macro_rules! feature_matrix {
         $call!(rkyv, rkyv_buf $(, $($tt)*)*);
         #[cfg(feature = "postcard")]
         $call!(postcard, postcard_buf $(, $($tt)*)*);
+        #[cfg(feature = "bson")]
+        $call!(bson, bson_buf $(, $($tt)*)*);
     };
 }
 

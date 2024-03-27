@@ -29,25 +29,31 @@ no-rt = []
 # used for ci testing
 test = ["musli-wire", "musli-storage", "musli-descriptive", "musli-value", "musli-json"]
 
-model-no-usize = []
-model-no-cstring = []
-model-no-map = ["model-no-map-string-key"]
-model-no-map-string-key = ["model-no-map"]
-model-no-btree = []
-model-no-vec = []
-model-no-tuple = []
-model-no-128 = []
+no-usize = []
+no-cstring = []
+no-map = []
+no-string-key = []
+no-number-key = []
+no-btree = []
+no-vec = []
+no-tuple = []
+no-128 = []
+# Maximum integer bound is limited to i64.
+no-u64 = []
+no-newtype = []
+no-string-set = []
 
 serde = ["dep:serde", "bitcode?/serde"]
 serde_json = ["dep:serde_json", "serde", "std"]
 bincode = ["dep:bincode", "serde"]
 rmp-serde = ["dep:rmp-serde", "serde"]
 postcard = ["dep:postcard", "serde"]
-rkyv = ["dep:rkyv", "std", "model-no-usize", "model-no-map-string-key", "model-no-tuple", "model-no-cstring"]
-serde_cbor = ["dep:serde_cbor", "serde", "model-no-128", "model-no-map"]
-dlhn = ["dep:dlhn", "serde", "model-no-128", "model-no-map"]
+rkyv = ["dep:rkyv", "std", "no-usize", "no-tuple", "no-cstring", "no-string-key", "no-string-set"]
+bson = ["dep:bson", "serde", "no-128", "no-u64", "no-number-key", "no-newtype"]
+serde_cbor = ["dep:serde_cbor", "serde", "no-128", "no-map"]
+dlhn = ["dep:dlhn", "serde", "no-128", "no-map"]
 bitcode = ["dep:bitcode", "serde"]
-bitcode-derive = ["dep:bitcode", "bitcode?/derive", "model-no-cstring"]
+bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.105", default-features = false, optional = true, features = ["alloc"] }
@@ -70,6 +76,7 @@ dlhn = { version = "0.1.6", default-features = false, optional = true }
 bitcode = { version = "0.6.0", default-features = false, optional = true }
 rkyv = { version = "0.7.44", default-features = false, optional = true, features = ["alloc", "size_32", "validation", "strict"] }
 postcard = { version = "1.0.8",  default-features = false, optional = true }
+bson = { version = "2.9.0", default-features = false, optional = true }
 zerocopy = { version = "0.7.32", default-features = false, optional = true, features = ["byteorder", "derive"] }
 
 [dev-dependencies]

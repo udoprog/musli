@@ -17,6 +17,13 @@ pub use musli_macros::Generate;
 #[cfg(feature = "std")]
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+miri! {
+    pub const STRING_RANGE: Range<usize> = 4..32, 2..16;
+    #[cfg(feature = "std")]
+    pub const MAP_RANGE: Range<usize> = 10..20, 1..3;
+    pub const VEC_RANGE: Range<usize> = 10..20, 1..3;
+}
+
 /// Random number generator.
 pub struct Rng {
     rng: rand::rngs::StdRng,
@@ -75,13 +82,6 @@ impl rand::RngCore for Rng {
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
         self.rng.try_fill_bytes(dest)
     }
-}
-
-miri! {
-    pub const STRING_RANGE: Range<usize> = 0..32, 0..16;
-    #[cfg(feature = "std")]
-    pub const MAP_RANGE: Range<usize> = 10..100, 1..3;
-    pub const VEC_RANGE: Range<usize> = 10..100, 1..3;
 }
 
 pub trait Generate: Sized {
@@ -313,6 +313,33 @@ tuple!(A, B, C, D, E);
 tuple!(A, B, C, D, E, F);
 tuple!(A, B, C, D, E, F, G);
 
+macro_rules! unsigned {
+    ($ty:ty) => {
+        impl Generate for $ty
+        where
+            Standard: Distribution<$ty>,
+        {
+            #[inline]
+            #[cfg(feature = "no-u64")]
+            fn generate<T>(rng: &mut T) -> Self
+            where
+                T: rand::Rng,
+            {
+                rng.gen_range(0..(i64::MAX as $ty))
+            }
+
+            #[inline]
+            #[cfg(not(feature = "no-u64"))]
+            fn generate<T>(rng: &mut T) -> Self
+            where
+                T: rand::Rng,
+            {
+                rng.gen()
+            }
+        }
+    };
+}
+
 macro_rules! primitive {
     ($ty:ty) => {
         impl Generate for $ty
@@ -333,15 +360,17 @@ macro_rules! primitive {
 primitive!(u8);
 primitive!(u16);
 primitive!(u32);
-primitive!(u64);
-primitive!(u128);
+unsigned!(u64);
+unsigned!(u128);
+unsigned!(usize);
+
 primitive!(i8);
 primitive!(i16);
 primitive!(i32);
 primitive!(i64);
 primitive!(i128);
-primitive!(usize);
 primitive!(isize);
+
 primitive!(f32);
 primitive!(f64);
 primitive!(char);

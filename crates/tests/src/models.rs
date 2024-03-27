@@ -1,12 +1,13 @@
-#[cfg(not(feature = "model-no-map"))]
-use std::collections::{HashMap, HashSet};
+#[cfg(not(feature = "no-map"))]
+use std::collections::HashMap;
+use std::collections::HashSet;
 
-#[cfg(not(feature = "model-no-btree"))]
+#[cfg(not(feature = "no-btree"))]
 use std::collections::{BTreeMap, BTreeSet};
 
 use core::ops::Range;
 
-#[cfg(not(feature = "model-no-cstring"))]
+#[cfg(not(feature = "no-cstring"))]
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -31,6 +32,7 @@ pub use rand::prelude::*;
 miri! {
     pub const PRIMITIVES_RANGE: Range<usize> = 10..100, 1..3;
     pub const MEDIUM_RANGE: Range<usize> = 10..100, 1..3;
+    pub const SMALL_FIELDS: Range<usize> = 1..3, 1..2;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]
@@ -53,7 +55,7 @@ pub struct PrimitivesPacked {
     unsigned16: u16,
     unsigned32: u32,
     unsigned64: u64,
-    #[cfg(not(feature = "model-no-128"))]
+    #[cfg(not(feature = "no-128"))]
     unsigned128: u128,
     signed8: i8,
     #[cfg_attr(feature = "musli", musli(bytes))]
@@ -61,11 +63,11 @@ pub struct PrimitivesPacked {
     signed16: i16,
     signed32: i32,
     signed64: i64,
-    #[cfg(not(feature = "model-no-128"))]
+    #[cfg(not(feature = "no-128"))]
     signed128: i128,
-    #[cfg(not(feature = "model-no-usize"))]
+    #[cfg(not(feature = "no-usize"))]
     unsignedsize: usize,
-    #[cfg(not(feature = "model-no-usize"))]
+    #[cfg(not(feature = "no-usize"))]
     signedsize: isize,
     float32: f32,
     #[cfg_attr(feature = "musli", musli(bytes))]
@@ -108,21 +110,21 @@ pub struct Primitives {
     unsigned16: u16,
     unsigned32: u32,
     unsigned64: u64,
-    #[cfg(not(feature = "model-no-128"))]
+    #[cfg(not(feature = "no-128"))]
     unsigned128: u128,
     signed8: i8,
     signed16: i16,
     signed32: i32,
     signed64: i64,
-    #[cfg(not(feature = "model-no-128"))]
+    #[cfg(not(feature = "no-128"))]
     signed128: i128,
-    #[cfg(not(feature = "model-no-usize"))]
+    #[cfg(not(feature = "no-usize"))]
     unsignedsize: usize,
-    #[cfg(not(feature = "model-no-usize"))]
+    #[cfg(not(feature = "no-usize"))]
     signedsize: isize,
-    #[cfg(not(feature = "model-no-float"))]
+    #[cfg(not(feature = "no-float"))]
     float32: f32,
-    #[cfg(not(feature = "model-no-float"))]
+    #[cfg(not(feature = "no-float"))]
     float64: f64,
 }
 
@@ -155,16 +157,32 @@ impl PartialEq<Primitives> for &Primitives {
 pub struct Allocated {
     string: String,
     #[cfg_attr(feature = "musli", musli(bytes))]
+    #[generate(range = SMALL_FIELDS)]
     bytes: Vec<u8>,
-    #[cfg(not(feature = "model-no-map"))]
+    #[cfg(all(not(feature = "no-map"), not(feature = "no-number-key")))]
+    #[generate(range = SMALL_FIELDS)]
     number_map: HashMap<u32, u64>,
-    #[cfg(not(feature = "model-no-map"))]
+    #[cfg(all(not(feature = "no-map"), not(feature = "no-string-key")))]
+    #[generate(range = SMALL_FIELDS)]
+    string_map: HashMap<String, u64>,
+    #[generate(range = SMALL_FIELDS)]
     number_set: HashSet<u32>,
-    #[cfg(not(feature = "model-no-btree"))]
+    #[generate(range = SMALL_FIELDS)]
+    #[cfg(not(feature = "no-string-set"))]
+    string_set: HashSet<String>,
+    #[cfg(all(not(feature = "no-btree"), not(feature = "no-number-key")))]
+    #[generate(range = SMALL_FIELDS)]
     number_btree: BTreeMap<u32, u64>,
-    #[cfg(not(feature = "model-no-btree"))]
+    #[cfg(not(feature = "no-btree"))]
+    #[generate(range = SMALL_FIELDS)]
+    string_btree: BTreeMap<String, u64>,
+    #[cfg(not(feature = "no-btree"))]
+    #[generate(range = SMALL_FIELDS)]
     number_btree_set: BTreeSet<u32>,
-    #[cfg(not(feature = "model-no-cstring"))]
+    #[cfg(not(feature = "no-btree"))]
+    #[generate(range = SMALL_FIELDS)]
+    string_btree_set: BTreeSet<String>,
+    #[cfg(not(feature = "no-cstring"))]
     c_string: CString,
 }
 
@@ -194,18 +212,18 @@ pub struct Tuples {
     u2: (bool, u8),
     u3: (bool, u8, u32),
     u4: (bool, u8, u32, u64),
-    #[cfg(not(feature = "model-no-float"))]
+    #[cfg(not(feature = "no-float"))]
     u5: (bool, u8, u32, u64, f32),
-    #[cfg(not(feature = "model-no-float"))]
+    #[cfg(not(feature = "no-float"))]
     u6: (bool, u8, u32, u64, f32, f64),
     i0: (),
     i1: (bool,),
     i2: (bool, i8),
     i3: (bool, i8, i32),
     i4: (bool, i8, i32, i64),
-    #[cfg(not(feature = "model-no-float"))]
+    #[cfg(not(feature = "no-float"))]
     i5: (bool, i8, i32, i64, f32),
-    #[cfg(not(feature = "model-no-float"))]
+    #[cfg(not(feature = "no-float"))]
     i6: (bool, i8, i32, i64, f32, f64),
 }
 
@@ -271,19 +289,19 @@ impl PartialEq<MediumEnum> for &MediumEnum {
 pub struct LargeStruct {
     #[generate(range = PRIMITIVES_RANGE)]
     primitives: Vec<Primitives>,
-    #[cfg(not(any(feature = "model-no-vec", feature = "model-no-tuple")))]
+    #[cfg(not(any(feature = "no-vec", feature = "no-tuple")))]
     #[generate(range = PRIMITIVES_RANGE)]
     tuples: Vec<(Tuples, Tuples)>,
     #[generate(range = MEDIUM_RANGE)]
     medium_vec: Vec<MediumEnum>,
-    #[cfg(not(feature = "model-no-map-string-key"))]
+    #[cfg(all(not(feature = "no-map"), not(feature = "no-string-key")))]
     #[generate(range = MEDIUM_RANGE)]
     medium_map: HashMap<String, MediumEnum>,
-    #[cfg(not(feature = "model-no-map-string-key"))]
+    #[cfg(all(not(feature = "no-map"), not(feature = "no-string-key")))]
     string_keys: HashMap<String, u64>,
-    #[cfg(not(feature = "model-no-map"))]
+    #[cfg(all(not(feature = "no-map"), not(feature = "no-number-key")))]
     number_map: HashMap<u32, u64>,
-    #[cfg(not(feature = "model-no-tuple"))]
+    #[cfg(not(feature = "no-tuple"))]
     number_vec: Vec<(u32, u64)>,
 }
 
