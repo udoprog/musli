@@ -26,8 +26,8 @@ use core::str;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, TypeHint, ValueVisitor,
-    Visitor,
+    Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip, TypeHint,
+    ValueVisitor, Visitor,
 };
 use musli::Context;
 
@@ -154,9 +154,9 @@ where
     }
 
     #[inline]
-    fn try_skip(self) -> Result<bool, C::Error> {
+    fn try_skip(self) -> Result<Skip, C::Error> {
         self.skip()?;
-        Ok(true)
+        Ok(Skip::Skipped)
     }
 
     #[inline]

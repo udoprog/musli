@@ -6,8 +6,8 @@ use alloc::vec::Vec;
 
 use musli::de::{
     Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint, NumberVisitor,
-    PackDecoder, SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder,
-    TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
+    PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
+    StructFieldsDecoder, TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::Context;
 use musli_common::int::continuation as c;
@@ -304,9 +304,9 @@ where
     }
 
     #[inline]
-    fn try_skip(self) -> Result<bool, C::Error> {
+    fn try_skip(self) -> Result<Skip, C::Error> {
         self.skip()?;
-        Ok(true)
+        Ok(Skip::Skipped)
     }
 
     #[inline]

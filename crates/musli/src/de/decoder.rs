@@ -7,7 +7,7 @@ use crate::expecting::{self, Expecting};
 use crate::Context;
 
 use super::{
-    AsDecoder, Decode, MapDecoder, MapEntriesDecoder, PackDecoder, SequenceDecoder,
+    AsDecoder, Decode, MapDecoder, MapEntriesDecoder, PackDecoder, SequenceDecoder, Skip,
     StructFieldsDecoder, TupleDecoder, VariantDecoder,
 };
 
@@ -128,14 +128,11 @@ pub trait Decoder<'de>: Sized {
     }
 
     /// This is a variant of [`Decoder::skip`], but instead of erroring in case
-    /// skipping is not supported it should return a boolean.
-    ///
-    /// Note that this must be implemented explicitly by a decoder, since it's
-    /// used as an important signal for various formats.
-    ///
-    /// Note that it will still error if skipping is supported, but the value is
-    /// malformed for one reason or another.
-    fn try_skip(self) -> Result<bool, <Self::Cx as Context>::Error>;
+    /// skipping is not supported it must return [`Skip::Unsupported`].
+    #[inline(always)]
+    fn try_skip(self) -> Result<Skip, <Self::Cx as Context>::Error> {
+        Ok(Skip::Unsupported)
+    }
 
     /// Return a [TypeHint] indicating which type is being produced by the
     /// [Decoder].

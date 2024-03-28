@@ -62,7 +62,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let Tokens {
         context_t,
-        core_result,
+        result,
         decode_t,
         decoder_t,
         ..
@@ -88,7 +88,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         #[allow(clippy::let_unit_value)]
         impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
-            fn decode<#d_param>(#ctx_var: &#d_param::Cx, #root_decoder_var: #d_param) -> #core_result<Self, <#d_param::Cx as #context_t>::Error>
+            fn decode<#d_param>(#ctx_var: &#d_param::Cx, #root_decoder_var: #d_param) -> #result<Self, <#d_param::Cx as #context_t>::Error>
             where
                 #d_param: #decoder_t<#lt, Mode = #mode_ident>,
             {
@@ -127,6 +127,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         option_none,
         option_some,
         result,
+        skip,
         struct_decoder_t,
         struct_field_decoder_t,
         variant_decoder_t,
@@ -163,7 +164,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let mut fallback = match en.fallback {
         Some(ident) => {
             quote! {{
-                if !#decoder_t::try_skip(#variant_decoder_t::decode_value(#variant_decoder_var)?)? {
+                if #skip::is_unsupported(#decoder_t::try_skip(#variant_decoder_t::decode_value(#variant_decoder_var)?)?) {
                     return #result::Err(#context_t::invalid_variant_tag(#ctx_var, #type_name, #variant_tag_var));
                 }
 
@@ -423,7 +424,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                 return #result::Err(#context_t::alloc_failed(#ctx_var));
                             }
                             Outcome::Err => {
-                                if !#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#entry_var)?)? {
+                                if #skip::is_unsupported(#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#entry_var)?)?) {
                                     return #result::Err(#context_t::invalid_field_string_tag(#ctx_var, #type_name, #field_alloc_var));
                                 }
                             }
@@ -439,7 +440,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                 break #struct_field_decoder_t::decode_field_value(#entry_var)?;
                             }
                             field => {
-                                if !#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#entry_var)?)? {
+                                if #skip::is_unsupported(#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#entry_var)?)?) {
                                     return #result::Err(#context_t::invalid_field_tag(#ctx_var, #type_name, field));
                                 }
                             }
@@ -592,7 +593,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                 return #result::Err(#context_t::alloc_failed(#ctx_var));
                             }
                             Outcome::Err => {
-                                if !#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#entry_var)?)? {
+                                if #skip::is_unsupported(#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#entry_var)?)?) {
                                     return #result::Err(#context_t::invalid_field_string_tag(#ctx_var, #type_name, #field_alloc_var));
                                 }
                             }
@@ -622,7 +623,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                 });
                             }
                             field => {
-                                if !#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#entry_var)?)? {
+                                if #skip::is_unsupported(#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#entry_var)?)?) {
                                     return #result::Err(#context_t::invalid_field_tag(#ctx_var, #type_name, field));
                                 }
                             }
@@ -709,16 +710,17 @@ fn decode_tagged(
     } = *cx;
 
     let Tokens {
-        context_t,
         buf_t,
+        context_t,
         decoder_t,
         default_function,
         fmt,
         option_none,
         option_some,
-        struct_field_decoder_t,
-        struct_decoder_t,
         result,
+        skip,
+        struct_decoder_t,
+        struct_field_decoder_t,
         visit_owned_fn,
         ..
     } = e.tokens;
@@ -905,7 +907,7 @@ fn decode_tagged(
     };
 
     let mut body = quote! {
-        if !#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#struct_decoder_var)?)? {
+        if #skip::is_unsupported(#decoder_t::try_skip(#struct_field_decoder_t::decode_field_value(#struct_decoder_var)?)?) {
             return #result::Err(#unsupported);
         }
     };
