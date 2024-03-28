@@ -26,6 +26,7 @@ simple [zero-copy serialization].
   [`derives`].
 * For information on how this library is tested, see [`tests`].
 * For [performance] and [size comparisons].
+* See [`musli-serde`] for [`serde`] compatibility.
 
 <br>
 
@@ -345,8 +346,6 @@ information on this.
 
 <br>
 
-[performance]: https://udoprog.github.io/musli/benchmarks/
-[size comparisons]: https://udoprog.github.io/musli/benchmarks/#size-comparisons
 [`bincode`]: https://docs.rs/bincode
 [`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
 [`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
@@ -354,14 +353,17 @@ information on this.
 [`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
 [`musli-descriptive`]: https://docs.rs/musli-descriptive
 [`musli-json`]: https://docs.rs/musli-json
+[`musli-serde`]: https://docs.rs/musli-serde
 [`musli-storage`]: https://docs.rs/musli-storage
-[`tests`]: https://github.com/udoprog/musli/tree/main/crates/tests
 [`musli-value`]: https://docs.rs/musli-value
 [`musli-wire`]: https://docs.rs/musli-wire
 [`protobuf`]: https://developers.google.com/protocol-buffers
 [`serde`]: https://serde.rs
+[`serde`]: https://serde.rs
 [`simdutf8`]: https://docs.rs/simdutf8
+[`tests`]: https://github.com/udoprog/musli/tree/main/crates/tests
 [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
-[when decoding collections]:
-https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
+[performance]: https://udoprog.github.io/musli/benchmarks/
+[size comparisons]: https://udoprog.github.io/musli/benchmarks/#size-comparisons
+[when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
 [zero-copy serialization]: https://docs.rs/musli-zerocopy

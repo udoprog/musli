@@ -5,6 +5,8 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
+use musli::context::StdError;
+
 /// Error raised during json encoding.
 #[derive(Debug)]
 pub struct Error {
@@ -80,9 +82,8 @@ impl fmt::Display for ErrorMessage {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ErrorMessage {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl StdError for ErrorMessage {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             ErrorMessage::ParseFloat(error) => Some(error),
         }

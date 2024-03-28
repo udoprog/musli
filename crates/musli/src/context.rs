@@ -13,7 +13,7 @@ pub use std::error::Error as StdError;
 pub trait StdError: fmt::Debug + fmt::Display {}
 
 #[cfg(not(feature = "std"))]
-impl<T> StdError for T where T: fmt::Debug + fmt::Display {}
+impl<T> StdError for T where T: 'static + fmt::Debug + fmt::Display {}
 
 /// Provides ergonomic access to the serialization context.
 ///

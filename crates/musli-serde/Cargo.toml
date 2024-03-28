@@ -20,8 +20,8 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
 [features]
 default = ["std", "alloc"]
-std = ["musli/std", "serde/std"]
-alloc = ["musli/alloc", "serde/alloc"]
+std = ["musli/std", "musli-common/std", "serde/std"]
+alloc = ["musli/alloc", "musli-common/alloc", "serde/alloc"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.105", default-features = false }
@@ -31,3 +31,4 @@ serde = { version = "1.0.197", default-features = false }
 [dev-dependencies]
 serde_derive = "1.0.197"
 url = { version = "2.5.0", features = ["serde"] }
+musli-json = { path = "../musli-json", version = "0.0.105", features = ["std"] }
