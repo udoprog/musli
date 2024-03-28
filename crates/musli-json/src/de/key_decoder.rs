@@ -1,6 +1,6 @@
 use core::fmt;
 
-use musli::de::{Decode, Decoder, NumberHint, SizeHint, TypeHint, ValueVisitor, Visitor};
+use musli::de::{Decode, Decoder, NumberHint, SizeHint, Skip, TypeHint, ValueVisitor, Visitor};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -83,9 +83,9 @@ where
     }
 
     #[inline]
-    fn try_skip(self) -> Result<bool, C::Error> {
+    fn try_skip(self) -> Result<Skip, C::Error> {
         self.skip()?;
-        Ok(true)
+        Ok(Skip::Skipped)
     }
 
     #[inline]

@@ -16,6 +16,9 @@
 //! }
 //! ```
 
+mod skip;
+pub use self::skip::Skip;
+
 mod as_decoder;
 pub use self::as_decoder::AsDecoder;
 

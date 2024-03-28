@@ -30,9 +30,9 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
     };
 
     let Tokens {
-        core_result,
         encode_t,
         encoder_t,
+        result,
         ..
     } = e.tokens;
 
@@ -64,7 +64,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         #[automatically_derived]
         impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
             #[inline]
-            fn encode<#e_param>(&self, #ctx_var: &#e_param::Cx, #encoder_var: #e_param) -> #core_result<<#e_param as #encoder_t>::Ok, <#e_param as #encoder_t>::Error>
+            fn encode<#e_param>(&self, #ctx_var: &#e_param::Cx, #encoder_var: #e_param) -> #result<<#e_param as #encoder_t>::Ok, <#e_param as #encoder_t>::Error>
             where
                 #e_param: #encoder_t<Mode = #mode_ident>,
             {

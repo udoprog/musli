@@ -140,11 +140,6 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     {
         match self._never {}
     }
-
-    #[inline]
-    fn try_skip(self) -> Result<bool, <Self::Cx as Context>::Error> {
-        match self._never {}
-    }
 }
 
 impl<C: ?Sized + Context> AsDecoder for Never<(), C> {

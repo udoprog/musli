@@ -84,11 +84,6 @@ where
     }
 
     #[inline]
-    fn try_skip(self) -> Result<bool, C::Error> {
-        Ok(false)
-    }
-
-    #[inline]
     fn decode_unit(mut self) -> Result<(), C::Error> {
         let mark = self.cx.mark();
         let count =

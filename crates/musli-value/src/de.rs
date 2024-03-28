@@ -5,8 +5,8 @@ use core::slice;
 use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint,
-    PackDecoder, SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder,
-    TupleDecoder, TypeHint, VariantDecoder, Visitor,
+    PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
+    StructFieldsDecoder, TupleDecoder, TypeHint, VariantDecoder, Visitor,
 };
 use musli::Context;
 use musli_storage::de::StorageDecoder;
@@ -93,8 +93,8 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[inline]
-    fn try_skip(self) -> Result<bool, C::Error> {
-        Ok(true)
+    fn try_skip(self) -> Result<Skip, C::Error> {
+        Ok(Skip::Skipped)
     }
 
     #[inline]
