@@ -1,6 +1,6 @@
 [package]
 name = "musli-zerocopy-macros"
-version = "0.0.106"
+version = "0.0.107"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.76"
