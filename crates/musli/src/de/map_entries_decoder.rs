@@ -47,11 +47,6 @@ pub trait MapEntriesDecoder<'de>: Sized {
         &mut self,
     ) -> Result<Self::DecodeMapEntryValue<'_>, <Self::Cx as Context>::Error>;
 
-    /// Indicate that the value should be skipped.
-    ///
-    /// The boolean returned indicates if the value was skipped or not.
-    fn skip_map_entry_value(&mut self) -> Result<bool, <Self::Cx as Context>::Error>;
-
     /// End entries decoding.
     fn end_map_entries(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

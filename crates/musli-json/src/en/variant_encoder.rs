@@ -49,7 +49,7 @@ where
     }
 
     #[inline]
-    fn end_variant(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_variant(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, b'}')
     }
 }

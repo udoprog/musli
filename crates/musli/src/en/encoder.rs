@@ -1073,7 +1073,7 @@ pub trait Encoder: Sized {
     ///         let mut pack = encoder.encode_pack()?;
     ///         pack.encode_packed()?.encode(self.field)?;
     ///         pack.encode_packed()?.encode(self.data)?;
-    ///         pack.end_pack()
+    ///         pack.finish_pack()
     ///     }
     /// }
     /// ```
@@ -1118,7 +1118,7 @@ pub trait Encoder: Sized {
     {
         let mut pack = self.encode_pack()?;
         f(&mut pack)?;
-        pack.end_pack()
+        pack.finish_pack()
     }
 
     /// Encode a sequence with a known length `len`.
@@ -1161,7 +1161,7 @@ pub trait Encoder: Sized {
     ///             seq.push(element)?;
     ///         }
     ///
-    ///         seq.end_sequence()
+    ///         seq.finish_sequence()
     ///     }
     /// }
     /// ```
@@ -1211,7 +1211,7 @@ pub trait Encoder: Sized {
     {
         let mut seq = self.encode_sequence(len)?;
         f(&mut seq)?;
-        seq.end_sequence()
+        seq.finish_sequence()
     }
 
     /// Encode a tuple with a known length `len`.
@@ -1240,7 +1240,7 @@ pub trait Encoder: Sized {
     ///         let mut tuple = encoder.encode_tuple(2)?;
     ///         tuple.encode_tuple_field()?.encode(self.0)?;
     ///         tuple.encode_tuple_field()?.encode(&self.1)?;
-    ///         tuple.end_tuple()
+    ///         tuple.finish_tuple()
     ///     }
     /// }
     /// ```
@@ -1290,7 +1290,7 @@ pub trait Encoder: Sized {
     {
         let mut tuple = self.encode_tuple(len)?;
         f(&mut tuple)?;
-        tuple.end_tuple()
+        tuple.finish_tuple()
     }
 
     /// Encode a map with a known length `len`.
@@ -1324,7 +1324,7 @@ pub trait Encoder: Sized {
     ///         let mut map = encoder.encode_map(2)?;
     ///         map.insert_entry("name", &self.name)?;
     ///         map.insert_entry("age", self.age)?;
-    ///         map.end_map()
+    ///         map.finish_map()
     ///     }
     /// }
     /// ```
@@ -1369,7 +1369,7 @@ pub trait Encoder: Sized {
     {
         let mut map = self.encode_map(len)?;
         f(&mut map)?;
-        map.end_map()
+        map.finish_map()
     }
 
     /// Encode a map through pairs with a known length `len`.
@@ -1398,7 +1398,7 @@ pub trait Encoder: Sized {
     ///         // Key and value encoding as a stream.
     ///         m.encode_map_entry_key()?.encode("age")?;
     ///         m.encode_map_entry_value()?.encode(self.age)?;
-    ///         m.end_map_entries()
+    ///         m.finish_map_entries()
     ///     }
     /// }
     /// ```
@@ -1434,7 +1434,7 @@ pub trait Encoder: Sized {
     ///         let mut st = encoder.encode_struct(2)?;
     ///         st.insert_struct_field("name", &self.name)?;
     ///         st.insert_struct_field("age", self.age)?;
-    ///         st.end_struct()
+    ///         st.finish_struct()
     ///     }
     /// }
     /// ```
@@ -1486,7 +1486,7 @@ pub trait Encoder: Sized {
     {
         let mut st = self.encode_struct(fields)?;
         f(&mut st)?;
-        st.end_struct()
+        st.finish_struct()
     }
 
     /// Encode a variant.
@@ -1530,9 +1530,9 @@ pub trait Encoder: Sized {
     ///
     ///                 let mut tuple = variant.encode_value()?.encode_tuple(1)?;
     ///                 tuple.push_tuple_field(data)?;
-    ///                 tuple.end_tuple()?;
+    ///                 tuple.finish_tuple()?;
     ///
-    ///                 variant.end_variant()
+    ///                 variant.finish_variant()
     ///             }
     ///             Enum::StructVariant { data, age } => {
     ///                 variant.encode_tag()?.encode_string("StructVariant")?;
@@ -1540,9 +1540,9 @@ pub trait Encoder: Sized {
     ///                 let mut st = variant.encode_value()?.encode_struct(2)?;
     ///                 st.insert_struct_field("data", data)?;
     ///                 st.insert_struct_field("age", age)?;
-    ///                 st.end_struct()?;
+    ///                 st.finish_struct()?;
     ///
-    ///                 variant.end_variant()
+    ///                 variant.finish_variant()
     ///             }
     ///         }
     ///     }
@@ -1618,7 +1618,7 @@ pub trait Encoder: Sized {
     {
         let mut variant = self.encode_variant()?;
         f(&mut variant)?;
-        variant.end_variant()
+        variant.finish_variant()
     }
 
     /// Simplified encoding for a unit variant.
@@ -1699,7 +1699,7 @@ pub trait Encoder: Sized {
     ///             Enum::TupleVariant(data) => {
     ///                 let mut variant = encoder.encode_tuple_variant("variant2", 1)?;
     ///                 variant.push_tuple_field(data)?;
-    ///                 variant.end_tuple()
+    ///                 variant.finish_tuple()
     ///             }
     ///         }
     ///     }
@@ -1755,7 +1755,7 @@ pub trait Encoder: Sized {
     ///                 let mut variant = encoder.encode_struct_variant("variant3", 2)?;
     ///                 variant.insert_struct_field("data", data)?;
     ///                 variant.insert_struct_field("age", age)?;
-    ///                 variant.end_struct()
+    ///                 variant.finish_struct()
     ///             }
     ///         }
     ///     }

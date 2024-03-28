@@ -14,12 +14,25 @@ pub trait MapEncoder {
         Self: 'this;
 
     /// Encode the next pair.
+    #[must_use = "Encoders must be consumed"]
     fn encode_map_entry(
         &mut self,
     ) -> Result<Self::EncodeMapEntry<'_>, <Self::Cx as Context>::Error>;
 
+    /// Simplified encoder for a map entry, which ensures that encoding is
+    /// always finished.
+    #[inline]
+    fn encode_map_entry_fn<F>(&mut self, f: F) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    where
+        F: FnOnce(&mut Self::EncodeMapEntry<'_>) -> Result<(), <Self::Cx as Context>::Error>,
+    {
+        let mut encoder = self.encode_map_entry()?;
+        f(&mut encoder)?;
+        encoder.finish_map_entry()
+    }
+
     /// Finish encoding pairs.
-    fn end_map(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_map(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert a pair immediately.
     #[inline]

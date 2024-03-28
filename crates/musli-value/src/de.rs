@@ -88,6 +88,16 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[inline]
+    fn skip(self) -> Result<(), C::Error> {
+        Ok(())
+    }
+
+    #[inline]
+    fn try_skip(self) -> Result<bool, C::Error> {
+        Ok(true)
+    }
+
+    #[inline]
     fn type_hint(&mut self) -> Result<TypeHint, C::Error> {
         Ok(self.value.type_hint())
     }
@@ -543,11 +553,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntriesDecoder<'de>
     }
 
     #[inline]
-    fn skip_map_entry_value(&mut self) -> Result<bool, C::Error> {
-        Ok(true)
-    }
-
-    #[inline]
     fn end_map_entries(self) -> Result<(), C::Error> {
         Ok(())
     }
@@ -570,11 +575,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntryDecoder<'de>
     #[inline]
     fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
         Ok(ValueDecoder::new(self.cx, &self.pair.1))
-    }
-
-    #[inline]
-    fn skip_map_value(self) -> Result<bool, C::Error> {
-        Ok(true)
     }
 }
 
@@ -625,11 +625,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> StructFieldsDecoder<'de>
     }
 
     #[inline]
-    fn skip_struct_field_value(&mut self) -> Result<bool, C::Error> {
-        Ok(self.iter.next().is_some())
-    }
-
-    #[inline]
     fn end_struct_fields(self) -> Result<(), C::Error> {
         Ok(())
     }
@@ -653,11 +648,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> StructFieldDecoder<'de>
     #[inline]
     fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
         MapEntryDecoder::decode_map_value(self)
-    }
-
-    #[inline]
-    fn skip_field_value(self) -> Result<bool, C::Error> {
-        MapEntryDecoder::skip_map_value(self)
     }
 }
 
@@ -707,11 +697,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> VariantDecoder<'de>
     #[inline]
     fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         Ok(ValueDecoder::new(self.cx, &self.pair.1))
-    }
-
-    #[inline]
-    fn skip_value(&mut self) -> Result<bool, C::Error> {
-        Ok(true)
     }
 }
 

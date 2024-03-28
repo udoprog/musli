@@ -19,11 +19,11 @@ pub trait PackEncoder {
         Self: 'this;
 
     /// Return encoder for the next element.
-    #[must_use = "Encoder must be consumed"]
+    #[must_use = "Encoders must be consumed"]
     fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, <Self::Cx as Context>::Error>;
 
     /// Finish encoding the pack.
-    fn end_pack(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_pack(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Push an element into the pack.
     #[inline]

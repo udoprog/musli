@@ -339,10 +339,11 @@ macro_rules! map {
                 encoder.encode_map_fn(self.len(), |map| {
                     for (k, v) in self {
                         $cx.enter_map_key(k);
-                        let mut entry = map.encode_map_entry()?;
-                        entry.encode_map_key()?.encode(k)?;
-                        entry.encode_map_value()?.encode(v)?;
-                        entry.end_map_entry()?;
+                        map.encode_map_entry_fn(|entry| {
+                            entry.encode_map_key()?.encode(k)?;
+                            entry.encode_map_value()?.encode(v)?;
+                            Ok(())
+                        })?;
                         $cx.leave_map_key();
                     }
 

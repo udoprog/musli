@@ -339,7 +339,7 @@ where
         let mut variant = self.encode_variant()?;
         variant.encode_tag()?.encode(tag)?;
         variant.encode_value()?.encode_unit()?;
-        variant.end_variant()?;
+        variant.finish_variant()?;
         Ok(())
     }
 
@@ -423,7 +423,7 @@ where
     }
 
     #[inline]
-    fn end_sequence(self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Sequence(self.values));
         Ok(())
     }
@@ -448,8 +448,8 @@ where
     }
 
     #[inline]
-    fn end_pack(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::end_sequence(self)
+    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
+        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -472,8 +472,8 @@ where
     }
 
     #[inline]
-    fn end_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::end_sequence(self)
+    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
+        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -515,7 +515,7 @@ where
     }
 
     #[inline]
-    fn end_map(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Map(self.values));
         Ok(())
     }
@@ -557,7 +557,7 @@ where
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Map(self.values));
         Ok(())
     }
@@ -582,7 +582,7 @@ where
     }
 
     #[inline]
-    fn end_struct(self) -> Result<Self::Ok, C::Error> {
+    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Map(self.values));
         Ok(())
     }
@@ -631,7 +631,7 @@ where
     }
 
     #[inline]
-    fn end_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
         self.output.push(self.pair);
         Ok(())
     }
@@ -660,7 +660,7 @@ where
     }
 
     #[inline]
-    fn end_field(self) -> Result<Self::Ok, C::Error> {
+    fn finish_field(self) -> Result<Self::Ok, C::Error> {
         self.output.push(self.pair);
         Ok(())
     }
@@ -712,7 +712,7 @@ where
     }
 
     #[inline]
-    fn end_variant(self) -> Result<Self::Ok, C::Error> {
+    fn finish_variant(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Variant(Box::new(self.pair)));
         Ok(())
     }
@@ -759,7 +759,7 @@ where
     }
 
     #[inline]
-    fn end_sequence(self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Variant(Box::new((
             self.variant,
             Value::Sequence(self.values),
@@ -787,8 +787,8 @@ where
     }
 
     #[inline]
-    fn end_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::end_sequence(self)
+    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
+        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -833,7 +833,7 @@ where
     }
 
     #[inline]
-    fn end_struct(self) -> Result<Self::Ok, C::Error> {
+    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Variant(Box::new((
             self.variant,
             Value::Map(self.fields),

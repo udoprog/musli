@@ -207,7 +207,7 @@ where
             };
 
             value.skip()?;
-            self.skip_map_entry_value()?;
+            self.decode_map_entry_value()?.skip()?;
         }
 
         Ok(())
@@ -263,6 +263,12 @@ where
     #[inline]
     fn skip(self) -> Result<(), C::Error> {
         self.skip_any()
+    }
+
+    #[inline]
+    fn try_skip(self) -> Result<bool, C::Error> {
+        self.skip()?;
+        Ok(true)
     }
 
     #[inline]
@@ -640,12 +646,6 @@ where
     fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
     }
-
-    #[inline]
-    fn skip_value(&mut self) -> Result<bool, C::Error> {
-        self.decode_value()?.skip()?;
-        Ok(true)
-    }
 }
 
 impl<'a, 'de, R, const OPT: Options, C> MapDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
@@ -702,12 +702,6 @@ where
     fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
         Ok(self)
     }
-
-    #[inline]
-    fn skip_map_value(self) -> Result<bool, C::Error> {
-        self.decode_map_value()?.skip()?;
-        Ok(true)
-    }
 }
 
 impl<'a, 'de, R, const OPT: Options, C> StructDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
@@ -749,11 +743,6 @@ where
     fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
         MapEntryDecoder::decode_map_value(self)
     }
-
-    #[inline]
-    fn skip_field_value(self) -> Result<bool, C::Error> {
-        MapEntryDecoder::skip_map_value(self)
-    }
 }
 
 impl<'a, 'de, R, const OPT: Options, C> MapEntriesDecoder<'de>
@@ -783,12 +772,6 @@ where
     #[inline]
     fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
         Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-
-    #[inline]
-    fn skip_map_entry_value(&mut self) -> Result<bool, C::Error> {
-        self.decode_map_entry_value()?.skip()?;
-        Ok(true)
     }
 
     #[inline]
@@ -826,11 +809,6 @@ where
     #[inline]
     fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
         Self::decode_map_entry_value(self)
-    }
-
-    #[inline]
-    fn skip_struct_field_value(&mut self) -> Result<bool, C::Error> {
-        Self::skip_map_entry_value(self)
     }
 
     #[inline]

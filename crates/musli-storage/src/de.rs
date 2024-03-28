@@ -84,6 +84,11 @@ where
     }
 
     #[inline]
+    fn try_skip(self) -> Result<bool, C::Error> {
+        Ok(false)
+    }
+
+    #[inline]
     fn decode_unit(mut self) -> Result<(), C::Error> {
         let mark = self.cx.mark();
         let count =
@@ -476,11 +481,6 @@ where
     fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
         Ok(self)
     }
-
-    #[inline]
-    fn skip_map_value(self) -> Result<bool, C::Error> {
-        Ok(false)
-    }
 }
 
 impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> StructDecoder<'de>
@@ -522,11 +522,6 @@ where
     fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
         MapEntryDecoder::decode_map_value(self)
     }
-
-    #[inline]
-    fn skip_field_value(self) -> Result<bool, C::Error> {
-        MapEntryDecoder::skip_map_value(self)
-    }
 }
 
 impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> MapEntriesDecoder<'de>
@@ -551,11 +546,6 @@ where
     #[inline]
     fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-
-    #[inline]
-    fn skip_map_entry_value(&mut self) -> Result<bool, C::Error> {
-        Ok(false)
     }
 
     #[inline]
@@ -595,11 +585,6 @@ where
     }
 
     #[inline]
-    fn skip_struct_field_value(&mut self) -> Result<bool, C::Error> {
-        Ok(false)
-    }
-
-    #[inline]
     fn end_struct_fields(self) -> Result<(), C::Error> {
         Ok(())
     }
@@ -622,11 +607,6 @@ where
     #[inline]
     fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-
-    #[inline]
-    fn skip_value(&mut self) -> Result<bool, C::Error> {
-        Ok(false)
     }
 }
 

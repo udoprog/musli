@@ -119,12 +119,23 @@ pub trait Decoder<'de>: Sized {
         T: Decode<'de, Self::Mode>;
 
     /// Skip over the current next value.
+    #[inline]
     fn skip(self) -> Result<(), <Self::Cx as Context>::Error> {
         Err(self.cx().message(format_args!(
             "Skipping is not supported, expected {}",
             ExpectingWrapper::new(&self).format()
         )))
     }
+
+    /// This is a variant of [`Decoder::skip`], but instead of erroring in case
+    /// skipping is not supported it should return a boolean.
+    ///
+    /// Note that this must be implemented explicitly by a decoder, since it's
+    /// used as an important signal for various formats.
+    ///
+    /// Note that it will still error if skipping is supported, but the value is
+    /// malformed for one reason or another.
+    fn try_skip(self) -> Result<bool, <Self::Cx as Context>::Error>;
 
     /// Return a [TypeHint] indicating which type is being produced by the
     /// [Decoder].
@@ -133,6 +144,7 @@ pub trait Decoder<'de>: Sized {
     /// detailed (`a 32-bit unsigned integer`) to vague (`a number`).
     ///
     /// This is used to construct dynamic containers of types.
+    #[inline]
     fn type_hint(&mut self) -> Result<TypeHint, <Self::Cx as Context>::Error> {
         Ok(TypeHint::Any)
     }

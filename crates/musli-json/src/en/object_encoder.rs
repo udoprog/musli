@@ -58,7 +58,7 @@ where
     }
 
     #[inline]
-    fn end_map(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_map(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_bytes(self.cx, self.end)
     }
 }
@@ -92,7 +92,7 @@ where
     }
 
     #[inline]
-    fn end_map_entries(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_map_entries(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, b'}')
     }
 }
@@ -114,7 +114,7 @@ where
     }
 
     #[inline]
-    fn end_struct(self) -> Result<Self::Ok, C::Error> {
-        MapEncoder::end_map(self)
+    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
+        MapEncoder::finish_map(self)
     }
 }

@@ -59,7 +59,7 @@ where
     }
 
     #[inline]
-    fn end_sequence(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_bytes(self.cx, self.end)
     }
 }
@@ -81,8 +81,8 @@ where
     }
 
     #[inline]
-    fn end_pack(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::end_sequence(self)
+    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
+        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -103,7 +103,7 @@ where
     }
 
     #[inline]
-    fn end_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::end_sequence(self)
+    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
+        SequenceEncoder::finish_sequence(self)
     }
 }

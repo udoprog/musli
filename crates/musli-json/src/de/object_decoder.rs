@@ -97,7 +97,7 @@ where
 
         while let Some(mut entry) = self.decode_entry()? {
             entry.decode_map_key()?.skip()?;
-            entry.skip_map_value()?;
+            entry.decode_map_value()?.skip()?;
         }
 
         let actual = self.parser.peek(self.cx)?;
@@ -193,12 +193,6 @@ where
     }
 
     #[inline]
-    fn skip_map_entry_value(&mut self) -> Result<bool, C::Error> {
-        self.decode_map_entry_value()?.skip()?;
-        Ok(true)
-    }
-
-    #[inline]
     fn end_map_entries(self) -> Result<(), C::Error> {
         self.skip_object_remaining()
     }
@@ -250,11 +244,6 @@ where
     #[inline]
     fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
         self.decode_map_entry_value()
-    }
-
-    #[inline]
-    fn skip_struct_field_value(&mut self) -> Result<bool, C::Error> {
-        self.skip_map_entry_value()
     }
 
     #[inline]

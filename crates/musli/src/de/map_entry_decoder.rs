@@ -33,9 +33,4 @@ pub trait MapEntryDecoder<'de> {
     /// Decode the second value in the pair..
     #[must_use = "Decoders must be consumed"]
     fn decode_map_value(self) -> Result<Self::DecodeMapValue, <Self::Cx as Context>::Error>;
-
-    /// Indicate that the second value should be skipped.
-    ///
-    /// The boolean returned indicates if the value was skipped or not.
-    fn skip_map_value(self) -> Result<bool, <Self::Cx as Context>::Error>;
 }
