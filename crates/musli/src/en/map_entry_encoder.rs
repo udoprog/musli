@@ -38,7 +38,7 @@ pub trait MapEntryEncoder {
     ) -> Result<Self::EncodeMapValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Stop encoding this pair.
-    fn end_map_entry(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_map_entry(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert the pair immediately.
     #[inline]
@@ -54,6 +54,6 @@ pub trait MapEntryEncoder {
     {
         self.encode_map_key()?.encode(key)?;
         self.encode_map_value()?.encode(value)?;
-        self.end_map_entry()
+        self.finish_map_entry()
     }
 }

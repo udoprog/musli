@@ -19,7 +19,7 @@ pub trait TupleEncoder {
         Self: 'this;
 
     /// Return encoder for the next element.
-    #[must_use = "Encoder must be consumed"]
+    #[must_use = "Encoders must be consumed"]
     fn encode_tuple_field(
         &mut self,
     ) -> Result<Self::EncodeTupleField<'_>, <Self::Cx as Context>::Error>;
@@ -35,5 +35,5 @@ pub trait TupleEncoder {
     }
 
     /// Finish encoding the tuple.
-    fn end_tuple(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_tuple(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 }

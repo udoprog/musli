@@ -19,11 +19,11 @@ pub trait SequenceEncoder {
         Self: 'this;
 
     /// Return encoder for the next element.
-    #[must_use = "Encoder must be consumed"]
+    #[must_use = "Encoders must be consumed"]
     fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, <Self::Cx as Context>::Error>;
 
     /// Finish encoding the sequence.
-    fn end_sequence(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_sequence(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Push an element into the sequence.
     #[inline]

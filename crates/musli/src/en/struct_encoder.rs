@@ -19,7 +19,7 @@ pub trait StructEncoder {
     ) -> Result<Self::EncodeStructField<'_>, <Self::Cx as Context>::Error>;
 
     /// Finish encoding the struct.
-    fn end_struct(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_struct(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Encode the next field using a closure.
     #[inline]
@@ -29,7 +29,7 @@ pub trait StructEncoder {
     {
         let mut encoder = self.encode_struct_field()?;
         let output = f(&mut encoder)?;
-        encoder.end_field()?;
+        encoder.finish_field()?;
         Ok(output)
     }
 

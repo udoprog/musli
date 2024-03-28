@@ -306,7 +306,7 @@ where
         let mut variant = self.encode_variant()?;
         variant.encode_tag()?.encode(tag)?;
         variant.encode_value()?.encode_unit()?;
-        VariantEncoder::end_variant(variant)?;
+        VariantEncoder::finish_variant(variant)?;
         Ok(())
     }
 
@@ -355,7 +355,7 @@ where
     }
 
     #[inline]
-    fn end_pack(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_pack(mut self) -> Result<Self::Ok, C::Error> {
         static PAD: [u8; 1024] = [0; 1024];
 
         let buffer = self.buffer.into_inner();
@@ -406,7 +406,7 @@ where
     }
 
     #[inline]
-    fn end_sequence(self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -426,8 +426,8 @@ where
     }
 
     #[inline]
-    fn end_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::end_sequence(self)
+    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
+        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -446,7 +446,7 @@ where
     }
 
     #[inline]
-    fn end_map(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -472,7 +472,7 @@ where
     }
 
     #[inline]
-    fn end_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -498,7 +498,7 @@ where
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -518,7 +518,7 @@ where
     }
 
     #[inline]
-    fn end_struct(self) -> Result<Self::Ok, C::Error> {
+    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -544,8 +544,8 @@ where
     }
 
     #[inline]
-    fn end_field(self) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::end_map_entry(self)
+    fn finish_field(self) -> Result<Self::Ok, C::Error> {
+        MapEntryEncoder::finish_map_entry(self)
     }
 }
 
@@ -570,7 +570,7 @@ where
     }
 
     #[inline]
-    fn end_variant(self) -> Result<Self::Ok, C::Error> {
+    fn finish_variant(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }

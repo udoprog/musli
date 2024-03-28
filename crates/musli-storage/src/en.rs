@@ -302,7 +302,7 @@ where
     }
 
     #[inline]
-    fn end_pack(self) -> Result<Self::Ok, C::Error> {
+    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -322,8 +322,8 @@ where
     }
 
     #[inline]
-    fn end_sequence(self) -> Result<Self::Ok, C::Error> {
-        PackEncoder::end_pack(self)
+    fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
+        PackEncoder::finish_pack(self)
     }
 }
 
@@ -342,8 +342,8 @@ where
     }
 
     #[inline]
-    fn end_tuple(self) -> Result<Self::Ok, C::Error> {
-        PackEncoder::end_pack(self)
+    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
+        PackEncoder::finish_pack(self)
     }
 }
 
@@ -362,7 +362,7 @@ where
     }
 
     #[inline]
-    fn end_map(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -388,7 +388,7 @@ where
     }
 
     #[inline]
-    fn end_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -414,7 +414,7 @@ where
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -434,7 +434,7 @@ where
     }
 
     #[inline]
-    fn end_struct(self) -> Result<Self::Ok, C::Error> {
+    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -460,8 +460,8 @@ where
     }
 
     #[inline]
-    fn end_field(self) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::end_map_entry(self)
+    fn finish_field(self) -> Result<Self::Ok, C::Error> {
+        MapEntryEncoder::finish_map_entry(self)
     }
 }
 
@@ -486,7 +486,7 @@ where
     }
 
     #[inline]
-    fn end_variant(self) -> Result<Self::Ok, C::Error> {
+    fn finish_variant(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }

@@ -288,7 +288,7 @@ where
     let mut variant = encoder.encode_variant()?;
     variant_tag.serialize(Serializer::new(cx, variant.encode_tag()?))?;
     let output = f(variant.encode_value()?)?;
-    variant.end_variant()?;
+    variant.finish_variant()?;
     Ok(output)
 }
 
@@ -329,7 +329,7 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end_sequence()
+        self.encoder.finish_sequence()
     }
 }
 
@@ -370,7 +370,7 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end_tuple()
+        self.encoder.finish_tuple()
     }
 }
 
@@ -440,7 +440,7 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end_struct()
+        self.encoder.finish_struct()
     }
 }
 
@@ -491,7 +491,7 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end_map_entries()
+        self.encoder.finish_map_entries()
     }
 }
 
@@ -532,13 +532,13 @@ where
         let mut field = self.encoder.encode_struct_field()?;
         field.encode_field_name()?.encode(key)?;
         value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
-        field.end_field()?;
+        field.finish_field()?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end_struct()
+        self.encoder.finish_struct()
     }
 }
 
@@ -585,6 +585,6 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.end_struct()
+        self.encoder.finish_struct()
     }
 }

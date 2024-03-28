@@ -150,8 +150,13 @@ where
 
     #[inline]
     fn skip(self) -> Result<(), C::Error> {
-        self.skip_any()?;
-        Ok(())
+        self.skip_any()
+    }
+
+    #[inline]
+    fn try_skip(self) -> Result<bool, C::Error> {
+        self.skip()?;
+        Ok(true)
     }
 
     #[inline]

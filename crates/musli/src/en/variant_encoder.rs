@@ -37,7 +37,7 @@ pub trait VariantEncoder {
     fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, <Self::Cx as Context>::Error>;
 
     /// End the variant encoder.
-    fn end_variant(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_variant(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert the variant immediately.
     #[inline]
@@ -53,6 +53,6 @@ pub trait VariantEncoder {
     {
         self.encode_tag()?.encode(tag)?;
         self.encode_value()?.encode(value)?;
-        self.end_variant()
+        self.finish_variant()
     }
 }

@@ -46,11 +46,6 @@ pub trait StructFieldsDecoder<'de> {
         &mut self,
     ) -> Result<Self::DecodeStructFieldValue<'_>, <Self::Cx as Context>::Error>;
 
-    /// Indicate that the second value should be skipped.
-    ///
-    /// The boolean returned indicates if the value was skipped or not.
-    fn skip_struct_field_value(&mut self) -> Result<bool, <Self::Cx as Context>::Error>;
-
     /// End pair decoding.
     fn end_struct_fields(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

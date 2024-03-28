@@ -83,6 +83,12 @@ where
     }
 
     #[inline]
+    fn try_skip(self) -> Result<bool, C::Error> {
+        self.skip()?;
+        Ok(true)
+    }
+
+    #[inline]
     fn type_hint(&mut self) -> Result<TypeHint, C::Error> {
         JsonDecoder::new(self.cx, self.parser.borrow_mut()).type_hint()
     }

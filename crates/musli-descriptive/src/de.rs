@@ -243,7 +243,7 @@ where
             };
 
             key.skip()?;
-            self.skip_map_entry_value()?;
+            self.decode_map_entry_value()?.skip()?;
         }
 
         Ok(())
@@ -301,6 +301,12 @@ where
     #[inline]
     fn skip(self) -> Result<(), C::Error> {
         self.skip_any()
+    }
+
+    #[inline]
+    fn try_skip(self) -> Result<bool, C::Error> {
+        self.skip()?;
+        Ok(true)
     }
 
     #[inline]
@@ -987,12 +993,6 @@ where
     }
 
     #[inline]
-    fn skip_map_entry_value(&mut self) -> Result<bool, C::Error> {
-        self.decode_map_entry_value()?.skip()?;
-        Ok(true)
-    }
-
-    #[inline]
     fn end_map_entries(self) -> Result<(), <Self::Cx as Context>::Error> {
         self.skip_map_remaining()?;
         Ok(())
@@ -1029,11 +1029,6 @@ where
     }
 
     #[inline]
-    fn skip_struct_field_value(&mut self) -> Result<bool, C::Error> {
-        MapEntriesDecoder::skip_map_entry_value(self)
-    }
-
-    #[inline]
     fn end_struct_fields(self) -> Result<(), C::Error> {
         MapEntriesDecoder::end_map_entries(self)
     }
@@ -1056,12 +1051,6 @@ where
     #[inline]
     fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
         Ok(self)
-    }
-
-    #[inline]
-    fn skip_map_value(self) -> Result<bool, C::Error> {
-        self.skip()?;
-        Ok(true)
     }
 }
 
@@ -1104,11 +1093,6 @@ where
     fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
         MapEntryDecoder::decode_map_value(self)
     }
-
-    #[inline]
-    fn skip_field_value(self) -> Result<bool, C::Error> {
-        MapEntryDecoder::skip_map_value(self)
-    }
 }
 
 impl<'a, 'de, R, const OPT: Options, C> VariantDecoder<'de> for SelfDecoder<'a, R, OPT, C>
@@ -1128,12 +1112,6 @@ where
     #[inline]
     fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         Ok(SelfDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-
-    #[inline]
-    fn skip_value(&mut self) -> Result<bool, C::Error> {
-        self.decode_value()?.skip()?;
-        Ok(true)
     }
 }
 

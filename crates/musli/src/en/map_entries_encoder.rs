@@ -46,7 +46,7 @@ pub trait MapEntriesEncoder {
     ) -> Result<Self::EncodeMapEntryValue<'_>, <Self::Cx as Context>::Error>;
 
     /// Complete encoding map entries.
-    fn end_map_entries(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_map_entries(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert the pair immediately.
     #[inline]

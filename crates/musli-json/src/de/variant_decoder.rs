@@ -1,4 +1,4 @@
-use musli::de::{Decoder, VariantDecoder};
+use musli::de::VariantDecoder;
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -70,11 +70,5 @@ where
 
         self.parser.skip(self.cx, 1)?;
         Ok(JsonDecoder::new(self.cx, self.parser.borrow_mut()))
-    }
-
-    #[inline]
-    fn skip_value(&mut self) -> Result<bool, C::Error> {
-        self.decode_value()?.skip()?;
-        Ok(true)
     }
 }

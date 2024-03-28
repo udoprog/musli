@@ -47,7 +47,7 @@ where
     }
 
     #[inline]
-    fn end_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -75,7 +75,7 @@ where
     }
 
     #[inline]
-    fn end_field(self) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::end_map_entry(self)
+    fn finish_field(self) -> Result<Self::Ok, C::Error> {
+        MapEntryEncoder::finish_map_entry(self)
     }
 }
