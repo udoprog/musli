@@ -62,16 +62,18 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
     let (_, type_generics, _) = e.input.generics.split_for_impl();
 
     Ok(quote! {
-        #[automatically_derived]
-        impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
-            #[inline]
-            fn encode<#e_param>(&self, #ctx_var: &#e_param::Cx, #encoder_var: #e_param) -> #result<<#e_param as #encoder_t>::Ok, <#e_param as #encoder_t>::Error>
-            where
-                #e_param: #encoder_t<Mode = #mode_ident>,
-            {
-                #body
+        const _: () = {
+            #[automatically_derived]
+            impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
+                #[inline]
+                fn encode<#e_param>(&self, #ctx_var: &#e_param::Cx, #encoder_var: #e_param) -> #result<<#e_param as #encoder_t>::Ok, <#e_param as #encoder_t>::Error>
+                where
+                    #e_param: #encoder_t<Mode = #mode_ident>,
+                {
+                    #body
+                }
             }
-        }
+        };
     })
 }
 
@@ -86,7 +88,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
     let Tokens {
         context_t,
         encoder_t,
-        result,
+        result_ok,
         ..
     } = e.tokens;
 
@@ -135,7 +137,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
                 #(#decls)*
                 let #output_var = #encoder_t::encode_struct_fn(#encoder_var, #len, |#encoder_var| {
                     #(#encoders)*
-                    #result::Ok(())
+                    #result_ok(())
                 })?;
                 #leave
                 #output_var
@@ -149,7 +151,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
                 let #output_var = #encoder_t::encode_pack_fn(#encoder_var, |#pack_var| {
                     #(#decls)*
                     #(#encoders)*
-                    #result::Ok(())
+                    #result_ok(())
                 })?;
                 #leave
                 #output_var
@@ -157,7 +159,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
         }
     }
 
-    Ok(quote!(#result::Ok(#encode)))
+    Ok(quote!(#result_ok(#encode)))
 }
 
 struct FieldTest<'st> {
@@ -180,7 +182,8 @@ fn insert_fields<'st>(
     let Tokens {
         context_t,
         pack_encoder_t,
-        result,
+        result_ok,
+
         struct_encoder_t,
         struct_field_encoder_t,
         ..
@@ -238,7 +241,7 @@ fn insert_fields<'st>(
                         #encode_t_encode(&#tag, #ctx_var, #field_encoder_var)?;
                         let #value_encoder_var = #struct_field_encoder_t::encode_field_value(#pair_encoder_var)?;
                         #encode_path(#access, #ctx_var, #value_encoder_var)?;
-                        #result::Ok(())
+                        #result_ok(())
                     })?;
 
                     #leave
@@ -281,7 +284,7 @@ fn encode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum<'_>) -> Result<TokenStrea
     let Ctxt { ctx_var, .. } = *cx;
 
     let Tokens {
-        context_t, result, ..
+        context_t, result_ok, result_err, ..
     } = e.tokens;
 
     let type_name = en.name;
@@ -303,13 +306,9 @@ fn encode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum<'_>) -> Result<TokenStrea
 
     // Special case: uninhabitable types.
     Ok(if variants.is_empty() {
-        quote!(#result::Err(#context_t::uninhabitable(#ctx_var, #type_name)))
+        quote!(#result_err(#context_t::uninhabitable(#ctx_var, #type_name)))
     } else {
-        quote! {
-            #result::Ok(match self {
-                #(#variants),*
-            })
-        }
+        quote!(#result_ok(match self { #(#variants),* }))
     })
 }
 
@@ -333,7 +332,7 @@ fn encode_variant(
     let Tokens {
         context_t,
         encoder_t,
-        result,
+        result_ok,
         struct_encoder_t,
         struct_field_encoder_t,
         variant_encoder_t,
@@ -364,7 +363,7 @@ fn encode_variant(
                         #encoder_t::encode_pack_fn(#encoder_var, |#pack_var| {
                             #(#decls)*
                             #(#encoders)*
-                            #result::Ok(())
+                            #result_ok(())
                         })?
                     }};
                 }
@@ -376,7 +375,7 @@ fn encode_variant(
                         #encoder_t::encode_struct_fn(#encoder_var, #len, |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
-                            #result::Ok(())
+                            #result_ok(())
                         })?
                     }};
                 }
@@ -395,7 +394,7 @@ fn encode_variant(
 
                         let #encoder_var = #variant_encoder_t::encode_value(#variant_encoder)?;
                         #encode;
-                        #result::Ok(())
+                        #result_ok(())
                     })?
                 }};
             }
@@ -414,7 +413,7 @@ fn encode_variant(
                         #struct_encoder_t::insert_struct_field(#encoder_var, #field_tag, #tag)?;
                         #(#decls)*
                         #(#encoders)*
-                        #result::Ok(())
+                        #result_ok(())
                     })?
                 }};
             }
@@ -449,13 +448,13 @@ fn encode_variant(
                             #encoder_t::encode_struct_fn(#content_struct, #len, |#encoder_var| {
                                 #(#decls)*
                                 #(#encoders)*
-                                #result::Ok(())
+                                #result_ok(())
                             })?;
 
-                            #result::Ok(())
+                            #result_ok(())
                         })?;
 
-                        #result::Ok(())
+                        #result_ok(())
                     })?
                 }};
             }

@@ -90,13 +90,13 @@ impl Ctxt {
 
         #[cfg(not(feature = "verbose"))]
         {
-            _ = write!(inner.b1, "_{extra}{index}");
+            _ = write!(inner.b1, "_{index}{extra}");
         }
 
         #[cfg(feature = "verbose")]
         {
             let name = name.strip_prefix("_").unwrap_or(name);
-            _ = write!(inner.b1, "_{extra}{name}");
+            _ = write!(inner.b1, "_{name}{extra}");
         }
 
         let ident = syn::Ident::new(&inner.b1, span);
@@ -106,7 +106,10 @@ impl Ctxt {
 
     /// Build a type identifier with a span.
     pub(crate) fn type_with_span(&self, name: &str, span: Span) -> syn::Ident {
-        let name = format!("T{name}");
-        syn::Ident::new(&name, span)
+        let mut inner = self.inner.borrow_mut();
+        _ = write!(inner.b1, "__{name}");
+        let ident = syn::Ident::new(&inner.b1, span);
+        inner.b1.clear();
+        ident
     }
 }

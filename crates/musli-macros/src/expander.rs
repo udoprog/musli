@@ -29,6 +29,7 @@ pub(crate) struct FieldData<'a> {
     pub(crate) name: Option<syn::LitStr>,
     pub(crate) attr: attr::Field,
     pub(crate) ident: Option<&'a syn::Ident>,
+    pub(crate) ty: &'a syn::Type,
 }
 
 pub(crate) struct StructData<'a> {
@@ -81,6 +82,7 @@ impl<'a> Expander<'a> {
                         .map(|ident| syn::LitStr::new(&ident.to_string(), ident.span())),
                     attr: attr::field_attrs(cx, &field.attrs),
                     ident: field.ident.as_ref(),
+                    ty: &field.ty,
                 })
                 .collect()
         }

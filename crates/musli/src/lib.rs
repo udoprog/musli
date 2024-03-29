@@ -575,3 +575,20 @@ pub use musli_macros::decoder;
 /// ```
 #[doc(inline)]
 pub use musli_macros::visitor;
+
+/// Internal implementation details of musli.
+///
+/// Using these directly is not supported.
+#[doc(hidden)]
+pub mod __priv {
+    pub use ::core::option::Option;
+    pub use ::core::result::Result;
+    pub use ::core::fmt;
+
+    pub fn default<T>() -> T where T: ::core::default::Default {
+        ::core::default::Default::default()
+    }
+
+    pub use Option::{None, Some};
+    pub use Result::{Ok, Err};
+}
