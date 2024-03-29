@@ -14,19 +14,22 @@ It provides a set of [formats](#formats), each with its own well-documented
 set of features and tradeoffs. Every byte-oriented serialization method
 (including [`musli-json`]) has full `#[no_std]` support with or without
 `alloc`. And a particularly neat component providing low-level refreshingly
-simple [zero-copy serialization].
+simple [zero-copy serialization][zerocopy].
 
 [^1]: As in Müsli should be able to do everything you need and more.
 
 <br>
 
-## Quick guide
+## Overview
 
-* For information on how to implement [`Encode`] and [`Decode`], see
-  [`derives`].
-* For information on how this library is tested, see [`tests`].
-* For [performance] and [size comparisons].
-* See [`musli-serde`] for [`serde`] compatibility.
+* See [`derives`] to learn how to implement [`Encode`] and [`Decode`].
+* See [benchmarks] and [size comparisons] to learn about the performance of
+  this framework.
+* See [`tests`] to learn how this library is tested.
+* See [`musli-serde`] for seamless compatibility with [`serde`]. You might
+  also be interested to learn how [Müsli is different][different].
+
+[different]: #müsli-is-different-from-serde
 
 <br>
 
@@ -36,6 +39,7 @@ Add the following to your `Cargo.toml` using the [format](#formats) you want
 to use:
 
 ```toml
+[dependencies]
 musli = "0.0.107"
 musli-wire = "0.0.107"
 ```
@@ -44,11 +48,11 @@ musli-wire = "0.0.107"
 
 ## Design
 
-The heavy lifting in user code is done through the [`Encode`] and [`Decode`]
-derives which are thoroughly documented in the [`derives`] module. Müsli
-primarily operates based on the schema types which implement these traits
-imply, but self-descriptive formats are also possible (see
-[`Formats`](#formats) below).
+The heavy lifting is done by the [`Encode`] and [`Decode`] derives which are
+documented in the [`derives`] module.
+
+Müsli operates based on the schema represented by the types which implement
+these traits.
 
 ```rust
 use musli::{Encode, Decode};
@@ -65,20 +69,21 @@ struct Person {
 
 The binary serialization formats provided aim to efficiently and accurately
 encode every type and data structure available in Rust. Each format comes
-with [well-documented tradeoffs](#formats) and aim to be fully memory safe
+with [well-documented tradeoffs](#formats) and aims to be fully memory safe
 to use.
 
 Internally we use the terms "encoding", "encode", and "decode" because it's
 distinct from [`serde`]'s use of "serialization", "serialize", and
-"deserialize" allowing for the ease of using both libraries side by side if
-desired.
+"deserialize" allowing for the clearer interoperability between the two
+libraries. Encoding and decoding also has more of a "binary serialization"
+vibe, which more closely reflects the focus of this framework.
 
 Müsli is designed on similar principles as [`serde`]. Relying on Rust's
 powerful trait system to generate code which can largely be optimized away.
-The end result should be very similar to handwritten highly optimized code.
+The end result should be very similar to handwritten, highly optimized code.
 
-As an example of this, these two functions both produce the same assembly on
-my machine (built with `--release`):
+As an example of this, these two functions both produce the same assembly
+(built with `--release`):
 
 ```rust
 const OPTIONS: Options = options::new()
@@ -109,14 +114,25 @@ fn without_musli(storage: &Storage) -> Result<[u8; 8]> {
 }
 ```
 
-Where Müsli differs in design philosophy is twofold:
+<br>
 
-We make use of GATs to provide tighter abstractions, which should be easier
-for Rust to optimize.
+## Müsli is different from [`serde`]
 
-We make less use of the Visitor pattern in certain instances where it's
-deemed unnecessary, such as [when decoding collections]. The result is
-usually cleaner decode implementations, as shown here:
+* We make use of GATs to provide tighter abstractions. GATs were not
+  available when serde was designed.
+* When decoding or encoding we operate by the principle that most things
+  return either return a [`Decoder`] or [`Encoder`]. This means for example
+  that field names are not restricted to be strings or indexes, but can be
+  renamed to [completely arbitrary types][musli-name-type].
+* We make less use of the Visitor pattern in certain instances where it's
+  deemed unnecessary, such as [when decoding collections]. The result is
+  usually cleaner decode implementations like below.
+* We make use of [*moded encoding*](#Modes) allowing the same struct to be
+  encoded in many different ways.
+* We support [detailed tracing] when decoding for rich diagnostics.
+* Müsli was designed to support [no-std and no-alloc] environments from the
+  ground up without compromising on features using a safe and efficient
+  [scoped allocations].
 
 ```rust
 use musli::Context;
@@ -143,12 +159,6 @@ impl<'de, M> Decode<'de, M> for MyType {
     }
 }
 ```
-
-Another major aspect where Müsli differs is in the concept of
-[modes](#modes) (note the `M` parameter above). Since this is a parameter of
-the `Encode` and `Decode` traits it allows for the same data model to be
-serialized in many different ways. This is a larger topic and is covered
-further down.
 
 <br>
 
@@ -349,9 +359,11 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 
 [`bincode`]: https://docs.rs/bincode
 [`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
+[`Decoder`]: https://docs.rs/musli/latest/musli/trait.Decoder.html
 [`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
 [`derives`]: https://docs.rs/musli/latest/musli/derives/
 [`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
+[`Encoder`]: https://docs.rs/musli/latest/musli/trait.Encoder.html
 [`musli-descriptive`]: https://docs.rs/musli-descriptive
 [`musli-json`]: https://docs.rs/musli-json
 [`musli-serde`]: https://docs.rs/musli-serde
@@ -362,8 +374,12 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [`serde`]: https://serde.rs
 [`simdutf8`]: https://docs.rs/simdutf8
 [`tests`]: https://github.com/udoprog/musli/tree/main/crates/tests
+[benchmarks]: https://udoprog.github.io/musli/benchmarks/
 [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
-[performance]: https://udoprog.github.io/musli/benchmarks/
+[detailed tracing]: https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html
+[musli-name-type]: https://docs.rs/musli/latest/musli/derives/index.html#musliname_type--
+[no-std and no-alloc]: https://github.com/udoprog/musli/blob/main/crates/no-std-examples/examples/no-std-json.rs
+[scoped allocations]: https://docs.rs/musli-allocator
 [size comparisons]: https://udoprog.github.io/musli/benchmarks/#size-comparisons
 [when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
-[zero-copy serialization]: https://docs.rs/musli-zerocopy
+[zerocopy]: https://docs.rs/musli-zerocopy
