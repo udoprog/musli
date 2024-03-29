@@ -23,6 +23,7 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 default = ["std", "alloc"]
 std = []
 alloc = []
+verbose = ["musli-macros/verbose"]
 
 [dependencies]
 musli-macros = { version = "=0.0.107", path = "../musli-macros" }

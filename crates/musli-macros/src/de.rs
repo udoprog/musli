@@ -20,6 +20,7 @@ struct Ctxt<'a> {
 
 pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     e.validate_decode()?;
+    e.cx.reset();
 
     let ctx_var = e.cx.ident("ctx");
     let root_decoder_var = e.cx.ident("decoder");
@@ -128,6 +129,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         option_some,
         result,
         skip,
+        str_ty,
         struct_decoder_t,
         struct_field_decoder_t,
         variant_decoder_t,
@@ -206,7 +208,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     #result::Ok(match string {
                         #(#arms,)*
                         string => {
-                            if !#buf_t::write(&mut #variant_alloc_var, str::as_bytes(string)) {
+                            if !#buf_t::write(&mut #variant_alloc_var, #str_ty::as_bytes(string)) {
                                 return #result::Err(#context_t::alloc_failed(#ctx_var));
                             }
 
@@ -405,7 +407,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                             #result::Ok(match string {
                                 #field_tag => Outcome::Tag,
                                 string => {
-                                    if !#buf_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                                    if !#buf_t::write(&mut #field_alloc_var, #str_ty::as_bytes(string)) {
                                         Outcome::AllocErr
                                     } else {
                                         Outcome::Err
@@ -562,7 +564,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                 #tag => Outcome::Tag,
                                 #content => Outcome::Content,
                                 string => {
-                                    if !#buf_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                                    if !#buf_t::write(&mut #field_alloc_var, #str_ty::as_bytes(string)) {
                                         Outcome::AllocErr
                                     } else {
                                         Outcome::Err
@@ -710,6 +712,7 @@ fn decode_tagged(
     } = *cx;
 
     let Tokens {
+        str_ty,
         buf_t,
         context_t,
         decoder_t,
@@ -828,7 +831,7 @@ fn decode_tagged(
                     #result::Ok(match string {
                         #(#patterns,)*
                         string => {
-                            if !#buf_t::write(&mut #field_alloc_var, str::as_bytes(string)) {
+                            if !#buf_t::write(&mut #field_alloc_var, #str_ty::as_bytes(string)) {
                                 return #result::Err(#context_t::alloc_failed(#ctx_var));
                             }
 

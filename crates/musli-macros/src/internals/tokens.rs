@@ -20,6 +20,7 @@ pub(crate) struct Tokens {
     pub(crate) pack_encoder_t: syn::Path,
     pub(crate) result: syn::Path,
     pub(crate) skip: syn::Path,
+    pub(crate) str_ty: syn::Path,
     pub(crate) struct_decoder_t: syn::Path,
     pub(crate) struct_encoder_t: syn::Path,
     pub(crate) struct_field_decoder_t: syn::Path,
@@ -49,6 +50,7 @@ impl Tokens {
             option_none: core(span, ["option", "Option", "None"]),
             option_some: core(span, ["option", "Option", "Some"]),
             pack_decoder_t: path(span, prefix, ["de", "PackDecoder"]),
+            str_ty: primitive(span, "str"),
             struct_decoder_t: path(span, prefix, ["de", "StructDecoder"]),
             struct_field_decoder_t: path(span, prefix, ["de", "StructFieldDecoder"]),
             struct_encoder_t: path(span, prefix, ["en", "StructEncoder"]),
@@ -85,4 +87,9 @@ fn core<const N: usize>(span: Span, segments: [&'static str; N]) -> syn::Path {
     }
 
     path
+}
+
+fn primitive(span: Span, primitive: &'static str) -> syn::Path {
+    let core = syn::Ident::new(primitive, span);
+    syn::Path::from(core)
 }
