@@ -166,17 +166,17 @@ where
     }
 
     #[inline]
-    fn enter_named_field<T>(&self, name: &'static str, _: T)
+    fn enter_named_field<T>(&self, name: &'static str, _: &T)
     where
-        T: fmt::Display,
+        T: ?Sized + fmt::Display,
     {
         self.push_path(Step::Named(name));
     }
 
     #[inline]
-    fn enter_unnamed_field<T>(&self, index: u32, _: T)
+    fn enter_unnamed_field<T>(&self, index: u32, _: &T)
     where
-        T: fmt::Display,
+        T: ?Sized + fmt::Display,
     {
         self.push_path(Step::Unnamed(index));
     }
