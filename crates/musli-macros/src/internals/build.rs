@@ -173,6 +173,7 @@ pub(crate) struct Field<'a> {
     pub(crate) member: syn::Member,
     pub(crate) packing: Packing,
     pub(crate) var: syn::Ident,
+    pub(crate) ty: &'a syn::Type,
 }
 
 /// Setup a build.
@@ -477,6 +478,7 @@ fn setup_field<'a>(
         member,
         packing,
         var,
+        ty: data.ty,
     })
 }
 

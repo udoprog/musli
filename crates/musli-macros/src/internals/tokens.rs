@@ -1,5 +1,4 @@
 use proc_macro2::Span;
-use syn::Token;
 
 pub(crate) struct Tokens {
     pub(crate) as_decoder_t: syn::Path,
@@ -14,11 +13,14 @@ pub(crate) struct Tokens {
     pub(crate) encode_t: syn::Path,
     pub(crate) encoder_t: syn::Path,
     pub(crate) fmt: syn::Path,
+    pub(crate) option: syn::Path,
     pub(crate) option_none: syn::Path,
     pub(crate) option_some: syn::Path,
     pub(crate) pack_decoder_t: syn::Path,
     pub(crate) pack_encoder_t: syn::Path,
     pub(crate) result: syn::Path,
+    pub(crate) result_ok: syn::Path,
+    pub(crate) result_err: syn::Path,
     pub(crate) skip: syn::Path,
     pub(crate) str_ty: syn::Path,
     pub(crate) struct_decoder_t: syn::Path,
@@ -41,21 +43,24 @@ impl Tokens {
             decode_t: path(span, prefix, ["de", "Decode"]),
             decode_bytes_t: path(span, prefix, ["de", "DecodeBytes"]),
             decoder_t: path(span, prefix, ["de", "Decoder"]),
-            default_function: core(span, ["default", "Default", "default"]),
+            default_function: path(span, prefix, ["__priv", "default"]),
             default_mode: path(span, prefix, ["mode", "DefaultMode"]),
             encode_t: path(span, prefix, ["en", "Encode"]),
             encode_bytes_t: path(span, prefix, ["en", "EncodeBytes"]),
             encoder_t: path(span, prefix, ["en", "Encoder"]),
-            fmt: core(span, ["fmt"]),
-            option_none: core(span, ["option", "Option", "None"]),
-            option_some: core(span, ["option", "Option", "Some"]),
+            fmt: path(span, prefix, ["__priv", "fmt"]),
+            option: path(span, prefix, ["__priv", "Option"]),
+            option_none: path(span, prefix, ["__priv", "None"]),
+            option_some: path(span, prefix, ["__priv", "Some"]),
             pack_decoder_t: path(span, prefix, ["de", "PackDecoder"]),
             str_ty: primitive(span, "str"),
             struct_decoder_t: path(span, prefix, ["de", "StructDecoder"]),
             struct_field_decoder_t: path(span, prefix, ["de", "StructFieldDecoder"]),
             struct_encoder_t: path(span, prefix, ["en", "StructEncoder"]),
             struct_field_encoder_t: path(span, prefix, ["en", "StructFieldEncoder"]),
-            result: core(span, ["result", "Result"]),
+            result: path(span, prefix, ["__priv", "Result"]),
+            result_ok: path(span, prefix, ["__priv", "Ok"]),
+            result_err: path(span, prefix, ["__priv", "Err"]),
             skip: path(span, prefix, ["de", "Skip"]),
             pack_encoder_t: path(span, prefix, ["en", "PackEncoder"]),
             trace_decode_t: path(span, prefix, ["de", "TraceDecode"]),
@@ -69,18 +74,6 @@ impl Tokens {
 
 fn path<const N: usize>(span: Span, prefix: &syn::Path, segments: [&'static str; N]) -> syn::Path {
     let mut path = prefix.clone();
-
-    for segment in segments {
-        path.segments.push(syn::Ident::new(segment, span).into());
-    }
-
-    path
-}
-
-fn core<const N: usize>(span: Span, segments: [&'static str; N]) -> syn::Path {
-    let core = syn::Ident::new("core", span);
-    let mut path = syn::Path::from(core);
-    path.leading_colon = Some(<Token![::]>::default());
 
     for segment in segments {
         path.segments.push(syn::Ident::new(segment, span).into());
