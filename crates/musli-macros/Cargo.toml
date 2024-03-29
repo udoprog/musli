@@ -21,6 +21,7 @@ path = "src/lib.rs"
 
 [features]
 test = []
+verbose = []
 
 [dependencies]
 proc-macro2 = "1.0.79"

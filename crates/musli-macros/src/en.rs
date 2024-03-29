@@ -16,6 +16,7 @@ struct Ctxt<'a> {
 
 pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
     e.validate_encode()?;
+    e.cx.reset();
 
     let type_ident = &e.input.ident;
 
@@ -159,17 +160,17 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
     Ok(quote!(#result::Ok(#encode)))
 }
 
-struct FieldTest {
+struct FieldTest<'st> {
     decl: TokenStream,
-    var: syn::Ident,
+    var: &'st syn::Ident,
 }
 
-fn insert_fields(
+fn insert_fields<'st>(
     cx: &Ctxt<'_>,
     e: &Build<'_>,
-    st: &Body<'_>,
+    st: &'st Body<'_>,
     pack_var: &syn::Ident,
-) -> Result<(Vec<TokenStream>, Vec<FieldTest>)> {
+) -> Result<(Vec<TokenStream>, Vec<FieldTest<'st>>)> {
     let Ctxt {
         ctx_var,
         encoder_var,
@@ -254,7 +255,7 @@ fn insert_fields(
         };
 
         if let Some((_, skip_encoding_if_path)) = f.skip_encoding_if.as_ref() {
-            let var = e.cx.ident_with_span(&format!("t{}", f.index), f.span);
+            let var = &f.var;
 
             let decl = quote! {
                 let #var = !#skip_encoding_if_path(#access);
@@ -488,7 +489,7 @@ fn encode_variant(
     Ok((pattern, encode))
 }
 
-fn length_test(count: usize, tests: &[FieldTest]) -> Punctuated<TokenStream, Token![+]> {
+fn length_test(count: usize, tests: &[FieldTest<'_>]) -> Punctuated<TokenStream, Token![+]> {
     let mut punctuated = Punctuated::<_, Token![+]>::new();
     let count = count.saturating_sub(tests.len());
     punctuated.push(quote!(#count));

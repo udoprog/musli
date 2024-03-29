@@ -461,8 +461,8 @@ fn setup_field<'a>(
     };
 
     let var = match &member {
-        syn::Member::Named(ident) => e.cx.field_ident(ident),
-        syn::Member::Unnamed(index) => quote::format_ident!("_{}", index.index),
+        syn::Member::Named(ident) => e.cx.ident_with_span(&ident.to_string(), ident.span(), "f_"),
+        syn::Member::Unnamed(index) => e.cx.ident_with_span(&index.index.to_string(), index.span, "f_"),
     };
 
     Ok(Field {

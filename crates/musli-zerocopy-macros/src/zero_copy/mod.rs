@@ -610,7 +610,7 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
 
         let variable = match &member {
             syn::Member::Named(ident) => ident.clone(),
-            syn::Member::Unnamed(index) => quote::format_ident!("_{}", index.index),
+            syn::Member::Unnamed(index) => quote::format_ident!("_f{}", index.index),
         };
 
         output.assigns.push(match &member {
