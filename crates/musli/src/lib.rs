@@ -180,7 +180,7 @@
 //! `reorder` determines whether fields must occur in exactly the order in which
 //! they are specified in their type. Reordering fields in such a type would
 //! cause unknown but safe behavior of some kind. This is only suitable for
-//! byte-oriented IPC where the data models of each client are are strictly
+//! communication where the data models of each client are strictly
 //! synchronized.
 //!
 //! `missing` determines if reading can handle missing fields through something
@@ -188,14 +188,15 @@
 //! that new optional fields can be added as the schema evolves.
 //!
 //! `unknown` determines if the format can skip over unknown fields. This is
-//! suitable for network communication. At this point you've reached *upgrade
-//! stability*. Some level of introspection is possible here, because the
-//! serialized format must contain enough information about fields to know what
-//! to skip which usually allows for reasoning about basic types.
+//! suitable for network communication. At this point you've reached [*upgrade
+//! stability*](#upgrade-stability). Some level of introspection is possible
+//! here, because the serialized format must contain enough information about
+//! fields to know what to skip which usually allows for reasoning about basic
+//! types.
 //!
 //! `self` determines if the format is self-descriptive. Allowing the structure
 //! of the data to be fully reconstructed from its serialized state. These
-//! formats do not require models to decode, and can be converted to and from
+//! formats do not require models to decode and can be converted to and from
 //! dynamic containers such as [`musli-value`] for introspection.
 //!
 //! For every feature you drop, the format becomes more compact and efficient.
@@ -213,10 +214,10 @@
 //! ## Upgrade stability
 //!
 //! The following is an example of *full upgrade stability* using
-//! [`musli-wire`]. Note how `Version1` can be decoded from an instance of
-//! `Version2` because it understands how to skip fields which are part of
-//! `Version2`. We're also explicitly `#[musli(rename = ..)]` the fields to
-//! ensure that they don't change in case they are re-ordered.
+//! [`musli-wire`]. `Version1` can be decoded from an instance of `Version2`
+//! because it understands how to skip fields which are part of `Version2`.
+//! We're also explicitly adding `#[musli(rename = ..)]` to the fields to ensure
+//! that they don't change in case they are re-ordered.
 //!
 //! ```ignore
 //! use musli::{Encode, Decode};
@@ -245,8 +246,8 @@
 //!
 //! The following is an example of *partial upgrade stability* using
 //! [`musli-storage`] on the same data models. Note how `Version2` can be
-//! decoded from `Version1` but *not* the other way around. That's why it's
-//! suitable for on-disk storage the schema can evolve from older to newer
+//! decoded from `Version1` but *not* the other way around making it suitable
+//! for on-disk storage where the schema can evolve from older to newer
 //! versions.
 //!
 //! ```ignore
@@ -275,23 +276,23 @@
 //!
 //! ## Modes
 //!
-//! In Müsli the same model can be serialized in different ways. Instead of
-//! requiring the use of distinct models we support implementing different
-//! *modes* for a single model.
+//! In Müsli in contrast to [`serde`] the same model can be serialized in
+//! different ways. Instead of requiring the use of distinct models we support
+//! implementing different *modes* for a single model.
 //!
-//! A mode allows for different encoding attributes to apply depending on which
-//! mode an encoder is configured to use. A mode can apply to *any* musli
-//! parameter giving you a lot of flexibility.
+//! A mode is a type parameter, which allows for different attributes to apply
+//! depending on which mode an encoder is configured to use. A mode can apply to
+//! *any* musli attributes giving you a lot of flexibility.
 //!
-//! If a mode is not specified, an implementation will apply to all modes (`M:
-//! Mode`), if at least one mode is specified it will be implemented for all
-//! modes which are present in a model and [`DefaultMode`]. This way, an
-//! encoding which uses `DefaultMode` (which it does by default) should always
-//! work.
+//! If a mode is not specified, an implementation will apply to all modes (`M`),
+//! if at least one mode is specified it will be implemented for all modes which
+//! are present in a model and [`DefaultMode`]. This way, an encoding which uses
+//! `DefaultMode` which is the default mode should always work.
 //!
-//! For more information on how to configure modes, see the [`derives`] module.
+//! For more information on how to configure modes, see [`derives`].
+//!
 //! Below is a simple example of how we can use two modes to provide two
-//! different kinds of serialization to a single struct.
+//! completely different formats using a single struct:
 //!
 //! ```ignore
 //! use musli::mode::DefaultMode;
@@ -330,7 +331,7 @@
 //! This is a non-exhaustive list of unsafe use in this crate, and why they are
 //! used:
 //!
-//! * A `mem::transcode` in `Tag::kind`. Which guarantees that converting into
+//! * A `mem::transmute` in `Tag::kind`. Which guarantees that converting into
 //!   the `Kind` enum which is `#[repr(u8)]` is as efficient as possible.
 //!
 //! * A largely unsafe `SliceReader` which provides more efficient reading than
@@ -340,18 +341,18 @@
 //! * Some unsafety related to UTF-8 handling in `musli_json`, because we check
 //!   UTF-8 validity internally ourselves (like `serde_json`).
 //!
-//! * `FixedBytes<N>` is a stack-based container that can operate over
+//! * `FixedBytes<N>`, which is a stack-based container that can operate over
 //!   uninitialized data. Its implementation is largely unsafe. With it
 //!   stack-based serialization can be performed which is useful in no-std
 //!   environments.
 //!
-//! * Some unsafe is used for owned `String` decoding in all binary formats to
-//!   support faster string processing using [`simdutf8`]. Disabling the
+//! * Some `unsafe` is used for owned `String` decoding in all binary formats to
+//!   support faster string processing through [`simdutf8`]. Disabling the
 //!   `simdutf8` feature (enabled by default) removes the use of this unsafe.
 //!
 //! To ensure this library is correctly implemented with regards to memory
-//! safety, extensive testing is performed using `miri`. See [`tests`] for more
-//! information on this.
+//! safety, extensive testing and fuzzing is performed using `miri`. See
+//! [`tests`] for more information.
 //!
 //! <br>
 //!
@@ -367,7 +368,6 @@
 //! [`musli-value`]: https://docs.rs/musli-value
 //! [`musli-wire`]: https://docs.rs/musli-wire
 //! [`protobuf`]: https://developers.google.com/protocol-buffers
-//! [`serde`]: https://serde.rs
 //! [`serde`]: https://serde.rs
 //! [`simdutf8`]: https://docs.rs/simdutf8
 //! [`tests`]: https://github.com/udoprog/musli/tree/main/crates/tests
