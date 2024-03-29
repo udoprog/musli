@@ -163,17 +163,17 @@ pub trait Decoder<'de>: Sized {
     /// use musli::de::{AsDecoder, MapDecoder, MapEntryDecoder};
     ///
     /// #[derive(Decode)]
-    /// struct Variant2 {
+    /// struct Person {
     ///     name: String,
     ///     age: u32,
     /// }
     ///
-    /// enum MyVariantType {
-    ///     Variant1,
-    ///     Variant2(Variant2),
+    /// enum Enum {
+    ///     Empty,
+    ///     Person(Person),
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for MyVariantType {
+    /// impl<'de, M> Decode<'de, M> for Enum {
     ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -183,7 +183,7 @@ pub trait Decoder<'de>: Sized {
     ///         let discriminant = buffer.as_decoder()?.decode_map(|st| {
     ///             loop {
     ///                 let Some(mut e) = st.decode_entry()? else {
-    ///                     return Err(cx.missing_variant_tag("MyVariantType"));
+    ///                     return Err(cx.missing_variant_tag("Enum"));
     ///                 };
     ///
     ///                 let found = e.decode_map_key()?.decode_string(musli::utils::visit_owned_fn("a string that is 'type'", |string: &str| {
@@ -197,9 +197,9 @@ pub trait Decoder<'de>: Sized {
     ///         })?;
     ///
     ///         match discriminant {
-    ///             0 => Ok(MyVariantType::Variant1),
-    ///             1 => Ok(MyVariantType::Variant2(buffer.as_decoder()?.decode()?)),
-    ///             other => Err(cx.invalid_variant_tag("MyVariantType", other)),
+    ///             0 => Ok(Enum::Empty),
+    ///             1 => Ok(Enum::Person(buffer.as_decoder()?.decode()?)),
+    ///             other => Err(cx.invalid_variant_tag("Enum", &other)),
     ///         }
     ///     }
     /// }
@@ -1468,8 +1468,8 @@ pub trait Decoder<'de>: Sized {
     /// use musli::de::{Decoder, VariantDecoder};
     ///
     /// enum Enum {
-    ///     Variant1(u32),
-    ///     Variant2(String),
+    ///     Number(u32),
+    ///     String(String),
     /// }
     ///
     /// impl<'de, M> Decode<'de, M> for Enum {
@@ -1479,17 +1479,12 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         decoder.decode_variant(|variant| {
     ///             let tag = variant.decode_tag()?.decode()?;
+    ///             let value = variant.decode_value()?;
     ///
     ///             match tag {
-    ///                 0 => {
-    ///                     Ok(Self::Variant1(variant.decode_value()?.decode()?))
-    ///                 }
-    ///                 1 => {
-    ///                     Ok(Self::Variant2(variant.decode_value()?.decode()?))
-    ///                 }
-    ///                 tag => {
-    ///                     Err(cx.invalid_variant_tag("Enum", tag))
-    ///                 }
+    ///                 0 => Ok(Self::Number(value.decode()?)),
+    ///                 1 => Ok(Self::String(value.decode()?)),
+    ///                 tag => Err(cx.invalid_variant_tag("Enum", &tag)),
     ///             }
     ///         })
     ///     }

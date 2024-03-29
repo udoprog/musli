@@ -1,6 +1,7 @@
 //! Things related to working with contexts.
 
 use core::fmt;
+use core::str;
 
 use crate::de::DecodeBytes;
 use crate::{Buf, Decode, Decoder};
@@ -139,18 +140,18 @@ pub trait Context {
 
     /// Report that an invalid variant tag was encountered.
     #[inline(always)]
-    fn invalid_variant_tag<T>(&self, _: &'static str, tag: T) -> Self::Error
+    fn invalid_variant_tag<T>(&self, _: &'static str, tag: &T) -> Self::Error
     where
-        T: fmt::Debug,
+        T: ?Sized + fmt::Debug,
     {
         self.message(format_args!("Invalid variant tag: {tag:?}"))
     }
 
     /// The value for the given tag could not be collected.
     #[inline(always)]
-    fn expected_tag<T>(&self, _: &'static str, tag: T) -> Self::Error
+    fn expected_tag<T>(&self, _: &'static str, tag: &T) -> Self::Error
     where
-        T: fmt::Debug,
+        T: ?Sized + fmt::Debug,
     {
         self.message(format_args!("Expected tag: {tag:?}"))
     }
@@ -163,9 +164,9 @@ pub trait Context {
 
     /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_tag<T>(&self, _: &'static str, tag: T) -> Self::Error
+    fn invalid_field_tag<T>(&self, _: &'static str, tag: &T) -> Self::Error
     where
-        T: fmt::Debug,
+        T: ?Sized + fmt::Debug,
     {
         self.message(format_args!("Invalid field tag `{tag:?}`"))
     }
@@ -176,7 +177,7 @@ pub trait Context {
         // SAFETY: Getting the slice does not overlap any interleaving operations.
         let bytes = field.as_slice();
 
-        if let Ok(string) = core::str::from_utf8(bytes) {
+        if let Ok(string) = str::from_utf8(bytes) {
             self.message(format_args!("Invalid field tag: {string}"))
         } else {
             self.message(format_args!("Invalid field tag"))
@@ -186,9 +187,9 @@ pub trait Context {
     /// Missing variant field required to decode.
     #[allow(unused_variables)]
     #[inline(always)]
-    fn missing_variant_field<T>(&self, name: &'static str, tag: T) -> Self::Error
+    fn missing_variant_field<T>(&self, name: &'static str, tag: &T) -> Self::Error
     where
-        T: fmt::Debug,
+        T: ?Sized + fmt::Debug,
     {
         self.message(format_args!("Missing variant field: {tag:?}"))
     }
@@ -203,10 +204,15 @@ pub trait Context {
     /// Encountered an unsupported variant field.
     #[allow(unused_variables)]
     #[inline(always)]
-    fn invalid_variant_field_tag<V, T>(&self, name: &'static str, variant: V, tag: T) -> Self::Error
+    fn invalid_variant_field_tag<V, T>(
+        &self,
+        name: &'static str,
+        variant: &V,
+        tag: &T,
+    ) -> Self::Error
     where
-        V: fmt::Debug,
-        T: fmt::Debug,
+        V: ?Sized + fmt::Debug,
+        T: ?Sized + fmt::Debug,
     {
         self.message(format_args!(
             "Invalid variant field tag `{tag:?}` for variant `{variant:?}`",
@@ -273,9 +279,9 @@ pub trait Context {
     /// [`leave_field`]: Context::leave_field
     #[allow(unused_variables)]
     #[inline(always)]
-    fn enter_named_field<T>(&self, name: &'static str, tag: T)
+    fn enter_named_field<T>(&self, name: &'static str, tag: &T)
     where
-        T: fmt::Display,
+        T: ?Sized + fmt::Display,
     {
     }
 
@@ -299,9 +305,9 @@ pub trait Context {
     /// [`leave_field`]: Context::leave_field
     #[allow(unused_variables)]
     #[inline(always)]
-    fn enter_unnamed_field<T>(&self, index: u32, tag: T)
+    fn enter_unnamed_field<T>(&self, index: u32, tag: &T)
     where
-        T: fmt::Display,
+        T: ?Sized + fmt::Display,
     {
     }
 

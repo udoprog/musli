@@ -1,8 +1,8 @@
 use std::cell::RefCell;
-use std::collections::HashSet;
-use std::fmt::{self, Write};
 #[cfg(not(feature = "verbose"))]
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::fmt::{self, Write};
 
 use proc_macro2::Span;
 
@@ -10,7 +10,10 @@ struct Inner {
     b1: String,
     modes: HashSet<syn::Path>,
     errors: Vec<syn::Error>,
+    #[cfg(not(feature = "verbose"))]
     names: HashMap<String, usize>,
+    #[cfg(not(feature = "verbose"))]
+    types: usize,
 }
 
 pub(crate) struct Ctxt {
@@ -25,7 +28,10 @@ impl Ctxt {
                 b1: String::new(),
                 modes: HashSet::new(),
                 errors: Vec::new(),
+                #[cfg(not(feature = "verbose"))]
                 names: HashMap::new(),
+                #[cfg(not(feature = "verbose"))]
+                types: 0,
             }),
         }
     }
@@ -67,8 +73,12 @@ impl Ctxt {
     }
 
     pub(crate) fn reset(&self) {
-        let mut inner = self.inner.borrow_mut();
-        inner.names.clear();
+        #[cfg(not(feature = "verbose"))]
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.names.clear();
+            inner.types = 0;
+        }
     }
 
     /// Build an identifier with the given name, escaped so it's harder to conflict with.
@@ -80,16 +90,16 @@ impl Ctxt {
     pub(crate) fn ident_with_span(&self, name: &str, span: Span, extra: &str) -> syn::Ident {
         let mut inner = self.inner.borrow_mut();
 
-        let index = if let Some(index) = inner.names.get(name) {
-            *index
-        } else {
-            let index = inner.names.len();
-            inner.names.insert(name.to_owned(), index);
-            index
-        };
-
         #[cfg(not(feature = "verbose"))]
         {
+            let index = if let Some(index) = inner.names.get(name) {
+                *index
+            } else {
+                let index = inner.names.len();
+                inner.names.insert(name.to_owned(), index);
+                index
+            };
+
             _ = write!(inner.b1, "_{index}{extra}");
         }
 
@@ -105,9 +115,28 @@ impl Ctxt {
     }
 
     /// Build a type identifier with a span.
-    pub(crate) fn type_with_span(&self, name: &str, span: Span) -> syn::Ident {
+    pub(crate) fn type_with_span<N>(
+        &self,
+        #[cfg_attr(not(feature = "verbose"), allow(unused))] name: N,
+        span: Span,
+    ) -> syn::Ident
+    where
+        N: fmt::Display,
+    {
         let mut inner = self.inner.borrow_mut();
-        _ = write!(inner.b1, "__{name}");
+
+        #[cfg(not(feature = "verbose"))]
+        {
+            let index = inner.types;
+            inner.types += 1;
+            _ = write!(inner.b1, "T{index}");
+        }
+
+        #[cfg(feature = "verbose")]
+        {
+            _ = write!(inner.b1, "{name}");
+        }
+
         let ident = syn::Ident::new(&inner.b1, span);
         inner.b1.clear();
         ident

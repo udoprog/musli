@@ -581,14 +581,39 @@ pub use musli_macros::visitor;
 /// Using these directly is not supported.
 #[doc(hidden)]
 pub mod __priv {
+    use crate::context::Context;
+    use crate::de::{Decoder, StructFieldDecoder};
+
+    pub use ::core::fmt;
     pub use ::core::option::Option;
     pub use ::core::result::Result;
-    pub use ::core::fmt;
 
-    pub fn default<T>() -> T where T: ::core::default::Default {
+    #[inline(always)]
+    pub fn default<T>() -> T
+    where
+        T: ::core::default::Default,
+    {
         ::core::default::Default::default()
     }
 
+    /// Note that this returns `true` if skipping was unsupported.
+    #[inline(always)]
+    pub fn skip<'de, D>(decoder: D) -> Result<bool, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        Ok(decoder.try_skip()?.is_unsupported())
+    }
+
+    /// Note that this returns `true` if skipping was unsupported.
+    #[inline(always)]
+    pub fn skip_field<'de, D>(decoder: D) -> Result<bool, <D::Cx as Context>::Error>
+    where
+        D: StructFieldDecoder<'de>,
+    {
+        skip(decoder.decode_field_value()?)
+    }
+
     pub use Option::{None, Some};
-    pub use Result::{Ok, Err};
+    pub use Result::{Err, Ok};
 }
