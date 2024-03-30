@@ -90,9 +90,9 @@ pub enum Kind {
     /// A marker value.
     Mark = 0b110_00000,
     /// Reserved.
-    Pack = 0b101_00000,
+    Reserved0 = 0b101_00000,
     /// Reserved.
-    Reserved0 = 0b111_00000,
+    Reserved1 = 0b111_00000,
 }
 
 /// A type tag.

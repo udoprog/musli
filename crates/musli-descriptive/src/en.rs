@@ -11,8 +11,7 @@ use musli_storage::en::StorageEncoder;
 use crate::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use crate::options::Options;
 use crate::tag::{
-    Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, ISIZE, MAX_INLINE_LEN, U128, U16, U32, U64,
-    U8, USIZE,
+    Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, ISIZE, U128, U16, U32, U64, U8, USIZE,
 };
 use crate::writer::{BufWriter, Writer};
 
@@ -356,37 +355,9 @@ where
 
     #[inline]
     fn finish_pack(mut self) -> Result<Self::Ok, C::Error> {
-        static PAD: [u8; 1024] = [0; 1024];
-
         let buffer = self.buffer.into_inner();
-        let len = buffer.len();
-
-        let (tag, mut rem) = if len <= MAX_INLINE_LEN {
-            (Tag::new(Kind::Bytes, len as u8), 0)
-        } else {
-            let pow = len.next_power_of_two();
-            let rem = pow - len;
-
-            let Ok(pow) = usize::try_from(pow.trailing_zeros()) else {
-                return Err(self.cx.message("Pack too large"));
-            };
-
-            if pow > MAX_INLINE_LEN {
-                return Err(self.cx.message("Pack too large"));
-            }
-
-            (Tag::new(Kind::Pack, pow as u8), rem)
-        };
-
-        self.writer.write_bytes(self.cx, &[tag.byte()])?;
+        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Bytes, buffer.len())?;
         self.writer.write_buffer(self.cx, buffer)?;
-
-        while rem > 0 {
-            let len = rem.min(PAD.len());
-            self.writer.write_bytes(self.cx, &PAD[..len])?;
-            rem -= len;
-        }
-
         Ok(())
     }
 }

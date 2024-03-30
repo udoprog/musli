@@ -61,17 +61,19 @@ fn pack_max() {
 }
 
 #[test]
-fn pow2() {
+fn max_inline_length() {
     macro_rules! test {
-        ($size:literal, $pow:expr, $pad:expr) => {
+        ($size:expr, $inline:expr, $pad:expr) => {
             let value = From {
                 prefix: Some(10),
-                field: Field { value: [1; $size] },
+                field: Field {
+                    value: [1; { $size }],
+                },
                 suffix: Some(20),
             };
 
             let bytes = crate::to_vec(&value).unwrap();
-            let actual: From<$size> = crate::from_slice(&bytes).unwrap();
+            let actual: From<{ $size }> = crate::from_slice(&bytes).unwrap();
             let to: To = crate::from_slice(&bytes).unwrap();
 
             assert_eq!(actual, value);
@@ -83,13 +85,10 @@ fn pow2() {
                 }
             );
 
-            assert_eq!(Tag::from_byte(bytes[8]), Tag::new(Kind::Pack, $pow));
-            assert_eq!(bytes.len(), $size + $pad);
-            let start = $size + 9;
-            assert!(bytes[start..start + 18].iter().all(|b| *b == 0));
+            assert_eq!(Tag::from_byte(bytes[8]), Tag::new(Kind::Bytes, $inline));
         };
     }
 
-    test!(110, 7, 32);
-    test!(200, 8, 70);
+    test!(MAX_INLINE_LEN, MAX_INLINE_LEN as u8, 32);
+    test!(MAX_INLINE_LEN + 10, (MAX_INLINE_LEN + 1) as u8, 70);
 }

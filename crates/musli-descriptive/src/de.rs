@@ -103,10 +103,6 @@ where
 
                     self.reader.skip(self.cx, len)?;
                 }
-                Kind::Pack => {
-                    let len = 2usize.pow(tag.data_raw() as u32);
-                    self.reader.skip(self.cx, len)?;
-                }
                 Kind::Sequence => {
                     let len = if let Some(len) = tag.data() {
                         len as usize
@@ -189,13 +185,6 @@ where
             } else {
                 musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
-            Kind::Pack => {
-                let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
-                    return Err(self.cx.message("Pack tag overflowed"));
-                };
-
-                Ok(len)
-            }
             _ => Err(self.cx.marked_message(start, "Expected prefix or pack")),
         }
     }
