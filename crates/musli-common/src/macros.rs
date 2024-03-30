@@ -230,16 +230,6 @@ macro_rules! test_fns {
                 }
             };
 
-            let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
-                Ok(decoded) => decoded,
-                Err(..) => {
-                    let error = format_error(&cx);
-                    panic!("{WHAT}: {}: failed to decode:\n{error}", type_name::<T>())
-                }
-            };
-
-            assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match", type_name::<T>());
-
             $crate::test_include_if! {
                 $($(#[$option])*)* =>
                 let value_decode: ::musli_value::Value = match ENCODING.from_slice_with(&cx, out.as_slice()) {
@@ -254,12 +244,22 @@ macro_rules! test_fns {
                     Ok(decoded) => decoded,
                     Err(..) => {
                         let error = format_error(&cx);
-                        panic!("{WHAT}: {}: failed to decode from value type:\n{error}", type_name::<T>())
+                        panic!("{WHAT}: {}: failed to decode from value type:\nValue: {value_decode:?}\n{error}", type_name::<T>())
                     }
                 };
 
                 assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match", type_name::<T>());
             }
+
+            let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
+                Ok(decoded) => decoded,
+                Err(..) => {
+                    let error = format_error(&cx);
+                    panic!("{WHAT}: {}: failed to decode:\n{error}", type_name::<T>())
+                }
+            };
+
+            assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match", type_name::<T>());
 
             decoded
         }
@@ -273,17 +273,82 @@ macro_rules! test_fns {
             T: ::musli::en::Encode + ::musli::de::DecodeOwned + ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
+            const ENCODING: crate::Encoding = crate::Encoding::new();
 
             use ::core::any::type_name;
+            use ::alloc::string::ToString;
 
-            let out = match crate::to_vec(&value) {
-                Ok(out) => out,
-                Err(err) => panic!("{WHAT}: {}: failed to encode: {err}", type_name::<T>()),
+            let format_error = |cx: &crate::context::SystemContext<_, _>| {
+                use ::alloc::vec::Vec;
+
+                let mut errors = Vec::new();
+
+                for error in cx.errors() {
+                    errors.push(error.to_string());
+                }
+
+                errors.join("\n")
             };
 
-            match crate::from_slice(out.as_slice()) {
+            let mut buf = crate::allocator::buffer();
+            let alloc = crate::allocator::new(&mut buf);
+            let mut cx = crate::context::SystemContext::new(&alloc);
+            cx.include_type();
+
+            let out = match ENCODING.to_vec_with(&cx, &value) {
+                Ok(out) => out,
+                Err(..) => {
+                    let error = format_error(&cx);
+                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                }
+            };
+
+            match ENCODING.from_slice_with(&cx, out.as_slice()) {
                 Ok(decoded) => decoded,
-                Err(err) => panic!("{WHAT}: {}: failed to decode: {err}", type_name::<T>()),
+                Err(error) => {
+                    let error = format_error(&cx);
+                    panic!("{WHAT}: {}: failed to decode:{error}", type_name::<T>())
+                }
+            }
+        }
+
+        /// Encode a value to bytes.
+        #[doc(hidden)]
+        #[track_caller]
+        #[cfg(feature = "test")]
+        pub fn to_vec<T>(value: T) -> ::alloc::vec::Vec<u8>
+        where
+            T: ::musli::en::Encode + ::musli::de::DecodeOwned + ::core::fmt::Debug + ::core::cmp::PartialEq,
+        {
+            const WHAT: &str = $what;
+            const ENCODING: crate::Encoding = crate::Encoding::new();
+
+            use ::core::any::type_name;
+            use ::alloc::string::ToString;
+
+            let format_error = |cx: &crate::context::SystemContext<_, _>| {
+                use ::alloc::vec::Vec;
+
+                let mut errors = Vec::new();
+
+                for error in cx.errors() {
+                    errors.push(error.to_string());
+                }
+
+                errors.join("\n")
+            };
+
+            let mut buf = crate::allocator::buffer();
+            let alloc = crate::allocator::new(&mut buf);
+            let mut cx = crate::context::SystemContext::new(&alloc);
+            cx.include_type();
+
+            match ENCODING.to_vec_with(&cx, &value) {
+                Ok(out) => out,
+                Err(..) => {
+                    let error = format_error(&cx);
+                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                }
             }
         }
     }

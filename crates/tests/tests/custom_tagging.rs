@@ -31,62 +31,52 @@ pub enum AdjacentlyTagged {
     },
 }
 
-macro_rules! test {
-    ($ty:ident :: $variant:ident $body:tt $(, json = $json:expr)?) => {{
-        let expected = $ty::$variant $body;
-        let string = musli_json::to_string(&expected).unwrap();
-        $(assert_eq!(string, $json);)*
-        let output: $ty = musli_json::from_slice(string.as_bytes()).unwrap();
-        assert_eq!(output, expected);
-    }};
-}
-
 #[test]
 fn internally_tagged() {
-    test! {
+    tests::rt_self! {
         InternallyTagged::Variant1 {
             string: String::from("Hello"),
             number: 42,
         },
-        json = "{\"type\":\"Variant1\",\"string\":\"Hello\",\"number\":42}"
+        json = r#"{"type":"Variant1","string":"Hello","number":42}"#
     };
 
-    test! {
+    tests::rt_self! {
         InternallyTagged::Variant2 {
             string: String::from("Hello")
         },
-        json = "{\"type\":\"variant2\",\"string\":\"Hello\"}"
+        json = r#"{"type":"variant2","string":"Hello"}"#
     };
 
-    test! {
+    tests::rt_self! {
         InternallyTagged::Variant2 {
             string: String::from("\"\u{0000}")
         },
-        json = "{\"type\":\"variant2\",\"string\":\"\\\"\\u0000\"}"
+        json = r#"{"type":"variant2","string":"\"\u0000"}"#
     };
 }
 
 #[test]
 fn adjacently_tagged() {
-    test! {
+    tests::rt! {
         AdjacentlyTagged::Variant1 {
             string: String::from("Hello"),
             number: 42,
         },
-        json = "{\"type\":\"Variant1\",\"content\":{\"string\":\"Hello\",\"number\":42}}"
+        json = r#"{"type":"Variant1","content":{"string":"Hello","number":42}}"#
     };
 
-    test! {
+    tests::rt! {
         AdjacentlyTagged::Variant2 {
             string: String::from("Hello")
         },
-        json = "{\"type\":\"variant2\",\"content\":{\"string\":\"Hello\"}}"
+        json = r#"{"type":"variant2","content":{"string":"Hello"}}"#
     };
 
-    test! {
+    tests::rt! {
         AdjacentlyTagged::Variant2 {
             string: String::from("\"\u{0000}")
         },
-        json = "{\"type\":\"variant2\",\"content\":{\"string\":\"\\\"\\u0000\"}}"
+        json = r#"{"type":"variant2","content":{"string":"\"\u0000"}}"#
     };
 }

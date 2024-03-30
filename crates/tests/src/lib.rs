@@ -56,17 +56,66 @@ pub mod json {
     pub use musli_json::*;
 }
 
+/// Roundtrip self-descriptive formats.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! rt_self {
+    ($expr:expr $(, json = $json_expected:expr)?) => {{
+        let expected = $expr;
+
+        #[cfg(feature = "musli-descriptive")]
+        {
+            let descriptive = ::musli_descriptive::test::rt($expr);
+            assert_eq!(expected, descriptive);
+        }
+
+        #[cfg(feature = "musli-json")]
+        {
+            let json = ::musli_json::test::rt($expr);
+            assert_eq!(expected, json);
+        }
+
+        #[cfg(feature = "musli-json")]
+        {
+            let json = ::musli_json::test::to_vec($expr);
+            let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
+
+            $(
+                assert_eq!(
+                    string, $json_expected,
+                    "json: encoded json does not match expected value"
+                );
+            )*
+        }
+
+        expected
+    }};
+}
+
 /// Roundtrip the given expression through all supported formats.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! rt {
-    ($expr:expr) => {{
+    ($expr:expr $(, json = $json_expected:expr)?) => {{
         let expected = $crate::rt_no_json!($expr);
 
         #[cfg(feature = "musli-json")]
         {
             let json = ::musli_json::test::rt($expr);
             assert_eq!(expected, json);
+        }
+
+        #[cfg(feature = "musli-json")]
+        {
+            let json = ::musli_json::test::to_vec($expr);
+            let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
+
+            $(
+                assert_eq!(
+                    string, $json_expected,
+                    "json: encoded json does not match expected value"
+                );
+            )*
         }
 
         expected
