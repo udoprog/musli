@@ -205,6 +205,25 @@ macro_rules! test_fns {
             use ::core::any::type_name;
             use ::alloc::string::ToString;
 
+            struct FormatBytes<'a>(&'a [u8]);
+
+            impl ::core::fmt::Display for FormatBytes<'_> {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    write!(f, "b\"")?;
+
+                    for b in self.0 {
+                        if b.is_ascii_graphic() {
+                            write!(f, "{}", *b as char)?;
+                        } else {
+                            write!(f, "\\x{b:02x}")?;
+                        }
+                    }
+
+                    write!(f, "\"")?;
+                    Ok(())
+                }
+            }
+
             let format_error = |cx: &crate::context::SystemContext<_, _>| {
                 use ::alloc::vec::Vec;
 
@@ -235,16 +254,18 @@ macro_rules! test_fns {
                 let value_decode: ::musli_value::Value = match ENCODING.from_slice_with(&cx, out.as_slice()) {
                     Ok(decoded) => decoded,
                     Err(..) => {
+                        let out = FormatBytes(&out);
                         let error = format_error(&cx);
-                        panic!("{WHAT}: {}: failed to decode to value type:\n{error}", type_name::<T>())
+                        panic!("{WHAT}: {}: failed to decode to value type:\nBytes:{out}\n{error}", type_name::<T>())
                     }
                 };
 
                 let value_decoded: T = match ::musli_value::decode_with(&cx, &value_decode) {
                     Ok(decoded) => decoded,
                     Err(..) => {
+                        let out = FormatBytes(&out);
                         let error = format_error(&cx);
-                        panic!("{WHAT}: {}: failed to decode from value type:\nValue: {value_decode:?}\n{error}", type_name::<T>())
+                        panic!("{WHAT}: {}: failed to decode from value type:\nBytes: {out}\nValue: {value_decode:?}\n{error}", type_name::<T>())
                     }
                 };
 
@@ -254,8 +275,9 @@ macro_rules! test_fns {
             let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
                 Ok(decoded) => decoded,
                 Err(..) => {
+                    let out = FormatBytes(&out);
                     let error = format_error(&cx);
-                    panic!("{WHAT}: {}: failed to decode:\n{error}", type_name::<T>())
+                    panic!("{WHAT}: {}: failed to decode:\nBytes: {out}\n{error}", type_name::<T>())
                 }
             };
 

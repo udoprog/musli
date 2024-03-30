@@ -150,7 +150,7 @@ pub mod musli_wire {
 #[cfg(feature = "musli-descriptive")]
 #[crate::benchmarker]
 pub mod musli_descriptive {
-    use alloc::vec::Vec;
+    use crate::no_alloc::Bytes;
 
     use ::musli_descriptive::Encoding;
     use musli::mode::DefaultMode;
@@ -159,15 +159,15 @@ pub mod musli_descriptive {
 
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
-    pub fn buffer() -> Vec<u8> {
-        Vec::with_capacity(4096)
+    pub fn buffer() -> Bytes {
+        Bytes::with_capacity(4096)
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
+    pub fn reset(buf: &mut Bytes) {
         buf.clear();
     }
 
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    pub fn encode<'buf, T>(buf: &'buf mut Bytes, value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode,
     {

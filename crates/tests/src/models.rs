@@ -1,15 +1,18 @@
-#[cfg(not(feature = "no-map"))]
+#[cfg(all(feature = "std", not(feature = "no-map")))]
 use std::collections::HashMap;
+#[cfg(feature = "std")]
 use std::collections::HashSet;
 
-#[cfg(not(feature = "no-btree"))]
-use std::collections::{BTreeMap, BTreeSet};
+#[cfg(all(feature = "alloc", not(feature = "no-btree")))]
+use alloc::collections::{BTreeMap, BTreeSet};
 
 use core::ops::Range;
 
-#[cfg(not(feature = "no-cstring"))]
+#[cfg(all(feature = "alloc", not(feature = "no-cstring")))]
 use alloc::ffi::CString;
+#[cfg(feature = "alloc")]
 use alloc::string::String;
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 #[cfg(feature = "musli-zerocopy")]
@@ -155,34 +158,49 @@ impl PartialEq<Primitives> for &Primitives {
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct Allocated {
+    #[cfg(feature = "alloc")]
     string: String,
     #[cfg_attr(feature = "musli", musli(bytes))]
+    #[cfg(feature = "alloc")]
     #[generate(range = SMALL_FIELDS)]
     bytes: Vec<u8>,
-    #[cfg(all(not(feature = "no-map"), not(feature = "no-number-key")))]
+    #[cfg(all(
+        feature = "std",
+        not(feature = "no-map"),
+        not(feature = "no-number-key")
+    ))]
     #[generate(range = SMALL_FIELDS)]
     number_map: HashMap<u32, u64>,
-    #[cfg(all(not(feature = "no-map"), not(feature = "no-string-key")))]
+    #[cfg(all(
+        feature = "std",
+        not(feature = "no-map"),
+        not(feature = "no-string-key")
+    ))]
     #[generate(range = SMALL_FIELDS)]
     string_map: HashMap<String, u64>,
     #[generate(range = SMALL_FIELDS)]
+    #[cfg(feature = "std")]
     number_set: HashSet<u32>,
     #[generate(range = SMALL_FIELDS)]
-    #[cfg(not(feature = "no-string-set"))]
+    #[cfg(all(feature = "std", not(feature = "no-string-set")))]
     string_set: HashSet<String>,
-    #[cfg(all(not(feature = "no-btree"), not(feature = "no-number-key")))]
+    #[cfg(all(
+        feature = "alloc",
+        not(feature = "no-btree"),
+        not(feature = "no-number-key")
+    ))]
     #[generate(range = SMALL_FIELDS)]
     number_btree: BTreeMap<u32, u64>,
-    #[cfg(not(feature = "no-btree"))]
+    #[cfg(all(feature = "alloc", not(feature = "no-btree")))]
     #[generate(range = SMALL_FIELDS)]
     string_btree: BTreeMap<String, u64>,
-    #[cfg(not(feature = "no-btree"))]
+    #[cfg(all(feature = "alloc", not(feature = "no-btree")))]
     #[generate(range = SMALL_FIELDS)]
     number_btree_set: BTreeSet<u32>,
-    #[cfg(not(feature = "no-btree"))]
+    #[cfg(all(feature = "alloc", not(feature = "no-btree")))]
     #[generate(range = SMALL_FIELDS)]
     string_btree_set: BTreeSet<String>,
-    #[cfg(not(feature = "no-cstring"))]
+    #[cfg(all(feature = "alloc", not(feature = "no-cstring")))]
     c_string: CString,
 }
 
@@ -254,8 +272,9 @@ pub enum MediumEnum {
     NewType(u64),
     Tuple(u64, u64),
     #[cfg_attr(feature = "musli", musli(transparent))]
-    #[cfg(not(feature = "no-newtype"))]
+    #[cfg(all(feature = "alloc", not(feature = "no-newtype")))]
     NewTypeString(String),
+    #[cfg(feature = "alloc")]
     TupleString(String, Vec<u8>),
     Struct {
         a: u32,
@@ -293,20 +312,34 @@ impl PartialEq<MediumEnum> for &MediumEnum {
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 pub struct LargeStruct {
     #[generate(range = PRIMITIVES_RANGE)]
+    #[cfg(feature = "alloc")]
     primitives: Vec<Primitives>,
-    #[cfg(not(any(feature = "no-vec", feature = "no-tuple")))]
+    #[cfg(all(feature = "alloc", not(any(feature = "no-vec", feature = "no-tuple"))))]
     #[generate(range = PRIMITIVES_RANGE)]
     tuples: Vec<(Tuples, Tuples)>,
     #[generate(range = MEDIUM_RANGE)]
+    #[cfg(feature = "alloc")]
     medium_vec: Vec<MediumEnum>,
-    #[cfg(all(not(feature = "no-map"), not(feature = "no-string-key")))]
+    #[cfg(all(
+        feature = "std",
+        not(feature = "no-map"),
+        not(feature = "no-string-key")
+    ))]
     #[generate(range = MEDIUM_RANGE)]
     medium_map: HashMap<String, MediumEnum>,
-    #[cfg(all(not(feature = "no-map"), not(feature = "no-string-key")))]
+    #[cfg(all(
+        feature = "std",
+        not(feature = "no-map"),
+        not(feature = "no-string-key")
+    ))]
     string_keys: HashMap<String, u64>,
-    #[cfg(all(not(feature = "no-map"), not(feature = "no-number-key")))]
+    #[cfg(all(
+        feature = "std",
+        not(feature = "no-map"),
+        not(feature = "no-number-key")
+    ))]
     number_map: HashMap<u32, u64>,
-    #[cfg(not(feature = "no-tuple"))]
+    #[cfg(all(feature = "alloc", not(feature = "no-tuple")))]
     number_vec: Vec<(u32, u64)>,
 }
 

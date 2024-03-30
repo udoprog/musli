@@ -5,8 +5,11 @@ use core::array;
 use core::hash::Hash;
 use core::ops::Range;
 
+#[cfg(feature = "alloc")]
 use alloc::ffi::CString;
+#[cfg(feature = "alloc")]
 use alloc::string::String;
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 use rand::distributions::Distribution;
@@ -14,13 +17,16 @@ use rand::distributions::Standard;
 
 pub use musli_macros::Generate;
 
+#[cfg(feature = "alloc")]
+use alloc::collections::{BTreeMap, BTreeSet};
 #[cfg(feature = "std")]
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 miri! {
     pub const STRING_RANGE: Range<usize> = 4..32, 2..16;
-    #[cfg(feature = "std")]
+    #[cfg(any(feature = "std", feature = "alloc"))]
     pub const MAP_RANGE: Range<usize> = 10..20, 1..3;
+    #[cfg(feature = "alloc")]
     pub const VEC_RANGE: Range<usize> = 10..20, 1..3;
 }
 
@@ -39,6 +45,7 @@ impl Rng {
     }
 
     /// Get the next vector.
+    #[cfg(feature = "alloc")]
     pub fn next_vector<T>(&mut self, count: usize) -> Vec<T>
     where
         T: Generate,
@@ -46,7 +53,7 @@ impl Rng {
         let mut out = Vec::with_capacity(count);
 
         for _ in 0..count {
-            T::generate_in(self, &mut out);
+            T::generate_in(self, |value| out.push(value));
         }
 
         out
@@ -99,11 +106,12 @@ pub trait Generate: Sized {
     }
 
     /// Generate a value of the given type into the specified collections.
-    fn generate_in<R>(rng: &mut R, out: &mut Vec<Self>)
+    fn generate_in<R, F>(rng: &mut R, mut out: F)
     where
         R: rand::Rng,
+        F: FnMut(Self),
     {
-        out.push(Self::generate(rng));
+        out(Self::generate(rng));
     }
 }
 
@@ -120,6 +128,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> Generate for Vec<T>
 where
     T: Generate,
@@ -205,7 +214,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<K, V> Generate for BTreeMap<K, V>
 where
     K: Eq + Ord,
@@ -234,7 +243,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<K> Generate for BTreeSet<K>
 where
     K: Ord,
@@ -262,6 +271,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Generate for String {
     fn generate<T>(rng: &mut T) -> Self
     where
@@ -277,6 +287,7 @@ impl Generate for String {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Generate for CString {
     fn generate<T>(rng: &mut T) -> Self
     where
