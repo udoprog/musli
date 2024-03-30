@@ -41,30 +41,7 @@ where
     }
 }
 
-/// Roundtrip encode the given value.
-#[macro_export]
-#[doc(hidden)]
-macro_rules! rt {
-    ($enum:ident :: $variant:ident $($tt:tt)?) => {
-        $crate::rt!($enum, $enum :: $variant $($tt)*)
-    };
-
-    ($struct:ident $($tt:tt)?) => {
-        $crate::rt!($struct, $struct $($tt)*)
-    };
-
-    ($ty:ty, $expr:expr) => {{
-        let value: $ty = $expr;
-        let out = $crate::to_vec(&value).expect(concat!("descriptive: ", stringify!($ty), ": failed to encode"));
-        let decoded: $ty = $crate::from_slice(out.as_slice()).expect(concat!("descriptive: ", stringify!($ty), ": failed to decode"));
-        assert_eq!(decoded, $expr, concat!("descriptive: ", stringify!($ty), ": roundtrip does not match"));
-
-        let value_decode: musli_value::Value = $crate::from_slice(out.as_slice()).expect(concat!("descriptive: ", stringify!($ty), ": failed to decode into value type"));
-        let value_decoded: $ty = musli_value::decode(&value_decode).expect(concat!("descriptive: ", stringify!($ty), ": failed to decode from value type"));
-        assert_eq!(value_decoded, $expr, concat!("descriptive: ", stringify!($ty), ": value roundtrip does not match"));
-        decoded
-    }};
-}
+musli_common::test_fns!("descriptive", #[musli_value]);
 
 /// Encode a type as one and decode as another.
 #[inline(never)]

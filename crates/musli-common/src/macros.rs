@@ -177,3 +177,114 @@ macro_rules! encoding_impls {
         $crate::encode_with_extensions!($mode);
     };
 }
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! test_include_if {
+    (#[musli_value] => $($rest:tt)*) => { $($rest)* };
+    (=> $($_:tt)*) => {};
+}
+
+/// Generate test functions which provides rich diagnostics when they fail.
+#[doc(hidden)]
+#[macro_export]
+#[allow(clippy::crate_in_macro_def)]
+macro_rules! test_fns {
+    ($what:expr $(, $(#[$option:ident])*)?) => {
+        /// Roundtrip encode the given value.
+        #[doc(hidden)]
+        #[track_caller]
+        #[cfg(feature = "test")]
+        pub fn rt<T>(value: T) -> T
+        where
+            T: ::musli::en::Encode + ::musli::de::DecodeOwned + ::core::fmt::Debug + ::core::cmp::PartialEq,
+        {
+            const WHAT: &str = $what;
+            const ENCODING: crate::Encoding = crate::Encoding::new();
+
+            use ::core::any::type_name;
+            use ::alloc::string::ToString;
+
+            let format_error = |cx: &crate::context::SystemContext<_, _>| {
+                use ::alloc::vec::Vec;
+
+                let mut errors = Vec::new();
+
+                for error in cx.errors() {
+                    errors.push(error.to_string());
+                }
+
+                errors.join("\n")
+            };
+
+            let mut buf = crate::allocator::buffer();
+            let alloc = crate::allocator::new(&mut buf);
+            let mut cx = crate::context::SystemContext::new(&alloc);
+            cx.include_type();
+
+            let out = match ENCODING.to_vec_with(&cx, &value) {
+                Ok(out) => out,
+                Err(..) => {
+                    let error = format_error(&cx);
+                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                }
+            };
+
+            let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
+                Ok(decoded) => decoded,
+                Err(..) => {
+                    let error = format_error(&cx);
+                    panic!("{WHAT}: {}: failed to decode:\n{error}", type_name::<T>())
+                }
+            };
+
+            assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match", type_name::<T>());
+
+            $crate::test_include_if! {
+                $($(#[$option])*)* =>
+                let value_decode: ::musli_value::Value = match ENCODING.from_slice_with(&cx, out.as_slice()) {
+                    Ok(decoded) => decoded,
+                    Err(..) => {
+                        let error = format_error(&cx);
+                        panic!("{WHAT}: {}: failed to decode to value type:\n{error}", type_name::<T>())
+                    }
+                };
+
+                let value_decoded: T = match ::musli_value::decode_with(&cx, &value_decode) {
+                    Ok(decoded) => decoded,
+                    Err(..) => {
+                        let error = format_error(&cx);
+                        panic!("{WHAT}: {}: failed to decode from value type:\n{error}", type_name::<T>())
+                    }
+                };
+
+                assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match", type_name::<T>());
+            }
+
+            decoded
+        }
+
+        /// Encode and then decode the given value once.
+        #[doc(hidden)]
+        #[track_caller]
+        #[cfg(feature = "test")]
+        pub fn decode<T>(value: T) -> T
+        where
+            T: ::musli::en::Encode + ::musli::de::DecodeOwned + ::core::fmt::Debug + ::core::cmp::PartialEq,
+        {
+            const WHAT: &str = $what;
+
+            use ::core::any::type_name;
+
+            let out = match crate::to_vec(&value) {
+                Ok(out) => out,
+                Err(err) => panic!("{WHAT}: {}: failed to encode: {err}", type_name::<T>()),
+            };
+
+            match crate::from_slice(out.as_slice()) {
+                Ok(decoded) => decoded,
+                Err(err) => panic!("{WHAT}: {}: failed to decode: {err}", type_name::<T>()),
+            }
+        }
+    }
+}

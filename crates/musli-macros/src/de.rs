@@ -1,5 +1,5 @@
 use proc_macro2::{Ident, Literal, Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
@@ -7,7 +7,7 @@ use syn::Token;
 use crate::expander::{Result, TagMethod};
 use crate::internals::apply;
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
-use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
+use crate::internals::build::{Body, Build, BuildData, Enum, Field, FieldSkip, Variant};
 use crate::internals::tokens::Tokens;
 
 struct Ctxt<'a> {
@@ -745,70 +745,81 @@ fn decode_tagged(
 
     let type_name = &st.name;
 
-    let mut patterns = Vec::with_capacity(st.fields.len());
+    let mut patterns = Vec::with_capacity(st.all_fields.len());
     let mut assigns = Punctuated::<_, Token![,]>::new();
 
     let mut fields_with = Vec::new();
 
-    for f in &st.fields {
+    for f in &st.all_fields {
         let tag = &f.tag;
         let var = &f.var;
         let decode_path = &f.decode_path.1;
 
-        let formatted_tag = match &st.name_format_with {
-            Some((_, path)) => quote!(&#path(&#tag)),
-            None => quote!(&#tag),
-        };
-
-        let enter = cx.trace.then(|| {
-            let (name, enter) = match &f.member {
-                syn::Member::Named(name) => (
-                    syn::Lit::Str(syn::LitStr::new(&name.to_string(), name.span())),
-                    Ident::new("enter_named_field", Span::call_site()),
-                ),
-                syn::Member::Unnamed(index) => (
-                    syn::Lit::Int(syn::LitInt::from(Literal::u32_suffixed(index.index))),
-                    Ident::new("enter_unnamed_field", Span::call_site()),
-                ),
-            };
-
-            quote! {
-                #context_t::#enter(#ctx_var, #name, #formatted_tag);
+        let expr = match &f.skip {
+            Some(FieldSkip::Default(span)) => {
+                let ty = f.ty;
+                syn::Expr::Verbatim(quote_spanned!(*span => #default_function::<#ty>()))
             }
-        });
+            Some(FieldSkip::Expr(expr)) => expr.clone(),
+            None => {
+                let formatted_tag = match &st.name_format_with {
+                    Some((_, path)) => quote!(&#path(&#tag)),
+                    None => quote!(&#tag),
+                };
 
-        let leave = cx.trace.then(|| {
-            quote! {
-                #context_t::leave_field(#ctx_var);
+                let enter = cx.trace.then(|| {
+                    let (name, enter) = match &f.member {
+                        syn::Member::Named(name) => (
+                            syn::Lit::Str(syn::LitStr::new(&name.to_string(), name.span())),
+                            Ident::new("enter_named_field", Span::call_site()),
+                        ),
+                        syn::Member::Unnamed(index) => (
+                            syn::Lit::Int(syn::LitInt::from(Literal::u32_suffixed(index.index))),
+                            Ident::new("enter_unnamed_field", Span::call_site()),
+                        ),
+                    };
+
+                    quote! {
+                        #context_t::#enter(#ctx_var, #name, #formatted_tag);
+                    }
+                });
+
+                let leave = cx.trace.then(|| {
+                    quote! {
+                        #context_t::leave_field(#ctx_var);
+                    }
+                });
+
+                let decode = quote! {
+                    #var = #option_some(#decode_path(#ctx_var, #struct_decoder_var)?);
+                };
+
+                fields_with.push((f, decode, (enter, leave)));
+
+                let fallback = if f.default_attr.is_some() {
+                    quote!(#default_function())
+                } else {
+                    quote! {
+                        return #result_err(#context_t::expected_tag(#ctx_var, #type_name, &#tag))
+                    }
+                };
+
+                let var = &f.var;
+
+                syn::Expr::Verbatim(quote! {
+                    match #var {
+                        #option_some(#var) => #var,
+                        #option_none => #fallback,
+                    }
+                })
             }
-        });
-
-        let decode = quote! {
-            #var = #option_some(#decode_path(#ctx_var, #struct_decoder_var)?);
         };
-
-        fields_with.push((f, decode, (enter, leave)));
-
-        let fallback = if f.default_attr.is_some() {
-            quote!(#default_function())
-        } else {
-            quote! {
-                return #result_err(#context_t::expected_tag(#ctx_var, #type_name, &#tag))
-            }
-        };
-
-        let var = &f.var;
 
         assigns.push(syn::FieldValue {
             attrs: Vec::new(),
             member: f.member.clone(),
             colon_token: Some(<Token![:]>::default()),
-            expr: syn::Expr::Verbatim(quote! {
-                match #var {
-                    #option_some(#var) => #var,
-                    #option_none => #fallback,
-                }
-            }),
+            expr,
         });
     }
 
@@ -956,11 +967,12 @@ fn decode_tagged(
     });
 
     let path = &st.path;
-    let fields_len = st.fields.len();
+    let fields_len = st.unskipped_fields.len();
 
     let decls = st
-        .fields
+        .unskipped_fields
         .iter()
+        .map(|f| &**f)
         .map(|Field { var, ty, .. }| quote!(let mut #var: #option<#ty> = #option_none;));
 
     let enter = (cx.trace && cx.trace_body).then(|| {
@@ -1001,8 +1013,8 @@ fn decode_transparent(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<To
         ..
     } = *cx;
 
-    let [f] = &st_.fields[..] else {
-        e.transparent_diagnostics(st_.span, &st_.fields);
+    let [f] = &st_.unskipped_fields[..] else {
+        e.transparent_diagnostics(st_.span, &st_.unskipped_fields);
         return Err(());
     };
 
@@ -1060,7 +1072,7 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
 
     let mut assign = Vec::new();
 
-    for f in &st_.fields {
+    for f in &st_.unskipped_fields {
         if let Some(span) = f.default_attr {
             e.packed_default_diagnostics(span);
         }

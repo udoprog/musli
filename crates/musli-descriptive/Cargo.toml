@@ -23,7 +23,7 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 default = ["std", "alloc", "simdutf8", "musli-value"]
 std = ["musli/std", "musli-common/std", "musli-storage/std", "musli-value?/std"]
 alloc = ["musli/alloc", "musli-common/alloc", "musli-storage/alloc", "musli-value?/alloc"]
-test = []
+test = ["musli-value"]
 simdutf8 = ["musli-common/simdutf8"]
 
 [dependencies]
