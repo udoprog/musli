@@ -299,7 +299,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_struct_fields(Some(fields.len()))?;
+        let hint = musli::__priv::struct_hint(fields.len());
+        let mut decoder = self.decoder.decode_struct_fields(&hint)?;
         let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields))?;
         decoder.end_struct_fields()?;
         Ok(output)
@@ -799,7 +800,8 @@ where
         V: de::Visitor<'de>,
     {
         let decoder = self.decoder.decode_value()?;
-        let mut st = decoder.decode_struct_fields(Some(fields.len()))?;
+        let hint = musli::__priv::struct_hint(fields.len());
+        let mut st = decoder.decode_struct_fields(&hint)?;
         let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
         st.end_struct_fields()?;
         Ok(value)

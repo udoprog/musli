@@ -7,7 +7,8 @@ use alloc::vec::Vec;
 use musli::de::{
     Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint, NumberVisitor,
     PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
+    StructFieldsDecoder, StructHint, TupleDecoder, TypeHint, UnsizedStructHint, ValueVisitor,
+    VariantDecoder, Visitor,
 };
 use musli::Context;
 use musli_common::int::continuation as c;
@@ -258,6 +259,7 @@ where
     type DecodeMap = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeStruct = RemainingSelfDecoder<'a, R, OPT, C>;
+    type DecodeUnsizedStruct = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeStructFields = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
@@ -707,7 +709,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<F, O>(self, _: Option<usize>, f: F) -> Result<O, C::Error>
+    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
     {
@@ -718,7 +720,18 @@ where
     }
 
     #[inline]
-    fn decode_struct_fields(self, _: Option<usize>) -> Result<Self::DecodeStructFields, C::Error> {
+    fn decode_unsized_struct<F, O>(self, _: &UnsizedStructHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, C::Error>,
+    {
+        let mut decoder = self.shared_decode_map()?;
+        let output = f(&mut decoder)?;
+        decoder.skip_map_remaining()?;
+        Ok(output)
+    }
+
+    #[inline]
+    fn decode_struct_fields(self, _: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
         self.shared_decode_map()
     }
 

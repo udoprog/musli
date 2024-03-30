@@ -6,8 +6,8 @@ use alloc::vec::Vec;
 
 use musli::de::{
     Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder, SequenceDecoder,
-    SizeHint, Skip, StructDecoder, StructFieldDecoder, StructFieldsDecoder, TupleDecoder,
-    ValueVisitor, VariantDecoder,
+    SizeHint, Skip, StructDecoder, StructFieldDecoder, StructFieldsDecoder, StructHint,
+    TupleDecoder, ValueVisitor, VariantDecoder,
 };
 use musli::Context;
 use musli_common::int::continuation as c;
@@ -522,7 +522,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<F, O>(self, _: Option<usize>, f: F) -> Result<O, C::Error>
+    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
     {
@@ -533,7 +533,7 @@ where
     }
 
     #[inline]
-    fn decode_struct_fields(self, _: Option<usize>) -> Result<Self::DecodeStructFields, C::Error> {
+    fn decode_struct_fields(self, _: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
         self.shared_decode_pair_sequence()
     }
 

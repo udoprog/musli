@@ -1,13 +1,13 @@
 use core::fmt;
 use core::slice;
 
-#[cfg(feature = "alloc")]
-use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint,
     PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
     StructFieldsDecoder, TupleDecoder, TypeHint, VariantDecoder, Visitor,
 };
+#[cfg(feature = "alloc")]
+use musli::de::{StructHint, UnsizedStructHint, ValueVisitor};
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_storage::options::Options;
@@ -58,6 +58,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     type DecodeMap = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeMapEntries = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeStruct = IterValuePairsDecoder<'a, 'de, OPT, C>;
+    type DecodeUnsizedStruct = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeStructFields = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeVariant = IterValueVariantDecoder<'a, 'de, OPT, C>;
 
@@ -308,7 +309,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_struct<F, O>(self, _: Option<usize>, f: F) -> Result<O, C::Error>
+    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
     {
@@ -319,7 +320,18 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_struct_fields(self, _: Option<usize>) -> Result<Self::DecodeStructFields, C::Error> {
+    fn decode_unsized_struct<F, O>(self, _: &UnsizedStructHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, C::Error>,
+    {
+        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
+            f(&mut IterValuePairsDecoder::new(self.cx, st))
+        })
+    }
+
+    #[cfg(feature = "alloc")]
+    #[inline]
+    fn decode_struct_fields(self, _: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
         ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
             Ok(IterValuePairsDecoder::new(self.cx, st))
         })

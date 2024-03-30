@@ -16,6 +16,12 @@
 //! }
 //! ```
 
+mod struct_hint;
+pub use self::struct_hint::StructHint;
+
+mod unsized_struct_hint;
+pub use self::unsized_struct_hint::UnsizedStructHint;
+
 mod skip;
 pub use self::skip::Skip;
 

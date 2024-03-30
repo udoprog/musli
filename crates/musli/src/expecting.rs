@@ -144,6 +144,7 @@ expect! {
     pub(crate) Sequence("sequence");
     pub(crate) Unit("unit");
     pub(crate) Struct("struct");
+    pub(crate) UnsizedStruct("unsized struct");
     pub(crate) Variant("variant");
     pub(crate) TupleVariant("tuple variant");
     pub(crate) StructVariant("struct variant");

@@ -56,6 +56,7 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("DecodeMap", Extra::None),
     ("DecodeMapEntries", Extra::None),
     ("DecodeStruct", Extra::None),
+    ("DecodeUnsizedStruct", Extra::None),
     ("DecodeStructFields", Extra::None),
     ("DecodeVariant", Extra::None),
 ];

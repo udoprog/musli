@@ -26,8 +26,8 @@ use core::str;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip, TypeHint,
-    ValueVisitor, Visitor,
+    Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip, StructHint,
+    TypeHint, UnsizedStructHint, ValueVisitor, Visitor,
 };
 use musli::Context;
 
@@ -119,6 +119,7 @@ where
     type DecodeMapEntries = JsonObjectDecoder<'a, P, C>;
     type DecodeSome = JsonDecoder<'a, P, C>;
     type DecodeStruct = JsonObjectDecoder<'a, P, C>;
+    type DecodeUnsizedStruct = JsonObjectDecoder<'a, P, C>;
     type DecodeStructFields = JsonObjectDecoder<'a, P, C>;
     type DecodeVariant = JsonVariantDecoder<'a, P, C>;
 
@@ -429,22 +430,30 @@ where
     }
 
     #[inline]
-    fn decode_struct<F, O>(self, len: Option<usize>, f: F) -> Result<O, C::Error>
+    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
     {
-        let mut decoder = JsonObjectDecoder::new(self.cx, len, self.parser)?;
+        let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
         let output = f(&mut decoder)?;
         decoder.skip_object_remaining()?;
         Ok(output)
     }
 
     #[inline]
-    fn decode_struct_fields(
-        self,
-        len: Option<usize>,
-    ) -> Result<Self::DecodeStructFields, C::Error> {
-        JsonObjectDecoder::new(self.cx, len, self.parser)
+    fn decode_unsized_struct<F, O>(self, _: &UnsizedStructHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.skip_object_remaining()?;
+        Ok(output)
+    }
+
+    #[inline]
+    fn decode_struct_fields(self, hint: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
+        JsonObjectDecoder::new(self.cx, Some(hint.fields), self.parser)
     }
 
     #[inline]

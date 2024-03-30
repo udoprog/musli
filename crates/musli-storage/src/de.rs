@@ -5,8 +5,8 @@ use alloc::vec::Vec;
 
 use musli::de::{
     Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder, SequenceDecoder,
-    SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, TupleDecoder, ValueVisitor,
-    VariantDecoder,
+    SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, StructHint, TupleDecoder,
+    ValueVisitor, VariantDecoder,
 };
 use musli::{Context, Decode};
 
@@ -313,7 +313,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<F, O>(self, _: Option<usize>, f: F) -> Result<O, C::Error>
+    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
     {
@@ -329,7 +329,7 @@ where
     }
 
     #[inline]
-    fn decode_struct_fields(self, _: Option<usize>) -> Result<Self::DecodeStructFields, C::Error> {
+    fn decode_struct_fields(self, _: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
         LimitedStorageDecoder::new(self.cx, self.reader)
     }
 

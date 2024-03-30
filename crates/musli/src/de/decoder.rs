@@ -8,7 +8,7 @@ use crate::Context;
 
 use super::{
     AsDecoder, Decode, MapDecoder, MapEntriesDecoder, PackDecoder, SequenceDecoder, Skip,
-    StructFieldsDecoder, TupleDecoder, VariantDecoder,
+    StructFieldsDecoder, StructHint, TupleDecoder, UnsizedStructHint, VariantDecoder,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -41,6 +41,8 @@ pub trait Decoder<'de>: Sized {
     type DecodeMapEntries: MapEntriesDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_struct`].
     type DecodeStruct: StructDecoder<'de, Cx = Self::Cx>;
+    /// Decoder returned by [`Decoder::decode_unsized_struct`].
+    type DecodeUnsizedStruct: StructDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_struct_fields`].
     type DecodeStructFields: StructFieldsDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_variant`].
@@ -1386,15 +1388,19 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{StructDecoder, StructFieldDecoder};
+    /// use musli::de::{StructDecoder, StructFieldDecoder, StructHint};
     /// # struct Struct { string: String, integer: u32 }
+    /// # const fn struct_hint() -> StructHint { musli::__priv::struct_hint(2) }
+    ///
+    /// // Note: a struct hint can't be constructed manually.
+    /// static STRUCT_HINT: &StructHint = &struct_hint();
     ///
     /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         decoder.decode_struct(None, |st| {
+    ///         decoder.decode_struct(STRUCT_HINT, |st| {
     ///             let mut string = None;
     ///             let mut integer = None;
     ///
@@ -1424,16 +1430,80 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_struct<F, O>(
-        self,
-        fields: Option<usize>,
-        f: F,
-    ) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_struct<F, O>(self, hint: &StructHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Struct,
+            ExpectingWrapper::new(&self),
+        )))
+    }
+
+    /// Decode a struct who's size is not known at compile time.
+    ///
+    /// This will error in case the underlying format doesn't know the size of
+    /// the struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{StructDecoder, StructFieldDecoder, UnsizedStructHint};
+    /// # const fn unsized_struct_hint() -> UnsizedStructHint { musli::__priv::unsized_struct_hint() }
+    ///
+    /// struct Struct {
+    ///     string: String,
+    ///     integer: u32,
+    /// }
+    ///
+    /// // Note: a struct hint can't be constructed manually.
+    /// static STRUCT_HINT: &UnsizedStructHint = &unsized_struct_hint();
+    ///
+    /// impl<'de, M> Decode<'de, M> for Struct {
+    ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         decoder.decode_unsized_struct(STRUCT_HINT, |st| {
+    ///             let mut string = None;
+    ///             let mut integer = None;
+    ///
+    ///             while let Some(mut field) = st.decode_field()? {
+    ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
+    ///                 let tag = field.decode_field_name()?.decode::<String>()?;
+    ///
+    ///                 match tag.as_str() {
+    ///                     "string" => {
+    ///                         string = Some(field.decode_field_value()?.decode()?);
+    ///                     }
+    ///                     "integer" => {
+    ///                         integer = Some(field.decode_field_value()?.decode()?);
+    ///                     }
+    ///                     tag => {
+    ///                         return Err(cx.invalid_field_tag("Struct", tag));
+    ///                     }
+    ///                 }
+    ///             }
+    ///
+    ///             Ok(Self {
+    ///                 string: string.ok_or_else(|| cx.expected_tag("Struct", "string"))?,
+    ///                 integer: integer.ok_or_else(|| cx.expected_tag("Struct", "integer"))?,
+    ///             })
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    fn decode_unsized_struct<F, O>(
+        self,
+        hint: &UnsizedStructHint,
+        f: F,
+    ) -> Result<O, <Self::Cx as Context>::Error>
+    where
+        F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, <Self::Cx as Context>::Error>,
+    {
+        Err(self.cx().message(expecting::unsupported_type(
+            &expecting::UnsizedStruct,
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1449,7 +1519,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn decode_struct_fields(
         self,
-        fields: Option<usize>,
+        hint: &StructHint,
     ) -> Result<Self::DecodeStructFields, <Self::Cx as Context>::Error>
     where
         Self: Sized,
