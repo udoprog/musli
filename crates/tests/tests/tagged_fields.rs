@@ -18,15 +18,21 @@ pub struct StructTo {
 
 #[test]
 fn struct_renamed() {
-    let from = tests::rt!(StructFrom {
-        string: String::from("a string"),
-        number: 42,
-    });
+    let from = tests::rt!(
+        full,
+        StructFrom {
+            string: String::from("a string"),
+            number: 42,
+        }
+    );
 
-    let to = tests::rt!(StructTo {
-        number: 42,
-        string: String::from("a string"),
-    });
+    let to = tests::rt!(
+        full,
+        StructTo {
+            number: 42,
+            string: String::from("a string"),
+        }
+    );
 
     let out = tests::wire::to_vec(&from).expect("failed to encode");
     let value: StructTo = tests::wire::decode(out.as_slice()).expect("failed to decode");

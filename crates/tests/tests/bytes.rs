@@ -3,12 +3,31 @@ use std::collections::VecDeque;
 use musli::compat::Bytes;
 use musli::{Decode, Encode};
 
-#[derive(Decode, Encode)]
-struct Container<'de> {
+#[derive(Debug, PartialEq, Decode, Encode)]
+struct Container {
     #[musli(bytes)]
     vec: Vec<u8>,
     #[musli(bytes)]
     vec_deque: VecDeque<u8>,
+    #[musli(bytes)]
+    boxed: Box<[u8]>,
+}
+
+#[test]
+fn container() {
+    tests::rt!(
+        full,
+        Container {
+            vec: vec![0, 1, 2, 3],
+            vec_deque: VecDeque::from([0, 1, 2, 3]),
+            boxed: Box::from([0, 1, 2, 3]),
+        },
+        json = r#"{"0":[0,1,2,3],"1":[0,1,2,3],"2":[0,1,2,3]}"#
+    );
+}
+
+#[derive(Debug, PartialEq, Decode, Encode)]
+struct ContainerBorrowed<'de> {
     #[musli(bytes)]
     bytes: &'de [u8],
 }
@@ -20,7 +39,10 @@ pub struct BytesCompat {
 
 #[test]
 fn bytes_compat() {
-    tests::rt!(BytesCompat {
-        empty_bytes: Bytes([]),
-    });
+    tests::rt!(
+        full,
+        BytesCompat {
+            empty_bytes: Bytes([]),
+        }
+    );
 }

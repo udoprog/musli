@@ -34,21 +34,34 @@ struct TransparentEnumUnpacked {
 
 #[test]
 fn transparent_struct() {
-    tests::rt!(TransparentStruct {
-        string: String::from("Hello"),
-    });
-    let string = tests::wire::transcode::<_, String>(TransparentStruct {
-        string: String::from("Hello"),
-    });
-    assert_eq!(string, "Hello");
+    tests::rt!(
+        full,
+        TransparentStruct {
+            string: String::from("Hello World"),
+        }
+    );
 
-    tests::rt!(TransparentTuple(String::from("Hello")));
-    let string = tests::wire::transcode::<_, String>(TransparentTuple(String::from("Hello")));
-    assert_eq!(string, "Hello");
+    tests::rt!(full, TransparentTuple(String::from("Hello World")));
+
+    tests::assert_decode_eq!(
+        full,
+        TransparentStruct {
+            string: String::from("Hello World"),
+        },
+        String::from("Hello World"),
+        json = r#""Hello World""#,
+    );
+
+    tests::assert_decode_eq!(
+        full,
+        TransparentTuple(String::from("Hello World")),
+        String::from("Hello World"),
+        json = r#""Hello World""#,
+    );
 }
 
 #[test]
 fn transparent_enum() {
-    tests::rt!(TransparentEnum::Transparent(42));
-    tests::rt!(TransparentEnum::NotTransparent { a: 1, b: 2 });
+    tests::rt!(full, TransparentEnum::Transparent(42));
+    tests::rt!(full, TransparentEnum::NotTransparent { a: 1, b: 2 });
 }

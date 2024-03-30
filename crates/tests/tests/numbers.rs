@@ -26,13 +26,16 @@ struct Unpacked {
 
 #[test]
 fn signed_unpacked() {
-    let out = tests::rt!(StructWithNumbers {
-        a: -1,
-        b: 1,
-        c: -2,
-        d: 2,
-        e: 10000000000,
-    });
+    let out = tests::rt!(
+        full,
+        StructWithNumbers {
+            a: -1,
+            b: 1,
+            c: -2,
+            d: 2,
+            e: 10000000000,
+        }
+    );
 
     let out = tests::wire::to_vec(&out).expect("failed to encode");
     let unpacked: Unpacked = tests::storage::decode(out.as_slice()).expect("failed to decode");

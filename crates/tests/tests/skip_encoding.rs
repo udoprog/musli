@@ -21,11 +21,15 @@ pub struct SkipSerializeUntagged {
 
 #[test]
 fn skip_serialize() {
-    tests::rt!(SkipSerializeUntagged {
-        before: 1,
-        skipped: Some(2),
-        after: 3,
-    });
+    tests::rt!(
+        full,
+        SkipSerializeUntagged {
+            before: 1,
+            skipped: Some(2),
+            after: 3,
+        },
+        json = r#"[1,2,3]"#,
+    );
 
     let out = tests::wire::transcode::<_, Unpacked>(SkipSerializeUntagged {
         before: 1,

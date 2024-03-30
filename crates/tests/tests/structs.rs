@@ -24,14 +24,20 @@ pub struct Struct5 {
 
 #[test]
 fn structs() {
-    tests::rt!(EmptyStruct);
-    tests::rt!(Struct2(String::from("Hello World")));
-    tests::rt!(Struct3(String::from("Hello World"), 42));
-    tests::rt!(Struct4 {
-        value: String::from("Hello World"),
-    });
-    tests::rt!(Struct5 {
-        value: String::from("Hello World"),
-        value2: 42,
-    });
+    tests::rt!(full, EmptyStruct);
+    tests::rt!(full, Struct2(String::from("Hello World")));
+    tests::rt!(full, Struct3(String::from("Hello World"), 42));
+    tests::rt!(
+        full,
+        Struct4 {
+            value: String::from("Hello World"),
+        }
+    );
+    tests::rt!(
+        full,
+        Struct5 {
+            value: String::from("Hello World"),
+            value2: 42,
+        }
+    );
 }

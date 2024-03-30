@@ -410,9 +410,13 @@ fn encode_variant(
             } => {
                 let tag = &v.tag;
                 let decls = tests.iter().map(|t| &t.decl);
+                let mut len = length_test(v.st.unskipped_fields.len(), &tests);
+
+                // Add one for the tag field.
+                len.push(quote!(1));
 
                 encode = quote! {{
-                    #encoder_t::encode_struct_fn(#encoder_var, 0, move |#encoder_var| {
+                    #encoder_t::encode_struct_fn(#encoder_var, #len, move |#encoder_var| {
                         #struct_encoder_t::insert_struct_field(#encoder_var, #field_tag, #tag)?;
                         #(#decls)*
                         #(#encoders)*

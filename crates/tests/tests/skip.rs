@@ -20,13 +20,18 @@ pub struct AllSkipped {
 
 #[test]
 fn skip() {
-    tests::rt!(AllSkipped {
-        skip: 0,
-        skip_default: 42,
-        complex_field: Some(Inner { a: 1, b: 2 }),
-    });
+    tests::rt!(
+        full,
+        AllSkipped {
+            skip: 0,
+            skip_default: 42,
+            complex_field: Some(Inner { a: 1, b: 2 }),
+        },
+        json = r#"{}"#,
+    );
 
     tests::assert_decode_eq!(
+        full,
         AllSkipped {
             skip: 10,
             skip_default: 52,
@@ -36,6 +41,7 @@ fn skip() {
             skip: 0,
             skip_default: 42,
             complex_field: Some(Inner { a: 1, b: 2 }),
-        }
+        },
+        json = r#"{}"#,
     );
 }

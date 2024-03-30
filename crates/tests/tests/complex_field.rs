@@ -49,15 +49,18 @@ pub struct StructCustomFieldAsStruct {
 
 #[test]
 fn bytes_tag_vec() {
-    tests::rt!(BytesTagVec(b"hello world".to_vec()));
+    tests::rt!(full, BytesTagVec(b"hello world".to_vec()));
 }
 
 #[test]
 fn custom_struct_tag() {
-    tests::rt_no_json!(StructCustomFieldAsStruct {
-        field1: 42,
-        field2: 84,
-    });
+    tests::rt!(
+        no_json,
+        StructCustomFieldAsStruct {
+            field1: 42,
+            field2: 84,
+        }
+    );
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -71,10 +74,13 @@ pub struct StructCustomTag {
 
 #[test]
 fn custom_tag() {
-    tests::rt_no_json!(StructCustomTag {
-        field1: 42,
-        field2: 84,
-    });
+    tests::rt!(
+        no_json,
+        StructCustomTag {
+            field1: 42,
+            field2: 84,
+        }
+    );
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -86,9 +92,12 @@ struct StructWithBytesTag {
 
 #[test]
 fn struct_with_bytes_tag() {
-    tests::rt_no_json!(StructWithBytesTag {
-        string: String::from("Some String"),
-    });
+    tests::rt!(
+        no_json,
+        StructWithBytesTag {
+            string: String::from("Some String"),
+        }
+    );
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -105,11 +114,17 @@ enum EnumWithBytesTag {
 
 #[test]
 fn bytes_tag_in_enum() {
-    tests::rt_no_json!(EnumWithBytesTag::Variant1 {
-        string: String::from("st"),
-    });
+    tests::rt!(
+        no_json,
+        EnumWithBytesTag::Variant1 {
+            string: String::from("st"),
+        }
+    );
 
-    tests::rt_no_json!(EnumWithBytesTag::Variant2 {
-        string: String::from("st"),
-    });
+    tests::rt!(
+        no_json,
+        EnumWithBytesTag::Variant2 {
+            string: String::from("st"),
+        }
+    );
 }

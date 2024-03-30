@@ -9,5 +9,5 @@ struct TestStruct {
 /// It should not be confused with an actual field named `tag`.
 #[test]
 fn struct_with_field_named_tag() {
-    tests::rt!(TestStruct { tag: 42 });
+    tests::rt!(full, TestStruct { tag: 42 });
 }

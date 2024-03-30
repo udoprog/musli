@@ -20,10 +20,14 @@ pub struct Indexed {
 
 #[test]
 fn struct_named_fields() {
-    tests::rt!(Named {
-        string: String::from("foo"),
-        number: 42,
-    });
+    tests::rt!(
+        full,
+        Named {
+            string: String::from("foo"),
+            number: 42,
+        },
+        json = r#"{"string":"foo","number":42}"#,
+    );
 
     let out = tests::wire::to_vec(&Named {
         string: String::from("foo"),
@@ -63,10 +67,14 @@ fn struct_named_fields() {
 
 #[test]
 fn struct_indexed_fields() {
-    tests::rt!(Indexed {
-        string: String::from("foo"),
-        number: 42,
-    });
+    tests::rt!(
+        full,
+        Indexed {
+            string: String::from("foo"),
+            number: 42,
+        },
+        json = r#"{"0":"foo","1":42}"#,
+    );
 
     let out = tests::wire::to_vec(&Indexed {
         string: String::from("foo"),

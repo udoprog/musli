@@ -30,6 +30,20 @@ macro_rules! encode_with_extensions {
             self.encode(writer, value)
         }
 
+        /// Encode the given value to the given [Write][io::Write] using the current
+        /// configuration and context `C`.
+        #[cfg(feature = "std")]
+        #[inline]
+        pub fn to_writer_with<C, W, T>(self, cx: &C, write: W, value: &T) -> Result<(), C::Error>
+        where
+            C: ?Sized + Context<Mode = $mode>,
+            W: io::Write,
+            T: ?Sized + Encode<$mode>,
+        {
+            let writer = $crate::exports::wrap::wrap(write);
+            self.encode_with(cx, writer, value)
+        }
+
         /// Encode the given value to a [`Vec`] using the current configuration.
         #[cfg(feature = "alloc")]
         #[inline]
@@ -290,9 +304,10 @@ macro_rules! test_fns {
         #[doc(hidden)]
         #[track_caller]
         #[cfg(feature = "test")]
-        pub fn decode<T>(value: T) -> T
+        pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, _hint: &U) -> U
         where
-            T: ::musli::en::Encode + ::musli::de::DecodeOwned + ::core::fmt::Debug + ::core::cmp::PartialEq,
+            T: ::musli::en::Encode + ::core::fmt::Debug + ::core::cmp::PartialEq,
+            U: ::musli::de::Decode<'de>,
         {
             const WHAT: &str = $what;
             const ENCODING: crate::Encoding = crate::Encoding::new();
@@ -317,19 +332,21 @@ macro_rules! test_fns {
             let mut cx = crate::context::SystemContext::new(&alloc);
             cx.include_type();
 
-            let out = match ENCODING.to_vec_with(&cx, &value) {
-                Ok(out) => out,
+            out.clear();
+
+            match ENCODING.to_writer_with(&cx, &mut *out, &value) {
+                Ok(()) => (),
                 Err(..) => {
                     let error = format_error(&cx);
                     panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
                 }
             };
 
-            match ENCODING.from_slice_with(&cx, out.as_slice()) {
+            match ENCODING.from_slice_with(&cx, out) {
                 Ok(decoded) => decoded,
                 Err(error) => {
                     let error = format_error(&cx);
-                    panic!("{WHAT}: {}: failed to decode:{error}", type_name::<T>())
+                    panic!("{WHAT}: {}: failed to decode:\n{error}", type_name::<T>())
                 }
             }
         }
@@ -340,7 +357,7 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn to_vec<T>(value: T) -> ::alloc::vec::Vec<u8>
         where
-            T: ::musli::en::Encode + ::musli::de::DecodeOwned + ::core::fmt::Debug + ::core::cmp::PartialEq,
+            T: ::musli::en::Encode,
         {
             const WHAT: &str = $what;
             const ENCODING: crate::Encoding = crate::Encoding::new();
