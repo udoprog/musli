@@ -52,7 +52,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
             $({
                 let mut values = Vec::<$ty>::new();
-                Generate::generate_in(&mut rng, &mut values);
+                Generate::generate_in(&mut rng, |value| values.push(value));
 
                 macro_rules! check {
                     ($framework:ident) => {{

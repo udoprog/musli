@@ -29,6 +29,15 @@ impl<const N: usize> FixedBytes<N> {
         }
     }
 
+    /// Construct a fixed bytes while asserting that the given runtime capacity isn't violated.
+    pub fn with_capacity(capacity: usize) -> Self {
+        assert!(
+            capacity < N,
+            "Requested capacity {capacity} is larger than {N}"
+        );
+        Self::new()
+    }
+
     /// Get the length of the collection.
     #[inline]
     pub const fn len(&self) -> usize {
@@ -82,9 +91,9 @@ impl<const N: usize> FixedBytes<N> {
 
     /// Coerce into the mutable slice of initialized memory which is present.
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &[u8] {
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
         if self.init == 0 {
-            return &[];
+            return &mut [];
         }
 
         // SAFETY: We've asserted that `initialized` accounts for the number of
@@ -142,6 +151,22 @@ impl<const N: usize> FixedBytes<N> {
         }
 
         Ok(())
+    }
+}
+
+impl<const N: usize> Deref for FixedBytes<N> {
+    type Target = [u8];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<const N: usize> DerefMut for FixedBytes<N> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
     }
 }
 

@@ -10,9 +10,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [features]
-default = ["std", "alloc", "test"]
-std = ["musli?/std", "musli-storage?/std", "musli-wire?/std", "musli-descriptive?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "serde?/std"]
-alloc = ["musli?/alloc", "musli-storage?/alloc", "musli-wire?/alloc", "musli-descriptive?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
+default = ["std", "alloc", "test", "simdutf8"]
+std = ["musli?/std", "serde?/std", "musli-common/std", "musli-storage?/std", "musli-wire?/std", "musli-descriptive?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std"]
+alloc = ["musli?/alloc", "musli-common/alloc", "musli-storage?/alloc", "musli-wire?/alloc", "musli-descriptive?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
 verbose = ["musli?/verbose"]
 extra = ["rkyv", "dlhn", "serde_cbor"]
 full = ["rmp-serde", "bincode", "postcard", "musli-json", "serde_json", "bitcode", "bitcode-derive"]
@@ -46,11 +46,11 @@ no-newtype = []
 no-string-set = []
 
 serde = ["dep:serde", "bitcode?/serde"]
-serde_json = ["dep:serde_json", "serde", "std"]
+serde_json = ["dep:serde_json", "serde"]
 bincode = ["dep:bincode", "serde"]
 rmp-serde = ["dep:rmp-serde", "serde"]
 postcard = ["dep:postcard", "serde"]
-rkyv = ["dep:rkyv", "std", "no-usize", "no-tuple", "no-cstring", "no-string-key", "no-string-set"]
+rkyv = ["dep:rkyv", "no-usize", "no-tuple", "no-cstring", "no-string-key", "no-string-set"]
 bson = ["dep:bson", "serde", "no-128", "no-u64", "no-number-key", "no-empty", "no-newtype"]
 serde_cbor = ["dep:serde_cbor", "serde", "no-128", "no-map"]
 dlhn = ["dep:dlhn", "serde", "no-128", "no-map"]
@@ -58,13 +58,14 @@ bitcode = ["dep:bitcode", "serde"]
 bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.107", default-features = false, optional = true, features = ["alloc"] }
-musli-wire = { path = "../musli-wire", version = "0.0.107", default-features = false, features = ["alloc", "test"], optional = true }
-musli-descriptive = { path = "../musli-descriptive", version = "0.0.107", default-features = false, features = ["alloc", "test"], optional = true }
-musli-storage = { path = "../musli-storage", version = "0.0.107", default-features = false, features = ["alloc", "test"], optional = true }
-musli-json = { path = "../musli-json", version = "0.0.107", default-features = false, features = ["alloc", "test"], optional = true }
-musli-value = { path = "../musli-value", version = "0.0.107", default-features = false, features = ["alloc", "test"], optional = true }
-musli-zerocopy = { path = "../musli-zerocopy", version = "0.0.107", default-features = false, features = ["alloc"], optional = true }
+musli = { path = "../musli", version = "0.0.107", default-features = false, optional = true, features = [] }
+musli-common = { path = "../musli-common", version = "0.0.107", default-features = false, features = [] }
+musli-wire = { path = "../musli-wire", version = "0.0.107", default-features = false, features = ["test"], optional = true }
+musli-descriptive = { path = "../musli-descriptive", version = "0.0.107", default-features = false, features = ["test"], optional = true }
+musli-storage = { path = "../musli-storage", version = "0.0.107", default-features = false, features = ["test"], optional = true }
+musli-json = { path = "../musli-json", version = "0.0.107", default-features = false, features = ["test"], optional = true }
+musli-value = { path = "../musli-value", version = "0.0.107", default-features = false, features = ["test"], optional = true }
+musli-zerocopy = { path = "../musli-zerocopy", version = "0.0.107", default-features = false, features = [], optional = true }
 musli-macros = { path = "../musli-macros", version = "0.0.107", features = ["test"] }
 
 anyhow = "1.0.81"
@@ -72,11 +73,11 @@ serde = { version = "1.0.197", default-features = false, optional = true, featur
 rand = { version = "0.8.5", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.2", optional = true }
 bincode = { version = "1.3.3", default-features = false, optional = true }
-serde_json = { version = "1.0.114", default-features = false, features = ["alloc", "float_roundtrip"], optional = true }
-serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc", "std"], optional = true }
+serde_json = { version = "1.0.114", default-features = false, features = ["float_roundtrip"], optional = true }
+serde_cbor = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 dlhn = { version = "0.1.6", default-features = false, optional = true }
 bitcode = { version = "0.6.0", default-features = false, optional = true }
-rkyv = { version = "0.7.44", default-features = false, optional = true, features = ["alloc", "size_32", "validation", "strict"] }
+rkyv = { version = "0.7.44", default-features = false, optional = true, features = ["size_32", "validation", "strict"] }
 postcard = { version = "1.0.8",  default-features = false, optional = true }
 bson = { version = "2.9.0", default-features = false, optional = true }
 zerocopy = { version = "0.7.32", default-features = false, optional = true, features = ["byteorder", "derive"] }

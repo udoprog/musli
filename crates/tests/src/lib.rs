@@ -9,6 +9,10 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg_attr(feature = "alloc", path = "alloc.rs")]
+#[cfg_attr(not(feature = "alloc"), path = "no_alloc.rs")]
+mod no_alloc;
+
 /// Default random seed to use.
 pub const RNG_SEED: u64 = 2718281828459045235;
 
@@ -78,7 +82,7 @@ macro_rules! rt_self {
         #[cfg(feature = "musli-json")]
         {
             let json = ::musli_json::test::to_vec($expr);
-            let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
+            let string = ::std::string::String::from_utf8(json).expect("encoded JSON is not valid utf-8");
 
             $(
                 assert_eq!(

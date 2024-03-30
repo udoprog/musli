@@ -69,13 +69,13 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
                 values.push(quote! {
                     #(#attrs)*
                     {
-                        __out.push(#value);
+                        __out(#value);
                     }
                 });
             }
 
             generate_in = Some(quote! {
-                fn generate_in<__R>(#rng: &mut __R, __out: &mut Vec<Self>) where __R: rand::Rng {
+                fn generate_in<__R, __F>(#rng: &mut __R, mut __out: __F) where __R: rand::Rng, __F: FnMut(Self) {
                     #(#values)*
                 }
             });
