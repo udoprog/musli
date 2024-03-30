@@ -63,7 +63,7 @@ fn pack_max() {
 #[test]
 fn max_inline_length() {
     macro_rules! test {
-        ($size:expr, $inline:expr, $pad:expr) => {
+        ($size:expr, $inline:expr) => {
             let value = From {
                 prefix: Some(10),
                 field: Field {
@@ -89,6 +89,6 @@ fn max_inline_length() {
         };
     }
 
-    test!(MAX_INLINE_LEN, MAX_INLINE_LEN as u8, 32);
-    test!(MAX_INLINE_LEN + 10, (MAX_INLINE_LEN + 1) as u8, 70);
+    test!(MAX_INLINE_LEN, MAX_INLINE_LEN as u8);
+    test!(MAX_INLINE_LEN + 10, (MAX_INLINE_LEN + 1) as u8);
 }
