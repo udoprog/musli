@@ -60,36 +60,89 @@ pub mod json {
 #[macro_export]
 #[doc(hidden)]
 macro_rules! rt {
-    ($enum:ident :: $variant:ident $($tt:tt)?) => {
-        $crate::rt!($enum, $enum :: $variant $($tt)*)
-    };
+    ($expr:expr) => {{
+        let expected = $crate::rt_no_json!($expr);
 
-    ($struct:ident $($tt:tt)?) => {
-        $crate::rt!($struct, $struct $($tt)*)
-    };
+        #[cfg(feature = "musli-json")]
+        {
+            let json = ::musli_json::test::rt($expr);
+            assert_eq!(expected, json);
+        }
 
-    ($ty:ty, $expr:expr) => {{
+        expected
+    }};
+}
+
+/// Roundtrip the given expression through all supported formats except JSON.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! rt_no_json {
+    ($expr:expr) => {{
         let expected = $expr;
 
         #[cfg(feature = "musli-storage")]
         {
-            let storage = ::musli_storage::rt!($ty, $expr);
+            let storage = ::musli_storage::test::rt($expr);
             assert_eq!(expected, storage);
         }
 
         #[cfg(feature = "musli-wire")]
         {
-            let wire = ::musli_wire::rt!($ty, $expr);
+            let wire = ::musli_wire::test::rt($expr);
             assert_eq!(expected, wire);
         }
 
         #[cfg(feature = "musli-descriptive")]
         {
-            let descriptive = ::musli_descriptive::rt!($ty, $expr);
+            let descriptive = ::musli_descriptive::test::rt($expr);
             assert_eq!(expected, descriptive);
         }
 
         expected
+    }};
+}
+
+/// This is used to test when there is a decode assymmetry, such as the decoded
+/// value does not match the encoded one due to things such as skipped fields.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! assert_decode_eq {
+    ($expr:expr, $expected:expr) => {{
+        #[cfg(feature = "musli-storage")]
+        {
+            let storage = ::musli_storage::test::decode($expr);
+            assert_eq!(
+                storage, $expected,
+                "storage: decoded value does not match expected"
+            );
+        }
+
+        #[cfg(feature = "musli-wire")]
+        {
+            let wire = ::musli_wire::test::decode($expr);
+            assert_eq!(
+                wire, $expected,
+                "wire: decoded value does not match expected"
+            );
+        }
+
+        #[cfg(feature = "musli-descriptive")]
+        {
+            let descriptive = ::musli_descriptive::test::decode($expr);
+            assert_eq!(
+                descriptive, $expected,
+                "descriptive: decoded value does not match expected"
+            );
+        }
+
+        #[cfg(feature = "musli-json")]
+        {
+            let json = ::musli_json::test::decode($expr);
+            assert_eq!(
+                json, $expected,
+                "json: decoded value does not match expected"
+            );
+        }
     }};
 }
 

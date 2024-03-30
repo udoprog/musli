@@ -110,10 +110,10 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
 
     match st.packing {
         Packing::Transparent => {
-            let f = match &st.fields[..] {
+            let f = match &st.unskipped_fields[..] {
                 [f] => f,
                 _ => {
-                    e.transparent_diagnostics(st.span, &st.fields);
+                    e.transparent_diagnostics(st.span, &st.unskipped_fields);
                     return Err(());
                 }
             };
@@ -129,7 +129,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
             }};
         }
         Packing::Tagged => {
-            let len = length_test(st.fields.len(), &tests);
+            let len = length_test(st.unskipped_fields.len(), &tests);
             let decls = tests.iter().map(|t| &t.decl);
 
             encode = quote! {{
@@ -196,10 +196,10 @@ fn insert_fields<'st>(
     let field_encoder_var = e.cx.ident("field_encoder");
     let value_encoder_var = e.cx.ident("value_encoder");
 
-    let mut encoders = Vec::with_capacity(st.fields.len());
-    let mut tests = Vec::with_capacity(st.fields.len());
+    let mut encoders = Vec::with_capacity(st.all_fields.len());
+    let mut tests = Vec::with_capacity(st.all_fields.len());
 
-    for f in &st.fields {
+    for f in &st.unskipped_fields {
         let encode_path = &f.encode_path.1;
         let access = &f.self_access;
         let tag = &f.tag;
@@ -350,8 +350,8 @@ fn encode_variant(
         None => {
             match v.st.packing {
                 Packing::Transparent => {
-                    let [f] = &v.st.fields[..] else {
-                        b.transparent_diagnostics(v.span, &v.st.fields);
+                    let [f] = &v.st.unskipped_fields[..] else {
+                        b.transparent_diagnostics(v.span, &v.st.unskipped_fields);
                         return Err(());
                     };
 
@@ -372,7 +372,7 @@ fn encode_variant(
                 }
                 Packing::Tagged => {
                     let decls = tests.iter().map(|t| &t.decl);
-                    let len = length_test(v.st.fields.len(), &tests);
+                    let len = length_test(v.st.unskipped_fields.len(), &tests);
 
                     encode = quote! {{
                         #encoder_t::encode_struct_fn(#encoder_var, #len, move |#encoder_var| {
@@ -432,7 +432,7 @@ fn encode_variant(
 
                 let decls = tests.iter().map(|t| &t.decl);
 
-                let len = length_test(v.st.fields.len(), &tests);
+                let len = length_test(v.st.unskipped_fields.len(), &tests);
                 let struct_encoder = b.cx.ident("struct_encoder");
                 let content_struct = b.cx.ident("content_struct");
                 let pair = b.cx.ident("pair");

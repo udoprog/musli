@@ -5,26 +5,7 @@ use core::fmt::Debug;
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 
-/// Roundtrip encode the given value.
-#[macro_export]
-#[doc(hidden)]
-macro_rules! rt {
-    ($enum:ident :: $variant:ident $($tt:tt)?) => {
-        $crate::rt!($enum, $enum :: $variant $($tt)*)
-    };
-
-    ($struct:ident $($tt:tt)?) => {
-        $crate::rt!($struct, $struct $($tt)*)
-    };
-
-    ($ty:ty, $expr:expr) => {{
-        let value: $ty = $expr;
-        let out = $crate::to_vec(&value).expect(concat!("storage: ", stringify!($ty), ": failed to encode"));
-        let decoded: $ty = $crate::from_slice(out.as_slice()).expect(concat!("storage: ", stringify!($ty), ": failed to decode"));
-        assert_eq!(decoded, $expr, concat!("storage: ", stringify!($ty), ": roundtrip does not match"));
-        decoded
-    }};
-}
+musli_common::test_fns!("storage");
 
 /// Encode a type as one and decode as another.
 #[inline(never)]

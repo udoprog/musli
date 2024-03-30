@@ -8,10 +8,7 @@ pub struct GenericWithBound<T> {
 
 #[test]
 fn generic_with_bound() {
-    tests::rt!(
-        GenericWithBound<String>,
-        GenericWithBound {
-            value: String::from("Hello"),
-        }
-    );
+    tests::rt!(GenericWithBound {
+        value: String::from("Hello"),
+    });
 }

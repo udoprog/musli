@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::rc::Rc;
 
 use proc_macro2::Span;
 use syn::punctuated::Punctuated;
@@ -57,11 +58,11 @@ impl Build<'_> {
 
     /// Emit diagnostics for a transparent encode / decode that failed because
     /// the wrong number of fields existed.
-    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[Field]) {
+    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[Rc<Field>]) {
         if fields.is_empty() {
             self.cx.error_span(
                 span,
-                format_args!("#[{ATTR}(transparent)] types must have a single field",),
+                format_args!("#[{ATTR}(transparent)] types must have a single unskipped field"),
             );
         } else {
             self.cx.error_span(
@@ -113,7 +114,8 @@ pub(crate) enum BuildData<'a> {
 pub(crate) struct Body<'a> {
     pub(crate) span: Span,
     pub(crate) name: &'a syn::LitStr,
-    pub(crate) fields: Vec<Field<'a>>,
+    pub(crate) unskipped_fields: Vec<Rc<Field<'a>>>,
+    pub(crate) all_fields: Vec<Rc<Field<'a>>>,
     pub(crate) name_type: Option<&'a (Span, syn::Type)>,
     pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing: Packing,
@@ -161,6 +163,14 @@ pub(crate) struct Variant<'a> {
     pub(crate) patterns: Punctuated<syn::FieldPat, Token![,]>,
 }
 
+/// Field skip configuration.
+pub(crate) enum FieldSkip {
+    /// Skip with a default value.
+    Default(Span),
+    /// Skip with an expression.
+    Expr(syn::Expr),
+}
+
 pub(crate) struct Field<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
@@ -168,7 +178,11 @@ pub(crate) struct Field<'a> {
     pub(crate) decode_path: (Span, syn::Path),
     pub(crate) tag: syn::Expr,
     pub(crate) skip_encoding_if: Option<&'a (Span, syn::Path)>,
+    /// Fill with default value, if missing.
     pub(crate) default_attr: Option<Span>,
+    /// Skip field entirely and always initialize with the specified expresion,
+    /// or default value if none is specified.
+    pub(crate) skip: Option<&'a FieldSkip>,
     pub(crate) self_access: syn::Expr,
     pub(crate) member: syn::Member,
     pub(crate) packing: Packing,
@@ -210,7 +224,8 @@ pub(crate) fn setup<'a>(
 }
 
 fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -> Result<Body<'a>> {
-    let mut fields = Vec::with_capacity(data.fields.len());
+    let mut unskipped_fields = Vec::with_capacity(data.fields.len());
+    let mut all_fields = Vec::with_capacity(data.fields.len());
 
     let default_field = e.type_attr.default_field(mode).map(|&(_, v)| v);
     let packing = e
@@ -222,7 +237,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
     let mut tag_methods = TagMethods::new(&e.cx);
 
     for f in &data.fields {
-        fields.push(setup_field(
+        let field = Rc::new(setup_field(
             e,
             mode,
             f,
@@ -231,12 +246,19 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
             None,
             &mut tag_methods,
         )?);
+
+        if field.skip.is_none() {
+            unskipped_fields.push(field.clone());
+        }
+
+        all_fields.push(field);
     }
 
     Ok(Body {
         span: data.span,
         name: &data.name,
-        fields,
+        unskipped_fields,
+        all_fields,
         name_type: e.type_attr.name_type(mode),
         name_format_with: e.type_attr.name_format_with(mode),
         packing,
@@ -297,7 +319,8 @@ fn setup_variant<'a>(
     fallback: &mut Option<&'a syn::Ident>,
     tag_methods: &mut TagMethods,
 ) -> Result<Variant<'a>> {
-    let mut fields = Vec::with_capacity(data.fields.len());
+    let mut unskipped_fields = Vec::with_capacity(data.fields.len());
+    let mut all_fields = Vec::with_capacity(data.fields.len());
 
     let variant_packing = data
         .attr
@@ -346,7 +369,7 @@ fn setup_variant<'a>(
     let mut field_tag_methods = TagMethods::new(&e.cx);
 
     for f in &data.fields {
-        fields.push(setup_field(
+        let field = Rc::new(setup_field(
             e,
             mode,
             f,
@@ -355,6 +378,12 @@ fn setup_variant<'a>(
             Some(&mut patterns),
             &mut field_tag_methods,
         )?);
+
+        if field.skip.is_none() {
+            unskipped_fields.push(field.clone());
+        }
+
+        all_fields.push(field);
     }
 
     Ok(Variant {
@@ -366,7 +395,8 @@ fn setup_variant<'a>(
         st: Body {
             span: data.span,
             name: &data.name,
-            fields,
+            unskipped_fields,
+            all_fields,
             packing: variant_packing,
             name_type: data.attr.name_type(mode),
             name_format_with: data.attr.name_format_with(mode),
@@ -391,6 +421,7 @@ fn setup_field<'a>(
     tag_methods.insert(data.span, tag_method);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
     let default_attr = data.attr.is_default(mode).map(|&(s, ())| s);
+    let skip = data.attr.skip(mode).map(|(_, skip)| skip);
 
     let member = match data.ident {
         Some(ident) => syn::Member::Named(ident.clone()),
@@ -476,6 +507,7 @@ fn setup_field<'a>(
         tag,
         skip_encoding_if,
         default_attr,
+        skip,
         self_access,
         member,
         packing,

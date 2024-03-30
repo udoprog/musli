@@ -12,6 +12,8 @@ use crate::expander::TagMethod;
 use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
 
+use super::build::FieldSkip;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum Only {
     Encode,
@@ -572,6 +574,8 @@ layer! {
         rename: syn::Expr,
         /// Use a default value for the field if it's not available.
         is_default: (),
+        /// Use a default value for the field if it's not available.
+        skip: FieldSkip,
         /// Use the alternate TraceDecode for the field.
         trace: (),
         /// Use the alternate EncodeBytes for the field.
@@ -693,6 +697,18 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
             // parse #[musli(default)]
             if meta.path.is_ident("default") {
                 new.is_default.push((meta.path.span(), ()));
+                return Ok(());
+            }
+
+            // parse #[musli(skip [= <path>])]
+            if meta.path.is_ident("skip") {
+                let skip = if meta.input.parse::<Option<Token![=]>>()?.is_some() {
+                    FieldSkip::Expr(meta.input.parse()?)
+                } else {
+                    FieldSkip::Default(meta.path.span())
+                };
+
+                new.skip.push((meta.path.span(), skip));
                 return Ok(());
             }
 

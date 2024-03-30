@@ -65,3 +65,15 @@ where
     let cx = musli_common::exports::context::Same::<_, DefaultMode, Error>::new(&alloc);
     value.decoder::<DEFAULT_OPTIONS, _>(&cx).decode()
 }
+
+/// Decode a [Value] into a type which implements [Decode] using a custom
+/// context.
+pub fn decode_with<'de, C, T>(cx: &C, value: &'de Value) -> Result<T, C::Error>
+where
+    C: ?Sized + musli::Context,
+    T: Decode<'de, C::Mode>,
+{
+    use musli::de::Decoder;
+
+    value.decoder::<DEFAULT_OPTIONS, _>(cx).decode()
+}

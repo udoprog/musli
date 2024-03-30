@@ -533,6 +533,8 @@
 //! struct Struct {
 //!     #[musli(rename = "other")]
 //!     something: String,
+//!     #[musli(skip = 42)]
+//!     skipped_field: u32,
 //! }
 //!
 //! #[derive(Encode, Decode)]
@@ -542,6 +544,45 @@
 //!         #[musli(rename = "other")]
 //!         something: String,
 //!     }
+//! }
+//! ```
+//!
+//! <br>
+//!
+//! #### `#[musli(skip [= <expr>])]`
+//!
+//! This attribute means that the entire field is skipped. If a field is decoded
+//! it either uses the provided `<expr>` to construct the value, or tries and
+//! initialize it with [`Default::default`].
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! struct Person {
+//!     name: String,
+//!     #[musli(skip)]
+//!     age: Option<u32>,
+//!     #[musli(skip = Some(String::from("Earth")))]
+//!     country: Option<String>,
+//! }
+//! ```
+//!
+//! <br>
+//!
+//! #### `#[musli(default)]`
+//!
+//! This constructs the field using [`Default::default`] in case it's not
+//! available. This is only used when a field is missing during decoding.
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! struct Person {
+//!     name: String,
+//!     #[musli(default)]
+//!     age: Option<u32>,
 //! }
 //! ```
 //!
@@ -725,24 +766,6 @@
 //!     }
 //! }
 //! # }
-//! ```
-//!
-//! <br>
-//!
-//! #### `#[musli(default)]`
-//!
-//! This constructs the field using [Default::default] in case it's not
-//! available. This is only used when a field is missing during decoding.
-//!
-//! ```
-//! use musli::{Encode, Decode};
-//!
-//! #[derive(Encode, Decode)]
-//! struct Person {
-//!     name: String,
-//!     #[musli(default)]
-//!     age: Option<u32>,
-//! }
 //! ```
 //!
 //! <br>
