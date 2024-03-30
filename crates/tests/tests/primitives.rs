@@ -29,46 +29,52 @@ pub struct Numbers {
 
 #[test]
 fn primitives_max() {
-    tests::rt!(Numbers {
-        bool_field: true,
-        char_field: char::MAX,
-        u8_field: u8::MAX,
-        u16_field: u16::MAX,
-        u32_field: u32::MAX,
-        u64_field: u64::MAX,
-        u128_field: u128::MAX,
-        i8_field: i8::MAX,
-        i16_field: i16::MAX,
-        i32_field: i32::MAX,
-        i64_field: i64::MAX,
-        i128_field: i128::MAX,
-        usize_field: usize::MAX,
-        isize_field: isize::MAX,
-        empty_array_field: Bytes([]),
-        empty_tuple: (),
-        empty_sequence: Sequence(()),
-    });
+    tests::rt!(
+        full,
+        Numbers {
+            bool_field: true,
+            char_field: char::MAX,
+            u8_field: u8::MAX,
+            u16_field: u16::MAX,
+            u32_field: u32::MAX,
+            u64_field: u64::MAX,
+            u128_field: u128::MAX,
+            i8_field: i8::MAX,
+            i16_field: i16::MAX,
+            i32_field: i32::MAX,
+            i64_field: i64::MAX,
+            i128_field: i128::MAX,
+            usize_field: usize::MAX,
+            isize_field: isize::MAX,
+            empty_array_field: Bytes([]),
+            empty_tuple: (),
+            empty_sequence: Sequence(()),
+        }
+    );
 }
 
 #[test]
 fn primitives_min() {
-    tests::rt!(Numbers {
-        bool_field: false,
-        char_field: '\u{0000}',
-        u8_field: u8::MIN,
-        u16_field: u16::MIN,
-        u32_field: u32::MIN,
-        u64_field: u64::MIN,
-        u128_field: u128::MIN,
-        i8_field: i8::MIN,
-        i16_field: i16::MIN,
-        i32_field: i32::MIN,
-        i64_field: i64::MIN,
-        i128_field: i128::MIN,
-        usize_field: usize::MIN,
-        isize_field: isize::MIN,
-        empty_array_field: Bytes([]),
-        empty_tuple: (),
-        empty_sequence: Sequence(()),
-    });
+    tests::rt!(
+        full,
+        Numbers {
+            bool_field: false,
+            char_field: '\u{0000}',
+            u8_field: u8::MIN,
+            u16_field: u16::MIN,
+            u32_field: u32::MIN,
+            u64_field: u64::MIN,
+            u128_field: u128::MIN,
+            i8_field: i8::MIN,
+            i16_field: i16::MIN,
+            i32_field: i32::MIN,
+            i64_field: i64::MIN,
+            i128_field: i128::MIN,
+            usize_field: usize::MIN,
+            isize_field: isize::MIN,
+            empty_array_field: Bytes([]),
+            empty_tuple: (),
+            empty_sequence: Sequence(()),
+        }
+    );
 }

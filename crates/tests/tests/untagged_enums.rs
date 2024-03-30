@@ -4,58 +4,84 @@ use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode)]
 #[musli(packed)]
-pub enum UntaggedEnum1 {
-    Variant1,
-    Variant2,
-}
-
-#[derive(Debug, PartialEq, Encode)]
-#[musli(packed)]
-pub enum UntaggedEnum2 {
-    Variant1(String),
-    Variant2(u32),
-}
-
-#[derive(Debug, PartialEq, Encode)]
-#[musli(packed)]
-pub enum UntaggedEnum3 {
-    Variant1 { value: String },
-    Variant2 { value: u32 },
+pub enum Enum {
+    EmptyVariant1,
+    EmptyVariant2,
+    StringVariant { value: String },
+    IntegerVariant { value: u32 },
+    StringTupleVariant(String, String),
+    IntegerTupleVariant(u32, u32),
 }
 
 #[derive(Debug, PartialEq, Decode)]
 #[musli(packed)]
-pub struct Empty;
+pub struct StringVariant {
+    value: String,
+}
+
+#[derive(Debug, PartialEq, Decode)]
+#[musli(packed)]
+pub struct StringTupleVariant(String, String);
+
+#[derive(Debug, PartialEq, Decode)]
+#[musli(packed)]
+pub struct IntegerTupleVariant(u32, u32);
+
+#[derive(Debug, PartialEq, Decode)]
+#[musli(packed)]
+pub struct IntegerVariant {
+    value: u32,
+}
+
+#[derive(Debug, PartialEq, Decode)]
+#[musli(packed)]
+pub struct EmptyVariant;
 
 /// Untagged enums may only implement `Encode`, and will be encoded according to
 /// the exact specification of fields part of the variant.
 #[test]
 fn untagged_enums() -> Result<(), Box<dyn std::error::Error>> {
-    use musli::compat::Packed;
+    tests::assert_decode_eq! {
+        full,
+        Enum::EmptyVariant1,
+        EmptyVariant,
+        json = r#"[]"#,
+    };
 
-    let out = tests::wire::to_vec(&UntaggedEnum1::Variant1).unwrap();
-    let _: Empty = tests::wire::decode(out.as_slice()).unwrap();
+    tests::assert_decode_eq! {
+        full,
+        Enum::EmptyVariant2,
+        EmptyVariant,
+        json = r#"[]"#,
+    };
 
-    let out = tests::wire::to_vec(&UntaggedEnum1::Variant2).unwrap();
-    let _: Empty = tests::wire::decode(out.as_slice()).unwrap();
+    tests::assert_decode_eq! {
+        full,
+        Enum::StringVariant { value: String::from("Hello World") },
+        StringVariant { value: String::from("Hello World") },
+        json = r#"["Hello World"]"#,
+    };
 
-    let out = tests::wire::to_vec(&UntaggedEnum2::Variant1(String::from("foo"))).unwrap();
-    let Packed((value,)): Packed<(String,)> = tests::wire::decode(out.as_slice()).unwrap();
-    assert_eq!(value, "foo");
+    tests::assert_decode_eq! {
+        full,
+        Enum::IntegerVariant { value: 421 },
+        IntegerVariant { value: 421 },
+        json = r#"[421]"#,
+    };
 
-    let out = tests::wire::to_vec(&UntaggedEnum2::Variant2(42)).unwrap();
-    let Packed((value,)): Packed<(u32,)> = tests::wire::decode(out.as_slice()).unwrap();
-    assert_eq!(value, 42);
+    tests::assert_decode_eq! {
+        full,
+        Enum::StringTupleVariant(String::from("Hello..."), String::from("World!")),
+        StringTupleVariant(String::from("Hello..."), String::from("World!")),
+        json = r#"["Hello...","World!"]"#,
+    };
 
-    let out = tests::wire::to_vec(&UntaggedEnum3::Variant1 {
-        value: String::from("foo"),
-    })
-    .unwrap();
-    let Packed((value,)): Packed<(String,)> = tests::wire::decode(out.as_slice()).unwrap();
-    assert_eq!(value, "foo");
+    tests::assert_decode_eq! {
+        full,
+        Enum::IntegerTupleVariant(10, 20),
+        IntegerTupleVariant(10, 20),
+        json = r#"[10,20]"#,
+    };
 
-    let out = tests::wire::to_vec(&UntaggedEnum3::Variant2 { value: 42 }).unwrap();
-    let Packed((value,)): Packed<(u32,)> = tests::wire::decode(out.as_slice()).unwrap();
-    assert_eq!(value, 42);
     Ok(())
 }

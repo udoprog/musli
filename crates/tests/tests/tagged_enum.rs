@@ -22,14 +22,17 @@ pub enum Variants {
 
 #[test]
 fn tagged_enums() {
-    tests::rt!(EmptyVariants::Variant1);
-    tests::rt!(EmptyVariants::Variant2);
+    tests::rt!(full, EmptyVariants::Variant1);
+    tests::rt!(full, EmptyVariants::Variant2);
 
-    tests::rt!(TupleVariants::Variant1(String::from("foo")));
-    tests::rt!(TupleVariants::Variant2(42));
+    tests::rt!(full, TupleVariants::Variant1(String::from("foo")));
+    tests::rt!(full, TupleVariants::Variant2(42));
 
-    tests::rt!(Variants::Variant1 {
-        value: String::from("foo"),
-    });
-    tests::rt!(Variants::Variant2 { value: 42 });
+    tests::rt!(
+        full,
+        Variants::Variant1 {
+            value: String::from("foo"),
+        }
+    );
+    tests::rt!(full, Variants::Variant2 { value: 42 });
 }

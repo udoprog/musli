@@ -11,7 +11,8 @@ pub enum SeveralVariants {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub enum OnlyFallback {
-    #[musli(rename = 42)]
+    // Renamed to something which is not provided in `SeveralVariants`.
+    #[musli(rename = 4)]
     Variant4,
     #[musli(default)]
     Fallback,
@@ -20,12 +21,24 @@ pub enum OnlyFallback {
 /// Test that enums can use fallback variants when decoding.
 #[test]
 fn fallback_variant() {
-    let actual = tests::wire::transcode::<_, OnlyFallback>(SeveralVariants::Variant1);
-    assert_eq!(actual, OnlyFallback::Fallback);
+    tests::assert_decode_eq!(
+        upgrade_stable,
+        SeveralVariants::Variant1,
+        OnlyFallback::Fallback,
+        json = r#"{"0":{}}"#,
+    );
 
-    let actual = tests::wire::transcode::<_, OnlyFallback>(SeveralVariants::Variant2);
-    assert_eq!(actual, OnlyFallback::Fallback);
+    tests::assert_decode_eq!(
+        upgrade_stable,
+        SeveralVariants::Variant2,
+        OnlyFallback::Fallback,
+        json = r#"{"1":{}}"#,
+    );
 
-    let actual = tests::wire::transcode::<_, OnlyFallback>(SeveralVariants::Variant3);
-    assert_eq!(actual, OnlyFallback::Fallback);
+    tests::assert_decode_eq!(
+        upgrade_stable,
+        SeveralVariants::Variant3,
+        OnlyFallback::Fallback,
+        json = r#"{"2":{}}"#,
+    );
 }

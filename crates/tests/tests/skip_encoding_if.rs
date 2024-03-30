@@ -14,13 +14,21 @@ pub struct SkipSerializeOuter {
 
 #[test]
 fn skip_serializing_if_outer() {
-    tests::rt!(SkipSerializeOuter {
-        flag: false,
-        inner: Some(SkipSerializeInner),
-    });
+    tests::rt!(
+        full,
+        SkipSerializeOuter {
+            flag: false,
+            inner: Some(SkipSerializeInner),
+        },
+        json = r#"{"0":false,"1":{}}"#,
+    );
 
-    tests::rt!(SkipSerializeOuter {
-        flag: false,
-        inner: None,
-    });
+    tests::rt!(
+        full,
+        SkipSerializeOuter {
+            flag: false,
+            inner: None,
+        },
+        json = r#"{"0":false}"#,
+    );
 }

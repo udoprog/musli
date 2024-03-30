@@ -13,7 +13,10 @@ pub struct SequenceCompat {
 
 #[test]
 fn sequence_compat() {
-    tests::rt!(SequenceCompat {
-        empty_sequence: Sequence(()),
-    });
+    tests::rt!(
+        full,
+        SequenceCompat {
+            empty_sequence: Sequence(()),
+        }
+    );
 }

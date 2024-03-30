@@ -59,13 +59,16 @@ fn large_enum_string_variants() {
     const IPV6: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
 
     // TODO: Fix this for JSON.
-    tests::rt_no_json!(LargeEnumStringVariants::A(A { id: ID, ip: IP }));
-    tests::rt_no_json!(LargeEnumStringVariants::A(A { id: ID, ip: IPV6 }));
-    tests::rt_no_json!(LargeEnumStringVariants::B(B {
-        id: ID,
-        user_id: USER_ID
-    }));
-    tests::rt_no_json!(LargeEnumStringVariants::C(C { id: ID }));
-    tests::rt_no_json!(LargeEnumStringVariants::D(D { id: ID }));
-    tests::rt_no_json!(LargeEnumStringVariants::E(E { id: ID }));
+    tests::rt!(no_json, LargeEnumStringVariants::A(A { id: ID, ip: IP }));
+    tests::rt!(no_json, LargeEnumStringVariants::A(A { id: ID, ip: IPV6 }));
+    tests::rt!(
+        no_json,
+        LargeEnumStringVariants::B(B {
+            id: ID,
+            user_id: USER_ID
+        })
+    );
+    tests::rt!(no_json, LargeEnumStringVariants::C(C { id: ID }));
+    tests::rt!(no_json, LargeEnumStringVariants::D(D { id: ID }));
+    tests::rt!(no_json, LargeEnumStringVariants::E(E { id: ID }));
 }

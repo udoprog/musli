@@ -1091,12 +1091,6 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
         });
     }
 
-    let path = &st_.path;
-
-    if assign.is_empty() {
-        return Ok(quote!(#path {}));
-    }
-
     let enter = (cx.trace && cx.trace_body).then(|| {
         quote! {
             #context_t::enter_struct(#ctx_var, #type_name);
@@ -1111,6 +1105,7 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
 
     let pack = e.cx.ident("pack");
     let assign = apply::iter(assign, &pack);
+    let path = &st_.path;
 
     Ok(quote! {{
         #enter

@@ -51,7 +51,7 @@ pub mod wire {
 }
 
 #[cfg(feature = "musli-descriptive")]
-pub mod desc {
+pub mod descriptive {
     pub use musli_descriptive::*;
 }
 
@@ -60,97 +60,25 @@ pub mod json {
     pub use musli_json::*;
 }
 
-/// Roundtrip self-descriptive formats.
-#[macro_export]
-#[doc(hidden)]
-macro_rules! rt_self {
-    ($expr:expr $(, json = $json_expected:expr)?) => {{
-        let expected = $expr;
-
-        #[cfg(feature = "musli-descriptive")]
-        {
-            let descriptive = ::musli_descriptive::test::rt($expr);
-            assert_eq!(expected, descriptive);
-        }
-
-        #[cfg(feature = "musli-json")]
-        {
-            let json = ::musli_json::test::rt($expr);
-            assert_eq!(expected, json);
-        }
-
-        #[cfg(feature = "musli-json")]
-        {
-            let json = ::musli_json::test::to_vec($expr);
-            let string = ::std::string::String::from_utf8(json).expect("encoded JSON is not valid utf-8");
-
-            $(
-                assert_eq!(
-                    string, $json_expected,
-                    "json: encoded json does not match expected value"
-                );
-            )*
-        }
-
-        expected
-    }};
-}
-
 /// Roundtrip the given expression through all supported formats.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! rt {
-    ($expr:expr $(, json = $json_expected:expr)?) => {{
-        let expected = $crate::rt_no_json!($expr);
-
-        #[cfg(feature = "musli-json")]
-        {
-            let json = ::musli_json::test::rt($expr);
-            assert_eq!(expected, json);
-        }
-
-        #[cfg(feature = "musli-json")]
-        {
-            let json = ::musli_json::test::to_vec($expr);
-            let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
-
-            $(
-                assert_eq!(
-                    string, $json_expected,
-                    "json: encoded json does not match expected value"
-                );
-            )*
-        }
-
-        expected
-    }};
-}
-
-/// Roundtrip the given expression through all supported formats except JSON.
-#[macro_export]
-#[doc(hidden)]
-macro_rules! rt_no_json {
-    ($expr:expr) => {{
+    ($what:ident, $expr:expr $(, $($extra:tt)*)?) => {{
         let expected = $expr;
 
-        #[cfg(feature = "musli-storage")]
-        {
-            let storage = ::musli_storage::test::rt($expr);
-            assert_eq!(expected, storage);
+        macro_rules! rt {
+            ($name:ident) => {{
+                assert_eq!(
+                    ::$name::test::rt($expr), expected,
+                    "{}: roundtripped value does not match expected",
+                    stringify!($name),
+                );
+            }}
         }
 
-        #[cfg(feature = "musli-wire")]
-        {
-            let wire = ::musli_wire::test::rt($expr);
-            assert_eq!(expected, wire);
-        }
-
-        #[cfg(feature = "musli-descriptive")]
-        {
-            let descriptive = ::musli_descriptive::test::rt($expr);
-            assert_eq!(expected, descriptive);
-        }
-
+        $crate::$what!(rt);
+        $crate::extra!($expr $(, $($extra)*)*);
         expected
     }};
 }
@@ -160,43 +88,95 @@ macro_rules! rt_no_json {
 #[macro_export]
 #[doc(hidden)]
 macro_rules! assert_decode_eq {
-    ($expr:expr, $expected:expr) => {{
-        #[cfg(feature = "musli-storage")]
-        {
-            let storage = ::musli_storage::test::decode($expr);
-            assert_eq!(
-                storage, $expected,
-                "storage: decoded value does not match expected"
-            );
+    ($what:ident, $expr:expr, $expected:expr $(, $($extra:tt)*)?) => {{
+        let mut bytes = Vec::new();
+
+        macro_rules! decode {
+            ($name:ident) => {{
+                assert_eq!(
+                    ::$name::test::decode($expr, &mut bytes, &$expected), $expected,
+                    "{}: decoded value does not match expected",
+                    stringify!($name),
+                );
+            }}
         }
 
-        #[cfg(feature = "musli-wire")]
-        {
-            let wire = ::musli_wire::test::decode($expr);
-            assert_eq!(
-                wire, $expected,
-                "wire: decoded value does not match expected"
-            );
-        }
+        $crate::$what!(decode);
+        $crate::extra!($expr $(, $($extra)*)*);
+    }};
+}
 
-        #[cfg(feature = "musli-descriptive")]
-        {
-            let descriptive = ::musli_descriptive::test::decode($expr);
-            assert_eq!(
-                descriptive, $expected,
-                "descriptive: decoded value does not match expected"
-            );
-        }
+#[macro_export]
+#[doc(hidden)]
+macro_rules! extra {
+    ($expr:expr $(,)?) => {};
 
+    ($expr:expr, json = $json_expected:expr $(, $($tt:tt)*)?) => {{
         #[cfg(feature = "musli-json")]
         {
-            let json = ::musli_json::test::decode($expr);
+            let json = ::musli_json::test::to_vec($expr);
+            let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
+
             assert_eq!(
-                json, $expected,
-                "json: decoded value does not match expected"
+                string, $json_expected,
+                "json: encoded json does not match expected value"
             );
         }
+
+        $crate::extra!($expr $(, $($tt)*)*);
     }};
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! descriptive {
+    ($call:path) => {
+        #[cfg(feature = "musli-descriptive")]
+        $call!(musli_descriptive);
+        #[cfg(feature = "musli-json")]
+        $call!(musli_json);
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! upgrade_stable {
+    ($call:path) => {
+        #[cfg(feature = "musli-wire")]
+        $call!(musli_wire);
+        #[cfg(feature = "musli-descriptive")]
+        $call!(musli_descriptive);
+        #[cfg(feature = "musli-json")]
+        $call!(musli_json);
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! full {
+    ($call:path) => {
+        #[cfg(feature = "musli-storage")]
+        $call!(musli_storage);
+        #[cfg(feature = "musli-wire")]
+        $call!(musli_wire);
+        #[cfg(feature = "musli-descriptive")]
+        $call!(musli_descriptive);
+        #[cfg(feature = "musli-json")]
+        $call!(musli_json);
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! no_json {
+    ($call:path) => {
+        #[cfg(feature = "musli-storage")]
+        $call!(musli_storage);
+        #[cfg(feature = "musli-wire")]
+        $call!(musli_wire);
+        #[cfg(feature = "musli-descriptive")]
+        $call!(musli_descriptive);
+    };
 }
 
 /// Call the given macro with the existing feature matrix.

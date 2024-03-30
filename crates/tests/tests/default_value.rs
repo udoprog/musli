@@ -11,36 +11,70 @@ struct Struct {
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct StructWithDefault {
     name: String,
-    #[musli(default)]
+    #[musli(default, skip_encoding_if = is_zero)]
     age: u32,
+    country: String,
+}
+
+fn is_zero(value: &u32) -> bool {
+    *value == 0
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct StructWithOption {
     name: String,
-    #[musli(default)]
+    #[musli(default, skip_encoding_if = Option::is_none)]
     age: Option<u32>,
+    country: String,
 }
 
+// Ensure that skipped over fields ensures compatibility.
 #[test]
 fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
-    let name = String::from("Aristotle");
-
-    let data = tests::wire::to_vec(&Struct { name: name.clone() })?;
-
-    let struct_with_default: StructWithDefault = tests::wire::decode(data.as_slice())?;
-
-    assert_eq!(
-        struct_with_default,
+    tests::assert_decode_eq!(
+        full,
         StructWithDefault {
-            name: name.clone(),
+            name: String::from("Aristotle"),
             age: 0,
-        }
+            country: String::from("Greece"),
+        },
+        StructWithOption {
+            name: String::from("Aristotle"),
+            age: None,
+            country: String::from("Greece"),
+        },
+        json = r#"{"0":"Aristotle","2":"Greece"}"#,
     );
 
-    let struct_with_option: StructWithOption = tests::wire::decode(data.as_slice())?;
+    tests::assert_decode_eq!(
+        full,
+        StructWithOption {
+            name: String::from("Aristotle"),
+            age: None,
+            country: String::from("Greece"),
+        },
+        StructWithOption {
+            name: String::from("Aristotle"),
+            age: None,
+            country: String::from("Greece"),
+        },
+        json = r#"{"0":"Aristotle","2":"Greece"}"#,
+    );
 
-    assert_eq!(struct_with_option, StructWithOption { name, age: None });
+    tests::assert_decode_eq!(
+        full,
+        StructWithOption {
+            name: String::from("Aristotle"),
+            age: None,
+            country: String::from("Greece"),
+        },
+        StructWithDefault {
+            name: String::from("Aristotle"),
+            age: 0,
+            country: String::from("Greece"),
+        },
+        json = r#"{"0":"Aristotle","2":"Greece"}"#,
+    );
 
     Ok(())
 }

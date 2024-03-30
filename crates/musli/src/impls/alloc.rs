@@ -715,6 +715,16 @@ impl<M> EncodeBytes<M> for Vec<u8> {
     }
 }
 
+impl<M> EncodeBytes<M> for Box<[u8]> {
+    #[inline]
+    fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder<Mode = M>,
+    {
+        encoder.encode_bytes(self.as_ref())
+    }
+}
+
 impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
     #[inline]
     fn decode_bytes<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
