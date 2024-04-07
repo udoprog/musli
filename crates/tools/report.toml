@@ -183,8 +183,7 @@ id = "miniserde"
 title = "Miniserde"
 link = "miniserde"
 description = [
-    "These frameworks provide a fair comparison against Müsli on various areas since",
-    "they support the same set of features in what types of data they can represent.",
+    "An experimental framework which only supports JSON and a limited number of Rust types.",
 ]
 features = [
     "musli-json",
