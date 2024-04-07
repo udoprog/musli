@@ -11,7 +11,6 @@ common = ["no-rt", "std", "alloc"]
 
 [missing_features]
 u64 = "Format is limited to the bounds of signed 64-bit integers."
-map = "Maps are not supported."
 "128" = "128-bit integers are not supported."
 newtype = "Newtype variants are not supported."
 empty = "Empty variants are not supported."
@@ -21,6 +20,11 @@ number-key = "Maps with numerical keys like `HashMap<u32, T>` are not supported.
 tuple = "Tuples like `(u32, u32)` are not supported."
 cstring = "`CString`'s are not supported."
 usize = "`usize` and `isize` types are not supported."
+set = "Sets like `HashSet<T>` are not supported."
+map = "Maps like `MashMap<K, V>` are not supported."
+nonunit-variant = "Only empty unit variants are supported."
+char = "Character types like `char` are not supported."
+binary-equality = "Values are not preserved exactly when serialized and deserialized. Such as floating point values, even when they are exact."
 
 [[kinds]]
 id = "dec"
@@ -174,11 +178,29 @@ expected = [
     "musli", "serde", "no-128", "no-u64", "no-empty", "no-newtype", "no-number-key"
 ]
 
+[[reports]]
+id = "miniserde"
+title = "Miniserde"
+link = "miniserde"
+description = [
+    "These frameworks provide a fair comparison against Müsli on various areas since",
+    "they support the same set of features in what types of data they can represent.",
+]
+features = [
+    "musli-json",
+    "serde_json",
+    "miniserde",
+]
+expected = [
+    "musli", "serde", "miniserde", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"
+]
+
 [footnotes]
 incomplete = "These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result."
 i128 = "Lacks 128-bit support."
 bson = "BSON does not support serializing directly in-place [without patches](https://github.com/mongodb/bson-rust/pull/328). As a result it is expected to be much slower."
 musli_value = "`musli-value` is a heap-allocated, in-memory format. Deserialization is expected to be as fast as a dynamic in-memory structure can be traversed, but serialization requires a lot of allocations. It is only included for reference."
+miniserde = "`miniserde` only supports allocated serialization (to `String`), and only supported deserialization from `&str` which if treated as opaque data would need to be validated as UTF-8."
 
 [crate_footnotes]
 bson = ["bson"]

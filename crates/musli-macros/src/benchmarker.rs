@@ -4,35 +4,43 @@ use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
+use syn::Token;
+
+enum AsBytes {
+    Default,
+    Disabled,
+    Method(syn::Path),
+}
 
 pub(super) struct Attributes {
-    not_bytes: bool,
+    as_bytes: AsBytes,
 }
 
 impl Parse for Attributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut end = false;
-        let mut not_bytes = false;
+        let mut as_bytes = AsBytes::Default;
 
         while !input.is_empty() {
-            let attr: syn::Meta = input.parse()?;
+            let path: syn::Path = input.parse()?;
 
-            let path = attr.require_path_only()?;
-
-            if path.is_ident("not_bytes") {
-                not_bytes = true;
+            if path.is_ident("as_bytes_disabled") {
+                as_bytes = AsBytes::Disabled;
+            } else if path.is_ident("as_bytes") {
+                input.parse::<Token![=]>()?;
+                as_bytes = AsBytes::Method(input.parse()?);
             } else {
-                return Err(syn::Error::new_spanned(attr, "Unsupported attribute"));
+                return Err(syn::Error::new_spanned(path, "Unsupported attribute"));
             }
 
             if end {
                 break;
             }
 
-            end = input.parse::<Option<syn::Token![,]>>()?.is_none();
+            end = input.parse::<Option<Token![,]>>()?.is_none();
         }
 
-        Ok(Attributes { not_bytes })
+        Ok(Attributes { as_bytes })
     }
 }
 
@@ -323,18 +331,29 @@ impl Benchmarker {
             }
         };
 
-        let as_bytes_fn = if attrs.not_bytes {
-            quote::quote! {
-                #[inline(always)]
-                #visibility fn as_bytes(&self) -> Option<&[u8]> {
-                    None
+        let as_bytes_fn = match &attrs.as_bytes {
+            AsBytes::Disabled => {
+                quote::quote! {
+                    #[inline(always)]
+                    #visibility fn as_bytes(&self) -> Option<&[u8]> {
+                        None
+                    }
                 }
             }
-        } else {
-            quote::quote! {
-                #[inline(always)]
-                #visibility fn as_bytes(&self) -> Option<&[u8]> {
-                    Some(&self.buffer)
+            AsBytes::Default => {
+                quote::quote! {
+                    #[inline(always)]
+                    #visibility fn as_bytes(&self) -> Option<&[u8]> {
+                        Some(&self.buffer)
+                    }
+                }
+            }
+            AsBytes::Method(path) => {
+                quote::quote! {
+                    #[inline(always)]
+                    #visibility fn as_bytes(&self) -> Option<&[u8]> {
+                        Some(#path(&self.buffer))
+                    }
                 }
             }
         };
@@ -385,7 +404,7 @@ enum ReferenceType {
 fn convert_arguments(
     arguments: Vec<Argument>,
     reference: ReferenceType,
-) -> Punctuated<syn::Expr, syn::Token![,]> {
+) -> Punctuated<syn::Expr, Token![,]> {
     let mut output = Punctuated::<syn::Expr, _>::new();
 
     for a in arguments {
@@ -668,7 +687,7 @@ fn public_decode_mangling(item_fn: &syn::ItemFn, arguments: &[Argument]) -> Opti
     }
 
     let mut new_inputs = Punctuated::new();
-    let mut inner_arguments = Punctuated::<syn::Expr, syn::Token![,]>::new();
+    let mut inner_arguments = Punctuated::<syn::Expr, Token![,]>::new();
 
     for (a, i) in arguments.iter().zip(&item_fn.sig.inputs) {
         match a {

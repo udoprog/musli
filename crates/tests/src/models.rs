@@ -1,6 +1,6 @@
 #[cfg(all(feature = "std", not(feature = "no-map")))]
 use std::collections::HashMap;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(feature = "no-set"),))]
 use std::collections::HashSet;
 
 #[cfg(all(feature = "alloc", not(feature = "no-btree")))]
@@ -51,6 +51,10 @@ miri! {
     archive_attr(derive(Debug))
 )]
 #[cfg_attr(any(feature = "musli-zerocopy", feature = "zerocopy"), repr(C))]
+#[cfg_attr(
+    feature = "miniserde",
+    derive(miniserde::Serialize, miniserde::Deserialize)
+)]
 pub struct PrimitivesPacked {
     unsigned8: u8,
     #[cfg_attr(feature = "musli", musli(bytes))]
@@ -106,8 +110,13 @@ impl PartialEq<PrimitivesPacked> for &PrimitivesPacked {
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 #[cfg_attr(feature = "musli-zerocopy", repr(C))]
+#[cfg_attr(
+    feature = "miniserde",
+    derive(miniserde::Serialize, miniserde::Deserialize)
+)]
 pub struct Primitives {
     boolean: bool,
+    #[cfg(not(feature = "no-char"))]
     character: char,
     unsigned8: u8,
     unsigned16: u16,
@@ -157,6 +166,10 @@ impl PartialEq<Primitives> for &Primitives {
     archive_attr(derive(Debug))
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
+#[cfg_attr(
+    feature = "miniserde",
+    derive(miniserde::Serialize, miniserde::Deserialize)
+)]
 pub struct Allocated {
     #[cfg(feature = "alloc")]
     string: String,
@@ -179,10 +192,14 @@ pub struct Allocated {
     #[generate(range = SMALL_FIELDS)]
     string_map: HashMap<String, u64>,
     #[generate(range = SMALL_FIELDS)]
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "no-set"),))]
     number_set: HashSet<u32>,
     #[generate(range = SMALL_FIELDS)]
-    #[cfg(all(feature = "std", not(feature = "no-string-set")))]
+    #[cfg(all(
+        feature = "std",
+        not(feature = "no-set"),
+        not(feature = "no-string-set")
+    ))]
     string_set: HashSet<String>,
     #[cfg(all(
         feature = "alloc",
@@ -263,24 +280,36 @@ impl PartialEq<Tuples> for &Tuples {
     archive_attr(derive(Debug))
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed))]
+#[cfg_attr(
+    feature = "miniserde",
+    derive(miniserde::Serialize, miniserde::Deserialize)
+)]
 pub enum MediumEnum {
     #[cfg(not(feature = "no-empty"))]
     Empty,
+    #[cfg(not(feature = "no-nonunit-variant"))]
     EmptyTuple(),
     #[cfg_attr(feature = "musli", musli(transparent))]
-    #[cfg(not(feature = "no-newtype"))]
+    #[cfg(all(not(feature = "no-newtype"), not(feature = "no-nonunit-variant")))]
     NewType(u64),
+    #[cfg(not(feature = "no-nonunit-variant"))]
     Tuple(u64, u64),
     #[cfg_attr(feature = "musli", musli(transparent))]
-    #[cfg(all(feature = "alloc", not(feature = "no-newtype")))]
+    #[cfg(all(
+        feature = "alloc",
+        not(feature = "no-newtype"),
+        not(feature = "no-nonunit-variant")
+    ))]
     NewTypeString(String),
-    #[cfg(feature = "alloc")]
+    #[cfg(all(feature = "alloc", not(feature = "no-nonunit-variant")))]
     TupleString(String, Vec<u8>),
+    #[cfg(all(not(feature = "no-nonunit-variant")))]
     Struct {
         a: u32,
         primitives: Primitives,
         b: u64,
     },
+    #[cfg(all(not(feature = "no-nonunit-variant")))]
     EmptyStruct {},
 }
 
@@ -310,11 +339,15 @@ impl PartialEq<MediumEnum> for &MediumEnum {
     archive_attr(derive(Debug))
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
+#[cfg_attr(
+    feature = "miniserde",
+    derive(miniserde::Serialize, miniserde::Deserialize)
+)]
 pub struct LargeStruct {
     #[generate(range = PRIMITIVES_RANGE)]
     #[cfg(feature = "alloc")]
     primitives: Vec<Primitives>,
-    #[cfg(all(feature = "alloc", not(any(feature = "no-vec", feature = "no-tuple"))))]
+    #[cfg(all(feature = "alloc", not(feature = "no-vec"), not(feature = "no-tuple")))]
     #[generate(range = PRIMITIVES_RANGE)]
     tuples: Vec<(Tuples, Tuples)>,
     #[generate(range = MEDIUM_RANGE)]

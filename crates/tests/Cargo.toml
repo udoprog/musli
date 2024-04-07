@@ -11,7 +11,7 @@ publish = false
 
 [features]
 default = ["std", "alloc", "test", "simdutf8"]
-std = ["musli?/std", "serde?/std", "musli-common/std", "musli-storage?/std", "musli-wire?/std", "musli-descriptive?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std"]
+std = ["musli?/std", "serde?/std", "musli-common/std", "musli-storage?/std", "musli-wire?/std", "musli-descriptive?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std"]
 alloc = ["musli?/alloc", "musli-common/alloc", "musli-storage?/alloc", "musli-wire?/alloc", "musli-descriptive?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
 verbose = ["musli?/verbose"]
 extra = ["rkyv", "dlhn", "serde_cbor"]
@@ -33,6 +33,7 @@ test = ["musli-wire", "musli-storage", "musli-descriptive", "musli-value", "musl
 no-usize = []
 no-cstring = []
 no-map = []
+no-set = []
 no-string-key = []
 no-number-key = []
 no-btree = []
@@ -44,6 +45,9 @@ no-u64 = []
 no-empty = []
 no-newtype = []
 no-string-set = []
+no-nonunit-variant = []
+no-char = []
+no-binary-equality = []
 
 serde = ["dep:serde", "bitcode?/serde"]
 serde_json = ["dep:serde_json", "serde"]
@@ -56,6 +60,7 @@ serde_cbor = ["dep:serde_cbor", "serde", "no-128", "no-map"]
 dlhn = ["dep:dlhn", "serde", "no-128", "no-map"]
 bitcode = ["dep:bitcode", "serde"]
 bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
+miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.108", default-features = false, optional = true, features = [] }
@@ -81,6 +86,7 @@ rkyv = { version = "0.7.44", default-features = false, optional = true, features
 postcard = { version = "1.0.8",  default-features = false, optional = true }
 bson = { version = "2.9.0", default-features = false, optional = true }
 zerocopy = { version = "0.7.32", default-features = false, optional = true, features = ["byteorder", "derive"] }
+miniserde = { version = "0.1.38", default-features = false, optional = true }
 
 [dev-dependencies]
 musli = { path = "../musli", version = "0.0.108", default-features = false, features = ["alloc"] }

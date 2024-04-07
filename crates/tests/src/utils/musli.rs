@@ -184,7 +184,7 @@ pub mod musli_descriptive {
 }
 
 #[cfg(feature = "musli-value")]
-#[crate::benchmarker(not_bytes)]
+#[crate::benchmarker(as_bytes_disabled)]
 pub mod musli_value {
     use ::musli_value::Value;
     use musli::{Decode, Encode};

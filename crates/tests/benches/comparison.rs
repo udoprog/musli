@@ -65,8 +65,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                         for (index, (value, framework)) in values.iter().zip(&mut frameworks).enumerate() {
                             let mut state = framework.state();
                             state.reset($size_hint, value);
-                            let mut out = state.encode(value).unwrap();
-                            let actual = out.decode::<$ty>().unwrap();
+                            let mut out = state.encode(value).expect("encoding should success");
+
+                            #[cfg_attr(feature = "no-binary-equality", allow(unused_variables))]
+                            let actual = out.decode::<$ty>().expect("decoding should succeed");
+
+                            #[cfg(not(feature = "no-binary-equality"))]
                             assert_eq!(actual, *value, "{} / {}: roundtrip encoding of value[{index}] should be equal", stringify!($framework), stringify!($name));
                         }
                     }}

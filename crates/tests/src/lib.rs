@@ -219,6 +219,8 @@ macro_rules! feature_matrix {
         $call!(postcard $(, $($tt)*)*);
         #[cfg(feature = "bson")]
         $call!(bson $(, $($tt)*)*);
+        #[cfg(feature = "miniserde")]
+        $call!(miniserde $(, $($tt)*)*);
     };
 }
 

@@ -233,3 +233,25 @@ pub mod zerocopy {
         T::read_from(buf).ok_or(Error)
     }
 }
+
+#[cfg(feature = "miniserde")]
+#[crate::benchmarker]
+pub mod miniserde {
+    use alloc::vec::Vec;
+    use miniserde::{json, Deserialize, Serialize};
+
+    pub fn encode<T>(value: &T) -> Result<Vec<u8>, miniserde::Error>
+    where
+        T: Serialize,
+    {
+        Ok(json::to_string(value).into_bytes())
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<T, miniserde::Error>
+    where
+        T: Deserialize,
+    {
+        let string = std::str::from_utf8(buf).map_err(|_| miniserde::Error)?;
+        json::from_str(string)
+    }
+}
