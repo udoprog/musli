@@ -303,13 +303,13 @@ pub enum MediumEnum {
     NewTypeString(String),
     #[cfg(all(feature = "alloc", not(feature = "no-nonunit-variant")))]
     TupleString(String, Vec<u8>),
-    #[cfg(all(not(feature = "no-nonunit-variant")))]
+    #[cfg(not(feature = "no-nonunit-variant"))]
     Struct {
         a: u32,
         primitives: Primitives,
         b: u64,
     },
-    #[cfg(all(not(feature = "no-nonunit-variant")))]
+    #[cfg(not(feature = "no-nonunit-variant"))]
     EmptyStruct {},
 }
 
