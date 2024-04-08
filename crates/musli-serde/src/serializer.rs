@@ -4,6 +4,7 @@ use musli::en::{
     MapEntriesEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, TupleEncoder,
     VariantEncoder,
 };
+use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::{Context, Encoder};
 
 use serde::ser::{self, Serialize};
@@ -194,13 +195,15 @@ where
             ));
         };
 
-        let encoder = self.encoder.encode_sequence(len)?;
+        let hint = SequenceHint::with_size(len);
+        let encoder = self.encoder.encode_sequence(&hint)?;
         Ok(SerializeSeq::new(self.cx, encoder))
     }
 
     #[inline]
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        let encoder = self.encoder.encode_tuple(len)?;
+        let hint = TupleHint::with_size(len);
+        let encoder = self.encoder.encode_tuple(&hint)?;
         Ok(SerializeTuple::new(self.cx, encoder))
     }
 
@@ -210,7 +213,8 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        let encoder = self.encoder.encode_struct(len)?;
+        let hint = StructHint::with_size(len);
+        let encoder = self.encoder.encode_struct(&hint)?;
         Ok(SerializeTupleStruct::new(self.cx, encoder))
     }
 
@@ -222,19 +226,21 @@ where
         variant_name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        let encoder = self.encoder.encode_tuple_variant(variant_name, len)?;
+        let hint = TupleHint::with_size(len);
+        let encoder = self.encoder.encode_tuple_variant(variant_name, &hint)?;
         Ok(SerializeTuple::new(self.cx, encoder))
     }
 
     #[inline]
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         let Some(len) = len else {
-            return Err(ser::Error::custom(
-                "Can only encode maps with known lengths",
-            ));
+            return Err(self
+                .cx
+                .message("Can only serialize maps with known lengths"));
         };
 
-        let encoder = self.encoder.encode_map_entries(len)?;
+        let hint = MapHint::with_size(len);
+        let encoder = self.encoder.encode_map_entries(&hint)?;
         Ok(SerializeMap::new(self.cx, encoder))
     }
 
@@ -244,7 +250,8 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        let encoder = self.encoder.encode_struct(len)?;
+        let hint = StructHint::with_size(len);
+        let encoder = self.encoder.encode_struct(&hint)?;
         Ok(SerializeStruct::new(self.cx, encoder))
     }
 
@@ -256,7 +263,8 @@ where
         variant_name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        let encoder = self.encoder.encode_struct_variant(variant_name, len)?;
+        let hint = StructHint::with_size(len);
+        let encoder = self.encoder.encode_struct_variant(variant_name, &hint)?;
         Ok(SerializeStructVariant::new(self.cx, encoder))
     }
 

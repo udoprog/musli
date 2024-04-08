@@ -11,6 +11,8 @@ use musli::en::{
     MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder, StructEncoder,
     StructFieldEncoder, TupleEncoder, VariantEncoder,
 };
+#[cfg(feature = "alloc")]
+use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::Context;
 
 use crate::value::{Number, Value};
@@ -296,31 +298,31 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_sequence(self, _: usize) -> Result<Self::EncodeSequence, C::Error> {
+    fn encode_sequence(self, _: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
         Ok(SequenceValueEncoder::new(self.cx, self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_tuple(self, _: usize) -> Result<Self::EncodeTuple, C::Error> {
+    fn encode_tuple(self, _: &TupleHint) -> Result<Self::EncodeTuple, C::Error> {
         Ok(SequenceValueEncoder::new(self.cx, self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_map(self, _: usize) -> Result<Self::EncodeMap, C::Error> {
+    fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_map_entries(self, _: usize) -> Result<Self::EncodeMapEntries, C::Error> {
+    fn encode_map_entries(self, _: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_struct(self, _: usize) -> Result<Self::EncodeStruct, C::Error> {
+    fn encode_struct(self, _: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
@@ -348,18 +350,19 @@ where
     fn encode_tuple_variant<T>(
         self,
         tag: &T,
-        len: usize,
+        hint: &TupleHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
         let mut variant = Value::Unit;
         ValueEncoder::new(self.cx, &mut variant).encode(tag)?;
+
         Ok(VariantSequenceEncoder::new(
             self.cx,
             self.output,
             variant,
-            len,
+            hint.size,
         ))
     }
 
@@ -368,18 +371,19 @@ where
     fn encode_struct_variant<T>(
         self,
         tag: &T,
-        len: usize,
+        hint: &StructHint,
     ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
         let mut variant = Value::Unit;
         ValueEncoder::new(self.cx, &mut variant).encode(tag)?;
+
         Ok(VariantStructEncoder::new(
             self.cx,
             self.output,
             variant,
-            len,
+            hint.size,
         ))
     }
 }

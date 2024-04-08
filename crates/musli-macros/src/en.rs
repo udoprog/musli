@@ -129,13 +129,15 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
             }};
         }
         Packing::Tagged => {
-            let len = length_test(st.unskipped_fields.len(), &tests);
             let decls = tests.iter().map(|t| &t.decl);
+            let (build_hint, hint) = length_test(st.unskipped_fields.len(), &tests).build(e);
 
             encode = quote! {{
                 #enter
                 #(#decls)*
-                let #output_var = #encoder_t::encode_struct_fn(#encoder_var, #len, move |#encoder_var| {
+                #build_hint
+
+                let #output_var = #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
                     #(#encoders)*
                     #result_ok(())
                 })?;
@@ -163,7 +165,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
 }
 
 struct FieldTest<'st> {
-    decl: TokenStream,
+    decl: syn::Stmt,
     var: &'st syn::Ident,
 }
 
@@ -260,7 +262,7 @@ fn insert_fields<'st>(
         if let Some((_, skip_encoding_if_path)) = f.skip_encoding_if.as_ref() {
             let var = &f.var;
 
-            let decl = quote! {
+            let decl = syn::parse_quote! {
                 let #var = !#skip_encoding_if_path(#access);
             };
 
@@ -339,8 +341,11 @@ fn encode_variant(
         struct_encoder_t,
         struct_field_encoder_t,
         variant_encoder_t,
+        struct_hint,
         ..
     } = b.tokens;
+
+    let hint = b.cx.ident("STRUCT_HINT");
 
     let type_name = v.st.name;
 
@@ -372,10 +377,13 @@ fn encode_variant(
                 }
                 Packing::Tagged => {
                     let decls = tests.iter().map(|t| &t.decl);
-                    let len = length_test(v.st.unskipped_fields.len(), &tests);
+                    let (build_hint, hint) =
+                        length_test(v.st.unskipped_fields.len(), &tests).build(b);
 
                     encode = quote! {{
-                        #encoder_t::encode_struct_fn(#encoder_var, #len, move |#encoder_var| {
+                        #build_hint
+
+                        #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result_ok(())
@@ -413,10 +421,14 @@ fn encode_variant(
                 let mut len = length_test(v.st.unskipped_fields.len(), &tests);
 
                 // Add one for the tag field.
-                len.push(quote!(1));
+                len.expressions.push(quote!(1));
+
+                let (build_hint, hint) = len.build(b);
 
                 encode = quote! {{
-                    #encoder_t::encode_struct_fn(#encoder_var, #len, move |#encoder_var| {
+                    #build_hint
+
+                    #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
                         #struct_encoder_t::insert_struct_field(#encoder_var, #field_tag, #tag)?;
                         #(#decls)*
                         #(#encoders)*
@@ -436,14 +448,18 @@ fn encode_variant(
 
                 let decls = tests.iter().map(|t| &t.decl);
 
-                let len = length_test(v.st.unskipped_fields.len(), &tests);
+                let (build_hint, inner_hint) =
+                    length_test(v.st.unskipped_fields.len(), &tests).build(b);
                 let struct_encoder = b.cx.ident("struct_encoder");
                 let content_struct = b.cx.ident("content_struct");
                 let pair = b.cx.ident("pair");
                 let content_tag = b.cx.ident("content_tag");
 
                 encode = quote! {{
-                    #encoder_t::encode_struct_fn(#encoder_var, 2, move |#struct_encoder| {
+                    static #hint: #struct_hint = #struct_hint::with_size(2);
+                    #build_hint
+
+                    #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#struct_encoder| {
                         #struct_encoder_t::insert_struct_field(#struct_encoder, &#field_tag, #tag)?;
 
                         #struct_encoder_t::encode_struct_field_fn(#struct_encoder, move |#pair| {
@@ -452,7 +468,7 @@ fn encode_variant(
 
                             let #content_struct = #struct_field_encoder_t::encode_field_value(#pair)?;
 
-                            #encoder_t::encode_struct_fn(#content_struct, #len, move |#encoder_var| {
+                            #encoder_t::encode_struct_fn(#content_struct, &#inner_hint, move |#encoder_var| {
                                 #(#decls)*
                                 #(#encoders)*
                                 #result_ok(())
@@ -495,14 +511,50 @@ fn encode_variant(
     Ok((pattern, encode))
 }
 
-fn length_test(count: usize, tests: &[FieldTest<'_>]) -> Punctuated<TokenStream, Token![+]> {
-    let mut punctuated = Punctuated::<_, Token![+]>::new();
+struct LengthTest {
+    kind: LengthTestKind,
+    expressions: Punctuated<TokenStream, Token![+]>,
+}
+
+impl LengthTest {
+    fn build(&self, b: &Build<'_>) -> (syn::Stmt, syn::Ident) {
+        let Tokens { struct_hint, .. } = b.tokens;
+
+        match self.kind {
+            LengthTestKind::Static => {
+                let hint = b.cx.ident("HINT");
+                let len = &self.expressions;
+                let item =
+                    syn::parse_quote!(static #hint: #struct_hint = #struct_hint::with_size(#len););
+                (item, hint)
+            }
+            LengthTestKind::Dynamic => {
+                let hint = b.cx.ident("hint");
+                let len = &self.expressions;
+                let item =
+                    syn::parse_quote!(let #hint: #struct_hint = #struct_hint::with_size(#len););
+                (item, hint)
+            }
+        }
+    }
+}
+
+enum LengthTestKind {
+    Static,
+    Dynamic,
+}
+
+fn length_test(count: usize, tests: &[FieldTest<'_>]) -> LengthTest {
+    let mut kind = LengthTestKind::Static;
+
+    let mut expressions = Punctuated::<_, Token![+]>::new();
     let count = count.saturating_sub(tests.len());
-    punctuated.push(quote!(#count));
+    expressions.push(quote!(#count));
 
     for FieldTest { var, .. } in tests {
-        punctuated.push(quote!(if #var { 1 } else { 0 }))
+        kind = LengthTestKind::Dynamic;
+        expressions.push(quote!(if #var { 1 } else { 0 }))
     }
 
-    punctuated
+    LengthTest { kind, expressions }
 }

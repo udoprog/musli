@@ -4,6 +4,7 @@ use musli::de::{
     Decoder, MapDecoder, MapEntriesDecoder, SequenceDecoder, SizeHint, StructFieldsDecoder,
     TupleDecoder, VariantDecoder, Visitor,
 };
+use musli::hint::{StructHint, TupleHint};
 use musli::Context;
 use serde::de;
 
@@ -260,8 +261,10 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.decoder.decode_tuple(len, |d| {
-            visitor.visit_seq(TupleAccess::new(self.cx, d, len))
+        let hint = TupleHint::with_size(len);
+
+        self.decoder.decode_tuple(&hint, |d| {
+            visitor.visit_seq(TupleAccess::new(self.cx, d, hint.size))
         })
     }
 
@@ -299,7 +302,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let hint = musli::__priv::struct_hint(fields.len());
+        let hint = StructHint::with_size(fields.len());
         let mut decoder = self.decoder.decode_struct_fields(&hint)?;
         let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields))?;
         decoder.end_struct_fields()?;
@@ -785,8 +788,10 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.decoder.decode_value()?.decode_tuple(len, |tuple| {
-            visitor.visit_seq(TupleAccess::new(self.cx, tuple, len))
+        let hint = TupleHint::with_size(len);
+
+        self.decoder.decode_value()?.decode_tuple(&hint, |tuple| {
+            visitor.visit_seq(TupleAccess::new(self.cx, tuple, hint.size))
         })
     }
 
@@ -800,7 +805,7 @@ where
         V: de::Visitor<'de>,
     {
         let decoder = self.decoder.decode_value()?;
-        let hint = musli::__priv::struct_hint(fields.len());
+        let hint = StructHint::with_size(fields.len());
         let mut st = decoder.decode_struct_fields(&hint)?;
         let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
         st.end_struct_fields()?;

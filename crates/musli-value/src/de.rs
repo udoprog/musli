@@ -1,13 +1,15 @@
 use core::fmt;
 use core::slice;
 
+#[cfg(feature = "alloc")]
+use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint,
     PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
     StructFieldsDecoder, TupleDecoder, TypeHint, VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
-use musli::de::{StructHint, UnsizedStructHint, ValueVisitor};
+use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_storage::options::Options;
@@ -279,7 +281,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_tuple<F, O>(self, _: usize, f: F) -> Result<O, C::Error>
+    fn decode_tuple<F, O>(self, _: &TupleHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
     {

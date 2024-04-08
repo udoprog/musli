@@ -1,6 +1,7 @@
 use core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 
 use crate::en::TupleEncoder;
+use crate::hint::TupleHint;
 use crate::{Decode, Decoder, Encode, Encoder};
 
 macro_rules! implement {
@@ -15,7 +16,9 @@ macro_rules! implement {
             where
                 E: Encoder<Mode = M>,
             {
-                encoder.encode_tuple_fn($count, |tuple| {
+                static HINT: TupleHint = TupleHint::with_size($count);
+
+                encoder.encode_tuple_fn(&HINT, |tuple| {
                     $(tuple.encode_tuple_field()?.encode(&self.$field)?;)*
                     Ok(())
                 })
@@ -49,7 +52,9 @@ macro_rules! implement_new {
             where
                 E: Encoder<Mode = M>,
             {
-                encoder.encode_tuple_fn($count, |tuple| {
+                static HINT: TupleHint = TupleHint::with_size($count);
+
+                encoder.encode_tuple_fn(&HINT, |tuple| {
                     $(tuple.encode_tuple_field()?.encode(self.$field())?;)*
                     Ok(())
                 })

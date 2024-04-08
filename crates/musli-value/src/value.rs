@@ -532,21 +532,33 @@ impl<M> Encode<M> for Value {
             #[cfg(feature = "alloc")]
             Value::String(string) => encoder.encode_string(string),
             #[cfg(feature = "alloc")]
-            Value::Sequence(values) => encoder.encode_sequence_fn(values.len(), |sequence| {
-                for value in values {
-                    sequence.encode_element()?.encode(value)?;
-                }
+            Value::Sequence(values) => {
+                use musli::hint::SequenceHint;
 
-                Ok(())
-            }),
+                let hint = SequenceHint::with_size(values.len());
+
+                encoder.encode_sequence_fn(&hint, |sequence| {
+                    for value in values {
+                        sequence.encode_element()?.encode(value)?;
+                    }
+
+                    Ok(())
+                })
+            }
             #[cfg(feature = "alloc")]
-            Value::Map(values) => encoder.encode_map_fn(values.len(), |map| {
-                for (first, second) in values {
-                    map.insert_entry(first, second)?;
-                }
+            Value::Map(values) => {
+                use musli::hint::MapHint;
 
-                Ok(())
-            }),
+                let hint = MapHint::with_size(values.len());
+
+                encoder.encode_map_fn(&hint, |map| {
+                    for (first, second) in values {
+                        map.insert_entry(first, second)?;
+                    }
+
+                    Ok(())
+                })
+            }
             #[cfg(feature = "alloc")]
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;

@@ -4,6 +4,7 @@ use musli::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
     StructEncoder, StructFieldEncoder, TupleEncoder, VariantEncoder,
 };
+use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::{Buf, Context};
 use musli_storage::en::StorageEncoder;
 
@@ -282,37 +283,41 @@ where
     }
 
     #[inline]
-    fn encode_sequence(mut self, len: usize) -> Result<Self::EncodeSequence, C::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
+    fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
+        let (tag, embedded) = Tag::with_len(Kind::Sequence, hint.size);
         self.writer.write_byte(self.cx, tag.byte())?;
 
         if !embedded {
-            musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+            musli_common::int::encode_usize::<_, _, OPT>(
+                self.cx,
+                self.writer.borrow_mut(),
+                hint.size,
+            )?;
         }
 
         Ok(self)
     }
 
     #[inline]
-    fn encode_tuple(mut self, len: usize) -> Result<Self::EncodeTuple, C::Error> {
-        self.encode_tuple_len(len)?;
+    fn encode_tuple(mut self, hint: &TupleHint) -> Result<Self::EncodeTuple, C::Error> {
+        self.encode_tuple_len(hint.size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map(mut self, len: usize) -> Result<Self::EncodeMap, C::Error> {
-        self.encode_map_len(len)?;
+    fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, C::Error> {
+        self.encode_map_len(hint.size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map_entries(self, len: usize) -> Result<Self::EncodeMapEntries, C::Error> {
-        self.encode_map(len)
+    fn encode_map_entries(self, hint: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
+        self.encode_map(hint)
     }
 
     #[inline]
-    fn encode_struct(mut self, len: usize) -> Result<Self::EncodeStruct, C::Error> {
-        let Some(len) = len.checked_mul(2) else {
+    fn encode_struct(mut self, hint: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
+        let Some(len) = hint.size.checked_mul(2) else {
             return Err(self.cx.message("Struct length overflow"));
         };
 
@@ -337,7 +342,7 @@ where
     fn encode_tuple_variant<T>(
         mut self,
         tag: &T,
-        len: usize,
+        hint: &TupleHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
@@ -345,14 +350,14 @@ where
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
         WireEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        self.encode_tuple(len)
+        self.encode_tuple(hint)
     }
 
     #[inline]
     fn encode_struct_variant<T>(
         mut self,
         tag: &T,
-        len: usize,
+        hint: &StructHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
@@ -360,7 +365,7 @@ where
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
         WireEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        self.encode_struct(len)
+        self.encode_struct(hint)
     }
 }
 

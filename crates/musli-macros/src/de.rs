@@ -124,8 +124,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let Tokens {
         as_decoder_t,
         buf_t,
-        build_struct_hint,
-        build_unsized_struct_hint,
         context_t,
         decoder_t,
         fmt,
@@ -485,9 +483,9 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 let #buffer_var = #decoder_t::decode_buffer(#decoder_var)?;
                 let st = #as_decoder_t::as_decoder(&#buffer_var)?;
 
-                static #struct_hint_static: &#unsized_struct_hint = &#build_unsized_struct_hint();
+                static #struct_hint_static: #unsized_struct_hint = #unsized_struct_hint::new();
 
-                let #variant_tag_var = #decoder_t::decode_unsized_struct(st, #struct_hint_static, |st| {
+                let #variant_tag_var = #decoder_t::decode_unsized_struct(st, &#struct_hint_static, |st| {
                     let #variant_tag_var #name_type = {
                         let #variant_decoder_var = loop {
                             let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(st)? else {
@@ -666,11 +664,11 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 #output_enum
                 #outcome_enum
 
-                static #struct_hint_static: &#struct_hint = &#build_struct_hint(2);
+                static #struct_hint_static: #struct_hint = #struct_hint::with_size(2);
 
                 #enter
 
-                #decoder_t::decode_struct(#decoder_var, #struct_hint_static, move |#struct_decoder_var| {
+                #decoder_t::decode_struct(#decoder_var, &#struct_hint_static, move |#struct_decoder_var| {
                     let mut #tag_var = #option_none;
 
                     let #output_var = loop {
@@ -731,7 +729,6 @@ fn decode_tagged(
 
     let Tokens {
         buf_t,
-        build_struct_hint,
         context_t,
         decoder_t,
         default_function,
@@ -1005,9 +1002,9 @@ fn decode_tagged(
 
         #enter
 
-        static #struct_hint_static: &#struct_hint = &#build_struct_hint(#fields_len);
+        static #struct_hint_static: #struct_hint = #struct_hint::with_size(#fields_len);
 
-        #decoder_t::decode_struct(#decoder_var, #struct_hint_static, move |#type_decoder_var| {
+        #decoder_t::decode_struct(#decoder_var, &#struct_hint_static, move |#type_decoder_var| {
             while let #option_some(mut #struct_decoder_var) = #struct_decoder_t::decode_field(#type_decoder_var)? {
                 #field_alloc
                 #tag_stmt
