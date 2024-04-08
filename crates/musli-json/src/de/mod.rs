@@ -26,9 +26,10 @@ use core::str;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip, StructHint,
-    TypeHint, UnsizedStructHint, ValueVisitor, Visitor,
+    Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip, TypeHint,
+    ValueVisitor, Visitor,
 };
+use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
 
 #[cfg(not(feature = "parse-full"))]
@@ -403,11 +404,11 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(self, len: usize, f: F) -> Result<O, C::Error>
+    fn decode_tuple<F, O>(self, hint: &TupleHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
     {
-        let mut decoder = JsonSequenceDecoder::new(self.cx, Some(len), self.parser)?;
+        let mut decoder = JsonSequenceDecoder::new(self.cx, Some(hint.size), self.parser)?;
         let output = f(&mut decoder)?;
         decoder.skip_sequence_remaining()?;
         Ok(output)
@@ -453,7 +454,7 @@ where
 
     #[inline]
     fn decode_struct_fields(self, hint: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
-        JsonObjectDecoder::new(self.cx, Some(hint.fields), self.parser)
+        JsonObjectDecoder::new(self.cx, Some(hint.size), self.parser)
     }
 
     #[inline]

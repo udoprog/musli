@@ -3,6 +3,7 @@
 
 use crate::de::{Decode, DecodeBytes, Decoder};
 use crate::en::{Encode, EncodeBytes, Encoder};
+use crate::hint::SequenceHint;
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
@@ -25,7 +26,9 @@ impl<M> Encode<M> for Sequence<()> {
     where
         E: Encoder<Mode = M>,
     {
-        encoder.encode_sequence_fn(0, |_| Ok(()))
+        static HINT: SequenceHint = SequenceHint::with_size(0);
+
+        encoder.encode_sequence_fn(&HINT, |_| Ok(()))
     }
 }
 

@@ -7,9 +7,9 @@ use alloc::vec::Vec;
 use musli::de::{
     Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint, NumberVisitor,
     PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, StructHint, TupleDecoder, TypeHint, UnsizedStructHint, ValueVisitor,
-    VariantDecoder, Visitor,
+    StructFieldsDecoder, TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
+use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
 use musli_common::int::continuation as c;
 use musli_storage::de::StorageDecoder;
@@ -674,16 +674,17 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(mut self, len: usize, f: F) -> Result<O, C::Error>
+    fn decode_tuple<F, O>(mut self, hint: &TupleHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
     {
         let pos = self.cx.mark();
         let actual = self.decode_prefix(Kind::Sequence, pos)?;
 
-        if len != actual {
+        if hint.size != actual {
             return Err(self.cx.message(format_args!(
-                "Tuple length mismatch: len: {len}, actual: {actual}"
+                "Tuple length {} did not match actual {actual}",
+                hint.size
             )));
         }
 

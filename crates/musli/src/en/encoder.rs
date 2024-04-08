@@ -3,6 +3,7 @@
 use core::fmt;
 
 use crate::expecting::{self, Expecting};
+use crate::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use crate::Context;
 
 use super::{
@@ -1148,6 +1149,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::SequenceEncoder;
+    /// use musli::hint::SequenceHint;
     /// # struct MyType { data: Vec<String> }
     ///
     /// impl<M> Encode<M> for MyType {
@@ -1155,7 +1157,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         let mut seq = encoder.encode_sequence(self.data.len())?;
+    ///         let hint = SequenceHint::with_size(self.data.len());
+    ///
+    ///         let mut seq = encoder.encode_sequence(&hint)?;
     ///
     ///         for element in &self.data {
     ///             seq.push(element)?;
@@ -1168,7 +1172,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_sequence(
         self,
-        len: usize,
+        hint: &SequenceHint,
     ) -> Result<Self::EncodeSequence, <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Sequence,
@@ -1183,6 +1187,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::SequenceEncoder;
+    /// use musli::hint::SequenceHint;
     /// # struct MyType { data: Vec<String> }
     ///
     /// impl<M> Encode<M> for MyType {
@@ -1190,7 +1195,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         encoder.encode_sequence_fn(self.data.len(), |seq| {
+    ///         let hint = SequenceHint::with_size(self.data.len());
+    ///
+    ///         encoder.encode_sequence_fn(&hint, |seq| {
     ///             for element in &self.data {
     ///                 seq.push(element)?;
     ///             }
@@ -1203,13 +1210,13 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_sequence_fn<F>(
         self,
-        len: usize,
+        hint: &SequenceHint,
         f: F,
     ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::EncodeSequence) -> Result<(), <Self::Cx as Context>::Error>,
     {
-        let mut seq = self.encode_sequence(len)?;
+        let mut seq = self.encode_sequence(hint)?;
         f(&mut seq)?;
         seq.finish_sequence()
     }
@@ -1229,6 +1236,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::TupleEncoder;
+    /// use musli::hint::TupleHint;
     ///
     /// struct PackedTuple(u32, [u8; 128]);
     ///
@@ -1237,7 +1245,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         let mut tuple = encoder.encode_tuple(2)?;
+    ///         static HINT: TupleHint = TupleHint::with_size(2);
+    ///
+    ///         let mut tuple = encoder.encode_tuple(&HINT)?;
     ///         tuple.encode_tuple_field()?.encode(self.0)?;
     ///         tuple.encode_tuple_field()?.encode(&self.1)?;
     ///         tuple.finish_tuple()
@@ -1245,7 +1255,10 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple(self, len: usize) -> Result<Self::EncodeTuple, <Self::Cx as Context>::Error> {
+    fn encode_tuple(
+        self,
+        hint: &TupleHint,
+    ) -> Result<Self::EncodeTuple, <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Tuple,
             ExpectingWrapper::new(&self),
@@ -1267,6 +1280,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::TupleEncoder;
+    /// use musli::hint::TupleHint;
     ///
     /// struct PackedTuple(u32, [u8; 128]);
     ///
@@ -1275,7 +1289,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         encoder.encode_tuple_fn(2, |tuple| {
+    ///         static HINT: TupleHint = TupleHint::with_size(2);
+    ///
+    ///         encoder.encode_tuple_fn(&HINT, |tuple| {
     ///             tuple.encode_tuple_field()?.encode(self.0)?;
     ///             tuple.encode_tuple_field()?.encode(&self.1)?;
     ///             Ok(())
@@ -1284,11 +1300,15 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_tuple_fn<F>(self, len: usize, f: F) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    fn encode_tuple_fn<F>(
+        self,
+        hint: &TupleHint,
+        f: F,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::EncodeTuple) -> Result<(), <Self::Cx as Context>::Error>,
     {
-        let mut tuple = self.encode_tuple(len)?;
+        let mut tuple = self.encode_tuple(hint)?;
         f(&mut tuple)?;
         tuple.finish_tuple()
     }
@@ -1314,6 +1334,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::MapEncoder;
+    /// use musli::hint::MapHint;
     /// # struct Struct { name: String, age: u32 }
     ///
     /// impl<M> Encode<M> for Struct {
@@ -1321,7 +1342,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         let mut map = encoder.encode_map(2)?;
+    ///         let hint = MapHint::with_size(2);
+    ///
+    ///         let mut map = encoder.encode_map(&hint)?;
     ///         map.insert_entry("name", &self.name)?;
     ///         map.insert_entry("age", self.age)?;
     ///         map.finish_map()
@@ -1329,7 +1352,7 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_map(self, len: usize) -> Result<Self::EncodeMap, <Self::Cx as Context>::Error> {
+    fn encode_map(self, hint: &MapHint) -> Result<Self::EncodeMap, <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Map,
             ExpectingWrapper::new(&self),
@@ -1343,6 +1366,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::MapEncoder;
+    /// use musli::hint::MapHint;
     ///
     /// struct Struct {
     ///     name: String,
@@ -1354,7 +1378,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         encoder.encode_map_fn(2, |map| {
+    ///         let hint = MapHint::with_size(2);
+    ///
+    ///         encoder.encode_map_fn(&hint, |map| {
     ///             map.insert_entry("name", &self.name)?;
     ///             map.insert_entry("age", self.age)?;
     ///             Ok(())
@@ -1363,11 +1389,15 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_map_fn<F>(self, len: usize, f: F) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    fn encode_map_fn<F>(
+        self,
+        hint: &MapHint,
+        f: F,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::EncodeMap) -> Result<(), <Self::Cx as Context>::Error>,
     {
-        let mut map = self.encode_map(len)?;
+        let mut map = self.encode_map(hint)?;
         f(&mut map)?;
         map.finish_map()
     }
@@ -1379,6 +1409,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::MapEntriesEncoder;
+    /// use musli::hint::MapHint;
     ///
     /// struct Struct {
     ///     name: String,
@@ -1390,7 +1421,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         let mut m = encoder.encode_map_entries(2)?;
+    ///         let hint = MapHint::with_size(2);
+    ///
+    ///         let mut m = encoder.encode_map_entries(&hint)?;
     ///
     ///         // Simplified encoding.
     ///         m.insert_entry("name", &self.name)?;
@@ -1405,7 +1438,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_map_entries(
         self,
-        len: usize,
+        hint: &MapHint,
     ) -> Result<Self::EncodeMapEntries, <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::MapPairs,
@@ -1420,6 +1453,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::StructEncoder;
+    /// use musli::hint::StructHint;
     ///
     /// struct Struct {
     ///     name: String,
@@ -1431,7 +1465,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         let mut st = encoder.encode_struct(2)?;
+    ///         static HINT: StructHint = StructHint::with_size(2);
+    ///
+    ///         let mut st = encoder.encode_struct(&HINT)?;
     ///         st.insert_struct_field("name", &self.name)?;
     ///         st.insert_struct_field("age", self.age)?;
     ///         st.finish_struct()
@@ -1441,7 +1477,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_struct(
         self,
-        fields: usize,
+        hint: &StructHint,
     ) -> Result<Self::EncodeStruct, <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Struct,
@@ -1456,6 +1492,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::StructEncoder;
+    /// use musli::hint::StructHint;
     ///
     /// struct Struct {
     ///     name: String,
@@ -1467,7 +1504,9 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         encoder.encode_struct_fn(2, |st| {
+    ///         static HINT: StructHint = StructHint::with_size(2);
+    ///
+    ///         encoder.encode_struct_fn(&HINT, |st| {
     ///             st.insert_struct_field("name", &self.name)?;
     ///             st.insert_struct_field("age", self.age)?;
     ///             Ok(())
@@ -1478,13 +1517,13 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_struct_fn<F>(
         self,
-        fields: usize,
+        hint: &StructHint,
         f: F,
     ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::EncodeStruct) -> Result<(), <Self::Cx as Context>::Error>,
     {
-        let mut st = self.encode_struct(fields)?;
+        let mut st = self.encode_struct(hint)?;
         f(&mut st)?;
         st.finish_struct()
     }
@@ -1512,6 +1551,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::{VariantEncoder, TupleEncoder, StructEncoder};
+    /// use musli::hint::{StructHint, TupleHint};
     /// # enum Enum { UnitVariant, TupleVariant(String), StructVariant { data: String, age: u32 } }
     ///
     /// impl<M> Encode<M> for Enum {
@@ -1526,18 +1566,22 @@ pub trait Encoder: Sized {
     ///                 variant.insert_variant("UnitVariant", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
+    ///                 static HINT: TupleHint = TupleHint::with_size(1);
+    ///
     ///                 variant.encode_tag()?.encode_string("TupleVariant")?;
     ///
-    ///                 let mut tuple = variant.encode_value()?.encode_tuple(1)?;
+    ///                 let mut tuple = variant.encode_value()?.encode_tuple(&HINT)?;
     ///                 tuple.push_tuple_field(data)?;
     ///                 tuple.finish_tuple()?;
     ///
     ///                 variant.finish_variant()
     ///             }
     ///             Enum::StructVariant { data, age } => {
+    ///                 static HINT: StructHint = StructHint::with_size(2);
+    ///
     ///                 variant.encode_tag()?.encode_string("StructVariant")?;
     ///
-    ///                 let mut st = variant.encode_value()?.encode_struct(2)?;
+    ///                 let mut st = variant.encode_value()?.encode_struct(&HINT)?;
     ///                 st.insert_struct_field("data", data)?;
     ///                 st.insert_struct_field("age", age)?;
     ///                 st.finish_struct()?;
@@ -1563,6 +1607,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::{VariantEncoder, TupleEncoder, StructEncoder};
+    /// use musli::hint::{StructHint, TupleHint};
     ///
     /// enum Enum {
     ///     UnitVariant,
@@ -1583,10 +1628,12 @@ pub trait Encoder: Sized {
     ///                 encoder.encode_variant()?.insert_variant("variant1", ())
     ///             }
     ///             Enum::TupleVariant(data) => {
+    ///                 static HINT: TupleHint = TupleHint::with_size(2);
+    ///
     ///                 encoder.encode_variant_fn(|variant| {
     ///                     variant.encode_tag()?.encode("TupleVariant")?;
     ///
-    ///                     variant.encode_value()?.encode_tuple_fn(1, |tuple| {
+    ///                     variant.encode_value()?.encode_tuple_fn(&HINT, |tuple| {
     ///                         tuple.push_tuple_field(data)?;
     ///                         Ok(())
     ///                     })?;
@@ -1596,9 +1643,11 @@ pub trait Encoder: Sized {
     ///             }
     ///             Enum::StructVariant { data, age } => {
     ///                 encoder.encode_variant_fn(|variant| {
+    ///                     static HINT: StructHint = StructHint::with_size(2);
+    ///
     ///                     variant.encode_tag()?.encode("variant3")?;
     ///
-    ///                     variant.encode_value()?.encode_struct_fn(2, |st| {
+    ///                     variant.encode_value()?.encode_struct_fn(&HINT, |st| {
     ///                         st.insert_struct_field("data", data)?;
     ///                         st.insert_struct_field("age", age)?;
     ///                         Ok(())
@@ -1688,6 +1737,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::TupleEncoder;
+    /// use musli::hint::TupleHint;
     /// # enum Enum { TupleVariant(String) }
     ///
     /// impl<M> Encode<M> for Enum {
@@ -1697,7 +1747,9 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::TupleVariant(data) => {
-    ///                 let mut variant = encoder.encode_tuple_variant("variant2", 1)?;
+    ///                 static HINT: TupleHint = TupleHint::with_size(1);
+    ///
+    ///                 let mut variant = encoder.encode_tuple_variant("variant2", &HINT)?;
     ///                 variant.push_tuple_field(data)?;
     ///                 variant.finish_tuple()
     ///             }
@@ -1709,7 +1761,7 @@ pub trait Encoder: Sized {
     fn encode_tuple_variant<T>(
         self,
         tag: &T,
-        fields: usize,
+        hint: &TupleHint,
     ) -> Result<Self::EncodeTupleVariant, <Self::Cx as Context>::Error>
     where
         T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
@@ -1743,6 +1795,7 @@ pub trait Encoder: Sized {
     /// ```
     /// use musli::{Encode, Encoder};
     /// use musli::en::StructEncoder;
+    /// use musli::hint::StructHint;
     /// # enum Enum { StructVariant { data: String, age: u32 } }
     ///
     /// impl<M> Encode<M> for Enum {
@@ -1752,7 +1805,9 @@ pub trait Encoder: Sized {
     ///     {
     ///         match self {
     ///             Enum::StructVariant { data, age } => {
-    ///                 let mut variant = encoder.encode_struct_variant("variant3", 2)?;
+    ///                 static HINT: StructHint = StructHint::with_size(2);
+    ///
+    ///                 let mut variant = encoder.encode_struct_variant("variant3", &HINT)?;
     ///                 variant.insert_struct_field("data", data)?;
     ///                 variant.insert_struct_field("age", age)?;
     ///                 variant.finish_struct()
@@ -1765,7 +1820,7 @@ pub trait Encoder: Sized {
     fn encode_struct_variant<T>(
         self,
         tag: &T,
-        fields: usize,
+        hint: &StructHint,
     ) -> Result<Self::EncodeStructVariant, <Self::Cx as Context>::Error>
     where
         T: ?Sized + Encode<<Self::Cx as Context>::Mode>,

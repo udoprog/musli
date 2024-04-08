@@ -16,6 +16,7 @@ use self::variant_encoder::JsonVariantEncoder;
 use core::fmt;
 
 use musli::en::{Encoder, SequenceEncoder};
+use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::{Context, Encode};
 
 use crate::writer::Writer;
@@ -275,27 +276,27 @@ where
     }
 
     #[inline]
-    fn encode_sequence(self, _: usize) -> Result<Self::EncodeSequence, C::Error> {
+    fn encode_sequence(self, _: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
         JsonArrayEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_tuple(self, _: usize) -> Result<Self::EncodeTuple, C::Error> {
+    fn encode_tuple(self, _: &TupleHint) -> Result<Self::EncodeTuple, C::Error> {
         JsonArrayEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_map(self, _: usize) -> Result<Self::EncodeMap, C::Error> {
+    fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         JsonObjectEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_map_entries(self, _: usize) -> Result<Self::EncodeMapEntries, C::Error> {
+    fn encode_map_entries(self, _: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
         JsonObjectEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_struct(self, _: usize) -> Result<Self::EncodeStruct, C::Error> {
+    fn encode_struct(self, _: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
         JsonObjectEncoder::new(self.cx, self.writer)
     }
 
@@ -308,7 +309,7 @@ where
     fn encode_tuple_variant<T>(
         mut self,
         tag: &T,
-        _: usize,
+        _: &TupleHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
@@ -323,7 +324,7 @@ where
     fn encode_struct_variant<T>(
         mut self,
         tag: &T,
-        _: usize,
+        _: &StructHint,
     ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,

@@ -16,6 +16,7 @@ use core::{fmt, marker};
 
 use crate::de::{Decode, DecodeBytes, Decoder, ValueVisitor, VariantDecoder};
 use crate::en::{Encode, EncodeBytes, Encoder, SequenceEncoder, VariantEncoder};
+use crate::hint::SequenceHint;
 use crate::Context;
 
 /// Platform tag used by certain platform-specific implementations.
@@ -161,7 +162,9 @@ where
     where
         E: Encoder<Mode = M>,
     {
-        encoder.encode_sequence_fn(N, |seq| {
+        let hint = SequenceHint::with_size(N);
+
+        encoder.encode_sequence_fn(&hint, |seq| {
             for value in self.iter() {
                 seq.encode_element()?.encode(value)?;
             }
@@ -307,7 +310,9 @@ where
     where
         E: Encoder<Mode = M>,
     {
-        encoder.encode_sequence_fn(self.len(), |seq| {
+        let hint = SequenceHint::with_size(self.len());
+
+        encoder.encode_sequence_fn(&hint, |seq| {
             let mut index = 0;
 
             for value in self {

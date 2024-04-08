@@ -4,6 +4,7 @@ use musli::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
     StructEncoder, StructFieldEncoder, TupleEncoder, VariantEncoder,
 };
+use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::Context;
 
 use crate::options::Options;
@@ -73,7 +74,8 @@ where
 
     #[inline]
     fn encode_unit(self) -> Result<Self::Ok, C::Error> {
-        self.encode_sequence_fn(0, |_| Ok(()))
+        static HINT: SequenceHint = SequenceHint::with_size(0);
+        self.encode_sequence_fn(&HINT, |_| Ok(()))
     }
 
     #[inline]
@@ -225,32 +227,32 @@ where
     }
 
     #[inline]
-    fn encode_sequence(mut self, len: usize) -> Result<Self::EncodeSequence, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+    fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
+        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_tuple(self, _: usize) -> Result<Self::EncodeSequence, C::Error> {
+    fn encode_tuple(self, _: &TupleHint) -> Result<Self::EncodeSequence, C::Error> {
         // NB: A tuple has statically known fixed length.
         Ok(self)
     }
 
     #[inline]
-    fn encode_map(mut self, len: usize) -> Result<Self::EncodeMap, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+    fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, C::Error> {
+        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map_entries(mut self, len: usize) -> Result<Self::EncodeMapEntries, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+    fn encode_map_entries(mut self, hint: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
+        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_struct(mut self, len: usize) -> Result<Self::EncodeStruct, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+    fn encode_struct(mut self, hint: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
+        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
@@ -263,7 +265,7 @@ where
     fn encode_tuple_variant<T>(
         mut self,
         tag: &T,
-        _: usize,
+        _: &TupleHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
@@ -276,13 +278,13 @@ where
     fn encode_struct_variant<T>(
         mut self,
         tag: &T,
-        len: usize,
+        hint: &StructHint,
     ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
         StorageEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 }

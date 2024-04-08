@@ -4,11 +4,12 @@ use core::fmt;
 
 use crate::de::{NumberVisitor, StructDecoder, TypeHint, ValueVisitor, Visitor};
 use crate::expecting::{self, Expecting};
+use crate::hint::{StructHint, TupleHint, UnsizedStructHint};
 use crate::Context;
 
 use super::{
     AsDecoder, Decode, MapDecoder, MapEntriesDecoder, PackDecoder, SequenceDecoder, Skip,
-    StructFieldsDecoder, StructHint, TupleDecoder, UnsizedStructHint, VariantDecoder,
+    StructFieldsDecoder, TupleDecoder, VariantDecoder,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -1264,6 +1265,7 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::{Context, Decode, Decoder};
     /// use musli::de::TupleDecoder;
+    /// use musli::hint::TupleHint;
     /// # struct TupleStruct(String, u32);
     ///
     /// impl<'de, M> Decode<'de, M> for TupleStruct {
@@ -1271,14 +1273,16 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         decoder.decode_tuple(2, |tuple| {
+    ///         static HINT: TupleHint = TupleHint::with_size(2);
+    ///
+    ///         decoder.decode_tuple(&HINT, |tuple| {
     ///             Ok(Self(tuple.next()?, tuple.next()?))
     ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_tuple<F, O>(self, len: usize, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_tuple<F, O>(self, hint: &TupleHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, <Self::Cx as Context>::Error>,
     {
@@ -1388,19 +1392,18 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{StructDecoder, StructFieldDecoder, StructHint};
+    /// use musli::de::{StructDecoder, StructFieldDecoder};
+    /// use musli::hint::StructHint;
     /// # struct Struct { string: String, integer: u32 }
-    /// # const fn struct_hint() -> StructHint { musli::__priv::struct_hint(2) }
     ///
-    /// // Note: a struct hint can't be constructed manually.
-    /// static STRUCT_HINT: &StructHint = &struct_hint();
+    /// static STRUCT_HINT: StructHint = StructHint::with_size(2);
     ///
     /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         decoder.decode_struct(STRUCT_HINT, |st| {
+    ///         decoder.decode_struct(&STRUCT_HINT, |st| {
     ///             let mut string = None;
     ///             let mut integer = None;
     ///
@@ -1449,23 +1452,22 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{StructDecoder, StructFieldDecoder, UnsizedStructHint};
-    /// # const fn unsized_struct_hint() -> UnsizedStructHint { musli::__priv::unsized_struct_hint() }
+    /// use musli::de::{StructDecoder, StructFieldDecoder};
+    /// use musli::hint::UnsizedStructHint;
     ///
     /// struct Struct {
     ///     string: String,
     ///     integer: u32,
     /// }
     ///
-    /// // Note: a struct hint can't be constructed manually.
-    /// static STRUCT_HINT: &UnsizedStructHint = &unsized_struct_hint();
+    /// static STRUCT_HINT: UnsizedStructHint = UnsizedStructHint::new();
     ///
     /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         decoder.decode_unsized_struct(STRUCT_HINT, |st| {
+    ///         decoder.decode_unsized_struct(&STRUCT_HINT, |st| {
     ///             let mut string = None;
     ///             let mut integer = None;
     ///

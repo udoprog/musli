@@ -420,6 +420,7 @@ pub mod de;
 pub mod derives;
 pub mod en;
 mod expecting;
+pub mod hint;
 mod impls;
 mod internal;
 pub mod mode;
@@ -612,18 +613,6 @@ pub mod __priv {
         D: StructFieldDecoder<'de>,
     {
         skip(decoder.decode_field_value()?)
-    }
-
-    /// Construct a struct hint for the given number of fields.
-    #[inline(always)]
-    pub const fn struct_hint(fields: usize) -> crate::de::StructHint {
-        crate::de::StructHint { fields }
-    }
-
-    /// Construct an unsized struct hint for the given number of fields.
-    #[inline(always)]
-    pub const fn unsized_struct_hint() -> crate::de::UnsizedStructHint {
-        crate::de::UnsizedStructHint {}
     }
 
     pub use Option::{None, Some};

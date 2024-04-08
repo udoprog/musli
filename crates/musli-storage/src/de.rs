@@ -5,9 +5,10 @@ use alloc::vec::Vec;
 
 use musli::de::{
     Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder, SequenceDecoder,
-    SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, StructHint, TupleDecoder,
-    ValueVisitor, VariantDecoder,
+    SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder, TupleDecoder, ValueVisitor,
+    VariantDecoder,
 };
+use musli::hint::{StructHint, TupleHint};
 use musli::{Context, Decode};
 
 use crate::options::Options;
@@ -284,7 +285,7 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(mut self, _: usize, f: F) -> Result<O, C::Error>
+    fn decode_tuple<F, O>(mut self, _: &TupleHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
     {
