@@ -60,6 +60,21 @@ pub mod json {
     pub use musli_json::*;
 }
 
+#[cfg(feature = "musli-value")]
+#[track_caller]
+pub fn musli_value_rt<T>(expected: T)
+where
+    T: musli::Encode + for<'de> musli::Decode<'de> + PartialEq + core::fmt::Debug,
+{
+    let value: ::musli_value::Value =
+        ::musli_value::encode(&expected).expect("value: Encoding should succeed");
+    let actual: T = ::musli_value::decode(&value).expect("value: Decoding should succeed");
+    assert_eq!(
+        actual, expected,
+        "value: roundtripped value does not match expected"
+    );
+}
+
 /// Roundtrip the given expression through all supported formats.
 #[macro_export]
 #[doc(hidden)]
@@ -78,6 +93,12 @@ macro_rules! rt {
         }
 
         $crate::$what!(rt);
+
+        #[cfg(feature = "musli-value")]
+        {
+            $crate::musli_value_rt($expr);
+        }
+
         $crate::extra!($expr $(, $($extra)*)*);
         expected
     }};
