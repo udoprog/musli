@@ -127,7 +127,9 @@ impl fmt::Display for ErrorMessage {
                 write!(f, "Expected sequence, but found {hint}")
             }
             #[cfg(feature = "alloc")]
-            ErrorMessage::ExpectedPack(hint) => write!(f, "Expected pack, but found {hint}"),
+            ErrorMessage::ExpectedPack(hint) => {
+                write!(f, "Expected pack of bytes, but found {hint}")
+            }
             #[cfg(feature = "alloc")]
             ErrorMessage::ExpectedMap(hint) => write!(f, "Expected map, but found {hint}"),
             #[cfg(feature = "alloc")]

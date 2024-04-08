@@ -49,7 +49,7 @@ where
     let mut buf = musli_common::exports::allocator::buffer();
     let alloc = musli_common::exports::allocator::new(&mut buf);
     let cx = musli_common::exports::context::Same::<_, DefaultMode, Error>::new(&alloc);
-    ValueEncoder::new(&cx, &mut output).encode(value)?;
+    ValueEncoder::<DEFAULT_OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
     Ok(output)
 }
 
