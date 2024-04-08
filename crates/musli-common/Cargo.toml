@@ -1,6 +1,6 @@
 [package]
 name = "musli-common"
-version = "0.0.108"
+version = "0.0.109"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.76"
@@ -25,8 +25,8 @@ std = ["musli/std", "simdutf8?/std", "musli-allocator/std"]
 alloc = ["musli-allocator/alloc"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.108", default-features = false }
-musli-allocator = { path = "../musli-allocator", version = "0.0.108", default-features = false }
+musli = { path = "../musli", version = "0.0.109", default-features = false }
+musli-allocator = { path = "../musli-allocator", version = "0.0.109", default-features = false }
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 
 [dev-dependencies]
