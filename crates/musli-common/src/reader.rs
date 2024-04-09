@@ -1,3 +1,9 @@
+//! Trait for governing how a particular source of bytes is read.
+//!
+//! `musli` requires all sources to reference the complete data being read from
+//! it which allows it to make the assumption the bytes are always returned with
+//! the `'de` lifetime.
+
 use core::array;
 use core::fmt;
 use core::marker;
@@ -257,6 +263,11 @@ pub struct SliceReader<'de> {
     _marker: marker::PhantomData<&'de [u8]>,
 }
 
+// SAFETY: `SliceReader` is effectively equivalent to `&'de [u8]`.
+unsafe impl Send for SliceReader<'_> {}
+// SAFETY: `SliceReader` is effectively equivalent to `&'de [u8]`.
+unsafe impl Sync for SliceReader<'_> {}
+
 impl<'de> SliceReader<'de> {
     /// Construct a new instance around the specified slice.
     #[inline]
@@ -265,6 +276,52 @@ impl<'de> SliceReader<'de> {
             range: slice.as_ptr_range(),
             _marker: marker::PhantomData,
         }
+    }
+
+    /// Get the remaining contents of the reader as a slice.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use musli::Context;
+    /// use musli_descriptive::reader::{Reader, SliceReader};
+    ///
+    /// fn process<C>(cx: &C) -> Result<(), C::Error>
+    /// where
+    ///     C: ?Sized + Context
+    /// {
+    ///     let reader = SliceReader::new(&[1, 2, 3, 4]);
+    ///     assert_eq!(reader.as_slice(), &[1, 2, 3, 4]);
+    ///     reader.skip(&cx, 2)?;
+    ///     assert_eq!(reader.as_slice(), &[3, 4]);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn as_slice(&self) -> &'de [u8] {
+        unsafe { slice::from_raw_parts(self.range.start, self.remaining()) }
+    }
+
+    /// Get remaining bytes in the reader.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use musli::Context;
+    /// use musli_descriptive::reader::{Reader, SliceReader};
+    ///
+    /// fn process<C>(cx: &C) -> Result<(), C::Error>
+    /// where
+    ///     C: ?Sized + Context
+    /// {
+    ///     let reader = SliceReader::new(&[1, 2, 3, 4]);
+    ///     assert_eq!(reader.remaining(), 4);
+    ///     reader.skip(&cx, 2);
+    ///     assert_eq!(reader.remaining(), 2);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn remaining(&self) -> usize {
+        self.range.end as usize - self.range.start as usize
     }
 }
 

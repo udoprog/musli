@@ -14,9 +14,9 @@ use alloc::vec::Vec;
 
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", any(unix, windows)))]
 use std::ffi::{OsStr, OsString};
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", any(unix, windows)))]
 use std::path::{Path, PathBuf};
 
 use crate::de::{
@@ -30,7 +30,7 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::internal::size_hint;
 use crate::Context;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", any(unix, windows)))]
 use super::PlatformTag;
 
 impl<M> Encode<M> for String {
