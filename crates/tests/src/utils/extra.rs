@@ -43,6 +43,7 @@ pub mod serde_dlhn {
 /// It has limited type support, so comparing it with full serialization methods
 /// would not be fair.
 #[cfg(feature = "rkyv")]
+#[crate::benchmarker]
 pub mod rkyv {
     use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
     use rkyv::ser::Serializer;
@@ -53,106 +54,50 @@ pub mod rkyv {
     const BUFFER_LEN: usize = 10_000_000;
     const SCRATCH_LEN: usize = 512_000;
 
-    pub struct Benchmarker {
-        serialize_buffer: AlignedVec,
-        serialize_scratch: AlignedVec,
-    }
-
-    pub fn new() -> Benchmarker {
-        let serialize_buffer = AlignedVec::with_capacity(BUFFER_LEN);
-        let mut serialize_scratch = AlignedVec::with_capacity(SCRATCH_LEN);
-
-        // SAFETY: I don't know why this is OK.
-        unsafe {
-            serialize_scratch.set_len(SCRATCH_LEN);
-        }
-
-        Benchmarker {
-            serialize_buffer,
-            serialize_scratch,
-        }
-    }
-
     type S<'buf> = CompositeSerializer<
         AlignedSerializer<&'buf mut AlignedVec>,
         BufferScratch<&'buf mut AlignedVec>,
         Infallible,
     >;
 
-    pub struct State<'buf, 'scratch> {
-        serialize_buffer: &'buf mut AlignedVec,
-        serialize_scratch: &'scratch mut AlignedVec,
+    struct Buffers {
+        serializer: AlignedVec,
+        scratch: AlignedVec,
     }
 
-    impl Benchmarker {
-        pub fn state(&mut self) -> State<'_, '_> {
-            State {
-                serialize_buffer: &mut self.serialize_buffer,
-                serialize_scratch: &mut self.serialize_scratch,
-            }
+    pub fn buffer() -> Buffers {
+        Buffers {
+            serializer: AlignedVec::with_capacity(BUFFER_LEN),
+            scratch: AlignedVec::with_capacity(SCRATCH_LEN),
         }
     }
 
-    pub struct DecodeState<'buf> {
-        bytes: &'buf [u8],
+    pub fn encode<'buf, T>(
+        buf: &'buf mut Buffers,
+        value: &T,
+    ) -> Result<&'buf [u8], <S<'buf> as Fallible>::Error>
+    where
+        T: for<'value> Serialize<S<'value>>,
+    {
+        let mut serializer = CompositeSerializer::new(
+            AlignedSerializer::new(&mut buf.serializer),
+            BufferScratch::new(&mut buf.scratch),
+            Infallible,
+        );
+
+        serializer.serialize_value(value)?;
+        let bytes = serializer.into_serializer().into_inner();
+        Ok(bytes)
     }
 
-    #[inline(always)]
-    pub fn decode<'de, T>(
-        bytes: &'de [u8],
-    ) -> Result<&'de T::Archived, CheckTypeError<T::Archived, DefaultValidator<'de>>>
+    pub fn decode<'buf, T>(
+        buf: &'buf [u8],
+    ) -> Result<&'buf T::Archived, CheckTypeError<T::Archived, DefaultValidator<'buf>>>
     where
         T: Archive,
-        T::Archived: CheckBytes<DefaultValidator<'de>>,
+        T::Archived: CheckBytes<DefaultValidator<'buf>>,
     {
-        rkyv::check_archived_root::<T>(bytes)
-    }
-
-    impl<'de> DecodeState<'de> {
-        #[inline(always)]
-        pub fn len(&self) -> usize {
-            self.bytes.len()
-        }
-
-        pub fn as_bytes(&self) -> Option<&'de [u8]> {
-            Some(self.bytes)
-        }
-
-        #[inline(always)]
-        pub fn decode<T>(
-            &self,
-        ) -> Result<&'de T::Archived, CheckTypeError<T::Archived, DefaultValidator<'de>>>
-        where
-            T: Archive,
-            T::Archived: CheckBytes<DefaultValidator<'de>>,
-        {
-            self::decode::<T>(self.bytes)
-        }
-    }
-
-    impl<'buf, 'scratch> State<'buf, 'scratch> {
-        pub fn reset<T>(&mut self, _: usize, _: &T) {
-            self.serialize_buffer.clear();
-        }
-
-        #[inline(always)]
-        pub fn encode<T>(
-            &mut self,
-            value: &T,
-        ) -> Result<DecodeState<'_>, <S<'buf> as Fallible>::Error>
-        where
-            T: for<'value> Serialize<S<'value>>,
-        {
-            let mut serializer = CompositeSerializer::new(
-                AlignedSerializer::new(&mut *self.serialize_buffer),
-                BufferScratch::new(&mut *self.serialize_scratch),
-                Infallible,
-            );
-
-            serializer.serialize_value(value)?;
-            let bytes = serializer.into_serializer().into_inner();
-            Ok(DecodeState { bytes })
-        }
+        rkyv::check_archived_root::<T>(buf)
     }
 }
 
