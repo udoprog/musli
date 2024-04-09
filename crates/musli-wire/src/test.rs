@@ -41,7 +41,7 @@ where
     }
 }
 
-musli_common::test_fns!("wire");
+musli_utils::test_fns!("wire");
 
 /// Encode a type as one and decode as another.
 #[inline(never)]

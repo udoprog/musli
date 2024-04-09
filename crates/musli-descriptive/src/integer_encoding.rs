@@ -1,11 +1,9 @@
 use musli::Context;
 
-use musli_common::int::continuation as c;
-use musli_common::int::zigzag as zig;
-use musli_common::int::{Signed, Unsigned};
-
-use crate::reader::Reader;
-use crate::writer::Writer;
+use musli_utils::int::continuation as c;
+use musli_utils::int::zigzag as zig;
+use musli_utils::int::{Signed, Unsigned};
+use musli_utils::{Reader, Writer};
 
 use crate::tag::{Kind, Tag};
 

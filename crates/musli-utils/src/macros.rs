@@ -11,9 +11,9 @@ macro_rules! encode_with_extensions {
             W: Writer,
             T: ?Sized + Encode<$mode>,
         {
-            let mut buf = $crate::exports::allocator::buffer();
-            let alloc = $crate::exports::allocator::new(&mut buf);
-            let cx = $crate::exports::context::Same::new(&alloc);
+            let mut buf = $crate::allocator::buffer();
+            let alloc = $crate::allocator::new(&mut buf);
+            let cx = $crate::context::Same::new(&alloc);
             self.encode_with(&cx, writer, value)
         }
 
@@ -26,7 +26,7 @@ macro_rules! encode_with_extensions {
             W: io::Write,
             T: ?Sized + Encode<$mode>,
         {
-            let writer = $crate::exports::wrap::wrap(write);
+            let writer = $crate::wrap::wrap(write);
             self.encode(writer, value)
         }
 
@@ -40,7 +40,7 @@ macro_rules! encode_with_extensions {
             W: io::Write,
             T: ?Sized + Encode<$mode>,
         {
-            let writer = $crate::exports::wrap::wrap(write);
+            let writer = $crate::wrap::wrap(write);
             self.encode_with(cx, writer, value)
         }
 
@@ -79,9 +79,9 @@ macro_rules! encode_with_extensions {
         where
             T: ?Sized + Encode<$mode>,
         {
-            let mut buf = $crate::exports::allocator::buffer();
-            let alloc = $crate::exports::allocator::new(&mut buf);
-            let cx = $crate::exports::context::Same::new(&alloc);
+            let mut buf = $crate::allocator::buffer();
+            let alloc = $crate::allocator::new(&mut buf);
+            let cx = $crate::context::Same::new(&alloc);
             self.to_fixed_bytes_with(&cx, value)
         }
 
@@ -116,9 +116,9 @@ macro_rules! encoding_from_slice_impls {
         where
             T: Decode<'de, $mode>,
         {
-            let mut buf = $crate::exports::allocator::buffer();
-            let alloc = $crate::exports::allocator::new(&mut buf);
-            let cx = $crate::exports::context::Same::new(&alloc);
+            let mut buf = $crate::allocator::buffer();
+            let alloc = $crate::allocator::new(&mut buf);
+            let cx = $crate::context::Same::new(&alloc);
             self.from_slice_with(&cx, bytes)
         }
 
@@ -133,7 +133,7 @@ macro_rules! encoding_from_slice_impls {
             C: ?Sized + Context<Mode = $mode>,
             T: Decode<'de, $mode>,
         {
-            let reader = SliceReader::new(bytes);
+            let reader = $crate::reader::SliceReader::new(bytes);
             self.decode_with(cx, reader)
         }
     };
@@ -182,9 +182,9 @@ macro_rules! encoding_impls {
             R: Reader<'de>,
             T: Decode<'de, $mode>,
         {
-            let mut buf = $crate::exports::allocator::buffer();
-            let alloc = $crate::exports::allocator::new(&mut buf);
-            let cx = $crate::exports::context::Same::new(&alloc);
+            let mut buf = $crate::allocator::buffer();
+            let alloc = $crate::allocator::new(&mut buf);
+            let cx = $crate::context::Same::new(&alloc);
             self.decode_with(&cx, reader)
         }
 
@@ -238,7 +238,7 @@ macro_rules! test_fns {
                 }
             }
 
-            let format_error = |cx: &crate::context::SystemContext<_, _>| {
+            let format_error = |cx: &$crate::context::SystemContext<_, _>| {
                 use ::alloc::vec::Vec;
 
                 let mut errors = Vec::new();
@@ -250,9 +250,9 @@ macro_rules! test_fns {
                 errors.join("\n")
             };
 
-            let mut buf = crate::allocator::buffer();
-            let alloc = crate::allocator::new(&mut buf);
-            let mut cx = crate::context::SystemContext::new(&alloc);
+            let mut buf = $crate::allocator::buffer();
+            let alloc = $crate::allocator::new(&mut buf);
+            let mut cx = $crate::context::SystemContext::new(&alloc);
             cx.include_type();
 
             let out = match ENCODING.to_vec_with(&cx, &value) {
@@ -315,7 +315,7 @@ macro_rules! test_fns {
             use ::core::any::type_name;
             use ::alloc::string::ToString;
 
-            let format_error = |cx: &crate::context::SystemContext<_, _>| {
+            let format_error = |cx: &$crate::context::SystemContext<_, _>| {
                 use ::alloc::vec::Vec;
 
                 let mut errors = Vec::new();
@@ -327,9 +327,9 @@ macro_rules! test_fns {
                 errors.join("\n")
             };
 
-            let mut buf = crate::allocator::buffer();
-            let alloc = crate::allocator::new(&mut buf);
-            let mut cx = crate::context::SystemContext::new(&alloc);
+            let mut buf = $crate::allocator::buffer();
+            let alloc = $crate::allocator::new(&mut buf);
+            let mut cx = $crate::context::SystemContext::new(&alloc);
             cx.include_type();
 
             out.clear();
@@ -365,7 +365,7 @@ macro_rules! test_fns {
             use ::core::any::type_name;
             use ::alloc::string::ToString;
 
-            let format_error = |cx: &crate::context::SystemContext<_, _>| {
+            let format_error = |cx: &$crate::context::SystemContext<_, _>| {
                 use ::alloc::vec::Vec;
 
                 let mut errors = Vec::new();
@@ -377,9 +377,9 @@ macro_rules! test_fns {
                 errors.join("\n")
             };
 
-            let mut buf = crate::allocator::buffer();
-            let alloc = crate::allocator::new(&mut buf);
-            let mut cx = crate::context::SystemContext::new(&alloc);
+            let mut buf = $crate::allocator::buffer();
+            let alloc = $crate::allocator::new(&mut buf);
+            let mut cx = $crate::context::SystemContext::new(&alloc);
             cx.include_type();
 
             match ENCODING.to_vec_with(&cx, &value) {
@@ -391,4 +391,74 @@ macro_rules! test_fns {
             }
         }
     }
+}
+
+/// Expands to a `str` module which provides local and lightweight simdutf8
+/// compatibility functions.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! simdutf8 {
+    () => {
+        pub(crate) mod str {
+            //! Functions for working with strings. The exported implementations change
+            //! depending on if the `simdutf8` feature is enabled.
+
+            #[cfg(feature = "alloc")]
+            use alloc::string::String;
+            #[cfg(feature = "alloc")]
+            use alloc::vec::Vec;
+
+            use core::fmt;
+
+            #[cfg(not(feature = "simdutf8"))]
+            #[doc(inline)]
+            pub use core::str::from_utf8;
+            #[cfg(feature = "simdutf8")]
+            #[doc(inline)]
+            pub use simdutf8::basic::from_utf8;
+
+            /// Error raised in case the UTF-8 sequence could not be decoded.
+            #[non_exhaustive]
+            #[derive(Debug)]
+            pub struct Utf8Error;
+
+            #[cfg(feature = "std")]
+            impl std::error::Error for Utf8Error {}
+
+            impl fmt::Display for Utf8Error {
+                #[inline]
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "invalid or incomplete utf-8 sequence")
+                }
+            }
+
+            /// The same as [`String::from_utf8`], but the implementation can different
+            /// depending on if the `simdutf8` feature is enabled.
+            ///
+            /// [`String::from_utf8`]: alloc::string::String::from_utf8
+            #[inline(always)]
+            #[cfg(all(feature = "alloc", not(feature = "simdutf8")))]
+            pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
+                match String::from_utf8(bytes) {
+                    Ok(string) => Ok(string),
+                    Err(..) => Err(Utf8Error),
+                }
+            }
+
+            /// The same as [`String::from_utf8`], but the implementation can different
+            /// depending on if the `simdutf8` feature is enabled.
+            ///
+            /// [`String::from_utf8`]: alloc::string::String::from_utf8
+            #[inline(always)]
+            #[cfg(all(feature = "alloc", feature = "simdutf8"))]
+            pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
+                if from_utf8(&bytes).is_err() {
+                    return Err(Utf8Error);
+                }
+
+                // SAFETY: String was checked above.
+                Ok(unsafe { String::from_utf8_unchecked(bytes) })
+            }
+        }
+    };
 }

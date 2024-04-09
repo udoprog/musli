@@ -3,9 +3,9 @@
 pub mod musli_json {
     use alloc::vec::Vec;
 
-    use ::musli_json::Encoding;
-    use ::musli_json::Error;
     use musli::{Decode, Encode};
+    use musli_json::Encoding;
+    use musli_json::Error;
 
     const ENCODING: Encoding = Encoding::new();
 
@@ -38,11 +38,9 @@ pub mod musli_json {
 pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
-    use ::musli_storage::options::{self, Integer, Options};
-    use ::musli_storage::Encoding;
-    use ::musli_storage::Error;
-
     use musli::{Decode, Encode};
+    use musli_storage::{Encoding, Error};
+    use musli_utils::options::{self, Integer, Options};
 
     use crate::mode::Packed;
 
@@ -78,11 +76,10 @@ pub mod musli_storage_packed {
 pub mod musli_storage {
     use alloc::vec::Vec;
 
-    use ::musli_storage::options::{self, Integer, Options};
-    use ::musli_storage::Encoding;
-    use ::musli_storage::Error;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
+    use musli_storage::{Encoding, Error};
+    use musli_utils::options::{self, Integer, Options};
 
     const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
     const ENCODING: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
@@ -116,10 +113,10 @@ pub mod musli_storage {
 pub mod musli_wire {
     use alloc::vec::Vec;
 
-    use ::musli_wire::Encoding;
-    use ::musli_wire::Error;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
+    use musli_wire::Encoding;
+    use musli_wire::Error;
 
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
 
@@ -152,9 +149,9 @@ pub mod musli_wire {
 pub mod musli_descriptive {
     use crate::no_alloc::Bytes;
 
-    use ::musli_descriptive::Encoding;
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
+    use musli_descriptive::Encoding;
     use musli_descriptive::Error;
 
     const ENCODING: Encoding<DefaultMode> = Encoding::new();
@@ -186,8 +183,8 @@ pub mod musli_descriptive {
 #[cfg(feature = "musli-value")]
 #[crate::benchmarker(as_bytes_disabled)]
 pub mod musli_value {
-    use ::musli_value::Value;
     use musli::{Decode, Encode};
+    use musli_value::Value;
 
     pub fn encode<T>(value: &T) -> Result<Value, musli_value::Error>
     where

@@ -6,15 +6,15 @@ use musli::en::{
 };
 use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::{Buf, Context, Encode};
-use musli_common::int::continuation as c;
 use musli_storage::en::StorageEncoder;
+use musli_utils::int::continuation as c;
+use musli_utils::writer::BufWriter;
+use musli_utils::{Options, Writer};
 
 use crate::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
-use crate::options::Options;
 use crate::tag::{
     Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, ISIZE, U128, U16, U32, U64, U8, USIZE,
 };
-use crate::writer::{BufWriter, Writer};
 
 const VARIANT: Tag = Tag::from_mark(Mark::Variant);
 
@@ -563,7 +563,7 @@ where
     writer.write_byte(cx, tag.byte())?;
 
     if !embedded {
-        musli_common::int::encode_usize::<_, _, OPT>(cx, writer, len)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(cx, writer, len)?;
     }
 
     Ok(())

@@ -79,5 +79,5 @@ pub use self::encoding::{decode, encode, from_slice, from_str, to_fixed_bytes, E
 pub use self::encoding::{to_string, to_vec};
 #[doc(inline)]
 pub use self::error::Error;
-#[doc(inline)]
-pub use musli_common::exports::*;
+
+musli_utils::simdutf8!();

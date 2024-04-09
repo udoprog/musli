@@ -12,14 +12,12 @@ use musli::de::Decode;
 use musli::en::Encode;
 use musli::mode::DefaultMode;
 use musli::Context;
+use musli_utils::options;
+use musli_utils::{FixedBytes, Options, Reader, Writer};
 
 use crate::de::WireDecoder;
 use crate::en::WireEncoder;
 use crate::error::Error;
-use crate::fixed::FixedBytes;
-use crate::options::{self, Options};
-use crate::reader::{Reader, SliceReader};
-use crate::writer::Writer;
 
 /// The default flavor used by the [`DEFAULT`] configuration.
 pub const DEFAULT_OPTIONS: options::Options = options::new().build();
@@ -31,8 +29,8 @@ pub const DEFAULT_OPTIONS: options::Options = options::new().build();
 /// The variable length encoding uses [zigzag] with [continuation] encoding for
 /// numbers.
 ///
-/// [zigzag]: musli_common::int::zigzag
-/// [continuation]: musli_common::int::continuation
+/// [zigzag]: musli_utils::int::zigzag
+/// [continuation]: musli_utils::int::continuation
 pub const DEFAULT: Encoding = Encoding::new();
 
 /// Encode the given value to the given [Writer] using the [`DEFAULT`]
@@ -111,10 +109,10 @@ impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
     /// You can modify this using the available factory methods:
     ///
     /// ```rust
-    /// use musli_wire::Encoding;
-    /// use musli_wire::options::{self, Options, Integer};
     /// use musli::{Encode, Decode};
     /// use musli::mode::DefaultMode;
+    /// use musli_utils::options::{self, Options, Integer};
+    /// use musli_wire::Encoding;
     ///
     /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
     /// const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
@@ -159,9 +157,9 @@ impl<M, const OPT: Options> Encoding<M, OPT> {
     /// # Examples
     ///
     /// ```rust
-    /// use musli_wire::Encoding;
-    /// use musli_wire::options::{self, Options, Integer};
     /// use musli::mode::DefaultMode;
+    /// use musli_utils::options::{self, Options, Integer};
+    /// use musli_wire::Encoding;
     ///
     /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
     /// const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
@@ -172,12 +170,12 @@ impl<M, const OPT: Options> Encoding<M, OPT> {
         }
     }
 
-    musli_common::encoding_impls!(
+    musli_utils::encoding_impls!(
         M,
         WireEncoder::<_, OPT, _>::new,
         WireDecoder::<_, OPT, _>::new
     );
-    musli_common::encoding_from_slice_impls!(M, WireDecoder::<_, F>::new);
+    musli_utils::encoding_from_slice_impls!(M, WireDecoder::<_, F>::new);
 }
 
 impl<M, const OPT: Options> Clone for Encoding<M, OPT> {

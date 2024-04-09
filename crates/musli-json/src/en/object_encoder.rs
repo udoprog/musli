@@ -1,8 +1,8 @@
 use musli::en::{MapEncoder, MapEntriesEncoder, StructEncoder};
 use musli::Context;
+use musli_utils::Writer;
 
 use super::{JsonEncoder, JsonObjectKeyEncoder, JsonObjectPairEncoder};
-use crate::writer::Writer;
 
 /// An object encoder for JSON.
 pub(crate) struct JsonObjectEncoder<'a, W, C: ?Sized> {

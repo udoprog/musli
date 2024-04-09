@@ -113,7 +113,7 @@ use serde::{Deserialize, Serialize};
 use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
-use musli_common::exports::buf::{self, BufString};
+use musli_utils::buf::{self, BufString};
 
 struct SerdeContext<'a, C>
 where

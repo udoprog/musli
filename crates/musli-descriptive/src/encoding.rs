@@ -11,14 +11,12 @@ use musli::de::Decode;
 use musli::en::Encode;
 use musli::mode::DefaultMode;
 use musli::Context;
+use musli_utils::options;
+use musli_utils::{FixedBytes, Options, Reader, Writer};
 
 use crate::de::SelfDecoder;
 use crate::en::SelfEncoder;
 use crate::error::Error;
-use crate::fixed::FixedBytes;
-use crate::options::{self, Options};
-use crate::reader::{Reader, SliceReader};
-use crate::writer::Writer;
 
 /// The default flavor used by the [DEFAULT] configuration.
 pub const DEFAULT_OPTIONS: options::Options = options::new().build();
@@ -30,8 +28,8 @@ pub const DEFAULT_OPTIONS: options::Options = options::new().build();
 /// The variable length encoding uses [zigzag] with [continuation] encoding for
 /// numbers.
 ///
-/// [zigzag]: musli_common::int::zigzag
-/// [continuation]: musli_common::int::continuation
+/// [zigzag]: musli_utils::int::zigzag
+/// [continuation]: musli_utils::int::continuation
 pub const DEFAULT: Encoding = Encoding::new();
 
 /// Encode the given value to the given [Writer] using the [DEFAULT]
@@ -148,12 +146,12 @@ impl<M, const OPT: Options> Encoding<M, OPT> {
         }
     }
 
-    musli_common::encoding_impls!(
+    musli_utils::encoding_impls!(
         M,
         SelfEncoder::<_, OPT, _>::new,
         SelfDecoder::<_, OPT, _>::new
     );
-    musli_common::encoding_from_slice_impls!(M, SelfDecoder::<_, F>::new);
+    musli_utils::encoding_from_slice_impls!(M, SelfDecoder::<_, F>::new);
 }
 
 impl<M, const OPT: Options> Clone for Encoding<M, OPT> {

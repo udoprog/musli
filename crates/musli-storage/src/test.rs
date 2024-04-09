@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 
-musli_common::test_fns!("storage");
+musli_utils::test_fns!("storage");
 
 /// Encode a type as one and decode as another.
 #[inline(never)]

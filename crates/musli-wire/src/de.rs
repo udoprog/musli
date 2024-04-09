@@ -11,13 +11,12 @@ use musli::de::{
 };
 use musli::hint::{StructHint, TupleHint};
 use musli::Context;
-use musli_common::int::continuation as c;
 use musli_storage::de::StorageDecoder;
+use musli_utils::int::continuation as c;
+use musli_utils::reader::Limit;
+use musli_utils::{Options, Reader};
 
-use crate::options::Options;
-use crate::reader::{Limit, Reader};
-use crate::tag::Kind;
-use crate::tag::Tag;
+use crate::tag::{Kind, Tag};
 
 /// A very simple decoder.
 pub struct WireDecoder<'a, R, const OPT: Options, C: ?Sized> {
@@ -75,7 +74,7 @@ where
                     let len = if let Some(len) = tag.data() {
                         len as usize
                     } else {
-                        musli_common::int::decode_usize::<_, _, OPT>(
+                        musli_utils::int::decode_usize::<_, _, OPT>(
                             self.cx,
                             self.reader.borrow_mut(),
                         )?
@@ -87,7 +86,7 @@ where
                     let len = if let Some(len) = tag.data() {
                         len as usize
                     } else {
-                        musli_common::int::decode_usize::<_, _, OPT>(
+                        musli_utils::int::decode_usize::<_, _, OPT>(
                             self.cx,
                             self.reader.borrow_mut(),
                         )?
@@ -114,7 +113,7 @@ where
             Kind::Sequence => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
+                musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
             _ => Err(self.cx.message(Expected {
                 expected: Kind::Sequence,
@@ -148,7 +147,7 @@ where
             Kind::Prefix => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
+                musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
             Kind::Pack => {
                 let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
@@ -340,19 +339,19 @@ where
             #[cfg(feature = "alloc")]
             #[inline]
             fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8_owned(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
             }
         }

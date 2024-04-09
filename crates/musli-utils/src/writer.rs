@@ -1,3 +1,7 @@
+//! Trait for governing how a particular sink of bytes is written to.
+//!
+//! To adapt [std::io::Write] types, see the [wrap][crate::wrap::wrap] function.
+
 use core::fmt;
 use core::mem::take;
 

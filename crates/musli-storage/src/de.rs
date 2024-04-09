@@ -10,9 +10,7 @@ use musli::de::{
 };
 use musli::hint::{StructHint, TupleHint};
 use musli::{Context, Decode};
-
-use crate::options::Options;
-use crate::reader::Reader;
+use musli_utils::{Options, Reader};
 
 /// A very simple decoder suitable for storage decoding.
 pub struct StorageDecoder<'a, R, const OPT: Options, C: ?Sized> {
@@ -87,8 +85,7 @@ where
     #[inline]
     fn decode_unit(mut self) -> Result<(), C::Error> {
         let mark = self.cx.mark();
-        let count =
-            musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
+        let count = musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
 
         if count != 0 {
             return Err(self
@@ -117,7 +114,7 @@ where
     where
         V: ValueVisitor<'de, C, [u8]>,
     {
-        let len = musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
+        let len = musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
         self.reader.read_bytes(self.cx, len, visitor)
     }
 
@@ -143,19 +140,19 @@ where
             #[cfg(feature = "alloc")]
             #[inline]
             fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8_owned(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
             }
         }
@@ -194,22 +191,22 @@ where
 
     #[inline]
     fn decode_u16(self) -> Result<u16, C::Error> {
-        musli_common::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_u32(self) -> Result<u32, C::Error> {
-        musli_common::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_u64(self) -> Result<u64, C::Error> {
-        musli_common::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_u128(self) -> Result<u128, C::Error> {
-        musli_common::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
@@ -219,27 +216,27 @@ where
 
     #[inline]
     fn decode_i16(self) -> Result<i16, C::Error> {
-        musli_common::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_i32(self) -> Result<i32, C::Error> {
-        musli_common::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_i64(self) -> Result<i64, C::Error> {
-        musli_common::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_i128(self) -> Result<i128, C::Error> {
-        musli_common::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
     fn decode_usize(self) -> Result<usize, C::Error> {
-        musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader)
+        musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
@@ -378,7 +375,7 @@ where
 {
     #[inline]
     fn new(cx: &'a C, mut reader: R) -> Result<Self, C::Error> {
-        let remaining = musli_common::int::decode_usize::<_, _, OPT>(cx, reader.borrow_mut())?;
+        let remaining = musli_utils::int::decode_usize::<_, _, OPT>(cx, reader.borrow_mut())?;
         Ok(Self {
             cx,
             reader,

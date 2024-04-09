@@ -11,8 +11,8 @@ publish = false
 
 [features]
 default = ["std", "alloc", "test", "simdutf8"]
-std = ["musli?/std", "serde?/std", "musli-common/std", "musli-storage?/std", "musli-wire?/std", "musli-descriptive?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std"]
-alloc = ["musli?/alloc", "musli-common/alloc", "musli-storage?/alloc", "musli-wire?/alloc", "musli-descriptive?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
+std = ["musli?/std", "serde?/std", "musli-utils/std", "musli-storage?/std", "musli-wire?/std", "musli-descriptive?/std", "musli-json?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std"]
+alloc = ["musli?/alloc", "musli-utils/alloc", "musli-storage?/alloc", "musli-wire?/alloc", "musli-descriptive?/alloc", "musli-json?/alloc", "musli-zerocopy?/alloc"]
 verbose = ["musli?/verbose"]
 extra = ["rkyv", "dlhn", "serde_cbor"]
 full = ["rmp-serde", "bincode", "postcard", "musli-json", "serde_json", "bitcode", "bitcode-derive"]
@@ -64,7 +64,7 @@ miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-s
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.110", default-features = false, optional = true, features = [] }
-musli-common = { path = "../musli-common", version = "0.0.110", default-features = false, features = [] }
+musli-utils = { path = "../musli-utils", version = "0.0.110", default-features = false, features = [] }
 musli-wire = { path = "../musli-wire", version = "0.0.110", default-features = false, features = ["test"], optional = true }
 musli-descriptive = { path = "../musli-descriptive", version = "0.0.110", default-features = false, features = ["test"], optional = true }
 musli-storage = { path = "../musli-storage", version = "0.0.110", default-features = false, features = ["test"], optional = true }

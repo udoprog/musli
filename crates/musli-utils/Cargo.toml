@@ -1,5 +1,5 @@
 [package]
-name = "musli-common"
+name = "musli-utils"
 version = "0.0.110"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
@@ -21,13 +21,12 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
 [features]
 default = ["std", "alloc"]
-std = ["musli/std", "simdutf8?/std", "musli-allocator/std"]
+std = ["musli/std", "musli-allocator/std"]
 alloc = ["musli-allocator/alloc"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.110", default-features = false }
 musli-allocator = { path = "../musli-allocator", version = "0.0.110", default-features = false }
-simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 
 [dev-dependencies]
 rand = "0.8.5"

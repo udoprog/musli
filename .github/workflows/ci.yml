@@ -75,7 +75,7 @@ jobs:
         package:
         - musli
         - musli-allocator
-        - musli-common
+        - musli-utils
         - musli-storage
         - musli-descriptive
         - musli-wire

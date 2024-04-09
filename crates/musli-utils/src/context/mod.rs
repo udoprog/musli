@@ -1,3 +1,7 @@
+//! Helper types to set up a basic Müsli [`Context`].
+//!
+//! [`Context`]: musli::Context
+
 mod access;
 mod error_marker;
 mod rich_error;

@@ -2,10 +2,11 @@
 //! continuation of the sequence or not.
 //!
 //! ```
-//! # use musli_common::exports::context::Ignore;
-//! # use musli_common::exports::fixed::FixedBytes;
-//! # use musli_common::exports::allocator;
-//! # use musli_common::int::continuation as c;
+//! use musli_utils::context::Ignore;
+//! use musli_utils::fixed::FixedBytes;
+//! use musli_utils::allocator;
+//! use musli_utils::int::continuation as c;
+//!
 //! let mut buf = allocator::buffer();
 //! let alloc = allocator::new(&mut buf);
 //!

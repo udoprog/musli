@@ -21,12 +21,13 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
 [features]
 default = ["std", "alloc", "simdutf8"]
-std = ["musli/std", "musli-common/std", "musli-storage/std"]
-alloc = ["musli/alloc", "musli-common/alloc", "musli-storage/alloc"]
+std = ["musli/std", "musli-utils/std", "musli-storage/std", "simdutf8?/std"]
+alloc = ["musli/alloc", "musli-utils/alloc", "musli-storage/alloc"]
 test = []
-simdutf8 = ["musli-common/simdutf8"]
+simdutf8 = ["dep:simdutf8"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.110", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.110", default-features = false }
+musli-utils = { path = "../musli-utils", version = "0.0.110", default-features = false }
 musli-storage = { path = "../musli-storage", version = "0.0.110", default-features = false }
+simdutf8 = { version = "0.1.4", optional = true, default-features = false }

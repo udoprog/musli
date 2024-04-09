@@ -12,8 +12,8 @@ use musli::de::{
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
 use musli_storage::de::StorageDecoder;
-use musli_storage::options::Options;
-use musli_storage::reader::SliceReader;
+use musli_utils::reader::SliceReader;
+use musli_utils::Options;
 
 use crate::error::ErrorMessage;
 use crate::value::{Number, Value};
