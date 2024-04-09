@@ -79,9 +79,9 @@ pub mod musli_storage {
     use musli::mode::DefaultMode;
     use musli::{Decode, Encode};
     use musli_storage::{Encoding, Error};
-    use musli_utils::options::{self, Integer, Options};
+    use musli_utils::options::{self, Options};
 
-    const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+    const OPTIONS: Options = options::new().build();
     const ENCODING: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
 
     pub fn buffer() -> Vec<u8> {
