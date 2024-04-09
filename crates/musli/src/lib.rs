@@ -37,8 +37,8 @@
 //!
 //! ```toml
 //! [dependencies]
-//! musli = "0.0.110"
-//! musli-wire = "0.0.110"
+//! musli = "0.0.111"
+//! musli-wire = "0.0.111"
 //! ```
 //!
 //! <br>
