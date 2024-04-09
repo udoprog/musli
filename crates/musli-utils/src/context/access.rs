@@ -57,6 +57,16 @@ impl Drop for Shared<'_> {
     }
 }
 
+impl Clone for Shared<'_> {
+    fn clone(&self) -> Self {
+        // Shared state is already acquired, so we simply decrement it one more.
+        self.access.state.set(self.access.state.get() - 1);
+        Shared {
+            access: self.access,
+        }
+    }
+}
+
 /// An exclusive access to some underlying state.
 pub(crate) struct Exlusive<'a> {
     access: &'a Access,

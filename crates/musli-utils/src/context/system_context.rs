@@ -50,8 +50,15 @@ impl<A, M> SystemContext<A, M> {
         self
     }
 
+    /// Generate a line-separated report of all collected errors.
+    pub fn report(&self) -> Report<'_> {
+        Report {
+            errors: self.errors(),
+        }
+    }
+
     /// Iterate over all collected errors.
-    pub fn errors(&self) -> Errors<'_, String> {
+    pub fn errors(&self) -> Errors<'_> {
         let access = self.access.shared();
 
         // SAFETY: We've checked above that we have shared access.
@@ -248,16 +255,32 @@ where
     }
 }
 
+/// A line-separated report of all errors.
+pub struct Report<'a> {
+    errors: Errors<'a>,
+}
+
+impl fmt::Display for Report<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for error in self.errors.clone() {
+            writeln!(f, "{error}")?;
+        }
+
+        Ok(())
+    }
+}
+
 /// An iterator over collected errors.
-pub struct Errors<'a, E> {
-    errors: &'a [BufTriplet<E>],
+#[derive(Clone)]
+pub struct Errors<'a> {
+    errors: &'a [BufTriplet<String>],
     index: usize,
     // NB: Drop order is significant, drop the shared access last.
     _access: access::Shared<'a>,
 }
 
-impl<'a, E> Iterator for Errors<'a, E> {
-    type Item = RichError<'a, String, E>;
+impl<'a> Iterator for Errors<'a> {
+    type Item = RichError<'a, String, String>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let (path, range, error) = self.errors.get(self.index)?;

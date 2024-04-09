@@ -11,10 +11,10 @@ macro_rules! encode_with_extensions {
             W: Writer,
             T: ?Sized + Encode<$mode>,
         {
-            let mut buf = $crate::allocator::buffer();
-            let alloc = $crate::allocator::new(&mut buf);
-            let cx = $crate::context::Same::new(&alloc);
-            self.encode_with(&cx, writer, value)
+            $crate::allocator::with(|alloc| {
+                let cx = $crate::context::Same::new(alloc);
+                self.encode_with(&cx, writer, value)
+            })
         }
 
         /// Encode the given value to the given [Write][io::Write] using the current
@@ -79,10 +79,10 @@ macro_rules! encode_with_extensions {
         where
             T: ?Sized + Encode<$mode>,
         {
-            let mut buf = $crate::allocator::buffer();
-            let alloc = $crate::allocator::new(&mut buf);
-            let cx = $crate::context::Same::new(&alloc);
-            self.to_fixed_bytes_with(&cx, value)
+            $crate::allocator::with(|alloc| {
+                let cx = $crate::context::Same::new(alloc);
+                self.to_fixed_bytes_with(&cx, value)
+            })
         }
 
         /// Encode the given value to a fixed-size bytes using the current
@@ -116,10 +116,10 @@ macro_rules! encoding_from_slice_impls {
         where
             T: Decode<'de, $mode>,
         {
-            let mut buf = $crate::allocator::buffer();
-            let alloc = $crate::allocator::new(&mut buf);
-            let cx = $crate::context::Same::new(&alloc);
-            self.from_slice_with(&cx, bytes)
+            $crate::allocator::with(|alloc| {
+                let cx = $crate::context::Same::new(alloc);
+                self.from_slice_with(&cx, bytes)
+            })
         }
 
         /// Decode the given type `T` from the given slice using the current
@@ -182,10 +182,10 @@ macro_rules! encoding_impls {
             R: Reader<'de>,
             T: Decode<'de, $mode>,
         {
-            let mut buf = $crate::allocator::buffer();
-            let alloc = $crate::allocator::new(&mut buf);
-            let cx = $crate::context::Same::new(&alloc);
-            self.decode_with(&cx, reader)
+            $crate::allocator::with(|alloc| {
+                let cx = $crate::context::Same::new(alloc);
+                self.decode_with(&cx, reader)
+            })
         }
 
         $crate::encode_with_extensions!($mode);
@@ -238,66 +238,53 @@ macro_rules! test_fns {
                 }
             }
 
-            let format_error = |cx: &$crate::context::SystemContext<_, _>| {
-                use ::alloc::vec::Vec;
+            $crate::allocator::with(|alloc| {
+                let mut cx = $crate::context::SystemContext::new(alloc);
+                cx.include_type();
 
-                let mut errors = Vec::new();
-
-                for error in cx.errors() {
-                    errors.push(error.to_string());
-                }
-
-                errors.join("\n")
-            };
-
-            let mut buf = $crate::allocator::buffer();
-            let alloc = $crate::allocator::new(&mut buf);
-            let mut cx = $crate::context::SystemContext::new(&alloc);
-            cx.include_type();
-
-            let out = match ENCODING.to_vec_with(&cx, &value) {
-                Ok(out) => out,
-                Err(..) => {
-                    let error = format_error(&cx);
-                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
-                }
-            };
-
-            $crate::test_include_if! {
-                $($(#[$option])*)* =>
-                let value_decode: ::musli_value::Value = match ENCODING.from_slice_with(&cx, out.as_slice()) {
-                    Ok(decoded) => decoded,
+                let out = match ENCODING.to_vec_with(&cx, &value) {
+                    Ok(out) => out,
                     Err(..) => {
-                        let out = FormatBytes(&out);
-                        let error = format_error(&cx);
-                        panic!("{WHAT}: {}: failed to decode to value type:\nBytes:{out}\n{error}", type_name::<T>())
+                        let error = cx.report();
+                        panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
                     }
                 };
 
-                let value_decoded: T = match ::musli_value::decode_with(&cx, &value_decode) {
+                $crate::test_include_if! {
+                    $($(#[$option])*)* =>
+                    let value_decode: ::musli_value::Value = match ENCODING.from_slice_with(&cx, out.as_slice()) {
+                        Ok(decoded) => decoded,
+                        Err(..) => {
+                            let out = FormatBytes(&out);
+                            let error = cx.report();
+                            panic!("{WHAT}: {}: failed to decode to value type:\nBytes:{out}\n{error}", type_name::<T>())
+                        }
+                    };
+
+                    let value_decoded: T = match ::musli_value::decode_with(&cx, &value_decode) {
+                        Ok(decoded) => decoded,
+                        Err(..) => {
+                            let out = FormatBytes(&out);
+                            let error = cx.report();
+                            panic!("{WHAT}: {}: failed to decode from value type:\nBytes: {out}\nValue: {value_decode:?}\n{error}", type_name::<T>())
+                        }
+                    };
+
+                    assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match", type_name::<T>());
+                }
+
+                let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
                     Ok(decoded) => decoded,
                     Err(..) => {
                         let out = FormatBytes(&out);
-                        let error = format_error(&cx);
-                        panic!("{WHAT}: {}: failed to decode from value type:\nBytes: {out}\nValue: {value_decode:?}\n{error}", type_name::<T>())
+                        let error = cx.report();
+                        panic!("{WHAT}: {}: failed to decode:\nBytes: {out}\n{error}", type_name::<T>())
                     }
                 };
 
-                assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match", type_name::<T>());
-            }
-
-            let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
-                Ok(decoded) => decoded,
-                Err(..) => {
-                    let out = FormatBytes(&out);
-                    let error = format_error(&cx);
-                    panic!("{WHAT}: {}: failed to decode:\nBytes: {out}\n{error}", type_name::<T>())
-                }
-            };
-
-            assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match", type_name::<T>());
-
-            decoded
+                assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match", type_name::<T>());
+                decoded
+            })
         }
 
         /// Encode and then decode the given value once.
@@ -315,40 +302,28 @@ macro_rules! test_fns {
             use ::core::any::type_name;
             use ::alloc::string::ToString;
 
-            let format_error = |cx: &$crate::context::SystemContext<_, _>| {
-                use ::alloc::vec::Vec;
+            $crate::allocator::with(|alloc| {
+                let mut cx = $crate::context::SystemContext::new(alloc);
+                cx.include_type();
 
-                let mut errors = Vec::new();
+                out.clear();
 
-                for error in cx.errors() {
-                    errors.push(error.to_string());
+                match ENCODING.to_writer_with(&cx, &mut *out, &value) {
+                    Ok(()) => (),
+                    Err(..) => {
+                        let error = cx.report();
+                        panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                    }
+                };
+
+                match ENCODING.from_slice_with(&cx, out) {
+                    Ok(decoded) => decoded,
+                    Err(error) => {
+                        let error = cx.report();
+                        panic!("{WHAT}: {}: failed to decode:\n{error}", type_name::<T>())
+                    }
                 }
-
-                errors.join("\n")
-            };
-
-            let mut buf = $crate::allocator::buffer();
-            let alloc = $crate::allocator::new(&mut buf);
-            let mut cx = $crate::context::SystemContext::new(&alloc);
-            cx.include_type();
-
-            out.clear();
-
-            match ENCODING.to_writer_with(&cx, &mut *out, &value) {
-                Ok(()) => (),
-                Err(..) => {
-                    let error = format_error(&cx);
-                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
-                }
-            };
-
-            match ENCODING.from_slice_with(&cx, out) {
-                Ok(decoded) => decoded,
-                Err(error) => {
-                    let error = format_error(&cx);
-                    panic!("{WHAT}: {}: failed to decode:\n{error}", type_name::<T>())
-                }
-            }
+            })
         }
 
         /// Encode a value to bytes.
@@ -365,30 +340,18 @@ macro_rules! test_fns {
             use ::core::any::type_name;
             use ::alloc::string::ToString;
 
-            let format_error = |cx: &$crate::context::SystemContext<_, _>| {
-                use ::alloc::vec::Vec;
+            $crate::allocator::with(|alloc| {
+                let mut cx = $crate::context::SystemContext::new(alloc);
+                cx.include_type();
 
-                let mut errors = Vec::new();
-
-                for error in cx.errors() {
-                    errors.push(error.to_string());
+                match ENCODING.to_vec_with(&cx, &value) {
+                    Ok(out) => out,
+                    Err(..) => {
+                        let error = cx.report();
+                        panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                    }
                 }
-
-                errors.join("\n")
-            };
-
-            let mut buf = $crate::allocator::buffer();
-            let alloc = $crate::allocator::new(&mut buf);
-            let mut cx = $crate::context::SystemContext::new(&alloc);
-            cx.include_type();
-
-            match ENCODING.to_vec_with(&cx, &value) {
-                Ok(out) => out,
-                Err(..) => {
-                    let error = format_error(&cx);
-                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
-                }
-            }
+            })
         }
     }
 }

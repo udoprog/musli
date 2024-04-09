@@ -45,11 +45,12 @@ where
     use musli::en::Encoder;
 
     let mut output = Value::Unit;
-    let mut buf = musli_utils::allocator::buffer();
-    let alloc = musli_utils::allocator::new(&mut buf);
-    let cx = musli_utils::context::Same::<_, DefaultMode, Error>::new(&alloc);
-    ValueEncoder::<DEFAULT_OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
-    Ok(output)
+
+    musli_utils::allocator::with(|alloc| {
+        let cx = musli_utils::context::Same::<_, DefaultMode, Error>::new(&alloc);
+        ValueEncoder::<DEFAULT_OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
+        Ok(output)
+    })
 }
 
 /// Decode a [Value] into a type which implements [Decode].
@@ -59,10 +60,10 @@ where
 {
     use musli::de::Decoder;
 
-    let mut buf = musli_utils::allocator::buffer();
-    let alloc = musli_utils::allocator::new(&mut buf);
-    let cx = musli_utils::context::Same::<_, DefaultMode, Error>::new(&alloc);
-    value.decoder::<DEFAULT_OPTIONS, _>(&cx).decode()
+    musli_utils::allocator::with(|alloc| {
+        let cx = musli_utils::context::Same::<_, DefaultMode, Error>::new(&alloc);
+        value.decoder::<DEFAULT_OPTIONS, _>(&cx).decode()
+    })
 }
 
 /// Decode a [Value] into a type which implements [Decode] using a custom

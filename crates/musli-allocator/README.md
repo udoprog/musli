@@ -20,29 +20,28 @@ This crate contains two types of allocators:
 ```rust
 use musli::{Allocator, Buf};
 
-let mut buf = musli_allocator::buffer();
-let alloc = musli_allocator::new(&mut buf);
+musli_allocator::with(|alloc| {
+    let mut a = alloc.alloc().expect("allocation a failed");
+    let mut b = alloc.alloc().expect("allocation b failed");
 
-let mut a = alloc.alloc().expect("allocation a failed");
-let mut b = alloc.alloc().expect("allocation b failed");
+    b.write(b"He11o");
+    a.write(b.as_slice());
 
-b.write(b"He11o");
-a.write(b.as_slice());
+    assert_eq!(a.as_slice(), b"He11o");
+    assert_eq!(a.len(), 5);
 
-assert_eq!(a.as_slice(), b"He11o");
-assert_eq!(a.len(), 5);
+    a.write(b" W0rld");
 
-a.write(b" W0rld");
+    assert_eq!(a.as_slice(), b"He11o W0rld");
+    assert_eq!(a.len(), 11);
 
-assert_eq!(a.as_slice(), b"He11o W0rld");
-assert_eq!(a.len(), 11);
+    let mut c = alloc.alloc().expect("allocation c failed");
+    c.write(b"!");
+    a.write(c.as_slice());
 
-let mut c = alloc.alloc().expect("allocation c failed");
-c.write(b"!");
-a.write(c.as_slice());
-
-assert_eq!(a.as_slice(), b"He11o W0rld!");
-assert_eq!(a.len(), 12);
+    assert_eq!(a.as_slice(), b"He11o W0rld!");
+    assert_eq!(a.len(), 12);
+});
 ```
 
 [Müsli]: <https://docs.rs/musli>

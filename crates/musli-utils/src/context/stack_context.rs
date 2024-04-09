@@ -14,30 +14,27 @@ use super::ErrorMarker;
 
 type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a>>);
 
-/// A rich context which uses allocations and tracks the exact location of every
-/// error.
+/// A rich context which uses allocations and tracks the exact location of
+/// errors.
 ///
-/// * This only stores the latest error raised.
-/// * The `P` param indicates the maximum number of path steps recorded. If
-///   another step is added it will simply be ignored and an incomplete
-///   indicator is used instead.
-/// * The `S` parameter indicates the maximum size in bytes (UTF-8) of a stored
-///   map key.
-pub struct StackContext<'a, const P: usize, A, M>
+/// This will only store 4 errors by default, and support a path up to 16. To
+/// control this, use the [`new_with`][StackContext::new_with] constructor.
+pub struct StackContext<'a, const E: usize, const P: usize, A, M>
 where
     A: ?Sized + Allocator,
 {
-    access: Access,
-    mark: Cell<usize>,
     alloc: &'a A,
-    error: UnsafeCell<Option<BufPair<'a, A>>>,
+    mark: Cell<usize>,
+    errors: UnsafeCell<FixedVec<BufPair<'a, A>, E>>,
     path: UnsafeCell<FixedVec<Step<BufString<A::Buf<'a>>>, P>>,
+    // How many elements of `path` we've gone over capacity.
     path_cap: Cell<usize>,
     include_type: bool,
+    access: Access,
     _marker: PhantomData<M>,
 }
 
-impl<'a, A, M> StackContext<'a, 16, A, M>
+impl<'a, A, M> StackContext<'a, 16, 4, A, M>
 where
     A: ?Sized + Allocator,
 {
@@ -45,14 +42,14 @@ where
     /// diagnostics.
     ///
     /// This uses the default values of:
-    /// * 16 path elements stored.
-    /// * A maximum map key of 32 bytes (UTF-8).
+    /// * The first 4 errors.
+    /// * 16 path elements stored when tracing.
     pub fn new(alloc: &'a A) -> Self {
         Self::new_with(alloc)
     }
 }
 
-impl<'a, const P: usize, A, M> StackContext<'a, P, A, M>
+impl<'a, const E: usize, const P: usize, A, M> StackContext<'a, E, P, A, M>
 where
     A: ?Sized + Allocator,
 {
@@ -60,13 +57,13 @@ where
     /// configurable number of diagnostics.
     pub fn new_with(alloc: &'a A) -> Self {
         Self {
-            access: Access::new(),
-            mark: Cell::new(0),
             alloc,
-            error: UnsafeCell::new(None),
+            mark: Cell::new(0),
+            errors: UnsafeCell::new(FixedVec::new()),
             path: UnsafeCell::new(FixedVec::new()),
             path_cap: Cell::new(0),
             include_type: false,
+            access: Access::new(),
             _marker: PhantomData,
         }
     }
@@ -78,13 +75,21 @@ where
         self
     }
 
+    /// Generate a line-separated report of all collected errors.
+    pub fn report(&self) -> Report<'_, 'a, A> {
+        Report {
+            errors: self.errors(),
+        }
+    }
+
     /// Iterate over all collected errors.
-    pub fn errors(&self) -> Errors<'_, impl fmt::Display + 'a> {
+    pub fn errors(&self) -> Errors<'_, 'a, A> {
         let access = self.access.shared();
 
         Errors {
             path: unsafe { &*self.path.get() },
-            error: unsafe { (*self.error.get()).as_ref() },
+            errors: unsafe { &*self.errors.get() },
+            index: 0,
             path_cap: self.path_cap.get(),
             _access: access,
         }
@@ -92,9 +97,11 @@ where
 
     /// Push an error into the collection.
     fn push_error(&self, range: Range<usize>, error: BufString<A::Buf<'a>>) {
-        // SAFETY: We've restricted access to the context, so this is safe.
+        let _access = self.access.exclusive();
+
+        // SAFETY: We've checked that we have exclusive access just above.
         unsafe {
-            self.error.get().replace(Some((range, error)));
+            _ = (*self.errors.get()).try_push((range, error));
         }
     }
 
@@ -138,7 +145,7 @@ where
     }
 }
 
-impl<'a, const V: usize, A, M> Context for StackContext<'a, V, A, M>
+impl<'a, const E: usize, const P: usize, A, M> Context for StackContext<'a, E, P, A, M>
 where
     A: ?Sized + Allocator,
 {
@@ -304,20 +311,49 @@ where
     }
 }
 
+/// A line-separated report of all errors.
+pub struct Report<'a, 'buf, A>
+where
+    A: 'buf + ?Sized + Allocator,
+{
+    errors: Errors<'a, 'buf, A>,
+}
+
+impl<'a, 'buf, A> fmt::Display for Report<'a, 'buf, A>
+where
+    A: 'buf + ?Sized + Allocator,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for error in self.errors.clone() {
+            writeln!(f, "{error}")?;
+        }
+
+        Ok(())
+    }
+}
+
 /// An iterator over available errors.
-pub struct Errors<'a, S> {
-    path: &'a [Step<S>],
-    error: Option<&'a (Range<usize>, S)>,
+pub struct Errors<'a, 'buf, A>
+where
+    A: 'buf + ?Sized + Allocator,
+{
+    path: &'a [Step<BufString<A::Buf<'buf>>>],
+    errors: &'a [(Range<usize>, BufString<A::Buf<'buf>>)],
+    index: usize,
     path_cap: usize,
     _access: Shared<'a>,
 }
 
-impl<'a, S> Iterator for Errors<'a, S> {
-    type Item = RichError<'a, S, S>;
+impl<'a, 'buf, A> Iterator for Errors<'a, 'buf, A>
+where
+    A: ?Sized + Allocator,
+{
+    type Item = RichError<'a, BufString<A::Buf<'buf>>, BufString<A::Buf<'buf>>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let (range, error) = self.error.take()?;
+        let (range, error) = self.errors.get(self.index)?;
+        self.index += 1;
 
         Some(RichError::new(
             self.path,
@@ -325,5 +361,20 @@ impl<'a, S> Iterator for Errors<'a, S> {
             range.clone(),
             error,
         ))
+    }
+}
+
+impl<'a, 'buf, A> Clone for Errors<'a, 'buf, A>
+where
+    A: ?Sized + Allocator,
+{
+    fn clone(&self) -> Self {
+        Self {
+            path: self.path,
+            errors: self.errors,
+            index: self.index,
+            path_cap: self.path_cap,
+            _access: self._access.clone(),
+        }
     }
 }

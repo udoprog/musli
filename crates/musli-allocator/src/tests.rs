@@ -30,8 +30,7 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
 
 #[test]
 fn alloc_basic() {
-    let mut buf = crate::SystemBuffer::new();
-    let alloc = crate::System::new(&mut buf);
+    let alloc = crate::System::new();
     basic_allocations(&alloc);
 }
 
