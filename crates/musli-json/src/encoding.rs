@@ -187,10 +187,10 @@ impl<M> Encoding<M> {
     where
         T: ?Sized + Encode<M>,
     {
-        let mut buf = musli_utils::allocator::buffer();
-        let alloc = musli_utils::allocator::new(&mut buf);
-        let cx = musli_utils::context::Same::new(&alloc);
-        self.to_string_with(&cx, value)
+        musli_utils::allocator::with(|alloc| {
+            let cx = musli_utils::context::Same::new(alloc);
+            self.to_string_with(&cx, value)
+        })
     }
 
     /// Encode the given value to a [`String`] using the current configuration.
@@ -218,10 +218,10 @@ impl<M> Encoding<M> {
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
-        let mut buf = musli_utils::allocator::buffer();
-        let alloc = musli_utils::allocator::new(&mut buf);
-        let cx = musli_utils::context::Same::new(&alloc);
-        self.decode_with(&cx, parser)
+        musli_utils::allocator::with(|alloc| {
+            let cx = musli_utils::context::Same::new(alloc);
+            self.decode_with(&cx, parser)
+        })
     }
 
     /// Decode the given type `T` from the given [`Parser`] using the current
@@ -270,10 +270,10 @@ impl<M> Encoding<M> {
     where
         T: Decode<'de, M>,
     {
-        let mut buf = musli_utils::allocator::buffer();
-        let alloc = musli_utils::allocator::new(&mut buf);
-        let cx = musli_utils::context::Same::<_, M, _>::new(&alloc);
-        self.from_slice_with(&cx, bytes)
+        musli_utils::allocator::with(|alloc| {
+            let cx = musli_utils::context::Same::<_, M, _>::new(alloc);
+            self.from_slice_with(&cx, bytes)
+        })
     }
 
     /// Decode the given type `T` from the given slice using the current

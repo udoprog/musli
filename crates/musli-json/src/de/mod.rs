@@ -31,7 +31,9 @@ use musli::de::{
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
+#[cfg(feature = "musli-value")]
 use musli_utils::options;
+#[cfg(feature = "musli-value")]
 use musli_utils::Options;
 
 #[cfg(not(feature = "parse-full"))]

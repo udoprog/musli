@@ -20,31 +20,31 @@ fn test_continuation_encoding() {
     where
         T: PartialEq<T> + fmt::Debug + Unsigned,
     {
-        let mut out = Vec::new();
-        let mut buf = allocator::buffer();
-        let alloc = allocator::new(&mut buf);
-        let cx = crate::context::Ignore::marker(&alloc);
-        c::encode(&cx, &mut out, expected).unwrap();
-        c::encode(&cx, &mut out, expected).unwrap();
-        let mut data = out.as_slice();
-        let cx = context::Ignore::marker(&alloc);
-        let a: T = c::decode(&cx, &mut data).unwrap();
-        let b: T = c::decode(&cx, &mut data).unwrap();
-        assert!(data.is_empty());
-        assert_eq!(a, expected);
-        assert_eq!(b, expected);
+        allocator::with(|alloc| {
+            let mut out = Vec::new();
+            let cx = crate::context::Ignore::marker(&alloc);
+            c::encode(&cx, &mut out, expected).unwrap();
+            c::encode(&cx, &mut out, expected).unwrap();
+            let mut data = out.as_slice();
+            let cx = context::Ignore::marker(&alloc);
+            let a: T = c::decode(&cx, &mut data).unwrap();
+            let b: T = c::decode(&cx, &mut data).unwrap();
+            assert!(data.is_empty());
+            assert_eq!(a, expected);
+            assert_eq!(b, expected);
+        })
     }
 
     fn encode<T>(value: T) -> Vec<u8>
     where
         T: Unsigned,
     {
-        let mut out = Vec::new();
-        let mut buf = allocator::buffer();
-        let alloc = allocator::new(&mut buf);
-        let cx = crate::context::Same::marker(&alloc);
-        c::encode(&cx, crate::wrap::wrap(&mut out), value).unwrap();
-        out
+        allocator::with(|alloc| {
+            let mut out = Vec::new();
+            let cx = crate::context::Same::marker(&alloc);
+            c::encode(&cx, crate::wrap::wrap(&mut out), value).unwrap();
+            out
+        })
     }
 
     macro_rules! test {

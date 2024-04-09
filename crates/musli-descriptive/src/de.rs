@@ -13,6 +13,7 @@ use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_utils::int::continuation as c;
+#[cfg(feature = "musli-value")]
 use musli_utils::options;
 use musli_utils::reader::Limit;
 use musli_utils::{Options, Reader};

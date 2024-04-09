@@ -17,29 +17,28 @@
 //! ```
 //! use musli::{Allocator, Buf};
 //!
-//! let mut buf = musli_allocator::buffer();
-//! let alloc = musli_allocator::new(&mut buf);
+//! musli_allocator::with(|alloc| {
+//!     let mut a = alloc.alloc().expect("allocation a failed");
+//!     let mut b = alloc.alloc().expect("allocation b failed");
 //!
-//! let mut a = alloc.alloc().expect("allocation a failed");
-//! let mut b = alloc.alloc().expect("allocation b failed");
+//!     b.write(b"He11o");
+//!     a.write(b.as_slice());
 //!
-//! b.write(b"He11o");
-//! a.write(b.as_slice());
+//!     assert_eq!(a.as_slice(), b"He11o");
+//!     assert_eq!(a.len(), 5);
 //!
-//! assert_eq!(a.as_slice(), b"He11o");
-//! assert_eq!(a.len(), 5);
+//!     a.write(b" W0rld");
 //!
-//! a.write(b" W0rld");
+//!     assert_eq!(a.as_slice(), b"He11o W0rld");
+//!     assert_eq!(a.len(), 11);
 //!
-//! assert_eq!(a.as_slice(), b"He11o W0rld");
-//! assert_eq!(a.len(), 11);
+//!     let mut c = alloc.alloc().expect("allocation c failed");
+//!     c.write(b"!");
+//!     a.write(c.as_slice());
 //!
-//! let mut c = alloc.alloc().expect("allocation c failed");
-//! c.write(b"!");
-//! a.write(c.as_slice());
-//!
-//! assert_eq!(a.as_slice(), b"He11o W0rld!");
-//! assert_eq!(a.len(), 12);
+//!     assert_eq!(a.as_slice(), b"He11o W0rld!");
+//!     assert_eq!(a.len(), 12);
+//! });
 //! ```
 //!
 //! [Müsli]: <https://docs.rs/musli>
@@ -61,9 +60,10 @@ mod tests;
 
 #[cfg(feature = "alloc")]
 mod system;
+
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub use self::system::{System, SystemBuffer};
+pub use self::system::System;
 
 mod disabled;
 pub use self::disabled::Disabled;
@@ -72,71 +72,80 @@ mod stack;
 #[doc(inline)]
 pub use self::stack::{Stack, StackBuffer};
 
-/// The default stack buffer size.
+/// The default stack buffer size for the default allocator provided through
+/// [`with`].
 pub const DEFAULT_STACK_BUFFER: usize = 4096;
 
+/// The default allocator.
 #[cfg(feature = "alloc")]
-mod default_alloc {
-    #[doc(hidden)]
-    pub type DefaultBuffer = super::SystemBuffer;
-    #[doc(hidden)]
-    pub type Default<'a> = super::System<'a>;
+pub type Default<'a> = System;
 
-    pub(super) fn buffer() -> DefaultBuffer {
-        DefaultBuffer::new()
-    }
+/// The default allocator.
+#[cfg(not(feature = "alloc"))]
+pub type Default<'a> = Stack<'a>;
 
-    pub(super) fn new(buf: &mut DefaultBuffer) -> Default<'_> {
-        Default::new(buf)
-    }
+/// Call the given closure with the default allocator.
+///
+/// This is useful if you want to write application which are agnostic to
+/// whether the `alloc` feature is or isn't enabled.
+///
+/// * If the `alloc` feature is enabled, this is the [`System`] allocator.
+/// * If the `alloc` feature is disabled, this is the [`Stack`] allocator with
+///   [`DEFAULT_STACK_BUFFER`] bytes allocated on the stack.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Allocator, Buf};
+///
+/// musli_allocator::with(|alloc| {
+///     let mut a = alloc.alloc().expect("allocation a failed");
+///     let mut b = alloc.alloc().expect("allocation b failed");
+///
+///     b.write(b"He11o");
+///     a.write(b.as_slice());
+///
+///     assert_eq!(a.as_slice(), b"He11o");
+///     assert_eq!(a.len(), 5);
+///
+///     a.write(b" W0rld");
+///
+///     assert_eq!(a.as_slice(), b"He11o W0rld");
+///     assert_eq!(a.len(), 11);
+///
+///     let mut c = alloc.alloc().expect("allocation c failed");
+///     c.write(b"!");
+///     a.write(c.as_slice());
+///
+///     assert_eq!(a.as_slice(), b"He11o W0rld!");
+///     assert_eq!(a.len(), 12);
+/// });
+/// ```
+#[inline(always)]
+pub fn with<F, O>(f: F) -> O
+where
+    F: FnOnce(&Default<'_>) -> O,
+{
+    with_impl(f)
+}
+
+#[cfg(feature = "alloc")]
+#[inline(always)]
+fn with_impl<F, O>(f: F) -> O
+where
+    F: FnOnce(&System) -> O,
+{
+    let alloc = System::new();
+    f(&alloc)
 }
 
 #[cfg(not(feature = "alloc"))]
-mod default_alloc {
-    use super::DEFAULT_STACK_BUFFER;
-
-    #[doc(hidden)]
-    pub type DefaultBuffer = super::StackBuffer<{ DEFAULT_STACK_BUFFER }>;
-    #[doc(hidden)]
-    pub type Default<'a> = super::Stack<'a>;
-
-    pub(super) fn buffer() -> DefaultBuffer {
-        DefaultBuffer::new()
-    }
-
-    pub(super) fn new(buf: &mut DefaultBuffer) -> Default<'_> {
-        Default::new(buf)
-    }
-}
-
-/// The default backing allocator buffer.
-///
-/// * If the `alloc` feature is enabled, this is [`SystemBuffer`].
-/// * Otherwise this is [`StackBuffer`] with a default size of
-///   [`DEFAULT_STACK_BUFFER`].
-#[doc(inline)]
-pub use self::default_alloc::DefaultBuffer;
-
-/// The default allocator.
-///
-/// * If the `alloc` feature is enabled, this is the [`System`] allocator.
-/// * Otherwise this is the [`Stack`] allocator.
-#[doc(inline)]
-pub use self::default_alloc::Default;
-
-/// Construct a new default buffer.
-///
-/// * If the `alloc` feature is enabled, this is [`SystemBuffer`].
-/// * Otherwise this is [`StackBuffer`] with a default size of
-///   [`DEFAULT_STACK_BUFFER`].
-pub fn buffer() -> DefaultBuffer {
-    self::default_alloc::buffer()
-}
-
-/// Construct a new default allocator.
-///
-/// * If the `alloc` feature is enabled, this is the [`System`] allocator.
-/// * Otherwise this is the [`Stack`] allocator.
-pub fn new(buf: &mut DefaultBuffer) -> Default<'_> {
-    self::default_alloc::new(buf)
+#[inline(always)]
+fn with_impl<F, O>(f: F) -> O
+where
+    F: FnOnce(&Stack<'_>) -> O,
+{
+    let mut buf = StackBuffer::<DEFAULT_STACK_BUFFER>::new();
+    let alloc = Stack::new(&mut buf);
+    f(&alloc)
 }

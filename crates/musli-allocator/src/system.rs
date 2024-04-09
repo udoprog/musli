@@ -6,53 +6,43 @@ use alloc::vec::Vec;
 
 use musli::{Allocator, Buf};
 
-/// A dynamic buffer allocated on the heap.
-pub struct SystemBuffer {
+/// Buffer used in combination with an [`Allocator`].
+pub struct System {
     internal: UnsafeCell<Internal>,
 }
 
-impl SystemBuffer {
-    /// Construct a new heap buffer.
-    pub fn new() -> Self {
+impl System {
+    /// Construct a new allocator.
+    #[inline]
+    pub const fn new() -> Self {
         Self {
             internal: UnsafeCell::new(Internal { head: None }),
         }
     }
 }
 
-impl Default for SystemBuffer {
+impl Default for System {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Buffer used in combination with an [`Allocator`].
-pub struct System<'a> {
-    buf: &'a mut SystemBuffer,
-}
-
-impl<'a> System<'a> {
-    /// Construct a new allocator.
-    pub fn new(buf: &'a mut SystemBuffer) -> Self {
-        Self { buf }
-    }
-}
-
-impl<'a> Allocator for System<'a> {
+impl Allocator for System {
     type Buf<'this> = SystemBuf<'this> where Self: 'this;
 
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         Some(SystemBuf {
-            region: Internal::alloc(&self.buf.internal),
-            internal: &self.buf.internal,
+            region: Internal::alloc(&self.internal),
+            internal: &self.internal,
         })
     }
 }
 
-impl<'a> Drop for System<'a> {
+impl Drop for System {
     fn drop(&mut self) {
-        let internal = unsafe { &mut *self.buf.internal.get() };
+        let internal = unsafe { &mut *self.internal.get() };
 
         while let Some(mut head) = internal.head.take() {
             // SAFETY: This collection has exclusive access to any heads it

@@ -7,17 +7,16 @@
 //! use musli_utils::allocator;
 //! use musli_utils::int::continuation as c;
 //!
-//! let mut buf = allocator::buffer();
-//! let alloc = allocator::new(&mut buf);
+//! allocator::with(|alloc| {
+//!     let cx = Ignore::marker(&alloc);
+//!     let mut bytes = FixedBytes::<8>::new();
+//!     c::encode(&cx, &mut bytes, 5000u32).unwrap();
+//!     assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 //!
-//! let cx = Ignore::marker(&alloc);
-//! let mut bytes = FixedBytes::<8>::new();
-//! c::encode(&cx, &mut bytes, 5000u32).unwrap();
-//! assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
-//!
-//! let cx = Ignore::marker(&alloc);
-//! let number: u32 = c::decode(&cx, bytes.as_slice()).unwrap();
-//! assert_eq!(number, 5000u32);
+//!     let cx = Ignore::marker(&alloc);
+//!     let number: u32 = c::decode(&cx, bytes.as_slice()).unwrap();
+//!     assert_eq!(number, 5000u32);
+//! })
 //! ```
 
 #![allow(unused)]
