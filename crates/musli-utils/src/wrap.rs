@@ -1,3 +1,9 @@
+//! Helpers for integrating musli with I/O types like [std::io] and
+//! [std::io::Write].
+//!
+//! The central function in this module is the [wrap] function which constructs
+//! an adapter around an I/O type to work with musli.
+
 #[cfg(feature = "std")]
 use musli::{Buf, Context};
 

@@ -59,10 +59,10 @@
 //! type:
 //!
 //! ```rust
-//! use musli_storage::Encoding;
-//! use musli_storage::options::{self, Options, Integer};
 //! use musli::mode::DefaultMode;
 //! use musli::{Encode, Decode};
+//! use musli_utils::options::{self, Options, Integer};
+//! use musli_storage::Encoding;
 //!
 //! const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
 //! const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
@@ -133,5 +133,5 @@ pub use self::error::Error;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
 #[doc(hidden)]
 pub use self::test::transcode;
-#[doc(inline)]
-pub use musli_common::exports::*;
+
+musli_utils::simdutf8!();

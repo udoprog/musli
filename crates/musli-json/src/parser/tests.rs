@@ -1,6 +1,8 @@
 #![cfg(feature = "std")]
 
 use musli::mode::DefaultMode;
+use musli_utils::allocator;
+use musli_utils::context;
 
 use crate::error::Error;
 use crate::parser::integer::{parse_signed_full, parse_unsigned_full};
@@ -8,9 +10,9 @@ use crate::parser::SliceParser;
 
 #[test]
 fn test_decode_exponent() {
-    let mut buf = crate::allocator::buffer();
-    let alloc = crate::allocator::new(&mut buf);
-    let cx = crate::context::Same::<_, DefaultMode, Error>::new(&alloc);
+    let mut buf = allocator::buffer();
+    let alloc = allocator::new(&mut buf);
+    let cx = context::Same::<_, DefaultMode, Error>::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr, $expected:expr) => {
@@ -45,9 +47,9 @@ fn test_decode_exponent() {
 
 #[test]
 fn test_decode_unsigned() {
-    let mut buf = crate::allocator::buffer();
-    let alloc = crate::allocator::new(&mut buf);
-    let cx = crate::context::Same::<_, DefaultMode, Error>::new(&alloc);
+    let mut buf = allocator::buffer();
+    let alloc = allocator::new(&mut buf);
+    let cx = context::Same::<_, DefaultMode, Error>::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {
@@ -113,9 +115,9 @@ fn test_decode_unsigned() {
 
 #[test]
 fn test_decode_signed() {
-    let mut buf = crate::allocator::buffer();
-    let alloc = crate::allocator::new(&mut buf);
-    let cx = crate::context::Same::<_, DefaultMode, Error>::new(&alloc);
+    let mut buf = allocator::buffer();
+    let alloc = allocator::new(&mut buf);
+    let cx = context::Same::<_, DefaultMode, Error>::new(&alloc);
 
     macro_rules! test_number {
         ($ty:ty, $num:expr) => {

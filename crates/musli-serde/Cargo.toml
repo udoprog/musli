@@ -20,12 +20,12 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
 [features]
 default = ["std", "alloc"]
-std = ["musli/std", "musli-common/std", "serde/std"]
-alloc = ["musli/alloc", "musli-common/alloc", "serde/alloc"]
+std = ["musli/std", "musli-utils/std", "serde/std"]
+alloc = ["musli/alloc", "musli-utils/alloc", "serde/alloc"]
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.110", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.110", default-features = false }
+musli-utils = { path = "../musli-utils", version = "0.0.110", default-features = false }
 serde = { version = "1.0.197", default-features = false }
 
 [dev-dependencies]

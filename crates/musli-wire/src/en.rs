@@ -7,10 +7,10 @@ use musli::en::{
 use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::{Buf, Context};
 use musli_storage::en::StorageEncoder;
+use musli_utils::writer::BufWriter;
+use musli_utils::{Options, Writer};
 
-use crate::options::Options;
 use crate::tag::{Kind, Tag, MAX_INLINE_LEN};
-use crate::writer::{BufWriter, Writer};
 
 /// A very simple encoder.
 pub struct WireEncoder<'a, W, const OPT: Options, C: ?Sized> {
@@ -39,7 +39,7 @@ where
         self.writer.write_byte(self.cx, tag.byte())?;
 
         if !embedded {
-            musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+            musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(())
@@ -51,7 +51,7 @@ where
         self.writer.write_byte(self.cx, tag.byte())?;
 
         if !embedded {
-            musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+            musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(())
@@ -288,7 +288,7 @@ where
         self.writer.write_byte(self.cx, tag.byte())?;
 
         if !embedded {
-            musli_common::int::encode_usize::<_, _, OPT>(
+            musli_utils::int::encode_usize::<_, _, OPT>(
                 self.cx,
                 self.writer.borrow_mut(),
                 hint.size,
@@ -325,7 +325,7 @@ where
         self.writer.write_byte(self.cx, tag.byte())?;
 
         if !embedded {
-            musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+            musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
         }
 
         Ok(self)
@@ -620,7 +620,7 @@ where
     writer.write_byte(cx, tag.byte())?;
 
     if !embedded {
-        musli_common::int::encode_usize::<_, _, OPT>(cx, writer, len)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(cx, writer, len)?;
     }
 
     Ok(())

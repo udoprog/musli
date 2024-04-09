@@ -1,12 +1,10 @@
 use musli::Context;
-use musli_common::int::continuation as c;
-use musli_common::int::zigzag as zig;
-use musli_common::int::{Signed, Unsigned, UnsignedOps};
+use musli_utils::int::continuation as c;
+use musli_utils::int::zigzag as zig;
+use musli_utils::int::{Signed, Unsigned, UnsignedOps};
+use musli_utils::{Options, Reader, Writer};
 
-use crate::options::Options;
-use crate::reader::Reader;
 use crate::tag::{Kind, Tag, DATA_MASK};
-use crate::writer::Writer;
 
 /// Governs how usize lengths are encoded into a [Writer].
 #[inline]
@@ -19,8 +17,8 @@ where
     C: ?Sized + Context,
     W: Writer,
 {
-    match crate::options::length::<OPT>() {
-        crate::options::Integer::Variable => {
+    match musli_utils::options::length::<OPT>() {
+        musli_utils::options::Integer::Variable => {
             if value.is_smaller_than(DATA_MASK) {
                 writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
             } else {
@@ -29,8 +27,8 @@ where
             }
         }
         _ => {
-            let bo = crate::options::byteorder::<OPT>();
-            let width = crate::options::length_width::<OPT>();
+            let bo = musli_utils::options::byteorder::<OPT>();
+            let width = musli_utils::options::length_width::<OPT>();
             let bytes = 1u8 << width as u8;
             writer.write_byte(cx, Tag::new(Kind::Prefix, bytes).byte())?;
 
@@ -44,7 +42,7 @@ where
                 }};
             }
 
-            musli_common::width_arm!(width, fixed)
+            musli_utils::width_arm!(width, fixed)
         }
     }
 }
@@ -59,8 +57,8 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    match crate::options::length::<OPT>() {
-        crate::options::Integer::Variable => {
+    match musli_utils::options::length::<OPT>() {
+        musli_utils::options::Integer::Variable => {
             let tag = Tag::from_byte(reader.read_byte(cx)?);
 
             if tag.kind() != Kind::Continuation {
@@ -74,8 +72,8 @@ where
             }
         }
         _ => {
-            let bo = crate::options::byteorder::<OPT>();
-            let width = crate::options::length_width::<OPT>();
+            let bo = musli_utils::options::byteorder::<OPT>();
+            let width = musli_utils::options::length_width::<OPT>();
 
             let bytes = 1u8 << width as u8;
             let tag = Tag::from_byte(reader.read_byte(cx)?);
@@ -97,7 +95,7 @@ where
                 }};
             }
 
-            musli_common::width_arm!(width, fixed)
+            musli_utils::width_arm!(width, fixed)
         }
     }
 }
@@ -114,8 +112,8 @@ where
     W: Writer,
     T: UnsignedOps,
 {
-    match crate::options::integer::<OPT>() {
-        crate::options::Integer::Variable => {
+    match musli_utils::options::integer::<OPT>() {
+        musli_utils::options::Integer::Variable => {
             if value.is_smaller_than(DATA_MASK) {
                 writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
             } else {
@@ -124,7 +122,7 @@ where
             }
         }
         _ => {
-            let bo = crate::options::byteorder::<OPT>();
+            let bo = musli_utils::options::byteorder::<OPT>();
             writer.write_byte(cx, Tag::new(Kind::Prefix, T::BYTES).byte())?;
             value.write_bytes(cx, writer, bo)
         }
@@ -142,8 +140,8 @@ where
     R: Reader<'de>,
     T: UnsignedOps,
 {
-    match crate::options::integer::<OPT>() {
-        crate::options::Integer::Variable => {
+    match musli_utils::options::integer::<OPT>() {
+        musli_utils::options::Integer::Variable => {
             let tag = Tag::from_byte(reader.read_byte(cx)?);
 
             if tag.kind() != Kind::Continuation {
@@ -157,7 +155,7 @@ where
             }
         }
         _ => {
-            let bo = crate::options::byteorder::<OPT>();
+            let bo = musli_utils::options::byteorder::<OPT>();
 
             if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::BYTES) {
                 return Err(cx.message("Expected fixed integer"));

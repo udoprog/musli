@@ -11,16 +11,17 @@ use musli::de::{
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
-use musli_common::int::continuation as c;
 use musli_storage::de::StorageDecoder;
+use musli_utils::int::continuation as c;
+use musli_utils::options;
+use musli_utils::reader::Limit;
+use musli_utils::{Options, Reader};
 
 use crate::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
-use crate::options::Options;
-use crate::reader::{Limit, Reader};
 use crate::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
 
 #[cfg(feature = "musli-value")]
-const BUFFER_OPTIONS: crate::options::Options = crate::options::new().build();
+const BUFFER_OPTIONS: Options = options::new().build();
 
 /// A very simple decoder.
 pub struct SelfDecoder<'a, R, const OPT: Options, C: ?Sized> {
@@ -96,7 +97,7 @@ where
                     let len = if let Some(len) = tag.data() {
                         len as usize
                     } else {
-                        musli_common::int::decode_usize::<_, _, OPT>(
+                        musli_utils::int::decode_usize::<_, _, OPT>(
                             self.cx,
                             self.reader.borrow_mut(),
                         )?
@@ -108,7 +109,7 @@ where
                     let len = if let Some(len) = tag.data() {
                         len as usize
                     } else {
-                        musli_common::int::decode_usize::<_, _, OPT>(
+                        musli_utils::int::decode_usize::<_, _, OPT>(
                             self.cx,
                             self.reader.borrow_mut(),
                         )?
@@ -120,7 +121,7 @@ where
                     let len = if let Some(len) = tag.data() {
                         len as usize
                     } else {
-                        musli_common::int::decode_usize::<_, _, OPT>(
+                        musli_utils::int::decode_usize::<_, _, OPT>(
                             self.cx,
                             self.reader.borrow_mut(),
                         )?
@@ -171,7 +172,7 @@ where
         Ok(if let Some(len) = tag.data() {
             len as usize
         } else {
-            musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
+            musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
         })
     }
 
@@ -184,7 +185,7 @@ where
             Kind::Bytes => Ok(if let Some(len) = tag.data() {
                 len as usize
             } else {
-                musli_common::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
+                musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
             _ => Err(self.cx.marked_message(start, "Expected prefix or pack")),
         }
@@ -438,19 +439,19 @@ where
             #[cfg(feature = "alloc")]
             #[inline]
             fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8_owned(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-                let string = musli_common::str::from_utf8(bytes).map_err(cx.map())?;
+                let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
             }
         }

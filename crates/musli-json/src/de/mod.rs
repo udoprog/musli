@@ -31,6 +31,8 @@ use musli::de::{
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
+use musli_utils::options;
+use musli_utils::Options;
 
 #[cfg(not(feature = "parse-full"))]
 use crate::parser::integer::{
@@ -43,7 +45,7 @@ use crate::parser::integer::{
 use crate::parser::{integer, string, Parser, StringReference, Token};
 
 #[cfg(feature = "musli-value")]
-const BUFFER_OPTIONS: crate::options::Options = crate::options::new().build();
+const BUFFER_OPTIONS: Options = options::new().build();
 
 /// A JSON decoder for Müsli.
 pub(crate) struct JsonDecoder<'a, P, C: ?Sized> {

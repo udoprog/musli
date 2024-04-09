@@ -41,7 +41,7 @@ where
     }
 }
 
-musli_common::test_fns!("descriptive", #[musli_value]);
+musli_utils::test_fns!("descriptive", #[musli_value]);
 
 /// Encode a type as one and decode as another.
 #[inline(never)]

@@ -18,9 +18,9 @@ use musli::Buf;
 use musli::Context;
 #[cfg(feature = "alloc")]
 use musli_storage::en::StorageEncoder;
-use musli_storage::options::Options;
 #[cfg(feature = "alloc")]
-use musli_storage::writer::BufWriter;
+use musli_utils::writer::BufWriter;
+use musli_utils::Options;
 
 use crate::value::{Number, Value};
 

@@ -29,14 +29,13 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 pub use self::value::{AsValueDecoder, Value};
 #[doc(inline)]
 pub use error::Error;
-#[doc(inline)]
-pub use musli_common::exports::*;
 
 use en::ValueEncoder;
 use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
+use musli_utils::Options;
 
-const DEFAULT_OPTIONS: crate::options::Options = crate::options::new().build();
+const DEFAULT_OPTIONS: Options = musli_utils::options::new().build();
 
 /// Encode something that implements [Encode] into a [Value].
 pub fn encode<T>(value: T) -> Result<Value, Error>
@@ -46,9 +45,9 @@ where
     use musli::en::Encoder;
 
     let mut output = Value::Unit;
-    let mut buf = musli_common::exports::allocator::buffer();
-    let alloc = musli_common::exports::allocator::new(&mut buf);
-    let cx = musli_common::exports::context::Same::<_, DefaultMode, Error>::new(&alloc);
+    let mut buf = musli_utils::allocator::buffer();
+    let alloc = musli_utils::allocator::new(&mut buf);
+    let cx = musli_utils::context::Same::<_, DefaultMode, Error>::new(&alloc);
     ValueEncoder::<DEFAULT_OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
     Ok(output)
 }
@@ -60,9 +59,9 @@ where
 {
     use musli::de::Decoder;
 
-    let mut buf = musli_common::exports::allocator::buffer();
-    let alloc = musli_common::exports::allocator::new(&mut buf);
-    let cx = musli_common::exports::context::Same::<_, DefaultMode, Error>::new(&alloc);
+    let mut buf = musli_utils::allocator::buffer();
+    let alloc = musli_utils::allocator::new(&mut buf);
+    let cx = musli_utils::context::Same::<_, DefaultMode, Error>::new(&alloc);
     value.decoder::<DEFAULT_OPTIONS, _>(&cx).decode()
 }
 

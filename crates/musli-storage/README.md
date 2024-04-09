@@ -61,10 +61,10 @@ To tweak the behavior of the storage format you can use the [`Encoding`]
 type:
 
 ```rust
-use musli_storage::Encoding;
-use musli_storage::options::{self, Options, Integer};
 use musli::mode::DefaultMode;
 use musli::{Encode, Decode};
+use musli_utils::options::{self, Options, Integer};
+use musli_storage::Encoding;
 
 const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
 const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();

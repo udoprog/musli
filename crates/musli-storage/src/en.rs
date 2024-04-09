@@ -6,9 +6,7 @@ use musli::en::{
 };
 use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::Context;
-
-use crate::options::Options;
-use crate::writer::Writer;
+use musli_utils::{Options, Writer};
 
 /// A vaery simple encoder suitable for storage encoding.
 pub struct StorageEncoder<'a, W, const OPT: Options, C: ?Sized> {
@@ -90,7 +88,7 @@ where
 
     #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(
+        musli_utils::int::encode_usize::<_, _, OPT>(
             self.cx,
             self.writer.borrow_mut(),
             bytes.len(),
@@ -105,7 +103,7 @@ where
         I: IntoIterator,
         I::Item: AsRef<[u8]>,
     {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(self.cx, bytes.as_ref())?;
@@ -116,7 +114,7 @@ where
 
     #[inline]
     fn encode_string(mut self, string: &str) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(
+        musli_utils::int::encode_usize::<_, _, OPT>(
             self.cx,
             self.writer.borrow_mut(),
             string.len(),
@@ -136,7 +134,7 @@ where
 
     #[inline]
     fn encode_usize(mut self, value: usize) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
@@ -161,22 +159,22 @@ where
 
     #[inline]
     fn encode_u16(mut self, value: u16) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_u32(mut self, value: u32) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_u64(mut self, value: u64) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_u128(mut self, value: u128) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
@@ -186,22 +184,22 @@ where
 
     #[inline]
     fn encode_i16(mut self, value: i16) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_i32(mut self, value: i32) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_i64(mut self, value: i64) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
     fn encode_i128(mut self, value: i128) -> Result<Self::Ok, C::Error> {
-        musli_common::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+        musli_utils::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]
@@ -228,7 +226,7 @@ where
 
     #[inline]
     fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
@@ -240,19 +238,19 @@ where
 
     #[inline]
     fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_map_entries(mut self, hint: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_struct(mut self, hint: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
@@ -284,7 +282,7 @@ where
         T: ?Sized + Encode<C::Mode>,
     {
         StorageEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        musli_common::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 }

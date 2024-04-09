@@ -15,13 +15,12 @@ use musli::de::{Decode, Decoder};
 use musli::en::{Encode, Encoder};
 use musli::mode::DefaultMode;
 use musli::Context;
+use musli_utils::{FixedBytes, Writer};
 
 use crate::de::JsonDecoder;
 use crate::en::JsonEncoder;
 use crate::error::Error;
-use crate::fixed::FixedBytes;
 use crate::parser::{Parser, SliceParser};
-use crate::writer::Writer;
 
 /// The default configuration.
 pub const DEFAULT: Encoding = Encoding::new();
@@ -188,9 +187,9 @@ impl<M> Encoding<M> {
     where
         T: ?Sized + Encode<M>,
     {
-        let mut buf = crate::allocator::buffer();
-        let alloc = crate::allocator::new(&mut buf);
-        let cx = crate::context::Same::new(&alloc);
+        let mut buf = musli_utils::allocator::buffer();
+        let alloc = musli_utils::allocator::new(&mut buf);
+        let cx = musli_utils::context::Same::new(&alloc);
         self.to_string_with(&cx, value)
     }
 
@@ -219,9 +218,9 @@ impl<M> Encoding<M> {
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
-        let mut buf = crate::allocator::buffer();
-        let alloc = crate::allocator::new(&mut buf);
-        let cx = crate::context::Same::new(&alloc);
+        let mut buf = musli_utils::allocator::buffer();
+        let alloc = musli_utils::allocator::new(&mut buf);
+        let cx = musli_utils::context::Same::new(&alloc);
         self.decode_with(&cx, parser)
     }
 
@@ -271,9 +270,9 @@ impl<M> Encoding<M> {
     where
         T: Decode<'de, M>,
     {
-        let mut buf = crate::allocator::buffer();
-        let alloc = crate::allocator::new(&mut buf);
-        let cx = crate::context::Same::<_, M, _>::new(&alloc);
+        let mut buf = musli_utils::allocator::buffer();
+        let alloc = musli_utils::allocator::new(&mut buf);
+        let cx = musli_utils::context::Same::<_, M, _>::new(&alloc);
         self.from_slice_with(&cx, bytes)
     }
 
@@ -291,7 +290,7 @@ impl<M> Encoding<M> {
         JsonDecoder::new(cx, SliceParser::new(bytes)).decode()
     }
 
-    musli_common::encode_with_extensions!(M);
+    musli_utils::encode_with_extensions!(M);
 }
 
 impl<M> Clone for Encoding<M> {

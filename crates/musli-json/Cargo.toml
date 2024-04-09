@@ -21,20 +21,21 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
 [features]
 default = ["std", "alloc", "simdutf8", "musli-value", "parse-full"]
-std = ["musli/std", "musli-common/std", "musli-value?/std", "alloc", "lexical/std"]
-alloc = ["musli/alloc", "musli-common/alloc", "musli-value?/alloc"]
+std = ["musli/std", "musli-utils/std", "musli-value?/std", "alloc", "lexical/std", "simdutf8?/std"]
+alloc = ["musli/alloc", "musli-utils/alloc", "musli-value?/alloc"]
 test = ["musli-value"]
-simdutf8 = ["musli-common/simdutf8"]
+simdutf8 = ["dep:simdutf8"]
 parse-full = []
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.110", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.110", default-features = false }
+musli-utils = { path = "../musli-utils", version = "0.0.110", default-features = false }
 musli-value = { path = "../musli-value", version = "0.0.110", default-features = false, optional = true }
 
 itoa = "1.0.10"
 ryu = "1.0.17"
 lexical = { version = "6.1.1", default-features = false, features = ["parse-floats"] }
+simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 
 [dev-dependencies]
 rand = "0.8.5"

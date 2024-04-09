@@ -21,13 +21,13 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
 [features]
 default = ["std", "alloc"]
-std = ["musli/std", "musli-storage/std", "musli-common/std"]
-alloc = ["musli/alloc", "musli-storage/alloc", "musli-common/alloc"]
+std = ["musli/std", "musli-storage/std", "musli-utils/std"]
+alloc = ["musli/alloc", "musli-storage/alloc", "musli-utils/alloc"]
 test = []
 
 [dependencies]
 musli = { path = "../musli", version = "0.0.110", default-features = false }
-musli-common = { path = "../musli-common", version = "0.0.110", default-features = false }
+musli-utils = { path = "../musli-utils", version = "0.0.110", default-features = false }
 musli-storage = { path = "../musli-storage", version = "0.0.110", default-features = false }
 
 itoa = "1.0.10"

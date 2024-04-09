@@ -2,8 +2,7 @@ use core::mem::take;
 
 use musli::en::{PackEncoder, SequenceEncoder, TupleEncoder};
 use musli::Context;
-
-use crate::writer::Writer;
+use musli_utils::Writer;
 
 use super::JsonEncoder;
 

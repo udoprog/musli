@@ -16,9 +16,9 @@ use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
 use musli::en::{MapEncoder, SequenceEncoder, VariantEncoder};
 use musli::Context;
+use musli_utils::Options;
 
 use crate::de::ValueDecoder;
-use crate::options::Options;
 
 /// A dynamic value capable of representing any [Müsli] type whether it be
 /// complex or simple.

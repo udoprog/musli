@@ -135,7 +135,7 @@ fn check_utf8<C>(cx: &C, bytes: &[u8], start: C::Mark) -> Result<(), C::Error>
 where
     C: ?Sized + Context,
 {
-    if musli_common::str::from_utf8(bytes).is_err() {
+    if crate::str::from_utf8(bytes).is_err() {
         Err(cx.marked_message(start, "Invalid unicode string"))
     } else {
         Ok(())

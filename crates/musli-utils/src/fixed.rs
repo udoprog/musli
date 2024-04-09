@@ -1,4 +1,5 @@
-//! Fixed capacity containers.
+//! Containers which can store up to a fixed number of uninitialized bytes on
+//! the stack and read into and from it.
 
 use core::fmt;
 use core::mem::{self, MaybeUninit};
