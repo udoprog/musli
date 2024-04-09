@@ -290,11 +290,11 @@ impl Benchmarker {
             }
         };
 
-        let encode_inner = &encode_fn.sig.ident;
         let encode_args = convert_arguments(encode_args, ReferenceType::Encode);
         let (provided_field, provided_expr) = convert_provided(&providers);
 
-        let encode_arguments = generics_to_path_arguments(&encode_generics);
+        let mut encode_inner = syn::PathSegment::from(encode_fn.sig.ident.clone());
+        encode_inner.arguments = generics_to_path_arguments(&encode_generics);
 
         let mut encode_item_fn = encode_fn.clone();
         encode_item_fn.sig.generics = encode_generics;
@@ -305,7 +305,7 @@ impl Benchmarker {
                 #encode_fn
 
                 Ok(EncodeState {
-                    buffer: #encode_inner #encode_arguments(#encode_args)?,
+                    buffer: #encode_inner(#encode_args)?,
                     #(#provided_field: #provided_expr,)*
                     _marker: ::core::marker::PhantomData,
                 })
@@ -321,17 +321,17 @@ impl Benchmarker {
 
         let decode_args = convert_arguments(decode_args, ReferenceType::Decode);
 
-        let decode_inner = &decode_fn.sig.ident;
         let mut decode_item_fn = decode_fn.clone();
 
-        let decode_arguments = generics_to_path_arguments(&decode_fn.sig.generics);
+        let mut decode_inner = syn::PathSegment::from(decode_fn.sig.ident.clone());
+        decode_inner.arguments = generics_to_path_arguments(&decode_fn.sig.generics);
 
         decode_item_fn.sig.inputs = syn::parse_quote!(&mut self);
         decode_item_fn.sig.generics = mangle_decode_lifetimes(&decode_fn, lifetime.as_ref());
         decode_item_fn.block = syn::parse_quote! {
             {
                 #decode_fn
-                #decode_inner #decode_arguments(#decode_args)
+                #decode_inner(#decode_args)
             }
         };
 
@@ -382,15 +382,11 @@ impl Benchmarker {
 }
 
 fn generics_to_path_arguments(encode_generics: &syn::Generics) -> syn::PathArguments {
-    if encode_generics.params.is_empty() {
-        return syn::PathArguments::None;
-    }
-
     let mut params = Punctuated::<syn::GenericArgument, Token![,]>::new();
 
     for p in &encode_generics.params {
         let arg = match p {
-            syn::GenericParam::Lifetime(p) => syn::GenericArgument::Lifetime(p.lifetime.clone()),
+            syn::GenericParam::Lifetime(..) => continue,
             syn::GenericParam::Type(p) => {
                 syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
                     qself: None,
@@ -407,6 +403,10 @@ fn generics_to_path_arguments(encode_generics: &syn::Generics) -> syn::PathArgum
         };
 
         params.push(arg);
+    }
+
+    if params.is_empty() {
+        return syn::PathArguments::None;
     }
 
     syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
@@ -741,21 +741,26 @@ fn public_decode_mangling(decode_fn: &syn::ItemFn, arguments: &[Argument]) -> Op
             }
         }
 
-        new_inputs.push(i.clone());
+        let mut new_input = i.clone();
 
-        let syn::FnArg::Typed(ty) = i else {
+        let syn::FnArg::Typed(ty) = &mut new_input else {
             return None;
         };
 
-        let syn::Pat::Ident(syn::PatIdent { ident, .. }) = &*ty.pat else {
+        let syn::Pat::Ident(syn::PatIdent {
+            ident, mutability, ..
+        }) = &mut *ty.pat
+        else {
             return None;
         };
 
         inner_arguments.push(syn::parse_quote!(#ident));
+        *mutability = None;
+        new_inputs.push(new_input);
     }
 
-    let inner_fn_ident = &decode_fn.sig.ident;
-    let decode_arguments = generics_to_path_arguments(&decode_fn.sig.generics);
+    let mut inner_fn_ident = syn::PathSegment::from(decode_fn.sig.ident.clone());
+    inner_fn_ident.arguments = generics_to_path_arguments(&decode_fn.sig.generics);
 
     let mut outer_fn = decode_fn.clone();
     outer_fn.sig.inputs = new_inputs;
@@ -764,7 +769,7 @@ fn public_decode_mangling(decode_fn: &syn::ItemFn, arguments: &[Argument]) -> Op
             #decode_fn
 
             let mut b = new();
-            #inner_fn_ident #decode_arguments(#inner_arguments)
+            #inner_fn_ident(#inner_arguments)
         }
     };
 

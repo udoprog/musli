@@ -262,16 +262,14 @@ macro_rules! if_supported {
 
 #[macro_export]
 macro_rules! types {
-    ($call:path $(, $($tt:tt)*)?) => {
-        $call! {
-            $($($tt)*,)?
-            primitives, Primitives, PRIMITIVES, 1000,
-            primpacked, PrimitivesPacked, PRIMITIVES_PACKED, 1000,
-            large, LargeStruct, LARGE_STRUCTS, 10000,
-            allocated, Allocated, ALLOCATED, 5000,
-            medium_enum, MediumEnum, MEDIUM_ENUMS, 1000
-        }
-    }
+    ($call:path) => {
+        $call!(primitives, Primitives, PRIMITIVES, 1000);
+        $call!(primpacked, PrimitivesPacked, PRIMITIVES_PACKED, 1000);
+        $call!(large, LargeStruct, LARGE_STRUCTS, 10000);
+        $call!(allocated, Allocated, ALLOCATED, 5000);
+        #[cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
+        $call!(medium_enum, MediumEnum, MEDIUM_ENUMS, 1000);
+    };
 }
 
 /// Build common RNG with custom seed.

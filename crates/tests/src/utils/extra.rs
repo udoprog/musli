@@ -171,7 +171,7 @@ pub mod zerocopy {
         Ok(buf.as_slice())
     }
 
-    pub fn decode<'buf, T>(buf: &[u8]) -> Result<T, Error>
+    pub fn decode<T>(buf: &[u8]) -> Result<T, Error>
     where
         T: FromBytes,
     {

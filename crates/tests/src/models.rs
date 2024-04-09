@@ -284,6 +284,7 @@ impl PartialEq<Tuples> for &Tuples {
     feature = "miniserde",
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
+#[cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
 pub enum MediumEnum {
     #[cfg(not(feature = "no-empty"))]
     Empty,
@@ -313,7 +314,10 @@ pub enum MediumEnum {
     EmptyStruct {},
 }
 
-#[cfg(feature = "rkyv")]
+#[cfg(all(
+    feature = "rkyv",
+    any(not(feature = "no-empty"), not(feature = "no-nonunit-variant"))
+))]
 impl PartialEq<MediumEnum> for &ArchivedMediumEnum {
     #[inline]
     fn eq(&self, other: &MediumEnum) -> bool {
@@ -321,6 +325,7 @@ impl PartialEq<MediumEnum> for &ArchivedMediumEnum {
     }
 }
 
+#[cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
 impl PartialEq<MediumEnum> for &MediumEnum {
     #[inline]
     fn eq(&self, other: &MediumEnum) -> bool {
@@ -351,7 +356,10 @@ pub struct LargeStruct {
     #[generate(range = PRIMITIVES_RANGE)]
     tuples: Vec<(Tuples, Tuples)>,
     #[generate(range = MEDIUM_RANGE)]
-    #[cfg(feature = "alloc")]
+    #[cfg(all(
+        feature = "alloc",
+        any(not(feature = "no-empty"), not(feature = "no-nonunit-variant"))
+    ))]
     medium_vec: Vec<MediumEnum>,
     #[cfg(all(
         feature = "std",

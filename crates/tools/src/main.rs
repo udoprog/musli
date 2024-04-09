@@ -849,8 +849,8 @@ where
         let mut rows = BTreeSet::new();
 
         macro_rules! build_column {
-            ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
-                $(columns.push(stringify!($name));)*
+            ($name:ident, $ty:ty, $num:expr, $size_hint:expr) => {
+                columns.push(stringify!($name));
             };
         }
 

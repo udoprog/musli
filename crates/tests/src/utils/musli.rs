@@ -234,7 +234,7 @@ pub mod musli_zerocopy {
         Ok(&buf[..])
     }
 
-    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<&'buf T, Error>
+    pub fn decode<T>(buf: &[u8]) -> Result<&T, Error>
     where
         T: ZeroCopy,
     {

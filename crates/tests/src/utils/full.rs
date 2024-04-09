@@ -131,7 +131,7 @@ pub mod postcard {
         }
     }
 
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], postcard::Error>
+    pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T) -> Result<&'buf [u8], postcard::Error>
     where
         T: Serialize,
     {
@@ -226,7 +226,7 @@ pub mod derive_bitcode {
         Ok(buf.encode(value))
     }
 
-    pub fn decode<'buf, T>(decode_buf: &mut Buffer, buf: &'buf [u8]) -> Result<T, bitcode::Error>
+    pub fn decode<T>(decode_buf: &mut Buffer, buf: &[u8]) -> Result<T, bitcode::Error>
     where
         for<'de> T: Decode<'de>,
     {

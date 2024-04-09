@@ -49,114 +49,120 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     macro_rules! setup {
-        ($($name:ident, $ty:ty, $num:expr, $size_hint:expr),*) => {
-            $({
-                let mut values = Vec::<$ty>::new();
-                Generate::generate_in(&mut rng, |value| values.push(value));
+        ($name:ident, $ty:ty, $num:expr, $size_hint:expr) => {{
+            let mut values = Vec::<$ty>::new();
+            Generate::generate_in(&mut rng, |value| values.push(value));
 
-                macro_rules! check {
-                    ($framework:ident) => {{
-                        let mut frameworks = Vec::with_capacity(values.len());
+            macro_rules! check {
+                ($framework:ident) => {{
+                    let mut frameworks = Vec::with_capacity(values.len());
 
-                        for _ in &values {
-                            frameworks.push(utils::$framework::new());
-                        }
+                    for _ in &values {
+                        frameworks.push(utils::$framework::new());
+                    }
 
-                        for (index, (value, framework)) in values.iter().zip(&mut frameworks).enumerate() {
+                    for (index, (value, framework)) in
+                        values.iter().zip(&mut frameworks).enumerate()
+                    {
+                        let mut state = framework.state();
+                        state.reset($size_hint, value);
+                        let mut out = state.encode(value).expect("encoding should success");
+
+                        #[cfg_attr(feature = "no-binary-equality", allow(unused_variables))]
+                        let actual = out.decode::<$ty>().expect("decoding should succeed");
+
+                        #[cfg(not(feature = "no-binary-equality"))]
+                        assert_eq!(
+                            actual,
+                            *value,
+                            "{} / {}: roundtrip encoding of value[{index}] should be equal",
+                            stringify!($framework),
+                            stringify!($name)
+                        );
+                    }
+                }};
+            }
+
+            for_each!($name, check);
+
+            #[allow(unused)]
+            macro_rules! it {
+                ($b:expr, $framework:ident) => {{
+                    let mut frameworks = Vec::with_capacity(values.len());
+
+                    for _ in &values {
+                        frameworks.push(utils::$framework::new());
+                    }
+
+                    $b.iter(|| {
+                        for (value, framework) in values.iter().zip(&mut frameworks) {
                             let mut state = framework.state();
                             state.reset($size_hint, value);
-                            let mut out = state.encode(value).expect("encoding should success");
-
-                            #[cfg_attr(feature = "no-binary-equality", allow(unused_variables))]
-                            let actual = out.decode::<$ty>().expect("decoding should succeed");
-
-                            #[cfg(not(feature = "no-binary-equality"))]
-                            assert_eq!(actual, *value, "{} / {}: roundtrip encoding of value[{index}] should be equal", stringify!($framework), stringify!($name));
+                            black_box(state.encode(value).unwrap());
                         }
-                    }}
-                }
+                    });
+                }};
+            }
 
-                for_each!($name, check);
+            group!(concat!("enc/", stringify!($name)), $name, it);
 
-                #[allow(unused)]
-                macro_rules! it {
-                    ($b:expr, $framework:ident) => {{
-                        let mut frameworks = Vec::with_capacity(values.len());
+            #[allow(unused)]
+            macro_rules! it {
+                ($b:expr, $framework:ident) => {{
+                    let mut frameworks = Vec::with_capacity(values.len());
 
-                        for _ in &values {
-                            frameworks.push(utils::$framework::new());
+                    for _ in &values {
+                        frameworks.push(utils::$framework::new());
+                    }
+
+                    let mut states = Vec::with_capacity(values.len());
+
+                    for framework in &mut frameworks {
+                        states.push(framework.state());
+                    }
+
+                    let mut inputs = Vec::with_capacity(values.len());
+
+                    for (value, state) in values.iter().zip(&mut states) {
+                        state.reset($size_hint, value);
+                        inputs.push(state.encode(value).unwrap());
+                    }
+
+                    $b.iter(move || {
+                        for data in &mut inputs {
+                            black_box(data.decode::<$ty>().unwrap());
                         }
+                    });
+                }};
+            }
 
-                        $b.iter(|| {
-                            for (value, framework) in values.iter().zip(&mut frameworks) {
-                                let mut state = framework.state();
-                                state.reset($size_hint, value);
-                                black_box(state.encode(value).unwrap());
-                            }
-                        });
-                    }};
-                }
+            group!(concat!("dec/", stringify!($name)), $name, it);
 
-                group!(concat!("enc/", stringify!($name)), $name, it);
+            #[allow(unused)]
+            macro_rules! it {
+                ($b:expr, $framework:ident) => {{
+                    let mut frameworks = Vec::with_capacity(values.len());
 
-                #[allow(unused)]
-                macro_rules! it {
-                    ($b:expr, $framework:ident) => {{
-                        let mut frameworks = Vec::with_capacity(values.len());
+                    for _ in &values {
+                        frameworks.push(utils::$framework::new());
+                    }
 
-                        for _ in &values {
-                            frameworks.push(utils::$framework::new());
-                        }
-
-                        let mut states = Vec::with_capacity(values.len());
-
-                        for framework in &mut frameworks {
-                            states.push(framework.state());
-                        }
-
-                        let mut inputs = Vec::with_capacity(values.len());
-
-                        for (value, state) in values.iter().zip(&mut states) {
+                    $b.iter(|| {
+                        for (value, framework) in values.iter().zip(&mut frameworks) {
+                            let mut state = framework.state();
                             state.reset($size_hint, value);
-                            inputs.push(state.encode(value).unwrap());
+                            let mut out = black_box(state.encode(value).unwrap());
+                            let actual = black_box(out.decode::<$ty>().unwrap());
+                            debug_assert_eq!(actual, *value);
+                            black_box(actual);
                         }
+                    });
+                }};
+            }
 
-                        $b.iter(move || {
-                            for data in &mut inputs {
-                                black_box(data.decode::<$ty>().unwrap());
-                            }
-                        });
-                    }};
-                }
-
-                group!(concat!("dec/", stringify!($name)), $name, it);
-
-                #[allow(unused)]
-                macro_rules! it {
-                    ($b:expr, $framework:ident) => {{
-                        let mut frameworks = Vec::with_capacity(values.len());
-
-                        for _ in &values {
-                            frameworks.push(utils::$framework::new());
-                        }
-
-                        $b.iter(|| {
-                            for (value, framework) in values.iter().zip(&mut frameworks) {
-                                let mut state = framework.state();
-                                state.reset($size_hint, value);
-                                let mut out = black_box(state.encode(value).unwrap());
-                                let actual = black_box(out.decode::<$ty>().unwrap());
-                                debug_assert_eq!(actual, *value);
-                                black_box(actual);
-                            }
-                        });
-                    }};
-                }
-
-                #[cfg(not(feature = "no-rt"))]
-                group!(concat!("rt/", stringify!($name)), $name, it);
-            })*
-        };
+            #[cfg(not(feature = "no-rt"))]
+            group!(concat!("rt/", stringify!($name)), $name, it);
+        }};
     }
 
     tests::types!(setup);

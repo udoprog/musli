@@ -190,7 +190,7 @@ enum Enum {
 struct Struct {
     a: u32,
     b: u64,
-    enum_: Enum,
+    inner_enum: Enum,
 }
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
@@ -229,7 +229,7 @@ macro_rules! build_test {
         $module::guided::<Struct>(stringify!($module), |r| Struct {
             a: r.next(),
             b: r.next(),
-            enum_: Enum::Empty,
+            inner_enum: Enum::Empty,
         });
 
         $module::guided::<Enum>(stringify!($module), |r| Enum::Tuple(r.next(), r.next()));
@@ -237,7 +237,7 @@ macro_rules! build_test {
         $module::guided::<Struct>(stringify!($module), |r| Struct {
             a: r.next(),
             b: r.next(),
-            enum_: Enum::Tuple(r.next(), r.next()),
+            inner_enum: Enum::Tuple(r.next(), r.next()),
         });
 
         $module::guided::<Enum>(stringify!($module), |r| Enum::Struct {
@@ -248,7 +248,7 @@ macro_rules! build_test {
         $module::guided::<Struct>(stringify!($module), |r| Struct {
             a: r.next(),
             b: r.next(),
-            enum_: Enum::Struct {
+            inner_enum: Enum::Struct {
                 a: r.next(),
                 b: r.next(),
             },
