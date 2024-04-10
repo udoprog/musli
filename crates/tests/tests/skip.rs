@@ -12,10 +12,18 @@ struct Inner {
 pub struct AllSkipped {
     #[musli(skip)]
     skip: u32,
-    #[musli(skip = 42)]
+    #[musli(skip, default = skip_default)]
     skip_default: u32,
-    #[musli(skip = Some(Inner { a: 1, b: 2 }))]
+    #[musli(skip, default = skip_complex_field)]
     complex_field: Option<Inner>,
+}
+
+fn skip_default() -> u32 {
+    42
+}
+
+fn skip_complex_field() -> Option<Inner> {
+    Some(Inner { a: 1, b: 2 })
 }
 
 #[test]

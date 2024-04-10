@@ -7,7 +7,7 @@ use syn::Token;
 use crate::expander::{Result, TagMethod};
 use crate::internals::apply;
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
-use crate::internals::build::{Body, Build, BuildData, Enum, Field, FieldSkip, Variant};
+use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
 use crate::internals::tokens::Tokens;
 
 struct Ctxt<'a> {
@@ -765,11 +765,14 @@ fn decode_tagged(
         let decode_path = &f.decode_path.1;
 
         let expr = match &f.skip {
-            Some(FieldSkip::Default(span)) => {
+            Some(span) => {
                 let ty = f.ty;
-                syn::Expr::Verbatim(quote_spanned!(*span => #default_function::<#ty>()))
+
+                match &f.default_attr {
+                    Some((_, Some(path))) => syn::Expr::Verbatim(quote_spanned!(*span => #path())),
+                    _ => syn::Expr::Verbatim(quote_spanned!(*span => #default_function::<#ty>())),
+                }
             }
-            Some(FieldSkip::Expr(expr)) => expr.clone(),
             None => {
                 let formatted_tag = match &st.name_format_with {
                     Some((_, path)) => quote!(&#path(&#tag)),

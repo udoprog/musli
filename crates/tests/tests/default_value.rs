@@ -2,34 +2,59 @@
 
 use musli::{Decode, Encode};
 
-/// Empty enums should work.
 #[derive(Encode, Decode)]
-struct Struct {
-    name: String,
+struct Struct<'a> {
+    name: &'a str,
+    age: u32,
+    country: &'a str,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-struct StructWithDefault {
-    name: String,
+struct StructDefault<'a> {
+    name: &'a str,
     #[musli(default, skip_encoding_if = is_zero)]
     age: u32,
-    country: String,
+    country: &'a str,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-struct StructWithOption {
-    name: String,
+struct StructWithOption<'a> {
+    name: &'a str,
     #[musli(default, skip_encoding_if = Option::is_none)]
     age: Option<u32>,
-    country: String,
+    country: &'a str,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-struct StructWithDefaultValue {
-    name: String,
+struct StructDefaultValue<'a> {
+    name: &'a str,
     #[musli(default = default_age, skip_encoding_if = is_zero)]
     age: u32,
-    country: String,
+    country: &'a str,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct StructSkip<'a> {
+    name: &'a str,
+    #[musli(skip)]
+    age: u32,
+    country: &'a str,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct StructSkipDefault<'a> {
+    name: &'a str,
+    #[musli(skip, default)]
+    age: u32,
+    country: &'a str,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct StructSkipValue<'a> {
+    name: &'a str,
+    #[musli(skip, default = default_age)]
+    age: u32,
+    country: &'a str,
 }
 
 fn is_zero(value: &u32) -> bool {
@@ -43,79 +68,127 @@ fn default_age() -> u32 {
 // Ensure that skipped over fields ensures compatibility.
 #[test]
 fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
+    static NAME: &str = "Aristotle";
+    static COUNTRY: &str = "Greece";
+
     tests::assert_decode_eq!(
         full,
-        StructWithDefault {
-            name: String::from("Aristotle"),
+        StructDefault {
+            name: NAME,
             age: 0,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
         StructWithOption {
-            name: String::from("Aristotle"),
+            name: NAME,
             age: None,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
-        json = r#"{"0":"Aristotle","2":"Greece"}"#,
+        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
         full,
         StructWithOption {
-            name: String::from("Aristotle"),
+            name: NAME,
             age: None,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
         StructWithOption {
-            name: String::from("Aristotle"),
+            name: NAME,
             age: None,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
-        json = r#"{"0":"Aristotle","2":"Greece"}"#,
+        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
         full,
         StructWithOption {
-            name: String::from("Aristotle"),
+            name: NAME,
             age: None,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
-        StructWithDefault {
-            name: String::from("Aristotle"),
+        StructDefault {
+            name: NAME,
             age: 0,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
-        json = r#"{"0":"Aristotle","2":"Greece"}"#,
+        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
         full,
-        StructWithDefaultValue {
-            name: String::from("Aristotle"),
+        StructDefaultValue {
+            name: NAME,
             age: 0,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
-        StructWithDefaultValue {
-            name: String::from("Aristotle"),
+        StructDefaultValue {
+            name: NAME,
             age: 180,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
-        json = r#"{"0":"Aristotle","2":"Greece"}"#,
+        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
         full,
-        StructWithDefaultValue {
-            name: String::from("Aristotle"),
+        StructDefaultValue {
+            name: NAME,
             age: 170,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
-        StructWithDefaultValue {
-            name: String::from("Aristotle"),
+        StructDefaultValue {
+            name: NAME,
             age: 170,
-            country: String::from("Greece"),
+            country: COUNTRY
         },
-        json = r#"{"0":"Aristotle","1":170,"2":"Greece"}"#,
+        json = format!(r#"{{"0":{NAME:?},"1":170,"2":{COUNTRY:?}}}"#),
+    );
+
+    tests::assert_decode_eq!(
+        full,
+        StructSkip {
+            name: NAME,
+            age: 170,
+            country: COUNTRY
+        },
+        StructDefault {
+            name: NAME,
+            age: 0,
+            country: COUNTRY
+        },
+        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+    );
+
+    tests::assert_decode_eq!(
+        full,
+        StructSkipDefault {
+            name: NAME,
+            age: 170,
+            country: COUNTRY
+        },
+        StructDefault {
+            name: NAME,
+            age: 0,
+            country: COUNTRY
+        },
+        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+    );
+
+    tests::assert_decode_eq!(
+        full,
+        StructSkip {
+            name: NAME,
+            age: 170,
+            country: COUNTRY
+        },
+        StructSkipValue {
+            name: NAME,
+            age: 180,
+            country: COUNTRY
+        },
+        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
     );
 
     Ok(())
