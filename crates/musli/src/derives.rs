@@ -533,8 +533,12 @@
 //! struct Struct {
 //!     #[musli(rename = "other")]
 //!     something: String,
-//!     #[musli(skip = 42)]
+//!     #[musli(skip, default = default_field)]
 //!     skipped_field: u32,
+//! }
+//!
+//! fn default_field() -> u32 {
+//!     42
 //! }
 //!
 //! #[derive(Encode, Decode)]
@@ -549,11 +553,11 @@
 //!
 //! <br>
 //!
-//! #### `#[musli(skip [= <expr>])]`
+//! #### `#[musli(skip)]`
 //!
 //! This attribute means that the entire field is skipped. If a field is decoded
-//! it either uses the provided `<expr>` to construct the value, or tries and
-//! initialize it with [`Default::default`].
+//! it uses [`Default::default`] to construct the value. Other defaults can be
+//! specified with [`#[musli(default = <path>)]`][#muslidefault--path].
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -563,17 +567,27 @@
 //!     name: String,
 //!     #[musli(skip)]
 //!     age: Option<u32>,
-//!     #[musli(skip = Some(String::from("Earth")))]
+//!     #[musli(skip, default = default_country)]
 //!     country: Option<String>,
+//! }
+//!
+//! fn default_country() -> Option<String> {
+//!     Some(String::from("Earth"))
 //! }
 //! ```
 //!
 //! <br>
 //!
-//! #### `#[musli(default)]`
+//! #### `#[musli(default [= <path>])]`
 //!
-//! This constructs the field using [`Default::default`] in case it's not
-//! available. This is only used when a field is missing during decoding.
+//! When a field is absent or disabled with `#[musli(skip)]`, this attribute
+//! specifies that a default value should be used instead.
+//!
+//! If `#[musli(default)]` is specified, the default value is constructed using
+//! [`Default::default`].
+//!
+//! If `#[musli(default = <path>)]` is specified, the default value is
+//! constructed by calling the function at `<path>`.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -585,10 +599,16 @@
 //!     age: Option<u32>,
 //!     #[musli(default = default_height)]
 //!     height: Option<u32>,
+//!     #[musli(skip, default = default_meaning)]
+//!     meaning: u32,
 //! }
 //!
 //! fn default_height() -> Option<u32> {
 //!     Some(180)
+//! }
+//!
+//! fn default_meaning() -> u32 {
+//!     42
 //! }
 //! ```
 //!
