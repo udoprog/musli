@@ -573,7 +573,7 @@ layer! {
         /// Rename a field to the given literal.
         rename: syn::Expr,
         /// Use a default value for the field if it's not available.
-        is_default: (),
+        is_default: Option<syn::Path>,
         /// Use a default value for the field if it's not available.
         skip: FieldSkip,
         /// Use the alternate TraceDecode for the field.
@@ -696,7 +696,13 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 
             // parse #[musli(default)]
             if meta.path.is_ident("default") {
-                new.is_default.push((meta.path.span(), ()));
+                if meta.input.parse::<Option<Token![=]>>()?.is_some() {
+                    new.is_default
+                        .push((meta.path.span(), Some(meta.input.parse()?)));
+                } else {
+                    new.is_default.push((meta.path.span(), None));
+                }
+
                 return Ok(());
             }
 

@@ -583,6 +583,12 @@
 //!     name: String,
 //!     #[musli(default)]
 //!     age: Option<u32>,
+//!     #[musli(default = default_height)]
+//!     height: Option<u32>,
+//! }
+//!
+//! fn default_height() -> Option<u32> {
+//!     Some(180)
 //! }
 //! ```
 //!

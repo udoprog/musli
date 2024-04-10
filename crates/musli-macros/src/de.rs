@@ -805,12 +805,12 @@ fn decode_tagged(
 
                 fields_with.push((f, decode, (enter, leave)));
 
-                let fallback = if f.default_attr.is_some() {
-                    quote!(#default_function())
-                } else {
-                    quote! {
+                let fallback = match f.default_attr {
+                    Some((span, None)) => quote_spanned!(span => #default_function()),
+                    Some((_, Some(path))) => quote!(#path()),
+                    None => quote! {
                         return #result_err(#context_t::expected_tag(#ctx_var, #type_name, &#tag))
-                    }
+                    },
                 };
 
                 let var = &f.var;
@@ -1085,7 +1085,7 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
     let mut assign = Vec::new();
 
     for f in &st_.unskipped_fields {
-        if let Some(span) = f.default_attr {
+        if let Some((span, _)) = f.default_attr {
             e.packed_default_diagnostics(span);
         }
 

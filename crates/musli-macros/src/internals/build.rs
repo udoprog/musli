@@ -179,7 +179,7 @@ pub(crate) struct Field<'a> {
     pub(crate) tag: syn::Expr,
     pub(crate) skip_encoding_if: Option<&'a (Span, syn::Path)>,
     /// Fill with default value, if missing.
-    pub(crate) default_attr: Option<Span>,
+    pub(crate) default_attr: Option<(Span, Option<&'a syn::Path>)>,
     /// Skip field entirely and always initialize with the specified expresion,
     /// or default value if none is specified.
     pub(crate) skip: Option<&'a FieldSkip>,
@@ -420,7 +420,10 @@ fn setup_field<'a>(
     let (tag, tag_method) = data.expand_tag(e, mode, default_field)?;
     tag_methods.insert(data.span, tag_method);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
-    let default_attr = data.attr.is_default(mode).map(|&(s, ())| s);
+    let default_attr = data
+        .attr
+        .is_default(mode)
+        .map(|(s, path)| (*s, path.as_ref()));
     let skip = data.attr.skip(mode).map(|(_, skip)| skip);
 
     let member = match data.ident {
