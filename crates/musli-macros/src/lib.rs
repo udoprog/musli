@@ -70,19 +70,14 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
 /// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attr = proc_macro2::TokenStream::from(attr);
-
-    if !attr.is_empty() {
-        return syn::Error::new_spanned(attr, "Arguments not supported")
-            .to_compile_error()
-            .into();
-    }
-
+    let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
+        &attr,
         "decoder",
         types::DECODER_TYPES,
+        types::DECODER_FNS,
         None,
         "__UseMusliDecoderAttributeMacro",
         types::Kind::SelfCx,
@@ -95,19 +90,14 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attr = proc_macro2::TokenStream::from(attr);
-
-    if !attr.is_empty() {
-        return syn::Error::new_spanned(attr, "Arguments not supported")
-            .to_compile_error()
-            .into();
-    }
-
+    let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
+        &attr,
         "encoder",
         types::ENCODER_TYPES,
+        &[],
         Some("Ok"),
         "__UseMusliEncoderAttributeMacro",
         types::Kind::SelfCx,
@@ -120,19 +110,14 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attr = proc_macro2::TokenStream::from(attr);
-
-    if !attr.is_empty() {
-        return syn::Error::new_spanned(attr, "Arguments not supported")
-            .to_compile_error()
-            .into();
-    }
-
+    let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
+        &attr,
         "visitor",
         types::VISITOR_TYPES,
+        &[],
         Some("Ok"),
         "__UseMusliVisitorAttributeMacro",
         types::Kind::GenericCx,

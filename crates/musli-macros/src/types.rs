@@ -28,6 +28,11 @@ pub(super) enum Extra {
     Visitor(Ty),
 }
 
+pub(crate) enum Fn {
+    Decode,
+    Visit,
+}
+
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
@@ -61,6 +66,8 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("DecodeVariant", Extra::None),
 ];
 
+pub(super) const DECODER_FNS: &[(&str, Fn)] = &[("decode", Fn::Decode), ("visit", Fn::Visit)];
+
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("String", Extra::Visitor(Ty::Str)),
     ("Bytes", Extra::Visitor(Ty::Bytes)),
@@ -71,6 +78,44 @@ pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
 pub(super) enum Kind {
     SelfCx,
     GenericCx,
+}
+
+pub(super) struct Attr {
+    crate_path: syn::Path,
+}
+
+impl Parse for Attr {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut crate_path = None;
+
+        while !input.is_empty() {
+            let path = input.parse::<syn::Path>()?;
+
+            if path.is_ident("crate") {
+                if input.parse::<Option<Token![=]>>()?.is_some() {
+                    crate_path = Some(input.parse()?);
+                } else {
+                    crate_path = Some(path);
+                }
+            } else {
+                return Err(syn::Error::new_spanned(
+                    path,
+                    format_args!("Unexpected attribute"),
+                ));
+            }
+
+            if !input.is_empty() {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        let crate_path = match crate_path {
+            Some(crate_path) => crate_path,
+            None => syn::parse_quote!(::musli),
+        };
+
+        Ok(Self { crate_path })
+    }
 }
 
 pub(super) struct Types {
@@ -89,15 +134,24 @@ impl Types {
     /// Expand encoder types.
     pub(crate) fn expand(
         mut self,
+        attr: &Attr,
         what: &str,
         types: &[(&str, Extra)],
+        fns: &[(&str, Fn)],
         argument: Option<&str>,
         hint: &str,
         kind: Kind,
     ) -> syn::Result<TokenStream> {
+        let crate_path = &attr.crate_path;
+
         let mut missing = types
             .iter()
             .map(|(ident, extra)| (syn::Ident::new(ident, Span::call_site()), *extra))
+            .collect::<BTreeMap<_, _>>();
+
+        let mut missing_fns = fns
+            .iter()
+            .map(|(name, f)| (syn::Ident::new(name, Span::call_site()), f))
             .collect::<BTreeMap<_, _>>();
 
         // List of associated types which are specified, but under a `cfg`
@@ -131,6 +185,9 @@ impl Types {
                         has_cfg = true;
                     }
                 }
+                syn::ImplItem::Fn(f) => {
+                    missing_fns.remove(&f.sig.ident);
+                }
                 _ => continue,
             }
         }
@@ -161,19 +218,47 @@ impl Types {
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
         }
 
+        for (_, f) in missing_fns {
+            match f {
+                Fn::Decode => {
+                    self.item_impl
+                        .items
+                        .push(syn::ImplItem::Verbatim(quote::quote! {
+                            #[inline(always)]
+                            fn decode<T>(self) -> Result<T, Self::Error>
+                            where
+                                T: #crate_path::de::Decode<'de, Self::Mode>
+                            {
+                                self.cx.decode(self)
+                            }
+                        }));
+                }
+                Fn::Visit => {
+                    self.item_impl.items.push(syn::ImplItem::Verbatim(quote::quote! {
+                        #[inline(always)]
+                        fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+                        where
+                            T: ?Sized + #crate_path::de::Visit<'de, Self::Mode>,
+                            F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::context::Context>::Error>
+                        {
+                            self.cx.visit(self, f)
+                        }
+                    }));
+                }
+            }
+        }
+
         for (ident, extra) in missing {
             let ty;
             let generics;
 
             match extra {
                 Extra::Mode => {
-                    ty = syn::parse_quote!(<Self::Cx as ::musli::context::Context>::Mode);
-
+                    ty = syn::parse_quote!(<Self::Cx as #crate_path::context::Context>::Mode);
                     generics = syn::Generics::default();
                 }
                 Extra::Error => {
-                    ty = syn::parse_quote!(<Self::Cx as ::musli::context::Context>::Error);
-
+                    ty = syn::parse_quote!(<Self::Cx as #crate_path::context::Context>::Error);
                     generics = syn::Generics::default();
                 }
                 Extra::Context => {
@@ -210,7 +295,7 @@ impl Types {
                     };
 
                     where_clause.predicates.push(
-                        syn::parse_quote!(#u_param: #this_lifetime + ::musli::context::Context),
+                        syn::parse_quote!(#u_param: #this_lifetime + #crate_path::context::Context),
                     );
 
                     generics = syn::Generics {
