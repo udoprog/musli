@@ -27,7 +27,7 @@ use alloc::vec::Vec;
 
 use musli::de::{
     Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip, TypeHint,
-    ValueVisitor, Visitor,
+    ValueVisitor, Visit, Visitor,
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
@@ -151,7 +151,16 @@ where
     where
         T: Decode<'de, Self::Mode>,
     {
-        T::decode(self.cx, self)
+        self.cx.decode(self)
+    }
+
+    #[inline]
+    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + Visit<'de, Self::Mode>,
+        F: FnOnce(&T) -> Result<O, Self::Error>,
+    {
+        self.cx.visit(self, f)
     }
 
     #[inline]

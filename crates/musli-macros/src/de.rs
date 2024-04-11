@@ -124,23 +124,21 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
     let Tokens {
         as_decoder_t,
-        buf_t,
         context_t,
         decoder_t,
         fmt,
         option_none,
         option_some,
+        priv_write,
         result_err,
         result_ok,
         skip_field,
         skip,
-        str_ty,
         struct_decoder_t,
         struct_field_decoder_t,
         struct_hint,
         unsized_struct_hint,
         variant_decoder_t,
-        visit_owned_fn,
         ..
     } = e.tokens;
 
@@ -167,7 +165,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let output_var = e.cx.ident("output");
     let struct_decoder_var = e.cx.ident("struct_decoder");
     let struct_hint_static = e.cx.ident("STRUCT_HINT");
-    let variant_alloc_var = e.cx.ident("variant_alloc");
     let variant_decoder_var = e.cx.ident("variant_decoder");
     let variant_output_var = e.cx.ident("variant_output");
     let variant_tag_var = e.cx.ident("variant_tag");
@@ -189,7 +186,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         },
     };
 
-    let variant_alloc;
     let decode_tag;
     let mut output_enum = quote!();
 
@@ -208,25 +204,13 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
             let arms = tag_variants.iter().map(|o| o.as_arm(option_some));
 
-            variant_alloc = Some(quote! {
-                let #option_some(mut #variant_alloc_var) = #context_t::alloc(#ctx_var) else {
-                    return #result_err(#context_t::alloc_failed(#ctx_var));
-                };
-            });
-
             decode_tag = quote! {
-                #decoder_t::decode_string(#variant_decoder_var, #visit_owned_fn("a string variant tag", |string: &str| {
+                #decoder_t::visit(#variant_decoder_var, |string: &str| {
                     #result_ok(match string {
                         #(#arms,)*
-                        string => {
-                            if !#buf_t::write(&mut #variant_alloc_var, #str_ty::as_bytes(string)) {
-                                return #result_err(#context_t::alloc_failed(#ctx_var));
-                            }
-
-                            #option_none
-                        }
+                        string => #option_none,
                     })
-                }))?
+                })?
             };
 
             let variants = tag_variants.iter().map(|o| &o.variant);
@@ -263,11 +247,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 }
             };
 
-            fallback = quote! {
-                #option_none => {
-                    #fallback
-                }
-            };
+            fallback = quote!(#option_none => { #fallback })
         }
         TagMethod::Any => {
             for v in en.variants.iter().filter(|v| !v.is_default) {
@@ -276,7 +256,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
             let decode_t_decode = &e.decode_t_decode;
 
-            variant_alloc = None;
             decode_tag = quote!(#decode_t_decode(#ctx_var, #variant_decoder_var)?);
             fallback = quote!(_ => #fallback);
         }
@@ -331,8 +310,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             #enter
 
             let #output_var = #decoder_t::decode_variant(#decoder_var, move |#variant_decoder_var| {
-                #variant_alloc
-
                 let #variant_tag_var #name_type = {
                     let mut #variant_decoder_var = #variant_decoder_t::decode_tag(#variant_decoder_var)?;
                     #decode_tag
@@ -391,8 +368,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     })
                 });
 
-            let decode_t_decode = &e.decode_t_decode;
-
             let field_alloc;
             let mut outcome_enum = quote!();
             let decode_match;
@@ -400,11 +375,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             match field_tag_method {
                 Some(TagMethod::String) => {
                     outcome_enum = quote! {
-                        enum #outcome_type {
-                            Tag,
-                            AllocErr,
-                            Err,
-                        }
+                        enum #outcome_type { Tag, Skip }
                     };
 
                     field_alloc = Some(quote! {
@@ -414,18 +385,18 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     });
 
                     let decode_outcome = quote! {
-                        #decoder_t::decode_string(#field_name_var, #visit_owned_fn("a string field tag", |string: &str| {
+                        #decoder_t::visit(#field_name_var, |string: &str| {
                             #result_ok(match string {
                                 #field_tag => #outcome_type::Tag,
                                 string => {
-                                    if !#buf_t::write(&mut #field_alloc_var, #str_ty::as_bytes(string)) {
-                                        #outcome_type::AllocErr
-                                    } else {
-                                        #outcome_type::Err
+                                    if #priv_write(&mut #field_alloc_var, string).is_err() {
+                                        return #result_err(#context_t::alloc_failed(#ctx_var));
                                     }
+
+                                    #outcome_type::Skip
                                 }
                             })
-                        }))?
+                        })?
                     };
 
                     decode_match = quote! {{
@@ -435,10 +406,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                             #outcome_type::Tag => {
                                 break #struct_field_decoder_t::decode_field_value(#entry_var)?;
                             }
-                            #outcome_type::AllocErr => {
-                                return #result_err(#context_t::alloc_failed(#ctx_var));
-                            }
-                            #outcome_type::Err => {
+                            #outcome_type::Skip => {
                                 if #skip_field(#entry_var)? {
                                     return #result_err(#context_t::invalid_field_string_tag(#ctx_var, #type_name, #field_alloc_var));
                                 }
@@ -447,6 +415,8 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     }};
                 }
                 _ => {
+                    let decode_t_decode = &e.decode_t_decode;
+
                     field_alloc = None;
 
                     decode_match = quote! {
@@ -499,7 +469,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                             #decode_match
                         };
 
-                        #variant_alloc
                         #decode_tag
                     };
 
@@ -564,7 +533,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             match tag_method {
                 Some(TagMethod::String) => {
                     outcome_enum = quote! {
-                        enum #outcome_type { Tag, Content, AllocErr, Err }
+                        enum #outcome_type { Tag, Content, Skip }
                     };
 
                     field_alloc = Some(quote! {
@@ -574,24 +543,23 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     });
 
                     decode_match = quote! {
-                        let outcome = #decoder_t::decode_string(#field_name_var, #visit_owned_fn("a string field tag", |string: &str| {
+                        let outcome = #decoder_t::visit(#field_name_var, |string: &str| {
                             #result_ok(match string {
                                 #tag => #outcome_type::Tag,
                                 #content => #outcome_type::Content,
                                 string => {
-                                    if !#buf_t::write(&mut #field_alloc_var, #str_ty::as_bytes(string)) {
-                                        #outcome_type::AllocErr
-                                    } else {
-                                        #outcome_type::Err
+                                    if #priv_write(&mut #field_alloc_var, string).is_err() {
+                                        return #result_err(#context_t::alloc_failed(#ctx_var));
                                     }
+
+                                    #outcome_type::Skip
                                 }
                             })
-                        }))?;
+                        })?;
 
                         match outcome {
                             #outcome_type::Tag => {
                                 let #variant_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var)?;
-                                #variant_alloc
                                 #tag_var = #option_some(#decode_tag);
                             }
                             #outcome_type::Content => {
@@ -606,10 +574,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                                     #fallback
                                 });
                             }
-                            #outcome_type::AllocErr => {
-                                return #result_err(#context_t::alloc_failed(#ctx_var));
-                            }
-                            #outcome_type::Err => {
+                            #outcome_type::Skip => {
                                 if #skip_field(#entry_var)? {
                                     return #result_err(#context_t::invalid_field_string_tag(#ctx_var, #type_name, #field_alloc_var));
                                 }
@@ -624,7 +589,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                         match #decode_t_decode(#ctx_var, decoder)? {
                             #tag => {
                                 let #variant_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var)?;
-                                #variant_alloc
                                 #tag_var = #option_some(#decode_tag);
                             }
                             #content => {
@@ -729,7 +693,6 @@ fn decode_tagged(
     } = *cx;
 
     let Tokens {
-        buf_t,
         context_t,
         decoder_t,
         default_function,
@@ -737,14 +700,13 @@ fn decode_tagged(
         option_none,
         option_some,
         option,
+        priv_write,
         result_err,
         result_ok,
         skip_field,
-        str_ty,
         struct_decoder_t,
         struct_field_decoder_t,
         struct_hint,
-        visit_owned_fn,
         ..
     } = e.tokens;
 
@@ -904,18 +866,18 @@ fn decode_tagged(
             });
 
             decode_tag = quote! {
-                #decoder_t::decode_string(#struct_decoder_var, #visit_owned_fn("a string field tag", |string: &str| {
+                #decoder_t::visit(#struct_decoder_var, |string: &str| {
                     #result_ok(match string {
                         #(#patterns,)*
                         string => {
-                            if !#buf_t::write(&mut #field_alloc_var, #str_ty::as_bytes(string)) {
+                            if #priv_write(&mut #field_alloc_var, string).is_err() {
                                 return #result_err(#context_t::alloc_failed(#ctx_var));
                             }
 
                             #option_none
                         }
                     })
-                }))?
+                })?
             };
 
             let variants = outputs.iter().map(|o| &o.variant);

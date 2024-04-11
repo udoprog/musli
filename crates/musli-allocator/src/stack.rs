@@ -2,6 +2,7 @@
 mod tests;
 
 use core::cell::{Cell, UnsafeCell};
+use core::fmt::{self, Arguments};
 use core::marker::PhantomData;
 use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
 use core::num::NonZeroU8;
@@ -9,6 +10,7 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
+use musli::buf::Error;
 use musli::{Allocator, Buf};
 
 use crate::DEFAULT_STACK_BUFFER;
@@ -330,6 +332,22 @@ impl<'a> Buf for StackBuf<'a> {
             let ptr = i.data.wrapping_add(this.start as usize).cast();
             slice::from_raw_parts(ptr, this.len as usize)
         }
+    }
+
+    #[inline(always)]
+    fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error> {
+        fmt::write(self, arguments).map_err(|_| Error)
+    }
+}
+
+impl fmt::Write for StackBuf<'_> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        if !self.write(s.as_bytes()) {
+            return Err(fmt::Error);
+        }
+
+        Ok(())
     }
 }
 

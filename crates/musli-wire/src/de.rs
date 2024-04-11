@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use musli::de::{
     Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder, SequenceDecoder,
     SizeHint, Skip, StructDecoder, StructFieldDecoder, StructFieldsDecoder, TupleDecoder,
-    ValueVisitor, VariantDecoder,
+    ValueVisitor, VariantDecoder, Visit,
 };
 use musli::hint::{StructHint, TupleHint};
 use musli::Context;
@@ -257,7 +257,16 @@ where
     where
         T: Decode<'de, Self::Mode>,
     {
-        T::decode(self.cx, self)
+        self.cx.decode(self)
+    }
+
+    #[inline]
+    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + Visit<'de, Self::Mode>,
+        F: FnOnce(&T) -> Result<O, Self::Error>,
+    {
+        self.cx.visit(self, f)
     }
 
     #[inline]

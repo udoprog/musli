@@ -53,13 +53,32 @@ impl<'a> Mode<'a> {
         encode_t
     }
 
-    /// Construct a typed encode call.
+    /// Construct a typed decode call.
     pub(crate) fn decode_t_decode(&self, trace: bool, bytes: bool) -> syn::Path {
         let (mut decode_t, name) = match (trace, bytes) {
             (_, true) => (self.tokens.decode_bytes_t.clone(), "decode_bytes"),
             (true, _) => (self.tokens.trace_decode_t.clone(), "trace_decode"),
             _ => (self.tokens.decode_t.clone(), "decode"),
         };
+
+        if let Some(segment) = decode_t.segments.last_mut() {
+            add_mode_argument(&self.mode_path, segment);
+        }
+
+        decode_t
+            .segments
+            .push(syn::PathSegment::from(syn::Ident::new(
+                name,
+                decode_t.span(),
+            )));
+
+        decode_t
+    }
+
+    /// Construct a typed visit call.
+    pub(crate) fn decode_t_visit(&self) -> syn::Path {
+        let mut decode_t = self.tokens.decode_t.clone();
+        let name = "visit";
 
         if let Some(segment) = decode_t.segments.last_mut() {
             add_mode_argument(&self.mode_path, segment);

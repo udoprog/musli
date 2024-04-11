@@ -41,7 +41,11 @@ macro_rules! declare {
     };
 
     (($ty0:ident, $ident0:ident) $(, ($ty:ident, $ident:ident))* $(,)?) => {
-        impl<M, $ty0 $(, $ty)*> Encode<M> for ($ty0, $($ty),*) where $ty0: Encode<M>, $($ty: Encode<M>),* {
+        impl<M, $ty0 $(, $ty)*> Encode<M> for ($ty0, $($ty),*)
+        where
+            $ty0: Encode<M>,
+            $($ty: Encode<M>),*
+        {
             #[inline]
             fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -58,7 +62,11 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*) where $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
+        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*)
+        where
+            $ty0: Decode<'de, M>,
+            $($ty: Decode<'de, M>),*
+        {
             #[inline]
             fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
@@ -74,7 +82,18 @@ macro_rules! declare {
             }
         }
 
-        impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)> where $ty0: Encode<M>, $($ty: Encode<M>),* {
+        visit! {
+            {$ty0, $($ty,)*} ($ty0, $($ty),*)
+            where
+                $ty0: Decode<'de, M>,
+                $($ty: Decode<'de, M>),*
+        }
+
+        impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)>
+        where
+            $ty0: Encode<M>,
+            $($ty: Encode<M>),*
+        {
             #[inline]
             fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -89,7 +108,11 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)> where $ty0: Decode<'de, M>, $($ty: Decode<'de, M>),* {
+        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)>
+        where
+            $ty0: Decode<'de, M>,
+            $($ty: Decode<'de, M>),*
+        {
             #[inline]
             fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
@@ -101,6 +124,13 @@ macro_rules! declare {
                     Ok(Packed(($ident0, $($ident),*)))
                 })
             }
+        }
+
+        visit! {
+            {$ty0, $($ty,)*} Packed<($ty0, $($ty),*)>
+            where
+                $ty0: Decode<'de, M>,
+                $($ty: Decode<'de, M>),*
         }
 
         declare!($(($ty, $ident)),*);

@@ -1,9 +1,11 @@
 use core::cell::UnsafeCell;
+use core::fmt::{self, Arguments};
 use core::ptr::NonNull;
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+use musli::buf::Error;
 use musli::{Allocator, Buf};
 
 /// Buffer used in combination with an [`Allocator`].
@@ -76,6 +78,19 @@ impl<'a> Buf for SystemBuf<'a> {
     #[inline(always)]
     fn as_slice(&self) -> &[u8] {
         &self.region.data
+    }
+
+    #[inline(always)]
+    fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error> {
+        fmt::write(self, arguments).map_err(|_| Error)
+    }
+}
+
+impl fmt::Write for SystemBuf<'_> {
+    #[inline(always)]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.region.data.extend_from_slice(s.as_bytes());
+        Ok(())
     }
 }
 
