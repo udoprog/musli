@@ -37,15 +37,15 @@ pub struct E {
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub enum LargeEnumStringVariants {
-    #[musli(transparent, rename = "a")]
+    #[musli(transparent, name = "a")]
     A(A),
-    #[musli(transparent, rename = "b")]
+    #[musli(transparent, name = "b")]
     B(B),
-    #[musli(transparent, rename = "c")]
+    #[musli(transparent, name = "c")]
     C(C),
-    #[musli(transparent, rename = "d")]
+    #[musli(transparent, name = "d")]
     D(D),
-    #[musli(transparent, rename = "e")]
+    #[musli(transparent, name = "e")]
     E(E),
 }
 

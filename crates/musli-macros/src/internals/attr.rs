@@ -7,8 +7,7 @@ use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Token;
 
-use crate::expander::determine_tag_method;
-use crate::expander::TagMethod;
+use crate::expander::{self, TagMethod};
 use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
 
@@ -223,7 +222,7 @@ impl TypeAttr {
     pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
         let (_, tag) = self.tag(mode)?;
 
-        let tag_method = determine_tag_method(tag);
+        let tag_method = expander::determine_tag_method(tag);
         let tag = EnumTag {
             value: tag,
             method: tag_method,
@@ -427,22 +426,15 @@ layer! {
         name_type: syn::Type,
         /// `#[musli(name_format_with)]`.
         name_format_with: syn::Path,
-        /// Rename a field to the given expression.
-        rename: syn::Expr,
+        /// Name a variant with the given expression.
+        name: syn::Expr,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
         /// `#[musli(default)]`.
-        default_attr_field: (),
+        default_variant: (),
         /// `#[musli(default_field = "..")]`.
         default_field: DefaultTag,
         @multiple
-    }
-}
-
-impl VariantAttr {
-    /// Test if the `#[musli(default)]` tag is specified.
-    pub(crate) fn default_attr(&self, mode: Mode<'_>) -> Option<Span> {
-        self.default_attr_field(mode).map(|&(s, ())| s)
     }
 }
 
@@ -492,16 +484,23 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
-            // parse #[musli(rename = <expr>)]
             if meta.path.is_ident("rename") {
+                return Err(syn::Error::new_spanned(
+                    meta.path,
+                    "#[musli(rename = ..)] has been changed to #[musli(name = ..)]",
+                ));
+            }
+
+            // parse #[musli(name = <expr>)]
+            if meta.path.is_ident("name") {
                 meta.input.parse::<Token![=]>()?;
-                new.rename.push((meta.path.span(), meta.input.parse()?));
+                new.name.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
             // parse #[musli(default)]
             if meta.path.is_ident("default") {
-                new.default_attr_field.push((meta.path.span(), ()));
+                new.default_variant.push((meta.path.span(), ()));
                 return Ok(());
             }
 
@@ -569,7 +568,7 @@ layer! {
         /// Method to check if we want to skip encoding.
         skip_encoding_if: syn::Path,
         /// Rename a field to the given literal.
-        rename: syn::Expr,
+        name: syn::Expr,
         /// Use a default value for the field if it's not available.
         is_default: Option<syn::Path>,
         /// Use a default value for the field if it's not available.
@@ -685,10 +684,17 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // parse #[musli(rename = <expr>)]
             if meta.path.is_ident("rename") {
+                return Err(syn::Error::new_spanned(
+                    meta.path,
+                    "#[musli(rename = ..)] has been changed to #[musli(name = ..)]",
+                ));
+            }
+
+            // parse #[musli(name = <expr>)]
+            if meta.path.is_ident("name") {
                 meta.input.parse::<Token![=]>()?;
-                new.rename.push((meta.path.span(), meta.input.parse()?));
+                new.name.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 

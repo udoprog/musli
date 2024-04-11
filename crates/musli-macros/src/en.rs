@@ -3,10 +3,10 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::Token;
 
-use crate::expander::Result;
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Variant};
 use crate::internals::tokens::Tokens;
+use crate::internals::Result;
 
 struct Ctxt<'a> {
     ctx_var: &'a syn::Ident,

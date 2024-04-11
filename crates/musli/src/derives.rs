@@ -153,7 +153,7 @@
 //! #[musli(default_field = "name")]
 //! struct Name<'a> {
 //!     sur_name: &'a str,
-//!     #[musli(decode_only, rename = "last")]
+//!     #[musli(decode_only, name = "last")]
 //!     last_name: &'a str,
 //! }
 //! ```
@@ -301,7 +301,7 @@
 //!
 //! #### `#[musli(name_type = ..)]`
 //!
-//! This indicates which type any contained `#[musli(rename = ..)]` attributes
+//! This indicates which type any contained `#[musli(name = ..)]` attributes
 //! should have. Tags can usually be inferred, but specifying this field ensures
 //! that all tags have a single well-defined type.
 //!
@@ -323,14 +323,14 @@
 //! #[derive(Encode, Decode)]
 //! #[musli(name_type = CustomTag)]
 //! struct Struct {
-//!     #[musli(rename = CustomTag(b"name in bytes"))]
+//!     #[musli(name = CustomTag(b"name in bytes"))]
 //!     name: String,
 //! }
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(name_type = CustomTag)]
 //! enum EnumWithCustomTag {
-//!     #[musli(rename = CustomTag(b"variant one"))]
+//!     #[musli(name = CustomTag(b"variant one"))]
 //!     Variant1 {
 //!         /* .. */
 //!     },
@@ -391,7 +391,7 @@
 //! ## Variant attributes
 //!
 //! *Variant attributes* are attributes which apply to each individual variant
-//! in an `enum`. Like the use of `#[musli(rename = ..)]` here:
+//! in an `enum`. Like the use of `#[musli(name = ..)]` here:
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -399,7 +399,7 @@
 //! #[derive(Encode, Decode)]
 //! #[musli(default_variant = "name")]
 //! enum Enum {
-//!     #[musli(rename = "Other")]
+//!     #[musli(name = "Other")]
 //!     Something {
 //!         /* variant body */
 //!     }
@@ -408,16 +408,16 @@
 //!
 //! <br>
 //!
-//! #### `#[musli(rename = ..)]`
+//! #### `#[musli(name = ..)]`
 //!
 //! This allows for renaming a variant from its default value. It can take any
 //! value (including complex ones) that can be serialized with the current
 //! encoding, such as:
 //!
-//! * `#[musli(rename = 1)]`
-//! * `#[musli(rename = "Hello World")]`
-//! * `#[musli(rename = b"box\0")]`
-//! * `#[musli(rename = SomeStruct { field: 42 })]` (if `SomeStruct` implements
+//! * `#[musli(name = 1)]`
+//! * `#[musli(name = "Hello World")]`
+//! * `#[musli(name = b"box\0")]`
+//! * `#[musli(name = SomeStruct { field: 42 })]` (if `SomeStruct` implements
 //!   [`Encode`] and [`Decode`] as appropriate).
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through
@@ -454,7 +454,7 @@
 //! enum Enum {
 //!     #[musli(name_type = CustomTag)]
 //!     Variant {
-//!         #[musli(rename = CustomTag(b"name in bytes"))]
+//!         #[musli(name = CustomTag(b"name in bytes"))]
 //!         name: String,
 //!     }
 //! }
@@ -508,9 +508,9 @@
 //!
 //! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 //! enum Animal {
-//!     #[musli(rename = "cat")]
+//!     #[musli(name = "cat")]
 //!     Cat,
-//!     #[musli(rename = "dog")]
+//!     #[musli(name = "dog")]
 //!     Dog,
 //!     #[musli(default)]
 //!     Unknown,
@@ -531,7 +531,7 @@
 //! #[derive(Encode, Decode)]
 //! #[musli(default_field = "name")]
 //! struct Struct {
-//!     #[musli(rename = "other")]
+//!     #[musli(name = "other")]
 //!     something: String,
 //!     #[musli(skip, default = default_field)]
 //!     skipped_field: u32,
@@ -545,7 +545,7 @@
 //! #[musli(default_field = "name")]
 //! enum Enum {
 //!     Variant {
-//!         #[musli(rename = "other")]
+//!         #[musli(name = "other")]
 //!         something: String,
 //!     }
 //! }
@@ -614,16 +614,16 @@
 //!
 //! <br>
 //!
-//! #### `#[musli(rename = ..)]`
+//! #### `#[musli(name = ..)]`
 //!
 //! This allows for renaming a field from its default value. It can take any
 //! value (including complex ones) that can be serialized with the current
 //! encoding, such as:
 //!
-//! * `#[musli(rename = 1)]`
-//! * `#[musli(rename = "Hello World")]`
-//! * `#[musli(rename = b"box\0")]`
-//! * `#[musli(rename = SomeStruct { field: 42 })]` (if `SomeStruct` implements
+//! * `#[musli(name = 1)]`
+//! * `#[musli(name = "Hello World")]`
+//! * `#[musli(name = b"box\0")]`
+//! * `#[musli(name = SomeStruct { field: 42 })]` (if `SomeStruct` implements
 //!   [`Encode`] and [`Decode`] as appropriate).
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through

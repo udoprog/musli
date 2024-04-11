@@ -4,11 +4,12 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
 
-use crate::expander::{Result, TagMethod};
+use crate::expander::TagMethod;
 use crate::internals::apply;
 use crate::internals::attr::{EnumTag, EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
 use crate::internals::tokens::Tokens;
+use crate::internals::Result;
 
 struct Ctxt<'a> {
     ctx_var: &'a Ident,

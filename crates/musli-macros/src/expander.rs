@@ -4,10 +4,7 @@ use syn::spanned::Spanned;
 use crate::internals::attr::{self, DefaultTag, TypeAttr};
 use crate::internals::build::Build;
 use crate::internals::tokens::Tokens;
-use crate::internals::ATTR;
-use crate::internals::{Ctxt, Expansion, Mode, Only};
-
-pub(crate) type Result<T, E = ()> = std::result::Result<T, E>;
+use crate::internals::{Ctxt, Expansion, Mode, Only, Result, ATTR};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TagMethod {
@@ -206,53 +203,51 @@ pub(crate) trait Taggable {
     /// The span of the taggable item.
     fn span(&self) -> Span;
     /// The rename configuration the taggable item currently has.
-    fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)>;
+    fn name(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)>;
     /// The index of the taggable item.
     fn index(&self) -> usize;
     /// The string name of the taggable item.
-    fn name(&self) -> Option<&syn::LitStr>;
+    fn literal_name(&self) -> Option<&syn::LitStr>;
+}
 
-    /// Expand the given configuration to the appropriate tag expression and
-    /// [TagMethod].
-    fn expand_tag(
-        &self,
-        e: &Expander<'_>,
-        mode: Mode<'_>,
-        default_tag: Option<DefaultTag>,
-    ) -> Result<(syn::Expr, Option<TagMethod>)>
-    where
-        Self: Sized,
-    {
-        let (lit, tag_method) = match (self.rename(mode), default_tag, self.name()) {
-            (Some((_, rename)), _, _) => {
-                return Ok((rename_lit(rename), determine_tag_method(rename)))
-            }
-            (None, Some(DefaultTag::Index), _) => (
-                usize_suffixed(self.index(), self.span()).into(),
-                Some(TagMethod::Any),
-            ),
-            (None, Some(DefaultTag::Name), None) => {
-                e.cx.error_span(
-                    self.span(),
-                    format_args!(
-                        "#[{ATTR}(default_field = \"name\")] is not supported on unnamed fields",
-                    ),
-                );
-                return Err(());
-            }
-            (None, Some(DefaultTag::Name), Some(ident)) => {
-                (ident.clone().into(), Some(TagMethod::String))
-            }
-            _ => (usize_suffixed(self.index(), self.span()).into(), None),
-        };
+/// Expand the given configuration to the appropriate tag expression and
+/// [TagMethod].
+pub(crate) fn expand_tag(
+    taggable: &dyn Taggable,
+    e: &Expander<'_>,
+    mode: Mode<'_>,
+    default_tag: Option<DefaultTag>,
+) -> Result<(syn::Expr, Option<TagMethod>)> {
+    let (lit, tag_method) = match (taggable.name(mode), default_tag, taggable.literal_name()) {
+        (Some((_, rename)), _, _) => return Ok((rename_lit(rename), determine_tag_method(rename))),
+        (None, Some(DefaultTag::Index), _) => (
+            usize_suffixed(taggable.index(), taggable.span()).into(),
+            Some(TagMethod::Any),
+        ),
+        (None, Some(DefaultTag::Name), None) => {
+            e.cx.error_span(
+                taggable.span(),
+                format_args!(
+                    "#[{ATTR}(default_field = \"name\")] is not supported on unnamed fields",
+                ),
+            );
+            return Err(());
+        }
+        (None, Some(DefaultTag::Name), Some(ident)) => {
+            (ident.clone().into(), Some(TagMethod::String))
+        }
+        _ => (
+            usize_suffixed(taggable.index(), taggable.span()).into(),
+            None,
+        ),
+    };
 
-        let tag = syn::Expr::Lit(syn::ExprLit {
-            attrs: Vec::new(),
-            lit,
-        });
+    let tag = syn::Expr::Lit(syn::ExprLit {
+        attrs: Vec::new(),
+        lit,
+    });
 
-        Ok((tag, tag_method))
-    }
+    Ok((tag, tag_method))
 }
 
 /// Ensure that the given integer is usize-suffixed so that it is treated as the
@@ -266,15 +261,15 @@ impl Taggable for FieldData<'_> {
         self.span
     }
 
-    fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
-        self.attr.rename(mode)
+    fn name(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+        self.attr.name(mode)
     }
 
     fn index(&self) -> usize {
         self.index
     }
 
-    fn name(&self) -> Option<&syn::LitStr> {
+    fn literal_name(&self) -> Option<&syn::LitStr> {
         self.name.as_ref()
     }
 }
@@ -284,15 +279,15 @@ impl Taggable for VariantData<'_> {
         self.span
     }
 
-    fn rename(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
-        self.attr.rename(mode)
+    fn name(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+        self.attr.name(mode)
     }
 
     fn index(&self) -> usize {
         self.index
     }
 
-    fn name(&self) -> Option<&syn::LitStr> {
+    fn literal_name(&self) -> Option<&syn::LitStr> {
         Some(&self.name)
     }
 }

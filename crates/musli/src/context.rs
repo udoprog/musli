@@ -271,7 +271,7 @@ pub trait Context {
     ///
     /// #[derive(Decode, Encode)]
     /// struct Struct {
-    ///     #[musli(rename = "string")]
+    ///     #[musli(name = "string")]
     ///     field: String,
     /// }
     /// ```
@@ -299,7 +299,7 @@ pub trait Context {
     /// use musli::{Decode, Encode};
     ///
     /// #[derive(Decode, Encode)]
-    /// struct Struct(#[musli(rename = "string")] String);
+    /// struct Struct(#[musli(name = "string")] String);
     /// ```
     ///
     /// [`leave_field`]: Context::leave_field
@@ -339,7 +339,7 @@ pub trait Context {
     ///
     /// #[derive(Decode, Encode)]
     /// struct Struct {
-    ///     #[musli(rename = "string")]
+    ///     #[musli(name = "string")]
     ///     field: String,
     /// }
     /// ```

@@ -12,3 +12,5 @@ pub(crate) use self::attr::Only;
 pub(crate) use self::ctxt::Ctxt;
 pub(crate) use self::expansion::Expansion;
 pub(crate) use self::mode::Mode;
+
+pub(crate) type Result<T, E = ()> = std::result::Result<T, E>;
