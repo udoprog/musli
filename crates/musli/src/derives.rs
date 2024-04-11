@@ -184,6 +184,44 @@
 //!
 //! <br>
 //!
+//! #### `#[musli(rename_all = "..")]`
+//!
+//! Allos for renaming every field in the container. It can take any of the
+//! following values:
+//!
+//! * `PascalCase`
+//! * `camelCase`
+//! * `snake_case`
+//! * `SCREAMING_SNAKE_CASE`
+//! * `kebab-case`
+//! * `SCREAMING-KEBAB-CASE`
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(rename_all = "PascalCase")]
+//! struct Struct {
+//!     field_name: u32,
+//! }
+//! ```
+//!
+//! If applied to an enum, it will instead rename all variants:
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(rename_all = "PascalCase")]
+//! enum Enum {
+//!     VariantName {
+//!         field_name: u32,
+//!     }
+//! }
+//! ```
+//!
+//! <br>
+//!
 //! #### `#[musli(default_field = "..")]`
 //!
 //! This determines how the default tag for a field is determined. It can take
@@ -422,6 +460,30 @@
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through
 //! the `#[musli(name_type)]` attribute.
+//!
+//! #### `#[musli(rename_all = "..")]`
+//!
+//! Allos for renaming every field in the container. It can take any of the
+//! following values:
+//!
+//! * `PascalCase`
+//! * `camelCase`
+//! * `snake_case`
+//! * `SCREAMING_SNAKE_CASE`
+//! * `kebab-case`
+//! * `SCREAMING-KEBAB-CASE`
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! enum Enum {
+//!     #[musli(rename_all = "PascalCase")]
+//!     Variant {
+//!         field_name: u32,
+//!     }
+//! }
+//! ```
 //!
 //! <br>
 //!

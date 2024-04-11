@@ -8,6 +8,7 @@ use syn::spanned::Spanned;
 use syn::Token;
 
 use crate::expander::{self, TagMethod};
+use crate::internals::rename::RenameAll;
 use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
 
@@ -191,6 +192,8 @@ layer! {
         krate: syn::Path,
         /// `#[musli(name_type)]`.
         name_type: syn::Type,
+        /// `#[musli(rename_all = "..")]`.
+        rename_all: RenameAll,
         /// `#[musli(name_format_with)]`.
         name_format_with: syn::Path,
         /// `#[musli(default_variant = "..")]`.
@@ -381,6 +384,12 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
+            // parse #[musli(rename_all = "..")]
+            if meta.path.is_ident("rename_all") {
+                new.rename_all.push((meta.path.span(), parse_rename_all(&meta)?));
+                return Ok(());
+            }
+
             Err(syn::Error::new_spanned(
                 meta.path,
                 format_args!("#[{ATTR}] Unsupported type attribute"),
@@ -403,6 +412,30 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
     }
 
     attr
+}
+
+fn parse_rename_all(meta: &syn::meta::ParseNestedMeta<'_>) -> Result<RenameAll, syn::Error> {
+    meta.input.parse::<Token![=]>()?;
+
+    let string: syn::LitStr = meta.input.parse()?;
+    let s = string.value();
+
+    let Some(rename_all) = RenameAll::parse(s.as_str()) else {
+        let mut options = Vec::new();
+
+        for option in RenameAll::ALL {
+            options.push(format!(r#""{option}""#));
+        }
+
+        let options = options.join(", ");
+
+        return Err(syn::Error::new_spanned(
+            string,
+            format_args!("#[{ATTR}(rename_all = {s:?})]: Bad value, expected one of {options}"),
+        ));
+    };
+
+    Ok(rename_all)
 }
 
 fn parse_bounds(
@@ -428,6 +461,8 @@ layer! {
         name_format_with: syn::Path,
         /// Name a variant with the given expression.
         name: syn::Expr,
+        /// `#[musli(rename_all = "..")]`.
+        rename_all: RenameAll,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
         /// `#[musli(default)]`.
@@ -532,6 +567,12 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             // parse #[musli(transparent)]
             if meta.path.is_ident("transparent") {
                 new.packing.push((meta.path.span(), Packing::Transparent));
+                return Ok(());
+            }
+
+            // parse #[musli(rename_all = "..")]
+            if meta.path.is_ident("rename_all") {
+                new.rename_all.push((meta.path.span(), parse_rename_all(&meta)?));
                 return Ok(());
             }
 
