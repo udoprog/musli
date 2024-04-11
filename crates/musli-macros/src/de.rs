@@ -160,17 +160,17 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let buffer_decoder_var = e.cx.ident("buffer_decoder");
     let buffer_var = e.cx.ident("buffer");
     let entry_var = e.cx.ident("entry");
+    let field_alloc_var = e.cx.ident("field_alloc");
+    let field_name_var = e.cx.ident("field_name");
+    let field_var = e.cx.ident("field");
+    let outcome_type = e.cx.type_with_span("Outcome", Span::call_site());
     let output_var = e.cx.ident("output");
     let struct_decoder_var = e.cx.ident("struct_decoder");
-    let variant_decoder_var = e.cx.ident("variant_decoder");
-    let variant_tag_var = e.cx.ident("variant_tag");
-    let variant_output_var = e.cx.ident("variant_output");
-    let variant_alloc_var = e.cx.ident("variant_alloc");
-    let field_alloc_var = e.cx.ident("field_alloc");
-    let field_var = e.cx.ident("field");
-    let field_name_var = e.cx.ident("field_name");
-    let outcome_type = e.cx.type_with_span("Outcome", Span::call_site());
     let struct_hint_static = e.cx.ident("STRUCT_HINT");
+    let variant_alloc_var = e.cx.ident("variant_alloc");
+    let variant_decoder_var = e.cx.ident("variant_decoder");
+    let variant_output_var = e.cx.ident("variant_output");
+    let variant_tag_var = e.cx.ident("variant_tag");
 
     let mut variant_output_tags = Vec::new();
 
@@ -748,14 +748,14 @@ fn decode_tagged(
         ..
     } = e.tokens;
 
-    let struct_decoder_var = e.cx.ident("struct_decoder");
     let field_alloc_var = e.cx.ident("field_alloc");
-    let type_decoder_var = e.cx.ident("type_decoder");
+    let leave_label = e.cx.lifetime("leave");
+    let struct_decoder_var = e.cx.ident("struct_decoder");
     let struct_hint_static = e.cx.ident("STRUCT_HINT");
+    let type_decoder_var = e.cx.ident("type_decoder");
 
     let type_name = &st.name;
 
-    let mut patterns = Vec::with_capacity(st.all_fields.len());
     let mut assigns = Punctuated::<_, Token![,]>::new();
 
     let mut fields_with = Vec::new();
@@ -840,18 +840,59 @@ fn decode_tagged(
     let decode_tag;
     let mut output_enum = quote!();
 
+    let unsupported = match variant_tag {
+        Some(variant_tag) => quote! {
+            #context_t::invalid_variant_field_tag(#ctx_var, #type_name, &#variant_tag, &#tag_var)
+        },
+        None => quote! {
+            #context_t::invalid_field_tag(#ctx_var, #type_name, &#tag_var)
+        },
+    };
+
+    let skip_field = quote! {
+        if #skip_field(#struct_decoder_var)? {
+            return #result_err(#unsupported);
+        }
+    };
+
+    let body;
+    let tag_type: syn::Type;
+
     match st.field_tag_method {
         TagMethod::String => {
             let mut outputs = Vec::new();
             let output_type =
                 e.cx.type_with_span("TagVisitorOutput", e.input.ident.span());
 
+            let mut patterns = Vec::with_capacity(fields_with.len());
+
             for (f, decode, trace) in fields_with {
-                let (output_pattern, output_tag, output) =
+                let (output_pattern, _, output) =
                     build_tag_variant(e, f.span, f.index, &f.tag, &output_type);
 
                 outputs.push(output);
-                patterns.push((output_pattern, output_tag, decode, trace));
+                patterns.push((output_pattern, decode, trace));
+            }
+
+            if !patterns.is_empty() {
+                let patterns = patterns
+                    .into_iter()
+                    .map(|(pattern_var, decode, (enter, leave))| {
+                        quote! {
+                            #pattern_var => {
+                                #enter
+                                let #struct_decoder_var = #struct_field_decoder_t::decode_field_value(#struct_decoder_var)?;
+                                #decode
+                                #leave
+                            }
+                        }
+                    });
+
+                body = quote! {
+                    match #tag_var { #(#patterns,)* #tag_var => { #skip_field } }
+                }
+            } else {
+                body = skip_field;
             }
 
             let patterns = outputs.iter().map(|o| o.as_arm(option_some));
@@ -863,7 +904,7 @@ fn decode_tagged(
             });
 
             decode_tag = quote! {
-                #decoder_t::decode_string(#struct_decoder_var, #visit_owned_fn("a string variant tag", |string: &str| {
+                #decoder_t::decode_string(#struct_decoder_var, #visit_owned_fn("a string field tag", |string: &str| {
                     #result_ok(match string {
                         #(#patterns,)*
                         string => {
@@ -897,87 +938,47 @@ fn decode_tagged(
                     }
                 }
             };
+
+            tag_type = syn::parse_quote!(#option<#output_type>);
         }
         TagMethod::Any => {
-            for (f, decode, trace) in fields_with {
-                patterns.push((f.tag.clone(), f.tag.clone(), decode, trace));
-            }
+            let mut statements = Vec::with_capacity(fields_with.len());
 
-            let decode_t_decode = &e.decode_t_decode;
+            for (f, decode, (enter, leave)) in fields_with {
+                let tag = &f.tag;
 
-            field_alloc = None;
-
-            decode_tag = quote! {
-                #decode_t_decode(#ctx_var, #struct_decoder_var)?
-            };
-        }
-    }
-
-    let mut tag_stmt = syn::Local {
-        attrs: Vec::new(),
-        let_token: <Token![let]>::default(),
-        pat: syn::Pat::Ident(syn::PatIdent {
-            attrs: Vec::new(),
-            by_ref: None,
-            mutability: None,
-            ident: tag_var.clone(),
-            subpat: None,
-        }),
-        init: None,
-        semi_token: <Token![;]>::default(),
-    };
-
-    if let Some((_, name_type)) = st.name_type {
-        tag_stmt.pat = syn::Pat::Type(syn::PatType {
-            attrs: Vec::new(),
-            pat: Box::new(tag_stmt.pat),
-            colon_token: <Token![:]>::default(),
-            ty: Box::new(name_type.clone()),
-        });
-    }
-
-    let unsupported = match variant_tag {
-        Some(variant_tag) => quote! {
-            #context_t::invalid_variant_field_tag(#ctx_var, #type_name, &#variant_tag, &#tag_var)
-        },
-        None => quote! {
-            #context_t::invalid_field_tag(#ctx_var, #type_name, &#tag_var)
-        },
-    };
-
-    let mut body = quote! {
-        if #skip_field(#struct_decoder_var)? {
-            return #result_err(#unsupported);
-        }
-    };
-
-    if !patterns.is_empty() {
-        let patterns = patterns
-            .into_iter()
-            .map(|(pattern_var, _, decode, (enter, leave))| {
-                quote! {
-                    #pattern_var => {
+                statements.push(quote! {
+                    if #tag_var == #tag {
                         #enter
                         let #struct_decoder_var = #struct_field_decoder_t::decode_field_value(#struct_decoder_var)?;
                         #decode
                         #leave
+                        break #leave_label;
                     }
+                });
+            }
+
+            body = quote! {{
+                #leave_label: {
+                    #(#statements)*
+                    #skip_field
                 }
-            });
+            }};
 
-        body = quote! {
-            match #tag_var { #(#patterns,)* #tag_var => { #body } }
+            field_alloc = None;
+
+            let decode_t_decode = &e.decode_t_decode;
+
+            decode_tag = quote! {
+                #decode_t_decode(#ctx_var, #struct_decoder_var)?
+            };
+
+            tag_type = match &st.name_type {
+                Some((_, ty)) => ty.clone(),
+                None => syn::parse_quote!(usize),
+            };
         }
-    };
-
-    tag_stmt.init = Some(syn::LocalInit {
-        eq_token: <Token![=]>::default(),
-        expr: Box::new(syn::Expr::Verbatim(quote! {{
-            let #struct_decoder_var = #struct_field_decoder_t::decode_field_name(&mut #struct_decoder_var)?;
-            #decode_tag
-        }})),
-        diverge: None,
-    });
+    }
 
     let path = &st.path;
     let fields_len = st.unskipped_fields.len();
@@ -1011,7 +1012,12 @@ fn decode_tagged(
         #decoder_t::decode_struct(#decoder_var, &#struct_hint_static, move |#type_decoder_var| {
             while let #option_some(mut #struct_decoder_var) = #struct_decoder_t::decode_field(#type_decoder_var)? {
                 #field_alloc
-                #tag_stmt
+
+                let #tag_var: #tag_type = {
+                    let #struct_decoder_var = #struct_field_decoder_t::decode_field_name(&mut #struct_decoder_var)?;
+                    #decode_tag
+                };
+
                 #body
             }
 

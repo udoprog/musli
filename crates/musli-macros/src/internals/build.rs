@@ -222,11 +222,15 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
 
     let default_field = e.type_attr.default_field(mode).map(|&(_, v)| v);
     let rename_all = e.type_attr.rename_all(mode).map(|&(_, v)| v);
+
     let packing = e
         .type_attr
         .packing(mode)
         .map(|&(_, p)| p)
         .unwrap_or_default();
+
+    let name_type = e.type_attr.name_type(mode);
+
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
     let mut tag_methods = TagMethods::new(&e.cx);
 
@@ -239,6 +243,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
             rename_all,
             packing,
             None,
+            name_type,
             &mut tag_methods,
         )?);
 
@@ -254,7 +259,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         name: &data.name,
         unskipped_fields,
         all_fields,
-        name_type: e.type_attr.name_type(mode),
+        name_type,
         name_format_with: e.type_attr.name_format_with(mode),
         packing,
         path,
@@ -278,6 +283,8 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         .map(|&(_, p)| p)
         .unwrap_or_default();
 
+    let name_type = e.type_attr.name_type(mode);
+
     if enum_tagging.is_some() {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
@@ -290,7 +297,14 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
     }
 
     for v in &data.variants {
-        variants.push(setup_variant(e, mode, v, &mut fallback, &mut tag_methods)?);
+        variants.push(setup_variant(
+            e,
+            mode,
+            v,
+            &mut fallback,
+            name_type,
+            &mut tag_methods,
+        )?);
     }
 
     Ok(Enum {
@@ -312,6 +326,7 @@ fn setup_variant<'a>(
     mode: Mode<'_>,
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
+    enum_name_type: Option<&(Span, syn::Type)>,
     tag_methods: &mut TagMethods,
 ) -> Result<Variant<'a>> {
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
@@ -336,6 +351,8 @@ fn setup_variant<'a>(
         .or_else(|| e.type_attr.rename_all(mode))
         .map(|&(_, v)| v);
 
+    let variant_name_type = data.attr.name_type(mode);
+
     let (tag, tag_method) = expander::expand_tag(
         data,
         e,
@@ -344,7 +361,10 @@ fn setup_variant<'a>(
         e.type_attr.rename_all(mode).map(|&(_, v)| v),
         Some(data.ident),
     )?;
-    tag_methods.insert(data.span, tag_method);
+
+    if enum_name_type.is_none() {
+        tag_methods.insert(data.span, tag_method);
+    }
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
@@ -384,6 +404,7 @@ fn setup_variant<'a>(
             rename_all,
             variant_packing,
             Some(&mut patterns),
+            variant_name_type,
             &mut field_tag_methods,
         )?);
 
@@ -406,7 +427,7 @@ fn setup_variant<'a>(
             unskipped_fields,
             all_fields,
             packing: variant_packing,
-            name_type: data.attr.name_type(mode),
+            name_type: variant_name_type,
             name_format_with: data.attr.name_format_with(mode),
             field_tag_method: field_tag_methods.pick(),
             path,
@@ -422,13 +443,19 @@ fn setup_field<'a>(
     rename_all: Option<RenameAll>,
     packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
+    name_type: Option<&(Span, syn::Type)>,
     tag_methods: &mut TagMethods,
 ) -> Result<Field<'a>> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
+
     let (tag, tag_method) =
         expander::expand_tag(data, e, mode, default_field, rename_all, data.ident)?;
-    tag_methods.insert(data.span, tag_method);
+
+    if name_type.is_none() {
+        tag_methods.insert(data.span, tag_method);
+    }
+
     let skip = data.attr.skip(mode).map(|&(s, ())| s);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
     let default_attr = data

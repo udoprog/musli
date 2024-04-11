@@ -81,6 +81,11 @@ impl Ctxt {
         }
     }
 
+    /// Build a lifetime.
+    pub(crate) fn lifetime(&self, name: &str) -> syn::Lifetime {
+        self.with_string("'", name, "", |s| syn::Lifetime::new(s, Span::call_site()))
+    }
+
     /// Build an identifier with the given name, escaped so it's harder to conflict with.
     pub(crate) fn ident(&self, name: &str) -> syn::Ident {
         self.ident_with_span(name, Span::call_site(), "")
@@ -88,6 +93,13 @@ impl Ctxt {
 
     /// Build an identifier with the given name, escaped so it's harder to conflict with.
     pub(crate) fn ident_with_span(&self, name: &str, span: Span, extra: &str) -> syn::Ident {
+        self.with_string("", name, extra, |s| syn::Ident::new(s, span))
+    }
+
+    fn with_string<F, O>(&self, prefix: &str, name: &str, suffix: &str, f: F) -> O
+    where
+        F: FnOnce(&str) -> O,
+    {
         let mut inner = self.inner.borrow_mut();
 
         #[cfg(not(feature = "verbose"))]
@@ -100,16 +112,16 @@ impl Ctxt {
                 index
             };
 
-            _ = write!(inner.b1, "_{index}{extra}");
+            _ = write!(inner.b1, "{prefix}_{index}{suffix}");
         }
 
         #[cfg(feature = "verbose")]
         {
             let name = name.strip_prefix("_").unwrap_or(name);
-            _ = write!(inner.b1, "_{name}{extra}");
+            _ = write!(inner.b1, "{prefix}_{name}{suffix}");
         }
 
-        let ident = syn::Ident::new(&inner.b1, span);
+        let ident = f(&inner.b1);
         inner.b1.clear();
         ident
     }

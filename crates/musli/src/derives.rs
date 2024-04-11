@@ -514,11 +514,20 @@
 //! #[derive(Encode, Decode)]
 //! #[musli(name_type = usize)]
 //! enum Enum {
-//!     #[musli(name_type = CustomTag)]
+//!     #[musli(name = 0usize, name_type = CustomTag)]
 //!     Variant {
-//!         #[musli(name = CustomTag(b"name in bytes"))]
-//!         name: String,
-//!     }
+//!         #[musli(name = CustomTag(b"field1"))]
+//!         field1: u32,
+//!         #[musli(name = CustomTag(b"field2"))]
+//!         field2: u32,
+//!     },
+//!     #[musli(name = 1usize)]
+//!     Variant2 {
+//!         #[musli(name = "field1")]
+//!         field1: u32,
+//!         #[musli(name = "field2")]
+//!         field2: u32,
+//!     },
 //! }
 //! ```
 //!
@@ -689,7 +698,7 @@
 //!   [`Encode`] and [`Decode`] as appropriate).
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through
-//! the `#[musli(name_type)]` variant or container attributes (see above).
+//! the `#[musli(name_type)]` variant or container attributes.
 //!
 //! <br>
 //!

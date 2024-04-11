@@ -40,6 +40,7 @@ const CUSTOM_TAG1: FieldVariantTag = FieldVariantTag { name: "field1" };
 const CUSTOM_TAG2: FieldVariantTag = FieldVariantTag { name: "field2" };
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = FieldVariantTag)]
 pub struct StructCustomFieldAsStruct {
     #[musli(name = CUSTOM_TAG1)]
     field1: u32,
