@@ -1,0 +1,5 @@
+error: #[musli(rename_all = "WHAT_IS_THIS")]: Bad value, expected one of "PascalCase", "camelCase", "snake_case", "SCREAMING_SNAKE_CASE", "kebab-case", "SCREAMING-KEBAB-CASE"
+ --> tests/ui/unsupported_rename_all_error.rs:4:22
+  |
+4 | #[musli(rename_all = "WHAT_IS_THIS")]
+  |                      ^^^^^^^^^^^^^^

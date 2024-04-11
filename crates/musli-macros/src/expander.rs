@@ -3,6 +3,7 @@ use syn::spanned::Spanned;
 
 use crate::internals::attr::{self, DefaultTag, TypeAttr};
 use crate::internals::build::Build;
+use crate::internals::rename::RenameAll;
 use crate::internals::tokens::Tokens;
 use crate::internals::{Ctxt, Expansion, Mode, Only, Result, ATTR};
 
@@ -217,29 +218,46 @@ pub(crate) fn expand_tag(
     e: &Expander<'_>,
     mode: Mode<'_>,
     default_tag: Option<DefaultTag>,
+    rename_all: Option<RenameAll>,
+    ident: Option<&syn::Ident>,
 ) -> Result<(syn::Expr, Option<TagMethod>)> {
-    let (lit, tag_method) = match (taggable.name(mode), default_tag, taggable.literal_name()) {
-        (Some((_, rename)), _, _) => return Ok((rename_lit(rename), determine_tag_method(rename))),
-        (None, Some(DefaultTag::Index), _) => (
-            usize_suffixed(taggable.index(), taggable.span()).into(),
-            Some(TagMethod::Any),
-        ),
-        (None, Some(DefaultTag::Name), None) => {
-            e.cx.error_span(
-                taggable.span(),
-                format_args!(
-                    "#[{ATTR}(default_field = \"name\")] is not supported on unnamed fields",
+    let (lit, tag_method) = 'out: {
+        if let Some((_, rename)) = taggable.name(mode) {
+            return Ok((rename_lit(rename), determine_tag_method(rename)));
+        }
+
+        if let Some(tag) = default_tag {
+            break 'out match (tag, taggable.literal_name()) {
+                (DefaultTag::Index, _) => (
+                    usize_suffixed(taggable.index(), taggable.span()).into(),
+                    Some(TagMethod::Any),
                 ),
+                (DefaultTag::Name, None) => {
+                    e.cx.error_span(
+                        taggable.span(),
+                        format_args!(
+                            "#[{ATTR}(default_field = \"name\")] is not supported on unnamed fields",
+                        ),
+                    );
+                    return Err(());
+                }
+                (DefaultTag::Name, Some(name)) => (name.clone().into(), Some(TagMethod::String)),
+            };
+        }
+
+        if let (Some(ident), Some(rename_all)) = (ident, rename_all) {
+            let name = rename_all.apply(&ident.to_string());
+
+            break 'out (
+                syn::LitStr::new(&name, ident.span()).into(),
+                Some(TagMethod::String),
             );
-            return Err(());
         }
-        (None, Some(DefaultTag::Name), Some(ident)) => {
-            (ident.clone().into(), Some(TagMethod::String))
-        }
-        _ => (
+
+        (
             usize_suffixed(taggable.index(), taggable.span()).into(),
             None,
-        ),
+        )
     };
 
     let tag = syn::Expr::Lit(syn::ExprLit {
