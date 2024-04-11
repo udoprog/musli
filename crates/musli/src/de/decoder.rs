@@ -101,13 +101,6 @@ pub trait Decoder<'de>: Sized {
     ///         write!(f, "32-bit unsigned integers")
     ///     }
     ///
-    ///     fn decode<T>(self) -> Result<T, Self::Error>
-    ///     where
-    ///         T: Decode<'de, Self::Mode>
-    ///     {
-    ///         T::decode(self.cx, self)
-    ///     }
-    ///
     ///     fn decode_u32(self) -> Result<u32, <Self::Cx as Context>::Error> {
     ///         Ok(42)
     ///     }
