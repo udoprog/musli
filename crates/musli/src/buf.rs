@@ -1,3 +1,17 @@
+//! Types related to buffers.
+
+use core::fmt::{self, Arguments};
+
+/// An error raised when we fail to write.
+#[derive(Debug)]
+pub struct Error;
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Allocation failed")
+    }
+}
+
 /// A buffer allocated from a context.
 ///
 /// Buffers are allocated through an allocator using [`Allocator::alloc`].
@@ -42,6 +56,9 @@ pub trait Buf {
 
     /// Get the buffer as its initialized slice.
     fn as_slice(&self) -> &[u8];
+
+    /// Try to write a format string into the buffer.
+    fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error>;
 }
 
 impl Buf for [u8] {
@@ -63,5 +80,10 @@ impl Buf for [u8] {
     #[inline(always)]
     fn as_slice(&self) -> &[u8] {
         self
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, _: Arguments<'_>) -> Result<(), Error> {
+        Err(Error)
     }
 }

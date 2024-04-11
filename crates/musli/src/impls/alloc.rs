@@ -82,6 +82,8 @@ impl<'de, M> Decode<'de, M> for String {
     }
 }
 
+visit!(String);
+
 impl<'de, M> Decode<'de, M> for Box<str> {
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
@@ -91,6 +93,8 @@ impl<'de, M> Decode<'de, M> for Box<str> {
         Ok(decoder.decode::<String>()?.into())
     }
 }
+
+visit!(Box<str>);
 
 impl<'de, M, T> Decode<'de, M> for Box<[T]>
 where
@@ -104,6 +108,8 @@ where
         Ok(decoder.decode::<Vec<T>>()?.into())
     }
 }
+
+visit!({T} Box<[T]> where T: Decode<'de, M>);
 
 macro_rules! cow {
     (
@@ -141,7 +147,7 @@ macro_rules! cow {
 
                     #[inline]
                     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                        write!(f, "string")
+                        write!(f, "a string")
                     }
 
                     #[inline]
@@ -187,6 +193,8 @@ cow! {
     |reference| Cow::Owned(reference.to_owned())
 }
 
+visit!(Cow<'de, str>);
+
 cow! {
     Encode::encode,
     Decode::decode,
@@ -196,6 +204,8 @@ cow! {
     |reference| Cow::Owned(CStr::from_bytes_with_nul(reference).map_err(cx.map())?.to_owned())
 }
 
+visit!(Cow<'de, CStr>);
+
 cow! {
     EncodeBytes::encode_bytes,
     DecodeBytes::decode_bytes,
@@ -204,6 +214,8 @@ cow! {
     |borrowed| Cow::Borrowed(borrowed),
     |reference| Cow::Owned(reference.to_owned())
 }
+
+visit_bytes!(Cow<'de, [u8]>);
 
 macro_rules! sequence {
     (
@@ -265,6 +277,12 @@ macro_rules! sequence {
                     Ok(out)
                 })
             }
+        }
+
+        visit! {
+            {T, $($extra)*} $ty<T $(, $extra)*> where
+                T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
+                $($extra: $extra_bound0 $(+ $extra_bound)*),*
         }
     }
 }
@@ -408,6 +426,13 @@ macro_rules! map {
                 })
             }
         }
+
+        visit! {
+            {K, V, $($extra)*} $ty<K, V $(, $extra)*> where
+                K: Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
+                V: Decode<'de, M>,
+                $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        }
     }
 }
 
@@ -473,6 +498,8 @@ impl<'de, M> Decode<'de, M> for CString {
     }
 }
 
+visit!(CString);
+
 macro_rules! smart_pointer {
     ($($ty:ident),* $(,)?) => {
         $(
@@ -502,6 +529,8 @@ macro_rules! smart_pointer {
                 }
             }
 
+            visit!({T} $ty<T> where T: Decode<'de, M>);
+
             impl<'de, M> DecodeBytes<'de, M> for $ty<[u8]> {
                 #[inline]
                 fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
@@ -512,6 +541,8 @@ macro_rules! smart_pointer {
                 }
             }
 
+            visit_bytes!($ty<[u8]>);
+
             impl<'de, M> Decode<'de, M> for $ty<CStr> {
                 #[inline]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
@@ -521,6 +552,8 @@ macro_rules! smart_pointer {
                     Ok($ty::from(CString::decode(cx, decoder)?))
                 }
             }
+
+            visit!($ty<CStr>);
 
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
@@ -536,6 +569,10 @@ macro_rules! smart_pointer {
 
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+            visit!($ty<Path>);
+
+            #[cfg(all(feature = "std", any(unix, windows)))]
+            #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
             impl<'de, M> Decode<'de, M> for $ty<OsStr> {
                 #[inline]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
@@ -545,11 +582,26 @@ macro_rules! smart_pointer {
                     Ok($ty::from(OsString::decode(cx, decoder)?))
                 }
             }
+
+            #[cfg(all(feature = "std", any(unix, windows)))]
+            #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+            visit!($ty<OsStr>);
         )*
     };
 }
 
 smart_pointer!(Box, Arc, Rc);
+visit_deref!({T} Box<[T]> as [T] where T: Decode<'de, M>);
+
+visit_deref!(Box<CStr> as CStr);
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+visit_deref!(Box<Path> as Path);
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+visit_deref!(Box<OsStr> as OsStr);
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
@@ -678,6 +730,10 @@ impl<'de, M> Decode<'de, M> for OsString {
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+visit!(OsString);
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
 impl<M> Encode<M> for Path {
     #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -711,6 +767,10 @@ impl<'de, M> Decode<'de, M> for PathBuf {
         Ok(PathBuf::from(decoder.decode::<OsString>()?))
     }
 }
+
+#[cfg(all(feature = "std", any(unix, windows)))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
+visit!(PathBuf);
 
 impl<M> EncodeBytes<M> for Vec<u8> {
     #[inline]
@@ -766,6 +826,8 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
     }
 }
 
+visit_bytes!(Vec<u8>);
+
 impl<M> EncodeBytes<M> for VecDeque<u8> {
     #[inline]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -786,3 +848,5 @@ impl<'de, M> DecodeBytes<'de, M> for VecDeque<u8> {
         Ok(VecDeque::from(<Vec<u8>>::decode_bytes(cx, decoder)?))
     }
 }
+
+visit_bytes!(VecDeque<u8>);

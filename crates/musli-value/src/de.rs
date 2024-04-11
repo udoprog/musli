@@ -6,7 +6,7 @@ use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint,
     PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, TupleDecoder, TypeHint, VariantDecoder, Visitor,
+    StructFieldsDecoder, TupleDecoder, TypeHint, VariantDecoder, Visit, Visitor,
 };
 #[cfg(feature = "alloc")]
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
@@ -87,7 +87,16 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     where
         T: Decode<'de, Self::Mode>,
     {
-        T::decode(self.cx, self)
+        self.cx.decode(self)
+    }
+
+    #[inline]
+    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + Visit<'de, Self::Mode>,
+        F: FnOnce(&T) -> Result<O, Self::Error>,
+    {
+        self.cx.visit(self, f)
     }
 
     #[inline]

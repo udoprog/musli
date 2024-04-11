@@ -15,7 +15,7 @@ use crate::no_std::ToOwned;
 use crate::de::{
     AsDecoder, Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberVisitor,
     PackDecoder, SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder,
-    TupleDecoder, ValueVisitor, VariantDecoder,
+    TupleDecoder, ValueVisitor, VariantDecoder, Visit,
 };
 use crate::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
@@ -40,6 +40,11 @@ impl Buf for NeverBuffer {
     #[inline(always)]
     fn as_slice(&self) -> &[u8] {
         &[]
+    }
+
+    #[inline(always)]
+    fn write_fmt(&mut self, _: fmt::Arguments<'_>) -> Result<(), crate::buf::Error> {
+        Err(crate::buf::Error)
     }
 }
 
@@ -138,6 +143,15 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     fn decode<T>(self) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn visit<T, F, O>(self, _: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + Visit<'de, Self::Mode>,
+        F: FnOnce(&T) -> Result<O, Self::Error>,
     {
         match self._never {}
     }

@@ -23,6 +23,8 @@ impl<'de, M> Decode<'de, M> for Ipv4Addr {
     }
 }
 
+visit!(Ipv4Addr);
+
 impl<M> Encode<M> for Ipv6Addr {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -42,6 +44,8 @@ impl<'de, M> Decode<'de, M> for Ipv6Addr {
         decoder.decode_array::<16>().map(Ipv6Addr::from)
     }
 }
+
+visit!(Ipv6Addr);
 
 #[derive(Encode, Decode)]
 #[musli(crate)]
@@ -82,6 +86,8 @@ impl<'de, M> Decode<'de, M> for IpAddr {
     }
 }
 
+visit!(IpAddr);
+
 impl<M> Encode<M> for SocketAddrV4 {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -105,6 +111,8 @@ impl<'de, M> Decode<'de, M> for SocketAddrV4 {
         decoder.decode_pack(|p| Ok(SocketAddrV4::new(p.next()?, p.next()?)))
     }
 }
+
+visit!(SocketAddrV4);
 
 impl<M> Encode<M> for SocketAddrV6 {
     #[inline]
@@ -131,6 +139,8 @@ impl<'de, M> Decode<'de, M> for SocketAddrV6 {
         decoder.decode_pack(|p| Ok(Self::new(p.next()?, p.next()?, p.next()?, p.next()?)))
     }
 }
+
+visit!(SocketAddrV6);
 
 #[derive(Encode, Decode)]
 #[musli(crate)]
@@ -170,3 +180,5 @@ impl<'de, M> Decode<'de, M> for SocketAddr {
         })
     }
 }
+
+visit!(SocketAddr);

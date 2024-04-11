@@ -2,10 +2,11 @@
 
 use core::fmt;
 
-use crate::de::{NumberVisitor, StructDecoder, TypeHint, ValueVisitor, Visitor};
 use crate::expecting::{self, Expecting};
 use crate::hint::{StructHint, TupleHint, UnsizedStructHint};
 use crate::Context;
+
+use super::{NumberVisitor, StructDecoder, TypeHint, ValueVisitor, Visit, Visitor};
 
 use super::{
     AsDecoder, Decode, MapDecoder, MapEntriesDecoder, PackDecoder, SequenceDecoder, Skip,
@@ -120,6 +121,12 @@ pub trait Decoder<'de>: Sized {
     fn decode<T>(self) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>;
+
+    /// Visit a reference to a value through the specified closure.
+    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + Visit<'de, Self::Mode>,
+        F: FnOnce(&T) -> Result<O, <Self::Cx as Context>::Error>;
 
     /// Skip over the current next value.
     #[inline]

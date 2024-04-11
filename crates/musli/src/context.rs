@@ -3,7 +3,7 @@
 use core::fmt;
 use core::str;
 
-use crate::de::DecodeBytes;
+use crate::de::{DecodeBytes, Visit};
 use crate::{Buf, Decode, Decoder};
 
 #[cfg(feature = "std")]
@@ -36,12 +36,24 @@ pub trait Context {
         Self: 'this;
 
     /// Decode the given input using the associated mode.
+    #[inline]
     fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
         D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
     {
         T::decode(self, decoder)
+    }
+
+    /// Decode the given visit using the associated mode.
+    #[inline]
+    fn visit<'de, T, D, F, O>(&self, decoder: D, f: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + Visit<'de, Self::Mode>,
+        D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
+        F: FnOnce(&T) -> Result<O, D::Error>,
+    {
+        T::visit(self, decoder, f)
     }
 
     /// Decode the given input as bytes using the associated mode.

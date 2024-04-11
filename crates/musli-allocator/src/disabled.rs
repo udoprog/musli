@@ -1,3 +1,6 @@
+use core::fmt::Arguments;
+
+use musli::buf::Error;
 use musli::{Allocator, Buf};
 
 /// An empty buffer.
@@ -17,6 +20,11 @@ impl Buf for EmptyBuf {
     #[inline(always)]
     fn as_slice(&self) -> &[u8] {
         &[]
+    }
+
+    #[inline(always)]
+    fn write_fmt(&mut self, _: Arguments<'_>) -> Result<(), Error> {
+        Err(Error)
     }
 }
 

@@ -1,6 +1,8 @@
 use core::fmt;
 
-use musli::de::{Decode, Decoder, NumberHint, SizeHint, Skip, TypeHint, ValueVisitor, Visitor};
+use musli::de::{
+    Decode, Decoder, NumberHint, SizeHint, Skip, TypeHint, ValueVisitor, Visit, Visitor,
+};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -74,7 +76,16 @@ where
     where
         T: Decode<'de, Self::Mode>,
     {
-        T::decode(self.cx, self)
+        self.cx.decode(self)
+    }
+
+    #[inline]
+    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + Visit<'de, Self::Mode>,
+        F: FnOnce(&T) -> Result<O, Self::Error>,
+    {
+        self.cx.visit(self, f)
     }
 
     #[inline]

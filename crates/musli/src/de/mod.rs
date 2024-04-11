@@ -25,6 +25,12 @@ pub use self::as_decoder::AsDecoder;
 mod decode;
 pub use self::decode::{Decode, TraceDecode};
 
+mod visit;
+pub use self::visit::Visit;
+
+mod visit_bytes;
+pub use self::visit_bytes::VisitBytes;
+
 mod decode_bytes;
 pub use self::decode_bytes::DecodeBytes;
 

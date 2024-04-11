@@ -2,7 +2,6 @@ use proc_macro2::Span;
 
 pub(crate) struct Tokens {
     pub(crate) as_decoder_t: syn::Path,
-    pub(crate) buf_t: syn::Path,
     pub(crate) context_t: syn::Path,
     pub(crate) decode_bytes_t: syn::Path,
     pub(crate) decode_t: syn::Path,
@@ -18,12 +17,12 @@ pub(crate) struct Tokens {
     pub(crate) option: syn::Path,
     pub(crate) pack_decoder_t: syn::Path,
     pub(crate) pack_encoder_t: syn::Path,
+    pub(crate) priv_write: syn::Path,
     pub(crate) result_err: syn::Path,
     pub(crate) result_ok: syn::Path,
     pub(crate) result: syn::Path,
     pub(crate) skip_field: syn::Path,
     pub(crate) skip: syn::Path,
-    pub(crate) str_ty: syn::Path,
     pub(crate) struct_decoder_t: syn::Path,
     pub(crate) struct_encoder_t: syn::Path,
     pub(crate) struct_field_decoder_t: syn::Path,
@@ -34,14 +33,12 @@ pub(crate) struct Tokens {
     pub(crate) unsized_struct_hint: syn::Path,
     pub(crate) variant_decoder_t: syn::Path,
     pub(crate) variant_encoder_t: syn::Path,
-    pub(crate) visit_owned_fn: syn::Path,
 }
 
 impl Tokens {
     pub(crate) fn new(span: Span, prefix: &syn::Path) -> Self {
         Self {
             as_decoder_t: path(span, prefix, ["de", "AsDecoder"]),
-            buf_t: path(span, prefix, ["Buf"]),
             context_t: path(span, prefix, ["Context"]),
             decode_bytes_t: path(span, prefix, ["de", "DecodeBytes"]),
             decode_t: path(span, prefix, ["de", "Decode"]),
@@ -57,12 +54,12 @@ impl Tokens {
             option: path(span, prefix, ["__priv", "Option"]),
             pack_decoder_t: path(span, prefix, ["de", "PackDecoder"]),
             pack_encoder_t: path(span, prefix, ["en", "PackEncoder"]),
+            priv_write: path(span, prefix, ["__priv", "write"]),
             result_err: path(span, prefix, ["__priv", "Err"]),
             result_ok: path(span, prefix, ["__priv", "Ok"]),
             result: path(span, prefix, ["__priv", "Result"]),
             skip_field: path(span, prefix, ["__priv", "skip_field"]),
             skip: path(span, prefix, ["__priv", "skip"]),
-            str_ty: primitive(span, "str"),
             struct_decoder_t: path(span, prefix, ["de", "StructDecoder"]),
             struct_encoder_t: path(span, prefix, ["en", "StructEncoder"]),
             struct_field_decoder_t: path(span, prefix, ["de", "StructFieldDecoder"]),
@@ -73,7 +70,6 @@ impl Tokens {
             unsized_struct_hint: path(span, prefix, ["hint", "UnsizedStructHint"]),
             variant_decoder_t: path(span, prefix, ["de", "VariantDecoder"]),
             variant_encoder_t: path(span, prefix, ["en", "VariantEncoder"]),
-            visit_owned_fn: path(span, prefix, ["utils", "visit_owned_fn"]),
         }
     }
 }
@@ -86,9 +82,4 @@ fn path<const N: usize>(span: Span, prefix: &syn::Path, segments: [&'static str;
     }
 
     path
-}
-
-fn primitive(span: Span, primitive: &'static str) -> syn::Path {
-    let core = syn::Ident::new(primitive, span);
-    syn::Path::from(core)
 }
