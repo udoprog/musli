@@ -4,19 +4,19 @@ use crate::tag::{Kind, Tag, MAX_INLINE_LEN};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct From<const N: usize> {
-    #[musli(rename = 0)]
+    #[musli(name = 0)]
     prefix: Option<u32>,
-    #[musli(rename = 1)]
+    #[musli(name = 1)]
     field: Field<N>,
-    #[musli(rename = 2)]
+    #[musli(name = 2)]
     suffix: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct To {
-    #[musli(rename = 0)]
+    #[musli(name = 0)]
     prefix: Option<u32>,
-    #[musli(rename = 2)]
+    #[musli(name = 2)]
     suffix: Option<u32>,
 }
 

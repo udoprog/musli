@@ -6,14 +6,13 @@ use syn::punctuated::Punctuated;
 use syn::Token;
 
 use crate::de::{build_call, build_reference};
-use crate::expander::Taggable;
 use crate::expander::{
-    Data, EnumData, Expander, FieldData, Result, StructData, TagMethod, VariantData,
+    self, Data, EnumData, Expander, FieldData, StructData, TagMethod, VariantData,
 };
 use crate::internals::attr::{DefaultTag, EnumTagging, Packing};
 use crate::internals::tokens::Tokens;
 use crate::internals::ATTR;
-use crate::internals::{Ctxt, Expansion, Mode, Only};
+use crate::internals::{Ctxt, Expansion, Mode, Only, Result};
 
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
@@ -327,14 +326,18 @@ fn setup_variant<'a>(
         .or_else(|| e.type_attr.default_field(mode))
         .map(|&(_, v)| v);
 
-    let (tag, tag_method) =
-        data.expand_tag(e, mode, e.type_attr.default_variant(mode).map(|&(_, v)| v))?;
+    let (tag, tag_method) = expander::expand_tag(
+        data,
+        e,
+        mode,
+        e.type_attr.default_variant(mode).map(|&(_, v)| v),
+    )?;
     tag_methods.insert(data.span, tag_method);
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
 
-    let is_default = if data.attr.default_attr(mode).is_some() {
+    let is_default = if data.attr.default_variant(mode).is_some() {
         if !data.fields.is_empty() {
             e.cx.error_span(
                 data.span,
@@ -409,7 +412,7 @@ fn setup_field<'a>(
 ) -> Result<Field<'a>> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
-    let (tag, tag_method) = data.expand_tag(e, mode, default_field)?;
+    let (tag, tag_method) = expander::expand_tag(data, e, mode, default_field)?;
     tag_methods.insert(data.span, tag_method);
     let skip = data.attr.skip(mode).map(|&(s, ())| s);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);

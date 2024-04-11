@@ -226,7 +226,7 @@
 //! The following is an example of *full upgrade stability* using
 //! [`musli-wire`]. `Version1` can be decoded from an instance of `Version2`
 //! because it understands how to skip fields which are part of `Version2`.
-//! We're also explicitly adding `#[musli(rename = ..)]` to the fields to ensure
+//! We're also explicitly adding `#[musli(name = ..)]` to the fields to ensure
 //! that they don't change in case they are re-ordered.
 //!
 //! ```ignore
@@ -234,15 +234,15 @@
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Version1 {
-//!     #[musli(rename = 0)]
+//!     #[musli(name = 0)]
 //!     name: String,
 //! }
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Version2 {
-//!     #[musli(rename = 0)]
+//!     #[musli(name = 0)]
 //!     name: String,
-//!     #[musli(default, rename = 1)]
+//!     #[musli(default, name = 1)]
 //!     age: Option<u32>,
 //! }
 //!

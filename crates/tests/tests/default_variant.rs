@@ -12,7 +12,7 @@ pub enum SeveralVariants {
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub enum OnlyFallback {
     // Renamed to something which is not provided in `SeveralVariants`.
-    #[musli(rename = 4)]
+    #[musli(name = 4)]
     Variant4,
     #[musli(default)]
     Fallback,

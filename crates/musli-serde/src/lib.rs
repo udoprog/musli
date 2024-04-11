@@ -11,7 +11,7 @@
 //!
 //! Note that the exact method that fields are serialized and deserialized will
 //! not match what Müsli does, since serde requires the use of a fundamentally
-//! different model and Müsli metadata such as `#[musli(rename = ..)]` is not
+//! different model and Müsli metadata such as `#[musli(name = ..)]` is not
 //! available in [`serde`].
 //!
 //! <br>

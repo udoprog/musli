@@ -7,7 +7,7 @@ pub enum InternallyTagged {
         string: String,
         number: u32,
     },
-    #[musli(rename = "variant2")]
+    #[musli(name = "variant2")]
     Variant2 {
         string: String,
     },
@@ -53,7 +53,7 @@ pub enum AdjacentlyTagged {
         string: String,
         number: u32,
     },
-    #[musli(rename = "variant2")]
+    #[musli(name = "variant2")]
     Variant2 {
         string: String,
     },
