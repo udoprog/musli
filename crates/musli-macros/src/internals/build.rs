@@ -285,8 +285,6 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         .map(|&(_, p)| p)
         .unwrap_or_default();
 
-    let name_type = e.type_attr.name_type(mode);
-
     if enum_tagging.is_some() {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
@@ -299,14 +297,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
     }
 
     for v in &data.variants {
-        variants.push(setup_variant(
-            e,
-            mode,
-            v,
-            &mut fallback,
-            name_type,
-            &mut tag_methods,
-        )?);
+        variants.push(setup_variant(e, mode, v, &mut fallback, &mut tag_methods)?);
     }
 
     Ok(Enum {
@@ -328,7 +319,6 @@ fn setup_variant<'a>(
     mode: Mode<'_>,
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
-    enum_name_type: Option<&(Span, syn::Type)>,
     tag_methods: &mut TagMethods,
 ) -> Result<Variant<'a>> {
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
@@ -364,9 +354,7 @@ fn setup_variant<'a>(
         Some(data.ident),
     )?;
 
-    if enum_name_type.is_none() {
-        tag_methods.insert(data.span, tag_method);
-    }
+    tag_methods.insert(data.span, tag_method);
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
@@ -564,16 +552,14 @@ impl<'a> TagMethods<'a> {
     }
 
     /// Insert a tag method and error in case it's invalid.
-    fn insert(&mut self, span: Span, method: Option<TagMethod>) {
+    fn insert(&mut self, span: Span, method: TagMethod) {
         let before = self.methods.len();
 
-        if let Some(method) = method {
-            self.methods.insert(method);
+        self.methods.insert(method);
 
-            if before == 1 && self.methods.len() > 1 {
-                self.cx
-                    .error_span(span, format_args!("#[{ATTR}(tag)] conflicting tag kind"));
-            }
+        if before == 1 && self.methods.len() > 1 {
+            self.cx
+                .error_span(span, format_args!("#[{ATTR}(tag)] conflicting tag kind"));
         }
     }
 
