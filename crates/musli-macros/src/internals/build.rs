@@ -161,7 +161,6 @@ pub(crate) struct Variant<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) tag: syn::Expr,
-    pub(crate) is_default: bool,
     pub(crate) st: Body<'a>,
     pub(crate) patterns: Punctuated<syn::FieldPat, Token![,]>,
 }
@@ -372,28 +371,21 @@ fn setup_variant<'a>(
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
 
-    let is_default = if data.attr.default_variant(mode).is_some() {
+    if let Some((span, _)) = data.attr.default_variant(mode) {
         if !data.fields.is_empty() {
             e.cx.error_span(
-                data.span,
+                *span,
                 format_args!("#[{ATTR}(default)] variant must be empty"),
             );
-
-            false
         } else if fallback.is_some() {
             e.cx.error_span(
-                data.span,
+                *span,
                 format_args!("#[{ATTR}(default)] only one fallback variant is supported",),
             );
-
-            false
         } else {
             *fallback = Some(data.ident);
-            true
         }
-    } else {
-        false
-    };
+    }
 
     let mut patterns = Punctuated::default();
     let mut field_tag_methods = TagMethods::new(&e.cx);
@@ -422,7 +414,6 @@ fn setup_variant<'a>(
         span: data.span,
         index: data.index,
         tag,
-        is_default,
         patterns,
         st: Body {
             span: data.span,
