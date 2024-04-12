@@ -4,7 +4,7 @@ pub(crate) mod build;
 mod ctxt;
 mod expansion;
 mod mode;
-pub(crate) mod rename;
+pub(crate) mod name;
 pub(crate) mod tokens;
 
 pub(crate) const ATTR: &str = "musli";

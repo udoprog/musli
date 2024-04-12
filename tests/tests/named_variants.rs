@@ -1,43 +1,43 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "PascalCase")]
+#[musli(name_all = "PascalCase")]
 enum PascalCase {
     VariantName,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "camelCase")]
+#[musli(name_all = "camelCase")]
 enum CamelCase {
     VariantName,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "snake_case")]
+#[musli(name_all = "snake_case")]
 enum SnakeCase {
     VariantName,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "SCREAMING_SNAKE_CASE")]
+#[musli(name_all = "SCREAMING_SNAKE_CASE")]
 enum ScreamingSnakeCase {
     VariantName,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "kebab-case")]
+#[musli(name_all = "kebab-case")]
 enum KebabCase {
     VariantName,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "SCREAMING-KEBAB-CASE")]
+#[musli(name_all = "SCREAMING-KEBAB-CASE")]
 enum ScreamingKebabCase {
     VariantName,
 }
 
 #[test]
-fn test_rename_all() {
+fn test_name_all() {
     tests::rt!(
         full,
         PascalCase::VariantName,

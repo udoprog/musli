@@ -3,7 +3,7 @@ use core::mem::take;
 
 #[derive(Debug, Clone, Copy)]
 #[allow(clippy::enum_variant_names)]
-pub(crate) enum RenameAll {
+pub(crate) enum NameAll {
     PascalCase,
     CamelCase,
     SnakeCase,
@@ -12,7 +12,7 @@ pub(crate) enum RenameAll {
     ScreamingKebabCase,
 }
 
-impl RenameAll {
+impl NameAll {
     pub(crate) const ALL: &'static [Self] = &[
         Self::PascalCase,
         Self::CamelCase,
@@ -105,7 +105,7 @@ impl RenameAll {
     }
 }
 
-impl fmt::Display for RenameAll {
+impl fmt::Display for NameAll {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::PascalCase => write!(f, "PascalCase"),
@@ -122,7 +122,7 @@ impl fmt::Display for RenameAll {
 fn test_rename() {
     #[track_caller]
     fn test(input: &str, rename: &str, expected: &str) {
-        let rename = RenameAll::parse(rename).unwrap();
+        let rename = NameAll::parse(rename).unwrap();
         assert_eq!(rename.apply(input), expected);
     }
 
