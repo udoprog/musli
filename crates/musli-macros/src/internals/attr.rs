@@ -43,13 +43,6 @@ pub(crate) enum EnumTagging<'a> {
     },
 }
 
-/// The kind of tag to use.
-#[derive(Debug, Clone, Copy)]
-pub enum DefaultTag {
-    Index,
-    Name,
-}
-
 /// If the type is tagged or not.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Packing {
@@ -196,10 +189,6 @@ layer! {
         name_all: NameAll,
         /// `#[musli(name_format_with)]`.
         name_format_with: syn::Path,
-        /// `#[musli(default_variant = "..")]`.
-        default_variant: DefaultTag,
-        /// `#[musli(default_field = "..")]`.
-        default_field: DefaultTag,
         /// If `#[musli(tag = <expr>)]` is specified.
         tag: syn::Expr,
         /// If `#[musli(content = <expr>)]` is specified.
@@ -319,44 +308,6 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // parse #[musli(default_variant = "..")]
-            if meta.path.is_ident("default_variant") {
-                meta.input.parse::<Token![=]>()?;
-                let string = meta.input.parse::<syn::LitStr>()?;
-
-                new.default_variant.push(match string.value().as_str() {
-                    "index" => (meta.path.span(), DefaultTag::Index),
-                    "name" => (meta.path.span(), DefaultTag::Name),
-                    value => {
-                        return Err(syn::Error::new_spanned(
-                            string,
-                            format_args!("#[{ATTR}(default_variant = {value:?})] Bad value, expected one of \"index\" or \"name\""),
-                        ));
-                    }
-                });
-
-                return Ok(());
-            }
-
-            // parse #[musli(default_field = "..")]
-            if meta.path.is_ident("default_field") {
-                meta.input.parse::<Token![=]>()?;
-                let string = meta.input.parse::<syn::LitStr>()?;
-
-                new.default_field.push(match string.value().as_str() {
-                    "index" => (meta.path.span(), DefaultTag::Index),
-                    "name" => (meta.path.span(), DefaultTag::Name),
-                    value => {
-                        return Err(syn::Error::new_spanned(
-                            string,
-                            format_args!("#[{ATTR}(default_field = {value:?})]: Bad value, expected one of \"index\" or \"name\""),
-                        ));
-                    }
-                });
-
-                return Ok(());
-            }
-
             // parse #[musli(bound = {..})]
             if meta.path.is_ident("bound") {
                 meta.input.parse::<Token![=]>()?;
@@ -385,7 +336,8 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             // parse #[musli(name_all = "..")]
             if meta.path.is_ident("name_all") {
-                new.name_all.push((meta.path.span(), parse_name_all(&meta)?));
+                new.name_all
+                    .push((meta.path.span(), parse_name_all(&meta)?));
                 return Ok(());
             }
 
@@ -466,8 +418,6 @@ layer! {
         packing: Packing,
         /// `#[musli(default)]`.
         default_variant: (),
-        /// `#[musli(default_field = "..")]`.
-        default_field: DefaultTag,
         @multiple
     }
 }
@@ -538,25 +488,6 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
-            // parse #[musli(default_field = "..")]
-            if meta.path.is_ident("default_field") {
-                meta.input.parse::<Token![=]>()?;
-                let string = meta.input.parse::<syn::LitStr>()?;
-
-                new.default_field.push(match string.value().as_str() {
-                    "index" => (meta.path.span(), DefaultTag::Index),
-                    "name" => (meta.path.span(), DefaultTag::Name),
-                    value => {
-                        return Err(syn::Error::new_spanned(
-                            string,
-                            format_args!("#[{ATTR}(default_field = {value:?})]: Bad value, expected one of \"index\" or \"name\"."),
-                        ));
-                    }
-                });
-
-                return Ok(());
-            }
-
             // parse #[musli(packed)]
             if meta.path.is_ident("packed") {
                 new.packing.push((meta.path.span(), Packing::Packed));
@@ -571,7 +502,8 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
             // parse #[musli(name_all = "..")]
             if meta.path.is_ident("name_all") {
-                new.name_all.push((meta.path.span(), parse_name_all(&meta)?));
+                new.name_all
+                    .push((meta.path.span(), parse_name_all(&meta)?));
                 return Ok(());
             }
 

@@ -1,9 +1,14 @@
 use core::fmt;
 use core::mem::take;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 #[allow(clippy::enum_variant_names)]
 pub(crate) enum NameAll {
+    /// Fields are named by index.
+    #[default]
+    Index,
+    /// Fields are named by their original name.
+    Name,
     PascalCase,
     CamelCase,
     SnakeCase,
@@ -14,6 +19,8 @@ pub(crate) enum NameAll {
 
 impl NameAll {
     pub(crate) const ALL: &'static [Self] = &[
+        Self::Index,
+        Self::Name,
         Self::PascalCase,
         Self::CamelCase,
         Self::SnakeCase,
@@ -24,6 +31,8 @@ impl NameAll {
 
     pub(crate) fn parse(input: &str) -> Option<Self> {
         match input {
+            "index" => Some(Self::Index),
+            "name" => Some(Self::Name),
             "PascalCase" => Some(Self::PascalCase),
             "camelCase" => Some(Self::CamelCase),
             "snake_case" => Some(Self::SnakeCase),
@@ -35,16 +44,10 @@ impl NameAll {
     }
 
     /// Apply the given rename to the input string.
-    pub(crate) fn apply(&self, input: &str) -> String {
-        let prefix = match self {
-            Self::SnakeCase => Some('_'),
-            Self::ScreamingSnakeCase => Some('_'),
-            Self::KebabCase => Some('-'),
-            Self::ScreamingKebabCase => Some('-'),
-            _ => None,
-        };
-
+    pub(crate) fn apply(&self, input: &str) -> Option<String> {
         let feed: fn(output: &mut String, open: bool, count: usize, c: char) = match self {
+            Self::Index => return None,
+            Self::Name => return Some(input.to_string()),
             Self::PascalCase => |output, open, _, c| {
                 if open {
                     output.extend(c.to_uppercase());
@@ -71,6 +74,14 @@ impl NameAll {
             Self::ScreamingKebabCase => |output, _, _, c| {
                 output.extend(c.to_uppercase());
             },
+        };
+
+        let prefix = match self {
+            Self::SnakeCase => Some('_'),
+            Self::ScreamingSnakeCase => Some('_'),
+            Self::KebabCase => Some('-'),
+            Self::ScreamingKebabCase => Some('-'),
+            _ => None,
         };
 
         let mut output = String::new();
@@ -101,13 +112,15 @@ impl NameAll {
             feed(&mut output, group, count, c);
         }
 
-        output
+        Some(output)
     }
 }
 
 impl fmt::Display for NameAll {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::Index => write!(f, "index"),
+            Self::Name => write!(f, "name"),
             Self::PascalCase => write!(f, "PascalCase"),
             Self::CamelCase => write!(f, "camelCase"),
             Self::SnakeCase => write!(f, "snake_case"),
@@ -123,7 +136,7 @@ fn test_rename() {
     #[track_caller]
     fn test(input: &str, rename: &str, expected: &str) {
         let rename = NameAll::parse(rename).unwrap();
-        assert_eq!(rename.apply(input), expected);
+        assert_eq!(rename.apply(input).unwrap(), expected);
     }
 
     test("hello_world", "PascalCase", "HelloWorld");

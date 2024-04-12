@@ -10,7 +10,7 @@ use crate::expander::{
     self, Data, EnumData, Expander, FieldData, StructData, TagMethod, VariantData,
 };
 
-use super::attr::{DefaultTag, EnumTagging, Packing};
+use super::attr::{EnumTagging, Packing};
 use super::name::NameAll;
 use super::tokens::Tokens;
 use super::ATTR;
@@ -222,8 +222,11 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
-    let default_field = e.type_attr.default_field(mode).map(|&(_, v)| v);
-    let name_all = e.type_attr.name_all(mode).map(|&(_, v)| v);
+    let name_all = e
+        .type_attr
+        .name_all(mode)
+        .map(|&(_, v)| v)
+        .unwrap_or_default();
 
     let packing = e
         .type_attr
@@ -241,7 +244,6 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
             e,
             mode,
             f,
-            default_field,
             name_all,
             packing,
             None,
@@ -331,26 +333,22 @@ fn setup_variant<'a>(
         .map(|&(_, v)| v)
         .unwrap_or_default();
 
-    let default_field = data
-        .attr
-        .default_field(mode)
-        .or_else(|| e.type_attr.default_field(mode))
-        .map(|&(_, v)| v);
-
     let name_all = data
         .attr
         .name_all(mode)
         .or_else(|| e.type_attr.name_all(mode))
-        .map(|&(_, v)| v);
+        .map(|&(_, v)| v)
+        .unwrap_or_default();
 
     let variant_name_type = data.attr.name_type(mode);
 
     let (tag, tag_method) = expander::expand_tag(
         data,
-        e,
         mode,
-        e.type_attr.default_variant(mode).map(|&(_, v)| v),
-        e.type_attr.name_all(mode).map(|&(_, v)| v),
+        e.type_attr
+            .name_all(mode)
+            .map(|&(_, v)| v)
+            .unwrap_or_default(),
         Some(data.ident),
     )?;
 
@@ -383,7 +381,6 @@ fn setup_variant<'a>(
             e,
             mode,
             f,
-            default_field,
             name_all,
             variant_packing,
             Some(&mut patterns),
@@ -421,8 +418,7 @@ fn setup_field<'a>(
     e: &'a Expander,
     mode: Mode<'_>,
     data: &'a FieldData<'a>,
-    default_field: Option<DefaultTag>,
-    name_all: Option<NameAll>,
+    name_all: NameAll,
     packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
     name_type: Option<&(Span, syn::Type)>,
@@ -431,8 +427,7 @@ fn setup_field<'a>(
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
 
-    let (tag, tag_method) =
-        expander::expand_tag(data, e, mode, default_field, name_all, data.ident)?;
+    let (tag, tag_method) = expander::expand_tag(data, mode, name_all, data.ident)?;
 
     if name_type.is_none() {
         tag_methods.insert(data.span, tag_method);

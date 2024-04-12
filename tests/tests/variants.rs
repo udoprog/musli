@@ -1,7 +1,7 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(default_variant = "name")]
+#[musli(name_all = "name")]
 enum EmptyVariants {
     Empty,
     Tuple(),
@@ -16,9 +16,11 @@ fn enum_with_empty_variant() {
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(default_variant = "name")]
+#[musli(name_all = "name")]
 enum NamedVariants {
+    #[musli(name_all = "index")]
     Variant1 { field: u32 },
+    #[musli(name_all = "index")]
     Variant2 { field: u32 },
 }
 

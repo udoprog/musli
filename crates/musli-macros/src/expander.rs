@@ -1,11 +1,11 @@
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
-use crate::internals::attr::{self, DefaultTag, TypeAttr};
+use crate::internals::attr::{self, TypeAttr};
 use crate::internals::build::Build;
 use crate::internals::name::NameAll;
 use crate::internals::tokens::Tokens;
-use crate::internals::{Ctxt, Expansion, Mode, Only, Result, ATTR};
+use crate::internals::{Ctxt, Expansion, Mode, Only, Result};
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TagMethod {
@@ -210,10 +210,8 @@ pub(crate) trait Taggable {
 /// [TagMethod].
 pub(crate) fn expand_tag(
     taggable: &dyn Taggable,
-    e: &Expander<'_>,
     mode: Mode<'_>,
-    default_tag: Option<DefaultTag>,
-    name_all: Option<NameAll>,
+    name_all: NameAll,
     ident: Option<&syn::Ident>,
 ) -> Result<(syn::Expr, TagMethod)> {
     let (lit, tag_method) = 'out: {
@@ -221,32 +219,13 @@ pub(crate) fn expand_tag(
             return Ok((rename_lit(rename), determine_tag_method(rename)));
         }
 
-        if let Some(tag) = default_tag {
-            break 'out match (tag, taggable.literal_name()) {
-                (DefaultTag::Index, _) => (
-                    usize_suffixed(taggable.index(), taggable.span()).into(),
-                    TagMethod::Value,
-                ),
-                (DefaultTag::Name, None) => {
-                    e.cx.error_span(
-                        taggable.span(),
-                        format_args!(
-                            "#[{ATTR}(default_field = \"name\")] is not supported on unnamed fields",
-                        ),
-                    );
-                    return Err(());
-                }
-                (DefaultTag::Name, Some(name)) => (name.clone().into(), TagMethod::Visit),
-            };
-        }
-
-        if let (Some(ident), Some(name_all)) = (ident, name_all) {
-            let name = name_all.apply(&ident.to_string());
-
-            break 'out (
-                syn::LitStr::new(&name, ident.span()).into(),
-                TagMethod::Visit,
-            );
+        if let (Some(ident), name_all) = (ident, name_all) {
+            if let Some(name) = name_all.apply(&ident.to_string()) {
+                break 'out (
+                    syn::LitStr::new(&name, ident.span()).into(),
+                    TagMethod::Visit,
+                );
+            }
         }
 
         (

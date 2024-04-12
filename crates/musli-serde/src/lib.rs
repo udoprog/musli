@@ -31,7 +31,7 @@
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "name")]
+//! #[musli(name_all = "name")]
 //! struct Person {
 //!     name: String,
 //!     #[musli(with = musli_serde)]
@@ -50,11 +50,11 @@
 //! # #[derive(Serialize, Deserialize)]
 //! # struct Address { street: String, city: String, zip: u32 }
 //! # #[derive(Encode, Decode)]
-//! # #[musli(default_field = "name")]
+//! # #[musli(name_all = "name")]
 //! # struct Person { name: String, #[musli(with = musli_serde)] address: Address, #[musli(with = musli_serde)] url: Url }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "name")]
+//! #[musli(name_all = "name")]
 //! struct MusliAddress {
 //!     street: String,
 //!     city: String,
@@ -62,7 +62,7 @@
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "name")]
+//! #[musli(name_all = "name")]
 //! struct MusliPerson {
 //!     name: String,
 //!     address: MusliAddress,

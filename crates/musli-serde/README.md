@@ -34,7 +34,7 @@ struct Address {
 }
 
 #[derive(Encode, Decode)]
-#[musli(default_field = "name")]
+#[musli(name_all = "name")]
 struct Person {
     name: String,
     #[musli(with = musli_serde)]
@@ -51,7 +51,7 @@ use musli::{Encode, Decode};
 use url::Url;
 
 #[derive(Encode, Decode)]
-#[musli(default_field = "name")]
+#[musli(name_all = "name")]
 struct MusliAddress {
     street: String,
     city: String,
@@ -59,7 +59,7 @@ struct MusliAddress {
 }
 
 #[derive(Encode, Decode)]
-#[musli(default_field = "name")]
+#[musli(name_all = "name")]
 struct MusliPerson {
     name: String,
     address: MusliAddress,

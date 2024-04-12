@@ -313,7 +313,7 @@
 //!
 //! #[derive(Decode, Encode)]
 //! #[musli(mode = Alt, packed)]
-//! #[musli(default_field = "name")]
+//! #[musli(name_all = "name")]
 //! struct Word<'a> {
 //!     text: &'a str,
 //!     teineigo: bool,
