@@ -197,6 +197,7 @@ fn insert_fields<'st>(
     let pair_encoder_var = e.cx.ident("pair_encoder");
     let field_encoder_var = e.cx.ident("field_encoder");
     let value_encoder_var = e.cx.ident("value_encoder");
+    let field_name_static = e.cx.ident("FIELD_NAME");
 
     let mut encoders = Vec::with_capacity(st.all_fields.len());
     let mut tests = Vec::with_capacity(st.all_fields.len());
@@ -204,7 +205,8 @@ fn insert_fields<'st>(
     for f in &st.unskipped_fields {
         let encode_path = &f.encode_path.1;
         let access = &f.self_access;
-        let tag = &f.tag;
+        let name = &f.name;
+        let name_type = st.name_local_type();
 
         let mut encode;
 
@@ -213,7 +215,7 @@ fn insert_fields<'st>(
                 let field_name = syn::LitStr::new(&ident.to_string(), ident.span());
 
                 cx.trace.then(|| {
-                    let tag = st.name_format(tag);
+                    let tag = st.name_format(name);
 
                     quote! {
                         #context_t::enter_named_field(#ctx_var, #field_name, #tag);
@@ -223,7 +225,7 @@ fn insert_fields<'st>(
             syn::Member::Unnamed(index) => {
                 let index = index.index;
                 cx.trace.then(|| {
-                    let tag = st.name_format(tag);
+                    let tag = st.name_format(name);
                     quote! {
                         #context_t::enter_unnamed_field(#ctx_var, #index, #tag);
                     }
@@ -239,8 +241,9 @@ fn insert_fields<'st>(
                     #enter
 
                     #struct_encoder_t::encode_struct_field_fn(#encoder_var, move |#pair_encoder_var| {
+                        static #field_name_static: #name_type = #name;
                         let #field_encoder_var = #struct_field_encoder_t::encode_field_name(#pair_encoder_var)?;
-                        #encode_t_encode(&#tag, #ctx_var, #field_encoder_var)?;
+                        #encode_t_encode(&#field_name_static, #ctx_var, #field_encoder_var)?;
                         let #value_encoder_var = #struct_field_encoder_t::encode_field_value(#pair_encoder_var)?;
                         #encode_path(#access, #ctx_var, #value_encoder_var)?;
                         #result_ok(())
@@ -321,8 +324,8 @@ fn encode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum<'_>) -> Result<TokenStrea
 fn encode_variant(
     cx: &Ctxt<'_>,
     b: &Build<'_>,
-    en: &Enum,
-    v: &Variant,
+    en: &Enum<'_>,
+    v: &Variant<'_>,
 ) -> Result<(syn::PatStruct, TokenStream)> {
     let pack_var = b.cx.ident("pack");
 
@@ -346,6 +349,9 @@ fn encode_variant(
     } = b.tokens;
 
     let hint = b.cx.ident("STRUCT_HINT");
+    let variant_encoder = b.cx.ident("variant_encoder");
+    let tag_encoder = b.cx.ident("tag_encoder");
+    let name_static = b.cx.ident("NAME");
 
     let type_name = v.st.name;
 
@@ -394,14 +400,15 @@ fn encode_variant(
 
             if let Packing::Tagged = en.enum_packing {
                 let encode_t_encode = &b.encode_t_encode;
-                let tag = &v.tag;
-                let variant_encoder = b.cx.ident("variant_encoder");
-                let tag_encoder = b.cx.ident("tag_encoder");
+                let name = &v.name;
+                let name_type = en.name_local_type();
 
                 encode = quote! {{
                     #encoder_t::encode_variant_fn(#encoder_var, move |#variant_encoder| {
                         let #tag_encoder = #variant_encoder_t::encode_tag(#variant_encoder)?;
-                        #encode_t_encode(&#tag, #ctx_var, #tag_encoder)?;
+                        static #name_static: #name_type = #name;
+
+                        #encode_t_encode(&#name_static, #ctx_var, #tag_encoder)?;
 
                         let #encoder_var = #variant_encoder_t::encode_value(#variant_encoder)?;
                         #encode;
@@ -416,7 +423,9 @@ fn encode_variant(
                     value: field_tag, ..
                 },
             } => {
-                let tag = &v.tag;
+                let name = &v.name;
+                let name_type = en.name_local_type();
+
                 let decls = tests.iter().map(|t| &t.decl);
                 let mut len = length_test(v.st.unskipped_fields.len(), &tests);
 
@@ -429,7 +438,8 @@ fn encode_variant(
                     #build_hint
 
                     #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
-                        #struct_encoder_t::insert_struct_field(#encoder_var, #field_tag, #tag)?;
+                        static #name_static: #name_type = #name;
+                        #struct_encoder_t::insert_struct_field(#encoder_var, #field_tag, #name_static)?;
                         #(#decls)*
                         #(#encoders)*
                         #result_ok(())
@@ -444,7 +454,8 @@ fn encode_variant(
             } => {
                 let encode_t_encode = &b.encode_t_encode;
 
-                let tag = &v.tag;
+                let name = &v.name;
+                let name_type = en.name_local_type();
 
                 let decls = tests.iter().map(|t| &t.decl);
 
@@ -460,7 +471,8 @@ fn encode_variant(
                     #build_hint
 
                     #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#struct_encoder| {
-                        #struct_encoder_t::insert_struct_field(#struct_encoder, &#field_tag, #tag)?;
+                        static #name_static: #name_type = #name;
+                        #struct_encoder_t::insert_struct_field(#struct_encoder, &#field_tag, #name_static)?;
 
                         #struct_encoder_t::encode_struct_field_fn(#struct_encoder, move |#pair| {
                             let #content_tag = #struct_field_encoder_t::encode_field_name(#pair)?;
@@ -496,8 +508,8 @@ fn encode_variant(
     if cx.trace {
         let output_var = b.cx.ident("output");
 
-        let tag = en.name_format(&v.tag);
-        let enter = quote!(#context_t::enter_variant(#ctx_var, #type_name, #tag));
+        let name = en.name_format(&v.name);
+        let enter = quote!(#context_t::enter_variant(#ctx_var, #type_name, #name));
         let leave = quote!(#context_t::leave_variant(#ctx_var));
 
         encode = quote! {{
