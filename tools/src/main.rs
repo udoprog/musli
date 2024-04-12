@@ -199,10 +199,7 @@ fn main() -> Result<()> {
     let root =
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").context("missing `CARGO_MANIFEST_DIR`")?);
 
-    let root = root
-        .parent()
-        .and_then(|p| p.parent())
-        .context("Missing root directory")?;
+    let root = root.parent().context("Missing root directory")?;
 
     let target = root.join("target");
 
@@ -210,8 +207,9 @@ fn main() -> Result<()> {
 
     let command = args.command.unwrap_or_default();
 
-    let reports_path = root.join("crates").join("tools").join("report.toml");
-    let reports = fs::read_to_string(&reports_path)?;
+    let reports_path = root.join("tools").join("report.toml");
+    let reports =
+        fs::read_to_string(&reports_path).with_context(|| anyhow!("{}", reports_path.display()))?;
     let manifest: Manifest =
         toml::from_str(&reports).with_context(|| anyhow!("{}", reports_path.display()))?;
 
