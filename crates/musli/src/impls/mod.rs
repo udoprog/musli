@@ -1,7 +1,14 @@
 /// Forward implementation of `Visit` which simply decodes the value on the
 /// stack allowing it to be visited.
 macro_rules! visit {
-    ($({$($impl:tt)*})? $ty:ty $(where $($where:tt)*)?) => {
+    (
+        $(#[cfg($($meta:meta)*)])*
+        $({$($impl:tt)*})? $ty:ty $(where $($where:tt)*)?
+    ) => {
+        $(
+            #[cfg($($meta)*)]
+            #[cfg_attr(doc_cfg, doc(cfg($($meta)*)))]
+        )*
         impl<'de, M $(, $($impl)*)*> $crate::de::Visit<'de, M> for $ty $(where $($where)*)? {
             #[inline(always)]
             fn visit<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
@@ -19,7 +26,14 @@ macro_rules! visit {
 /// Forward implementation of `Visit` which uses the deref implementation of something.
 #[cfg(feature = "alloc")]
 macro_rules! visit_deref {
-    ($({$($impl:tt)*})? $ty:ty as $other:ty $(where $($where:tt)*)?) => {
+    (
+        $(#[cfg($($meta:meta)*)])*
+        $({$($impl:tt)*})? $ty:ty as $other:ty $(where $($where:tt)*)?
+    ) => {
+        $(
+            #[cfg($($meta)*)]
+            #[cfg_attr(doc_cfg, doc(cfg($($meta)*)))]
+        )*
         impl<'de, M $(, $($impl)*)*> $crate::de::Visit<'de, M> for $other $(where $($where)*)? {
             #[inline(always)]
             fn visit<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
@@ -37,7 +51,14 @@ macro_rules! visit_deref {
 /// Forward implementation of `VisitBytes` which simply decodes the value on the
 /// stack allowing it to be visited.
 macro_rules! visit_bytes {
-    ($({$($impl:tt)*})? $ty:ty $(where $($where:tt)*)?) => {
+    (
+        $(#[cfg($($meta:meta)*)])*
+        $({$($impl:tt)*})? $ty:ty $(where $($where:tt)*)?
+    ) => {
+        $(
+            #[cfg($($meta)*)]
+            #[cfg_attr(doc_cfg, doc(cfg($($meta)*)))]
+        )*
         impl<'de, M $(, $($impl)*)*> $crate::de::VisitBytes<'de, M> for $ty $(where $($where)*)? {
             #[inline(always)]
             fn visit_bytes<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>

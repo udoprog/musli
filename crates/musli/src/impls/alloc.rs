@@ -567,9 +567,10 @@ macro_rules! smart_pointer {
                 }
             }
 
-            #[cfg(all(feature = "std", any(unix, windows)))]
-            #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-            visit!($ty<Path>);
+            visit! {
+                #[cfg(all(feature = "std", any(unix, windows)))]
+                $ty<Path>
+            }
 
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
@@ -583,9 +584,10 @@ macro_rules! smart_pointer {
                 }
             }
 
-            #[cfg(all(feature = "std", any(unix, windows)))]
-            #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-            visit!($ty<OsStr>);
+            visit! {
+                #[cfg(all(feature = "std", any(unix, windows)))]
+                $ty<OsStr>
+            }
         )*
     };
 }
@@ -595,13 +597,15 @@ visit_deref!({T} Box<[T]> as [T] where T: Decode<'de, M>);
 
 visit_deref!(Box<CStr> as CStr);
 
-#[cfg(all(feature = "std", any(unix, windows)))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-visit_deref!(Box<Path> as Path);
+visit_deref! {
+    #[cfg(all(feature = "std", any(unix, windows)))]
+    Box<Path> as Path
+}
 
-#[cfg(all(feature = "std", any(unix, windows)))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-visit_deref!(Box<OsStr> as OsStr);
+visit_deref! {
+    #[cfg(all(feature = "std", any(unix, windows)))]
+    Box<OsStr> as OsStr
+}
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
@@ -728,9 +732,10 @@ impl<'de, M> Decode<'de, M> for OsString {
     }
 }
 
-#[cfg(all(feature = "std", any(unix, windows)))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-visit!(OsString);
+visit! {
+    #[cfg(all(feature = "std", any(unix, windows)))]
+    OsString
+}
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
@@ -768,9 +773,10 @@ impl<'de, M> Decode<'de, M> for PathBuf {
     }
 }
 
-#[cfg(all(feature = "std", any(unix, windows)))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-visit!(PathBuf);
+visit! {
+    #[cfg(all(feature = "std", any(unix, windows)))]
+    PathBuf
+}
 
 impl<M> EncodeBytes<M> for Vec<u8> {
     #[inline]
