@@ -282,6 +282,7 @@ pub trait Context {
     /// use musli::{Decode, Encode};
     ///
     /// #[derive(Decode, Encode)]
+    /// #[musli(name_all = "name")]
     /// struct Struct {
     ///     #[musli(name = "string")]
     ///     field: String,
@@ -305,19 +306,20 @@ pub trait Context {
     ///
     /// This will be matched with a corresponding call to [`leave_field`].
     ///
-    /// Here `index` is `0` and `tag` is `"string"`.
+    /// Here `index` is `0` and `name` is `"string"`.
     ///
     /// ```rust
     /// use musli::{Decode, Encode};
     ///
     /// #[derive(Decode, Encode)]
+    /// #[musli(name_all = "name")]
     /// struct Struct(#[musli(name = "string")] String);
     /// ```
     ///
     /// [`leave_field`]: Context::leave_field
     #[allow(unused_variables)]
     #[inline(always)]
-    fn enter_unnamed_field<T>(&self, index: u32, tag: &T)
+    fn enter_unnamed_field<T>(&self, index: u32, name: &T)
     where
         T: ?Sized + fmt::Display,
     {
@@ -350,6 +352,7 @@ pub trait Context {
     /// use musli::{Decode, Encode};
     ///
     /// #[derive(Decode, Encode)]
+    /// #[musli(name_all = "name")]
     /// struct Struct {
     ///     #[musli(name = "string")]
     ///     field: String,

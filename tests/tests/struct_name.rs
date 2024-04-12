@@ -12,6 +12,13 @@ pub struct Named {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = str)]
+pub struct NamedByType {
+    string: String,
+    number: u32,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(name_all = "index")]
 pub struct Indexed {
     string: String,
@@ -19,7 +26,7 @@ pub struct Indexed {
 }
 
 #[test]
-fn struct_named_fields() {
+fn named_struct() {
     tests::rt!(
         full,
         Named {
@@ -28,6 +35,28 @@ fn struct_named_fields() {
         },
         json = r#"{"string":"foo","number":42}"#,
     );
+
+    tests::rt!(
+        full,
+        NamedByType {
+            string: String::from("foo"),
+            number: 42,
+        },
+        json = r#"{"string":"foo","number":42}"#,
+    );
+}
+
+#[test]
+fn named_struct_unpack() {
+    #[derive(Debug, PartialEq, Decode)]
+    #[musli(packed)]
+    pub struct Unpacked {
+        field_count: Tag,
+        field1_name: Typed<[u8; 6]>,
+        field1_value: Typed<[u8; 3]>,
+        field2_name: Typed<[u8; 6]>,
+        field2_value: Tag,
+    }
 
     let out = tests::wire::to_vec(&Named {
         string: String::from("foo"),
@@ -53,20 +82,10 @@ fn struct_named_fields() {
             field2_value: Tag::new(Kind::Continuation, 42),
         }
     );
-
-    #[derive(Debug, PartialEq, Decode)]
-    #[musli(packed)]
-    pub struct Unpacked {
-        field_count: Tag,
-        field1_name: Typed<[u8; 6]>,
-        field1_value: Typed<[u8; 3]>,
-        field2_name: Typed<[u8; 6]>,
-        field2_value: Tag,
-    }
 }
 
 #[test]
-fn struct_indexed_fields() {
+fn indexed_struct() {
     tests::rt!(
         full,
         Indexed {
@@ -75,7 +94,10 @@ fn struct_indexed_fields() {
         },
         json = r#"{"0":"foo","1":42}"#,
     );
+}
 
+#[test]
+fn indexed_struct_unpack() {
     let out = tests::wire::to_vec(&Indexed {
         string: String::from("foo"),
         number: 42,

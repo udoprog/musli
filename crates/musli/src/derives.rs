@@ -302,6 +302,9 @@
 //! should have. Tags can usually be inferred, but specifying this field ensures
 //! that all tags have a single well-defined type.
 //!
+//! The following values are treated specially:
+//! * `str` applies `#[musli(name_all = "name")]` by default.
+//!
 //! ```
 //! use core::fmt;
 //!
@@ -470,8 +473,8 @@
 //! should have. Tags can usually be inferred, but specifying this field ensures
 //! that all tags have a well-defined type.
 //!
-//! This attribute takes priority over the one with the same name on the
-//! container.
+//! The following values are treated specially:
+//! * `str` applies `#[musli(name_all = "name")]` by default.
 //!
 //! ```
 //! use core::fmt;
@@ -498,7 +501,7 @@
 //!         #[musli(name = CustomTag(b"field2"))]
 //!         field2: u32,
 //!     },
-//!     #[musli(name = 1usize)]
+//!     #[musli(name = 1usize, name_all = "name")]
 //!     Variant2 {
 //!         #[musli(name = "field1")]
 //!         field1: u32,

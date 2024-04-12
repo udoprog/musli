@@ -36,6 +36,7 @@ pub struct E {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
+#[musli(name_all = "name")]
 pub enum LargeEnumStringVariants {
     #[musli(transparent, name = "a")]
     A(A),
