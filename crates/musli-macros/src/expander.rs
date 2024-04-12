@@ -215,7 +215,7 @@ pub(crate) fn expand_tag(
 ) -> Result<syn::Expr> {
     let lit = 'out: {
         if let Some((_, rename)) = taggable.name(mode) {
-            return Ok(rename_lit(rename));
+            return Ok(rename.clone());
         }
 
         if let (Some(ident), name_all) = (ident, name_all) {
@@ -274,19 +274,5 @@ impl Taggable for VariantData<'_> {
 
     fn literal_name(&self) -> Option<&syn::LitStr> {
         Some(&self.name)
-    }
-}
-
-/// Process rename literal to ensure it's always typed.
-fn rename_lit(expr: &syn::Expr) -> syn::Expr {
-    match expr {
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Int(int),
-            ..
-        }) if int.suffix().is_empty() => syn::Expr::Lit(syn::ExprLit {
-            attrs: Vec::new(),
-            lit: syn::LitInt::new(&format!("{}usize", int), int.span()).into(),
-        }),
-        expr => expr.clone(),
     }
 }

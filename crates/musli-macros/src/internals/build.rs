@@ -132,6 +132,18 @@ impl Body<'_> {
             None => build_reference(value.clone()),
         }
     }
+
+    pub(crate) fn name_local_type(&self) -> syn::Type {
+        match self.name_method {
+            NameMethod::Visit => syn::Type::Reference(syn::TypeReference {
+                and_token: <Token![&]>::default(),
+                lifetime: None,
+                mutability: None,
+                elem: Box::new(self.name_type.clone()),
+            }),
+            NameMethod::Value => self.name_type.clone(),
+        }
+    }
 }
 
 pub(crate) struct Enum<'a> {
@@ -154,12 +166,24 @@ impl Enum<'_> {
             None => build_reference(value.clone()),
         }
     }
+
+    pub(crate) fn name_local_type(&self) -> syn::Type {
+        match self.name_method {
+            NameMethod::Visit => syn::Type::Reference(syn::TypeReference {
+                and_token: <Token![&]>::default(),
+                lifetime: None,
+                mutability: None,
+                elem: Box::new(self.name_type.clone()),
+            }),
+            NameMethod::Value => self.name_type.clone(),
+        }
+    }
 }
 
 pub(crate) struct Variant<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
-    pub(crate) tag: syn::Expr,
+    pub(crate) name: syn::Expr,
     pub(crate) st: Body<'a>,
     pub(crate) patterns: Punctuated<syn::FieldPat, Token![,]>,
 }
@@ -169,7 +193,7 @@ pub(crate) struct Field<'a> {
     pub(crate) index: usize,
     pub(crate) encode_path: (Span, syn::Path),
     pub(crate) decode_path: (Span, syn::Path),
-    pub(crate) tag: syn::Expr,
+    pub(crate) name: syn::Expr,
     /// Skip field entirely and always initialize with the specified expresion,
     /// or default value through `default_attr`.
     pub(crate) skip: Option<Span>,
@@ -375,7 +399,7 @@ fn setup_variant<'a>(
     Ok(Variant {
         span: data.span,
         index: data.index,
-        tag,
+        name: tag,
         patterns,
         st: Body {
             span: data.span,
@@ -492,7 +516,7 @@ fn setup_field<'a>(
         index: data.index,
         encode_path,
         decode_path,
-        tag,
+        name: tag,
         skip,
         skip_encoding_if,
         default_attr,

@@ -200,7 +200,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
             for v in &en.variants {
                 let (tag_pattern, tag_value, tag_variant) =
-                    build_tag_variant(e, v.span, v.index, &v.tag, &output_type);
+                    build_tag_variant(e, v.span, v.index, &v.name, &output_type);
 
                 tag_variants.push(tag_variant);
                 variant_output_tags.push((v, tag_pattern, tag_value));
@@ -258,7 +258,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         }
         NameMethod::Value => {
             for v in &en.variants {
-                variant_output_tags.push((v, v.tag.clone(), v.tag.clone()));
+                variant_output_tags.push((v, v.name.clone(), v.name.clone()));
             }
 
             let decode_t_decode = &e.decode_t_decode;
@@ -727,7 +727,7 @@ fn decode_tagged(
     let mut fields_with = Vec::new();
 
     for f in &st.all_fields {
-        let tag = &f.tag;
+        let tag = &f.name;
         let var = &f.var;
         let decode_path = &f.decode_path.1;
 
@@ -829,7 +829,7 @@ fn decode_tagged(
             let mut statements = Vec::with_capacity(fields_with.len());
 
             for (f, decode, (enter, leave)) in fields_with {
-                let tag = &f.tag;
+                let tag = &f.name;
 
                 statements.push(quote! {
                     if #tag_var == #tag {
@@ -868,7 +868,7 @@ fn decode_tagged(
 
             for (f, decode, trace) in fields_with {
                 let (output_pattern, _, output) =
-                    build_tag_variant(e, f.span, f.index, &f.tag, &output_type);
+                    build_tag_variant(e, f.span, f.index, &f.name, &output_type);
 
                 outputs.push(output);
                 patterns.push((output_pattern, decode, trace));
