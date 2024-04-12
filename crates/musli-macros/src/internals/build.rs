@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use proc_macro2::Span;
@@ -7,7 +6,7 @@ use syn::Token;
 
 use crate::de::{build_call, build_reference};
 use crate::expander::{
-    self, Data, EnumData, Expander, FieldData, StructData, TagMethod, VariantData,
+    self, Data, EnumData, Expander, FieldData, NameMethod, StructData, VariantData,
 };
 
 use super::attr::{EnumTagging, Packing};
@@ -119,11 +118,11 @@ pub(crate) struct Body<'a> {
     pub(crate) name: &'a syn::LitStr,
     pub(crate) unskipped_fields: Vec<Rc<Field<'a>>>,
     pub(crate) all_fields: Vec<Rc<Field<'a>>>,
-    pub(crate) name_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_type: syn::Type,
+    pub(crate) name_method: NameMethod,
     pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing: Packing,
     pub(crate) path: syn::Path,
-    pub(crate) field_tag_method: TagMethod,
 }
 
 impl Body<'_> {
@@ -142,8 +141,8 @@ pub(crate) struct Enum<'a> {
     pub(crate) enum_packing: Packing,
     pub(crate) variants: Vec<Variant<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
-    pub(crate) variant_tag_method: TagMethod,
-    pub(crate) name_type: Option<&'a (Span, syn::Type)>,
+    pub(crate) name_type: syn::Type,
+    pub(crate) name_method: NameMethod,
     pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
@@ -222,34 +221,19 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
-    let name_all = e
-        .type_attr
-        .name_all(mode)
-        .map(|&(_, v)| v)
-        .unwrap_or_default();
-
     let packing = e
         .type_attr
         .packing(mode)
         .map(|&(_, p)| p)
         .unwrap_or_default();
 
-    let name_type = e.type_attr.name_type(mode);
+    let (name_all, name_type, name_method) =
+        split_name(e.type_attr.name_all(mode), e.type_attr.name_type(mode));
 
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
-    let mut tag_methods = TagMethods::new(&e.cx);
 
     for f in &data.fields {
-        let field = Rc::new(setup_field(
-            e,
-            mode,
-            f,
-            name_all,
-            packing,
-            None,
-            name_type,
-            &mut tag_methods,
-        )?);
+        let field = Rc::new(setup_field(e, mode, f, name_all, packing, None)?);
 
         if field.skip.is_none() {
             unskipped_fields.push(field.clone());
@@ -264,19 +248,17 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         unskipped_fields,
         all_fields,
         name_type,
+        name_method,
         name_format_with: e.type_attr.name_format_with(mode),
         packing,
         path,
-        field_tag_method: tag_methods.pick(),
     })
 }
 
 fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Result<Enum<'a>> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
-    // Keep track of variant index manually since fallback variants do not
-    // count.
-    let mut tag_methods = TagMethods::new(&e.cx);
+
     let enum_tagging = e.type_attr.enum_tagging(mode);
 
     let packing_span = e.type_attr.packing(mode);
@@ -286,6 +268,9 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         .packing(mode)
         .map(|&(_, p)| p)
         .unwrap_or_default();
+
+    let (_, name_type, name_method) =
+        split_name(e.type_attr.name_all(mode), e.type_attr.name_type(mode));
 
     if enum_tagging.is_some() {
         match packing_span {
@@ -299,7 +284,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
     }
 
     for v in &data.variants {
-        variants.push(setup_variant(e, mode, v, &mut fallback, &mut tag_methods)?);
+        variants.push(setup_variant(e, mode, v, &mut fallback)?);
     }
 
     Ok(Enum {
@@ -309,8 +294,8 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         enum_packing,
         variants,
         fallback,
-        variant_tag_method: tag_methods.pick(),
-        name_type: e.type_attr.name_type(mode),
+        name_type,
+        name_method,
         name_format_with: e.type_attr.name_format_with(mode),
         packing_span,
     })
@@ -321,7 +306,6 @@ fn setup_variant<'a>(
     mode: Mode<'_>,
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
-    tag_methods: &mut TagMethods,
 ) -> Result<Variant<'a>> {
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
     let mut all_fields = Vec::with_capacity(data.fields.len());
@@ -333,16 +317,14 @@ fn setup_variant<'a>(
         .map(|&(_, v)| v)
         .unwrap_or_default();
 
-    let name_all = data
-        .attr
-        .name_all(mode)
-        .or_else(|| e.type_attr.name_all(mode))
-        .map(|&(_, v)| v)
-        .unwrap_or_default();
+    let (name_all, name_type, name_method) = split_name(
+        data.attr
+            .name_all(mode)
+            .or_else(|| e.type_attr.name_all(mode)),
+        data.attr.name_type(mode),
+    );
 
-    let variant_name_type = data.attr.name_type(mode);
-
-    let (tag, tag_method) = expander::expand_tag(
+    let tag = expander::expand_tag(
         data,
         mode,
         e.type_attr
@@ -351,8 +333,6 @@ fn setup_variant<'a>(
             .unwrap_or_default(),
         Some(data.ident),
     )?;
-
-    tag_methods.insert(data.span, tag_method);
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
@@ -374,7 +354,6 @@ fn setup_variant<'a>(
     }
 
     let mut patterns = Punctuated::default();
-    let mut field_tag_methods = TagMethods::new(&e.cx);
 
     for f in &data.fields {
         let field = Rc::new(setup_field(
@@ -384,8 +363,6 @@ fn setup_variant<'a>(
             name_all,
             variant_packing,
             Some(&mut patterns),
-            variant_name_type,
-            &mut field_tag_methods,
         )?);
 
         if field.skip.is_none() {
@@ -406,9 +383,9 @@ fn setup_variant<'a>(
             unskipped_fields,
             all_fields,
             packing: variant_packing,
-            name_type: variant_name_type,
+            name_type,
+            name_method,
             name_format_with: data.attr.name_format_with(mode),
-            field_tag_method: field_tag_methods.pick(),
             path,
         },
     })
@@ -421,17 +398,11 @@ fn setup_field<'a>(
     name_all: NameAll,
     packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
-    name_type: Option<&(Span, syn::Type)>,
-    tag_methods: &mut TagMethods,
 ) -> Result<Field<'a>> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
 
-    let (tag, tag_method) = expander::expand_tag(data, mode, name_all, data.ident)?;
-
-    if name_type.is_none() {
-        tag_methods.insert(data.span, tag_method);
-    }
+    let tag = expander::expand_tag(data, mode, name_all, data.ident)?;
 
     let skip = data.attr.skip(mode).map(|&(s, ())| s);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
@@ -533,33 +504,34 @@ fn setup_field<'a>(
     })
 }
 
-struct TagMethods<'a> {
-    cx: &'a Ctxt,
-    methods: BTreeSet<TagMethod>,
+fn split_name(
+    name_all: Option<&(Span, NameAll)>,
+    ty: Option<&(Span, syn::Type)>,
+) -> (NameAll, syn::Type, NameMethod) {
+    let name_all = name_all.map(|&(_, v)| v);
+
+    let Some((_, ty)) = ty else {
+        let name_all = name_all.unwrap_or_default();
+        return (name_all, name_all.ty(), name_all.name_method());
+    };
+
+    let (name_method, default_name_all) = determine_name_method(ty);
+    let name_all = name_all.or(default_name_all).unwrap_or_default();
+    (name_all, ty.clone(), name_method)
 }
 
-impl<'a> TagMethods<'a> {
-    fn new(cx: &'a Ctxt) -> Self {
-        Self {
-            cx,
-            methods: BTreeSet::new(),
+fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {
+    match ty {
+        syn::Type::Path(syn::TypePath { qself: None, path }) => {
+            if path.is_ident("str") {
+                return (NameMethod::Visit, Some(NameAll::Name));
+            }
         }
-    }
-
-    /// Insert a tag method and error in case it's invalid.
-    fn insert(&mut self, span: Span, method: TagMethod) {
-        let before = self.methods.len();
-
-        self.methods.insert(method);
-
-        if before == 1 && self.methods.len() > 1 {
-            self.cx
-                .error_span(span, format_args!("#[{ATTR}(tag)] conflicting tag kind"));
+        syn::Type::Slice(..) => {
+            return (NameMethod::Visit, None);
         }
+        _ => {}
     }
 
-    /// Pick a tag method to use.
-    fn pick(self) -> TagMethod {
-        self.methods.into_iter().next().unwrap_or_default()
-    }
+    (NameMethod::Value, None)
 }

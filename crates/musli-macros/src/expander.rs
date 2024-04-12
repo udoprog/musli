@@ -8,7 +8,7 @@ use crate::internals::tokens::Tokens;
 use crate::internals::{Ctxt, Expansion, Mode, Only, Result};
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum TagMethod {
+pub(crate) enum NameMethod {
     /// Load the tag by visit.
     Visit,
     /// Load the tag by value.
@@ -206,32 +206,25 @@ pub(crate) trait Taggable {
     fn literal_name(&self) -> Option<&syn::LitStr>;
 }
 
-/// Expand the given configuration to the appropriate tag expression and
-/// [TagMethod].
+/// Expand the given configuration to the appropriate tag expression.
 pub(crate) fn expand_tag(
     taggable: &dyn Taggable,
     mode: Mode<'_>,
     name_all: NameAll,
     ident: Option<&syn::Ident>,
-) -> Result<(syn::Expr, TagMethod)> {
-    let (lit, tag_method) = 'out: {
+) -> Result<syn::Expr> {
+    let lit = 'out: {
         if let Some((_, rename)) = taggable.name(mode) {
-            return Ok((rename_lit(rename), determine_tag_method(rename)));
+            return Ok(rename_lit(rename));
         }
 
         if let (Some(ident), name_all) = (ident, name_all) {
             if let Some(name) = name_all.apply(&ident.to_string()) {
-                break 'out (
-                    syn::LitStr::new(&name, ident.span()).into(),
-                    TagMethod::Visit,
-                );
+                break 'out syn::LitStr::new(&name, ident.span()).into();
             }
         }
 
-        (
-            usize_suffixed(taggable.index(), taggable.span()).into(),
-            TagMethod::Value,
-        )
+        usize_suffixed(taggable.index(), taggable.span()).into()
     };
 
     let tag = syn::Expr::Lit(syn::ExprLit {
@@ -239,7 +232,7 @@ pub(crate) fn expand_tag(
         lit,
     });
 
-    Ok((tag, tag_method))
+    Ok(tag)
 }
 
 /// Ensure that the given integer is usize-suffixed so that it is treated as the
@@ -296,21 +289,4 @@ fn rename_lit(expr: &syn::Expr) -> syn::Expr {
         }),
         expr => expr.clone(),
     }
-}
-
-/// Try and determine tag method from the given expression.
-pub(crate) fn determine_tag_method(expr: &syn::Expr) -> TagMethod {
-    let syn::Expr::Lit(lit) = expr else {
-        return TagMethod::Value;
-    };
-
-    let syn::ExprLit {
-        lit: syn::Lit::Str(..),
-        ..
-    } = lit
-    else {
-        return TagMethod::Value;
-    };
-
-    TagMethod::Visit
 }

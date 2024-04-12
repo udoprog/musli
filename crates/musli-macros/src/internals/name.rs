@@ -1,6 +1,8 @@
 use core::fmt;
 use core::mem::take;
 
+use crate::expander::NameMethod;
+
 #[derive(Default, Debug, Clone, Copy)]
 #[allow(clippy::enum_variant_names)]
 pub(crate) enum NameAll {
@@ -28,6 +30,20 @@ impl NameAll {
         Self::KebabCase,
         Self::ScreamingKebabCase,
     ];
+
+    pub(crate) fn ty(&self) -> syn::Type {
+        match self {
+            NameAll::Index => syn::parse_quote! { usize },
+            _ => syn::parse_quote! { str },
+        }
+    }
+
+    pub(crate) fn name_method(&self) -> NameMethod {
+        match self {
+            NameAll::Index => NameMethod::Value,
+            _ => NameMethod::Visit,
+        }
+    }
 
     pub(crate) fn parse(input: &str) -> Option<Self> {
         match input {

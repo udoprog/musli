@@ -7,7 +7,6 @@ use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Token;
 
-use crate::expander::{self, TagMethod};
 use crate::internals::name::NameAll;
 use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
@@ -29,7 +28,6 @@ struct OneOf<T> {
 #[derive(Clone, Copy)]
 pub(crate) struct EnumTag<'a> {
     pub(crate) value: &'a syn::Expr,
-    pub(crate) method: TagMethod,
 }
 
 #[derive(Clone, Copy)]
@@ -214,10 +212,7 @@ impl TypeAttr {
     pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
         let (_, tag) = self.tag(mode)?;
 
-        let tag = EnumTag {
-            value: tag,
-            method: expander::determine_tag_method(tag),
-        };
+        let tag = EnumTag { value: tag };
 
         match self.content(mode) {
             Some((_, content)) => Some(EnumTagging::Adjacent { tag, content }),
