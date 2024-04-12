@@ -3,5 +3,16 @@ opt-level = 3
 
 [workspace]
 resolver = "2"
-members = ["crates/*"]
-default-members = ["crates/musli*"]
+members = [
+    "crates/*",
+    "asm",
+    "tests",
+    "tools",
+    "no-std"
+]
+default-members = [
+    "crates/*",
+    "asm",
+    "tests",
+    "tools",
+]

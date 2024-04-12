@@ -23,13 +23,13 @@ jobs:
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{matrix.rust}}
-    - run: cargo build --workspace --exclude tools --exclude musli-tests
+    - run: cargo build
       if: matrix.rust != 'stable'
-    - run: cargo build --workspace --exclude no-std-examples --all-targets
+    - run: cargo build --all-targets
       if: matrix.rust == 'stable'
-    - run: cargo test --workspace --exclude no-std-examples --all-targets --features test
+    - run: cargo test --all-targets --features test
       if: matrix.rust == 'stable'
-    - run: cargo test --workspace --exclude no-std-examples --doc
+    - run: cargo test --doc
       if: matrix.rust == 'stable'
 
   tests_clippy:
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo build
-      - run: cargo +nightly run -p no-std-examples --example no-std-${{matrix.example}}
+      - run: cargo +nightly run -p no-std --example no-std-${{matrix.example}}
 
   fuzz:
     needs: [test, tests_clippy, each_package, recursive]
@@ -70,7 +70,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: miri
-    - run: cargo miri test --workspace --exclude no-std-examples --features test
+    - run: cargo miri test --features test
     - run: cargo miri run -p tests --features test --bin fuzz
     - run: cargo miri run -p tests --features test --bin fuzz -- --random
 
@@ -117,7 +117,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@1.76
       with:
         components: clippy
-    - run: cargo clippy --workspace --exclude no-std-examples --all-targets --features test -- -D warnings
+    - run: cargo clippy --all-targets --features test -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest

@@ -382,12 +382,12 @@
 //! [`protobuf`]: https://developers.google.com/protocol-buffers
 //! [`serde`]: https://serde.rs
 //! [`simdutf8`]: https://docs.rs/simdutf8
-//! [`tests`]: https://github.com/udoprog/musli/tree/main/crates/tests
+//! [`tests`]: https://github.com/udoprog/musli/tree/main/tests
 //! [benchmarks]: https://udoprog.github.io/musli/benchmarks/
 //! [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
 //! [detailed tracing]: https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html
 //! [musli-name-type]: https://docs.rs/musli/latest/musli/derives/index.html#musliname_type--
-//! [no-std and no-alloc]: https://github.com/udoprog/musli/blob/main/crates/no-std-examples/examples/no-std-json.rs
+//! [no-std and no-alloc]: https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs
 //! [scoped allocations]: https://docs.rs/musli-allocator
 //! [size comparisons]: https://udoprog.github.io/musli/benchmarks/#size-comparisons
 //! [when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
