@@ -11,7 +11,7 @@ use crate::expander::{
 };
 
 use super::attr::{DefaultTag, EnumTagging, Packing};
-use super::rename::RenameAll;
+use super::name::NameAll;
 use super::tokens::Tokens;
 use super::ATTR;
 use super::{Ctxt, Expansion, Mode, Only, Result};
@@ -223,7 +223,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
     let default_field = e.type_attr.default_field(mode).map(|&(_, v)| v);
-    let rename_all = e.type_attr.rename_all(mode).map(|&(_, v)| v);
+    let name_all = e.type_attr.name_all(mode).map(|&(_, v)| v);
 
     let packing = e
         .type_attr
@@ -242,7 +242,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
             mode,
             f,
             default_field,
-            rename_all,
+            name_all,
             packing,
             None,
             name_type,
@@ -337,10 +337,10 @@ fn setup_variant<'a>(
         .or_else(|| e.type_attr.default_field(mode))
         .map(|&(_, v)| v);
 
-    let rename_all = data
+    let name_all = data
         .attr
-        .rename_all(mode)
-        .or_else(|| e.type_attr.rename_all(mode))
+        .name_all(mode)
+        .or_else(|| e.type_attr.name_all(mode))
         .map(|&(_, v)| v);
 
     let variant_name_type = data.attr.name_type(mode);
@@ -350,7 +350,7 @@ fn setup_variant<'a>(
         e,
         mode,
         e.type_attr.default_variant(mode).map(|&(_, v)| v),
-        e.type_attr.rename_all(mode).map(|&(_, v)| v),
+        e.type_attr.name_all(mode).map(|&(_, v)| v),
         Some(data.ident),
     )?;
 
@@ -384,7 +384,7 @@ fn setup_variant<'a>(
             mode,
             f,
             default_field,
-            rename_all,
+            name_all,
             variant_packing,
             Some(&mut patterns),
             variant_name_type,
@@ -422,7 +422,7 @@ fn setup_field<'a>(
     mode: Mode<'_>,
     data: &'a FieldData<'a>,
     default_field: Option<DefaultTag>,
-    rename_all: Option<RenameAll>,
+    name_all: Option<NameAll>,
     packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
     name_type: Option<&(Span, syn::Type)>,
@@ -432,7 +432,7 @@ fn setup_field<'a>(
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
 
     let (tag, tag_method) =
-        expander::expand_tag(data, e, mode, default_field, rename_all, data.ident)?;
+        expander::expand_tag(data, e, mode, default_field, name_all, data.ident)?;
 
     if name_type.is_none() {
         tag_methods.insert(data.span, tag_method);

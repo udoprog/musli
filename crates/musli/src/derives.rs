@@ -184,7 +184,7 @@
 //!
 //! <br>
 //!
-//! #### `#[musli(rename_all = "..")]`
+//! #### `#[musli(name_all = "..")]`
 //!
 //! Allos for renaming every field in the container. It can take any of the
 //! following values:
@@ -200,7 +200,7 @@
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(rename_all = "PascalCase")]
+//! #[musli(name_all = "PascalCase")]
 //! struct Struct {
 //!     field_name: u32,
 //! }
@@ -212,7 +212,7 @@
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(rename_all = "PascalCase")]
+//! #[musli(name_all = "PascalCase")]
 //! enum Enum {
 //!     VariantName {
 //!         field_name: u32,
@@ -461,7 +461,7 @@
 //! If the type of the tag is ambiguous it can be explicitly specified through
 //! the `#[musli(name_type)]` attribute.
 //!
-//! #### `#[musli(rename_all = "..")]`
+//! #### `#[musli(name_all = "..")]`
 //!
 //! Allos for renaming every field in the container. It can take any of the
 //! following values:
@@ -478,7 +478,7 @@
 //!
 //! #[derive(Encode, Decode)]
 //! enum Enum {
-//!     #[musli(rename_all = "PascalCase")]
+//!     #[musli(name_all = "PascalCase")]
 //!     Variant {
 //!         field_name: u32,
 //!     }
@@ -578,10 +578,9 @@
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Eq, Encode, Decode)]
+//! #[musli(name_all = "kebab-case")]
 //! enum Animal {
-//!     #[musli(name = "cat")]
 //!     Cat,
-//!     #[musli(name = "dog")]
 //!     Dog,
 //!     #[musli(default)]
 //!     Unknown,
@@ -593,8 +592,8 @@
 //! ## Field attributes
 //!
 //! *Field attributes* are attributes which apply to each individual field
-//! either in a `struct` or an `enum` variant. Like the uses of
-//! `#[musli(rename)]` here:
+//! either in a `struct` or an `enum` variant. Like the uses of `#[musli(all)]`
+//! here:
 //!
 //! ```
 //! use musli::{Encode, Decode};

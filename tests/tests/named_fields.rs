@@ -1,43 +1,43 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "PascalCase")]
+#[musli(name_all = "PascalCase")]
 struct PascalCase {
     field_name: i32,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "camelCase")]
+#[musli(name_all = "camelCase")]
 struct CamelCase {
     field_name: i32,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "snake_case")]
+#[musli(name_all = "snake_case")]
 struct SnakeCase {
     field_name: i32,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "SCREAMING_SNAKE_CASE")]
+#[musli(name_all = "SCREAMING_SNAKE_CASE")]
 struct ScreamingSnakeCase {
     field_name: i32,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "kebab-case")]
+#[musli(name_all = "kebab-case")]
 struct KebabCase {
     field_name: i32,
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
-#[musli(rename_all = "SCREAMING-KEBAB-CASE")]
+#[musli(name_all = "SCREAMING-KEBAB-CASE")]
 struct ScreamingKebabCase {
     field_name: i32,
 }
 
 #[test]
-fn test_rename_all() {
+fn test_name_all() {
     tests::rt!(
         full,
         PascalCase { field_name: 42 },

@@ -3,7 +3,7 @@ use syn::spanned::Spanned;
 
 use crate::internals::attr::{self, DefaultTag, TypeAttr};
 use crate::internals::build::Build;
-use crate::internals::rename::RenameAll;
+use crate::internals::name::NameAll;
 use crate::internals::tokens::Tokens;
 use crate::internals::{Ctxt, Expansion, Mode, Only, Result, ATTR};
 
@@ -213,7 +213,7 @@ pub(crate) fn expand_tag(
     e: &Expander<'_>,
     mode: Mode<'_>,
     default_tag: Option<DefaultTag>,
-    rename_all: Option<RenameAll>,
+    name_all: Option<NameAll>,
     ident: Option<&syn::Ident>,
 ) -> Result<(syn::Expr, TagMethod)> {
     let (lit, tag_method) = 'out: {
@@ -240,8 +240,8 @@ pub(crate) fn expand_tag(
             };
         }
 
-        if let (Some(ident), Some(rename_all)) = (ident, rename_all) {
-            let name = rename_all.apply(&ident.to_string());
+        if let (Some(ident), Some(name_all)) = (ident, name_all) {
+            let name = name_all.apply(&ident.to_string());
 
             break 'out (
                 syn::LitStr::new(&name, ident.span()).into(),
