@@ -7,18 +7,13 @@ use crate::internals::rename::RenameAll;
 use crate::internals::tokens::Tokens;
 use crate::internals::{Ctxt, Expansion, Mode, Only, Result, ATTR};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TagMethod {
     /// Special method that requires generating a visitor.
     String,
     /// The default tag method.
+    #[default]
     Any,
-}
-
-impl Default for TagMethod {
-    fn default() -> Self {
-        Self::Any
-    }
 }
 
 pub(crate) struct FieldData<'a> {
