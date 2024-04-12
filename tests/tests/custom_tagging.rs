@@ -1,16 +1,12 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(tag = "type", default_field = "name", default_variant = "name")]
+#[musli(tag = "type", name_all = "name")]
 pub enum InternallyTagged {
-    Variant1 {
-        string: String,
-        number: u32,
-    },
-    #[musli(name = "variant2")]
-    Variant2 {
-        string: String,
-    },
+    #[musli(name_all = "name")]
+    Variant1 { string: String, number: u32 },
+    #[musli(name = "variant2", name_all = "name")]
+    Variant2 { string: String },
 }
 
 #[test]
@@ -42,21 +38,12 @@ fn internally_tagged() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(
-    tag = "type",
-    content = "content",
-    default_field = "name",
-    default_variant = "name"
-)]
+#[musli(tag = "type", content = "content", name_all = "name")]
 pub enum AdjacentlyTagged {
-    Variant1 {
-        string: String,
-        number: u32,
-    },
-    #[musli(name = "variant2")]
-    Variant2 {
-        string: String,
-    },
+    #[musli(name_all = "name")]
+    Variant1 { string: String, number: u32 },
+    #[musli(name = "variant2", name_all = "name")]
+    Variant2 { string: String },
 }
 
 #[test]
@@ -88,21 +75,17 @@ fn adjacently_tagged() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(
-    tag = "type",
-    content = "content",
-    default_field = "name",
-    default_variant = "name"
-)]
+#[musli(tag = "type", content = "content", name_all = "name")]
 pub enum AdjacentlyTaggedWithSkip {
     Empty,
+    #[musli(name_all = "name")]
     Struct {
         string: String,
         #[musli(skip)]
         skipped: u32,
         number: u32,
     },
-    #[musli(default_field = "index")]
+    #[musli(name_all = "index")]
     Tuple(String, #[musli(skip)] u32, u32),
 }
 

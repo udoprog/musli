@@ -46,8 +46,8 @@
 //! enum Json {}
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "index")]
-//! #[musli(mode = Json, default_field = "name")]
+//! #[musli(name_all = "index")]
+//! #[musli(mode = Json, name_all = "name")]
 //! struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
@@ -63,7 +63,7 @@
 //! # use musli::{Encode, Decode};
 //! # enum Json {}
 //! # #[derive(Encode, Decode)]
-//! # #[musli(mode = Json, default_field = "name")]
+//! # #[musli(mode = Json, name_all = "name")]
 //! # struct Person<'a> { name: &'a str, age: u32 }
 //! use musli_json::Encoding;
 //!
@@ -108,8 +108,7 @@
 //! enum Json {}
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "index")]
-//! #[musli(mode = Json, default_field = "name")]
+//! #[musli(mode = Json, name_all = "name")]
 //! struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
@@ -150,7 +149,7 @@
 //! use musli::{Decode, Encode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "name")]
+//! #[musli(name_all = "name")]
 //! struct Name<'a> {
 //!     sur_name: &'a str,
 //!     #[musli(decode_only, name = "last")]
@@ -164,7 +163,7 @@
 //!
 //! Container attributes apply to the container, such as directly on the
 //! `struct` or `enum`. Like the uses of `#[musli(packed)]` and
-//! `#[musli(default_variant = "name")]` here:
+//! `#[musli(name_all = "name")]` here:
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -176,9 +175,9 @@
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_variant = "name")]
+//! #[musli(name_all = "name")]
 //! enum Enum {
-//!     /* the body of the struct */
+//!     /* the body of the enum */
 //! }
 //! ```
 //!
@@ -189,20 +188,29 @@
 //! Allos for renaming every field in the container. It can take any of the
 //! following values:
 //!
-//! * `PascalCase`
-//! * `camelCase`
-//! * `snake_case`
-//! * `SCREAMING_SNAKE_CASE`
-//! * `kebab-case`
-//! * `SCREAMING-KEBAB-CASE`
+//! * `index` (default) - the index of the field will be used.
+//! * `name` - the literal name of the field will be used.
+//! * `PascalCase` - the field will be converted to pascal case.
+//! * `camelCase` - the field will be converted to camel case.
+//! * `snake_case` - the field will be converted to snake case.
+//! * `SCREAMING_SNAKE_CASE` - the field will be converted to screaming snake case.
+//! * `kebab-case` - the field will be converted to kebab case.
+//! * `SCREAMING-KEBAB-CASE` - the field will be converted to screaming kebab case.
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(name_all = "PascalCase")]
-//! struct Struct {
+//! struct PascalCaseStruct {
 //!     field_name: u32,
+//! }
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(name_all = "name")]
+//! struct NamedStruct {
+//!     field1: u32,
+//!     field2: u32,
 //! }
 //! ```
 //!
@@ -213,64 +221,15 @@
 //!
 //! #[derive(Encode, Decode)]
 //! #[musli(name_all = "PascalCase")]
-//! enum Enum {
+//! enum PascalCaseEnum {
 //!     VariantName {
 //!         field_name: u32,
 //!     }
 //! }
-//! ```
-//!
-//! <br>
-//!
-//! #### `#[musli(default_field = "..")]`
-//!
-//! This determines how the default tag for a field is determined. It can take
-//! either `"name"` or `"index"`.
-//!
-//! * `#[musli(default_field = "index")]` will use the index of the field.
-//!   This is the default.
-//! * `#[musli(default_field = "name")]` will use the name of the field.
-//!
-//! ```
-//! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "name")]
-//! struct Struct {
-//!     field1: u32,
-//!     field2: u32,
-//! }
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(default_field = "name")]
-//! enum Enum {
-//!     Variant1 {
-//!         field1: u32,
-//!     },
-//!     Variant2 {
-//!         field1: u32,
-//!     },
-//! }
-//! ```
-//!
-//! <br>
-//!
-//! #### `#[musli(default_variant = "..")]`
-//!
-//! This determines how the default tag for a variant is determined. It can take
-//! either `"name"` or `"index"`.
-//!
-//! * `#[musli(default_variant = "index")]` will use the index of the
-//!   variant. This is the default.
-//! * `#[musli(default_variant = "name")]` will use the name of the
-//!   variant.
-//!
-//! ```
-//! use musli::{Encode, Decode};
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(default_variant = "name")]
-//! enum Enum {
+//! #[musli(name_all = "name")]
+//! enum NamedEnum {
 //!     Variant1 {
 //!         field1: u32,
 //!     },
@@ -435,12 +394,15 @@
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_variant = "name")]
+//!#[musli(name_all = "name")]
 //! enum Enum {
+//!     Variant {
+//!         /* variant body */
+//!     },
 //!     #[musli(name = "Other")]
 //!     Something {
 //!         /* variant body */
-//!     }
+//!     },
 //! }
 //! ```
 //!
@@ -461,27 +423,42 @@
 //! If the type of the tag is ambiguous it can be explicitly specified through
 //! the `#[musli(name_type)]` attribute.
 //!
+//! <br>
+//!
 //! #### `#[musli(name_all = "..")]`
 //!
-//! Allos for renaming every field in the container. It can take any of the
+//! Allos for renaming every field in the variant. It can take any of the
 //! following values:
 //!
-//! * `PascalCase`
-//! * `camelCase`
-//! * `snake_case`
-//! * `SCREAMING_SNAKE_CASE`
-//! * `kebab-case`
-//! * `SCREAMING-KEBAB-CASE`
+//! * `index` (default) - the index of the field will be used.
+//! * `name` - the literal name of the field will be used.
+//! * `PascalCase` - the field will be converted to pascal case.
+//! * `camelCase` - the field will be converted to camel case.
+//! * `snake_case` - the field will be converted to snake case.
+//! * `SCREAMING_SNAKE_CASE` - the field will be converted to screaming snake case.
+//! * `kebab-case` - the field will be converted to kebab case.
+//! * `SCREAMING-KEBAB-CASE` - the field will be converted to screaming kebab case.
 //!
 //! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! enum Enum {
+//! enum PascalCaseEnum {
 //!     #[musli(name_all = "PascalCase")]
 //!     Variant {
 //!         field_name: u32,
 //!     }
+//! }
+//!
+//! #[derive(Encode, Decode)]
+//! enum NamedEnum {
+//!     #[musli(name_all = "name")]
+//!     Variant {
+//!         field1: u32,
+//!     },
+//!     Variant2 {
+//!         field1: u32,
+//!     },
 //! }
 //! ```
 //!
@@ -533,32 +510,6 @@
 //!
 //! <br>
 //!
-//! #### `#[musli(default_field = "..")]`
-//!
-//! This determines how the default tag for a field in the current variant is
-//! determined. This overrides the tagging convention specified on the
-//! *container* and can take either `"name"` or `"index"`.
-//!
-//! * `#[musli(default_field = "index")]` will use the index of the field.
-//!   This is the default.
-//! * `#[musli(default_field = "name")]` will use the name of the field.
-//!
-//! ```
-//! use musli::{Encode, Decode};
-//!
-//! #[derive(Encode, Decode)]
-//! #[musli(default_field = "index")]
-//! enum Enum {
-//!     #[musli(default_field = "name")]
-//!     Variant {
-//!         field1: u32,
-//!     },
-//!     Variant2 {
-//!         field1: u32,
-//!     },
-//! }
-//! ```
-//!
 //! <br>
 //!
 //! #### `#[musli(transparent)]`
@@ -599,7 +550,7 @@
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "name")]
+//! #[musli(name_all = "name")]
 //! struct Struct {
 //!     #[musli(name = "other")]
 //!     something: String,
@@ -612,7 +563,7 @@
 //! }
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(default_field = "name")]
+//! #[musli(name_all = "name")]
 //! enum Enum {
 //!     Variant {
 //!         #[musli(name = "other")]

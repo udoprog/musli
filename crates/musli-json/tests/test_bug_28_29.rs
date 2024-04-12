@@ -4,7 +4,7 @@ use musli::{Decode, Encode};
 #[test]
 fn bug_28_skip_any() {
     #[derive(Debug, Encode, Decode)]
-    #[musli(default_field = "name")]
+    #[musli(name_all = "name")]
     struct T {
         a: u32,
     }
@@ -27,7 +27,7 @@ fn bug_28_skip_any() {
 #[test]
 fn bug_29_whitespace() {
     #[derive(Debug, PartialEq, Encode, Decode)]
-    #[musli(default_field = "name")]
+    #[musli(name_all = "name")]
     struct T {
         a: u32,
         b: u32,
