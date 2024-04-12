@@ -9,11 +9,11 @@ use crate::internals::{Ctxt, Expansion, Mode, Only, Result, ATTR};
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TagMethod {
-    /// Special method that requires generating a visitor.
-    String,
-    /// The default tag method.
+    /// Load the tag by visit.
+    Visit,
+    /// Load the tag by value.
     #[default]
-    Any,
+    Value,
 }
 
 pub(crate) struct FieldData<'a> {
@@ -215,7 +215,7 @@ pub(crate) fn expand_tag(
     default_tag: Option<DefaultTag>,
     rename_all: Option<RenameAll>,
     ident: Option<&syn::Ident>,
-) -> Result<(syn::Expr, Option<TagMethod>)> {
+) -> Result<(syn::Expr, TagMethod)> {
     let (lit, tag_method) = 'out: {
         if let Some((_, rename)) = taggable.name(mode) {
             return Ok((rename_lit(rename), determine_tag_method(rename)));
@@ -225,7 +225,7 @@ pub(crate) fn expand_tag(
             break 'out match (tag, taggable.literal_name()) {
                 (DefaultTag::Index, _) => (
                     usize_suffixed(taggable.index(), taggable.span()).into(),
-                    Some(TagMethod::Any),
+                    TagMethod::Value,
                 ),
                 (DefaultTag::Name, None) => {
                     e.cx.error_span(
@@ -236,7 +236,7 @@ pub(crate) fn expand_tag(
                     );
                     return Err(());
                 }
-                (DefaultTag::Name, Some(name)) => (name.clone().into(), Some(TagMethod::String)),
+                (DefaultTag::Name, Some(name)) => (name.clone().into(), TagMethod::Visit),
             };
         }
 
@@ -245,13 +245,13 @@ pub(crate) fn expand_tag(
 
             break 'out (
                 syn::LitStr::new(&name, ident.span()).into(),
-                Some(TagMethod::String),
+                TagMethod::Visit,
             );
         }
 
         (
             usize_suffixed(taggable.index(), taggable.span()).into(),
-            None,
+            TagMethod::Value,
         )
     };
 
@@ -320,21 +320,18 @@ fn rename_lit(expr: &syn::Expr) -> syn::Expr {
 }
 
 /// Try and determine tag method from the given expression.
-pub(crate) fn determine_tag_method(expr: &syn::Expr) -> Option<TagMethod> {
-    let lit = match expr {
-        syn::Expr::Lit(lit) => lit,
-        _ => return None,
+pub(crate) fn determine_tag_method(expr: &syn::Expr) -> TagMethod {
+    let syn::Expr::Lit(lit) = expr else {
+        return TagMethod::Value;
     };
 
-    match lit {
-        syn::ExprLit {
-            lit: syn::Lit::Str(..),
-            ..
-        } => Some(TagMethod::String),
-        syn::ExprLit {
-            lit: syn::Lit::Int(..),
-            ..
-        } => Some(TagMethod::Any),
-        _ => None,
-    }
+    let syn::ExprLit {
+        lit: syn::Lit::Str(..),
+        ..
+    } = lit
+    else {
+        return TagMethod::Value;
+    };
+
+    TagMethod::Visit
 }

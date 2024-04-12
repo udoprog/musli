@@ -190,7 +190,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let mut output_enum = quote!();
 
     match en.variant_tag_method {
-        TagMethod::String => {
+        TagMethod::Visit => {
             let mut tag_variants = Vec::new();
             let output_type = e.cx.type_with_span("VariantTag", en.span);
 
@@ -249,7 +249,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
             fallback = quote!(#option_none => { #fallback })
         }
-        TagMethod::Any => {
+        TagMethod::Value => {
             for v in &en.variants {
                 variant_output_tags.push((v, v.tag.clone(), v.tag.clone()));
             }
@@ -373,7 +373,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let decode_match;
 
             match field_tag_method {
-                Some(TagMethod::String) => {
+                TagMethod::Visit => {
                     outcome_enum = quote! {
                         enum #outcome_type { Tag, Skip }
                     };
@@ -414,7 +414,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                         }
                     }};
                 }
-                _ => {
+                TagMethod::Value => {
                     let decode_t_decode = &e.decode_t_decode;
 
                     field_alloc = None;
@@ -531,7 +531,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let decode_match;
 
             match tag_method {
-                Some(TagMethod::String) => {
+                TagMethod::Visit => {
                     outcome_enum = quote! {
                         enum #outcome_type { Tag, Content, Skip }
                     };
@@ -582,7 +582,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                         }
                     };
                 }
-                _ => {
+                TagMethod::Value => {
                     field_alloc = None;
 
                     decode_match = quote! {
@@ -821,7 +821,7 @@ fn decode_tagged(
     let tag_type: syn::Type;
 
     match st.field_tag_method {
-        TagMethod::String => {
+        TagMethod::Visit => {
             let mut outputs = Vec::new();
             let output_type =
                 e.cx.type_with_span("TagVisitorOutput", e.input.ident.span());
@@ -903,7 +903,7 @@ fn decode_tagged(
 
             tag_type = syn::parse_quote!(#option<#output_type>);
         }
-        TagMethod::Any => {
+        TagMethod::Value => {
             let mut statements = Vec::with_capacity(fields_with.len());
 
             for (f, decode, (enter, leave)) in fields_with {

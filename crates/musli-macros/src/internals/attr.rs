@@ -29,7 +29,7 @@ struct OneOf<T> {
 #[derive(Clone, Copy)]
 pub(crate) struct EnumTag<'a> {
     pub(crate) value: &'a syn::Expr,
-    pub(crate) method: Option<TagMethod>,
+    pub(crate) method: TagMethod,
 }
 
 #[derive(Clone, Copy)]
@@ -225,10 +225,9 @@ impl TypeAttr {
     pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
         let (_, tag) = self.tag(mode)?;
 
-        let tag_method = expander::determine_tag_method(tag);
         let tag = EnumTag {
             value: tag,
-            method: tag_method,
+            method: expander::determine_tag_method(tag),
         };
 
         match self.content(mode) {
