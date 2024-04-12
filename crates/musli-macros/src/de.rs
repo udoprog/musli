@@ -194,7 +194,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let mut tag_variants = Vec::new();
             let output_type = e.cx.type_with_span("VariantTag", en.span);
 
-            for v in en.variants.iter().filter(|v| !v.is_default) {
+            for v in &en.variants {
                 let (tag_pattern, tag_value, tag_variant) =
                     build_tag_variant(e, v.span, v.index, &v.tag, &output_type);
 
@@ -250,7 +250,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             fallback = quote!(#option_none => { #fallback })
         }
         TagMethod::Any => {
-            for v in en.variants.iter().filter(|v| !v.is_default) {
+            for v in &en.variants {
                 variant_output_tags.push((v, v.tag.clone(), v.tag.clone()));
             }
 
