@@ -17,9 +17,8 @@ pub const MAX_INLINE_LEN: usize = (DATA_MASK - 1) as usize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Kind {
-    /// A packed sequence. The length of the packed sequence is the 2 to the
-    /// power of the mask as an unsigned integer.
-    Pack = 0b00_000000,
+    /// A reserved value.
+    Reserve = 0b00_000000,
     /// A fixed element where data indicates how many bytes it consists of. Data
     /// contains the prefix length unless it's set to all 1s after which a
     /// continuation sequence indicating the length should be decoded.

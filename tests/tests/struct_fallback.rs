@@ -21,13 +21,13 @@ fn struct_rename() {
     tests::assert_decode_eq!(
         upgrade_stable,
         Struct {
-            field1: 10,
+            field1: 11,
             field2: 13,
             field3: 15,
             field4: 17,
         },
         StructRename { field4: 17 },
-        json = r#"{"0":0,"1":1,"2":2,"3":3}"#,
+        json = r#"{"0":11,"1":13,"2":15,"3":17}"#,
     );
 }
 

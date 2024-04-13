@@ -66,10 +66,6 @@ where
             let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
             match tag.kind() {
-                Kind::Pack => {
-                    let len = 2usize.pow(tag.data_raw() as u32);
-                    self.reader.skip(self.cx, len)?;
-                }
                 Kind::Prefix => {
                     let len = if let Some(len) = tag.data() {
                         len as usize
@@ -98,6 +94,9 @@ where
                     if tag.data().is_none() {
                         let _ = c::decode::<_, _, u128>(self.cx, self.reader.borrow_mut())?;
                     }
+                }
+                kind => {
+                    return Err(self.cx.message(format_args!("Unsupported kind {kind:?}")));
                 }
             }
         }
@@ -149,14 +148,7 @@ where
             } else {
                 musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
-            Kind::Pack => {
-                let Some(len) = 2usize.checked_pow(tag.data_raw() as u32) else {
-                    return Err(self.cx.message("Pack tag overflowed"));
-                };
-
-                Ok(len)
-            }
-            _ => Err(self.cx.marked_message(start, "Expected prefix or pack")),
+            _ => Err(self.cx.marked_message(start, "Expected prefix")),
         }
     }
 }

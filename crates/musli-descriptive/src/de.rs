@@ -79,13 +79,9 @@ where
 
             let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
-            std::dbg!(remaining, tag);
-
             match tag.kind() {
                 Kind::Number => {
-                    if tag.data().is_none() {
-                        _ = c::decode::<_, _, u128>(self.cx, self.reader.borrow_mut())?;
-                    }
+                    _ = c::decode::<_, _, u128>(self.cx, self.reader.borrow_mut())?;
                 }
                 Kind::Mark => match tag.mark() {
                     Mark::Variant => {
