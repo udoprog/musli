@@ -466,23 +466,19 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
                 static #struct_hint_static: #unsized_struct_hint = #unsized_struct_hint::new();
 
-                let #variant_tag_var = #decoder_t::decode_unsized_struct(#struct_var, &#struct_hint_static, |#struct_var| {
-                    let #variant_tag_var = {
-                        let #variant_decoder_var = loop {
-                            let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(#struct_var)? else {
-                                return #result_err(#context_t::missing_variant_field(#ctx_var, #type_name, &#tag));
-                            };
-
-                            let #field_name_var = #struct_field_decoder_t::decode_field_name(&mut #entry_var)?;
-
-                            #field_alloc
-                            #decode_match
+                let #variant_tag_var: #name_type = #decoder_t::decode_unsized_struct(#struct_var, &#struct_hint_static, |#struct_var| {
+                    let #variant_decoder_var = loop {
+                        let #option_some(mut #entry_var) = #struct_decoder_t::decode_field(#struct_var)? else {
+                            return #result_err(#context_t::missing_variant_field(#ctx_var, #type_name, &#tag));
                         };
 
-                        #decode_name
+                        let #field_name_var = #struct_field_decoder_t::decode_field_name(&mut #entry_var)?;
+
+                        #field_alloc
+                        #decode_match
                     };
 
-                    #result_ok(#variant_tag_var)
+                    #result_ok(#decode_name)
                 })?;
 
                 let #output_var = match #variant_tag_var {

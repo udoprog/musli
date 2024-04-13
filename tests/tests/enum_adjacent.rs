@@ -1,16 +1,16 @@
 use musli::{Decode, Encode};
 
-#[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_all = "name", tag = "type", content = "content")]
-pub enum Named {
-    #[musli(name_all = "name")]
-    Variant1 { string: String, number: u32 },
-    #[musli(name = "variant2", name_all = "name")]
-    Variant2 { string: String },
-}
-
 #[test]
 fn named() {
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    #[musli(name_all = "name", tag = "type", content = "content")]
+    pub enum Named {
+        #[musli(name_all = "name")]
+        Variant1 { string: String, number: u32 },
+        #[musli(name = "variant2", name_all = "name")]
+        Variant2 { string: String },
+    }
+
     tests::rt! {
         descriptive,
         Named::Variant1 {
