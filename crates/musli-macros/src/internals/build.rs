@@ -184,6 +184,7 @@ pub(crate) struct Variant<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
     pub(crate) name: syn::Expr,
+    pub(crate) pattern: Option<&'a syn::Pat>,
     pub(crate) st: Body<'a>,
     pub(crate) patterns: Punctuated<syn::FieldPat, Token![,]>,
 }
@@ -194,6 +195,7 @@ pub(crate) struct Field<'a> {
     pub(crate) encode_path: (Span, syn::Path),
     pub(crate) decode_path: (Span, syn::Path),
     pub(crate) name: syn::Expr,
+    pub(crate) pattern: Option<&'a syn::Pat>,
     /// Skip field entirely and always initialize with the specified expresion,
     /// or default value through `default_attr`.
     pub(crate) skip: Option<Span>,
@@ -251,8 +253,11 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         .map(|&(_, p)| p)
         .unwrap_or_default();
 
-    let (name_all, name_type, name_method) =
-        split_name(e.type_attr.name_all(mode), e.type_attr.name_type(mode));
+    let (name_all, name_type, name_method) = split_name(
+        e.type_attr.name_type(mode),
+        e.type_attr.name_all(mode),
+        e.type_attr.name_method(mode),
+    );
 
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
 
@@ -293,8 +298,11 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         .map(|&(_, p)| p)
         .unwrap_or_default();
 
-    let (_, name_type, name_method) =
-        split_name(e.type_attr.name_all(mode), e.type_attr.name_type(mode));
+    let (_, name_type, name_method) = split_name(
+        e.type_attr.name_type(mode),
+        e.type_attr.name_all(mode),
+        e.type_attr.name_method(mode),
+    );
 
     if enum_tagging.is_some() {
         match packing_span {
@@ -342,13 +350,12 @@ fn setup_variant<'a>(
         .unwrap_or_default();
 
     let (name_all, name_type, name_method) = split_name(
-        data.attr
-            .name_all(mode)
-            .or_else(|| e.type_attr.name_all(mode)),
         data.attr.name_type(mode),
+        data.attr.name_all(mode),
+        data.attr.name_method(mode),
     );
 
-    let tag = expander::expand_tag(
+    let name = expander::expand_name(
         data,
         mode,
         e.type_attr
@@ -357,6 +364,8 @@ fn setup_variant<'a>(
             .unwrap_or_default(),
         Some(data.ident),
     )?;
+
+    let pattern = data.attr.pattern(mode).map(|(_, p)| p);
 
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
@@ -399,7 +408,8 @@ fn setup_variant<'a>(
     Ok(Variant {
         span: data.span,
         index: data.index,
-        name: tag,
+        name,
+        pattern,
         patterns,
         st: Body {
             span: data.span,
@@ -426,7 +436,8 @@ fn setup_field<'a>(
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
 
-    let tag = expander::expand_tag(data, mode, name_all, data.ident)?;
+    let name = expander::expand_name(data, mode, name_all, data.ident)?;
+    let pattern = data.attr.pattern(mode).map(|(_, p)| p);
 
     let skip = data.attr.skip(mode).map(|&(s, ())| s);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
@@ -516,7 +527,8 @@ fn setup_field<'a>(
         index: data.index,
         encode_path,
         decode_path,
-        name: tag,
+        name,
+        pattern,
         skip,
         skip_encoding_if,
         default_attr,
@@ -529,19 +541,26 @@ fn setup_field<'a>(
 }
 
 fn split_name(
+    name_type: Option<&(Span, syn::Type)>,
     name_all: Option<&(Span, NameAll)>,
-    ty: Option<&(Span, syn::Type)>,
+    name_method: Option<&(Span, NameMethod)>,
 ) -> (NameAll, syn::Type, NameMethod) {
     let name_all = name_all.map(|&(_, v)| v);
+    let name_method = name_method.map(|&(_, v)| v);
 
-    let Some((_, ty)) = ty else {
+    let Some((_, name_type)) = name_type else {
         let name_all = name_all.unwrap_or_default();
-        return (name_all, name_all.ty(), name_all.name_method());
+        let name_method = name_method.unwrap_or_else(|| name_all.name_method());
+        return (name_all, name_all.ty(), name_method);
     };
 
-    let (name_method, default_name_all) = determine_name_method(ty);
+    let (name_method, default_name_all) = match name_method {
+        Some(name_method) => (name_method, name_method.name_all()),
+        None => determine_name_method(name_type),
+    };
+
     let name_all = name_all.or(default_name_all).unwrap_or_default();
-    (name_all, ty.clone(), name_method)
+    (name_all, name_type.clone(), name_method)
 }
 
 fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {

@@ -82,6 +82,7 @@ impl Ctxt {
     }
 
     /// Build a lifetime.
+    #[allow(unused)]
     pub(crate) fn lifetime(&self, name: &str) -> syn::Lifetime {
         self.with_string("'", name, "", |s| syn::Lifetime::new(s, Span::call_site()))
     }

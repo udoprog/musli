@@ -112,7 +112,8 @@ macro_rules! assert_decode_eq {
         macro_rules! decode {
             ($name:ident) => {{
                 assert_eq!(
-                    ::$name::test::decode($expr, &mut bytes, &$expected), $expected,
+                    ::$name::test::decode($expr, &mut bytes, &$expected),
+                    $expected,
                     "{}: decoded value does not match expected",
                     stringify!($name),
                 );
