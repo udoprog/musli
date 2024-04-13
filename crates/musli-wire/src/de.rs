@@ -96,7 +96,9 @@ where
                     }
                 }
                 kind => {
-                    return Err(self.cx.message(format_args!("Unsupported kind {kind:?}")));
+                    return Err(self
+                        .cx
+                        .message(format_args!("Cannot skip over kind {kind:?}")));
                 }
             }
         }

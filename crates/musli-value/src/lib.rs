@@ -75,5 +75,6 @@ where
 {
     use musli::de::Decoder;
 
+    cx.clear();
     value.decoder::<DEFAULT_OPTIONS, _>(cx).decode()
 }

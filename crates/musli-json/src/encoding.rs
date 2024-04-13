@@ -177,6 +177,7 @@ impl<M> Encoding<M> {
         W: Writer,
         T: ?Sized + Encode<M>,
     {
+        cx.clear();
         JsonEncoder::new(cx, writer).encode(value)
     }
 
@@ -204,6 +205,7 @@ impl<M> Encoding<M> {
         C: ?Sized + Context<Mode = M>,
         T: ?Sized + Encode<M>,
     {
+        cx.clear();
         let mut data = Vec::with_capacity(128);
         JsonEncoder::new(cx, &mut data).encode(value)?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
@@ -236,6 +238,7 @@ impl<M> Encoding<M> {
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
+        cx.clear();
         JsonDecoder::new(cx, parser).decode()
     }
 
@@ -287,6 +290,7 @@ impl<M> Encoding<M> {
         C: ?Sized + Context<Mode = M>,
         T: Decode<'de, M>,
     {
+        cx.clear();
         JsonDecoder::new(cx, SliceParser::new(bytes)).decode()
     }
 

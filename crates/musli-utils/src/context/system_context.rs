@@ -114,6 +114,18 @@ where
     type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
 
     #[inline]
+    fn clear(&self) {
+        self.mark.set(0);
+        let _access = self.access.exclusive();
+
+        // SAFETY: We have acquired exclusive access just above.
+        unsafe {
+            (*self.errors.get()).clear();
+            (*self.path.get()).clear();
+        }
+    }
+
+    #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
     }

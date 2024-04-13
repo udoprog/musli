@@ -175,7 +175,7 @@ impl<M, const OPT: Options> Encoding<M, OPT> {
         WireEncoder::<_, OPT, _>::new,
         WireDecoder::<_, OPT, _>::new
     );
-    musli_utils::encoding_from_slice_impls!(M, WireDecoder::<_, F>::new);
+    musli_utils::encoding_from_slice_impls!(M);
 }
 
 impl<M, const OPT: Options> Clone for Encoding<M, OPT> {

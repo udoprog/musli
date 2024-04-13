@@ -174,7 +174,7 @@ impl<M, const OPT: Options> Encoding<M, OPT> {
         StorageEncoder::<_, OPT, _>::new,
         StorageDecoder::<_, OPT, _>::new
     );
-    musli_utils::encoding_from_slice_impls!(M, StorageDecoder::<_, F>::new);
+    musli_utils::encoding_from_slice_impls!(M);
 }
 
 impl<M, const OPT: Options> Clone for Encoding<M, OPT> {

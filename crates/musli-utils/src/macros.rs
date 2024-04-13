@@ -108,7 +108,7 @@ macro_rules! encode_with_extensions {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! encoding_from_slice_impls {
-    ($mode:ident, $decoder_new:path) => {
+    ($mode:ident) => {
         /// Decode the given type `T` from the given slice using the current
         /// configuration.
         #[inline]
@@ -156,6 +156,7 @@ macro_rules! encoding_impls {
             W: Writer,
             T: ?Sized + Encode<$mode>,
         {
+            cx.clear();
             T::encode(value, cx, $encoder_new(cx, writer))
         }
 
@@ -171,6 +172,7 @@ macro_rules! encoding_impls {
             R: Reader<'de>,
             T: Decode<'de, $mode>,
         {
+            cx.clear();
             T::decode(cx, $decoder_new(cx, reader))
         }
 
@@ -233,7 +235,7 @@ macro_rules! test_fns {
                         }
                     }
 
-                    write!(f, "\"")?;
+                    write!(f, "\" (0-{})", self.0.len())?;
                     Ok(())
                 }
             }
@@ -250,6 +252,17 @@ macro_rules! test_fns {
                     }
                 };
 
+                let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
+                    Ok(decoded) => decoded,
+                    Err(..) => {
+                        let out = FormatBytes(&out);
+                        let error = cx.report();
+                        panic!("{WHAT}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<T>())
+                    }
+                };
+
+                assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match\nValue: {value:?}", type_name::<T>());
+
                 $crate::test_include_if! {
                     $($(#[$option])*)* =>
                     let value_decode: ::musli_value::Value = match ENCODING.from_slice_with(&cx, out.as_slice()) {
@@ -257,7 +270,7 @@ macro_rules! test_fns {
                         Err(..) => {
                             let out = FormatBytes(&out);
                             let error = cx.report();
-                            panic!("{WHAT}: {}: failed to decode to value type:\nBytes:{out}\n{error}", type_name::<T>())
+                            panic!("{WHAT}: {}: failed to decode to value type:\nValue: {value:?}\nBytes:{out}\n{error}", type_name::<T>())
                         }
                     };
 
@@ -266,23 +279,13 @@ macro_rules! test_fns {
                         Err(..) => {
                             let out = FormatBytes(&out);
                             let error = cx.report();
-                            panic!("{WHAT}: {}: failed to decode from value type:\nBytes: {out}\nValue: {value_decode:?}\n{error}", type_name::<T>())
+                            panic!("{WHAT}: {}: failed to decode from value type:\nValue: {value:?}\nBytes: {out}\nBuffered value: {value_decode:?}\n{error}", type_name::<T>())
                         }
                     };
 
-                    assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match", type_name::<T>());
+                    assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match\nValue: {value:?}", type_name::<T>());
                 }
 
-                let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
-                    Ok(decoded) => decoded,
-                    Err(..) => {
-                        let out = FormatBytes(&out);
-                        let error = cx.report();
-                        panic!("{WHAT}: {}: failed to decode:\nBytes: {out}\n{error}", type_name::<T>())
-                    }
-                };
-
-                assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match", type_name::<T>());
                 decoded
             })
         }
@@ -316,7 +319,7 @@ macro_rules! test_fns {
                         }
                     }
 
-                    write!(f, "\"")?;
+                    write!(f, "\" (0-{})", self.0.len())?;
                     Ok(())
                 }
             }
@@ -340,7 +343,7 @@ macro_rules! test_fns {
                     Err(error) => {
                         let out = FormatBytes(&*out);
                         let error = cx.report();
-                        panic!("{WHAT}: {}: failed to decode:\nBytes: {out}\n{error}", type_name::<T>())
+                        panic!("{WHAT}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<T>())
                     }
                 };
 

@@ -138,6 +138,12 @@ where
         Self: 'this;
 
     #[inline]
+    fn clear(&self) {
+        self.inner.clear();
+        *self.error.borrow_mut() = None;
+    }
+
+    #[inline]
     fn mark(&self) -> Self::Mark {
         self.inner.mark()
     }
