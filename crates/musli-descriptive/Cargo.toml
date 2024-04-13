@@ -1,6 +1,6 @@
 [package]
 name = "musli-descriptive"
-version = "0.0.112"
+version = "0.0.113"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.76"
@@ -27,8 +27,8 @@ test = ["musli-value"]
 simdutf8 = ["dep:simdutf8"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.112", default-features = false }
-musli-utils = { path = "../musli-utils", version = "0.0.112", default-features = false }
-musli-storage = { path = "../musli-storage", version = "0.0.112", default-features = false }
-musli-value = { path = "../musli-value", version = "0.0.112", default-features = false, optional = true }
+musli = { path = "../musli", version = "0.0.113", default-features = false }
+musli-utils = { path = "../musli-utils", version = "0.0.113", default-features = false }
+musli-storage = { path = "../musli-storage", version = "0.0.113", default-features = false }
+musli-value = { path = "../musli-value", version = "0.0.113", default-features = false, optional = true }
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }

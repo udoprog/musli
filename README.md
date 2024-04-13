@@ -40,8 +40,8 @@ to use:
 
 ```toml
 [dependencies]
-musli = "0.0.112"
-musli-wire = "0.0.112"
+musli = "0.0.113"
+musli-wire = "0.0.113"
 ```
 
 <br>
