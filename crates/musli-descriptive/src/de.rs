@@ -79,6 +79,8 @@ where
 
             let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
+            std::dbg!(remaining, tag);
+
             match tag.kind() {
                 Kind::Number => {
                     if tag.data().is_none() {
