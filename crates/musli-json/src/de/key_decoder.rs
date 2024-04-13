@@ -1,7 +1,7 @@
 use core::fmt;
 
 use musli::de::{
-    Decode, Decoder, NumberHint, SizeHint, Skip, TypeHint, ValueVisitor, Visit, Visitor,
+    Decode, DecodeUnsized, Decoder, NumberHint, SizeHint, Skip, TypeHint, ValueVisitor, Visitor,
 };
 use musli::Context;
 
@@ -80,12 +80,12 @@ where
     }
 
     #[inline]
-    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        T: ?Sized + Visit<'de, Self::Mode>,
+        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
         F: FnOnce(&T) -> Result<O, Self::Error>,
     {
-        self.cx.visit(self, f)
+        self.cx.decode_unsized(self, f)
     }
 
     #[inline]

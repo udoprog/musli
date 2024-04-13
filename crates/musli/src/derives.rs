@@ -304,6 +304,7 @@
 //!
 //! The following values are treated specially:
 //! * `str` applies `#[musli(name_all = "name")]` by default.
+//! * `[u8]` applies `#[musli(name_all = "name")]` by default.
 //!
 //! ```
 //! use core::fmt;
@@ -475,6 +476,7 @@
 //!
 //! The following values are treated specially:
 //! * `str` applies `#[musli(name_all = "name")]` by default.
+//! * `[u8]` applies `#[musli(name_all = "name")]` by default.
 //!
 //! ```
 //! use core::fmt;

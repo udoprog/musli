@@ -38,8 +38,6 @@ macro_rules! implement {
                 Ok($ty { $($field,)* })
             }
         }
-
-        visit!({$($type)*} $ty $(<$type>)* where $($type: Decode<'de, M>,)*);
     }
 }
 
@@ -76,8 +74,6 @@ macro_rules! implement_new {
                 Ok($ty::new($($field,)*))
             }
         }
-
-        visit!({T} $ty<T> where T: Decode<'de, M>);
     }
 }
 

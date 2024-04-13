@@ -5,9 +5,9 @@ use core::mem::take;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint, NumberVisitor,
-    PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visit, Visitor,
+    Decode, DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint,
+    NumberVisitor, PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
+    StructFieldsDecoder, TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
@@ -292,12 +292,12 @@ where
     }
 
     #[inline]
-    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        T: ?Sized + Visit<'de, Self::Mode>,
+        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
         F: FnOnce(&T) -> Result<O, Self::Error>,
     {
-        self.cx.visit(self, f)
+        self.cx.decode_unsized(self, f)
     }
 
     #[inline]

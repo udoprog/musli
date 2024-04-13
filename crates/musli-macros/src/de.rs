@@ -194,7 +194,19 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let name_type;
 
     match en.name_method {
-        NameMethod::Visit => {
+        NameMethod::Value => {
+            for v in &en.variants {
+                variant_output_tags.push((v, v.name.clone(), v.name.clone()));
+            }
+
+            let decode_t_decode = &e.decode_t_decode;
+
+            decode_tag = quote!(#decode_t_decode(#ctx_var, #variant_decoder_var)?);
+            output_enum = None;
+            fallback = quote!(_ => #fallback);
+            name_type = en.name_type.clone();
+        }
+        NameMethod::Unsized(method) => {
             let mut tag_variants = Vec::new();
             let output_type = e.cx.type_with_span("VariantTag", en.span);
 
@@ -209,9 +221,10 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let arms = tag_variants.iter().map(|o| o.as_arm(option_some));
 
             let visit_type = &en.name_type;
+            let method = method.as_method_name();
 
             decode_tag = quote! {
-                #decoder_t::visit(#variant_decoder_var, |#value_var: &#visit_type| {
+                #decoder_t::#method(#variant_decoder_var, |#value_var: &#visit_type| {
                     #result_ok(match #value_var {
                         #(#arms,)*
                         _ => #option_none,
@@ -255,18 +268,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
             fallback = quote!(#option_none => { #fallback });
             name_type = syn::parse_quote!(#option<#output_type>);
-        }
-        NameMethod::Value => {
-            for v in &en.variants {
-                variant_output_tags.push((v, v.name.clone(), v.name.clone()));
-            }
-
-            let decode_t_decode = &e.decode_t_decode;
-
-            decode_tag = quote!(#decode_t_decode(#ctx_var, #variant_decoder_var)?);
-            output_enum = None;
-            fallback = quote!(_ => #fallback);
-            name_type = en.name_type.clone();
         }
     }
 
@@ -395,7 +396,7 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                         }
                     };
                 }
-                NameMethod::Visit => {
+                NameMethod::Unsized(method) => {
                     outcome_enum = Some(quote! {
                         enum #outcome_type { Tag, Skip }
                     });
@@ -407,9 +408,10 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     });
 
                     let visit_type = &en.name_type;
+                    let method = method.as_method_name();
 
                     let decode_outcome = quote! {
-                        #decoder_t::visit(#field_name_var, |#value_var: &#visit_type| {
+                        #decoder_t::#method(#field_name_var, |#value_var: &#visit_type| {
                             #result_ok(match #value_var {
                                 #field_tag => #outcome_type::Tag,
                                 #value_var => {
@@ -532,7 +534,36 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let decode_match;
 
             match en.name_method {
-                NameMethod::Visit => {
+                NameMethod::Value => {
+                    field_alloc = None;
+
+                    decode_match = quote! {
+                        match #decode_t_decode(#ctx_var, decoder)? {
+                            #tag => {
+                                let #variant_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var)?;
+                                #tag_var = #option_some(#decode_tag);
+                            }
+                            #content => {
+                                let #option_some(#variant_tag_var) = #tag_var else {
+                                    return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, &#tag));
+                                };
+
+                                let #body_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var)?;
+
+                                break #result_ok(match #variant_tag_var {
+                                    #(#patterns,)*
+                                    #fallback
+                                });
+                            }
+                            #field_var => {
+                                if #skip_field(#entry_var)? {
+                                    return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, &#field_var));
+                                }
+                            }
+                        }
+                    };
+                }
+                NameMethod::Unsized(method) => {
                     outcome_enum = quote! {
                         enum #outcome_type { Tag, Content, Skip }
                     };
@@ -544,9 +575,10 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                     });
 
                     let visit_type = &en.name_type;
+                    let method = method.as_method_name();
 
                     decode_match = quote! {
-                        let outcome = #decoder_t::visit(#field_name_var, |#value_var: &#visit_type| {
+                        let outcome = #decoder_t::#method(#field_name_var, |#value_var: &#visit_type| {
                             #result_ok(match #value_var {
                                 #tag => #outcome_type::Tag,
                                 #content => #outcome_type::Content,
@@ -580,35 +612,6 @@ fn decode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                             #outcome_type::Skip => {
                                 if #skip_field(#entry_var)? {
                                     return #result_err(#context_t::invalid_field_string_tag(#ctx_var, #type_name, #field_alloc_var));
-                                }
-                            }
-                        }
-                    };
-                }
-                NameMethod::Value => {
-                    field_alloc = None;
-
-                    decode_match = quote! {
-                        match #decode_t_decode(#ctx_var, decoder)? {
-                            #tag => {
-                                let #variant_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var)?;
-                                #tag_var = #option_some(#decode_tag);
-                            }
-                            #content => {
-                                let #option_some(#variant_tag_var) = #tag_var else {
-                                    return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, &#tag));
-                                };
-
-                                let #body_decoder_var = #struct_field_decoder_t::decode_field_value(#entry_var)?;
-
-                                break #result_ok(match #variant_tag_var {
-                                    #(#patterns,)*
-                                    #fallback
-                                });
-                            }
-                            #field_var => {
-                                if #skip_field(#entry_var)? {
-                                    return #result_err(#context_t::invalid_field_tag(#ctx_var, #type_name, &#field_var));
                                 }
                             }
                         }
@@ -859,7 +862,7 @@ fn decode_tagged(
 
             name_type = st.name_type.clone();
         }
-        NameMethod::Visit => {
+        NameMethod::Unsized(method) => {
             let mut outputs = Vec::new();
             let output_type =
                 e.cx.type_with_span("TagVisitorOutput", e.input.ident.span());
@@ -904,9 +907,10 @@ fn decode_tagged(
             });
 
             let visit_type = &st.name_type;
+            let method = method.as_method_name();
 
             decode_tag = quote! {
-                #decoder_t::visit(#struct_decoder_var, |#value_var: &#visit_type| {
+                #decoder_t::#method(#struct_decoder_var, |#value_var: &#visit_type| {
                     #result_ok(match #value_var {
                         #(#patterns,)*
                         #value_var => {

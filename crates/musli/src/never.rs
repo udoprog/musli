@@ -13,9 +13,9 @@ use core::marker;
 use crate::no_std::ToOwned;
 
 use crate::de::{
-    AsDecoder, Decode, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberVisitor,
-    PackDecoder, SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder,
-    TupleDecoder, ValueVisitor, VariantDecoder, Visit,
+    AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, MapDecoder, MapEntriesDecoder,
+    MapEntryDecoder, NumberVisitor, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
+    StructFieldDecoder, StructFieldsDecoder, TupleDecoder, ValueVisitor, VariantDecoder,
 };
 use crate::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
@@ -141,9 +141,18 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     }
 
     #[inline]
-    fn visit<T, F, O>(self, _: F) -> Result<O, Self::Error>
+    fn decode_unsized<T, F, O>(self, _: F) -> Result<O, Self::Error>
     where
-        T: ?Sized + Visit<'de, Self::Mode>,
+        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
+        F: FnOnce(&T) -> Result<O, Self::Error>,
+    {
+        match self._never {}
+    }
+
+    #[inline]
+    fn decode_unsized_bytes<T, F, O>(self, _: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + DecodeUnsizedBytes<'de, Self::Mode>,
         F: FnOnce(&T) -> Result<O, Self::Error>,
     {
         match self._never {}

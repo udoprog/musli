@@ -30,7 +30,8 @@ pub(super) enum Extra {
 
 pub(crate) enum Fn {
     Decode,
-    Visit,
+    DecodeUnsized,
+    DecodeUnsizedBytes,
 }
 
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
@@ -66,7 +67,11 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("DecodeVariant", Extra::None),
 ];
 
-pub(super) const DECODER_FNS: &[(&str, Fn)] = &[("decode", Fn::Decode), ("visit", Fn::Visit)];
+pub(super) const DECODER_FNS: &[(&str, Fn)] = &[
+    ("decode", Fn::Decode),
+    ("decode_unsized", Fn::DecodeUnsized),
+    ("decode_unsized_bytes", Fn::DecodeUnsizedBytes),
+];
 
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("String", Extra::Visitor(Ty::Str)),
@@ -233,15 +238,27 @@ impl Types {
                             }
                         }));
                 }
-                Fn::Visit => {
+                Fn::DecodeUnsized => {
                     self.item_impl.items.push(syn::ImplItem::Verbatim(quote::quote! {
                         #[inline(always)]
-                        fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+                        fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
                         where
-                            T: ?Sized + #crate_path::de::Visit<'de, Self::Mode>,
+                            T: ?Sized + #crate_path::de::DecodeUnsized<'de, Self::Mode>,
                             F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::context::Context>::Error>
                         {
-                            self.cx.visit(self, f)
+                            self.cx.decode_unsized(self, f)
+                        }
+                    }));
+                }
+                Fn::DecodeUnsizedBytes => {
+                    self.item_impl.items.push(syn::ImplItem::Verbatim(quote::quote! {
+                        #[inline(always)]
+                        fn decode_unsized_bytes<T, F, O>(self, f: F) -> Result<O, Self::Error>
+                        where
+                            T: ?Sized + #crate_path::de::DecodeUnsizedBytes<'de, Self::Mode>,
+                            F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::context::Context>::Error>
+                        {
+                            self.cx.decode_unsized_bytes(self, f)
                         }
                     }));
                 }

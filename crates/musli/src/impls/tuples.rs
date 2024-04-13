@@ -82,13 +82,6 @@ macro_rules! declare {
             }
         }
 
-        visit! {
-            {$ty0, $($ty,)*} ($ty0, $($ty),*)
-            where
-                $ty0: Decode<'de, M>,
-                $($ty: Decode<'de, M>),*
-        }
-
         impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)>
         where
             $ty0: Encode<M>,
@@ -124,13 +117,6 @@ macro_rules! declare {
                     Ok(Packed(($ident0, $($ident),*)))
                 })
             }
-        }
-
-        visit! {
-            {$ty0, $($ty,)*} Packed<($ty0, $($ty),*)>
-            where
-                $ty0: Decode<'de, M>,
-                $($ty: Decode<'de, M>),*
         }
 
         declare!($(($ty, $ident)),*);
