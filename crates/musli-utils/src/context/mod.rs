@@ -83,6 +83,9 @@ where
     type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
 
     #[inline]
+    fn clear(&self) {}
+
+    #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
     }
@@ -178,6 +181,9 @@ where
     type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
 
     #[inline]
+    fn clear(&self) {}
+
+    #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {
         self.alloc.alloc()
     }
@@ -246,6 +252,15 @@ where
     type Mark = ();
     type Buf<'this> = A::Buf<'this> where Self: 'this;
     type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
+
+    #[inline]
+    fn clear(&self) {
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            (*self.error.get()) = None;
+        }
+    }
 
     #[inline]
     fn alloc(&self) -> Option<Self::Buf<'_>> {

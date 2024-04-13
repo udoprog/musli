@@ -92,7 +92,7 @@ where
                     }
                     _ => {}
                 },
-                Kind::Bytes => {
+                Kind::Bytes | Kind::String => {
                     let len = if let Some(len) = tag.data() {
                         len as usize
                     } else {
@@ -129,7 +129,9 @@ where
                     remaining += len * 2;
                 }
                 kind => {
-                    return Err(self.cx.message(format_args!("Unsupported kind {kind:?}")));
+                    return Err(self
+                        .cx
+                        .message(format_args!("Cannot skip over kind {kind:?}")));
                 }
             }
         }
@@ -625,8 +627,8 @@ where
     }
 
     #[inline]
-    fn decode_usize(self) -> Result<usize, C::Error> {
-        decode_typed_unsigned(self.cx, self.reader)
+    fn decode_usize(mut self) -> Result<usize, C::Error> {
+        decode_typed_unsigned(self.cx, self.reader.borrow_mut())
     }
 
     #[inline]

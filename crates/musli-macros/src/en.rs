@@ -3,7 +3,7 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::Token;
 
-use crate::internals::attr::{EnumTag, EnumTagging, Packing};
+use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Variant};
 use crate::internals::tokens::Tokens;
 use crate::internals::Result;
@@ -215,20 +215,15 @@ fn insert_fields<'st>(
                 let field_name = syn::LitStr::new(&ident.to_string(), ident.span());
 
                 cx.trace.then(|| {
-                    let tag = st.name_format(name);
-
-                    quote! {
-                        #context_t::enter_named_field(#ctx_var, #field_name, #tag);
-                    }
+                    let name = st.name_format(name);
+                    quote!(#context_t::enter_named_field(#ctx_var, #field_name, #name);)
                 })
             }
             syn::Member::Unnamed(index) => {
                 let index = index.index;
                 cx.trace.then(|| {
-                    let tag = st.name_format(name);
-                    quote! {
-                        #context_t::enter_unnamed_field(#ctx_var, #index, #tag);
-                    }
+                    let name = st.name_format(name);
+                    quote!(#context_t::enter_unnamed_field(#ctx_var, #index, #name);)
                 })
             }
         };
@@ -352,13 +347,16 @@ fn encode_variant(
     let variant_encoder = b.cx.ident("variant_encoder");
     let tag_encoder = b.cx.ident("tag_encoder");
     let name_static = b.cx.ident("NAME");
+    let value_static = b.cx.ident("VALUE");
+    let tag_static = b.cx.ident("TAG");
+    let content_static = b.cx.ident("CONTENT");
 
     let type_name = v.st.name;
 
     let mut encode;
 
     match en.enum_tagging {
-        None => {
+        EnumTagging::Default => {
             match v.st.packing {
                 Packing::Transparent => {
                     let [f] = &v.st.unskipped_fields[..] else {
@@ -406,9 +404,9 @@ fn encode_variant(
                 encode = quote! {{
                     #encoder_t::encode_variant_fn(#encoder_var, move |#variant_encoder| {
                         let #tag_encoder = #variant_encoder_t::encode_tag(#variant_encoder)?;
-                        static #name_static: #name_type = #name;
+                        static #tag_static: #name_type = #name;
 
-                        #encode_t_encode(&#name_static, #ctx_var, #tag_encoder)?;
+                        #encode_t_encode(&#tag_static, #ctx_var, #tag_encoder)?;
 
                         let #encoder_var = #variant_encoder_t::encode_value(#variant_encoder)?;
                         #encode;
@@ -417,83 +415,77 @@ fn encode_variant(
                 }};
             }
         }
-        Some(enum_tagging) => match enum_tagging {
-            EnumTagging::Internal {
-                tag: EnumTag {
-                    value: field_tag, ..
-                },
-            } => {
-                let name = &v.name;
-                let name_type = en.name_local_type();
+        EnumTagging::Internal { tag } => {
+            let name = &v.name;
 
-                let decls = tests.iter().map(|t| &t.decl);
-                let mut len = length_test(v.st.unskipped_fields.len(), &tests);
+            let name_type = en.name_local_type();
 
-                // Add one for the tag field.
-                len.expressions.push(quote!(1));
+            let decls = tests.iter().map(|t| &t.decl);
+            let mut len = length_test(v.st.unskipped_fields.len(), &tests);
 
-                let (build_hint, hint) = len.build(b);
+            // Add one for the tag field.
+            len.expressions.push(quote!(1));
 
-                encode = quote! {{
-                    #build_hint
+            let (build_hint, hint) = len.build(b);
 
-                    #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
-                        static #name_static: #name_type = #name;
-                        #struct_encoder_t::insert_struct_field(#encoder_var, #field_tag, #name_static)?;
-                        #(#decls)*
-                        #(#encoders)*
-                        #result_ok(())
-                    })?
-                }};
-            }
-            EnumTagging::Adjacent {
-                tag: EnumTag {
-                    value: field_tag, ..
-                },
-                content,
-            } => {
-                let encode_t_encode = &b.encode_t_encode;
+            encode = quote! {{
+                #build_hint
 
-                let name = &v.name;
-                let name_type = en.name_local_type();
+                #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
+                    static #name_static: #name_type = #tag;
+                    static #value_static: #name_type = #name;
+                    #struct_encoder_t::insert_struct_field(#encoder_var, #name_static, #value_static)?;
+                    #(#decls)*
+                    #(#encoders)*
+                    #result_ok(())
+                })?
+            }};
+        }
+        EnumTagging::Adjacent { tag, content } => {
+            let encode_t_encode = &b.encode_t_encode;
 
-                let decls = tests.iter().map(|t| &t.decl);
+            let name = &v.name;
+            let name_type = en.name_local_type();
 
-                let (build_hint, inner_hint) =
-                    length_test(v.st.unskipped_fields.len(), &tests).build(b);
-                let struct_encoder = b.cx.ident("struct_encoder");
-                let content_struct = b.cx.ident("content_struct");
-                let pair = b.cx.ident("pair");
-                let content_tag = b.cx.ident("content_tag");
+            let decls = tests.iter().map(|t| &t.decl);
 
-                encode = quote! {{
-                    static #hint: #struct_hint = #struct_hint::with_size(2);
-                    #build_hint
+            let (build_hint, inner_hint) =
+                length_test(v.st.unskipped_fields.len(), &tests).build(b);
+            let struct_encoder = b.cx.ident("struct_encoder");
+            let content_struct = b.cx.ident("content_struct");
+            let pair = b.cx.ident("pair");
+            let content_tag = b.cx.ident("content_tag");
 
-                    #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#struct_encoder| {
-                        static #name_static: #name_type = #name;
-                        #struct_encoder_t::insert_struct_field(#struct_encoder, &#field_tag, #name_static)?;
+            encode = quote! {{
+                static #hint: #struct_hint = #struct_hint::with_size(2);
+                #build_hint
 
-                        #struct_encoder_t::encode_struct_field_fn(#struct_encoder, move |#pair| {
-                            let #content_tag = #struct_field_encoder_t::encode_field_name(#pair)?;
-                            #encode_t_encode(&#content, #ctx_var, #content_tag)?;
+                #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#struct_encoder| {
+                    static #tag_static: #name_type = #tag;
+                    static #name_static: #name_type = #name;
+                    static #content_static: #name_type = #content;
 
-                            let #content_struct = #struct_field_encoder_t::encode_field_value(#pair)?;
+                    #struct_encoder_t::insert_struct_field(#struct_encoder, #tag_static, #name_static)?;
 
-                            #encoder_t::encode_struct_fn(#content_struct, &#inner_hint, move |#encoder_var| {
-                                #(#decls)*
-                                #(#encoders)*
-                                #result_ok(())
-                            })?;
+                    #struct_encoder_t::encode_struct_field_fn(#struct_encoder, move |#pair| {
+                        let #content_tag = #struct_field_encoder_t::encode_field_name(#pair)?;
+                        #encode_t_encode(&#content_static, #ctx_var, #content_tag)?;
 
+                        let #content_struct = #struct_field_encoder_t::encode_field_value(#pair)?;
+
+                        #encoder_t::encode_struct_fn(#content_struct, &#inner_hint, move |#encoder_var| {
+                            #(#decls)*
+                            #(#encoders)*
                             #result_ok(())
                         })?;
 
                         #result_ok(())
-                    })?
-                }};
-            }
-        },
+                    })?;
+
+                    #result_ok(())
+                })?
+            }};
+        }
     }
 
     let pattern = syn::PatStruct {

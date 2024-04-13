@@ -26,19 +26,17 @@ struct OneOf<T> {
     any: T,
 }
 
-/// The value and method to encode / decode a tag.
-#[derive(Clone, Copy)]
-pub(crate) struct EnumTag<'a> {
-    pub(crate) value: &'a syn::Expr,
-}
-
-#[derive(Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub(crate) enum EnumTagging<'a> {
+    /// Use the default tagging method, as provided by the encoder-specific
+    /// method.
+    #[default]
+    Default,
     /// The type is internally tagged by the field given by the expression.
-    Internal { tag: EnumTag<'a> },
+    Internal { tag: &'a syn::Expr },
     /// An enumerator is adjacently tagged.
     Adjacent {
-        tag: EnumTag<'a>,
+        tag: &'a syn::Expr,
         content: &'a syn::Expr,
     },
 }
@@ -213,14 +211,14 @@ impl TypeAttr {
     }
 
     /// Indicates the state of enum tagging.
-    pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
-        let (_, tag) = self.tag(mode)?;
-
-        let tag = EnumTag { value: tag };
+    pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> EnumTagging<'_> {
+        let Some((_, tag)) = self.tag(mode) else {
+            return EnumTagging::Default;
+        };
 
         match self.content(mode) {
-            Some((_, content)) => Some(EnumTagging::Adjacent { tag, content }),
-            _ => Some(EnumTagging::Internal { tag }),
+            Some((_, content)) => EnumTagging::Adjacent { tag, content },
+            _ => EnumTagging::Internal { tag },
         }
     }
 

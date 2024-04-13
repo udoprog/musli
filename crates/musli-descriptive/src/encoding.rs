@@ -151,7 +151,7 @@ impl<M, const OPT: Options> Encoding<M, OPT> {
         SelfEncoder::<_, OPT, _>::new,
         SelfDecoder::<_, OPT, _>::new
     );
-    musli_utils::encoding_from_slice_impls!(M, SelfDecoder::<_, F>::new);
+    musli_utils::encoding_from_slice_impls!(M);
 }
 
 impl<M, const OPT: Options> Clone for Encoding<M, OPT> {

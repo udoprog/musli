@@ -149,7 +149,7 @@ impl Body<'_> {
 pub(crate) struct Enum<'a> {
     pub(crate) span: Span,
     pub(crate) name: &'a syn::LitStr,
-    pub(crate) enum_tagging: Option<EnumTagging<'a>>,
+    pub(crate) enum_tagging: EnumTagging<'a>,
     pub(crate) enum_packing: Packing,
     pub(crate) variants: Vec<Variant<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
@@ -304,7 +304,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         e.type_attr.name_method(mode),
     );
 
-    if enum_tagging.is_some() {
+    if !matches!(enum_tagging, EnumTagging::Default) {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
             Some(&(span, packing)) => {

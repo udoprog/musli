@@ -35,6 +35,9 @@ pub trait Context {
     where
         Self: 'this;
 
+    /// Clear the state of the context, allowing it to be re-used.
+    fn clear(&self);
+
     /// Decode the given input using the associated mode.
     #[inline]
     fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
@@ -167,7 +170,7 @@ pub trait Context {
     where
         T: ?Sized + fmt::Debug,
     {
-        self.message(format_args!("Invalid variant tag: {tag:?}"))
+        self.message(format_args!("Invalid variant tag {tag:?}"))
     }
 
     /// The value for the given tag could not be collected.
@@ -191,7 +194,28 @@ pub trait Context {
     where
         T: ?Sized + fmt::Debug,
     {
-        self.message(format_args!("Invalid field tag `{tag:?}`"))
+        self.message(format_args!("Invalid field tag {tag:?}"))
+    }
+
+    /// Expected another field to decode.
+    #[inline(always)]
+    fn expected_field_adjacent<T, C>(&self, _: &'static str, tag: &T, content: &C) -> Self::Error
+    where
+        T: ?Sized + fmt::Debug,
+        C: ?Sized + fmt::Debug,
+    {
+        self.message(format_args!(
+            "Expected adjacent field {tag:?} or {content:?}"
+        ))
+    }
+
+    /// Missing adjacent tag when decoding.
+    #[inline(always)]
+    fn missing_adjacent_tag<T>(&self, _: &'static str, tag: &T) -> Self::Error
+    where
+        T: ?Sized + fmt::Debug,
+    {
+        self.message(format_args!("Missing adjacent tag {tag:?}"))
     }
 
     /// Encountered an unsupported field tag.
@@ -201,9 +225,9 @@ pub trait Context {
         let bytes = field.as_slice();
 
         if let Ok(string) = str::from_utf8(bytes) {
-            self.message(format_args!("Invalid field tag: {string}"))
+            self.message(format_args!("Invalid field tag {string:?}"))
         } else {
-            self.message(format_args!("Invalid field tag"))
+            self.message(format_args!("Invalid field tag {bytes:?}"))
         }
     }
 
