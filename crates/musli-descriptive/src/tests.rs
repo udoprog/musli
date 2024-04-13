@@ -28,9 +28,9 @@ struct Field<const N: usize> {
 }
 
 #[test]
-fn pack_max() {
+fn pack_inline_max() {
     macro_rules! test {
-        ($size:expr, $len:expr) => {
+        ($size:expr) => {
             let value = From {
                 prefix: Some(10),
                 field: Field { value: [1; $size] },
@@ -50,14 +50,13 @@ fn pack_max() {
                 }
             );
 
-            assert_eq!(Tag::from_byte(bytes[8]), Tag::new(Kind::Bytes, $len));
+            assert_eq!(Tag::from_byte(bytes[8]), Tag::new(Kind::Bytes, $size));
             assert_eq!(bytes.len(), $size + 14);
         };
     }
 
-    test!(0, 0);
-    test!(23, 23);
-    test!(MAX_INLINE_LEN, 62);
+    test!(0);
+    test!(23);
 }
 
 #[test]

@@ -77,22 +77,22 @@ pub const MAX_INLINE_LEN: usize = (DATA_MASK - 1) as usize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Kind {
-    /// A positive continuation-encoded numerical value.
-    Number = 0b000_00000,
+    /// Reserved 0.
+    Reserved0 = 0b000_00000,
+    /// Reserved 1.
+    Reserved1 = 0b001_00000,
+    /// A continuation-encoded numerical value.
+    Number = 0b010_00000,
     /// A length-prefixed sequence of value.
-    Sequence = 0b001_00000,
+    Sequence = 0b011_00000,
     /// A length-prefixed map.
-    Map = 0b010_00000,
+    Map = 0b100_00000,
     /// A sequence of raw bytes.
-    Bytes = 0b011_00000,
+    Bytes = 0b101_00000,
     /// A string.
-    String = 0b100_00000,
-    /// A marker value.
-    Mark = 0b110_00000,
-    /// Reserved.
-    Reserved0 = 0b101_00000,
-    /// Reserved.
-    Reserved1 = 0b111_00000,
+    String = 0b110_00000,
+    /// A distinct mark.
+    Mark = 0b111_00000,
 }
 
 /// A type tag.
