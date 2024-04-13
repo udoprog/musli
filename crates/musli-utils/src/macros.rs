@@ -291,16 +291,35 @@ macro_rules! test_fns {
         #[doc(hidden)]
         #[track_caller]
         #[cfg(feature = "test")]
-        pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, _hint: &U) -> U
+        pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
         where
             T: ::musli::en::Encode + ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: ::musli::de::Decode<'de>,
+            U: ::musli::de::Decode<'de> + ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
             const ENCODING: crate::Encoding = crate::Encoding::new();
 
             use ::core::any::type_name;
             use ::alloc::string::ToString;
+
+            struct FormatBytes<'a>(&'a [u8]);
+
+            impl ::core::fmt::Display for FormatBytes<'_> {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    write!(f, "b\"")?;
+
+                    for b in self.0 {
+                        if b.is_ascii_graphic() {
+                            write!(f, "{}", *b as char)?;
+                        } else {
+                            write!(f, "\\x{b:02x}")?;
+                        }
+                    }
+
+                    write!(f, "\"")?;
+                    Ok(())
+                }
+            }
 
             $crate::allocator::with(|alloc| {
                 let mut cx = $crate::context::SystemContext::new(alloc);
@@ -316,13 +335,23 @@ macro_rules! test_fns {
                     }
                 };
 
-                match ENCODING.from_slice_with(&cx, out) {
+                let actual = match ENCODING.from_slice_with(&cx, &*out) {
                     Ok(decoded) => decoded,
                     Err(error) => {
+                        let out = FormatBytes(&*out);
                         let error = cx.report();
-                        panic!("{WHAT}: {}: failed to decode:\n{error}", type_name::<T>())
+                        panic!("{WHAT}: {}: failed to decode:\nBytes: {out}\n{error}", type_name::<T>())
                     }
-                }
+                };
+
+                assert_eq!(
+                    actual,
+                    *expected,
+                    "{WHAT}: decoded value does not match expected\nBytes: {}",
+                    FormatBytes(&*out),
+                );
+
+                actual
             })
         }
 
