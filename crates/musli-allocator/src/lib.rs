@@ -122,6 +122,7 @@ pub type Default<'a> = Stack<'a>;
 /// });
 /// ```
 #[inline(always)]
+#[track_caller]
 pub fn with<F, O>(f: F) -> O
 where
     F: FnOnce(&Default<'_>) -> O,
@@ -131,6 +132,7 @@ where
 
 #[cfg(feature = "alloc")]
 #[inline(always)]
+#[track_caller]
 fn with_impl<F, O>(f: F) -> O
 where
     F: FnOnce(&System) -> O,
@@ -141,6 +143,7 @@ where
 
 #[cfg(not(feature = "alloc"))]
 #[inline(always)]
+#[track_caller]
 fn with_impl<F, O>(f: F) -> O
 where
     F: FnOnce(&Stack<'_>) -> O,

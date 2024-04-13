@@ -7,6 +7,8 @@ use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Token;
 
+use crate::expander::NameMethod;
+use crate::expander::UnsizedMethod;
 use crate::internals::name::NameAll;
 use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
@@ -185,6 +187,8 @@ layer! {
         name_type: syn::Type,
         /// `#[musli(name_all = "..")]`.
         name_all: NameAll,
+        /// `#[musli(name_method = "..")]`.
+        name_method: NameMethod,
         /// `#[musli(name_format_with)]`.
         name_format_with: syn::Path,
         /// If `#[musli(tag = <expr>)]` is specified.
@@ -336,6 +340,13 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
+            // parse #[musli(name_method = "..")]
+            if meta.path.is_ident("name_method") {
+                new.name_method
+                    .push((meta.path.span(), parse_name_method(&meta)?));
+                return Ok(());
+            }
+
             Err(syn::Error::new_spanned(
                 meta.path,
                 format_args!("#[{ATTR}] Unsupported type attribute"),
@@ -358,6 +369,23 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
     }
 
     attr
+}
+
+fn parse_name_method(meta: &syn::meta::ParseNestedMeta<'_>) -> Result<NameMethod, syn::Error> {
+    meta.input.parse::<Token![=]>()?;
+
+    let string: syn::LitStr = meta.input.parse()?;
+    let s = string.value();
+
+    match s.as_str() {
+        "value" => Ok(NameMethod::Value),
+        "unsized" => Ok(NameMethod::Unsized(UnsizedMethod::Default)),
+        "unsized_bytes" => Ok(NameMethod::Unsized(UnsizedMethod::Bytes)),
+        _ => Err(syn::Error::new_spanned(
+            string,
+            "#[musli(name_method = ..)]: Bad value, expected one of \"value\", \"unsized\", \"unsized_bytes\"",
+        )),
+    }
 }
 
 fn parse_name_all(meta: &syn::meta::ParseNestedMeta<'_>) -> Result<NameAll, syn::Error> {
@@ -407,8 +435,12 @@ layer! {
         name_format_with: syn::Path,
         /// Name a variant with the given expression.
         name: syn::Expr,
+        /// Pattern used to match the given field when decoding.
+        pattern: syn::Pat,
         /// `#[musli(name_all = "..")]`.
         name_all: NameAll,
+        /// `#[musli(name_method = "..")]`.
+        name_method: NameMethod,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
         /// `#[musli(default)]`.
@@ -477,6 +509,14 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
+            // parse #[musli(pattern = <expr>)]
+            if meta.path.is_ident("pattern") {
+                meta.input.parse::<Token![=]>()?;
+                new.pattern
+                    .push((meta.path.span(), meta.input.call(syn::Pat::parse_single)?));
+                return Ok(());
+            }
+
             // parse #[musli(default)]
             if meta.path.is_ident("default") {
                 new.default_variant.push((meta.path.span(), ()));
@@ -499,6 +539,13 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             if meta.path.is_ident("name_all") {
                 new.name_all
                     .push((meta.path.span(), parse_name_all(&meta)?));
+                return Ok(());
+            }
+
+            // parse #[musli(name_method = "..")]
+            if meta.path.is_ident("name_method") {
+                new.name_method
+                    .push((meta.path.span(), parse_name_method(&meta)?));
                 return Ok(());
             }
 
@@ -536,6 +583,8 @@ layer! {
         skip_encoding_if: syn::Path,
         /// Rename a field to the given literal.
         name: syn::Expr,
+        /// Pattern used to match the given field when decoding.
+        pattern: syn::Pat,
         /// Use a default value for the field if it's not available.
         is_default: Option<syn::Path>,
         /// Use a default value for the field if it's not available.
@@ -662,6 +711,14 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
             if meta.path.is_ident("name") {
                 meta.input.parse::<Token![=]>()?;
                 new.name.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            // parse #[musli(pattern = <expr>)]
+            if meta.path.is_ident("pattern") {
+                meta.input.parse::<Token![=]>()?;
+                new.pattern
+                    .push((meta.path.span(), meta.input.call(syn::Pat::parse_single)?));
                 return Ok(());
             }
 

@@ -340,6 +340,23 @@
 //!
 //! <br>
 //!
+//! #### `#[musli(name_method = ..)]`
+//!
+//! This allows for explicitly setting which method should be used to decode
+//! names. Available options are:
+//!
+//! * `"value"` (default) - the name is decoded as a value.
+//! * `"unsized"` - the name is decoded as an unsized value, this is the default
+//!   if for example `#[musli(name_type = str)]` is used.
+//! * `"unsized_bytes"` - the name is decoded as a unsized bytes, this is the
+//!   default if for example `#[musli(name_type = [u8])]` is used.
+//!
+//! This can be overrided for values which are unsized, but cannot be determined
+//! through heuristics. Such a type must also implement [`Decode`] (for
+//! `"value"`), `DecodeUnsized`, or `DecodeUnsizedBytes` as appropriate.
+//!
+//! <br>
+//!
 //! #### `#[musli(bound = {..})]` and `#[musli(decode_bound = {..})]`
 //!
 //! These attributes can be used to apply bounds to an [`Encode`] or [`Decode`]
@@ -380,7 +397,7 @@
 //! # #[derive(Encode, Decode)] struct Params;
 //! # #[derive(Encode, Decode)] struct Value;
 //! #[derive(Encode, Decode)]
-//! #[musli(tag = "type")]
+//! #[musli(name_all = "name", tag = "type")]
 //! enum Message {
 //!     Request { id: String, method: String, params: Params },
 //!     Response { id: String, result: Value },
@@ -426,6 +443,26 @@
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through
 //! the `#[musli(name_type)]` attribute.
+//!
+//! <br>
+//!
+//! #### `#[musli(pattern = ..)]`
+//!
+//! A pattern to match for decoding a variant.
+//!
+//! This allows for more flexibility when decoding variants.
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! enum Enum {
+//!     Variant1,
+//!     Variant2,
+//!     #[musli(pattern = 2..=4)]
+//!     Deprecated,
+//! }
+//! ```
 //!
 //! <br>
 //!
@@ -515,6 +552,21 @@
 //!
 //! <br>
 //!
+//! #### `#[musli(name_method = ..)]`
+//!
+//! This allows for explicitly setting which method should be used to decode
+//! field names. Available options are:
+//!
+//! * `"value"` (default) - the name is decoded as a value.
+//! * `"unsized"` - the name is decoded as an unsized value, this is the default
+//!   if for example `#[musli(name_type = str)]` is used.
+//! * `"unsized_bytes"` - the name is decoded as a unsized bytes, this is the
+//!   default if for example `#[musli(name_type = [u8])]` is used.
+//!
+//! This can be overrided for values which are unsized, but cannot be determined
+//! through heuristics. Such a type must also implement [`Decode`] (for
+//! `"value"`), `DecodeUnsized`, or `DecodeUnsizedBytes` as appropriate.
+//!
 //! <br>
 //!
 //! #### `#[musli(transparent)]`
@@ -570,6 +622,7 @@
 //! #[derive(Encode, Decode)]
 //! #[musli(name_all = "name")]
 //! enum Enum {
+//!     #[musli(name_all = "name")]
 //!     Variant {
 //!         #[musli(name = "other")]
 //!         something: String,
@@ -654,6 +707,26 @@
 //!
 //! If the type of the tag is ambiguous it can be explicitly specified through
 //! the `#[musli(name_type)]` variant or container attributes.
+//!
+//! <br>
+//!
+//! #### `#[musli(pattern = ..)]`
+//!
+//! A pattern to match for decoding the given field.
+//!
+//! This allows for more flexibility when decoding fields.
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! struct Struct {
+//!     field1: u32,
+//!     field2: u32,
+//!     #[musli(pattern = 2..=4)]
+//!     other: u32,
+//! }
+//! ```
 //!
 //! <br>
 //!
@@ -920,7 +993,7 @@
 //! # #[derive(Encode, Decode)] struct Params;
 //! # #[derive(Encode, Decode)] struct Value;
 //! #[derive(Encode, Decode)]
-//! #[musli(tag = "type")]
+//! #[musli(name_all = "name", tag = "type")]
 //! enum Message {
 //!     Request { id: String, method: String, params: Params },
 //!     Response { id: String, result: Value },

@@ -32,6 +32,15 @@ pub(crate) enum NameMethod {
     Unsized(UnsizedMethod),
 }
 
+impl NameMethod {
+    pub(crate) fn name_all(&self) -> Option<NameAll> {
+        match self {
+            Self::Value => None,
+            Self::Unsized(_) => Some(NameAll::Name),
+        }
+    }
+}
+
 pub(crate) struct FieldData<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
@@ -223,7 +232,7 @@ pub(crate) trait Taggable {
 }
 
 /// Expand the given configuration to the appropriate tag expression.
-pub(crate) fn expand_tag(
+pub(crate) fn expand_name(
     taggable: &dyn Taggable,
     mode: Mode<'_>,
     name_all: NameAll,
