@@ -26,8 +26,8 @@ use core::str;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip, TypeHint,
-    ValueVisitor, Visit, Visitor,
+    Decode, DecodeUnsized, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip,
+    TypeHint, ValueVisitor, Visitor,
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
@@ -155,12 +155,12 @@ where
     }
 
     #[inline]
-    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        T: ?Sized + Visit<'de, Self::Mode>,
+        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
         F: FnOnce(&T) -> Result<O, Self::Error>,
     {
-        self.cx.visit(self, f)
+        self.cx.decode_unsized(self, f)
     }
 
     #[inline]

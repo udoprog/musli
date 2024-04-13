@@ -6,7 +6,7 @@ use syn::Token;
 
 use crate::de::{build_call, build_reference};
 use crate::expander::{
-    self, Data, EnumData, Expander, FieldData, NameMethod, StructData, VariantData,
+    self, Data, EnumData, Expander, FieldData, NameMethod, StructData, UnsizedMethod, VariantData,
 };
 
 use super::attr::{EnumTagging, Packing};
@@ -135,7 +135,7 @@ impl Body<'_> {
 
     pub(crate) fn name_local_type(&self) -> syn::Type {
         match self.name_method {
-            NameMethod::Visit => syn::Type::Reference(syn::TypeReference {
+            NameMethod::Unsized(..) => syn::Type::Reference(syn::TypeReference {
                 and_token: <Token![&]>::default(),
                 lifetime: None,
                 mutability: None,
@@ -169,7 +169,7 @@ impl Enum<'_> {
 
     pub(crate) fn name_local_type(&self) -> syn::Type {
         match self.name_method {
-            NameMethod::Visit => syn::Type::Reference(syn::TypeReference {
+            NameMethod::Unsized(..) => syn::Type::Reference(syn::TypeReference {
                 and_token: <Token![&]>::default(),
                 lifetime: None,
                 mutability: None,
@@ -546,14 +546,21 @@ fn split_name(
 
 fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {
     match ty {
-        syn::Type::Path(syn::TypePath { qself: None, path }) => {
-            if path.is_ident("str") {
-                return (NameMethod::Visit, Some(NameAll::Name));
+        syn::Type::Path(syn::TypePath { qself: None, path }) if path.is_ident("str") => {
+            return (
+                NameMethod::Unsized(UnsizedMethod::Default),
+                Some(NameAll::Name),
+            );
+        }
+        syn::Type::Slice(syn::TypeSlice { elem, .. }) => match &**elem {
+            syn::Type::Path(syn::TypePath { qself: None, path }) if path.is_ident("u8") => {
+                return (
+                    NameMethod::Unsized(UnsizedMethod::Bytes),
+                    Some(NameAll::Name),
+                );
             }
-        }
-        syn::Type::Slice(..) => {
-            return (NameMethod::Visit, None);
-        }
+            _ => {}
+        },
         _ => {}
     }
 

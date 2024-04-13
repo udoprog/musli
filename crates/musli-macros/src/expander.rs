@@ -7,13 +7,29 @@ use crate::internals::name::NameAll;
 use crate::internals::tokens::Tokens;
 use crate::internals::{Ctxt, Expansion, Mode, Only, Result};
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy)]
+pub(crate) enum UnsizedMethod {
+    Default,
+    Bytes,
+}
+
+impl UnsizedMethod {
+    /// Get corresponding decoder method name to use.
+    pub(crate) fn as_method_name(&self) -> syn::Ident {
+        match self {
+            Self::Default => syn::Ident::new("decode_unsized", Span::call_site()),
+            Self::Bytes => syn::Ident::new("decode_unsized_bytes", Span::call_site()),
+        }
+    }
+}
+
+#[derive(Default, Clone, Copy)]
 pub(crate) enum NameMethod {
-    /// Load the tag by visit.
-    Visit,
     /// Load the tag by value.
     #[default]
     Value,
+    /// Load the tag by visit.
+    Unsized(UnsizedMethod),
 }
 
 pub(crate) struct FieldData<'a> {

@@ -1,7 +1,7 @@
 use core::fmt;
 use core::mem::take;
 
-use crate::expander::NameMethod;
+use crate::expander::{NameMethod, UnsizedMethod};
 
 #[derive(Default, Debug, Clone, Copy)]
 #[allow(clippy::enum_variant_names)]
@@ -41,7 +41,7 @@ impl NameAll {
     pub(crate) fn name_method(&self) -> NameMethod {
         match self {
             NameAll::Index => NameMethod::Value,
-            _ => NameMethod::Visit,
+            _ => NameMethod::Unsized(UnsizedMethod::Default),
         }
     }
 

@@ -1,78 +1,3 @@
-/// Forward implementation of `Visit` which simply decodes the value on the
-/// stack allowing it to be visited.
-macro_rules! visit {
-    (
-        $(#[cfg($($meta:meta)*)])*
-        $({$($impl:tt)*})? $ty:ty $(where $($where:tt)*)?
-    ) => {
-        $(
-            #[cfg($($meta)*)]
-            #[cfg_attr(doc_cfg, doc(cfg($($meta)*)))]
-        )*
-        impl<'de, M $(, $($impl)*)*> $crate::de::Visit<'de, M> for $ty $(where $($where)*)? {
-            #[inline(always)]
-            fn visit<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
-            where
-                D: $crate::de::Decoder<'de, Mode = M>,
-                F: FnOnce(&Self) -> Result<O, D::Error>,
-            {
-                let value = $crate::de::Decode::<M>::decode(cx, decoder)?;
-                f(&value)
-            }
-        }
-    }
-}
-
-/// Forward implementation of `Visit` which uses the deref implementation of something.
-#[cfg(feature = "alloc")]
-macro_rules! visit_deref {
-    (
-        $(#[cfg($($meta:meta)*)])*
-        $({$($impl:tt)*})? $ty:ty as $other:ty $(where $($where:tt)*)?
-    ) => {
-        $(
-            #[cfg($($meta)*)]
-            #[cfg_attr(doc_cfg, doc(cfg($($meta)*)))]
-        )*
-        impl<'de, M $(, $($impl)*)*> $crate::de::Visit<'de, M> for $other $(where $($where)*)? {
-            #[inline(always)]
-            fn visit<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
-            where
-                D: $crate::de::Decoder<'de, Mode = M>,
-                F: FnOnce(&Self) -> Result<O, D::Error>,
-            {
-                let value: $ty = $crate::de::Decode::<M>::decode(cx, decoder)?;
-                f(&value)
-            }
-        }
-    }
-}
-
-/// Forward implementation of `VisitBytes` which simply decodes the value on the
-/// stack allowing it to be visited.
-macro_rules! visit_bytes {
-    (
-        $(#[cfg($($meta:meta)*)])*
-        $({$($impl:tt)*})? $ty:ty $(where $($where:tt)*)?
-    ) => {
-        $(
-            #[cfg($($meta)*)]
-            #[cfg_attr(doc_cfg, doc(cfg($($meta)*)))]
-        )*
-        impl<'de, M $(, $($impl)*)*> $crate::de::VisitBytes<'de, M> for $ty $(where $($where)*)? {
-            #[inline(always)]
-            fn visit_bytes<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
-            where
-                D: $crate::de::Decoder<'de, Mode = M>,
-                F: FnOnce(&Self) -> Result<O, D::Error>,
-            {
-                let value = $crate::de::DecodeBytes::<M>::decode_bytes(cx, decoder)?;
-                f(&value)
-            }
-        }
-    }
-}
-
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 mod alloc;
@@ -89,7 +14,9 @@ use core::num::{
 };
 use core::{fmt, marker};
 
-use crate::de::{Decode, DecodeBytes, Decoder, ValueVisitor, VariantDecoder, Visit, VisitBytes};
+use crate::de::{
+    Decode, DecodeBytes, DecodeUnsized, DecodeUnsizedBytes, Decoder, ValueVisitor, VariantDecoder,
+};
 use crate::en::{Encode, EncodeBytes, Encoder, SequenceEncoder, VariantEncoder};
 use crate::hint::SequenceHint;
 use crate::Context;
@@ -123,8 +50,6 @@ impl<'de, M> Decode<'de, M> for () {
     }
 }
 
-visit!(());
-
 impl<T, M> Encode<M> for marker::PhantomData<T> {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -146,8 +71,6 @@ impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T> {
     }
 }
 
-visit!({T} marker::PhantomData<T>);
-
 macro_rules! atomic_impl {
     ($size:literal $(, $ty:ident)*) => {
         $(
@@ -160,8 +83,6 @@ macro_rules! atomic_impl {
                     decoder.decode().map(Self::new)
                 }
             }
-
-            visit!(core::sync::atomic::$ty);
         )*
     };
 }
@@ -200,8 +121,6 @@ macro_rules! non_zero {
                 }
             }
         }
-
-        visit!($ty);
     };
 }
 
@@ -267,8 +186,6 @@ impl<'de, M, const N: usize> Decode<'de, M> for [u8; N] {
     }
 }
 
-visit!({const N: usize} [u8; N]);
-
 macro_rules! impl_number {
     ($ty:ty, $read:ident, $write:ident) => {
         impl<M> Encode<M> for $ty {
@@ -290,8 +207,6 @@ macro_rules! impl_number {
                 decoder.$read()
             }
         }
-
-        visit!($ty);
     };
 }
 
@@ -315,8 +230,6 @@ impl<'de, M> Decode<'de, M> for bool {
     }
 }
 
-visit!(bool);
-
 impl<M> Encode<M> for char {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -336,8 +249,6 @@ impl<'de, M> Decode<'de, M> for char {
         decoder.decode_char()
     }
 }
-
-visit!(char);
 
 impl_number!(usize, decode_usize, encode_usize);
 impl_number!(isize, decode_isize, encode_isize);
@@ -393,9 +304,9 @@ impl<'de, M> Decode<'de, M> for &'de str {
     }
 }
 
-impl<'de, M> Visit<'de, M> for str {
+impl<'de, M> DecodeUnsized<'de, M> for str {
     #[inline]
-    fn visit<D, F, O>(_: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
+    fn decode_unsized<D, F, O>(_: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
     where
         D: Decoder<'de>,
         F: FnOnce(&Self) -> Result<O, D::Error>,
@@ -478,9 +389,9 @@ impl<'de, M> Decode<'de, M> for &'de [u8] {
     }
 }
 
-impl<'de, M> VisitBytes<'de, M> for [u8] {
+impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
     #[inline]
-    fn visit_bytes<D, F, O>(_: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
+    fn decode_unsized_bytes<D, F, O>(_: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
     where
         D: Decoder<'de>,
         F: FnOnce(&Self) -> Result<O, D::Error>,
@@ -542,8 +453,6 @@ where
     }
 }
 
-visit!({T} Option<T> where T: Decode<'de, M>);
-
 #[derive(Encode, Decode)]
 #[musli(crate)]
 enum ResultTag {
@@ -591,8 +500,6 @@ where
     }
 }
 
-visit!({T, U} Result<T, U> where T: Decode<'de, M>, U: Decode<'de, M>);
-
 impl<T, M> Encode<M> for Wrapping<T>
 where
     T: Encode<M>,
@@ -619,8 +526,6 @@ where
     }
 }
 
-visit!({T} Wrapping<T> where T: Decode<'de, M>);
-
 impl<M> Encode<M> for CStr {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -639,6 +544,20 @@ impl<'de, M> Decode<'de, M> for &'de CStr {
     {
         let bytes = decoder.decode()?;
         CStr::from_bytes_with_nul(bytes).map_err(cx.map())
+    }
+}
+
+impl<'de, M> DecodeUnsized<'de, M> for CStr {
+    #[inline(always)]
+    fn decode_unsized<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
+    where
+        D: Decoder<'de, Mode = M>,
+        F: FnOnce(&Self) -> Result<O, D::Error>,
+    {
+        cx.decode_unsized_bytes(decoder, |bytes: &[u8]| {
+            let cstr = CStr::from_bytes_with_nul(bytes).map_err(cx.map())?;
+            f(cstr)
+        })
     }
 }
 
@@ -681,5 +600,3 @@ impl<'de, M, const N: usize> DecodeBytes<'de, M> for [u8; N] {
         decoder.decode_array()
     }
 }
-
-visit_bytes!({const N: usize} [u8; N]);

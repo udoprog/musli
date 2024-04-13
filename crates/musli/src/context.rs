@@ -3,7 +3,7 @@
 use core::fmt;
 use core::str;
 
-use crate::de::{DecodeBytes, Visit};
+use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
 use crate::{Buf, Decode, Decoder};
 
 #[cfg(feature = "std")]
@@ -45,15 +45,15 @@ pub trait Context {
         T::decode(self, decoder)
     }
 
-    /// Decode the given visit using the associated mode.
+    /// Decode the given unsized value using the associated mode.
     #[inline]
-    fn visit<'de, T, D, F, O>(&self, decoder: D, f: F) -> Result<O, Self::Error>
+    fn decode_unsized<'de, T, D, F, O>(&self, decoder: D, f: F) -> Result<O, Self::Error>
     where
-        T: ?Sized + Visit<'de, Self::Mode>,
+        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
         D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
         F: FnOnce(&T) -> Result<O, D::Error>,
     {
-        T::visit(self, decoder, f)
+        T::decode_unsized(self, decoder, f)
     }
 
     /// Decode the given input as bytes using the associated mode.
@@ -63,6 +63,17 @@ pub trait Context {
         D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
     {
         T::decode_bytes(self, decoder)
+    }
+
+    /// Decode the given unsized value as bytes using the associated mode.
+    #[inline]
+    fn decode_unsized_bytes<'de, T, D, F, O>(&self, decoder: D, f: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + DecodeUnsizedBytes<'de, Self::Mode>,
+        D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
+        F: FnOnce(&T) -> Result<O, D::Error>,
+    {
+        T::decode_unsized_bytes(self, decoder, f)
     }
 
     /// Allocate a buffer.

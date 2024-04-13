@@ -6,11 +6,10 @@ use crate::expecting::{self, Expecting};
 use crate::hint::{StructHint, TupleHint, UnsizedStructHint};
 use crate::Context;
 
-use super::{NumberVisitor, StructDecoder, TypeHint, ValueVisitor, Visit, Visitor};
-
 use super::{
-    AsDecoder, Decode, MapDecoder, MapEntriesDecoder, PackDecoder, SequenceDecoder, Skip,
-    StructFieldsDecoder, TupleDecoder, VariantDecoder,
+    AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, MapDecoder, MapEntriesDecoder,
+    NumberVisitor, PackDecoder, SequenceDecoder, Skip, StructDecoder, StructFieldsDecoder,
+    TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -115,10 +114,17 @@ pub trait Decoder<'de>: Sized {
     where
         T: Decode<'de, Self::Mode>;
 
-    /// Visit a reference to a value through the specified closure.
-    fn visit<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    /// Decode an unsized value by reference through the specified closure.
+    fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        T: ?Sized + Visit<'de, Self::Mode>,
+        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
+        F: FnOnce(&T) -> Result<O, <Self::Cx as Context>::Error>;
+
+    /// Decode an unsized value as bytes by reference through the specified
+    /// closure.
+    fn decode_unsized_bytes<T, F, O>(self, f: F) -> Result<O, Self::Error>
+    where
+        T: ?Sized + DecodeUnsizedBytes<'de, Self::Mode>,
         F: FnOnce(&T) -> Result<O, <Self::Cx as Context>::Error>;
 
     /// Skip over the current next value.
