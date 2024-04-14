@@ -88,6 +88,8 @@ pub(crate) enum ErrorMessage {
     #[cfg(feature = "alloc")]
     ExpectedString(TypeHint),
     #[cfg(feature = "alloc")]
+    ExpectedStringAsNumber,
+    #[cfg(feature = "alloc")]
     ExpectedOption(TypeHint),
     #[cfg(feature = "alloc")]
     ExpectedSequence(TypeHint),
@@ -104,36 +106,59 @@ impl fmt::Display for ErrorMessage {
         match self {
             #[cfg(feature = "alloc")]
             ErrorMessage::ArrayOutOfBounds => {
-                write!(f, "tried to decode array that is out-of-bounds")
+                write!(
+                    f,
+                    "Value buffer tried to decode array that is out-of-bounds"
+                )
             }
-            ErrorMessage::ExpectedPackValue => write!(f, "Expected pack value"),
-            ErrorMessage::ExpectedUnit(hint) => write!(f, "Expected unit, but found {hint}"),
-            ErrorMessage::ExpectedBool(hint) => write!(f, "Expected boolean, but found {hint}"),
-            ErrorMessage::ExpectedChar(hint) => write!(f, "Expected character, but found {hint}"),
+            ErrorMessage::ExpectedPackValue => write!(f, "Value buffer expected pack value"),
+            ErrorMessage::ExpectedUnit(hint) => {
+                write!(f, "Value buffer expected unit, but found {hint}")
+            }
+            ErrorMessage::ExpectedBool(hint) => {
+                write!(f, "Value buffer expected boolean, but found {hint}")
+            }
+            ErrorMessage::ExpectedChar(hint) => {
+                write!(f, "Value buffer expected character, but found {hint}")
+            }
             ErrorMessage::ExpectedNumber(number, hint) => {
-                write!(f, "Expected {number}, but found {hint}")
+                write!(f, "Value buffer expected {number}, but found {hint}")
             }
-            ErrorMessage::ExpectedFieldName => write!(f, "Expected field name"),
-            ErrorMessage::ExpectedFieldValue => write!(f, "Expected field value"),
-            ErrorMessage::ExpectedMapValue => write!(f, "Expected map value"),
+            ErrorMessage::ExpectedFieldName => write!(f, "Value buffer expected field name"),
+            ErrorMessage::ExpectedFieldValue => write!(f, "Value buffer expected field value"),
+            ErrorMessage::ExpectedMapValue => write!(f, "Value buffer expected map value"),
             #[cfg(feature = "alloc")]
-            ErrorMessage::ExpectedBytes(hint) => write!(f, "Expected bytes, but found {hint}"),
+            ErrorMessage::ExpectedBytes(hint) => {
+                write!(f, "Value buffer expected bytes, but found {hint}")
+            }
             #[cfg(feature = "alloc")]
-            ErrorMessage::ExpectedString(hint) => write!(f, "Expected string, but found {hint}"),
+            ErrorMessage::ExpectedString(hint) => {
+                write!(f, "Value buffer expected string, but found {hint}")
+            }
             #[cfg(feature = "alloc")]
-            ErrorMessage::ExpectedOption(hint) => write!(f, "Expected option, but found {hint}"),
+            ErrorMessage::ExpectedStringAsNumber => {
+                write!(f, "Value buffer expected string containing number")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorMessage::ExpectedOption(hint) => {
+                write!(f, "Value buffer expected option, but found {hint}")
+            }
             #[cfg(feature = "alloc")]
             ErrorMessage::ExpectedSequence(hint) => {
-                write!(f, "Expected sequence, but found {hint}")
+                write!(f, "Value buffer expected sequence, but found {hint}")
             }
             #[cfg(feature = "alloc")]
             ErrorMessage::ExpectedPack(hint) => {
-                write!(f, "Expected pack of bytes, but found {hint}")
+                write!(f, "Value buffer expected pack of bytes, but found {hint}")
             }
             #[cfg(feature = "alloc")]
-            ErrorMessage::ExpectedMap(hint) => write!(f, "Expected map, but found {hint}"),
+            ErrorMessage::ExpectedMap(hint) => {
+                write!(f, "Value buffer expected map, but found {hint}")
+            }
             #[cfg(feature = "alloc")]
-            ErrorMessage::ExpectedVariant(hint) => write!(f, "Expected struct, but found {hint}"),
+            ErrorMessage::ExpectedVariant(hint) => {
+                write!(f, "Value buffer expected struct, but found {hint}")
+            }
         }
     }
 }

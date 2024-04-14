@@ -61,9 +61,16 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
     let (impl_generics, _, where_clause) = impl_generics.split_for_impl();
     let (_, type_generics, _) = e.input.generics.split_for_impl();
 
+    let mut attributes = Vec::<syn::Attribute>::new();
+
+    if cfg!(not(feature = "verbose")) {
+        attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
+    }
+
     Ok(quote! {
         const _: () = {
             #[automatically_derived]
+            #(#attributes)*
             impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
                 #[inline]
                 fn encode<#e_param>(&self, #ctx_var: &#e_param::Cx, #encoder_var: #e_param) -> #result<<#e_param as #encoder_t>::Ok, <#e_param as #encoder_t>::Error>
@@ -343,13 +350,12 @@ fn encode_variant(
         ..
     } = b.tokens;
 
-    let hint = b.cx.ident("STRUCT_HINT");
-    let variant_encoder = b.cx.ident("variant_encoder");
-    let tag_encoder = b.cx.ident("tag_encoder");
-    let name_static = b.cx.ident("NAME");
-    let value_static = b.cx.ident("VALUE");
-    let tag_static = b.cx.ident("TAG");
     let content_static = b.cx.ident("CONTENT");
+    let hint = b.cx.ident("STRUCT_HINT");
+    let name_static = b.cx.ident("NAME");
+    let tag_encoder = b.cx.ident("tag_encoder");
+    let tag_static = b.cx.ident("TAG");
+    let variant_encoder = b.cx.ident("variant_encoder");
 
     let type_name = v.st.name;
 
@@ -399,14 +405,14 @@ fn encode_variant(
             if let Packing::Tagged = en.enum_packing {
                 let encode_t_encode = &b.encode_t_encode;
                 let name = &v.name;
-                let name_type = en.name_local_type();
+                let static_type = en.static_type();
 
                 encode = quote! {{
                     #encoder_t::encode_variant_fn(#encoder_var, move |#variant_encoder| {
                         let #tag_encoder = #variant_encoder_t::encode_tag(#variant_encoder)?;
-                        static #tag_static: #name_type = #name;
+                        static #name_static: #static_type = #name;
 
-                        #encode_t_encode(&#tag_static, #ctx_var, #tag_encoder)?;
+                        #encode_t_encode(&#name_static, #ctx_var, #tag_encoder)?;
 
                         let #encoder_var = #variant_encoder_t::encode_value(#variant_encoder)?;
                         #encode;
@@ -418,7 +424,7 @@ fn encode_variant(
         EnumTagging::Internal { tag } => {
             let name = &v.name;
 
-            let name_type = en.name_local_type();
+            let static_type = en.static_type();
 
             let decls = tests.iter().map(|t| &t.decl);
             let mut len = length_test(v.st.unskipped_fields.len(), &tests);
@@ -432,9 +438,9 @@ fn encode_variant(
                 #build_hint
 
                 #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
-                    static #name_static: #name_type = #tag;
-                    static #value_static: #name_type = #name;
-                    #struct_encoder_t::insert_struct_field(#encoder_var, #name_static, #value_static)?;
+                    static #tag_static: #static_type = #tag;
+                    static #name_static: #static_type = #name;
+                    #struct_encoder_t::insert_struct_field(#encoder_var, #tag_static, #name_static)?;
                     #(#decls)*
                     #(#encoders)*
                     #result_ok(())
@@ -445,7 +451,7 @@ fn encode_variant(
             let encode_t_encode = &b.encode_t_encode;
 
             let name = &v.name;
-            let name_type = en.name_local_type();
+            let static_type = en.static_type();
 
             let decls = tests.iter().map(|t| &t.decl);
 
@@ -461,9 +467,9 @@ fn encode_variant(
                 #build_hint
 
                 #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#struct_encoder| {
-                    static #tag_static: #name_type = #tag;
-                    static #name_static: #name_type = #name;
-                    static #content_static: #name_type = #content;
+                    static #tag_static: #static_type = #tag;
+                    static #name_static: #static_type = #name;
+                    static #content_static: #static_type = #content;
 
                     #struct_encoder_t::insert_struct_field(#struct_encoder, #tag_static, #name_static)?;
 
@@ -500,11 +506,12 @@ fn encode_variant(
     if cx.trace {
         let output_var = b.cx.ident("output");
 
-        let name = en.name_format(&v.name);
+        let (decl, name) = en.name_format(&name_static, &v.name);
         let enter = quote!(#context_t::enter_variant(#ctx_var, #type_name, #name));
         let leave = quote!(#context_t::leave_variant(#ctx_var));
 
         encode = quote! {{
+            #decl
             #enter;
             let #output_var = #encode;
             #leave;
