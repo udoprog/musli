@@ -1582,7 +1582,12 @@ pub trait Decoder<'de>: Sized {
     /// Decode dynamically through a [`Visitor`].
     ///
     /// If the current encoding does not support dynamic decoding,
-    /// [`Visitor::visit_any`] will be called with the current decoder.
+    /// [`Visitor::visit_any`] might be called with the current decoder. At this
+    /// point, the implementor of the [`Visitor`] must call an explicitly typed
+    /// method or error through the context. It must not call [`decode_any`]
+    /// again.
+    ///
+    /// [`decode_any`]: Decoder::decode_any
     #[inline]
     fn decode_any<V>(self, visitor: V) -> Result<V::Ok, <Self::Cx as Context>::Error>
     where
