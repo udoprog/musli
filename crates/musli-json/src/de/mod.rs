@@ -47,7 +47,7 @@ use crate::parser::integer::{
 use crate::parser::{integer, string, Parser, StringReference, Token};
 
 #[cfg(feature = "musli-value")]
-const BUFFER_OPTIONS: Options = options::new().build();
+const BUFFER_OPTIONS: Options = options::new().with_map_keys_as_numbers(true).build();
 
 /// A JSON decoder for Müsli.
 pub(crate) struct JsonDecoder<'a, P, C: ?Sized> {
@@ -193,6 +193,8 @@ where
     fn decode_buffer(self) -> Result<Self::DecodeBuffer, C::Error> {
         let cx = self.cx;
         let value = self.decode::<musli_value::Value>()?;
+        // JSON: Encodes numbers in objects as strings, so we need to permit
+        // treating them as such here as well.
         Ok(value.into_value_decoder(cx))
     }
 

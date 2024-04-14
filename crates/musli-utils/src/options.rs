@@ -24,37 +24,57 @@ pub type Options = u128;
 const BYTEORDER_BIT: Options = 0;
 const INTEGER_BIT: Options = 1;
 const LENGTH_BIT: Options = 2;
+const MAP_KEYS_AS_NUMBERS_BIT: Options = 3;
 const FLOAT_BIT: Options = 8;
 const LENGTH_WIDTH_BIT: Options = 16;
 
 impl OptionsBuilder {
     /// Indicates if an integer serialization should be variable.
+    #[inline(always)]
     pub const fn with_integer(self, integer: Integer) -> Self {
-        Self(self.0 | ((integer as Options) << INTEGER_BIT))
+        const MASK: Options = 0b11 << INTEGER_BIT;
+        Self((self.0 & !MASK) | ((integer as Options) << INTEGER_BIT))
     }
 
     /// Indicates the configuration of float serialization.
+    #[inline(always)]
     pub const fn with_float(self, float: Float) -> Self {
-        Self(self.0 | ((float as Options) << FLOAT_BIT))
+        const MASK: Options = 0b11 << FLOAT_BIT;
+        Self((self.0 & !MASK) | ((float as Options) << FLOAT_BIT))
     }
 
     /// Specify which byte order to use, if that's relevant.
+    #[inline(always)]
     pub const fn with_byte_order(self, byte_order: ByteOrder) -> Self {
-        Self(self.0 | ((byte_order as Options) << BYTEORDER_BIT))
+        const MASK: Options = 0b1 << BYTEORDER_BIT;
+        Self((self.0 & !MASK) | ((byte_order as Options) << BYTEORDER_BIT))
     }
 
     /// Specify how lengths should be serialized.
+    #[inline(always)]
     pub const fn with_length(self, length: Integer) -> Self {
-        Self(self.0 | ((length as Options) << LENGTH_BIT))
+        const MASK: Options = 0b1 << LENGTH_BIT;
+        Self((self.0 & !MASK) | ((length as Options) << LENGTH_BIT))
+    }
+
+    /// Allows for treating string keys as numbers.
+    #[inline(always)]
+    pub const fn with_map_keys_as_numbers(self, value: bool) -> Self {
+        const MASK: Options = 0b1 << MAP_KEYS_AS_NUMBERS_BIT;
+        let value = if value { 1 } else { 0 };
+        Self((self.0 & !MASK) | (value << MAP_KEYS_AS_NUMBERS_BIT))
     }
 
     /// If length is set to [`Integer::Fixed`], specify the width of the length.
+    #[inline(always)]
     pub const fn with_length_width(self, width: Width) -> Self {
+        const MASK: Options = 0b11 << LENGTH_WIDTH_BIT;
         let this = self.with_length(Integer::Fixed);
-        Self(this.0 | ((width as Options) << LENGTH_WIDTH_BIT))
+        Self((this.0 & !MASK) | ((width as Options) << LENGTH_WIDTH_BIT))
     }
 
     /// Build a flavor.
+    #[inline(always)]
     pub const fn build(self) -> Options {
         self.0
     }
@@ -101,6 +121,11 @@ pub const fn byteorder<const OPT: Options>() -> ByteOrder {
         0 => ByteOrder::LittleEndian,
         _ => ByteOrder::BigEndian,
     }
+}
+
+#[doc(hidden)]
+pub const fn is_map_keys_as_numbers<const OPT: Options>() -> bool {
+    ((OPT >> MAP_KEYS_AS_NUMBERS_BIT) & 0b1) == 1
 }
 
 /// Integer serialization mode.
@@ -220,18 +245,25 @@ fn test_builds() {
             $(float = $float:expr,)?
             $(length = $length:expr,)?
             $(length_width = $length_width:expr,)?
+            $(is_map_keys_as_numbers = $is_map_keys_as_numbers:expr,)?
         }) => {{
             const O: Options = $expr.build();
             assert_or_default!($expr, byteorder::<O>(), ByteOrder::NATIVE, ($($byteorder)?));
             assert_or_default!($expr, integer::<O>(), Integer::Variable, ($($integer)?));
             assert_or_default!($expr, float::<O>(), Float::Integer, ($($float)?));
             assert_or_default!($expr, length::<O>(), Integer::Variable, ($($length)?));
-            assert_or_default!($expr, length_width::<O>(), Width::U8, ($($length_width)?));
+            assert_or_default!($expr, is_map_keys_as_numbers::<O>(), false, ($($is_map_keys_as_numbers)?));
         }}
     }
 
     test_case! {
         self::new() => {}
+    }
+
+    test_case! {
+        self::new().with_map_keys_as_numbers(true) => {
+            is_map_keys_as_numbers = true,
+        }
     }
 
     test_case! {

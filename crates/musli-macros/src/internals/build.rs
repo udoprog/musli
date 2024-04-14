@@ -160,14 +160,25 @@ pub(crate) struct Enum<'a> {
 }
 
 impl Enum<'_> {
-    pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
+    pub(crate) fn name_format(
+        &self,
+        static_var: &syn::Ident,
+        value: &syn::Expr,
+    ) -> (Option<syn::ItemStatic>, syn::Expr) {
         match self.name_format_with {
-            Some((_, path)) => build_call(path, [build_reference(value.clone())]),
-            None => build_reference(value.clone()),
+            Some((_, path)) => (None, syn::parse_quote!(&#path(#static_var, #value))),
+            None => {
+                let static_type = self.static_type();
+
+                (
+                    Some(syn::parse_quote!(static #static_var: #static_type = #value;)),
+                    syn::parse_quote!(&#static_var),
+                )
+            }
         }
     }
 
-    pub(crate) fn name_local_type(&self) -> syn::Type {
+    pub(crate) fn static_type(&self) -> syn::Type {
         match self.name_method {
             NameMethod::Unsized(..) => syn::Type::Reference(syn::TypeReference {
                 and_token: <Token![&]>::default(),

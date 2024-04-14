@@ -23,13 +23,49 @@ use crate::AsValueDecoder;
 pub struct ValueDecoder<'a, 'de, const OPT: Options, C: ?Sized> {
     cx: &'a C,
     value: &'de Value,
+    #[cfg(feature = "alloc")]
+    map_key: bool,
 }
 
 impl<'a, 'de, const OPT: Options, C: ?Sized> ValueDecoder<'a, 'de, OPT, C> {
     #[inline]
     pub(crate) const fn new(cx: &'a C, value: &'de Value) -> Self {
-        Self { cx, value }
+        Self {
+            cx,
+            value,
+            #[cfg(feature = "alloc")]
+            map_key: false,
+        }
     }
+
+    #[inline]
+    pub(crate) const fn with_map_key(cx: &'a C, value: &'de Value) -> Self {
+        Self {
+            cx,
+            value,
+            #[cfg(feature = "alloc")]
+            map_key: true,
+        }
+    }
+}
+
+macro_rules! ensure_number {
+    ($self:expr, $opt:expr, $hint:ident, $ident:ident $tt:tt, Value::$variant:ident($block:ident) => $ty:ty) => {
+        match $self.value {
+            Value::$variant($block) => <$ty>::from_number($block).map_err($self.cx.map_message()),
+            #[cfg(feature = "alloc")]
+            Value::String(string) if musli_utils::options::is_map_keys_as_numbers::<$opt>() && $self.map_key => {
+                match <$ty>::parse_number(string) {
+                    Some(value) => Ok(value),
+                    None => Err($self.cx.message(ErrorMessage::ExpectedStringAsNumber)),
+                }
+            }
+            value => {
+                let $hint = value.type_hint();
+                return Err($self.cx.message(ErrorMessage::$ident $tt));
+            }
+        }
+    };
 }
 
 macro_rules! ensure {
@@ -136,86 +172,62 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[inline]
     fn decode_u8(self) -> Result<u8, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => {
-            u8::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => u8)
     }
 
     #[inline]
     fn decode_u16(self) -> Result<u16, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => {
-            u16::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => u16)
     }
 
     #[inline]
     fn decode_u32(self) -> Result<u32, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => {
-            u32::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => u32)
     }
 
     #[inline]
     fn decode_u64(self) -> Result<u64, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => {
-            u64::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => u64)
     }
 
     #[inline]
     fn decode_u128(self) -> Result<u128, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => {
-            u128::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => u128)
     }
 
     #[inline]
     fn decode_i8(self) -> Result<i8, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => {
-            i8::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => i8)
     }
 
     #[inline]
     fn decode_i16(self) -> Result<i16, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => {
-            i16::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => i16)
     }
 
     #[inline]
     fn decode_i32(self) -> Result<i32, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => {
-            i32::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => i32)
     }
 
     #[inline]
     fn decode_i64(self) -> Result<i64, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => {
-            i64::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => i64)
     }
 
     #[inline]
     fn decode_i128(self) -> Result<i128, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => {
-            i128::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => i128)
     }
 
     #[inline]
     fn decode_usize(self) -> Result<usize, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => {
-            usize::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => usize)
     }
 
     #[inline]
     fn decode_isize(self) -> Result<isize, C::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => {
-            isize::from_number(n).map_err(self.cx.map_message())
-        })
+        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => isize)
     }
 
     #[inline]
@@ -563,7 +575,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntriesDecoder<'de>
             return Ok(None);
         };
 
-        Ok(Some(ValueDecoder::new(self.cx, name)))
+        Ok(Some(ValueDecoder::with_map_key(self.cx, name)))
     }
 
     #[inline]
@@ -592,7 +604,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntryDecoder<'de>
 
     #[inline]
     fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, C::Error> {
-        Ok(ValueDecoder::new(self.cx, &self.pair.0))
+        Ok(ValueDecoder::with_map_key(self.cx, &self.pair.0))
     }
 
     #[inline]
@@ -728,6 +740,8 @@ trait FromNumber: Sized {
     const NUMBER_HINT: NumberHint;
 
     fn from_number(number: &Number) -> Result<Self, ErrorMessage>;
+
+    fn parse_number(string: &str) -> Option<Self>;
 }
 
 macro_rules! integer_from {
@@ -761,6 +775,11 @@ macro_rules! integer_from {
                         TypeHint::Number(number.type_hint()),
                     )),
                 }
+            }
+
+            #[inline]
+            fn parse_number(string: &str) -> Option<Self> {
+                string.parse().ok()
             }
         }
     };
@@ -797,6 +816,11 @@ macro_rules! float_from {
                         TypeHint::Number(number.type_hint()),
                     )),
                 }
+            }
+
+            #[inline]
+            fn parse_number(string: &str) -> Option<Self> {
+                string.parse().ok()
             }
         }
     };

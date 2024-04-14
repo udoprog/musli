@@ -51,11 +51,12 @@ fn bytes_reference() {
     );
 
     let value = musli_value::Value::Number(42u32.into());
+
     assert_eq!(
         musli_value::decode::<BytesReference>(&value)
             .unwrap_err()
             .to_string(),
-        "Expected bytes, but found number"
+        "Value buffer expected bytes, but found number"
     );
 }
 
@@ -105,11 +106,12 @@ fn string_reference() {
     );
 
     let value = musli_value::Value::Number(42u32.into());
+
     assert_eq!(
         musli_value::decode::<StringReference>(&value)
             .unwrap_err()
             .to_string(),
-        "Expected string, but found number"
+        "Value buffer expected string, but found number"
     );
 }
 
