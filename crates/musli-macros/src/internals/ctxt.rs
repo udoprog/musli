@@ -118,7 +118,7 @@ impl Ctxt {
 
         #[cfg(feature = "verbose")]
         {
-            let name = name.strip_prefix("_").unwrap_or(name);
+            let name = name.strip_prefix('_').unwrap_or(name);
             _ = write!(inner.b1, "{prefix}_{name}{suffix}");
         }
 

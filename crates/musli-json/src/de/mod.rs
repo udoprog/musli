@@ -26,8 +26,8 @@ use core::str;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, DecodeUnsized, Decoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, Skip,
-    TypeHint, ValueVisitor, Visitor,
+    Decode, DecodeUnsized, Decoder, NumberVisitor, SequenceDecoder, SizeHint, Skip, ValueVisitor,
+    Visitor,
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
@@ -172,20 +172,6 @@ where
     fn try_skip(self) -> Result<Skip, C::Error> {
         self.skip()?;
         Ok(Skip::Skipped)
-    }
-
-    #[inline]
-    fn type_hint(&mut self) -> Result<TypeHint, C::Error> {
-        Ok(match self.parser.peek(self.cx)? {
-            Token::OpenBrace => TypeHint::Map(SizeHint::Any),
-            Token::OpenBracket => TypeHint::Sequence(SizeHint::Any),
-            Token::String => TypeHint::String(SizeHint::Any),
-            Token::Number => TypeHint::Number(NumberHint::Any),
-            Token::Null => TypeHint::Unit,
-            Token::True => TypeHint::Bool,
-            Token::False => TypeHint::Bool,
-            _ => TypeHint::Any,
-        })
     }
 
     #[cfg(feature = "musli-value")]
@@ -500,7 +486,7 @@ where
                 self.decode_string(visitor)
             }
             Token::Number => {
-                let visitor = visitor.visit_number(cx, NumberHint::Any)?;
+                let visitor = visitor.visit_number(cx)?;
                 self.decode_number(visitor)
             }
             Token::Null => {
@@ -515,7 +501,7 @@ where
                 self.parse_false()?;
                 visitor.visit_bool(cx, false)
             }
-            _ => visitor.visit_any(cx, self, TypeHint::Any),
+            token => Err(cx.message(format_args!("Expected value, found {token:?}"))),
         }
     }
 }

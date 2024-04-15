@@ -5,9 +5,9 @@ use core::mem::take;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberHint,
-    NumberVisitor, PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
+    Decode, DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberVisitor,
+    PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
+    StructFieldsDecoder, TupleDecoder, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
@@ -309,69 +309,6 @@ where
     fn try_skip(self) -> Result<Skip, C::Error> {
         self.skip()?;
         Ok(Skip::Skipped)
-    }
-
-    #[inline]
-    fn type_hint(&mut self) -> Result<TypeHint, C::Error> {
-        let tag = match self.reader.peek(self.cx)? {
-            Some(b) => Tag::from_byte(b),
-            None => return Ok(TypeHint::Any),
-        };
-
-        match tag.kind() {
-            Kind::Number => Ok(TypeHint::Number(match tag.data() {
-                Some(U8) => NumberHint::U8,
-                Some(U16) => NumberHint::U16,
-                Some(U32) => NumberHint::U32,
-                Some(U64) => NumberHint::U64,
-                Some(U128) => NumberHint::U128,
-                Some(I8) => NumberHint::I8,
-                Some(I16) => NumberHint::I16,
-                Some(I32) => NumberHint::I32,
-                Some(I64) => NumberHint::I64,
-                Some(I128) => NumberHint::I128,
-                Some(F32) => NumberHint::F32,
-                Some(F64) => NumberHint::F64,
-                _ => NumberHint::Any,
-            })),
-            Kind::Sequence => {
-                let hint = tag
-                    .data()
-                    .map(|d| SizeHint::Exact(d as usize))
-                    .unwrap_or_default();
-                Ok(TypeHint::Sequence(hint))
-            }
-            Kind::Map => {
-                let hint = tag
-                    .data()
-                    .map(|d| SizeHint::Exact(d as usize))
-                    .unwrap_or_default();
-                Ok(TypeHint::Map(hint))
-            }
-            Kind::Bytes => {
-                let hint = tag
-                    .data()
-                    .map(|d| SizeHint::Exact(d as usize))
-                    .unwrap_or_default();
-                Ok(TypeHint::Bytes(hint))
-            }
-            Kind::String => {
-                let hint = tag
-                    .data()
-                    .map(|d| SizeHint::Exact(d as usize))
-                    .unwrap_or_default();
-                Ok(TypeHint::String(hint))
-            }
-            Kind::Mark => Ok(match tag.mark() {
-                Mark::True | Mark::False => TypeHint::Bool,
-                Mark::Variant => TypeHint::Variant,
-                Mark::Some | Mark::None => TypeHint::Option,
-                Mark::Char => TypeHint::Char,
-                Mark::Unit => TypeHint::Unit,
-                _ => TypeHint::Any,
-            }),
-            _ => Ok(TypeHint::Any),
-        }
     }
 
     #[cfg(feature = "musli-value")]
@@ -773,66 +710,68 @@ where
     {
         let cx = self.cx;
 
-        let tag = match self.reader.peek(cx)? {
-            Some(b) => Tag::from_byte(b),
-            None => return visitor.visit_any(cx, self, TypeHint::Any),
+        let Some(tag) = self.reader.peek(cx)?.map(Tag::from_byte) else {
+            return Err(cx.message("Expected tag in input"));
         };
 
         match tag.kind() {
-            Kind::Number => match tag.data() {
-                Some(U8) => {
-                    let value = self.decode_u8()?;
-                    visitor.visit_u8(cx, value)
+            Kind::Number => {
+                let Some(data) = tag.data() else {
+                    return Err(cx.message("Expected number with data"));
+                };
+
+                match data {
+                    U8 => {
+                        let value = self.decode_u8()?;
+                        visitor.visit_u8(cx, value)
+                    }
+                    U16 => {
+                        let value = self.decode_u16()?;
+                        visitor.visit_u16(cx, value)
+                    }
+                    U32 => {
+                        let value = self.decode_u32()?;
+                        visitor.visit_u32(cx, value)
+                    }
+                    U64 => {
+                        let value = self.decode_u64()?;
+                        visitor.visit_u64(cx, value)
+                    }
+                    U128 => {
+                        let value = self.decode_u128()?;
+                        visitor.visit_u128(cx, value)
+                    }
+                    I8 => {
+                        let value = self.decode_i8()?;
+                        visitor.visit_i8(cx, value)
+                    }
+                    I16 => {
+                        let value = self.decode_i16()?;
+                        visitor.visit_i16(cx, value)
+                    }
+                    I32 => {
+                        let value = self.decode_i32()?;
+                        visitor.visit_i32(cx, value)
+                    }
+                    I64 => {
+                        let value = self.decode_i64()?;
+                        visitor.visit_i64(cx, value)
+                    }
+                    I128 => {
+                        let value = self.decode_i128()?;
+                        visitor.visit_i128(cx, value)
+                    }
+                    F32 => {
+                        let value = self.decode_f32()?;
+                        visitor.visit_f32(cx, value)
+                    }
+                    F64 => {
+                        let value = self.decode_f64()?;
+                        visitor.visit_f64(cx, value)
+                    }
+                    data => Err(cx.message(format_args!("Unsupported number data {data:?}"))),
                 }
-                Some(U16) => {
-                    let value = self.decode_u16()?;
-                    visitor.visit_u16(cx, value)
-                }
-                Some(U32) => {
-                    let value = self.decode_u32()?;
-                    visitor.visit_u32(cx, value)
-                }
-                Some(U64) => {
-                    let value = self.decode_u64()?;
-                    visitor.visit_u64(cx, value)
-                }
-                Some(U128) => {
-                    let value = self.decode_u128()?;
-                    visitor.visit_u128(cx, value)
-                }
-                Some(I8) => {
-                    let value = self.decode_i8()?;
-                    visitor.visit_i8(cx, value)
-                }
-                Some(I16) => {
-                    let value = self.decode_i16()?;
-                    visitor.visit_i16(cx, value)
-                }
-                Some(I32) => {
-                    let value = self.decode_i32()?;
-                    visitor.visit_i32(cx, value)
-                }
-                Some(I64) => {
-                    let value = self.decode_i64()?;
-                    visitor.visit_i64(cx, value)
-                }
-                Some(I128) => {
-                    let value = self.decode_i128()?;
-                    visitor.visit_i128(cx, value)
-                }
-                Some(F32) => {
-                    let value = self.decode_f32()?;
-                    visitor.visit_f32(cx, value)
-                }
-                Some(F64) => {
-                    let value = self.decode_f64()?;
-                    visitor.visit_f64(cx, value)
-                }
-                _ => {
-                    let visitor = visitor.visit_number(cx, NumberHint::Any)?;
-                    visitor.visit_any(cx, self, TypeHint::Number(NumberHint::Any))
-                }
-            },
+            }
             Kind::Sequence => {
                 let mut sequence = self.shared_decode_sequence()?;
                 let output = visitor.visit_sequence(cx, &mut sequence)?;
@@ -879,9 +818,9 @@ where
                     self.decode_unit()?;
                     visitor.visit_unit(cx)
                 }
-                _ => visitor.visit_any(cx, self, TypeHint::Any),
+                mark => Err(cx.message(format_args!("Unsupported mark {mark:?}"))),
             },
-            _ => visitor.visit_any(cx, self, TypeHint::Any),
+            kind => Err(cx.message(format_args!("Unsupported kind {kind:?}"))),
         }
     }
 }

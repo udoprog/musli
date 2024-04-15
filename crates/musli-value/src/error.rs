@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
-use musli::de::{NumberHint, TypeHint};
+use crate::type_hint::{NumberHint, TypeHint};
 
 /// An error raised when encoding or decoding [`Value`][crate::Value].
 #[derive(Debug)]

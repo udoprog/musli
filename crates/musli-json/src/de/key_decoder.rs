@@ -1,8 +1,6 @@
 use core::fmt;
 
-use musli::de::{
-    Decode, DecodeUnsized, Decoder, NumberHint, SizeHint, Skip, TypeHint, ValueVisitor, Visitor,
-};
+use musli::de::{Decode, DecodeUnsized, Decoder, SizeHint, Skip, ValueVisitor, Visitor};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -100,11 +98,6 @@ where
     }
 
     #[inline]
-    fn type_hint(&mut self) -> Result<TypeHint, C::Error> {
-        JsonDecoder::new(self.cx, self.parser.borrow_mut()).type_hint()
-    }
-
-    #[inline]
     fn decode_u8(self) -> Result<u8, C::Error> {
         self.decode_escaped_bytes(KeyUnsignedVisitor::new())
     }
@@ -183,10 +176,12 @@ where
                 self.decode_string(visitor)
             }
             Token::Number => {
-                let visitor = visitor.visit_number(self.cx, NumberHint::Any)?;
+                let visitor = visitor.visit_number(self.cx)?;
                 self.decode_number(visitor)
             }
-            _ => visitor.visit_any(self.cx, self, TypeHint::Any),
+            token => Err(self
+                .cx
+                .message(format_args!("Unsupported key type {token:?}"))),
         }
     }
 }
