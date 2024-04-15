@@ -498,7 +498,7 @@ where
 
         if hint.size != decoder.remaining {
             return Err(decoder.cx.message(format_args!(
-                "Tuple length {} di not match actual: {}",
+                "Tuple length {} does not match actual: {}",
                 hint.size, decoder.remaining
             )));
         }
