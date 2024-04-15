@@ -2,7 +2,6 @@ use core::borrow::Borrow;
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::de::{Decoder, TypeHint};
 use crate::expecting::{self, Expecting};
 use crate::no_std::ToOwned;
 use crate::Context;
@@ -53,19 +52,6 @@ where
     fn visit_ref(self, cx: &C, _: &T) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
-            ExpectingWrapper::new(&self),
-        )))
-    }
-
-    /// Fallback used when the type is either not implemented for this visitor
-    /// or the underlying format doesn't know which type to decode.
-    #[inline]
-    fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
-    where
-        D: Decoder<'de, Cx = C>,
-    {
-        Err(cx.message(expecting::unsupported_type(
-            &hint,
             ExpectingWrapper::new(&self),
         )))
     }

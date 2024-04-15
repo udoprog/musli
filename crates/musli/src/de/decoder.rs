@@ -9,7 +9,7 @@ use crate::Context;
 use super::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, MapDecoder, MapEntriesDecoder,
     NumberVisitor, PackDecoder, SequenceDecoder, Skip, StructDecoder, StructFieldsDecoder,
-    TupleDecoder, TypeHint, ValueVisitor, VariantDecoder, Visitor,
+    TupleDecoder, ValueVisitor, VariantDecoder, Visitor,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -141,18 +141,6 @@ pub trait Decoder<'de>: Sized {
     #[inline(always)]
     fn try_skip(self) -> Result<Skip, <Self::Cx as Context>::Error> {
         Ok(Skip::Unsupported)
-    }
-
-    /// Return a [TypeHint] indicating which type is being produced by the
-    /// [Decoder].
-    ///
-    /// Not all formats support type hints, and they might be ranging from
-    /// detailed (`a 32-bit unsigned integer`) to vague (`a number`).
-    ///
-    /// This is used to construct dynamic containers of types.
-    #[inline]
-    fn type_hint(&mut self) -> Result<TypeHint, <Self::Cx as Context>::Error> {
-        Ok(TypeHint::Any)
     }
 
     /// Buffer the current decoder into a buffer that can be used multiple times.
@@ -1580,14 +1568,6 @@ pub trait Decoder<'de>: Sized {
     }
 
     /// Decode dynamically through a [`Visitor`].
-    ///
-    /// If the current encoding does not support dynamic decoding,
-    /// [`Visitor::visit_any`] might be called with the current decoder. At this
-    /// point, the implementor of the [`Visitor`] must call an explicitly typed
-    /// method or error through the context. It must not call [`decode_any`]
-    /// again.
-    ///
-    /// [`decode_any`]: Decoder::decode_any
     #[inline]
     fn decode_any<V>(self, visitor: V) -> Result<V::Ok, <Self::Cx as Context>::Error>
     where

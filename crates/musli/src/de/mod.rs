@@ -67,8 +67,8 @@ pub use self::struct_field_decoder::StructFieldDecoder;
 mod struct_fields_decoder;
 pub use self::struct_fields_decoder::StructFieldsDecoder;
 
-mod type_hint;
-pub use self::type_hint::{NumberHint, SizeHint, TypeHint};
+mod size_hint;
+pub use self::size_hint::SizeHint;
 
 mod value_visitor;
 pub use self::value_visitor::ValueVisitor;

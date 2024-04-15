@@ -56,7 +56,7 @@ fn bytes_reference() {
         musli_value::decode::<BytesReference>(&value)
             .unwrap_err()
             .to_string(),
-        "Value buffer expected bytes, but found number"
+        "Value buffer expected bytes, but found u32"
     );
 }
 
@@ -111,7 +111,7 @@ fn string_reference() {
         musli_value::decode::<StringReference>(&value)
             .unwrap_err()
             .to_string(),
-        "Value buffer expected string, but found number"
+        "Value buffer expected string, but found u32"
     );
 }
 

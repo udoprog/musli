@@ -5,8 +5,8 @@ use core::slice;
 use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decode, DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder,
-    NumberHint, PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, TupleDecoder, TypeHint, VariantDecoder, Visitor,
+    PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
+    StructFieldsDecoder, TupleDecoder, VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
@@ -16,6 +16,7 @@ use musli_utils::reader::SliceReader;
 use musli_utils::Options;
 
 use crate::error::ErrorMessage;
+use crate::type_hint::{NumberHint, TypeHint};
 use crate::value::{Number, Value};
 use crate::AsValueDecoder;
 
@@ -143,11 +144,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     #[inline]
     fn try_skip(self) -> Result<Skip, C::Error> {
         Ok(Skip::Skipped)
-    }
-
-    #[inline]
-    fn type_hint(&mut self) -> Result<TypeHint, C::Error> {
-        Ok(self.value.type_hint())
     }
 
     #[inline]

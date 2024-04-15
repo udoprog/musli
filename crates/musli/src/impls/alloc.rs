@@ -207,12 +207,14 @@ cow! {
 
 macro_rules! sequence {
     (
+        $(#[$($meta:meta)*])*
         $cx:ident,
         $ty:ident <T $(: $trait0:ident $(+ $trait:ident)*)? $(, $extra:ident: $extra_bound0:ident $(+ $extra_bound:ident)*)*>,
         $insert:ident,
         $access:ident,
         $factory:expr
     ) => {
+        $(#[$($meta)*])*
         impl<M, T $(, $extra)*> Encode<M> for $ty<T $(, $extra)*>
         where
             T: Encode<M>,
@@ -240,6 +242,7 @@ macro_rules! sequence {
             }
         }
 
+        $(#[$($meta)*])*
         impl<'de, M, T $(, $extra)*> Decode<'de, M> for $ty<T $(, $extra)*>
         where
             T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
@@ -284,8 +287,9 @@ sequence!(
     VecDeque::with_capacity(size_hint::cautious(seq.size_hint()))
 );
 sequence!(cx, BTreeSet<T: Ord>, insert, seq, BTreeSet::new());
-#[cfg(feature = "std")]
 sequence!(
+    #[cfg(feature = "std")]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
     cx,
     HashSet<T: Eq + Hash, S: BuildHasher + Default>,
     insert,
@@ -302,11 +306,13 @@ sequence!(
 
 macro_rules! map {
     (
+        $(#[$($meta:meta)*])*
         $cx:ident,
         $ty:ident<K $(: $key_bound0:ident $(+ $key_bound:ident)*)?, V $(, $extra:ident: $extra_bound0:ident $(+ $extra_bound:ident)*)*>,
         $access:ident,
         $with_capacity:expr
     ) => {
+        $(#[$($meta)*])*
         impl<'de, M, K, V $(, $extra)*> Encode<M> for $ty<K, V $(, $extra)*>
         where
             K: Encode<M>,
@@ -330,6 +336,7 @@ macro_rules! map {
             }
         }
 
+        $(#[$($meta)*])*
         impl<'de, M, K, V $(, $extra)*> TraceEncode<M> for $ty<K, V $(, $extra)*>
         where
             K: fmt::Display + Encode<M>,
@@ -359,6 +366,7 @@ macro_rules! map {
             }
         }
 
+        $(#[$($meta)*])*
         impl<'de, K, V, M $(, $extra)*> Decode<'de, M> for $ty<K, V $(, $extra)*>
         where
             K: Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
@@ -382,6 +390,7 @@ macro_rules! map {
             }
         }
 
+        $(#[$($meta)*])*
         impl<'de, K, V, M $(, $extra)*> TraceDecode<'de, M> for $ty<K, V $(, $extra)*>
         where
             K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
@@ -413,9 +422,9 @@ macro_rules! map {
 
 map!(_cx, BTreeMap<K: Ord, V>, map, BTreeMap::new());
 
-#[cfg(feature = "std")]
-#[cfg_attr(doc_cfg, doc(feature = "std"))]
 map!(
+    #[cfg(feature = "std")]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
     _cx,
     HashMap<K: Eq + Hash, V, S: BuildHasher + Default>,
     map,

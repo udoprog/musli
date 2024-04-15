@@ -7,7 +7,7 @@ use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use musli::de::{AsDecoder, Decode, Decoder, NumberHint, NumberVisitor, TypeHint, Visitor};
+use musli::de::{AsDecoder, Decode, Decoder, NumberVisitor, Visitor};
 #[cfg(feature = "alloc")]
 use musli::de::{
     MapDecoder, MapEntryDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
@@ -19,6 +19,7 @@ use musli::Context;
 use musli_utils::Options;
 
 use crate::de::ValueDecoder;
+use crate::type_hint::{NumberHint, TypeHint};
 
 /// A dynamic value capable of representing any [Müsli] type whether it be
 /// complex or simple.
@@ -57,8 +58,27 @@ pub enum Value {
 }
 
 impl Value {
+    /// Construct a [AsValueDecoder] implementation out of this value which
+    /// emits the specified error `E`.
+    #[inline]
+    pub fn into_value_decoder<const OPT: Options, C: ?Sized>(
+        self,
+        cx: &C,
+    ) -> AsValueDecoder<'_, OPT, C> {
+        AsValueDecoder::new(cx, self)
+    }
+
+    /// Get a decoder associated with a value.
+    #[inline]
+    pub(crate) fn decoder<'a, 'de, const OPT: Options, C: ?Sized>(
+        &'de self,
+        cx: &'a C,
+    ) -> ValueDecoder<'a, 'de, OPT, C> {
+        ValueDecoder::new(cx, self)
+    }
+
     /// Get the type hint corresponding to the value.
-    pub fn type_hint(&self) -> TypeHint {
+    pub(crate) fn type_hint(&self) -> TypeHint {
         match self {
             Value::Unit => TypeHint::Unit,
             Value::Bool(..) => TypeHint::Bool,
@@ -77,25 +97,6 @@ impl Value {
             #[cfg(feature = "alloc")]
             Value::Option(..) => TypeHint::Option,
         }
-    }
-
-    /// Construct a [AsValueDecoder] implementation out of this value which
-    /// emits the specified error `E`.
-    #[inline]
-    pub fn into_value_decoder<const OPT: Options, C: ?Sized>(
-        self,
-        cx: &C,
-    ) -> AsValueDecoder<'_, OPT, C> {
-        AsValueDecoder::new(cx, self)
-    }
-
-    /// Get a decoder associated with a value.
-    #[inline]
-    pub(crate) fn decoder<'a, 'de, const OPT: Options, C: ?Sized>(
-        &'de self,
-        cx: &'a C,
-    ) -> ValueDecoder<'a, 'de, OPT, C> {
-        ValueDecoder::new(cx, self)
     }
 }
 
@@ -183,7 +184,7 @@ impl<M> Encode<M> for Number {
 
 impl Number {
     /// Get the type hint for the number.
-    pub fn type_hint(&self) -> NumberHint {
+    pub(crate) fn type_hint(&self) -> NumberHint {
         match self {
             Number::U8(_) => NumberHint::U8,
             Number::U16(_) => NumberHint::U16,
@@ -363,7 +364,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_number(self, _: &C, _: NumberHint) -> Result<Self::Number, C::Error> {
+    fn visit_number(self, _: &C) -> Result<Self::Number, C::Error> {
         Ok(ValueNumberVisitor)
     }
 

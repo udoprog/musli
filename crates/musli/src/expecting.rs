@@ -2,7 +2,7 @@
 
 use core::fmt::{self, Display};
 
-use crate::de::{NumberHint, SizeHint};
+use crate::de::SizeHint;
 
 pub trait Expecting {
     /// Generated the actual message of what we expected.
@@ -111,7 +111,6 @@ expect_with! {
     pub(crate) MapWith("map with {0}", SizeHint);
     pub(crate) BytesWith("bytes with {0}", SizeHint);
     pub(crate) StringWith("string with {0}", SizeHint);
-    pub(crate) NumberWith("{0} number", NumberHint);
 }
 
 expect! {

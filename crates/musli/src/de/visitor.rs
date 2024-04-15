@@ -1,10 +1,7 @@
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::de::{
-    Decoder, MapDecoder, NumberHint, NumberVisitor, SequenceDecoder, SizeHint, TypeHint,
-    VariantDecoder,
-};
+use crate::de::{Decoder, MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, VariantDecoder};
 use crate::expecting::{self, Expecting};
 use crate::Context;
 
@@ -34,18 +31,6 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     /// Format the human-readable message that should occur if the decoder was
     /// expecting to decode some specific kind of value.
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
-
-    /// Fallback used when the type is either not implemented for this visitor
-    /// or the underlying format doesn't know which type to decode.
-    fn visit_any<D>(self, cx: &C, _: D, hint: TypeHint) -> Result<Self::Ok, C::Error>
-    where
-        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode>,
-    {
-        Err(cx.message(expecting::unsupported_type(
-            &hint,
-            ExpectingWrapper::new(&self),
-        )))
-    }
 
     /// Indicates that the visited type is a `unit`.
     #[inline]
@@ -256,9 +241,9 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
 
     /// Indicates that the visited type is a number.
     #[inline]
-    fn visit_number(self, cx: &C, hint: NumberHint) -> Result<Self::Number, C::Error> {
+    fn visit_number(self, cx: &C) -> Result<Self::Number, C::Error> {
         Err(cx.message(expecting::unsupported_type(
-            &expecting::NumberWith(hint),
+            &expecting::Number,
             ExpectingWrapper::new(&self),
         )))
     }

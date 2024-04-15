@@ -1008,7 +1008,7 @@ where
     }
 
     #[inline]
-    fn visit_number(self, _: &C, _: musli::de::NumberHint) -> Result<Self::Number, C::Error> {
+    fn visit_number(self, _: &C) -> Result<Self::Number, C::Error> {
         Ok(AnyNumberVisitor::new(self.visitor))
     }
 }

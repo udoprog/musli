@@ -20,6 +20,7 @@ extern crate std;
 mod de;
 mod en;
 mod error;
+mod type_hint;
 mod value;
 
 /// Convenient result alias for use with `musli_value`.
