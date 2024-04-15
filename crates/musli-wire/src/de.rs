@@ -150,7 +150,9 @@ where
             } else {
                 musli_utils::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
-            _ => Err(self.cx.marked_message(start, "Expected prefix")),
+            kind => Err(self
+                .cx
+                .marked_message(start, format_args!("Expected prefix, but got {kind:?}"))),
         }
     }
 }

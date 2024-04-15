@@ -17,37 +17,49 @@
 //! ```
 
 mod encode;
+#[doc(inline)]
 pub use self::encode::{Encode, TraceEncode};
 
 mod encode_bytes;
+#[doc(inline)]
 pub use self::encode_bytes::EncodeBytes;
 
 mod encoder;
+#[doc(inline)]
 pub use self::encoder::Encoder;
 
 mod sequence_encoder;
+#[doc(inline)]
 pub use self::sequence_encoder::SequenceEncoder;
 
 mod tuple_encoder;
+#[doc(inline)]
 pub use self::tuple_encoder::TupleEncoder;
 
 mod pack_encoder;
+#[doc(inline)]
 pub use self::pack_encoder::PackEncoder;
 
 mod map_encoder;
+#[doc(inline)]
 pub use self::map_encoder::MapEncoder;
 
 mod map_entry_encoder;
+#[doc(inline)]
 pub use self::map_entry_encoder::MapEntryEncoder;
 
 mod map_entries_encoder;
+#[doc(inline)]
 pub use self::map_entries_encoder::MapEntriesEncoder;
 
 mod struct_encoder;
+#[doc(inline)]
 pub use self::struct_encoder::StructEncoder;
 
 mod struct_field_encoder;
+#[doc(inline)]
 pub use self::struct_field_encoder::StructFieldEncoder;
 
 mod variant_encoder;
+#[doc(inline)]
 pub use self::variant_encoder::VariantEncoder;

@@ -15,7 +15,8 @@ use core::num::{
 use core::{fmt, marker};
 
 use crate::de::{
-    Decode, DecodeBytes, DecodeUnsized, DecodeUnsizedBytes, Decoder, ValueVisitor, VariantDecoder,
+    Decode, DecodeBytes, DecodeUnsized, DecodeUnsizedBytes, Decoder, SequenceDecoder, ValueVisitor,
+    VariantDecoder,
 };
 use crate::en::{Encode, EncodeBytes, Encoder, SequenceEncoder, VariantEncoder};
 use crate::hint::SequenceHint;
@@ -176,13 +177,36 @@ where
     }
 }
 
-impl<'de, M, const N: usize> Decode<'de, M> for [u8; N] {
+impl<'de, M, T, const N: usize> Decode<'de, M> for [T; N]
+where
+    T: Decode<'de, M>,
+{
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de>,
+        D: Decoder<'de, Mode = M>,
     {
-        decoder.decode_array()
+        let mark = cx.mark();
+
+        decoder.decode_sequence(|seq| {
+            let mut array = crate::fixed::FixedVec::new();
+
+            while let Some(item) = seq.decode_next()? {
+                array.try_push(item.decode()?).map_err(cx.map())?;
+            }
+
+            if array.len() != N {
+                return Err(cx.marked_message(
+                    mark,
+                    format_args!(
+                        "Array with length {} does not have the expected {N} number of elements",
+                        array.len()
+                    ),
+                ));
+            }
+
+            Ok(array.into_inner())
+        })
     }
 }
 

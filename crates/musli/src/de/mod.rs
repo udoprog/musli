@@ -17,66 +17,87 @@
 //! ```
 
 mod skip;
+#[doc(inline)]
 pub use self::skip::Skip;
 
 mod as_decoder;
+#[doc(inline)]
 pub use self::as_decoder::AsDecoder;
 
 mod decode;
+#[doc(inline)]
 pub use self::decode::{Decode, TraceDecode};
 
 mod decode_unsized;
+#[doc(inline)]
 pub use self::decode_unsized::DecodeUnsized;
 
 mod decode_unsized_bytes;
+#[doc(inline)]
 pub use self::decode_unsized_bytes::DecodeUnsizedBytes;
 
 mod decode_bytes;
+#[doc(inline)]
 pub use self::decode_bytes::DecodeBytes;
 
 mod decoder;
+#[doc(inline)]
 pub use self::decoder::Decoder;
 
 mod map_decoder;
+#[doc(inline)]
 pub use self::map_decoder::MapDecoder;
 
 mod map_entries_decoder;
+#[doc(inline)]
 pub use self::map_entries_decoder::MapEntriesDecoder;
 
 mod map_entry_decoder;
+#[doc(inline)]
 pub use self::map_entry_decoder::MapEntryDecoder;
 
 mod number_visitor;
+#[doc(inline)]
 pub use self::number_visitor::NumberVisitor;
 
 mod pack_decoder;
+#[doc(inline)]
 pub use self::pack_decoder::PackDecoder;
 
 mod tuple_decoder;
+#[doc(inline)]
 pub use self::tuple_decoder::TupleDecoder;
 
 mod sequence_decoder;
+#[doc(inline)]
 pub use self::sequence_decoder::SequenceDecoder;
 
 mod struct_decoder;
+#[doc(inline)]
 pub use self::struct_decoder::StructDecoder;
 
 mod struct_field_decoder;
+#[doc(inline)]
 pub use self::struct_field_decoder::StructFieldDecoder;
 
 mod struct_fields_decoder;
+#[doc(inline)]
 pub use self::struct_fields_decoder::StructFieldsDecoder;
 
 mod size_hint;
+#[doc(inline)]
 pub use self::size_hint::SizeHint;
 
 mod value_visitor;
+#[doc(inline)]
 pub use self::value_visitor::ValueVisitor;
 
 mod variant_decoder;
+#[doc(inline)]
 pub use self::variant_decoder::VariantDecoder;
 
 mod visitor;
+#[doc(inline)]
 pub use self::visitor::Visitor;
 
 use crate::mode::DefaultMode;
