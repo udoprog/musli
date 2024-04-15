@@ -29,30 +29,86 @@ pub enum Mark {
     Reserved0 = 0b111,
 }
 
+/// The kind of a number.
+///
+/// Not that this enum occupies all possible low 2-bit patterns, which allows it
+/// to be transmuted from a byte masked over `0b11`.
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub(crate) enum NumberKind {
+    /// The numerical type is a signed value.
+    Signed = 0b00,
+    /// The numerical type is an unsigned value.
+    Unsigned = 0b01,
+    /// The numerical type is a float.
+    Float = 0b10,
+    /// Reserved number kind.
+    #[allow(unused)]
+    Reserved0 = 0b11,
+}
+
+/// The width of the field.
+///
+/// Note that this representation directly corresponds to 2 to the power of the
+/// specified width.
+#[repr(u8)]
+pub(crate) enum Width {
+    #[allow(unused)]
+    Reserved0 = 0b000,
+    #[allow(unused)]
+    Reserved1 = 0b001,
+    #[allow(unused)]
+    Reserved2 = 0b010,
+    /// 8-bit width.
+    U8 = 0b011,
+    /// 16-bit width.
+    U16 = 0b100,
+    /// 32-bit width.
+    U32 = 0b101,
+    /// 64-bit width.
+    U64 = 0b110,
+    /// 128-bit width.
+    U128 = 0b111,
+}
+
+#[test]
+fn ensure_width() {
+    assert_eq!(2u32.pow(Width::U8 as u32), 8u32);
+    assert_eq!(1u32 << Width::U8 as u32, 8u32);
+    assert_eq!(2u32.pow(Width::U16 as u32), 16u32);
+    assert_eq!(1u32 << Width::U16 as u32, 16u32);
+    assert_eq!(2u32.pow(Width::U32 as u32), 32u32);
+    assert_eq!(1u32 << Width::U32 as u32, 32u32);
+    assert_eq!(2u32.pow(Width::U64 as u32), 64u32);
+    assert_eq!(1u32 << Width::U64 as u32, 64u32);
+    assert_eq!(2u32.pow(Width::U128 as u32), 128u32);
+    assert_eq!(1u32 << Width::U128 as u32, 128u32);
+}
+
 /// 8-bit unsigned number.
-pub const U8: u8 = 0b00001;
-/// 8-bit signed number.
-pub const I8: u8 = 0b10001;
+pub const U8: u8 = (Width::U8 as u8) << 2 | NumberKind::Unsigned as u8;
 /// 16-bit unsigned number.
-pub const U16: u8 = 0b00010;
-/// 16-bit signed number.
-pub const I16: u8 = 0b10010;
+pub const U16: u8 = (Width::U16 as u8) << 2 | NumberKind::Unsigned as u8;
 /// 32-bit unsigned number.
-pub const U32: u8 = 0b00011;
-/// 32-bit signed number.
-pub const I32: u8 = 0b10011;
-/// 32-bit float hint.
-pub const F32: u8 = 0b01011;
+pub const U32: u8 = (Width::U32 as u8) << 2 | NumberKind::Unsigned as u8;
 /// 64-bit unsigned number.
-pub const U64: u8 = 0b00100;
-/// 64-bit signed number.
-pub const I64: u8 = 0b10100;
-/// 64-bit float hint.
-pub const F64: u8 = 0b01100;
+pub const U64: u8 = (Width::U64 as u8) << 2 | NumberKind::Unsigned as u8;
 /// 128-bit number hint.
-pub const U128: u8 = 0b00101;
+pub const U128: u8 = (Width::U128 as u8) << 2 | NumberKind::Unsigned as u8;
+/// 8-bit signed number.
+pub const I8: u8 = (Width::U8 as u8) << 2 | NumberKind::Signed as u8;
+/// 16-bit signed number.
+pub const I16: u8 = (Width::U16 as u8) << 2 | NumberKind::Signed as u8;
+/// 32-bit signed number.
+pub const I32: u8 = (Width::U32 as u8) << 2 | NumberKind::Signed as u8;
+/// 64-bit signed number.
+pub const I64: u8 = (Width::U64 as u8) << 2 | NumberKind::Signed as u8;
 /// 128-bit signed number.
-pub const I128: u8 = 0b10101;
+pub const I128: u8 = (Width::U128 as u8) << 2 | NumberKind::Signed as u8;
+/// 32-bit float hint.
+pub const F32: u8 = (Width::U32 as u8) << 2 | NumberKind::Float as u8;
+/// 64-bit float hint.
+pub const F64: u8 = (Width::U64 as u8) << 2 | NumberKind::Float as u8;
 /// The marker for a usize.
 #[cfg(target_pointer_width = "32")]
 pub const USIZE: u8 = U32;
@@ -69,6 +125,7 @@ pub const ISIZE: u8 = I64;
 /// Data masked into the data type.
 pub(crate) const DATA_MASK: u8 = 0b000_11111;
 pub(crate) const MARK_MASK: u8 = 0b00000_111;
+pub(crate) const NUMBER_KIND_MASK: u8 = 0b000000_11;
 /// The maximum length that can be inlined in the tag without adding additional
 /// data to the wire format.
 pub const MAX_INLINE_LEN: usize = (DATA_MASK - 1) as usize;
@@ -134,6 +191,14 @@ impl Tag {
         // SAFETY: The representation used by `Mark` is exhaustive over all
         // emitted bit-patterns.
         unsafe { mem::transmute(self.repr & MARK_MASK) }
+    }
+
+    /// Access the number kind this tag corresponds to.
+    #[inline]
+    pub(crate) const fn number_kind(&self) -> NumberKind {
+        // SAFETY: The representation used by `Mark` is exhaustive over all
+        // emitted bit-patterns.
+        unsafe { mem::transmute(self.repr & NUMBER_KIND_MASK) }
     }
 
     /// Construct a new empty tag of the given [Kind].
