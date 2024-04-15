@@ -137,6 +137,6 @@ pub use self::error::Error;
 #[cfg(feature = "test")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
 #[doc(hidden)]
-pub use self::test::{transcode, Typed};
+pub use self::test::transcode;
 
 musli_utils::simdutf8!();

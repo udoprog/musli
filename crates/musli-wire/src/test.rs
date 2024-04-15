@@ -2,9 +2,8 @@
 
 use core::fmt::Debug;
 
-use musli::de::PackDecoder;
 use musli::mode::DefaultMode;
-use musli::{Decode, Decoder, Encode};
+use musli::{Decode, Encode};
 
 use crate::tag::Tag;
 
@@ -12,32 +11,18 @@ use crate::tag::Tag;
 ///
 /// This is used in combination with the storage deserializer to "inspect" type
 /// tags.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Typed<T> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
+#[musli(packed)]
+pub struct Typed<const N: usize> {
     tag: Tag,
-    value: T,
+    #[musli(bytes)]
+    value: [u8; N],
 }
 
-impl<T> Typed<T> {
+impl<const N: usize> Typed<N> {
     /// Construct a new typed field.
-    pub const fn new(tag: Tag, value: T) -> Self {
+    pub const fn new(tag: Tag, value: [u8; N]) -> Self {
         Self { tag, value }
-    }
-}
-
-impl<'de, M, T> Decode<'de, M> for Typed<T>
-where
-    T: Decode<'de, M>,
-{
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
-    where
-        D: Decoder<'de, Mode = M>,
-    {
-        decoder.decode_pack(|pack| {
-            let tag = pack.decode_next()?.decode()?;
-            let value = pack.decode_next()?.decode()?;
-            Ok(Self { tag, value })
-        })
     }
 }
 

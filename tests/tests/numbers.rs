@@ -21,7 +21,7 @@ struct Unpacked {
     b: (Tag, Tag),
     c: (Tag, Tag),
     d: (Tag, Tag),
-    e: (Tag, Typed<[u8; 5]>),
+    e: (Tag, Typed<5>),
 }
 
 #[test]
