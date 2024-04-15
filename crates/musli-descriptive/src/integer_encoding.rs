@@ -5,7 +5,7 @@ use musli_utils::int::zigzag as zig;
 use musli_utils::int::{Signed, Unsigned};
 use musli_utils::{Reader, Writer};
 
-use crate::tag::{Kind, Tag};
+use crate::tag::{Kind, NumberKind, Tag};
 
 #[inline]
 pub(crate) fn encode_typed_unsigned<C, W, T>(
@@ -19,7 +19,7 @@ where
     W: Writer,
     T: Unsigned,
 {
-    encode_typed(cx, writer, Kind::Number, bits, value)
+    encode_typed(cx, writer, bits, value)
 }
 
 #[inline]
@@ -27,30 +27,41 @@ pub(crate) fn decode_typed_unsigned<'de, C, R, T>(cx: &C, reader: R) -> Result<T
 where
     C: ?Sized + Context,
     R: Reader<'de>,
-    T: Unsigned,
+    T: Unsigned + TryFrom<T::Signed>,
 {
-    decode_typed(cx, reader, Kind::Number)
+    let (value, kind): (T, NumberKind) = decode_typed(cx, reader)?;
+
+    match kind {
+        NumberKind::Signed => {
+            let value = zig::decode(value);
+
+            let Ok(value) = T::try_from(value) else {
+                return Err(cx.message(format_args!("Unsigned value outside of signed range")));
+            };
+
+            Ok(value)
+        }
+        NumberKind::Unsigned => Ok(value),
+        kind => Err(cx.message(format_args!(
+            "Expected signed or unsigned number, got {:?}",
+            kind
+        ))),
+    }
 }
 
 #[inline]
-fn encode_typed<C, W, T>(
-    cx: &C,
-    mut writer: W,
-    kind: Kind,
-    bits: u8,
-    value: T,
-) -> Result<(), C::Error>
+fn encode_typed<C, W, T>(cx: &C, mut writer: W, bits: u8, value: T) -> Result<(), C::Error>
 where
     C: ?Sized + Context,
     W: Writer,
     T: Unsigned,
 {
-    writer.write_byte(cx, Tag::new(kind, bits).byte())?;
+    writer.write_byte(cx, Tag::new(Kind::Number, bits).byte())?;
     c::encode(cx, writer, value)
 }
 
 #[inline]
-fn decode_typed<'de, C, R, T>(cx: &C, mut reader: R, kind: Kind) -> Result<T, C::Error>
+fn decode_typed<'de, C, R, T>(cx: &C, mut reader: R) -> Result<(T, NumberKind), C::Error>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
@@ -58,11 +69,12 @@ where
 {
     let tag = Tag::from_byte(reader.read_byte(cx)?);
 
-    if tag.kind() != kind {
-        return Err(cx.message(format_args!("Expected {kind:?}, got {tag:?}")));
+    if tag.kind() != Kind::Number {
+        return Err(cx.message(format_args!("Expected {:?}, got {tag:?}", Kind::Number)));
     }
 
-    c::decode(cx, reader)
+    let kind = tag.number_kind();
+    Ok((c::decode(cx, reader)?, kind))
 }
 
 #[inline]
@@ -77,7 +89,7 @@ where
     W: Writer,
     T: Signed,
 {
-    encode_typed(cx, writer, Kind::Number, bits, zig::encode(value))
+    encode_typed(cx, writer, bits, zig::encode(value))
 }
 
 #[inline]
@@ -85,8 +97,22 @@ pub(crate) fn decode_typed_signed<'de, C, R, T>(cx: &C, reader: R) -> Result<T, 
 where
     C: ?Sized + Context,
     R: Reader<'de>,
-    T: Signed,
+    T: Signed + TryFrom<<T as Signed>::Unsigned>,
 {
-    let value: T::Unsigned = decode_typed(cx, reader, Kind::Number)?;
-    Ok(zig::decode(value))
+    let (value, kind): (T::Unsigned, NumberKind) = decode_typed(cx, reader)?;
+
+    match kind {
+        NumberKind::Signed => Ok(zig::decode(value)),
+        NumberKind::Unsigned => {
+            let Ok(value) = T::try_from(value) else {
+                return Err(cx.message(format_args!("Unsigned value outside of signed range")));
+            };
+
+            Ok(value)
+        }
+        kind => Err(cx.message(format_args!(
+            "Expected signed or unsigned number, got {:?}",
+            kind
+        ))),
+    }
 }
