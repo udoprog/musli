@@ -205,7 +205,9 @@ types.
 `self` determines if the format is self-descriptive. Allowing the structure
 of the data to be fully reconstructed from its serialized state. These
 formats do not require models to decode and can be converted to and from
-dynamic containers such as [`musli-value`] for introspection.
+dynamic containers such as [`musli-value`] for introspection. Such formats
+also allows for type-coercions to be performed, so that a signed number can
+be correctly read as an unsigned number if it fits in the destination type.
 
 For every feature you drop, the format becomes more compact and efficient.
 [`musli-storage`] using `#[musli(packed)]` for example is roughly as compact
