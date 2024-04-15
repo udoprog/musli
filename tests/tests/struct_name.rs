@@ -52,9 +52,9 @@ fn named_struct_unpack() {
     #[musli(packed)]
     pub struct Unpacked {
         field_count: Tag,
-        field1_name: Typed<[u8; 6]>,
-        field1_value: Typed<[u8; 3]>,
-        field2_name: Typed<[u8; 6]>,
+        field1_name: Typed<6>,
+        field1_value: Typed<3>,
+        field2_name: Typed<6>,
         field2_value: Tag,
     }
 
@@ -122,7 +122,7 @@ fn indexed_struct_unpack() {
     pub struct Unpacked {
         field_count: Tag,
         field1_index: Tag,
-        field1_value: Typed<[u8; 3]>,
+        field1_value: Typed<3>,
         field2_index: Tag,
         field2_value: Tag,
     }

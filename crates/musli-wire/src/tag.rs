@@ -5,7 +5,8 @@
 use core::fmt;
 use core::mem;
 
-use musli::{Decode, Decoder};
+#[cfg(feature = "test")]
+use musli::{Decode, Encode};
 
 /// Data masked into the data type.
 pub(crate) const DATA_MASK: u8 = 0b00_111111;
@@ -40,7 +41,9 @@ pub enum Kind {
 /// question. It is primarily used to smuggle extra data for the kind in
 /// question.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "test", derive(Encode, Decode))]
 #[repr(transparent)]
+#[cfg_attr(feature = "test", musli(transparent))]
 pub struct Tag {
     /// The internal representation of the tag.
     repr: u8,
@@ -139,15 +142,5 @@ impl fmt::Debug for Tag {
             .field("kind", &self.kind())
             .field("data", &self.data())
             .finish()
-    }
-}
-
-impl<'de, M> Decode<'de, M> for Tag {
-    #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
-    where
-        D: Decoder<'de, Mode = M>,
-    {
-        Ok(Self::from_byte(decoder.decode()?))
     }
 }
