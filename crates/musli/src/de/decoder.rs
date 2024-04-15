@@ -1359,14 +1359,8 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Decode a struct which has an expected `len` number of elements using a
-    /// closure.
-    ///
-    /// The `len` indicates how many fields the decoder is *expecting* depending
-    /// on how many fields are present in the underlying struct being decoded,
-    /// butit should only be considered advisory.
-    ///
-    /// The size of a struct might therefore change from one session to another.
+    /// Decode a struct with a [`StructHint`] that might contain information
+    /// about the structing being decode.
     ///
     /// # Examples
     ///
@@ -1504,14 +1498,11 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Simplified decoding of a struct which has an expected `len` number of
-    /// elements.
+    /// Decode a struct with a [`StructHint`] that might contain information
+    /// about the structing being decode.
     ///
-    /// The `len` indicates how many fields the decoder is *expecting* depending
-    /// on how many fields are present in the underlying struct being decoded,
-    /// butit should only be considered advisory.
-    ///
-    /// The size of a struct might therefore change from one session to another.
+    /// This variant returns a decoder that decodes the struct as a sequence of
+    /// fields.
     #[inline]
     fn decode_struct_fields(
         self,

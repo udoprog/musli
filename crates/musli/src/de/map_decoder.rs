@@ -25,24 +25,23 @@ pub trait MapDecoder<'de>: Sized {
         &mut self,
     ) -> Result<Option<Self::DecodeEntry<'_>>, <Self::Cx as Context>::Error>;
 
+    /// Return simplified decoder for remaining entries.
+    fn decode_remaining_entries(
+        &mut self,
+    ) -> Result<Self::DecodeRemainingEntries<'_>, <Self::Cx as Context>::Error>;
+
     /// Decode the next map entry as a tuple.
     fn entry<K, V>(&mut self) -> Result<Option<(K, V)>, <Self::Cx as Context>::Error>
     where
         K: Decode<'de, <Self::Cx as Context>::Mode>,
         V: Decode<'de, <Self::Cx as Context>::Mode>,
     {
-        match self.decode_entry()? {
-            Some(mut entry) => {
-                let key = entry.decode_map_key()?.decode()?;
-                let value = entry.decode_map_value()?.decode()?;
-                Ok(Some((key, value)))
-            }
-            None => Ok(None),
-        }
-    }
+        let Some(mut entry) = self.decode_entry()? else {
+            return Ok(None);
+        };
 
-    /// Return simplified decoder for remaining entries.
-    fn decode_remaining_entries(
-        &mut self,
-    ) -> Result<Self::DecodeRemainingEntries<'_>, <Self::Cx as Context>::Error>;
+        let key = entry.decode_map_key()?.decode()?;
+        let value = entry.decode_map_value()?.decode()?;
+        Ok(Some((key, value)))
+    }
 }
