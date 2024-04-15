@@ -422,6 +422,7 @@ pub mod de;
 pub mod derives;
 pub mod en;
 mod expecting;
+mod fixed;
 pub mod hint;
 mod impls;
 mod internal;
