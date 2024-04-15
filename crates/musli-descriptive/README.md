@@ -12,14 +12,15 @@ Descriptive encoding is fully upgrade stable:
 * ✔ Can tolerate missing fields if they are annotated with
   `#[musli(default)]`.
 * ✔ Can skip over unknown fields.
+* ✔ Can be fully converted back and forth between dynamic containers such as
+  the [Value] type.
+* ✔ Can handle coercion from different types of primitive types, such as
+  signed to unsigned integers. So primitive field types can be assuming they
+  only inhabit compatible values.
 
-Furthermore, it can be fully converted back and from to the [Value] type.
-
-This means that it's suitable as a wire and general interchange format,
-since the data model can evolve independently among clients. Once some
-clients are upgraded they will start sending unknown fields which
-non-upgraded clients will be forced to skip over for the duration of the
-upgrade.
+This means that it's suitable as a wire and general interchange format. It's
+also suitable for dynamically translating to and from different wire formats
+such as JSON without having access to the data model.
 
 ```rust
 use musli::{Encode, Decode};
