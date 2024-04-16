@@ -51,6 +51,7 @@ where
     type DecodeSequence = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeTuple = Self;
     type DecodeMap = LimitedStorageDecoder<'a, R, OPT, C>;
+    type DecodeUnsizedMap = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeStruct = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
@@ -297,9 +298,17 @@ where
     }
 
     #[inline]
-    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, hint: &MapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+    {
+        self.decode_unsized_map(f)
+    }
+
+    #[inline]
+    fn decode_unsized_map<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeUnsizedMap) -> Result<O, C::Error>,
     {
         let cx = self.cx;
         let mut decoder = LimitedStorageDecoder::new(self.cx, self.reader)?;

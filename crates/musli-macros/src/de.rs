@@ -143,7 +143,6 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         map_decoder_t,
         struct_field_decoder_t,
         map_hint,
-        unsized_map_hint,
         variant_decoder_t,
         ..
     } = b.tokens;
@@ -481,9 +480,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 let #buffer_var = #decoder_t::decode_buffer(#decoder_var)?;
                 let #struct_var = #as_decoder_t::as_decoder(&#buffer_var)?;
 
-                static #struct_hint_static: #unsized_map_hint = #unsized_map_hint::new();
-
-                let #variant_tag_var: #name_type = #decoder_t::decode_unsized_struct(#struct_var, &#struct_hint_static, |#struct_var| {
+                let #variant_tag_var: #name_type = #decoder_t::decode_unsized_map(#struct_var, |#struct_var| {
                     let #variant_decoder_var = loop {
                         let #option_some(mut #entry_var) = #map_decoder_t::decode_entry(#struct_var)? else {
                             return #result_err(#context_t::missing_variant_field(#ctx_var, #type_name, &#tag_static));

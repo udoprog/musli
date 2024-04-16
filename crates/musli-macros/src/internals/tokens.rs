@@ -30,7 +30,6 @@ pub(crate) struct Tokens {
     pub(crate) struct_field_decoder_t: syn::Path,
     pub(crate) trace_decode_t: syn::Path,
     pub(crate) trace_encode_t: syn::Path,
-    pub(crate) unsized_map_hint: syn::Path,
     pub(crate) variant_decoder_t: syn::Path,
     pub(crate) variant_encoder_t: syn::Path,
 }
@@ -67,7 +66,6 @@ impl Tokens {
             struct_field_decoder_t: path(span, prefix, ["de", "MapEntryDecoder"]),
             trace_decode_t: path(span, prefix, ["de", "TraceDecode"]),
             trace_encode_t: path(span, prefix, ["en", "TraceEncode"]),
-            unsized_map_hint: path(span, prefix, ["hint", "UnsizedMapHint"]),
             variant_decoder_t: path(span, prefix, ["de", "VariantDecoder"]),
             variant_encoder_t: path(span, prefix, ["en", "VariantEncoder"]),
         }

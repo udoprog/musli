@@ -109,7 +109,7 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     type DecodeMapEntries = Self;
     type DecodeSome = Self;
     type DecodeStruct = Self;
-    type DecodeUnsizedStruct = Self;
+    type DecodeUnsizedMap = Self;
     type DecodeVariant = Self;
     type __UseMusliDecoderAttributeMacro = ();
 

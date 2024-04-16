@@ -9,7 +9,7 @@ use musli::de::{
     PackDecoder, SequenceDecoder, SizeHint, Skip, TupleDecoder, ValueVisitor, VariantDecoder,
     Visitor,
 };
-use musli::hint::{MapHint, SequenceHint, UnsizedMapHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_utils::int::continuation as c;
@@ -259,9 +259,9 @@ where
     type DecodeSequence = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeTuple = SelfTupleDecoder<'a, R, OPT, C>;
     type DecodeMap = RemainingSelfDecoder<'a, R, OPT, C>;
+    type DecodeUnsizedMap = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeStruct = RemainingSelfDecoder<'a, R, OPT, C>;
-    type DecodeUnsizedStruct = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
     #[inline]
@@ -641,9 +641,17 @@ where
     }
 
     #[inline]
-    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+    {
+        self.decode_unsized_map(f)
+    }
+
+    #[inline]
+    fn decode_unsized_map<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeUnsizedMap) -> Result<O, C::Error>,
     {
         let mut decoder = self.shared_decode_map()?;
         let output = f(&mut decoder)?;
@@ -660,17 +668,6 @@ where
     fn decode_struct<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
-    {
-        let mut decoder = self.shared_decode_map()?;
-        let output = f(&mut decoder)?;
-        decoder.skip_map_remaining()?;
-        Ok(output)
-    }
-
-    #[inline]
-    fn decode_unsized_struct<F, O>(self, _: &UnsizedMapHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, C::Error>,
     {
         let mut decoder = self.shared_decode_map()?;
         let output = f(&mut decoder)?;

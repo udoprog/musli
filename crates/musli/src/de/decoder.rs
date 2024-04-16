@@ -3,7 +3,7 @@
 use core::fmt;
 
 use crate::expecting::{self, Expecting};
-use crate::hint::{MapHint, SequenceHint, UnsizedMapHint};
+use crate::hint::{MapHint, SequenceHint};
 use crate::Context;
 
 use super::{
@@ -38,12 +38,12 @@ pub trait Decoder<'de>: Sized {
     type DecodeTuple: TupleDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_map`].
     type DecodeMap: MapDecoder<'de, Cx = Self::Cx>;
+    /// Decoder returned by [`Decoder::decode_unsized_map`].
+    type DecodeUnsizedMap: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_map_entries`].
     type DecodeMapEntries: MapEntriesDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_struct`].
     type DecodeStruct: MapDecoder<'de, Cx = Self::Cx>;
-    /// Decoder returned by [`Decoder::decode_unsized_struct`].
-    type DecodeUnsizedStruct: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_variant`].
     type DecodeVariant: VariantDecoder<'de, Cx = Self::Cx>;
 
@@ -175,7 +175,7 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         let mut buffer = decoder.decode_buffer()?;
     ///
-    ///         let discriminant = buffer.as_decoder()?.decode_map(|st| {
+    ///         let discriminant = buffer.as_decoder()?.decode_unsized_map(|st| {
     ///             loop {
     ///                 let Some(mut e) = st.decode_entry()? else {
     ///                     return Err(cx.missing_variant_tag("Enum"));
@@ -1323,7 +1323,7 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         decoder.decode_map(|map| {
+    ///         decoder.decode_unsized_map(|map| {
     ///             let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
     ///             while let Some((key, value)) = map.entry()? {
@@ -1336,12 +1336,69 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_map<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_map<F, O>(self, hint: &MapHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Map,
+            ExpectingWrapper::new(&self),
+        )))
+    }
+
+    /// Decode a map who's size is not known at compile time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::{MapDecoder, MapEntryDecoder};
+    ///
+    /// struct Struct {
+    ///     string: String,
+    ///     integer: u32,
+    /// }
+    ///
+    /// impl<'de, M> Decode<'de, M> for Struct {
+    ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         decoder.decode_unsized_map(|st| {
+    ///             let mut string = None;
+    ///             let mut integer = None;
+    ///
+    ///             while let Some(mut field) = st.decode_entry()? {
+    ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
+    ///                 let tag = field.decode_map_key()?.decode::<String>()?;
+    ///
+    ///                 match tag.as_str() {
+    ///                     "string" => {
+    ///                         string = Some(field.decode_map_value()?.decode()?);
+    ///                     }
+    ///                     "integer" => {
+    ///                         integer = Some(field.decode_map_value()?.decode()?);
+    ///                     }
+    ///                     tag => {
+    ///                         return Err(cx.invalid_field_tag("Struct", tag));
+    ///                     }
+    ///                 }
+    ///             }
+    ///
+    ///             Ok(Self {
+    ///                 string: string.ok_or_else(|| cx.expected_tag("Struct", "string"))?,
+    ///                 integer: integer.ok_or_else(|| cx.expected_tag("Struct", "integer"))?,
+    ///             })
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    fn decode_unsized_map<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    where
+        F: FnOnce(&mut Self::DecodeUnsizedMap) -> Result<O, <Self::Cx as Context>::Error>,
+    {
+        Err(self.cx().message(expecting::unsupported_type(
+            &expecting::UnsizedStruct,
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1429,73 +1486,6 @@ pub trait Decoder<'de>: Sized {
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Struct,
-            ExpectingWrapper::new(&self),
-        )))
-    }
-
-    /// Decode a struct who's size is not known at compile time.
-    ///
-    /// This will error in case the underlying format doesn't know the size of
-    /// the struct.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{MapDecoder, MapEntryDecoder};
-    /// use musli::hint::UnsizedMapHint;
-    ///
-    /// struct Struct {
-    ///     string: String,
-    ///     integer: u32,
-    /// }
-    ///
-    /// static STRUCT_HINT: UnsizedMapHint = UnsizedMapHint::new();
-    ///
-    /// impl<'de, M> Decode<'de, M> for Struct {
-    ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
-    ///     where
-    ///         D: Decoder<'de>,
-    ///     {
-    ///         decoder.decode_unsized_struct(&STRUCT_HINT, |st| {
-    ///             let mut string = None;
-    ///             let mut integer = None;
-    ///
-    ///             while let Some(mut field) = st.decode_entry()? {
-    ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///                 let tag = field.decode_map_key()?.decode::<String>()?;
-    ///
-    ///                 match tag.as_str() {
-    ///                     "string" => {
-    ///                         string = Some(field.decode_map_value()?.decode()?);
-    ///                     }
-    ///                     "integer" => {
-    ///                         integer = Some(field.decode_map_value()?.decode()?);
-    ///                     }
-    ///                     tag => {
-    ///                         return Err(cx.invalid_field_tag("Struct", tag));
-    ///                     }
-    ///                 }
-    ///             }
-    ///
-    ///             Ok(Self {
-    ///                 string: string.ok_or_else(|| cx.expected_tag("Struct", "string"))?,
-    ///                 integer: integer.ok_or_else(|| cx.expected_tag("Struct", "integer"))?,
-    ///             })
-    ///         })
-    ///     }
-    /// }
-    /// ```
-    fn decode_unsized_struct<F, O>(
-        self,
-        hint: &UnsizedMapHint,
-        f: F,
-    ) -> Result<O, <Self::Cx as Context>::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, <Self::Cx as Context>::Error>,
-    {
-        Err(self.cx().message(expecting::unsupported_type(
-            &expecting::UnsizedStruct,
             ExpectingWrapper::new(&self),
         )))
     }
