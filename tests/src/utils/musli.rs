@@ -3,7 +3,7 @@
 pub mod musli_json {
     use alloc::vec::Vec;
 
-    use musli::mode::DefaultMode;
+    use musli::mode::Binary;
     use musli::{Decode, Encode};
     use musli_json::Encoding;
     use musli_json::Error;
@@ -20,7 +20,7 @@ pub mod musli_json {
 
     pub fn encode<'buf, T>(buffer: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
-        T: Encode<DefaultMode>,
+        T: Encode<Binary>,
     {
         ENCODING.encode(&mut *buffer, value)?;
         Ok(buffer)
@@ -28,7 +28,7 @@ pub mod musli_json {
 
     pub fn decode<'buf, T>(buffer: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, DefaultMode>,
+        T: Decode<'buf, Binary>,
     {
         ENCODING.from_slice(buffer)
     }
@@ -77,7 +77,7 @@ pub mod musli_storage_packed {
 pub mod musli_storage {
     use alloc::vec::Vec;
 
-    use musli::mode::DefaultMode;
+    use musli::mode::Binary;
     use musli::{Decode, Encode};
     use musli_storage::{Encoding, Error};
     use musli_utils::options::{self, Options};
@@ -95,7 +95,7 @@ pub mod musli_storage {
 
     pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
-        T: Encode<DefaultMode>,
+        T: Encode<Binary>,
     {
         ENCODING.encode(&mut *buf, value)?;
         Ok(buf)
@@ -103,7 +103,7 @@ pub mod musli_storage {
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, DefaultMode>,
+        T: Decode<'buf, Binary>,
     {
         ENCODING.from_slice(buf)
     }
@@ -114,7 +114,7 @@ pub mod musli_storage {
 pub mod musli_wire {
     use alloc::vec::Vec;
 
-    use musli::mode::DefaultMode;
+    use musli::mode::Binary;
     use musli::{Decode, Encode};
     use musli_wire::Encoding;
     use musli_wire::Error;
@@ -131,7 +131,7 @@ pub mod musli_wire {
 
     pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
-        T: Encode<DefaultMode>,
+        T: Encode<Binary>,
     {
         ENCODING.encode(&mut *buf, value)?;
         Ok(buf.as_slice())
@@ -139,7 +139,7 @@ pub mod musli_wire {
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, DefaultMode>,
+        T: Decode<'buf, Binary>,
     {
         ENCODING.from_slice(buf)
     }
@@ -150,7 +150,7 @@ pub mod musli_wire {
 pub mod musli_descriptive {
     use crate::no_alloc::Bytes;
 
-    use musli::mode::DefaultMode;
+    use musli::mode::Binary;
     use musli::{Decode, Encode};
     use musli_descriptive::Encoding;
     use musli_descriptive::Error;
@@ -167,7 +167,7 @@ pub mod musli_descriptive {
 
     pub fn encode<'buf, T>(buf: &'buf mut Bytes, value: &T) -> Result<&'buf [u8], Error>
     where
-        T: Encode<DefaultMode>,
+        T: Encode<Binary>,
     {
         ENCODING.encode(&mut *buf, value)?;
         Ok(buf)
@@ -175,7 +175,7 @@ pub mod musli_descriptive {
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, DefaultMode>,
+        T: Decode<'buf, Binary>,
     {
         ENCODING.from_slice(buf)
     }
@@ -184,20 +184,20 @@ pub mod musli_descriptive {
 #[cfg(feature = "musli-value")]
 #[crate::benchmarker(as_bytes_disabled)]
 pub mod musli_value {
-    use musli::mode::DefaultMode;
+    use musli::mode::Binary;
     use musli::{Decode, Encode};
     use musli_value::Value;
 
     pub fn encode<T>(value: &T) -> Result<Value, musli_value::Error>
     where
-        T: Encode<DefaultMode>,
+        T: Encode<Binary>,
     {
         musli_value::encode(value)
     }
 
     pub fn decode<T>(buf: &Value) -> Result<T, musli_value::Error>
     where
-        for<'a> T: Decode<'a, DefaultMode>,
+        for<'a> T: Decode<'a, Binary>,
     {
         musli_value::decode(buf)
     }

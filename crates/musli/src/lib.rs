@@ -84,7 +84,7 @@
 //!
 //! ```ignore
 //! # use musli::{Decode, Encode};
-//! # use musli::mode::DefaultMode;
+//! # use musli::mode::Binary;
 //! # use musli_storage::encoding::Encoding;
 //! # use musli_storage::options::{self, Options, Integer, ByteOrder};
 //! # type Result<T, E = musli_storage::Error> = core::result::Result<T, E>;
@@ -298,8 +298,8 @@
 //!
 //! If a mode is not specified, an implementation will apply to all modes (`M`),
 //! if at least one mode is specified it will be implemented for all modes which
-//! are present in a model and [`DefaultMode`]. This way, an encoding which uses
-//! `DefaultMode` which is the default mode should always work.
+//! are present in a model and [`Binary`]. This way, an encoding which uses
+//! `Binary` which is the default mode should always work.
 //!
 //! For more information on how to configure modes, see [`derives`].
 //!
@@ -308,7 +308,7 @@
 //!
 //! ```ignore
 //! use musli::{Decode, Encode};
-//! use musli_json::{DEFAULT_OPTIONS, Encoding};
+//! use musli_json::{OPTIONS, Encoding};
 //!
 //! enum Alt {}
 //!
@@ -321,7 +321,7 @@
 //! }
 //!
 //! const CONFIG: Encoding = Encoding::new();
-//! const ALT_CONFIG: Encoding<DEFAULT_OPTIONS, Alt> = Encoding::new().with_mode();
+//! const ALT_CONFIG: Encoding<OPTIONS, Alt> = Encoding::new().with_mode();
 //!
 //! let word = Word {
 //!     text: "あります",
@@ -370,7 +370,7 @@
 //! [`bincode`]: https://docs.rs/bincode
 //! [`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
 //! [`Decoder`]: https://docs.rs/musli/latest/musli/trait.Decoder.html
-//! [`DefaultMode`]: https://docs.rs/musli/latest/musli/mode/enum.DefaultMode.html
+//! [`Binary`]: https://docs.rs/musli/latest/musli/mode/enum.Binary.html
 //! [`derives`]: https://docs.rs/musli/latest/musli/derives/
 //! [`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
 //! [`Encoder`]: https://docs.rs/musli/latest/musli/trait.Encoder.html

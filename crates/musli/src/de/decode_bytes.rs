@@ -1,5 +1,4 @@
-use crate::de::Decoder;
-use crate::Context;
+use super::Decoder;
 
 /// Trait governing how types are decoded as bytes.
 ///
@@ -43,7 +42,7 @@ use crate::Context;
 /// ```
 pub trait DecodeBytes<'de, M>: Sized {
     /// Decode the given input as bytes.
-    fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, <D::Cx as Context>::Error>
+    fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>;
 }

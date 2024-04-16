@@ -11,7 +11,7 @@
 //!   `#[musli(default)]`.
 //! * ✔ Can skip over unknown fields.
 //!
-//! ```rust
+//! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]

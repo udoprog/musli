@@ -1,11 +1,12 @@
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::de::{Decoder, MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, VariantDecoder};
 use crate::expecting::{self, Expecting};
 use crate::Context;
 
-use super::ValueVisitor;
+use super::{
+    Decoder, MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
+};
 
 /// Visitor capable of decoding any type into a value [`Visitor::Ok`].
 ///

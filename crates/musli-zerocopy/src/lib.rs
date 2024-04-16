@@ -111,7 +111,7 @@
 //!
 //! Say you want to store the string `"Hello World!"`.
 //!
-//! ```rust
+//! ```
 //! use musli_zerocopy::OwnedBuf;
 //!
 //! let mut buf = OwnedBuf::new();
@@ -137,7 +137,7 @@
 //!
 //! Let's have a look at a [`Ref<[u32]>`][ref-u32] next:
 //!
-//! ```rust
+//! ```
 //! use musli_zerocopy::{Ref, OwnedBuf};
 //!
 //! let mut buf = OwnedBuf::new();

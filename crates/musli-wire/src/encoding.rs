@@ -10,7 +10,7 @@ use std::io;
 
 use musli::de::Decode;
 use musli::en::Encode;
-use musli::mode::DefaultMode;
+use musli::mode::Binary;
 use musli::Context;
 use musli_utils::options;
 use musli_utils::{FixedBytes, Options, Reader, Writer};
@@ -20,38 +20,40 @@ use crate::en::WireEncoder;
 use crate::error::Error;
 
 /// The default flavor used by the [`DEFAULT`] configuration.
-pub const DEFAULT_OPTIONS: options::Options = options::new().build();
+pub const OPTIONS: options::Options = options::new().build();
 
 /// The default configuration.
 ///
 /// Uses variable-encoded numerical fields and variable-encoded prefix lengths.
 ///
-/// The variable length encoding uses [zigzag] with [continuation] encoding for
-/// numbers.
+/// The variable length encoding uses [`zigzag`] with [`continuation`] encoding
+/// for numbers.
 ///
-/// [zigzag]: musli_utils::int::zigzag
-/// [continuation]: musli_utils::int::continuation
+/// [`zigzag`]: musli_utils::int::zigzag
+/// [`continuation`]: musli_utils::int::continuation
 pub const DEFAULT: Encoding = Encoding::new();
 
-/// Encode the given value to the given [Writer] using the [`DEFAULT`]
+/// Encode the given value to the given [`Writer`] using the [`DEFAULT`]
 /// configuration.
 #[inline]
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
-    T: ?Sized + Encode<DefaultMode>,
+    T: ?Sized + Encode<Binary>,
 {
     DEFAULT.encode(writer, value)
 }
 
-/// Encode the given value to the given [Write][io::Write] using the [`DEFAULT`]
+/// Encode the given value to the given [`Write`] using the [`DEFAULT`]
 /// configuration.
+///
+/// [`Write`]: io::Write
 #[cfg(feature = "std")]
 #[inline]
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: io::Write,
-    T: ?Sized + Encode<DefaultMode>,
+    T: ?Sized + Encode<Binary>,
 {
     DEFAULT.to_writer(writer, value)
 }
@@ -61,7 +63,7 @@ where
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
 where
-    T: ?Sized + Encode<DefaultMode>,
+    T: ?Sized + Encode<Binary>,
 {
     DEFAULT.to_vec(value)
 }
@@ -71,18 +73,18 @@ where
 #[inline]
 pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, Error>
 where
-    T: ?Sized + Encode<DefaultMode>,
+    T: ?Sized + Encode<Binary>,
 {
     DEFAULT.to_fixed_bytes::<N, _>(value)
 }
 
-/// Decode the given type `T` from the given [Reader] using the [`DEFAULT`]
+/// Decode the given type `T` from the given [`Reader`] using the [`DEFAULT`]
 /// configuration.
 #[inline]
 pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
 where
     R: Reader<'de>,
-    T: Decode<'de, DefaultMode>,
+    T: Decode<'de, Binary>,
 {
     DEFAULT.decode(reader)
 }
@@ -92,18 +94,18 @@ where
 #[inline]
 pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
 where
-    T: Decode<'de, DefaultMode>,
+    T: Decode<'de, Binary>,
 {
     DEFAULT.from_slice(bytes)
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<const OPT: Options = DEFAULT_OPTIONS, M = DefaultMode> {
+pub struct Encoding<const OPT: Options = OPTIONS, M = Binary> {
     _marker: marker::PhantomData<M>,
 }
 
-impl Encoding<DEFAULT_OPTIONS, DefaultMode> {
-    /// Construct a new [`Encoding`] instance with the [`DEFAULT_OPTIONS`]
+impl Encoding<OPTIONS, Binary> {
+    /// Construct a new [`Encoding`] instance with the [`OPTIONS`]
     /// configuration.
     ///
     /// You can modify this using the available factory methods:
@@ -149,11 +151,11 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
     /// # Examples
     ///
     /// ```
-    /// use musli_wire::{DEFAULT_OPTIONS, Encoding};
+    /// use musli_wire::{OPTIONS, Encoding};
     ///
     /// enum Custom {}
     ///
-    /// const CONFIG: Encoding<DEFAULT_OPTIONS, Custom> = Encoding::new().with_mode();
+    /// const CONFIG: Encoding<OPTIONS, Custom> = Encoding::new().with_mode();
     /// ```
     pub const fn with_mode<T>(self) -> Encoding<OPT, T> {
         Encoding {

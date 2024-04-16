@@ -6,7 +6,7 @@
 //! itself. This also comes with a derive allowing you to derive high
 //! performance decoding associated with native Rust types.
 //!
-//! ```rust
+//! ```
 //! use musli::Decode;
 //!
 //! #[derive(Decode)]
@@ -30,7 +30,11 @@ pub use self::as_decoder::AsDecoder;
 
 mod decode;
 #[doc(inline)]
-pub use self::decode::{Decode, TraceDecode};
+pub use self::decode::Decode;
+
+mod decode_trace;
+#[doc(inline)]
+pub use self::decode_trace::DecodeTrace;
 
 mod decode_unsized;
 #[doc(inline)]

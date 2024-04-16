@@ -16,7 +16,7 @@
 //!
 //! See [musli-wire] for a fully upgrade safe format.
 //!
-//! ```rust
+//! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
@@ -58,8 +58,8 @@
 //! To tweak the behavior of the storage format you can use the [`Encoding`]
 //! type:
 //!
-//! ```rust
-//! use musli::mode::DefaultMode;
+//! ```
+//! use musli::mode::Binary;
 //! use musli::{Encode, Decode};
 //! use musli_utils::options::{self, Options, Integer};
 //! use musli_storage::Encoding;
@@ -126,7 +126,7 @@ pub use self::encoding::to_vec;
 #[doc(inline)]
 pub use self::encoding::to_writer;
 #[doc(inline)]
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding, DEFAULT_OPTIONS};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding, OPTIONS};
 #[doc(inline)]
 pub use self::error::Error;
 #[cfg(feature = "test")]

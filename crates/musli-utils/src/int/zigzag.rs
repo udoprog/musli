@@ -2,7 +2,7 @@
 //!
 //! [zigzag encoding]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
 //!
-//! ```rust
+//! ```
 //! assert_eq!(musli_utils::int::zigzag::encode(-1i32), 1u32);
 //! assert_eq!(musli_utils::int::zigzag::encode(-2i32), 3u32);
 //! ```

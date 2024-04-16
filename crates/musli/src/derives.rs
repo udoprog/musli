@@ -57,7 +57,7 @@
 //! What this means is that if we want to serialize `Person` using named fields,
 //! we can simply turn on the `Json` mode for our given serializer. If we want
 //! to revert back to the default behavior and use indexed fields we can instead
-//! use [`DefaultMode`].
+//! use [`Binary`].
 //!
 //! ```ignore
 //! # use musli::{Encode, Decode};
@@ -126,7 +126,7 @@
 //! not supported for enums.
 //!
 //! ```
-//! use musli::mode::DefaultMode;
+//! use musli::mode::Binary;
 //! use musli::{Decode, Encode};
 //!
 //! enum Packed {}
@@ -940,7 +940,7 @@
 //!
 //! #### `#[musli(trace)]`
 //!
-//! This causes the field to use the [`TraceDecode`] / [`TraceEncode`] when
+//! This causes the field to use the [`DecodeTrace`] / [`EncodeTrace`] when
 //! encoding the field. This is left optional for types where enabling tracing
 //! for the field requires extra traits to be implemented, such as `HashMap<K,
 //! V>` where we'd need `K` to implement `fmt::Display`.
@@ -1040,20 +1040,20 @@
 //! a map for the field corresponding to the `tag`, and then use this to
 //! determine which decoder implementation to call.
 //!
+//! [`Binary`]: crate::mode::Binary
 //! [`Decode`]: crate::Decode
 //! [`DecodeBytes`]: crate::de::DecodeBytes
 //! [`DecodePacked`]: crate::de::DecodePacked
 //! [`Decoder::decode_buffer`]: crate::Decoder::decode_buffer
 //! [`Decoder::decode_variant`]: crate::Decoder::decode_variant
 //! [`Decoder`]: crate::Decoder
-//! [`DefaultMode`]: crate::mode::DefaultMode
+//! [`DecodeTrace`]: crate::de::DecodeTrace
 //! [`Encode`]: crate::Encode
 //! [`EncodeBytes`]: crate::en::EncodeBytes
 //! [`EncodePacked`]: crate::en::EncodePacked
 //! [`Encoder::encode_variant`]: crate::Encoder::encode_variant
 //! [`Encoder`]: crate::Encoder
-//! [`TraceDecode`]: crate::de::TraceDecode
-//! [`TraceEncode`]: crate::en::TraceEncode
-//! [default mode]: crate::mode::DefaultMode
+//! [`EncodeTrace`]: crate::en::EncodeTrace
+//! [default mode]: crate::mode::Binary
 
 // Parts of this documentation

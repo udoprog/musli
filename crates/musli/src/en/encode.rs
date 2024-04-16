@@ -1,5 +1,4 @@
 use crate::en::Encoder;
-use crate::Context;
 
 pub use musli_macros::Encode;
 
@@ -40,22 +39,7 @@ pub use musli_macros::Encode;
 /// ```
 pub trait Encode<M> {
     /// Encode the given output.
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, <E::Cx as Context>::Error>
-    where
-        E: Encoder<Mode = M>;
-}
-
-/// Trait governing how types are encoded specifically for tracing.
-///
-/// This is used for types where some extra bounds might be necessary to trace a
-/// container such as a [`HashMap<K, V>`] where `K` would have to implement
-/// [`fmt::Display`].
-///
-/// [`HashMap<K, V>`]: std::collections::HashMap
-/// [`fmt::Display`]: std::fmt::Display
-pub trait TraceEncode<M> {
-    /// Encode the given output.
-    fn trace_encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, <E::Cx as Context>::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>;
 }

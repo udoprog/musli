@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 
-use musli::mode::DefaultMode;
+use musli::mode::Binary;
 use musli_utils::allocator;
 use musli_utils::context;
 
@@ -11,7 +11,7 @@ use crate::parser::SliceParser;
 #[test]
 fn test_decode_exponent() {
     allocator::with(|alloc| {
-        let cx = context::Same::<_, DefaultMode, Error>::new(alloc);
+        let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {
             ($ty:ty, $num:expr, $expected:expr) => {
@@ -48,7 +48,7 @@ fn test_decode_exponent() {
 #[test]
 fn test_decode_unsigned() {
     allocator::with(|alloc| {
-        let cx = context::Same::<_, DefaultMode, Error>::new(alloc);
+        let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {
             ($ty:ty, $num:expr) => {
@@ -116,7 +116,7 @@ fn test_decode_unsigned() {
 #[test]
 fn test_decode_signed() {
     allocator::with(|alloc| {
-        let cx = context::Same::<_, DefaultMode, Error>::new(alloc);
+        let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {
             ($ty:ty, $num:expr) => {

@@ -20,12 +20,12 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use crate::de::{
-    Decode, DecodeBytes, Decoder, EntryDecoder, MapDecoder, SequenceDecoder, TraceDecode,
+    Decode, DecodeBytes, DecodeTrace, Decoder, EntryDecoder, MapDecoder, SequenceDecoder,
     ValueVisitor,
 };
 use crate::en::{
-    Encode, EncodeBytes, EncodePacked, Encoder, EntryEncoder, MapEncoder, SequenceEncoder,
-    TraceEncode,
+    Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntryEncoder, MapEncoder,
+    SequenceEncoder,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::internal::size_hint;
@@ -364,7 +364,7 @@ macro_rules! map {
         }
 
         $(#[$($meta)*])*
-        impl<'de, M, K, V $(, $extra)*> TraceEncode<M> for $ty<K, V $(, $extra)*>
+        impl<'de, M, K, V $(, $extra)*> EncodeTrace<M> for $ty<K, V $(, $extra)*>
         where
             K: fmt::Display + Encode<M>,
             V: Encode<M>,
@@ -418,7 +418,7 @@ macro_rules! map {
         }
 
         $(#[$($meta)*])*
-        impl<'de, K, V, M $(, $extra)*> TraceDecode<'de, M> for $ty<K, V $(, $extra)*>
+        impl<'de, K, V, M $(, $extra)*> DecodeTrace<'de, M> for $ty<K, V $(, $extra)*>
         where
             K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
             V: Decode<'de, M>,

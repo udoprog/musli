@@ -3,7 +3,7 @@
 #[macro_export]
 macro_rules! encode_with_extensions {
     ($mode:ident) => {
-        /// Encode the given value to the given [Writer] using the current
+        /// Encode the given value to the given [`Writer`] using the current
         /// configuration.
         #[inline]
         pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), Error>
@@ -160,8 +160,8 @@ macro_rules! encoding_impls {
             T::encode(value, cx, $encoder_new(cx, writer))
         }
 
-        /// Decode the given type `T` from the given [Reader] using the current
-        /// configuration.
+        /// Decode the given type `T` from the given [`Reader`] using the
+        /// current configuration.
         ///
         /// This is the same as [`Encoding::decode`] but allows for using a
         /// configurable [`Context`].
@@ -176,8 +176,8 @@ macro_rules! encoding_impls {
             T::decode(cx, $decoder_new(cx, reader))
         }
 
-        /// Decode the given type `T` from the given [Reader] using the current
-        /// configuration.
+        /// Decode the given type `T` from the given [`Reader`] using the
+        /// current configuration.
         #[inline]
         pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
@@ -213,7 +213,7 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn rt<T>(value: T) -> T
         where
-            T: ::musli::en::Encode<::musli::mode::DefaultMode> + ::musli::de::DecodeOwned<::musli::mode::DefaultMode>,
+            T: ::musli::en::Encode<::musli::mode::Binary> + ::musli::de::DecodeOwned<::musli::mode::Binary>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
@@ -297,9 +297,9 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
         where
-            T: ::musli::en::Encode<::musli::mode::DefaultMode>,
+            T: ::musli::en::Encode<::musli::mode::Binary>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: ::musli::de::Decode<'de, ::musli::mode::DefaultMode>,
+            U: ::musli::de::Decode<'de, ::musli::mode::Binary>,
             U: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
@@ -367,7 +367,7 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn to_vec<T>(value: T) -> ::alloc::vec::Vec<u8>
         where
-            T: ::musli::en::Encode<::musli::mode::DefaultMode>,
+            T: ::musli::en::Encode<::musli::mode::Binary>,
         {
             const WHAT: &str = $what;
             const ENCODING: crate::Encoding = crate::Encoding::new();

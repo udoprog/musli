@@ -61,7 +61,7 @@ To tweak the behavior of the storage format you can use the [`Encoding`]
 type:
 
 ```rust
-use musli::mode::DefaultMode;
+use musli::mode::Binary;
 use musli::{Encode, Decode};
 use musli_utils::options::{self, Options, Integer};
 use musli_storage::Encoding;

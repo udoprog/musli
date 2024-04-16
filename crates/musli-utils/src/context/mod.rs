@@ -17,7 +17,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use musli::context::StdError;
-use musli::mode::DefaultMode;
+use musli::mode::Binary;
 use musli::{Allocator, Context};
 
 use crate::buf::{self, BufString};
@@ -49,7 +49,7 @@ impl<A, M, E> Same<A, M, E> {
     }
 }
 
-impl<A> Same<A, DefaultMode, ErrorMarker> {
+impl<A> Same<A, Binary, ErrorMarker> {
     /// Construct a new `Same` capturing context.
     #[inline]
     #[doc(hidden)]
@@ -148,7 +148,7 @@ impl<A, M, E> Ignore<A, M, E> {
     }
 }
 
-impl<A> Ignore<A, DefaultMode, ErrorMarker> {
+impl<A> Ignore<A, Binary, ErrorMarker> {
     /// Construct a new ignoring context which collects an error marker.
     #[doc(hidden)]
     pub fn marker(alloc: A) -> Self {
