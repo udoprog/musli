@@ -1,6 +1,6 @@
 use crate::Context;
 
-use super::Decoder;
+use super::{Decoder, SizeHint};
 
 /// Trait governing how to decode a map entry.
 pub trait MapEntryDecoder<'de> {
@@ -22,6 +22,12 @@ pub trait MapEntryDecoder<'de> {
         Error = <Self::Cx as Context>::Error,
         Mode = <Self::Cx as Context>::Mode,
     >;
+
+    /// Get a size hint for the size of the map being decoded.
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Any
+    }
 
     /// Return the decoder for the first value in the pair.
     ///

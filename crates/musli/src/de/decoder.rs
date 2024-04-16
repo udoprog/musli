@@ -8,8 +8,8 @@ use crate::Context;
 
 use super::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, MapDecoder, MapEntriesDecoder,
-    NumberVisitor, PackDecoder, SequenceDecoder, Skip, StructDecoder, StructFieldsDecoder,
-    TupleDecoder, ValueVisitor, VariantDecoder, Visitor,
+    NumberVisitor, PackDecoder, SequenceDecoder, Skip, TupleDecoder, ValueVisitor, VariantDecoder,
+    Visitor,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -41,11 +41,9 @@ pub trait Decoder<'de>: Sized {
     /// Decoder returned by [`Decoder::decode_map_entries`].
     type DecodeMapEntries: MapEntriesDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_struct`].
-    type DecodeStruct: StructDecoder<'de, Cx = Self::Cx>;
+    type DecodeStruct: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_unsized_struct`].
-    type DecodeUnsizedStruct: StructDecoder<'de, Cx = Self::Cx>;
-    /// Decoder used by [`Decoder::decode_struct_fields`].
-    type DecodeStructFields: StructFieldsDecoder<'de, Cx = Self::Cx>;
+    type DecodeUnsizedStruct: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_variant`].
     type DecodeVariant: VariantDecoder<'de, Cx = Self::Cx>;
 
@@ -1380,7 +1378,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{StructDecoder, StructFieldDecoder};
+    /// use musli::de::{MapDecoder, MapEntryDecoder};
     /// use musli::hint::StructHint;
     /// # struct Struct { string: String, integer: u32 }
     ///
@@ -1395,16 +1393,16 @@ pub trait Decoder<'de>: Sized {
     ///             let mut string = None;
     ///             let mut integer = None;
     ///
-    ///             while let Some(mut field) = st.decode_field()? {
+    ///             while let Some(mut field) = st.decode_entry()? {
     ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///                 let tag = field.decode_field_name()?.decode::<String>()?;
+    ///                 let tag = field.decode_map_key()?.decode::<String>()?;
     ///
     ///                 match tag.as_str() {
     ///                     "string" => {
-    ///                         string = Some(field.decode_field_value()?.decode()?);
+    ///                         string = Some(field.decode_map_value()?.decode()?);
     ///                     }
     ///                     "integer" => {
-    ///                         integer = Some(field.decode_field_value()?.decode()?);
+    ///                         integer = Some(field.decode_map_value()?.decode()?);
     ///                     }
     ///                     tag => {
     ///                         return Err(cx.invalid_field_tag("Struct", tag));
@@ -1440,7 +1438,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{StructDecoder, StructFieldDecoder};
+    /// use musli::de::{MapDecoder, MapEntryDecoder};
     /// use musli::hint::UnsizedStructHint;
     ///
     /// struct Struct {
@@ -1459,16 +1457,16 @@ pub trait Decoder<'de>: Sized {
     ///             let mut string = None;
     ///             let mut integer = None;
     ///
-    ///             while let Some(mut field) = st.decode_field()? {
+    ///             while let Some(mut field) = st.decode_entry()? {
     ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///                 let tag = field.decode_field_name()?.decode::<String>()?;
+    ///                 let tag = field.decode_map_key()?.decode::<String>()?;
     ///
     ///                 match tag.as_str() {
     ///                     "string" => {
-    ///                         string = Some(field.decode_field_value()?.decode()?);
+    ///                         string = Some(field.decode_map_value()?.decode()?);
     ///                     }
     ///                     "integer" => {
-    ///                         integer = Some(field.decode_field_value()?.decode()?);
+    ///                         integer = Some(field.decode_map_value()?.decode()?);
     ///                     }
     ///                     tag => {
     ///                         return Err(cx.invalid_field_tag("Struct", tag));
@@ -1496,24 +1494,6 @@ pub trait Decoder<'de>: Sized {
             &expecting::UnsizedStruct,
             ExpectingWrapper::new(&self),
         )))
-    }
-
-    /// Decode a struct with a [`StructHint`] that might contain information
-    /// about the structing being decode.
-    ///
-    /// This variant returns a decoder that decodes the struct as a sequence of
-    /// fields.
-    #[inline]
-    fn decode_struct_fields(
-        self,
-        hint: &StructHint,
-    ) -> Result<Self::DecodeStructFields, <Self::Cx as Context>::Error>
-    where
-        Self: Sized,
-    {
-        Err(self
-            .cx()
-            .message("Decoder does not support StructPairs decoding"))
     }
 
     /// Decode a variant using a closure.

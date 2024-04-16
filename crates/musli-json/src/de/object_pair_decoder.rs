@@ -1,4 +1,4 @@
-use musli::de::{MapEntryDecoder, StructFieldDecoder};
+use musli::de::MapEntryDecoder;
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -45,27 +45,5 @@ where
 
         self.parser.skip(self.cx, 1)?;
         Ok(JsonDecoder::new(self.cx, self.parser))
-    }
-}
-
-impl<'a, 'de, P, C> StructFieldDecoder<'de> for JsonObjectPairDecoder<'a, P, C>
-where
-    P: Parser<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeFieldName<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
-    where
-        Self: 'this;
-    type DecodeFieldValue = JsonDecoder<'a, P, C>;
-
-    #[inline]
-    fn decode_field_name(&mut self) -> Result<Self::DecodeFieldName<'_>, C::Error> {
-        MapEntryDecoder::decode_map_key(self)
-    }
-
-    #[inline]
-    fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
-        MapEntryDecoder::decode_map_value(self)
     }
 }

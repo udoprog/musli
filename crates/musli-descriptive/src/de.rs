@@ -6,8 +6,8 @@ use alloc::vec::Vec;
 
 use musli::de::{
     Decode, DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberVisitor,
-    PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, TupleDecoder, ValueVisitor, VariantDecoder, Visitor,
+    PackDecoder, SequenceDecoder, SizeHint, Skip, TupleDecoder, ValueVisitor, VariantDecoder,
+    Visitor,
 };
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
 use musli::Context;
@@ -262,7 +262,6 @@ where
     type DecodeMapEntries = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeStruct = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeUnsizedStruct = RemainingSelfDecoder<'a, R, OPT, C>;
-    type DecodeStructFields = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
     #[inline]
@@ -680,11 +679,6 @@ where
     }
 
     #[inline]
-    fn decode_struct_fields(self, _: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
-        self.shared_decode_map()
-    }
-
-    #[inline]
     fn decode_variant<F, O>(mut self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, C::Error>,
@@ -952,41 +946,6 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> StructFieldsDecoder<'de>
-    for RemainingSelfDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeStructFieldName<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
-    where
-        Self: 'this;
-    type DecodeStructFieldValue<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
-        if self.remaining == 0 {
-            return Err(self.cx.message("Ran out of fields"));
-        }
-
-        self.remaining -= 1;
-        Ok(SelfDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-
-    #[inline]
-    fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
-        MapEntriesDecoder::decode_map_entry_value(self)
-    }
-
-    #[inline]
-    fn end_struct_fields(self) -> Result<(), C::Error> {
-        MapEntriesDecoder::end_map_entries(self)
-    }
-}
-
 impl<'a, 'de, R, const OPT: Options, C> MapEntryDecoder<'de> for SelfDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
@@ -1004,47 +963,6 @@ where
     #[inline]
     fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
         Ok(self)
-    }
-}
-
-impl<'a, 'de, R, const OPT: Options, C> StructDecoder<'de> for RemainingSelfDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeField<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
-    }
-
-    #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
-        MapDecoder::decode_entry(self)
-    }
-}
-
-impl<'a, 'de, R, const OPT: Options, C> StructFieldDecoder<'de> for SelfDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeFieldName<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeFieldValue = Self;
-
-    #[inline]
-    fn decode_field_name(&mut self) -> Result<Self::DecodeFieldName<'_>, C::Error> {
-        MapEntryDecoder::decode_map_key(self)
-    }
-
-    #[inline]
-    fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
-        MapEntryDecoder::decode_map_value(self)
     }
 }
 

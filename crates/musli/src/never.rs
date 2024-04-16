@@ -14,8 +14,8 @@ use crate::no_std::ToOwned;
 
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, MapDecoder, MapEntriesDecoder,
-    MapEntryDecoder, NumberVisitor, PackDecoder, SequenceDecoder, SizeHint, StructDecoder,
-    StructFieldDecoder, StructFieldsDecoder, TupleDecoder, ValueVisitor, VariantDecoder,
+    MapEntryDecoder, NumberVisitor, PackDecoder, SequenceDecoder, SizeHint, TupleDecoder,
+    ValueVisitor, VariantDecoder,
 };
 use crate::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
@@ -110,7 +110,6 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     type DecodeSome = Self;
     type DecodeStruct = Self;
     type DecodeUnsizedStruct = Self;
-    type DecodeStructFields = Self;
     type DecodeVariant = Self;
     type __UseMusliDecoderAttributeMacro = ();
 
@@ -169,22 +168,6 @@ impl<C: ?Sized + Context> AsDecoder for Never<(), C> {
     }
 }
 
-impl<'de, C: ?Sized + Context> StructFieldDecoder<'de> for Never<(), C> {
-    type Cx = C;
-    type DecodeFieldName<'this> = Self where Self: 'this;
-    type DecodeFieldValue = Self;
-
-    #[inline]
-    fn decode_field_name(&mut self) -> Result<Self::DecodeFieldName<'_>, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
-        match self._never {}
-    }
-}
-
 impl<'de, C: ?Sized + Context> MapEntriesDecoder<'de> for Never<(), C> {
     type Cx = C;
     type DecodeMapEntryKey<'this> = Self where Self: 'this;
@@ -202,42 +185,6 @@ impl<'de, C: ?Sized + Context> MapEntriesDecoder<'de> for Never<(), C> {
 
     #[inline]
     fn end_map_entries(self) -> Result<(), C::Error> {
-        match self._never {}
-    }
-}
-
-impl<'de, C: ?Sized + Context> StructDecoder<'de> for Never<(), C> {
-    type Cx = C;
-    type DecodeField<'this> = Self where Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> SizeHint {
-        match self._never {}
-    }
-
-    #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
-        match self._never {}
-    }
-}
-
-impl<'de, C: ?Sized + Context> StructFieldsDecoder<'de> for Never<(), C> {
-    type Cx = C;
-    type DecodeStructFieldName<'this> = Self where Self: 'this;
-    type DecodeStructFieldValue<'this> = Self where Self: 'this;
-
-    #[inline]
-    fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn end_struct_fields(self) -> Result<(), C::Error> {
         match self._never {}
     }
 }

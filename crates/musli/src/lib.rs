@@ -580,7 +580,7 @@ pub use musli_macros::visitor;
 pub mod __priv {
     use crate::buf::Buf;
     use crate::context::Context;
-    use crate::de::{Decoder, StructFieldDecoder};
+    use crate::de::{Decoder, MapEntryDecoder};
 
     pub use ::core::fmt;
     pub use ::core::option::Option;
@@ -616,9 +616,9 @@ pub mod __priv {
     #[inline(always)]
     pub fn skip_field<'de, D>(decoder: D) -> Result<bool, <D::Cx as Context>::Error>
     where
-        D: StructFieldDecoder<'de>,
+        D: MapEntryDecoder<'de>,
     {
-        skip(decoder.decode_field_value()?)
+        skip(decoder.decode_map_value()?)
     }
 
     pub use Option::{None, Some};

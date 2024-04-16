@@ -20,6 +20,10 @@ mod skip;
 #[doc(inline)]
 pub use self::skip::Skip;
 
+mod size_hint;
+#[doc(inline)]
+pub use self::size_hint::SizeHint;
+
 mod as_decoder;
 #[doc(inline)]
 pub use self::as_decoder::AsDecoder;
@@ -71,22 +75,6 @@ pub use self::tuple_decoder::TupleDecoder;
 mod sequence_decoder;
 #[doc(inline)]
 pub use self::sequence_decoder::SequenceDecoder;
-
-mod struct_decoder;
-#[doc(inline)]
-pub use self::struct_decoder::StructDecoder;
-
-mod struct_field_decoder;
-#[doc(inline)]
-pub use self::struct_field_decoder::StructFieldDecoder;
-
-mod struct_fields_decoder;
-#[doc(inline)]
-pub use self::struct_fields_decoder::StructFieldsDecoder;
-
-mod size_hint;
-#[doc(inline)]
-pub use self::size_hint::SizeHint;
 
 mod value_visitor;
 #[doc(inline)]

@@ -1,9 +1,6 @@
 use core::mem::{replace, take};
 
-use musli::de::{
-    Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, SizeHint, StructDecoder,
-    StructFieldsDecoder,
-};
+use musli::de::{Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, SizeHint};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -195,59 +192,5 @@ where
     #[inline]
     fn end_map_entries(self) -> Result<(), C::Error> {
         self.skip_object_remaining()
-    }
-}
-
-impl<'a, 'de, P, C> StructDecoder<'de> for JsonObjectDecoder<'a, P, C>
-where
-    P: Parser<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeField<'this> = JsonObjectPairDecoder<'a, P::Mut<'this>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> SizeHint {
-        MapDecoder::size_hint(self)
-    }
-
-    #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
-        MapDecoder::decode_entry(self)
-    }
-}
-
-impl<'a, 'de, P, C> StructFieldsDecoder<'de> for JsonObjectDecoder<'a, P, C>
-where
-    P: Parser<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeStructFieldName<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
-    where
-        Self: 'this;
-    type DecodeStructFieldValue<'this> = JsonDecoder<'a, P::Mut<'this>, C> where Self: 'this;
-
-    #[inline]
-    fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
-        let cx = self.cx;
-
-        let Some(decoder) = self.decode_map_entry_key()? else {
-            return Err(cx.message("Expected struct field"));
-        };
-
-        Ok(decoder)
-    }
-
-    #[inline]
-    fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
-        self.decode_map_entry_value()
-    }
-
-    #[inline]
-    fn end_struct_fields(self) -> Result<(), C::Error> {
-        self.end_map_entries()
     }
 }

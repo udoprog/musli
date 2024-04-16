@@ -1,10 +1,10 @@
 use core::fmt;
 
 use musli::de::{
-    Decoder, MapDecoder, MapEntriesDecoder, SequenceDecoder, SizeHint, StructFieldsDecoder,
-    TupleDecoder, VariantDecoder, Visitor,
+    Decoder, MapDecoder, MapEntriesDecoder, SequenceDecoder, SizeHint, TupleDecoder,
+    VariantDecoder, Visitor,
 };
-use musli::hint::{StructHint, TupleHint};
+use musli::hint::TupleHint;
 use musli::Context;
 use serde::de;
 
@@ -296,16 +296,15 @@ where
     fn deserialize_struct<V>(
         self,
         _: &'static str,
-        fields: &'static [&'static str],
+        _: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        let hint = StructHint::with_size(fields.len());
-        let mut decoder = self.decoder.decode_struct_fields(&hint)?;
-        let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder, fields))?;
-        decoder.end_struct_fields()?;
+        let mut decoder = self.decoder.decode_map_entries()?;
+        let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder))?;
+        decoder.end_map_entries()?;
         Ok(output)
     }
 
@@ -393,30 +392,25 @@ where
 }
 struct StructAccess<'de, 'a, D>
 where
-    D: StructFieldsDecoder<'de>,
+    D: MapEntriesDecoder<'de>,
 {
     cx: &'a D::Cx,
     decoder: &'a mut D,
-    remaining: usize,
 }
 
 impl<'de, 'a, D> StructAccess<'de, 'a, D>
 where
-    D: StructFieldsDecoder<'de>,
+    D: MapEntriesDecoder<'de>,
 {
     #[inline]
-    fn new(cx: &'a D::Cx, decoder: &'a mut D, fields: &'static [&'static str]) -> Self {
-        StructAccess {
-            cx,
-            decoder,
-            remaining: fields.len(),
-        }
+    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
+        StructAccess { cx, decoder }
     }
 }
 
 impl<'de, 'a, D> de::MapAccess<'de> for StructAccess<'de, 'a, D>
 where
-    D: StructFieldsDecoder<'de>,
+    D: MapEntriesDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
 {
     type Error = <D::Cx as Context>::Error;
@@ -426,12 +420,10 @@ where
     where
         K: de::DeserializeSeed<'de>,
     {
-        if self.remaining == 0 {
+        let Some(decoder) = self.decoder.decode_map_entry_key()? else {
             return Ok(None);
-        }
+        };
 
-        self.remaining -= 1;
-        let decoder = self.decoder.decode_struct_field_name()?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
     }
@@ -441,14 +433,14 @@ where
     where
         V: de::DeserializeSeed<'de>,
     {
-        let decoder = self.decoder.decode_struct_field_value()?;
+        let decoder = self.decoder.decode_map_entry_value()?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(output)
     }
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+        self.decoder.size_hint().into_option()
     }
 }
 
@@ -798,17 +790,16 @@ where
     #[inline]
     fn struct_variant<V>(
         self,
-        fields: &'static [&'static str],
+        _: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
         let decoder = self.decoder.decode_value()?;
-        let hint = StructHint::with_size(fields.len());
-        let mut st = decoder.decode_struct_fields(&hint)?;
-        let value = visitor.visit_map(StructAccess::new(self.cx, &mut st, fields))?;
-        st.end_struct_fields()?;
+        let mut st = decoder.decode_map_entries()?;
+        let value = visitor.visit_map(StructAccess::new(self.cx, &mut st))?;
+        st.end_map_entries()?;
         Ok(value)
     }
 }

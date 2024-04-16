@@ -1,6 +1,6 @@
 use crate::Context;
 
-use super::Decoder;
+use super::{Decoder, SizeHint};
 
 /// Trait governing how to decode a sequence of map pairs.
 ///
@@ -31,6 +31,12 @@ pub trait MapEntriesDecoder<'de>: Sized {
     >
     where
         Self: 'this;
+
+    /// Get a size hint for the size of the map being decoded.
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Any
+    }
 
     /// Try to return the decoder for the first value in the pair.
     ///

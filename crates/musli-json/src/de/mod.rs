@@ -125,7 +125,6 @@ where
     type DecodeSome = JsonDecoder<'a, P, C>;
     type DecodeStruct = JsonObjectDecoder<'a, P, C>;
     type DecodeUnsizedStruct = JsonObjectDecoder<'a, P, C>;
-    type DecodeStructFields = JsonObjectDecoder<'a, P, C>;
     type DecodeVariant = JsonVariantDecoder<'a, P, C>;
 
     #[inline]
@@ -451,11 +450,6 @@ where
         let output = f(&mut decoder)?;
         decoder.skip_object_remaining()?;
         Ok(output)
-    }
-
-    #[inline]
-    fn decode_struct_fields(self, hint: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
-        JsonObjectDecoder::new(self.cx, Some(hint.size), self.parser)
     }
 
     #[inline]

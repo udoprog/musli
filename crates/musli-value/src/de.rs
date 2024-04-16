@@ -5,8 +5,7 @@ use core::slice;
 use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decode, DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder,
-    PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, TupleDecoder, VariantDecoder, Visitor,
+    PackDecoder, SequenceDecoder, SizeHint, Skip, TupleDecoder, VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
 use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
@@ -98,7 +97,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     type DecodeMapEntries = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeStruct = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeUnsizedStruct = IterValuePairsDecoder<'a, 'de, OPT, C>;
-    type DecodeStructFields = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeVariant = IterValueVariantDecoder<'a, 'de, OPT, C>;
 
     #[inline]
@@ -345,14 +343,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     {
         ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
             f(&mut IterValuePairsDecoder::new(self.cx, st))
-        })
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn decode_struct_fields(self, _: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
-            Ok(IterValuePairsDecoder::new(self.cx, st))
         })
     }
 
@@ -606,79 +596,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntryDecoder<'de>
     #[inline]
     fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
         Ok(ValueDecoder::new(self.cx, &self.pair.1))
-    }
-}
-
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> StructDecoder<'de>
-    for IterValuePairsDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeField<'this> = IterValuePairDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> SizeHint {
-        MapDecoder::size_hint(self)
-    }
-
-    #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
-        MapDecoder::decode_entry(self)
-    }
-}
-
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> StructFieldsDecoder<'de>
-    for IterValuePairsDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeStructFieldName<'this> = ValueDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-    type DecodeStructFieldValue<'this> = ValueDecoder<'a, 'de, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
-        let Some((name, _)) = self.iter.clone().next() else {
-            return Err(self.cx.message(ErrorMessage::ExpectedFieldName));
-        };
-
-        Ok(ValueDecoder::new(self.cx, name))
-    }
-
-    #[inline]
-    fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
-        let Some((_, value)) = self.iter.next() else {
-            return Err(self.cx.message(ErrorMessage::ExpectedFieldValue));
-        };
-
-        Ok(ValueDecoder::new(self.cx, value))
-    }
-
-    #[inline]
-    fn end_struct_fields(self) -> Result<(), C::Error> {
-        Ok(())
-    }
-}
-
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> StructFieldDecoder<'de>
-    for IterValuePairDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeFieldName<'this> = ValueDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-
-    type DecodeFieldValue = ValueDecoder<'a, 'de, OPT, C>;
-
-    #[inline]
-    fn decode_field_name(&mut self) -> Result<Self::DecodeFieldName<'_>, C::Error> {
-        MapEntryDecoder::decode_map_key(self)
-    }
-
-    #[inline]
-    fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
-        MapEntryDecoder::decode_map_value(self)
     }
 }
 
