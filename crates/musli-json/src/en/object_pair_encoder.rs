@@ -1,4 +1,4 @@
-use musli::en::{MapEntryEncoder, StructFieldEncoder};
+use musli::en::MapEntryEncoder;
 use musli::Context;
 use musli_utils::Writer;
 
@@ -48,33 +48,5 @@ where
     #[inline]
     fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
-    }
-}
-
-impl<'a, W, C> StructFieldEncoder for JsonObjectPairEncoder<'a, W, C>
-where
-    W: Writer,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeFieldName<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
-    where
-        Self: 'this;
-    type EncodeFieldValue<'this> = JsonEncoder<'a, W::Mut<'this>, C> where Self: 'this;
-
-    #[inline]
-    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        self.encode_map_key()
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        self.encode_map_value()
-    }
-
-    #[inline]
-    fn finish_field(self) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::finish_map_entry(self)
     }
 }

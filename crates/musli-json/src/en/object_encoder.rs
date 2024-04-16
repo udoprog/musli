@@ -1,4 +1,4 @@
-use musli::en::{MapEncoder, MapEntriesEncoder, StructEncoder};
+use musli::en::{MapEncoder, MapEntriesEncoder};
 use musli::Context;
 use musli_utils::Writer;
 
@@ -94,27 +94,5 @@ where
     #[inline]
     fn finish_map_entries(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, b'}')
-    }
-}
-
-impl<'a, W, C> StructEncoder for JsonObjectEncoder<'a, W, C>
-where
-    W: Writer,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeStructField<'this> = JsonObjectPairEncoder<'a, W::Mut<'this>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
-        MapEncoder::encode_map_entry(self)
-    }
-
-    #[inline]
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
-        MapEncoder::finish_map(self)
     }
 }

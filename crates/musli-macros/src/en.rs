@@ -193,8 +193,8 @@ fn insert_fields<'st>(
         pack_encoder_t,
         result_ok,
 
-        struct_encoder_t,
-        struct_field_encoder_t,
+        map_encoder_t,
+        map_entry_encoder_t,
         ..
     } = e.tokens;
 
@@ -242,11 +242,11 @@ fn insert_fields<'st>(
                 encode = quote! {
                     #enter
 
-                    #struct_encoder_t::encode_struct_field_fn(#encoder_var, move |#pair_encoder_var| {
+                    #map_encoder_t::encode_map_entry_fn(#encoder_var, move |#pair_encoder_var| {
                         static #field_name_static: #name_type = #name;
-                        let #field_encoder_var = #struct_field_encoder_t::encode_field_name(#pair_encoder_var)?;
+                        let #field_encoder_var = #map_entry_encoder_t::encode_map_key(#pair_encoder_var)?;
                         #encode_t_encode(&#field_name_static, #ctx_var, #field_encoder_var)?;
-                        let #value_encoder_var = #struct_field_encoder_t::encode_field_value(#pair_encoder_var)?;
+                        let #value_encoder_var = #map_entry_encoder_t::encode_map_value(#pair_encoder_var)?;
                         #encode_path(#access, #ctx_var, #value_encoder_var)?;
                         #result_ok(())
                     })?;
@@ -343,8 +343,8 @@ fn encode_variant(
         context_t,
         encoder_t,
         result_ok,
-        struct_encoder_t,
-        struct_field_encoder_t,
+        map_encoder_t,
+        map_entry_encoder_t,
         variant_encoder_t,
         struct_hint,
         ..
@@ -440,7 +440,7 @@ fn encode_variant(
                 #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
                     static #tag_static: #static_type = #tag;
                     static #name_static: #static_type = #name;
-                    #struct_encoder_t::insert_struct_field(#encoder_var, #tag_static, #name_static)?;
+                    #map_encoder_t::insert_entry(#encoder_var, #tag_static, #name_static)?;
                     #(#decls)*
                     #(#encoders)*
                     #result_ok(())
@@ -471,13 +471,13 @@ fn encode_variant(
                     static #name_static: #static_type = #name;
                     static #content_static: #static_type = #content;
 
-                    #struct_encoder_t::insert_struct_field(#struct_encoder, #tag_static, #name_static)?;
+                    #map_encoder_t::insert_entry(#struct_encoder, #tag_static, #name_static)?;
 
-                    #struct_encoder_t::encode_struct_field_fn(#struct_encoder, move |#pair| {
-                        let #content_tag = #struct_field_encoder_t::encode_field_name(#pair)?;
+                    #map_encoder_t::encode_map_entry_fn(#struct_encoder, move |#pair| {
+                        let #content_tag = #map_entry_encoder_t::encode_map_key(#pair)?;
                         #encode_t_encode(&#content_static, #ctx_var, #content_tag)?;
 
-                        let #content_struct = #struct_field_encoder_t::encode_field_value(#pair)?;
+                        let #content_struct = #map_entry_encoder_t::encode_map_value(#pair)?;
 
                         #encoder_t::encode_struct_fn(#content_struct, &#inner_hint, move |#encoder_var| {
                             #(#decls)*

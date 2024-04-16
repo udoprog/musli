@@ -8,8 +8,8 @@ use alloc::vec::Vec;
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
 use musli::en::{
-    MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder, StructEncoder,
-    StructFieldEncoder, TupleEncoder, VariantEncoder,
+    MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder, TupleEncoder,
+    VariantEncoder,
 };
 #[cfg(feature = "alloc")]
 use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
@@ -606,31 +606,6 @@ where
     }
 }
 
-#[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> StructEncoder for MapValueEncoder<'a, OPT, O, C>
-where
-    O: ValueOutput,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-
-    type EncodeStructField<'this> = PairValueEncoder<'this, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
-        Ok(PairValueEncoder::new(self.cx, &mut self.values))
-    }
-
-    #[inline]
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
-        self.output.write(Value::Map(self.values));
-        Ok(())
-    }
-}
-
 /// A pairs encoder.
 #[cfg(feature = "alloc")]
 pub struct PairValueEncoder<'a, const OPT: Options, C: ?Sized> {
@@ -675,35 +650,6 @@ where
 
     #[inline]
     fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
-        self.output.push(self.pair);
-        Ok(())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, C> StructFieldEncoder for PairValueEncoder<'a, OPT, C>
-where
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeFieldName<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
-    where
-        Self: 'this;
-    type EncodeFieldValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C> where Self: 'this;
-
-    #[inline]
-    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        Ok(ValueEncoder::new(self.cx, &mut self.pair.0))
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        Ok(ValueEncoder::new(self.cx, &mut self.pair.1))
-    }
-
-    #[inline]
-    fn finish_field(self) -> Result<Self::Ok, C::Error> {
         self.output.push(self.pair);
         Ok(())
     }
@@ -858,7 +804,7 @@ impl<'a, const OPT: Options, O, C: ?Sized> VariantStructEncoder<'a, OPT, O, C> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> StructEncoder for VariantStructEncoder<'a, OPT, O, C>
+impl<'a, const OPT: Options, O, C> MapEncoder for VariantStructEncoder<'a, OPT, O, C>
 where
     O: ValueOutput,
     C: ?Sized + Context,
@@ -866,17 +812,17 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeStructField<'this> = PairValueEncoder<'this, OPT, C>
+    type EncodeMapEntry<'this> = PairValueEncoder<'this, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
+    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
         Ok(PairValueEncoder::new(self.cx, &mut self.fields))
     }
 
     #[inline]
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Variant(Box::new((
             self.variant,
             Value::Map(self.fields),

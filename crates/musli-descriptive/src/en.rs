@@ -2,7 +2,7 @@ use core::fmt;
 
 use musli::en::{
     Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
-    StructEncoder, StructFieldEncoder, TupleEncoder, VariantEncoder,
+    TupleEncoder, VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::{Buf, Context, Encode};
@@ -472,52 +472,6 @@ where
     #[inline]
     fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
         Ok(())
-    }
-}
-
-impl<'a, W, const OPT: Options, C> StructEncoder for SelfEncoder<'a, W, OPT, C>
-where
-    W: Writer,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeStructField<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
-        MapEncoder::encode_map_entry(self)
-    }
-
-    #[inline]
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
-        Ok(())
-    }
-}
-
-impl<'a, W, const OPT: Options, C> StructFieldEncoder for SelfEncoder<'a, W, OPT, C>
-where
-    W: Writer,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeFieldName<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeFieldValue<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        MapEntryEncoder::encode_map_key(self)
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        MapEntryEncoder::encode_map_value(self)
-    }
-
-    #[inline]
-    fn finish_field(self) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::finish_map_entry(self)
     }
 }
 

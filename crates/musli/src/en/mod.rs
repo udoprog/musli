@@ -52,14 +52,6 @@ mod map_entries_encoder;
 #[doc(inline)]
 pub use self::map_entries_encoder::MapEntriesEncoder;
 
-mod struct_encoder;
-#[doc(inline)]
-pub use self::struct_encoder::StructEncoder;
-
-mod struct_field_encoder;
-#[doc(inline)]
-pub use self::struct_field_encoder::StructFieldEncoder;
-
 mod variant_encoder;
 #[doc(inline)]
 pub use self::variant_encoder::VariantEncoder;

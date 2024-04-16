@@ -7,8 +7,8 @@ use crate::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use crate::Context;
 
 use super::{
-    Encode, MapEncoder, MapEntriesEncoder, PackEncoder, SequenceEncoder, StructEncoder,
-    TupleEncoder, VariantEncoder,
+    Encode, MapEncoder, MapEntriesEncoder, PackEncoder, SequenceEncoder, TupleEncoder,
+    VariantEncoder,
 };
 
 /// Trait governing how the encoder works.
@@ -41,13 +41,13 @@ pub trait Encoder: Sized {
     /// Streaming encoder for map pairs.
     type EncodeMapEntries: MapEntriesEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Encoder that can encode a struct.
-    type EncodeStruct: StructEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeStruct: MapEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Encoder for a struct variant.
     type EncodeVariant: VariantEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Specialized encoder for a tuple variant.
     type EncodeTupleVariant: TupleEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Specialized encoder for a struct variant.
-    type EncodeStructVariant: StructEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeStructVariant: MapEncoder<Cx = Self::Cx, Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::encoder]`][crate::encoder] attribute
@@ -1452,7 +1452,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::StructEncoder;
+    /// use musli::en::MapEncoder;
     /// use musli::hint::StructHint;
     ///
     /// struct Struct {
@@ -1468,9 +1468,9 @@ pub trait Encoder: Sized {
     ///         static HINT: StructHint = StructHint::with_size(2);
     ///
     ///         let mut st = encoder.encode_struct(&HINT)?;
-    ///         st.insert_struct_field("name", &self.name)?;
-    ///         st.insert_struct_field("age", self.age)?;
-    ///         st.finish_struct()
+    ///         st.insert_entry("name", &self.name)?;
+    ///         st.insert_entry("age", self.age)?;
+    ///         st.finish_map()
     ///     }
     /// }
     /// ```
@@ -1491,7 +1491,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::StructEncoder;
+    /// use musli::en::MapEncoder;
     /// use musli::hint::StructHint;
     ///
     /// struct Struct {
@@ -1507,8 +1507,8 @@ pub trait Encoder: Sized {
     ///         static HINT: StructHint = StructHint::with_size(2);
     ///
     ///         encoder.encode_struct_fn(&HINT, |st| {
-    ///             st.insert_struct_field("name", &self.name)?;
-    ///             st.insert_struct_field("age", self.age)?;
+    ///             st.insert_entry("name", &self.name)?;
+    ///             st.insert_entry("age", self.age)?;
     ///             Ok(())
     ///         })
     ///     }
@@ -1525,7 +1525,7 @@ pub trait Encoder: Sized {
     {
         let mut st = self.encode_struct(hint)?;
         f(&mut st)?;
-        st.finish_struct()
+        st.finish_map()
     }
 
     /// Encode a variant.
@@ -1550,7 +1550,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{VariantEncoder, TupleEncoder, StructEncoder};
+    /// use musli::en::{VariantEncoder, TupleEncoder, MapEncoder};
     /// use musli::hint::{StructHint, TupleHint};
     /// # enum Enum { UnitVariant, TupleVariant(String), StructVariant { data: String, age: u32 } }
     ///
@@ -1582,9 +1582,9 @@ pub trait Encoder: Sized {
     ///                 variant.encode_tag()?.encode_string("StructVariant")?;
     ///
     ///                 let mut st = variant.encode_value()?.encode_struct(&HINT)?;
-    ///                 st.insert_struct_field("data", data)?;
-    ///                 st.insert_struct_field("age", age)?;
-    ///                 st.finish_struct()?;
+    ///                 st.insert_entry("data", data)?;
+    ///                 st.insert_entry("age", age)?;
+    ///                 st.finish_map()?;
     ///
     ///                 variant.finish_variant()
     ///             }
@@ -1606,7 +1606,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{VariantEncoder, TupleEncoder, StructEncoder};
+    /// use musli::en::{VariantEncoder, TupleEncoder, MapEncoder};
     /// use musli::hint::{StructHint, TupleHint};
     ///
     /// enum Enum {
@@ -1648,8 +1648,8 @@ pub trait Encoder: Sized {
     ///                     variant.encode_tag()?.encode("variant3")?;
     ///
     ///                     variant.encode_value()?.encode_struct_fn(&HINT, |st| {
-    ///                         st.insert_struct_field("data", data)?;
-    ///                         st.insert_struct_field("age", age)?;
+    ///                         st.insert_entry("data", data)?;
+    ///                         st.insert_entry("age", age)?;
     ///                         Ok(())
     ///                     })?;
     ///
@@ -1689,7 +1689,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::{VariantEncoder, StructEncoder, SequenceEncoder};
+    /// use musli::en::{VariantEncoder, MapEncoder, SequenceEncoder};
     /// # enum Enum { UnitVariant }
     ///
     /// impl<M> Encode<M> for Enum {
@@ -1794,7 +1794,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::StructEncoder;
+    /// use musli::en::MapEncoder;
     /// use musli::hint::StructHint;
     /// # enum Enum { StructVariant { data: String, age: u32 } }
     ///
@@ -1808,9 +1808,9 @@ pub trait Encoder: Sized {
     ///                 static HINT: StructHint = StructHint::with_size(2);
     ///
     ///                 let mut variant = encoder.encode_struct_variant("variant3", &HINT)?;
-    ///                 variant.insert_struct_field("data", data)?;
-    ///                 variant.insert_struct_field("age", age)?;
-    ///                 variant.finish_struct()
+    ///                 variant.insert_entry("data", data)?;
+    ///                 variant.insert_entry("age", age)?;
+    ///                 variant.finish_map()
     ///             }
     ///         }
     ///     }

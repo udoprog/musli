@@ -19,7 +19,7 @@ use crate::de::{
 };
 use crate::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
-    StructEncoder, StructFieldEncoder, TupleEncoder, VariantEncoder,
+    TupleEncoder, VariantEncoder,
 };
 use crate::{Buf, Context};
 
@@ -500,43 +500,6 @@ impl<O: 'static, C: ?Sized + Context> MapEntriesEncoder for Never<O, C> {
 
     #[inline]
     fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
-        match self._never {}
-    }
-}
-
-impl<O: 'static, C: ?Sized + Context> StructEncoder for Never<O, C> {
-    type Cx = C;
-    type Ok = O;
-    type EncodeStructField<'this> = Self where Self: 'this;
-
-    #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
-        match self._never {}
-    }
-
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
-        match self._never {}
-    }
-}
-
-impl<O: 'static, C: ?Sized + Context> StructFieldEncoder for Never<O, C> {
-    type Cx = C;
-    type Ok = O;
-    type EncodeFieldName<'this> = Self where Self: 'this;
-    type EncodeFieldValue<'this> = Self where Self: 'this;
-
-    #[inline]
-    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn finish_field(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }

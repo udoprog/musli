@@ -1,8 +1,7 @@
 use core::fmt;
 
 use musli::en::{
-    MapEntriesEncoder, SequenceEncoder, StructEncoder, StructFieldEncoder, TupleEncoder,
-    VariantEncoder,
+    MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, TupleEncoder, VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
 use musli::{Context, Encoder};
@@ -406,7 +405,7 @@ where
 
 pub struct SerializeTupleStruct<'a, E>
 where
-    E: StructEncoder,
+    E: MapEncoder,
 {
     cx: &'a E::Cx,
     encoder: E,
@@ -415,7 +414,7 @@ where
 
 impl<'a, E> SerializeTupleStruct<'a, E>
 where
-    E: StructEncoder,
+    E: MapEncoder,
 {
     fn new(cx: &'a E::Cx, encoder: E) -> Self {
         Self {
@@ -429,7 +428,7 @@ where
 impl<'a, E> ser::SerializeTupleStruct for SerializeTupleStruct<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
-    E: StructEncoder,
+    E: MapEncoder,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -439,16 +438,18 @@ where
     where
         T: ser::Serialize,
     {
-        self.encoder.encode_struct_field_fn(|field| {
-            field.encode_field_name()?.encode(self.field)?;
-            value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
+        self.encoder.encode_map_entry_fn(|field| {
+            field.encode_map_key()?.encode(self.field)?;
+            value.serialize(Serializer::new(self.cx, field.encode_map_value()?))?;
             Ok(())
-        })
+        })?;
+
+        Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_struct()
+        self.encoder.finish_map()
     }
 }
 
@@ -505,7 +506,7 @@ where
 
 pub struct SerializeStruct<'a, E>
 where
-    E: StructEncoder,
+    E: MapEncoder,
 {
     cx: &'a E::Cx,
     encoder: E,
@@ -513,7 +514,7 @@ where
 
 impl<'a, E> SerializeStruct<'a, E>
 where
-    E: StructEncoder,
+    E: MapEncoder,
 {
     fn new(cx: &'a E::Cx, encoder: E) -> Self {
         Self { cx, encoder }
@@ -523,7 +524,7 @@ where
 impl<'a, E> ser::SerializeStruct for SerializeStruct<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
-    E: StructEncoder,
+    E: MapEncoder,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -537,22 +538,22 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.encode_struct_field()?;
-        field.encode_field_name()?.encode(key)?;
-        value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
-        field.finish_field()?;
+        let mut field = self.encoder.encode_map_entry()?;
+        field.encode_map_key()?.encode(key)?;
+        value.serialize(Serializer::new(self.cx, field.encode_map_value()?))?;
+        field.finish_map_entry()?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_struct()
+        self.encoder.finish_map()
     }
 }
 
 pub struct SerializeStructVariant<'a, E>
 where
-    E: StructEncoder,
+    E: MapEncoder,
 {
     cx: &'a E::Cx,
     encoder: E,
@@ -560,7 +561,7 @@ where
 
 impl<'a, E> SerializeStructVariant<'a, E>
 where
-    E: StructEncoder,
+    E: MapEncoder,
 {
     fn new(cx: &'a E::Cx, encoder: E) -> Self {
         Self { cx, encoder }
@@ -570,7 +571,7 @@ where
 impl<'a, E> ser::SerializeStructVariant for SerializeStructVariant<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
-    E: StructEncoder,
+    E: MapEncoder,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -584,15 +585,17 @@ where
     where
         T: ser::Serialize,
     {
-        self.encoder.encode_struct_field_fn(|field| {
-            field.encode_field_name()?.encode(key)?;
-            value.serialize(Serializer::new(self.cx, field.encode_field_value()?))?;
+        self.encoder.encode_map_entry_fn(|field| {
+            field.encode_map_key()?.encode(key)?;
+            value.serialize(Serializer::new(self.cx, field.encode_map_value()?))?;
             Ok(())
-        })
+        })?;
+
+        Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_struct()
+        self.encoder.finish_map()
     }
 }
