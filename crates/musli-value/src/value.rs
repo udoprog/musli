@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use musli::de::{AsDecoder, Decode, Decoder, NumberVisitor, Visitor};
 #[cfg(feature = "alloc")]
 use musli::de::{
-    MapDecoder, MapEntryDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
+    EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
 };
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
@@ -326,7 +326,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     {
         let mut out = Vec::with_capacity(seq.size_hint().or_default());
 
-        while let Some(item) = seq.next()? {
+        while let Some(item) = seq.try_next()? {
             out.push(item);
         }
 
@@ -342,8 +342,8 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
         let mut out = Vec::with_capacity(map.size_hint().or_default());
 
         while let Some(mut entry) = map.decode_entry()? {
-            let first = entry.decode_map_key()?.decode()?;
-            let second = entry.decode_map_value()?.decode()?;
+            let first = entry.decode_key()?.decode()?;
+            let second = entry.decode_value()?.decode()?;
             out.push((first, second));
         }
 
@@ -540,7 +540,7 @@ impl<M> Encode<M> for Value {
 
                 encoder.encode_sequence_fn(&hint, |sequence| {
                     for value in values {
-                        sequence.encode_element()?.encode(value)?;
+                        sequence.encode_next()?.encode(value)?;
                     }
 
                     Ok(())

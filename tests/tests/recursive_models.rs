@@ -5,7 +5,7 @@
 //! ```
 //!
 //! ```text
-//! error[E0275]: overflow evaluating the requirement `<<TE as Encoder<TC>>::EncodeVariant as VariantEncoder<TC>>::EncodeValue<'_>: Encoder<TC>`
+//! error[E0275]: overflow evaluating the requirement `<<TE as Encoder<TC>>::EncodeVariant as VariantEncoder<TC>>::EncodeData<'_>: Encoder<TC>`
 //!  |
 //!  = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`recursive_models`)
 //! ```

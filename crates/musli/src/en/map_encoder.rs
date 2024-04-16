@@ -1,6 +1,6 @@
 use crate::Context;
 
-use super::{Encode, MapEntryEncoder};
+use super::{Encode, EntryEncoder};
 
 /// Encoder for a map.
 pub trait MapEncoder {
@@ -9,30 +9,25 @@ pub trait MapEncoder {
     /// Result type of the encoder.
     type Ok;
     /// Encode the next pair.
-    type EncodeMapEntry<'this>: MapEntryEncoder<Cx = Self::Cx, Ok = Self::Ok>
+    type EncodeEntry<'this>: EntryEncoder<Cx = Self::Cx, Ok = Self::Ok>
     where
         Self: 'this;
 
     /// Encode the next pair.
     #[must_use = "Encoders must be consumed"]
-    fn encode_map_entry(
-        &mut self,
-    ) -> Result<Self::EncodeMapEntry<'_>, <Self::Cx as Context>::Error>;
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, <Self::Cx as Context>::Error>;
 
     /// Simplified encoder for a map entry, which ensures that encoding is
     /// always finished.
     #[inline]
-    fn encode_map_entry_fn<F>(&mut self, f: F) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    fn encode_entry_fn<F>(&mut self, f: F) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::EncodeMapEntry<'_>) -> Result<(), <Self::Cx as Context>::Error>,
+        F: FnOnce(&mut Self::EncodeEntry<'_>) -> Result<(), <Self::Cx as Context>::Error>,
     {
-        let mut encoder = self.encode_map_entry()?;
+        let mut encoder = self.encode_entry()?;
         f(&mut encoder)?;
-        encoder.finish_map_entry()
+        encoder.finish_entry()
     }
-
-    /// Finish encoding pairs.
-    fn finish_map(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Insert a pair immediately.
     #[inline]
@@ -42,7 +37,10 @@ pub trait MapEncoder {
         F: Encode<<Self::Cx as Context>::Mode>,
         S: Encode<<Self::Cx as Context>::Mode>,
     {
-        self.encode_map_entry()?.insert_entry(key, value)?;
+        self.encode_entry()?.insert_entry(key, value)?;
         Ok(())
     }
+
+    /// Finish encoding pairs.
+    fn finish_map(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 }

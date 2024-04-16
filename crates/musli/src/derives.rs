@@ -730,6 +730,33 @@
 //!
 //! <br>
 //!
+//! #### `#[musli(packed)]`
+//!
+//! This specifies that encoding and decoding should happen through the
+//! [`EncodePacked`] and [`DecodePacked`] traits, instead of the default
+//! [`Encode`] and [`Decode`].
+//!
+//! These traits contained implementations which are biased towards encoding the
+//! field as a compact, non-future compatible pack. In essense, the fields are
+//! encoded "one after another" without any metadata separating them. So for
+//! packed fields, the order, types and number of the fields are important.
+//!
+//! ```
+//! use std::collections::VecDeque;
+//!
+//! use musli::{Decode, Encode};
+//!
+//! #[derive(Decode, Encode)]
+//! struct Container {
+//!     #[musli(packed)]
+//!     tuple: (u32, u64),
+//!     #[musli(packed)]
+//!     array: [u32; 4],
+//! }
+//! ```
+//!
+//! <br>
+//!
 //! #### `#[musli(bytes)]`
 //!
 //! This specifies that encoding and decoding should happen through the
@@ -1015,12 +1042,14 @@
 //!
 //! [`Decode`]: crate::Decode
 //! [`DecodeBytes`]: crate::de::DecodeBytes
+//! [`DecodePacked`]: crate::de::DecodePacked
 //! [`Decoder::decode_buffer`]: crate::Decoder::decode_buffer
 //! [`Decoder::decode_variant`]: crate::Decoder::decode_variant
 //! [`Decoder`]: crate::Decoder
 //! [`DefaultMode`]: crate::mode::DefaultMode
 //! [`Encode`]: crate::Encode
 //! [`EncodeBytes`]: crate::en::EncodeBytes
+//! [`EncodePacked`]: crate::en::EncodePacked
 //! [`Encoder::encode_variant`]: crate::Encoder::encode_variant
 //! [`Encoder`]: crate::Encoder
 //! [`TraceDecode`]: crate::de::TraceDecode

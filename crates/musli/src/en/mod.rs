@@ -24,6 +24,10 @@ mod encode_bytes;
 #[doc(inline)]
 pub use self::encode_bytes::EncodeBytes;
 
+mod encode_packed;
+#[doc(inline)]
+pub use self::encode_packed::EncodePacked;
+
 mod encoder;
 #[doc(inline)]
 pub use self::encoder::Encoder;
@@ -32,33 +36,17 @@ mod sequence_encoder;
 #[doc(inline)]
 pub use self::sequence_encoder::SequenceEncoder;
 
-mod tuple_encoder;
-#[doc(inline)]
-pub use self::tuple_encoder::TupleEncoder;
-
-mod pack_encoder;
-#[doc(inline)]
-pub use self::pack_encoder::PackEncoder;
-
 mod map_encoder;
 #[doc(inline)]
 pub use self::map_encoder::MapEncoder;
 
-mod map_entry_encoder;
+mod entry_encoder;
 #[doc(inline)]
-pub use self::map_entry_encoder::MapEntryEncoder;
+pub use self::entry_encoder::EntryEncoder;
 
-mod map_entries_encoder;
+mod entries_encoder;
 #[doc(inline)]
-pub use self::map_entries_encoder::MapEntriesEncoder;
-
-mod struct_encoder;
-#[doc(inline)]
-pub use self::struct_encoder::StructEncoder;
-
-mod struct_field_encoder;
-#[doc(inline)]
-pub use self::struct_field_encoder::StructFieldEncoder;
+pub use self::entries_encoder::EntriesEncoder;
 
 mod variant_encoder;
 #[doc(inline)]

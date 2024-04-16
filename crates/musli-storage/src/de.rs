@@ -4,11 +4,10 @@ use core::fmt;
 use alloc::vec::Vec;
 
 use musli::de::{
-    DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder,
-    SequenceDecoder, SizeHint, StructDecoder, StructFieldDecoder, StructFieldsDecoder,
-    TupleDecoder, ValueVisitor, VariantDecoder,
+    DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint,
+    ValueVisitor, VariantDecoder,
 };
-use musli::hint::{StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Decode};
 use musli_utils::{Options, Reader};
 
@@ -50,11 +49,10 @@ where
     type DecodePack = Self;
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeTuple = Self;
+    type DecodeSequenceHint = LimitedStorageDecoder<'a, R, OPT, C>;
+    type DecodeMapHint = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMap = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeStruct = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeStructFields = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
     fn cx(&self) -> &C {
@@ -291,11 +289,11 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(mut self, _: &TupleHint, f: F) -> Result<O, C::Error>
+    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
     {
-        f(&mut self)
+        self.decode_sequence(f)
     }
 
     #[inline]
@@ -315,28 +313,15 @@ where
     }
 
     #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
-        LimitedStorageDecoder::new(self.cx, self.reader)
-    }
-
-    #[inline]
-    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
+    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
     {
-        let cx = self.cx;
-        let mut decoder = LimitedStorageDecoder::new(self.cx, self.reader)?;
-        let output = f(&mut decoder)?;
-
-        if decoder.remaining != 0 {
-            return Err(cx.message("Caller did not decode all available struct fields"));
-        }
-
-        Ok(output)
+        self.decode_map(f)
     }
 
     #[inline]
-    fn decode_struct_fields(self, _: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
+    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
         LimitedStorageDecoder::new(self.cx, self.reader)
     }
 
@@ -349,31 +334,24 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> PackDecoder<'de>
+impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> SequenceDecoder<'de>
     for StorageDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeNext<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+
+    #[inline]
+    fn try_decode_next(
+        &mut self,
+    ) -> Result<Option<Self::DecodeNext<'_>>, <Self::Cx as Context>::Error> {
+        Ok(Some(self.decode_next()?))
+    }
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-}
-
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> TupleDecoder<'de>
-    for StorageDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-{
-    type Cx = C;
-    type DecodeNext<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        PackDecoder::decode_next(self)
     }
 }
 
@@ -385,6 +363,7 @@ where
     #[inline]
     fn new(cx: &'a C, mut reader: R) -> Result<Self, C::Error> {
         let remaining = musli_utils::int::decode_usize::<_, _, OPT>(cx, reader.borrow_mut())?;
+
         Ok(Self {
             cx,
             reader,
@@ -416,14 +395,24 @@ where
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
 
         self.remaining -= 1;
-
         Ok(Some(StorageDecoder::new(self.cx, self.reader.borrow_mut())))
+    }
+
+    #[inline]
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, <Self::Cx as Context>::Error> {
+        let cx = self.cx;
+
+        let Some(decoder) = self.try_decode_next()? else {
+            return Err(cx.message("No remaining elements"));
+        };
+
+        Ok(decoder)
     }
 }
 
@@ -465,78 +454,37 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> MapEntryDecoder<'de>
+impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> EntryDecoder<'de>
     for StorageDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeMapKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeMapValue = Self;
+    type DecodeKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeValue = Self;
 
     #[inline]
-    fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, C::Error> {
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
+    fn decode_value(self) -> Result<Self::DecodeValue, C::Error> {
         Ok(self)
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> StructDecoder<'de>
+impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> EntriesDecoder<'de>
     for LimitedStorageDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeField<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C>
-    where
-        Self: 'this;
+    type DecodeEntryKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeEntryValue<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn size_hint(&self) -> SizeHint {
-        MapDecoder::size_hint(self)
-    }
-
-    #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
-        MapDecoder::decode_entry(self)
-    }
-}
-
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> StructFieldDecoder<'de>
-    for StorageDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-{
-    type Cx = C;
-    type DecodeFieldName<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeFieldValue = Self;
-
-    #[inline]
-    fn decode_field_name(&mut self) -> Result<Self::DecodeFieldName<'_>, C::Error> {
-        MapEntryDecoder::decode_map_key(self)
-    }
-
-    #[inline]
-    fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
-        MapEntryDecoder::decode_map_value(self)
-    }
-}
-
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> MapEntriesDecoder<'de>
-    for LimitedStorageDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-{
-    type Cx = C;
-    type DecodeMapEntryKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeMapEntryValue<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn decode_map_entry_key(&mut self) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -546,48 +494,18 @@ where
     }
 
     #[inline]
-    fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<(), C::Error> {
+    fn end_entries(self) -> Result<(), C::Error> {
         if self.remaining != 0 {
             return Err(self
                 .cx
                 .message("Caller did not decode all available map entries"));
         }
 
-        Ok(())
-    }
-}
-
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> StructFieldsDecoder<'de>
-    for LimitedStorageDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-{
-    type Cx = C;
-    type DecodeStructFieldName<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeStructFieldValue<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
-        if self.remaining == 0 {
-            return Err(self.cx.message("Ran out of struct fields to decode"));
-        }
-
-        self.remaining -= 1;
-        Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-
-    #[inline]
-    fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
-        Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-
-    #[inline]
-    fn end_struct_fields(self) -> Result<(), C::Error> {
         Ok(())
     }
 }

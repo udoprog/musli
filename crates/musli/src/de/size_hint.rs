@@ -48,4 +48,12 @@ impl SizeHint {
             SizeHint::Exact(len) => len,
         }
     }
+
+    /// Coerce into an `Option`.
+    pub fn into_option(self) -> Option<usize> {
+        match self {
+            SizeHint::Any => None,
+            SizeHint::Exact(len) => Some(len),
+        }
+    }
 }

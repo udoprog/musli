@@ -1,10 +1,9 @@
 use core::fmt;
 
 use musli::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
-    StructEncoder, StructFieldEncoder, TupleEncoder, VariantEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
-use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::{Buf, Context};
 use musli_storage::en::StorageEncoder;
 use musli_utils::writer::BufWriter;
@@ -46,7 +45,7 @@ where
     }
 
     #[inline]
-    fn encode_tuple_len(&mut self, len: usize) -> Result<(), C::Error> {
+    fn encode_sequence_len(&mut self, len: usize) -> Result<(), C::Error> {
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(self.cx, tag.byte())?;
 
@@ -58,13 +57,13 @@ where
     }
 }
 
-pub struct WirePackEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
+pub struct WireSequenceEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
     cx: &'a C,
     writer: W,
     buffer: BufWriter<B>,
 }
 
-impl<'a, W, B, const OPT: Options, C: ?Sized> WirePackEncoder<'a, W, B, OPT, C> {
+impl<'a, W, B, const OPT: Options, C: ?Sized> WireSequenceEncoder<'a, W, B, OPT, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(cx: &'a C, writer: W, buffer: B) -> Self {
@@ -87,16 +86,14 @@ where
     type Ok = ();
     type Mode = C::Mode;
     type WithContext<'this, U> = WireEncoder<'this, W, OPT, U> where U: 'this + Context;
-    type EncodePack = WirePackEncoder<'a, W, C::Buf<'a>, OPT, C>;
+    type EncodePack = WireSequenceEncoder<'a, W, C::Buf<'a>, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
-    type EncodeTuple = Self;
     type EncodeMap = Self;
     type EncodeMapEntries = Self;
-    type EncodeStruct = Self;
     type EncodeVariant = Self;
-    type EncodeTupleVariant = Self;
-    type EncodeStructVariant = Self;
+    type EncodeSequenceVariant = Self;
+    type EncodeMapVariant = Self;
 
     #[inline]
     fn cx(&self) -> &Self::Cx {
@@ -137,7 +134,7 @@ where
             return Err(self.cx.message("Failed to allocate pack buffer"));
         };
 
-        Ok(WirePackEncoder::new(self.cx, self.writer, buf))
+        Ok(WireSequenceEncoder::new(self.cx, self.writer, buf))
     }
 
     #[inline]
@@ -284,23 +281,7 @@ where
 
     #[inline]
     fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, hint.size);
-        self.writer.write_byte(self.cx, tag.byte())?;
-
-        if !embedded {
-            musli_utils::int::encode_usize::<_, _, OPT>(
-                self.cx,
-                self.writer.borrow_mut(),
-                hint.size,
-            )?;
-        }
-
-        Ok(self)
-    }
-
-    #[inline]
-    fn encode_tuple(mut self, hint: &TupleHint) -> Result<Self::EncodeTuple, C::Error> {
-        self.encode_tuple_len(hint.size)?;
+        self.encode_sequence_len(hint.size)?;
         Ok(self)
     }
 
@@ -316,22 +297,6 @@ where
     }
 
     #[inline]
-    fn encode_struct(mut self, hint: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
-        let Some(len) = hint.size.checked_mul(2) else {
-            return Err(self.cx.message("Struct length overflow"));
-        };
-
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(self.cx, tag.byte())?;
-
-        if !embedded {
-            musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
-        }
-
-        Ok(self)
-    }
-
-    #[inline]
     fn encode_variant(mut self) -> Result<Self::EncodeVariant, C::Error> {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
@@ -339,37 +304,37 @@ where
     }
 
     #[inline]
-    fn encode_tuple_variant<T>(
+    fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
-        hint: &TupleHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+        hint: &SequenceHint,
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
         WireEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        self.encode_tuple(hint)
+        self.encode_sequence(hint)
     }
 
     #[inline]
-    fn encode_struct_variant<T>(
+    fn encode_map_variant<T>(
         mut self,
         tag: &T,
-        hint: &StructHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+        hint: &MapHint,
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
         WireEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        self.encode_struct(hint)
+        self.encode_map(hint)
     }
 }
 
-impl<'a, W, B, const OPT: Options, C> PackEncoder for WirePackEncoder<'a, W, B, OPT, C>
+impl<'a, W, B, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<'a, W, B, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
@@ -377,15 +342,15 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodePacked<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this, B: Buf;
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this, B: Buf;
 
     #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, &mut self.buffer))
     }
 
     #[inline]
-    fn finish_pack(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), buffer.len())?;
         self.writer.write_buffer(self.cx, buffer)?;
@@ -400,36 +365,16 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeElement<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(WireEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
     fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         Ok(())
-    }
-}
-
-impl<'a, W, const OPT: Options, C> TupleEncoder for WireEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeTupleField<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        SequenceEncoder::encode_element(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -440,10 +385,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntry<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntry<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(WireEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
@@ -453,101 +398,55 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEntriesEncoder for WireEncoder<'a, W, OPT, C>
+impl<'a, W, const OPT: Options, C> EntriesEncoder for WireEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntryKey<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeMapEntryValue<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntryKey<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntryValue<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_entry_key(&mut self) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
+    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         Ok(WireEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn encode_map_entry_value(&mut self) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
+    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         Ok(WireEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entries(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEntryEncoder for WireEncoder<'a, W, OPT, C>
+impl<'a, W, const OPT: Options, C> EntryEncoder for WireEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeMapValue<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeKey<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeValue<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_key(&mut self) -> Result<Self::EncodeMapKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         Ok(WireEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn encode_map_value(&mut self) -> Result<Self::EncodeMapValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         Ok(WireEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
-    }
-}
-
-impl<'a, W, const OPT: Options, C> StructEncoder for WireEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeStructField<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
-        MapEncoder::encode_map_entry(self)
-    }
-
-    #[inline]
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
-        Ok(())
-    }
-}
-
-impl<'a, W, const OPT: Options, C> StructFieldEncoder for WireEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeFieldName<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeFieldValue<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        MapEntryEncoder::encode_map_key(self)
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        MapEntryEncoder::encode_map_value(self)
-    }
-
-    #[inline]
-    fn finish_field(self) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::finish_map_entry(self)
     }
 }
 
@@ -559,7 +458,7 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeTag<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeValue<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeData<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
@@ -567,7 +466,7 @@ where
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         Ok(WireEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 

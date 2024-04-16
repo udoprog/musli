@@ -1,7 +1,7 @@
 use core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 
-use crate::en::TupleEncoder;
-use crate::hint::TupleHint;
+use crate::en::SequenceEncoder;
+use crate::hint::SequenceHint;
 use crate::{Decode, Decoder, Encode, Encoder};
 
 macro_rules! implement {
@@ -16,10 +16,10 @@ macro_rules! implement {
             where
                 E: Encoder<Mode = M>,
             {
-                static HINT: TupleHint = TupleHint::with_size($count);
+                static HINT: SequenceHint = SequenceHint::with_size($count);
 
-                encoder.encode_tuple_fn(&HINT, |tuple| {
-                    $(tuple.encode_tuple_field()?.encode(&self.$field)?;)*
+                encoder.encode_sequence_fn(&HINT, |tuple| {
+                    $(tuple.encode_next()?.encode(&self.$field)?;)*
                     Ok(())
                 })
             }
@@ -52,10 +52,10 @@ macro_rules! implement_new {
             where
                 E: Encoder<Mode = M>,
             {
-                static HINT: TupleHint = TupleHint::with_size($count);
+                static HINT: SequenceHint = SequenceHint::with_size($count);
 
-                encoder.encode_tuple_fn(&HINT, |tuple| {
-                    $(tuple.encode_tuple_field()?.encode(self.$field())?;)*
+                encoder.encode_sequence_fn(&HINT, |tuple| {
+                    $(tuple.encode_next()?.encode(self.$field())?;)*
                     Ok(())
                 })
             }

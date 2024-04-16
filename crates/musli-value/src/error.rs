@@ -80,8 +80,6 @@ pub(crate) enum ErrorMessage {
     ExpectedBool(TypeHint),
     ExpectedChar(TypeHint),
     ExpectedNumber(NumberHint, TypeHint),
-    ExpectedFieldName,
-    ExpectedFieldValue,
     ExpectedMapValue,
     #[cfg(feature = "alloc")]
     ExpectedBytes(TypeHint),
@@ -124,8 +122,6 @@ impl fmt::Display for ErrorMessage {
             ErrorMessage::ExpectedNumber(number, hint) => {
                 write!(f, "Value buffer expected {number}, but found {hint}")
             }
-            ErrorMessage::ExpectedFieldName => write!(f, "Value buffer expected field name"),
-            ErrorMessage::ExpectedFieldValue => write!(f, "Value buffer expected field value"),
             ErrorMessage::ExpectedMapValue => write!(f, "Value buffer expected map value"),
             #[cfg(feature = "alloc")]
             ErrorMessage::ExpectedBytes(hint) => {

@@ -41,13 +41,11 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
     ("EncodeSome", Extra::None),
     ("EncodePack", Extra::None),
     ("EncodeSequence", Extra::None),
-    ("EncodeTuple", Extra::None),
     ("EncodeMap", Extra::None),
     ("EncodeMapEntries", Extra::None),
-    ("EncodeStruct", Extra::None),
     ("EncodeVariant", Extra::None),
-    ("EncodeTupleVariant", Extra::None),
-    ("EncodeStructVariant", Extra::None),
+    ("EncodeSequenceVariant", Extra::None),
+    ("EncodeMapVariant", Extra::None),
 ];
 
 pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
@@ -58,12 +56,10 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("DecodeSome", Extra::None),
     ("DecodePack", Extra::None),
     ("DecodeSequence", Extra::None),
-    ("DecodeTuple", Extra::None),
+    ("DecodeSequenceHint", Extra::None),
     ("DecodeMap", Extra::None),
+    ("DecodeMapHint", Extra::None),
     ("DecodeMapEntries", Extra::None),
-    ("DecodeStruct", Extra::None),
-    ("DecodeUnsizedStruct", Extra::None),
-    ("DecodeStructFields", Extra::None),
     ("DecodeVariant", Extra::None),
 ];
 

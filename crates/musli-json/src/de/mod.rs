@@ -29,7 +29,7 @@ use musli::de::{
     Decode, DecodeUnsized, Decoder, NumberVisitor, SequenceDecoder, SizeHint, Skip, ValueVisitor,
     Visitor,
 };
-use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
 #[cfg(feature = "musli-value")]
 use musli_utils::options;
@@ -119,13 +119,11 @@ where
     type DecodeBuffer = musli_value::AsValueDecoder<'a, BUFFER_OPTIONS, C>;
     type DecodePack = JsonSequenceDecoder<'a, P, C>;
     type DecodeSequence = JsonSequenceDecoder<'a, P, C>;
-    type DecodeTuple = JsonSequenceDecoder<'a, P, C>;
+    type DecodeSequenceHint = JsonSequenceDecoder<'a, P, C>;
     type DecodeMap = JsonObjectDecoder<'a, P, C>;
+    type DecodeMapHint = JsonObjectDecoder<'a, P, C>;
     type DecodeMapEntries = JsonObjectDecoder<'a, P, C>;
     type DecodeSome = JsonDecoder<'a, P, C>;
-    type DecodeStruct = JsonObjectDecoder<'a, P, C>;
-    type DecodeUnsizedStruct = JsonObjectDecoder<'a, P, C>;
-    type DecodeStructFields = JsonObjectDecoder<'a, P, C>;
     type DecodeVariant = JsonVariantDecoder<'a, P, C>;
 
     #[inline]
@@ -309,7 +307,7 @@ where
             let mut bytes = [0; N];
             let mut index = 0;
 
-            while let Some(item) = seq.decode_next()? {
+            while let Some(item) = seq.try_decode_next()? {
                 if index <= N {
                     bytes[index] = item.decode_u8()?;
                 }
@@ -349,7 +347,7 @@ where
         self.decode_sequence(|seq| {
             let mut bytes = Vec::with_capacity(seq.size_hint().or_default());
 
-            while let Some(item) = seq.decode_next()? {
+            while let Some(item) = seq.try_decode_next()? {
                 bytes.push(item.decode_u8()?);
             }
 
@@ -405,9 +403,9 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(self, hint: &TupleHint, f: F) -> Result<O, C::Error>
+    fn decode_sequence_hint<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, Some(hint.size), self.parser)?;
         let output = f(&mut decoder)?;
@@ -427,35 +425,19 @@ where
     }
 
     #[inline]
+    fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonObjectDecoder::new(self.cx, Some(hint.size), self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.skip_object_remaining()?;
+        Ok(output)
+    }
+
+    #[inline]
     fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
         JsonObjectDecoder::new(self.cx, None, self.parser)
-    }
-
-    #[inline]
-    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
-    {
-        let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
-        let output = f(&mut decoder)?;
-        decoder.skip_object_remaining()?;
-        Ok(output)
-    }
-
-    #[inline]
-    fn decode_unsized_struct<F, O>(self, _: &UnsizedStructHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, C::Error>,
-    {
-        let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
-        let output = f(&mut decoder)?;
-        decoder.skip_object_remaining()?;
-        Ok(output)
-    }
-
-    #[inline]
-    fn decode_struct_fields(self, hint: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
-        JsonObjectDecoder::new(self.cx, Some(hint.size), self.parser)
     }
 
     #[inline]

@@ -1,9 +1,8 @@
 //! Implementations for variously lengthed tuples.
 
-use crate::compat::Packed;
-use crate::de::{Decode, Decoder, PackDecoder, TupleDecoder};
-use crate::en::{Encode, Encoder, PackEncoder, TupleEncoder};
-use crate::hint::TupleHint;
+use crate::de::{Decode, DecodePacked, Decoder, SequenceDecoder};
+use crate::en::{Encode, EncodePacked, Encoder, SequenceEncoder};
+use crate::hint::SequenceHint;
 
 macro_rules! count {
     (_) => { 1 };
@@ -51,12 +50,12 @@ macro_rules! declare {
             where
                 E: Encoder<Mode = M>,
             {
-                static HINT: TupleHint = TupleHint::with_size(count!($ident0 $($ident)*));
+                static HINT: SequenceHint = SequenceHint::with_size(count!($ident0 $($ident)*));
 
-                encoder.encode_tuple_fn(&HINT, |tuple| {
+                encoder.encode_sequence_fn(&HINT, |tuple| {
                     let ($ident0, $($ident),*) = self;
-                    tuple.encode_tuple_field()?.encode($ident0)?;
-                    $(tuple.encode_tuple_field()?.encode($ident)?;)*
+                    tuple.encode_next()?.encode($ident0)?;
+                    $(tuple.encode_next()?.encode($ident)?;)*
                     Ok(())
                 })
             }
@@ -72,49 +71,49 @@ macro_rules! declare {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                static HINT: TupleHint = TupleHint::with_size(count!($ident0 $($ident)*));
+                static HINT: SequenceHint = SequenceHint::with_size(count!($ident0 $($ident)*));
 
-                decoder.decode_tuple(&HINT, |tuple| {
-                    let $ident0 = tuple.decode_next()?.decode()?;
-                    $(let $ident = tuple.decode_next()?.decode()?;)*
+                decoder.decode_sequence_hint(&HINT, |tuple| {
+                    let $ident0 = tuple.next()?;
+                    $(let $ident = tuple.next()?;)*
                     Ok(($ident0, $($ident),*))
                 })
             }
         }
 
-        impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)>
+        impl<M, $ty0 $(,$ty)*> EncodePacked<M> for ($ty0, $($ty),*)
         where
             $ty0: Encode<M>,
             $($ty: Encode<M>),*
         {
             #[inline]
-            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode_packed<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
-                let Packed(($ident0, $($ident),*)) = self;
+                let ($ident0, $($ident),*) = self;
                 encoder.encode_pack_fn(|pack| {
-                    pack.encode_packed()?.encode($ident0)?;
-                    $(pack.encode_packed()?.encode($ident)?;)*
+                    pack.encode_next()?.encode($ident0)?;
+                    $(pack.encode_next()?.encode($ident)?;)*
                     Ok(())
                 })
             }
         }
 
-        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)>
+        impl<'de, M, $ty0, $($ty,)*> DecodePacked<'de, M> for ($ty0, $($ty),*)
         where
             $ty0: Decode<'de, M>,
             $($ty: Decode<'de, M>),*
         {
             #[inline]
-            fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode_packed<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
                 decoder.decode_pack(|pack| {
                     let $ident0 = pack.next()?;
                     $(let $ident = pack.next()?;)*
-                    Ok(Packed(($ident0, $($ident),*)))
+                    Ok(($ident0, $($ident),*))
                 })
             }
         }

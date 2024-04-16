@@ -1,10 +1,9 @@
 use core::fmt;
 
 use musli::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
-    StructEncoder, StructFieldEncoder, TupleEncoder, VariantEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
-use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
 use musli_utils::{Options, Writer};
 
@@ -36,13 +35,11 @@ where
     type EncodePack = StorageEncoder<'a, W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
-    type EncodeTuple = Self;
     type EncodeMap = Self;
     type EncodeMapEntries = Self;
-    type EncodeStruct = Self;
     type EncodeVariant = Self;
-    type EncodeTupleVariant = Self;
-    type EncodeStructVariant = Self;
+    type EncodeSequenceVariant = Self;
+    type EncodeMapVariant = Self;
 
     #[inline]
     fn cx(&self) -> &Self::Cx {
@@ -231,12 +228,6 @@ where
     }
 
     #[inline]
-    fn encode_tuple(self, _: &TupleHint) -> Result<Self::EncodeSequence, C::Error> {
-        // NB: A tuple has statically known fixed length.
-        Ok(self)
-    }
-
-    #[inline]
     fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
@@ -249,35 +240,16 @@ where
     }
 
     #[inline]
-    fn encode_struct(mut self, hint: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
-        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
-        Ok(self)
-    }
-
-    #[inline]
     fn encode_variant(self) -> Result<Self::EncodeVariant, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn encode_tuple_variant<T>(
+    fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
-        _: &TupleHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
-    where
-        T: ?Sized + Encode<C::Mode>,
-    {
-        StorageEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        Ok(self)
-    }
-
-    #[inline]
-    fn encode_struct_variant<T>(
-        mut self,
-        tag: &T,
-        hint: &StructHint,
-    ) -> Result<Self::EncodeStructVariant, C::Error>
+        hint: &SequenceHint,
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -285,25 +257,19 @@ where
         musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
-}
-
-impl<'a, W, const OPT: Options, C> PackEncoder for StorageEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodePacked<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
-        Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
-    }
-
-    #[inline]
-    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
-        Ok(())
+    fn encode_map_variant<T>(
+        mut self,
+        tag: &T,
+        hint: &MapHint,
+    ) -> Result<Self::EncodeMapVariant, C::Error>
+    where
+        T: ?Sized + Encode<C::Mode>,
+    {
+        StorageEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+        Ok(self)
     }
 }
 
@@ -314,36 +280,16 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeElement<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
-        PackEncoder::encode_packed(self)
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
+        Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
     fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
-        PackEncoder::finish_pack(self)
-    }
-}
-
-impl<'a, W, const OPT: Options, C> TupleEncoder for StorageEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeTupleField<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        PackEncoder::encode_packed(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
-        PackEncoder::finish_pack(self)
+        Ok(())
     }
 }
 
@@ -354,10 +300,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntry<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntry<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
@@ -367,101 +313,55 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEntryEncoder for StorageEncoder<'a, W, OPT, C>
+impl<'a, W, const OPT: Options, C> EntryEncoder for StorageEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeMapValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_key(&mut self) -> Result<Self::EncodeMapKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn encode_map_value(&mut self) -> Result<Self::EncodeMapValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEntriesEncoder for StorageEncoder<'a, W, OPT, C>
+impl<'a, W, const OPT: Options, C> EntriesEncoder for StorageEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntryKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeMapEntryValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntryKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntryValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_entry_key(&mut self) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
+    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn encode_map_entry_value(&mut self) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
+    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entries(self) -> Result<Self::Ok, C::Error> {
         Ok(())
-    }
-}
-
-impl<'a, W, const OPT: Options, C> StructEncoder for StorageEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeStructField<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
-        MapEncoder::encode_map_entry(self)
-    }
-
-    #[inline]
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
-        Ok(())
-    }
-}
-
-impl<'a, W, const OPT: Options, C> StructFieldEncoder for StorageEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeFieldName<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeFieldValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        MapEntryEncoder::encode_map_key(self)
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        MapEntryEncoder::encode_map_value(self)
-    }
-
-    #[inline]
-    fn finish_field(self) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::finish_map_entry(self)
     }
 }
 
@@ -473,7 +373,7 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeTag<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeData<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
@@ -481,7 +381,7 @@ where
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 

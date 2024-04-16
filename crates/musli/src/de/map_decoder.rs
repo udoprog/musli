@@ -1,22 +1,25 @@
 use crate::Context;
 
-use super::{Decode, Decoder, MapEntriesDecoder, MapEntryDecoder, SizeHint};
+use super::{Decode, Decoder, EntriesDecoder, EntryDecoder, SizeHint};
 
 /// Trait governing how to decode a sequence of pairs.
 pub trait MapDecoder<'de>: Sized {
     /// Context associated with the decoder.
     type Cx: ?Sized + Context;
     /// The decoder to use for a key.
-    type DecodeEntry<'this>: MapEntryDecoder<'de, Cx = Self::Cx>
+    type DecodeEntry<'this>: EntryDecoder<'de, Cx = Self::Cx>
     where
         Self: 'this;
     /// Decoder returned by [`MapDecoder::decode_remaining_entries`].
-    type DecodeRemainingEntries<'this>: MapEntriesDecoder<'de, Cx = Self::Cx>
+    type DecodeRemainingEntries<'this>: EntriesDecoder<'de, Cx = Self::Cx>
     where
         Self: 'this;
 
     /// Get a size hint of known remaining elements.
-    fn size_hint(&self) -> SizeHint;
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Any
+    }
 
     /// Decode the next key. This returns `Ok(None)` where there are no more
     /// elements to decode.
@@ -40,8 +43,8 @@ pub trait MapDecoder<'de>: Sized {
             return Ok(None);
         };
 
-        let key = entry.decode_map_key()?.decode()?;
-        let value = entry.decode_map_value()?.decode()?;
+        let key = entry.decode_key()?.decode()?;
+        let value = entry.decode_value()?.decode()?;
         Ok(Some((key, value)))
     }
 }

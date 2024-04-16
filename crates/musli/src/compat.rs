@@ -1,8 +1,8 @@
 //! Wrapper types which ensures that a given field is encoded or decoded as a
 //! certain kind of value.
 
-use crate::de::{Decode, DecodeBytes, Decoder};
-use crate::en::{Encode, EncodeBytes, Encoder};
+use crate::de::{Decode, DecodeBytes, DecodePacked, Decoder};
+use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder};
 use crate::hint::SequenceHint;
 
 /// Ensures that the given value `T` is encoded as a sequence.
@@ -75,6 +75,7 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
 #[musli(crate, bound = {T: EncodeBytes<M>}, decode_bound = {T: DecodeBytes<'de, M>})]
 #[repr(transparent)]
+#[musli(transparent)]
 pub struct Bytes<T>(#[musli(bytes)] pub T);
 
 impl<T> AsRef<[u8]> for Bytes<T>
@@ -126,4 +127,8 @@ where
 ///     }
 /// }
 /// ```
-pub struct Packed<T>(pub T);
+#[derive(Encode, Decode)]
+#[musli(crate, bound = {T: EncodePacked<M>}, decode_bound = {T: DecodePacked<'de, M>})]
+#[repr(transparent)]
+#[musli(transparent)]
+pub struct Packed<T>(#[musli(packed)] pub T);

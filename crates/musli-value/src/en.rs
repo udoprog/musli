@@ -7,12 +7,9 @@ use alloc::vec::Vec;
 
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
-use musli::en::{
-    MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder, StructEncoder,
-    StructFieldEncoder, TupleEncoder, VariantEncoder,
-};
+use musli::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
 #[cfg(feature = "alloc")]
-use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 #[cfg(feature = "alloc")]
 use musli::Buf;
 use musli::Context;
@@ -91,19 +88,15 @@ where
     #[cfg(feature = "alloc")]
     type EncodeSequence = SequenceValueEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
-    type EncodeTuple = SequenceValueEncoder<'a, OPT, O, C>;
-    #[cfg(feature = "alloc")]
     type EncodeMap = MapValueEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
     type EncodeMapEntries = MapValueEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
-    type EncodeStruct = MapValueEncoder<'a, OPT, O, C>;
-    #[cfg(feature = "alloc")]
     type EncodeVariant = VariantValueEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
-    type EncodeTupleVariant = VariantSequenceEncoder<'a, OPT, O, C>;
+    type EncodeSequenceVariant = VariantSequenceEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
-    type EncodeStructVariant = VariantStructEncoder<'a, OPT, O, C>;
+    type EncodeMapVariant = VariantStructEncoder<'a, OPT, O, C>;
 
     #[inline]
     fn cx(&self) -> &C {
@@ -311,12 +304,6 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_tuple(self, _: &TupleHint) -> Result<Self::EncodeTuple, C::Error> {
-        Ok(SequenceValueEncoder::new(self.cx, self.output))
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
     fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
@@ -324,12 +311,6 @@ where
     #[cfg(feature = "alloc")]
     #[inline]
     fn encode_map_entries(self, _: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
-        Ok(MapValueEncoder::new(self.cx, self.output))
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn encode_struct(self, _: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
@@ -347,18 +328,18 @@ where
     {
         let mut variant = self.encode_variant()?;
         variant.encode_tag()?.encode(tag)?;
-        variant.encode_value()?.encode_unit()?;
+        variant.encode_data()?.encode_unit()?;
         variant.finish_variant()?;
         Ok(())
     }
 
     #[inline]
     #[cfg(feature = "alloc")]
-    fn encode_tuple_variant<T>(
+    fn encode_sequence_variant<T>(
         self,
         tag: &T,
-        hint: &TupleHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+        hint: &SequenceHint,
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -375,11 +356,11 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_struct_variant<T>(
+    fn encode_map_variant<T>(
         self,
         tag: &T,
-        hint: &StructHint,
-    ) -> Result<Self::EncodeStructVariant, C::Error>
+        hint: &MapHint,
+    ) -> Result<Self::EncodeMapVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -424,12 +405,12 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeElement<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
+    type EncodeNext<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.values))
     }
 
@@ -471,7 +452,7 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> PackEncoder for PackValueEncoder<'a, OPT, O, C>
+impl<'a, const OPT: Options, O, C> SequenceEncoder for PackValueEncoder<'a, OPT, O, C>
 where
     O: ValueOutput,
     C: ?Sized + Context,
@@ -479,44 +460,20 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodePacked<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a>>, OPT, C>
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a>>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, &mut self.writer))
     }
 
     #[inline]
-    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         let buf = self.writer.into_inner();
         self.output.write(Value::Bytes(buf.as_slice().into()));
         Ok(())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> TupleEncoder for SequenceValueEncoder<'a, OPT, O, C>
-where
-    O: ValueOutput,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-
-    type EncodeTupleField<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        SequenceEncoder::encode_element(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -548,12 +505,12 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntry<'this> = PairValueEncoder<'this, OPT, C>
+    type EncodeEntry<'this> = PairValueEncoder<'this, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(PairValueEncoder::new(self.cx, &mut self.values))
     }
 
@@ -565,22 +522,22 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> MapEntriesEncoder for MapValueEncoder<'a, OPT, O, C>
+impl<'a, const OPT: Options, O, C> EntriesEncoder for MapValueEncoder<'a, OPT, O, C>
 where
     O: ValueOutput,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntryKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeEntryKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeMapEntryValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeEntryValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_map_entry_key(&mut self) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
+    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         self.values.push((Value::Unit, Value::Unit));
 
         let Some((key, _)) = self.values.last_mut() else {
@@ -591,7 +548,7 @@ where
     }
 
     #[inline]
-    fn encode_map_entry_value(&mut self) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
+    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         let Some((_, value)) = self.values.last_mut() else {
             return Err(self.cx.message("Pair has not been encoded"));
         };
@@ -600,32 +557,7 @@ where
     }
 
     #[inline]
-    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
-        self.output.write(Value::Map(self.values));
-        Ok(())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> StructEncoder for MapValueEncoder<'a, OPT, O, C>
-where
-    O: ValueOutput,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-
-    type EncodeStructField<'this> = PairValueEncoder<'this, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
-        Ok(PairValueEncoder::new(self.cx, &mut self.values))
-    }
-
-    #[inline]
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entries(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Map(self.values));
         Ok(())
     }
@@ -652,58 +584,29 @@ impl<'a, const OPT: Options, C: ?Sized> PairValueEncoder<'a, OPT, C> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, C> MapEntryEncoder for PairValueEncoder<'a, OPT, C>
+impl<'a, const OPT: Options, C> EntryEncoder for PairValueEncoder<'a, OPT, C>
 where
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeMapValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C> where Self: 'this;
+    type EncodeValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_key(&mut self) -> Result<Self::EncodeMapKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.pair.0))
     }
 
     #[inline]
-    fn encode_map_value(&mut self) -> Result<Self::EncodeMapValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.pair.1))
     }
 
     #[inline]
-    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
-        self.output.push(self.pair);
-        Ok(())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, C> StructFieldEncoder for PairValueEncoder<'a, OPT, C>
-where
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeFieldName<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
-    where
-        Self: 'this;
-    type EncodeFieldValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C> where Self: 'this;
-
-    #[inline]
-    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        Ok(ValueEncoder::new(self.cx, &mut self.pair.0))
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        Ok(ValueEncoder::new(self.cx, &mut self.pair.1))
-    }
-
-    #[inline]
-    fn finish_field(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         self.output.push(self.pair);
         Ok(())
     }
@@ -740,7 +643,7 @@ where
     type EncodeTag<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeData<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
 
@@ -750,7 +653,7 @@ where
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.pair.1))
     }
 
@@ -792,12 +695,12 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeElement<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
+    type EncodeNext<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.values))
     }
 
@@ -808,30 +711,6 @@ where
             Value::Sequence(self.values),
         ))));
         Ok(())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> TupleEncoder for VariantSequenceEncoder<'a, OPT, O, C>
-where
-    O: ValueOutput,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-
-    type EncodeTupleField<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        SequenceEncoder::encode_element(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -858,7 +737,7 @@ impl<'a, const OPT: Options, O, C: ?Sized> VariantStructEncoder<'a, OPT, O, C> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> StructEncoder for VariantStructEncoder<'a, OPT, O, C>
+impl<'a, const OPT: Options, O, C> MapEncoder for VariantStructEncoder<'a, OPT, O, C>
 where
     O: ValueOutput,
     C: ?Sized + Context,
@@ -866,17 +745,17 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeStructField<'this> = PairValueEncoder<'this, OPT, C>
+    type EncodeEntry<'this> = PairValueEncoder<'this, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_struct_field(&mut self) -> Result<Self::EncodeStructField<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(PairValueEncoder::new(self.cx, &mut self.fields))
     }
 
     #[inline]
-    fn finish_struct(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Variant(Box::new((
             self.variant,
             Value::Map(self.fields),

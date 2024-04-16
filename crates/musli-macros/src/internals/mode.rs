@@ -4,8 +4,9 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
 
-use crate::internals::tokens::Tokens;
-use crate::internals::Only;
+use super::attr::FieldEncoding;
+use super::tokens::Tokens;
+use super::Only;
 
 #[derive(Clone, Copy)]
 pub(crate) enum ModePath<'a> {
@@ -32,11 +33,12 @@ pub(crate) struct Mode<'a> {
 
 impl<'a> Mode<'a> {
     /// Construct a typed encode call.
-    pub(crate) fn encode_t_encode(&self, trace: bool, bytes: bool) -> syn::Path {
-        let (mut encode_t, name) = match (trace, bytes) {
-            (_, true) => (self.tokens.encode_bytes_t.clone(), "encode_bytes"),
-            (true, _) => (self.tokens.trace_encode_t.clone(), "trace_encode"),
-            _ => (self.tokens.encode_t.clone(), "encode"),
+    pub(crate) fn encode_t_encode(&self, encoding: FieldEncoding) -> syn::Path {
+        let (mut encode_t, name) = match encoding {
+            FieldEncoding::Packed => (self.tokens.encode_packed_t.clone(), "encode_packed"),
+            FieldEncoding::Bytes => (self.tokens.encode_bytes_t.clone(), "encode_bytes"),
+            FieldEncoding::Trace => (self.tokens.trace_encode_t.clone(), "trace_encode"),
+            FieldEncoding::Default => (self.tokens.encode_t.clone(), "encode"),
         };
 
         if let Some(segment) = encode_t.segments.last_mut() {
@@ -54,11 +56,12 @@ impl<'a> Mode<'a> {
     }
 
     /// Construct a typed decode call.
-    pub(crate) fn decode_t_decode(&self, trace: bool, bytes: bool) -> syn::Path {
-        let (mut decode_t, name) = match (trace, bytes) {
-            (_, true) => (self.tokens.decode_bytes_t.clone(), "decode_bytes"),
-            (true, _) => (self.tokens.trace_decode_t.clone(), "trace_decode"),
-            _ => (self.tokens.decode_t.clone(), "decode"),
+    pub(crate) fn decode_t_decode(&self, encoding: FieldEncoding) -> syn::Path {
+        let (mut decode_t, name) = match encoding {
+            FieldEncoding::Packed => (self.tokens.decode_packed_t.clone(), "decode_packed"),
+            FieldEncoding::Bytes => (self.tokens.decode_bytes_t.clone(), "decode_bytes"),
+            FieldEncoding::Trace => (self.tokens.trace_decode_t.clone(), "trace_decode"),
+            FieldEncoding::Default => (self.tokens.decode_t.clone(), "decode"),
         };
 
         if let Some(segment) = decode_t.segments.last_mut() {

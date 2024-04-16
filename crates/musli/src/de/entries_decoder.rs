@@ -1,19 +1,20 @@
 use crate::Context;
 
-use super::Decoder;
+use super::{Decoder, SizeHint};
 
-/// Trait governing how to decode a sequence of struct pairs.
+/// Trait governing how to decode a sequence of map pairs.
 ///
 /// This trait exists so that decoders can implement a mode that is compatible
 /// with serde deserialization.
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
-pub trait StructFieldsDecoder<'de> {
+#[must_use = "Must call end_entries to complete decoding"]
+pub trait EntriesDecoder<'de>: Sized {
     /// Context associated with the decoder.
     type Cx: ?Sized + Context;
     /// The decoder to use for a tuple field index.
-    type DecodeStructFieldName<'this>: Decoder<
+    type DecodeEntryKey<'this>: Decoder<
         'de,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
@@ -22,7 +23,7 @@ pub trait StructFieldsDecoder<'de> {
     where
         Self: 'this;
     /// The decoder to use for a tuple field value.
-    type DecodeStructFieldValue<'this>: Decoder<
+    type DecodeEntryValue<'this>: Decoder<
         'de,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
@@ -31,21 +32,27 @@ pub trait StructFieldsDecoder<'de> {
     where
         Self: 'this;
 
+    /// Get a size hint for the size of the map being decoded.
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Any
+    }
+
     /// Try to return the decoder for the first value in the pair.
     ///
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "Decoders must be consumed"]
-    fn decode_struct_field_name(
+    fn decode_entry_key(
         &mut self,
-    ) -> Result<Self::DecodeStructFieldName<'_>, <Self::Cx as Context>::Error>;
+    ) -> Result<Option<Self::DecodeEntryKey<'_>>, <Self::Cx as Context>::Error>;
 
-    /// Decode the second value in the pair..
+    /// Decode the value in the map.
     #[must_use = "Decoders must be consumed"]
-    fn decode_struct_field_value(
+    fn decode_entry_value(
         &mut self,
-    ) -> Result<Self::DecodeStructFieldValue<'_>, <Self::Cx as Context>::Error>;
+    ) -> Result<Self::DecodeEntryValue<'_>, <Self::Cx as Context>::Error>;
 
-    /// End struct fields decoding.
-    fn end_struct_fields(self) -> Result<(), <Self::Cx as Context>::Error>;
+    /// End entries decoding.
+    fn end_entries(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

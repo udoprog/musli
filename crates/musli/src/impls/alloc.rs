@@ -20,11 +20,12 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use crate::de::{
-    Decode, DecodeBytes, Decoder, MapDecoder, MapEntryDecoder, SequenceDecoder, TraceDecode,
+    Decode, DecodeBytes, Decoder, EntryDecoder, MapDecoder, SequenceDecoder, TraceDecode,
     ValueVisitor,
 };
 use crate::en::{
-    Encode, EncodeBytes, Encoder, MapEncoder, MapEntryEncoder, SequenceEncoder, TraceEncode,
+    Encode, EncodeBytes, EncodePacked, Encoder, EntryEncoder, MapEncoder, SequenceEncoder,
+    TraceEncode,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::internal::size_hint;
@@ -258,7 +259,7 @@ macro_rules! sequence {
 
                     let mut index = 0;
 
-                    while let Some(value) = $access.decode_next()? {
+                    while let Some(value) = $access.try_decode_next()? {
                         $cx.enter_sequence_index(index);
                         out.$insert(T::decode($cx, value)?);
                         $cx.leave_sequence_index();
@@ -266,6 +267,32 @@ macro_rules! sequence {
                     }
 
                     Ok(out)
+                })
+            }
+        }
+
+        $(#[$($meta)*])*
+        impl<M, T $(, $extra)*> EncodePacked<M> for $ty<T $(, $extra)*>
+        where
+            T: Encode<M>,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            #[inline]
+            fn encode_packed<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            where
+                E: Encoder<Mode = M>,
+            {
+                encoder.encode_pack_fn(|pack| {
+                    let mut index = 0;
+
+                    for value in self {
+                        $cx.enter_sequence_index(index);
+                        pack.push(value)?;
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
+
+                    Ok(())
                 })
             }
         }
@@ -353,9 +380,9 @@ macro_rules! map {
                 encoder.encode_map_fn(&hint, |map| {
                     for (k, v) in self {
                         $cx.enter_map_key(k);
-                        map.encode_map_entry_fn(|entry| {
-                            entry.encode_map_key()?.encode(k)?;
-                            entry.encode_map_value()?.encode(v)?;
+                        map.encode_entry_fn(|entry| {
+                            entry.encode_key()?.encode(k)?;
+                            entry.encode_value()?.encode(v)?;
                             Ok(())
                         })?;
                         $cx.leave_map_key();
@@ -406,9 +433,9 @@ macro_rules! map {
                     let mut out = $with_capacity;
 
                     while let Some(mut entry) = $access.decode_entry()? {
-                        let key = entry.decode_map_key()?.decode()?;
+                        let key = entry.decode_key()?.decode()?;
                         $cx.enter_map_key(&key);
-                        let value = entry.decode_map_value()?.decode()?;
+                        let value = entry.decode_value()?.decode()?;
                         out.insert(key, value);
                         $cx.leave_map_key();
                     }
@@ -575,7 +602,7 @@ impl<M> Encode<M> for OsStr {
 
         encoder.encode_variant_fn(|variant| {
             variant.encode_tag()?.encode(PlatformTag::Unix)?;
-            variant.encode_value()?.encode_bytes(self.as_bytes())?;
+            variant.encode_data()?.encode_bytes(self.as_bytes())?;
             Ok(())
         })
     }
@@ -604,7 +631,7 @@ impl<M> Encode<M> for OsStr {
                 }
             }
 
-            variant.encode_value()?.encode_bytes(buf.as_slice())?;
+            variant.encode_data()?.encode_bytes(buf.as_slice())?;
             Ok(())
         })
     }

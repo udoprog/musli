@@ -38,7 +38,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
     } = e.tokens;
 
     let body = match &e.data {
-        BuildData::Struct(st) => encode_struct(&cx, &e, st)?,
+        BuildData::Struct(st) => encode_map(&cx, &e, st)?,
         BuildData::Enum(en) => encode_enum(&cx, &e, en)?,
     };
 
@@ -85,7 +85,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 }
 
 /// Encode a struct.
-fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn encode_map(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         ctx_var,
         encoder_var,
@@ -144,7 +144,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
                 #(#decls)*
                 #build_hint
 
-                let #output_var = #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
+                let #output_var = #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
                     #(#encoders)*
                     #result_ok(())
                 })?;
@@ -190,11 +190,11 @@ fn insert_fields<'st>(
 
     let Tokens {
         context_t,
-        pack_encoder_t,
+        sequence_encoder_t,
         result_ok,
 
-        struct_encoder_t,
-        struct_field_encoder_t,
+        map_encoder_t,
+        map_entry_encoder_t,
         ..
     } = e.tokens;
 
@@ -242,11 +242,11 @@ fn insert_fields<'st>(
                 encode = quote! {
                     #enter
 
-                    #struct_encoder_t::encode_struct_field_fn(#encoder_var, move |#pair_encoder_var| {
+                    #map_encoder_t::encode_entry_fn(#encoder_var, move |#pair_encoder_var| {
                         static #field_name_static: #name_type = #name;
-                        let #field_encoder_var = #struct_field_encoder_t::encode_field_name(#pair_encoder_var)?;
+                        let #field_encoder_var = #map_entry_encoder_t::encode_key(#pair_encoder_var)?;
                         #encode_t_encode(&#field_name_static, #ctx_var, #field_encoder_var)?;
-                        let #value_encoder_var = #struct_field_encoder_t::encode_field_value(#pair_encoder_var)?;
+                        let #value_encoder_var = #map_entry_encoder_t::encode_value(#pair_encoder_var)?;
                         #encode_path(#access, #ctx_var, #value_encoder_var)?;
                         #result_ok(())
                     })?;
@@ -257,7 +257,7 @@ fn insert_fields<'st>(
             Packing::Packed => {
                 encode = quote! {
                     #enter
-                    let #sequence_decoder_next_var = #pack_encoder_t::encode_packed(#pack_var)?;
+                    let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(#pack_var)?;
                     #encode_path(#access, #ctx_var, #sequence_decoder_next_var)?;
                     #leave
                 };
@@ -343,10 +343,10 @@ fn encode_variant(
         context_t,
         encoder_t,
         result_ok,
-        struct_encoder_t,
-        struct_field_encoder_t,
+        map_encoder_t,
+        map_entry_encoder_t,
         variant_encoder_t,
-        struct_hint,
+        map_hint,
         ..
     } = b.tokens;
 
@@ -393,7 +393,7 @@ fn encode_variant(
                     encode = quote! {{
                         #build_hint
 
-                        #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
+                        #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result_ok(())
@@ -414,7 +414,7 @@ fn encode_variant(
 
                         #encode_t_encode(&#name_static, #ctx_var, #tag_encoder)?;
 
-                        let #encoder_var = #variant_encoder_t::encode_value(#variant_encoder)?;
+                        let #encoder_var = #variant_encoder_t::encode_data(#variant_encoder)?;
                         #encode;
                         #result_ok(())
                     })?
@@ -437,10 +437,10 @@ fn encode_variant(
             encode = quote! {{
                 #build_hint
 
-                #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
+                #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
                     static #tag_static: #static_type = #tag;
                     static #name_static: #static_type = #name;
-                    #struct_encoder_t::insert_struct_field(#encoder_var, #tag_static, #name_static)?;
+                    #map_encoder_t::insert_entry(#encoder_var, #tag_static, #name_static)?;
                     #(#decls)*
                     #(#encoders)*
                     #result_ok(())
@@ -463,23 +463,23 @@ fn encode_variant(
             let content_tag = b.cx.ident("content_tag");
 
             encode = quote! {{
-                static #hint: #struct_hint = #struct_hint::with_size(2);
+                static #hint: #map_hint = #map_hint::with_size(2);
                 #build_hint
 
-                #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#struct_encoder| {
+                #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#struct_encoder| {
                     static #tag_static: #static_type = #tag;
                     static #name_static: #static_type = #name;
                     static #content_static: #static_type = #content;
 
-                    #struct_encoder_t::insert_struct_field(#struct_encoder, #tag_static, #name_static)?;
+                    #map_encoder_t::insert_entry(#struct_encoder, #tag_static, #name_static)?;
 
-                    #struct_encoder_t::encode_struct_field_fn(#struct_encoder, move |#pair| {
-                        let #content_tag = #struct_field_encoder_t::encode_field_name(#pair)?;
+                    #map_encoder_t::encode_entry_fn(#struct_encoder, move |#pair| {
+                        let #content_tag = #map_entry_encoder_t::encode_key(#pair)?;
                         #encode_t_encode(&#content_static, #ctx_var, #content_tag)?;
 
-                        let #content_struct = #struct_field_encoder_t::encode_field_value(#pair)?;
+                        let #content_struct = #map_entry_encoder_t::encode_value(#pair)?;
 
-                        #encoder_t::encode_struct_fn(#content_struct, &#inner_hint, move |#encoder_var| {
+                        #encoder_t::encode_map_fn(#content_struct, &#inner_hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result_ok(())
@@ -529,21 +529,19 @@ struct LengthTest {
 
 impl LengthTest {
     fn build(&self, b: &Build<'_>) -> (syn::Stmt, syn::Ident) {
-        let Tokens { struct_hint, .. } = b.tokens;
+        let Tokens { map_hint, .. } = b.tokens;
 
         match self.kind {
             LengthTestKind::Static => {
                 let hint = b.cx.ident("HINT");
                 let len = &self.expressions;
-                let item =
-                    syn::parse_quote!(static #hint: #struct_hint = #struct_hint::with_size(#len););
+                let item = syn::parse_quote!(static #hint: #map_hint = #map_hint::with_size(#len););
                 (item, hint)
             }
             LengthTestKind::Dynamic => {
                 let hint = b.cx.ident("hint");
                 let len = &self.expressions;
-                let item =
-                    syn::parse_quote!(let #hint: #struct_hint = #struct_hint::with_size(#len););
+                let item = syn::parse_quote!(let #hint: #map_hint = #map_hint::with_size(#len););
                 (item, hint)
             }
         }

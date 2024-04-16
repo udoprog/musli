@@ -247,7 +247,7 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
-            // parse #[musli(mode = <path>)]
+            // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
@@ -264,21 +264,21 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // parse #[musli(tag = <expr>)]
+            // #[musli(tag = <expr>)]
             if meta.path.is_ident("tag") {
                 meta.input.parse::<Token![=]>()?;
                 new.tag.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
-            // parse #[musli(content = <expr>)]
+            // #[musli(content = <expr>)]
             if meta.path.is_ident("content") {
                 meta.input.parse::<Token![=]>()?;
                 new.content.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
-            // parse #[musli(crate = <path>)]
+            // #[musli(crate = <path>)]
             if meta.path.is_ident("crate") {
                 let path = if meta.input.parse::<Option<Token![=]>>()?.is_some() {
                     meta.input.parse()?
@@ -290,14 +290,14 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // parse #[musli(name_type = <type>)]
+            // #[musli(name_type = <type>)]
             if meta.path.is_ident("name_type") {
                 meta.input.parse::<Token![=]>()?;
                 new.name_type.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
-            // parse #[musli(name_format_with = <path>)]
+            // #[musli(name_format_with = <path>)]
             if meta.path.is_ident("name_format_with") {
                 meta.input.parse::<Token![=]>()?;
                 new.name_format_with
@@ -305,40 +305,40 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // parse #[musli(bound = {..})]
+            // #[musli(bound = {..})]
             if meta.path.is_ident("bound") {
                 meta.input.parse::<Token![=]>()?;
                 parse_bounds(&meta, &mut new.bounds)?;
                 return Ok(());
             }
 
-            // parse #[musli(decode_bound = {..})]
+            // #[musli(decode_bound = {..})]
             if meta.path.is_ident("decode_bound") {
                 meta.input.parse::<Token![=]>()?;
                 parse_bounds(&meta, &mut new.decode_bounds)?;
                 return Ok(());
             }
 
-            // parse #[musli(packed)]
+            // #[musli(packed)]
             if meta.path.is_ident("packed") {
                 new.packing.push((meta.path.span(), Packing::Packed));
                 return Ok(());
             }
 
-            // parse #[musli(transparent)]
+            // #[musli(transparent)]
             if meta.path.is_ident("transparent") {
                 new.packing.push((meta.path.span(), Packing::Transparent));
                 return Ok(());
             }
 
-            // parse #[musli(name_all = "..")]
+            // #[musli(name_all = "..")]
             if meta.path.is_ident("name_all") {
                 new.name_all
                     .push((meta.path.span(), parse_name_all(&meta)?));
                 return Ok(());
             }
 
-            // parse #[musli(name_method = "..")]
+            // #[musli(name_method = "..")]
             if meta.path.is_ident("name_method") {
                 new.name_method
                     .push((meta.path.span(), parse_name_method(&meta)?));
@@ -461,7 +461,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
-            // parse #[musli(mode = <path>)]
+            // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
@@ -478,14 +478,14 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
-            // parse #[musli(name_type = <type>)]
+            // #[musli(name_type = <type>)]
             if meta.path.is_ident("name_type") {
                 meta.input.parse::<Token![=]>()?;
                 new.name_type.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
-            // parse #[musli(name_format_with = <path>)]
+            // #[musli(name_format_with = <path>)]
             if meta.path.is_ident("name_format_with") {
                 meta.input.parse::<Token![=]>()?;
                 new.name_format_with
@@ -500,14 +500,14 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 ));
             }
 
-            // parse #[musli(name = <expr>)]
+            // #[musli(name = <expr>)]
             if meta.path.is_ident("name") {
                 meta.input.parse::<Token![=]>()?;
                 new.name.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
-            // parse #[musli(pattern = <expr>)]
+            // #[musli(pattern = <expr>)]
             if meta.path.is_ident("pattern") {
                 meta.input.parse::<Token![=]>()?;
                 new.pattern
@@ -515,32 +515,32 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
-            // parse #[musli(default)]
+            // #[musli(default)]
             if meta.path.is_ident("default") {
                 new.default_variant.push((meta.path.span(), ()));
                 return Ok(());
             }
 
-            // parse #[musli(packed)]
+            // #[musli(packed)]
             if meta.path.is_ident("packed") {
                 new.packing.push((meta.path.span(), Packing::Packed));
                 return Ok(());
             }
 
-            // parse #[musli(transparent)]
+            // #[musli(transparent)]
             if meta.path.is_ident("transparent") {
                 new.packing.push((meta.path.span(), Packing::Transparent));
                 return Ok(());
             }
 
-            // parse #[musli(name_all = "..")]
+            // #[musli(name_all = "..")]
             if meta.path.is_ident("name_all") {
                 new.name_all
                     .push((meta.path.span(), parse_name_all(&meta)?));
                 return Ok(());
             }
 
-            // parse #[musli(name_method = "..")]
+            // #[musli(name_method = "..")]
             if meta.path.is_ident("name_method") {
                 new.name_method
                     .push((meta.path.span(), parse_name_method(&meta)?));
@@ -571,6 +571,15 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
     attr
 }
 
+#[derive(Default, Clone, Copy)]
+pub(crate) enum FieldEncoding {
+    Packed,
+    Bytes,
+    Trace,
+    #[default]
+    Default,
+}
+
 layer! {
     Field, FieldNew, FieldLayer {
         /// Module to use when decoding.
@@ -587,10 +596,8 @@ layer! {
         is_default: Option<syn::Path>,
         /// Use a default value for the field if it's not available.
         skip: (),
-        /// Use the alternate TraceDecode for the field.
-        trace: (),
-        /// Use the alternate EncodeBytes for the field.
-        bytes: (),
+        /// Field encoding to use.
+        encoding: FieldEncoding,
         @multiple
     }
 }
@@ -603,9 +610,8 @@ impl Field {
         if let Some((span, encode_path)) = encode_path {
             (*span, encode_path.clone())
         } else {
-            let trace = self.trace(mode).is_some();
-            let bytes = self.bytes(mode).is_some();
-            let encode_path = mode.encode_t_encode(trace, bytes);
+            let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
+            let encode_path = mode.encode_t_encode(field_encoding);
             (span, encode_path)
         }
     }
@@ -617,9 +623,8 @@ impl Field {
         if let Some((span, decode_path)) = decode_path {
             (*span, decode_path.clone())
         } else {
-            let trace = self.trace(mode).is_some();
-            let bytes = self.bytes(mode).is_some();
-            let decode_path = mode.decode_t_decode(trace, bytes);
+            let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
+            let decode_path = mode.decode_t_decode(field_encoding);
             (span, decode_path)
         }
     }
@@ -639,7 +644,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
-            // parse #[musli(mode = <path>)]
+            // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(meta.input.parse()?);
@@ -656,7 +661,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // parse parse #[musli(with = <path>)]
+            // parse #[musli(with = <path>)]
             if meta.path.is_ident("with") {
                 meta.input.parse::<Token![=]>()?;
                 let mut path = meta.input.parse::<syn::Path>()?;
@@ -690,7 +695,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // parse #[musli(skip_encoding_if = <path>)]
+            // #[musli(skip_encoding_if = <path>)]
             if meta.path.is_ident("skip_encoding_if") {
                 meta.input.parse::<Token![=]>()?;
                 new.skip_encoding_if
@@ -705,14 +710,14 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 ));
             }
 
-            // parse #[musli(name = <expr>)]
+            // #[musli(name = <expr>)]
             if meta.path.is_ident("name") {
                 meta.input.parse::<Token![=]>()?;
                 new.name.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
-            // parse #[musli(pattern = <expr>)]
+            // #[musli(pattern = <expr>)]
             if meta.path.is_ident("pattern") {
                 meta.input.parse::<Token![=]>()?;
                 new.pattern
@@ -720,7 +725,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // parse #[musli(default)]
+            // #[musli(default)]
             if meta.path.is_ident("default") {
                 if meta.input.parse::<Option<Token![=]>>()?.is_some() {
                     new.is_default
@@ -732,21 +737,27 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // parse #[musli(skip)]
+            // #[musli(skip)]
             if meta.path.is_ident("skip") {
                 new.skip.push((meta.path.span(), ()));
                 return Ok(());
             }
 
-            // parse #[musli(trace)]
+            // #[musli(trace)]
             if meta.path.is_ident("trace") {
-                new.trace.push((meta.path.span(), ()));
+                new.encoding.push((meta.path.span(), FieldEncoding::Trace));
                 return Ok(());
             }
 
-            // parse #[musli(bytes)]
+            // #[musli(bytes)]
             if meta.path.is_ident("bytes") {
-                new.bytes.push((meta.path.span(), ()));
+                new.encoding.push((meta.path.span(), FieldEncoding::Bytes));
+                return Ok(());
+            }
+
+            // #[musli(packed)]
+            if meta.path.is_ident("packed") {
+                new.encoding.push((meta.path.span(), FieldEncoding::Packed));
                 return Ok(());
             }
 

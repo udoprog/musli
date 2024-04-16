@@ -1,4 +1,4 @@
-use musli::en::{MapEntryEncoder, StructFieldEncoder};
+use musli::en::EntryEncoder;
 use musli::Context;
 use musli_utils::Writer;
 
@@ -18,20 +18,20 @@ impl<'a, W, C: ?Sized> JsonObjectPairEncoder<'a, W, C> {
     }
 }
 
-impl<'a, W, C> MapEntryEncoder for JsonObjectPairEncoder<'a, W, C>
+impl<'a, W, C> EntryEncoder for JsonObjectPairEncoder<'a, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
+    type EncodeKey<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeMapValue<'this> = JsonEncoder<'a, W::Mut<'this>, C> where Self: 'this;
+    type EncodeValue<'this> = JsonEncoder<'a, W::Mut<'this>, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_key(&mut self) -> Result<Self::EncodeMapKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         if !self.empty {
             self.writer.write_byte(self.cx, b',')?;
         }
@@ -40,41 +40,13 @@ where
     }
 
     #[inline]
-    fn encode_map_value(&mut self) -> Result<Self::EncodeMapValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         self.writer.write_byte(self.cx, b':')?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
-    }
-}
-
-impl<'a, W, C> StructFieldEncoder for JsonObjectPairEncoder<'a, W, C>
-where
-    W: Writer,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeFieldName<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
-    where
-        Self: 'this;
-    type EncodeFieldValue<'this> = JsonEncoder<'a, W::Mut<'this>, C> where Self: 'this;
-
-    #[inline]
-    fn encode_field_name(&mut self) -> Result<Self::EncodeFieldName<'_>, C::Error> {
-        self.encode_map_key()
-    }
-
-    #[inline]
-    fn encode_field_value(&mut self) -> Result<Self::EncodeFieldValue<'_>, C::Error> {
-        self.encode_map_value()
-    }
-
-    #[inline]
-    fn finish_field(self) -> Result<Self::Ok, C::Error> {
-        MapEntryEncoder::finish_map_entry(self)
     }
 }

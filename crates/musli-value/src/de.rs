@@ -4,12 +4,11 @@ use core::slice;
 #[cfg(feature = "alloc")]
 use musli::de::ValueVisitor;
 use musli::de::{
-    AsDecoder, Decode, DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder,
-    PackDecoder, SequenceDecoder, SizeHint, Skip, StructDecoder, StructFieldDecoder,
-    StructFieldsDecoder, TupleDecoder, VariantDecoder, Visitor,
+    AsDecoder, Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
+    SequenceDecoder, SizeHint, Skip, VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
-use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_utils::reader::SliceReader;
@@ -93,12 +92,10 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     type DecodeSome = Self;
     type DecodePack = StorageDecoder<'a, SliceReader<'de>, OPT, C>;
     type DecodeSequence = IterValueDecoder<'a, 'de, OPT, C>;
-    type DecodeTuple = IterValueDecoder<'a, 'de, OPT, C>;
+    type DecodeSequenceHint = IterValueDecoder<'a, 'de, OPT, C>;
     type DecodeMap = IterValuePairsDecoder<'a, 'de, OPT, C>;
+    type DecodeMapHint = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeMapEntries = IterValuePairsDecoder<'a, 'de, OPT, C>;
-    type DecodeStruct = IterValuePairsDecoder<'a, 'de, OPT, C>;
-    type DecodeUnsizedStruct = IterValuePairsDecoder<'a, 'de, OPT, C>;
-    type DecodeStructFields = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeVariant = IterValueVariantDecoder<'a, 'de, OPT, C>;
 
     #[inline]
@@ -298,9 +295,9 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_tuple<F, O>(self, _: &TupleHint, f: F) -> Result<O, C::Error>
+    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
     {
         ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
             f(&mut IterValueDecoder::new(self.cx, sequence))
@@ -313,6 +310,17 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
     {
+        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
+            f(&mut IterValuePairsDecoder::new(self.cx, st))
+        })
+    }
+
+    #[cfg(feature = "alloc")]
+    #[inline]
+    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+    {
         ensure!(self, hint, ExpectedMap(hint), Value::Map(map) => {
             f(&mut IterValuePairsDecoder::new(self.cx, map))
         })
@@ -323,36 +331,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
         ensure!(self, hint, ExpectedMap(hint), Value::Map(map) => {
             Ok(IterValuePairsDecoder::new(self.cx, map))
-        })
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
-    {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
-            f(&mut IterValuePairsDecoder::new(self.cx, st))
-        })
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn decode_unsized_struct<F, O>(self, _: &UnsizedStructHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, C::Error>,
-    {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
-            f(&mut IterValuePairsDecoder::new(self.cx, st))
-        })
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn decode_struct_fields(self, _: &StructHint) -> Result<Self::DecodeStructFields, C::Error> {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
-            Ok(IterValuePairsDecoder::new(self.cx, st))
         })
     }
 
@@ -456,37 +434,6 @@ impl<'a, 'de, const OPT: Options, C: ?Sized> IterValueDecoder<'a, 'de, OPT, C> {
     }
 }
 
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> PackDecoder<'de>
-    for IterValueDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeNext<'this> = ValueDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        match self.iter.next() {
-            Some(value) => Ok(ValueDecoder::new(self.cx, value)),
-            None => Err(self.cx.message(ErrorMessage::ExpectedPackValue)),
-        }
-    }
-}
-
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> TupleDecoder<'de>
-    for IterValueDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeNext<'this> = ValueDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        PackDecoder::decode_next(self)
-    }
-}
-
 impl<'a, 'de, C: ?Sized + Context, const OPT: Options> SequenceDecoder<'de>
     for IterValueDecoder<'a, 'de, OPT, C>
 {
@@ -501,10 +448,18 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> SequenceDecoder<'de>
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         match self.iter.next() {
             Some(value) => Ok(Some(ValueDecoder::new(self.cx, value))),
             None => Ok(None),
+        }
+    }
+
+    #[inline]
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
+        match self.iter.next() {
+            Some(value) => Ok(ValueDecoder::new(self.cx, value)),
+            None => Err(self.cx.message(ErrorMessage::ExpectedPackValue)),
         }
     }
 }
@@ -556,17 +511,17 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapDecoder<'de>
     }
 }
 
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntriesDecoder<'de>
+impl<'a, 'de, C: ?Sized + Context, const OPT: Options> EntriesDecoder<'de>
     for IterValuePairsDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeMapEntryKey<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeEntryKey<'this> = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
-    type DecodeMapEntryValue<'this> = ValueDecoder<'a, 'de, OPT, C> where Self: 'this;
+    type DecodeEntryValue<'this> = ValueDecoder<'a, 'de, OPT, C> where Self: 'this;
 
     #[inline]
-    fn decode_map_entry_key(&mut self) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         let Some((name, _)) = self.iter.clone().next() else {
             return Ok(None);
         };
@@ -575,7 +530,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntriesDecoder<'de>
     }
 
     #[inline]
-    fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
         let Some((_, value)) = self.iter.next() else {
             return Err(self.cx.message(ErrorMessage::ExpectedMapValue));
         };
@@ -584,101 +539,28 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntriesDecoder<'de>
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<(), C::Error> {
+    fn end_entries(self) -> Result<(), C::Error> {
         Ok(())
     }
 }
 
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapEntryDecoder<'de>
+impl<'a, 'de, C: ?Sized + Context, const OPT: Options> EntryDecoder<'de>
     for IterValuePairDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeMapKey<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeKey<'this> = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
-    type DecodeMapValue = ValueDecoder<'a, 'de, OPT, C>;
+    type DecodeValue = ValueDecoder<'a, 'de, OPT, C>;
 
     #[inline]
-    fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, C::Error> {
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(ValueDecoder::with_map_key(self.cx, &self.pair.0))
     }
 
     #[inline]
-    fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
+    fn decode_value(self) -> Result<Self::DecodeValue, C::Error> {
         Ok(ValueDecoder::new(self.cx, &self.pair.1))
-    }
-}
-
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> StructDecoder<'de>
-    for IterValuePairsDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeField<'this> = IterValuePairDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> SizeHint {
-        MapDecoder::size_hint(self)
-    }
-
-    #[inline]
-    fn decode_field(&mut self) -> Result<Option<Self::DecodeField<'_>>, C::Error> {
-        MapDecoder::decode_entry(self)
-    }
-}
-
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> StructFieldsDecoder<'de>
-    for IterValuePairsDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeStructFieldName<'this> = ValueDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-    type DecodeStructFieldValue<'this> = ValueDecoder<'a, 'de, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn decode_struct_field_name(&mut self) -> Result<Self::DecodeStructFieldName<'_>, C::Error> {
-        let Some((name, _)) = self.iter.clone().next() else {
-            return Err(self.cx.message(ErrorMessage::ExpectedFieldName));
-        };
-
-        Ok(ValueDecoder::new(self.cx, name))
-    }
-
-    #[inline]
-    fn decode_struct_field_value(&mut self) -> Result<Self::DecodeStructFieldValue<'_>, C::Error> {
-        let Some((_, value)) = self.iter.next() else {
-            return Err(self.cx.message(ErrorMessage::ExpectedFieldValue));
-        };
-
-        Ok(ValueDecoder::new(self.cx, value))
-    }
-
-    #[inline]
-    fn end_struct_fields(self) -> Result<(), C::Error> {
-        Ok(())
-    }
-}
-
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> StructFieldDecoder<'de>
-    for IterValuePairDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeFieldName<'this> = ValueDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-
-    type DecodeFieldValue = ValueDecoder<'a, 'de, OPT, C>;
-
-    #[inline]
-    fn decode_field_name(&mut self) -> Result<Self::DecodeFieldName<'_>, C::Error> {
-        MapEntryDecoder::decode_map_key(self)
-    }
-
-    #[inline]
-    fn decode_field_value(self) -> Result<Self::DecodeFieldValue, C::Error> {
-        MapEntryDecoder::decode_map_value(self)
     }
 }
 

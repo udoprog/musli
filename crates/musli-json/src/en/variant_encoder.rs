@@ -32,7 +32,7 @@ where
     type EncodeTag<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeValue<'this> = JsonEncoder<'a, W::Mut<'this>, C>
+    type EncodeData<'this> = JsonEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -42,7 +42,7 @@ where
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         self.writer.write_byte(self.cx, b':')?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }

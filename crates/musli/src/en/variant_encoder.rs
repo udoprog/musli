@@ -19,7 +19,7 @@ pub trait VariantEncoder {
     where
         Self: 'this;
     /// The encoder returned when advancing the map encoder to encode the value.
-    type EncodeValue<'this>: Encoder<
+    type EncodeData<'this>: Encoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = <Self::Cx as Context>::Error,
@@ -34,7 +34,7 @@ pub trait VariantEncoder {
 
     /// Return encoder for the second element in the variant.
     #[must_use = "Encoders must be consumed"]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, <Self::Cx as Context>::Error>;
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, <Self::Cx as Context>::Error>;
 
     /// End the variant encoder.
     fn finish_variant(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
@@ -52,7 +52,7 @@ pub trait VariantEncoder {
         V: Encode<<Self::Cx as Context>::Mode>,
     {
         self.encode_tag()?.encode(tag)?;
-        self.encode_value()?.encode(value)?;
+        self.encode_data()?.encode(value)?;
         self.finish_variant()
     }
 }

@@ -16,7 +16,7 @@ use self::variant_encoder::JsonVariantEncoder;
 use core::fmt;
 
 use musli::en::{Encoder, SequenceEncoder};
-use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Encode};
 use musli_utils::Writer;
 
@@ -48,13 +48,11 @@ where
     type EncodePack = JsonArrayEncoder<'a, W, C>;
     type EncodeSome = Self;
     type EncodeSequence = JsonArrayEncoder<'a, W, C>;
-    type EncodeTuple = JsonArrayEncoder<'a, W, C>;
     type EncodeMap = JsonObjectEncoder<'a, W, C>;
     type EncodeMapEntries = JsonObjectEncoder<'a, W, C>;
-    type EncodeStruct = JsonObjectEncoder<'a, W, C>;
     type EncodeVariant = JsonVariantEncoder<'a, W, C>;
-    type EncodeTupleVariant = JsonArrayEncoder<'a, W, C>;
-    type EncodeStructVariant = JsonObjectEncoder<'a, W, C>;
+    type EncodeSequenceVariant = JsonArrayEncoder<'a, W, C>;
+    type EncodeMapVariant = JsonObjectEncoder<'a, W, C>;
 
     #[inline]
     fn cx(&self) -> &C {
@@ -280,11 +278,6 @@ where
     }
 
     #[inline]
-    fn encode_tuple(self, _: &TupleHint) -> Result<Self::EncodeTuple, C::Error> {
-        JsonArrayEncoder::new(self.cx, self.writer)
-    }
-
-    #[inline]
     fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         JsonObjectEncoder::new(self.cx, self.writer)
     }
@@ -295,21 +288,16 @@ where
     }
 
     #[inline]
-    fn encode_struct(self, _: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
-        JsonObjectEncoder::new(self.cx, self.writer)
-    }
-
-    #[inline]
     fn encode_variant(self) -> Result<Self::EncodeVariant, C::Error> {
         JsonVariantEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_tuple_variant<T>(
+    fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
-        _: &TupleHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+        _: &SequenceHint,
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -320,11 +308,11 @@ where
     }
 
     #[inline]
-    fn encode_struct_variant<T>(
+    fn encode_map_variant<T>(
         mut self,
         tag: &T,
-        _: &StructHint,
-    ) -> Result<Self::EncodeStructVariant, C::Error>
+        _: &MapHint,
+    ) -> Result<Self::EncodeMapVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
