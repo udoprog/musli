@@ -4,8 +4,8 @@ use core::fmt;
 use alloc::vec::Vec;
 
 use musli::de::{
-    DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, PackDecoder, SequenceDecoder,
-    SizeHint, ValueVisitor, VariantDecoder,
+    DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint,
+    ValueVisitor, VariantDecoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Decode};
@@ -334,13 +334,20 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> PackDecoder<'de>
+impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> SequenceDecoder<'de>
     for StorageDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeNext<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+
+    #[inline]
+    fn try_decode_next(
+        &mut self,
+    ) -> Result<Option<Self::DecodeNext<'_>>, <Self::Cx as Context>::Error> {
+        Ok(Some(self.decode_next()?))
+    }
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
@@ -380,7 +387,7 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeElement<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -388,14 +395,24 @@ where
     }
 
     #[inline]
-    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
 
         self.remaining -= 1;
-
         Ok(Some(StorageDecoder::new(self.cx, self.reader.borrow_mut())))
+    }
+
+    #[inline]
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, <Self::Cx as Context>::Error> {
+        let cx = self.cx;
+
+        let Some(decoder) = self.try_decode_next()? else {
+            return Err(cx.message("No remaining elements"));
+        };
+
+        Ok(decoder)
     }
 }
 

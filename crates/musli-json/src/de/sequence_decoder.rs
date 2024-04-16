@@ -1,6 +1,6 @@
 use core::mem;
 
-use musli::de::{Decoder, PackDecoder, SequenceDecoder, SizeHint};
+use musli::de::{Decoder, SequenceDecoder, SizeHint};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -72,7 +72,7 @@ where
             return Ok(());
         }
 
-        while let Some(decoder) = SequenceDecoder::decode_element(&mut self)? {
+        while let Some(decoder) = SequenceDecoder::try_decode_next(&mut self)? {
             decoder.skip()?;
         }
 
@@ -96,7 +96,7 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeElement<'this> = JsonDecoder<'a, P::Mut<'this>, C>
+    type DecodeNext<'this> = JsonDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -106,24 +106,13 @@ where
     }
 
     #[inline]
-    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if !self.parse_next_value()? {
             return Ok(None);
         }
 
         Ok(Some(JsonDecoder::new(self.cx, self.parser.borrow_mut())))
     }
-}
-
-impl<'a, 'de, P, C> PackDecoder<'de> for JsonSequenceDecoder<'a, P, C>
-where
-    P: Parser<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeNext<'this> = JsonDecoder<'a, P::Mut<'this>, C>
-    where
-        Self: 'this;
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {

@@ -259,7 +259,7 @@ macro_rules! sequence {
 
                     let mut index = 0;
 
-                    while let Some(value) = $access.decode_element()? {
+                    while let Some(value) = $access.try_decode_next()? {
                         $cx.enter_sequence_index(index);
                         out.$insert(T::decode($cx, value)?);
                         $cx.leave_sequence_index();

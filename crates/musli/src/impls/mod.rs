@@ -15,8 +15,8 @@ use core::num::{
 use core::{fmt, marker};
 
 use crate::de::{
-    Decode, DecodeBytes, DecodePacked, DecodeUnsized, DecodeUnsizedBytes, Decoder, PackDecoder,
-    SequenceDecoder, ValueVisitor, VariantDecoder,
+    Decode, DecodeBytes, DecodePacked, DecodeUnsized, DecodeUnsizedBytes, Decoder, SequenceDecoder,
+    ValueVisitor, VariantDecoder,
 };
 use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder, SequenceEncoder, VariantEncoder};
 use crate::hint::SequenceHint;
@@ -191,7 +191,7 @@ where
         decoder.decode_sequence(|seq| {
             let mut array = crate::fixed::FixedVec::new();
 
-            while let Some(item) = seq.decode_element()? {
+            while let Some(item) = seq.try_decode_next()? {
                 array.try_push(item.decode()?).map_err(cx.map())?;
             }
 

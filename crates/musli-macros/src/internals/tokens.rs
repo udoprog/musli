@@ -59,7 +59,7 @@ impl Tokens {
             option_none: path(span, prefix, ["__priv", "None"]),
             option_some: path(span, prefix, ["__priv", "Some"]),
             option: path(span, prefix, ["__priv", "Option"]),
-            pack_decoder_t: path(span, prefix, ["de", "PackDecoder"]),
+            pack_decoder_t: path(span, prefix, ["de", "SequenceDecoder"]),
             sequence_encoder_t: path(span, prefix, ["en", "SequenceEncoder"]),
             priv_write: path(span, prefix, ["__priv", "write"]),
             result_err: path(span, prefix, ["__priv", "Err"]),

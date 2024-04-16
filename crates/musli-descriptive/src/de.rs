@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 
 use musli::de::{
     Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, NumberVisitor,
-    PackDecoder, SequenceDecoder, SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
+    SequenceDecoder, SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
@@ -207,7 +207,7 @@ where
 
     #[inline]
     fn skip_sequence_remaining(mut self) -> Result<(), C::Error> {
-        if let Some(item) = self.decode_element()? {
+        if let Some(item) = self.try_decode_next()? {
             item.skip()?;
         }
 
@@ -779,13 +779,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> PackDecoder<'de> for SelfDecoder<'a, Limit<R>, OPT, C>
+impl<'a, 'de, R, const OPT: Options, C> SequenceDecoder<'de> for SelfDecoder<'a, Limit<R>, OPT, C>
 where
     R: Reader<'de>,
     C: ?Sized + Context,
 {
     type Cx = C;
     type DecodeNext<'this> = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C> where Self: 'this;
+
+    #[inline]
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+        Ok(Some(StorageDecoder::new(self.cx, self.reader.borrow_mut())))
+    }
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
@@ -799,7 +804,7 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeElement<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -807,14 +812,24 @@ where
     }
 
     #[inline]
-    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
 
         self.remaining -= 1;
-
         Ok(Some(SelfDecoder::new(self.cx, self.reader.borrow_mut())))
+    }
+
+    #[inline]
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, <Self::Cx as Context>::Error> {
+        let cx = self.cx;
+
+        let Some(decoder) = self.try_decode_next()? else {
+            return Err(cx.message("No remaining elements"));
+        };
+
+        Ok(decoder)
     }
 }
 

@@ -368,7 +368,7 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.decode_element()? else {
+        let Some(decoder) = self.decoder.try_decode_next()? else {
             return Ok(None);
         };
 
@@ -505,7 +505,7 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.decode_element()? else {
+        let Some(decoder) = self.decoder.try_decode_next()? else {
             return Ok(None);
         };
 

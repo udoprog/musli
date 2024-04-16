@@ -14,8 +14,7 @@ use crate::no_std::ToOwned;
 
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
-    MapDecoder, NumberVisitor, PackDecoder, SequenceDecoder, SizeHint, ValueVisitor,
-    VariantDecoder,
+    MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
 };
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
@@ -244,25 +243,15 @@ impl<'de, C: ?Sized + Context> EntryDecoder<'de> for Never<(), C> {
 
 impl<'de, C: ?Sized + Context> SequenceDecoder<'de> for Never<(), C> {
     type Cx = C;
-    type DecodeElement<'this> = Self where Self: 'this;
-
-    #[inline]
-    fn size_hint(&self) -> SizeHint {
-        match self._never {}
-    }
-
-    #[inline]
-    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
-        match self._never {}
-    }
-}
-
-impl<'de, C: ?Sized + Context> PackDecoder<'de> for Never<(), C> {
-    type Cx = C;
     type DecodeNext<'this> = Self where Self: 'this;
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
+        match self._never {}
+    }
+
+    #[inline]
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         match self._never {}
     }
 }

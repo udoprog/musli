@@ -5,7 +5,7 @@ use core::slice;
 use musli::de::ValueVisitor;
 use musli::de::{
     AsDecoder, Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
-    PackDecoder, SequenceDecoder, SizeHint, Skip, VariantDecoder, Visitor,
+    SequenceDecoder, SizeHint, Skip, VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
 use musli::hint::{MapHint, SequenceHint};
@@ -434,28 +434,11 @@ impl<'a, 'de, const OPT: Options, C: ?Sized> IterValueDecoder<'a, 'de, OPT, C> {
     }
 }
 
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> PackDecoder<'de>
-    for IterValueDecoder<'a, 'de, OPT, C>
-{
-    type Cx = C;
-    type DecodeNext<'this> = ValueDecoder<'a, 'de, OPT, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        match self.iter.next() {
-            Some(value) => Ok(ValueDecoder::new(self.cx, value)),
-            None => Err(self.cx.message(ErrorMessage::ExpectedPackValue)),
-        }
-    }
-}
-
 impl<'a, 'de, C: ?Sized + Context, const OPT: Options> SequenceDecoder<'de>
     for IterValueDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeElement<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeNext<'this> = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
 
@@ -465,10 +448,18 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> SequenceDecoder<'de>
     }
 
     #[inline]
-    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         match self.iter.next() {
             Some(value) => Ok(Some(ValueDecoder::new(self.cx, value))),
             None => Ok(None),
+        }
+    }
+
+    #[inline]
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
+        match self.iter.next() {
+            Some(value) => Ok(ValueDecoder::new(self.cx, value)),
+            None => Err(self.cx.message(ErrorMessage::ExpectedPackValue)),
         }
     }
 }

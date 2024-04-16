@@ -68,10 +68,6 @@ mod number_visitor;
 #[doc(inline)]
 pub use self::number_visitor::NumberVisitor;
 
-mod pack_decoder;
-#[doc(inline)]
-pub use self::pack_decoder::PackDecoder;
-
 mod sequence_decoder;
 #[doc(inline)]
 pub use self::sequence_decoder::SequenceDecoder;

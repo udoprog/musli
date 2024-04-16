@@ -5,8 +5,8 @@ use core::mem::take;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, PackDecoder,
-    SequenceDecoder, SizeHint, Skip, ValueVisitor, VariantDecoder,
+    Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
+    SizeHint, Skip, ValueVisitor, VariantDecoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
@@ -184,7 +184,7 @@ where
     #[inline]
     fn skip_sequence_remaining(mut self) -> Result<(), C::Error> {
         loop {
-            let Some(value) = SequenceDecoder::decode_element(&mut self)? else {
+            let Some(value) = SequenceDecoder::try_decode_next(&mut self)? else {
                 break;
             };
 
@@ -539,13 +539,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> PackDecoder<'de> for WireDecoder<'a, Limit<R>, OPT, C>
+impl<'a, 'de, R, const OPT: Options, C> SequenceDecoder<'de> for WireDecoder<'a, Limit<R>, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeNext<'this> = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C> where Self: 'this;
+
+    #[inline]
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+        Ok(Some(self.decode_next()?))
+    }
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
@@ -559,7 +564,7 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeElement<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -567,7 +572,7 @@ where
     }
 
     #[inline]
-    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -575,15 +580,6 @@ where
         self.remaining -= 1;
         Ok(Some(WireDecoder::new(self.cx, self.reader.borrow_mut())))
     }
-}
-
-impl<'a, 'de, R, const OPT: Options, C> PackDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
-where
-    C: ?Sized + Context,
-    R: Reader<'de>,
-{
-    type Cx = C;
-    type DecodeNext<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {

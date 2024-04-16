@@ -8,7 +8,7 @@ use crate::Context;
 
 use super::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, EntriesDecoder, MapDecoder,
-    NumberVisitor, PackDecoder, SequenceDecoder, Skip, ValueVisitor, VariantDecoder, Visitor,
+    NumberVisitor, SequenceDecoder, Skip, ValueVisitor, VariantDecoder, Visitor,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -30,7 +30,7 @@ pub trait Decoder<'de>: Sized {
     /// Decoder returned by [`Decoder::decode_option`].
     type DecodeSome: Decoder<'de, Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
     /// Decoder used by [`Decoder::decode_pack`].
-    type DecodePack: PackDecoder<'de, Cx = Self::Cx>;
+    type DecodePack: SequenceDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_sequence`].
     type DecodeSequence: SequenceDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_sequence_hint`].
@@ -1156,7 +1156,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::PackDecoder;
+    /// use musli::de::SequenceDecoder;
     /// # struct PackedStruct { field: u32, data: [u8; 128] }
     ///
     /// impl<'de, M> Decode<'de, M> for PackedStruct {
@@ -1216,7 +1216,7 @@ pub trait Decoder<'de>: Sized {
     ///         decoder.decode_sequence(|seq| {
     ///             let mut data = Vec::new();
     ///
-    ///             while let Some(decoder) = seq.decode_element()? {
+    ///             while let Some(decoder) = seq.try_decode_next()? {
     ///                 data.push(decoder.decode()?);
     ///             }
     ///
@@ -1251,7 +1251,7 @@ pub trait Decoder<'de>: Sized {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         decoder.decode_sequence_hint(&HINT, |tuple| {
-    ///             Ok(Self(tuple.required_next(cx)?, tuple.required_next(cx)?))
+    ///             Ok(Self(tuple.next(cx)?, tuple.next(cx)?))
     ///         })
     ///     }
     /// }
@@ -1285,7 +1285,7 @@ pub trait Decoder<'de>: Sized {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         decoder.decode_sequence_hint(&HINT, |tuple| {
-    ///             Ok(Self(tuple.required_next(cx)?, tuple.required_next(cx)?))
+    ///             Ok(Self(tuple.next(cx)?, tuple.next(cx)?))
     ///         })
     ///     }
     /// }

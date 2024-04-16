@@ -1,6 +1,6 @@
 //! Implementations for variously lengthed tuples.
 
-use crate::de::{Decode, DecodePacked, Decoder, PackDecoder, SequenceDecoder};
+use crate::de::{Decode, DecodePacked, Decoder, SequenceDecoder};
 use crate::en::{Encode, EncodePacked, Encoder, SequenceEncoder};
 use crate::hint::SequenceHint;
 
@@ -67,15 +67,15 @@ macro_rules! declare {
             $($ty: Decode<'de, M>),*
         {
             #[inline]
-            fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
                 static HINT: SequenceHint = SequenceHint::with_size(count!($ident0 $($ident)*));
 
                 decoder.decode_sequence_hint(&HINT, |tuple| {
-                    let $ident0 = tuple.required_next(cx)?;
-                    $(let $ident = tuple.required_next(cx)?;)*
+                    let $ident0 = tuple.next()?;
+                    $(let $ident = tuple.next()?;)*
                     Ok(($ident0, $($ident),*))
                 })
             }

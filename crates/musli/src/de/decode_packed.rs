@@ -28,7 +28,7 @@ use crate::Context;
 ///
 /// ```
 /// use musli::{Decode, Decoder};
-/// use musli::de::PackDecoder;
+/// use musli::de::SequenceDecoder;
 ///
 /// struct Packed {
 ///     data: (u32, u32),
