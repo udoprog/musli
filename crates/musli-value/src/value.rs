@@ -326,7 +326,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     {
         let mut out = Vec::with_capacity(seq.size_hint().or_default());
 
-        while let Some(item) = seq.next()? {
+        while let Some(item) = seq.element()? {
             out.push(item);
         }
 

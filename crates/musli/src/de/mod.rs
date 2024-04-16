@@ -44,6 +44,10 @@ mod decode_bytes;
 #[doc(inline)]
 pub use self::decode_bytes::DecodeBytes;
 
+mod decode_packed;
+#[doc(inline)]
+pub use self::decode_packed::DecodePacked;
+
 mod decoder;
 #[doc(inline)]
 pub use self::decoder::Decoder;

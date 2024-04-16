@@ -1216,7 +1216,7 @@ pub trait Decoder<'de>: Sized {
     ///         decoder.decode_sequence(|seq| {
     ///             let mut data = Vec::new();
     ///
-    ///             while let Some(decoder) = seq.decode_next()? {
+    ///             while let Some(decoder) = seq.decode_element()? {
     ///                 data.push(decoder.decode()?);
     ///             }
     ///
@@ -1251,7 +1251,7 @@ pub trait Decoder<'de>: Sized {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         decoder.decode_sequence_hint(&HINT, |tuple| {
-    ///             Ok(Self(tuple.next_required(cx)?, tuple.next_required(cx)?))
+    ///             Ok(Self(tuple.required_next(cx)?, tuple.required_next(cx)?))
     ///         })
     ///     }
     /// }
@@ -1285,7 +1285,7 @@ pub trait Decoder<'de>: Sized {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         decoder.decode_sequence_hint(&HINT, |tuple| {
-    ///             Ok(Self(tuple.next_required(cx)?, tuple.next_required(cx)?))
+    ///             Ok(Self(tuple.required_next(cx)?, tuple.required_next(cx)?))
     ///         })
     ///     }
     /// }

@@ -455,7 +455,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> SequenceDecoder<'de>
     for IterValueDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeNext<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeElement<'this> = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
 
@@ -465,7 +465,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> SequenceDecoder<'de>
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
         match self.iter.next() {
             Some(value) => Ok(Some(ValueDecoder::new(self.cx, value))),
             None => Ok(None),

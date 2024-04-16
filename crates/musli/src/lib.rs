@@ -152,7 +152,7 @@
 //!         decoder.decode_sequence(|seq| {
 //!             let mut data = Vec::with_capacity(seq.size_hint().or_default());
 //!
-//!             while let Some(decoder) = seq.decode_next()? {
+//!             while let Some(decoder) = seq.decode_element()? {
 //!                 data.push(decoder.decode()?);
 //!             }
 //!

@@ -1,8 +1,7 @@
 //! Implementations for variously lengthed tuples.
 
-use crate::compat::Packed;
-use crate::de::{Decode, Decoder, PackDecoder, SequenceDecoder};
-use crate::en::{Encode, Encoder, PackEncoder, SequenceEncoder};
+use crate::de::{Decode, DecodePacked, Decoder, PackDecoder, SequenceDecoder};
+use crate::en::{Encode, EncodePacked, Encoder, PackEncoder, SequenceEncoder};
 use crate::hint::SequenceHint;
 
 macro_rules! count {
@@ -75,24 +74,24 @@ macro_rules! declare {
                 static HINT: SequenceHint = SequenceHint::with_size(count!($ident0 $($ident)*));
 
                 decoder.decode_sequence_hint(&HINT, |tuple| {
-                    let $ident0 = tuple.next_required(cx)?;
-                    $(let $ident = tuple.next_required(cx)?;)*
+                    let $ident0 = tuple.required_next(cx)?;
+                    $(let $ident = tuple.required_next(cx)?;)*
                     Ok(($ident0, $($ident),*))
                 })
             }
         }
 
-        impl<M, $ty0 $(,$ty)*> Encode<M> for Packed<($ty0, $($ty),*)>
+        impl<M, $ty0 $(,$ty)*> EncodePacked<M> for ($ty0, $($ty),*)
         where
             $ty0: Encode<M>,
             $($ty: Encode<M>),*
         {
             #[inline]
-            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode_packed<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
-                let Packed(($ident0, $($ident),*)) = self;
+                let ($ident0, $($ident),*) = self;
                 encoder.encode_pack_fn(|pack| {
                     pack.encode_packed()?.encode($ident0)?;
                     $(pack.encode_packed()?.encode($ident)?;)*
@@ -101,20 +100,20 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for Packed<($ty0, $($ty),*)>
+        impl<'de, M, $ty0, $($ty,)*> DecodePacked<'de, M> for ($ty0, $($ty),*)
         where
             $ty0: Decode<'de, M>,
             $($ty: Decode<'de, M>),*
         {
             #[inline]
-            fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode_packed<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
                 decoder.decode_pack(|pack| {
                     let $ident0 = pack.next()?;
                     $(let $ident = pack.next()?;)*
-                    Ok(Packed(($ident0, $($ident),*)))
+                    Ok(($ident0, $($ident),*))
                 })
             }
         }

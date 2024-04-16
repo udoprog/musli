@@ -24,6 +24,10 @@ mod encode_bytes;
 #[doc(inline)]
 pub use self::encode_bytes::EncodeBytes;
 
+mod encode_packed;
+#[doc(inline)]
+pub use self::encode_packed::EncodePacked;
+
 mod encoder;
 #[doc(inline)]
 pub use self::encoder::Encoder;

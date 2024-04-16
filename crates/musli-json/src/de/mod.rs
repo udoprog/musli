@@ -307,7 +307,7 @@ where
             let mut bytes = [0; N];
             let mut index = 0;
 
-            while let Some(item) = seq.decode_next()? {
+            while let Some(item) = seq.decode_element()? {
                 if index <= N {
                     bytes[index] = item.decode_u8()?;
                 }
@@ -347,7 +347,7 @@ where
         self.decode_sequence(|seq| {
             let mut bytes = Vec::with_capacity(seq.size_hint().or_default());
 
-            while let Some(item) = seq.decode_next()? {
+            while let Some(item) = seq.decode_element()? {
                 bytes.push(item.decode_u8()?);
             }
 

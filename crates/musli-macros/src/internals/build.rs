@@ -9,7 +9,7 @@ use crate::expander::{
     self, Data, EnumData, Expander, FieldData, NameMethod, StructData, UnsizedMethod, VariantData,
 };
 
-use super::attr::{EnumTagging, Packing};
+use super::attr::{EnumTagging, FieldEncoding, Packing};
 use super::name::NameAll;
 use super::tokens::Tokens;
 use super::ATTR;
@@ -247,9 +247,9 @@ pub(crate) fn setup<'a>(
         decode_bounds: e.type_attr.decode_bounds(mode),
         expansion,
         data,
-        decode_t_decode: mode.decode_t_decode(false, false),
+        decode_t_decode: mode.decode_t_decode(FieldEncoding::Default),
         decode_t_visit: mode.decode_t_visit(),
-        encode_t_encode: mode.encode_t_encode(false, false),
+        encode_t_encode: mode.encode_t_encode(FieldEncoding::Default),
         enum_tagging_span: e.type_attr.enum_tagging_span(mode),
     })
 }

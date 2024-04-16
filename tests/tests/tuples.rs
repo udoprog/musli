@@ -1,4 +1,4 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 #[test]
 fn unit() {

@@ -24,7 +24,8 @@ use crate::de::{
     ValueVisitor,
 };
 use crate::en::{
-    Encode, EncodeBytes, Encoder, EntryEncoder, MapEncoder, SequenceEncoder, TraceEncode,
+    Encode, EncodeBytes, EncodePacked, Encoder, EntryEncoder, MapEncoder, PackEncoder,
+    SequenceEncoder, TraceEncode,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::internal::size_hint;
@@ -258,7 +259,7 @@ macro_rules! sequence {
 
                     let mut index = 0;
 
-                    while let Some(value) = $access.decode_next()? {
+                    while let Some(value) = $access.decode_element()? {
                         $cx.enter_sequence_index(index);
                         out.$insert(T::decode($cx, value)?);
                         $cx.leave_sequence_index();
@@ -266,6 +267,32 @@ macro_rules! sequence {
                     }
 
                     Ok(out)
+                })
+            }
+        }
+
+        $(#[$($meta)*])*
+        impl<M, T $(, $extra)*> EncodePacked<M> for $ty<T $(, $extra)*>
+        where
+            T: Encode<M>,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            #[inline]
+            fn encode_packed<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            where
+                E: Encoder<Mode = M>,
+            {
+                encoder.encode_pack_fn(|pack| {
+                    let mut index = 0;
+
+                    for value in self {
+                        $cx.enter_sequence_index(index);
+                        pack.push(value)?;
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
+
+                    Ok(())
                 })
             }
         }

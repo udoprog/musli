@@ -17,10 +17,15 @@ struct StructWithNumbers {
 #[musli(packed)]
 struct Unpacked {
     count: Tag,
+    #[musli(packed)]
     a: (Tag, Tag),
+    #[musli(packed)]
     b: (Tag, Tag),
+    #[musli(packed)]
     c: (Tag, Tag),
+    #[musli(packed)]
     d: (Tag, Tag),
+    #[musli(packed)]
     e: (Tag, Typed<5>),
 }
 

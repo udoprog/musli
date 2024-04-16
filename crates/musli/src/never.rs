@@ -245,7 +245,7 @@ impl<'de, C: ?Sized + Context> EntryDecoder<'de> for Never<(), C> {
 
 impl<'de, C: ?Sized + Context> SequenceDecoder<'de> for Never<(), C> {
     type Cx = C;
-    type DecodeNext<'this> = Self where Self: 'this;
+    type DecodeElement<'this> = Self where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -253,7 +253,7 @@ impl<'de, C: ?Sized + Context> SequenceDecoder<'de> for Never<(), C> {
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
         match self._never {}
     }
 }

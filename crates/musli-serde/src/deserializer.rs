@@ -263,7 +263,7 @@ where
         let hint = SequenceHint::with_size(len);
 
         self.decoder.decode_sequence_hint(&hint, |d| {
-            visitor.visit_seq(TupleAccess::new(self.cx, d, hint.size))
+            visitor.visit_seq(SequenceAccess::new(self.cx, d))
         })
     }
 
@@ -339,29 +339,24 @@ where
     }
 }
 
-struct TupleAccess<'de, 'a, D>
+struct SequenceAccess<'de, 'a, D>
 where
     D: SequenceDecoder<'de>,
 {
     cx: &'a D::Cx,
     decoder: &'a mut D,
-    remaining: usize,
 }
 
-impl<'de, 'a, D> TupleAccess<'de, 'a, D>
+impl<'de, 'a, D> SequenceAccess<'de, 'a, D>
 where
     D: SequenceDecoder<'de>,
 {
-    fn new(cx: &'a D::Cx, decoder: &'a mut D, len: usize) -> Self {
-        TupleAccess {
-            cx,
-            decoder,
-            remaining: len,
-        }
+    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
+        SequenceAccess { cx, decoder }
     }
 }
 
-impl<'de, 'a, D> de::SeqAccess<'de> for TupleAccess<'de, 'a, D>
+impl<'de, 'a, D> de::SeqAccess<'de> for SequenceAccess<'de, 'a, D>
 where
     D: SequenceDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
@@ -373,11 +368,9 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.decode_next()? else {
+        let Some(decoder) = self.decoder.decode_element()? else {
             return Ok(None);
         };
-
-        self.remaining -= 1;
 
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
@@ -385,7 +378,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+        self.decoder.size_hint().into_option()
     }
 }
 struct StructAccess<'de, 'a, D>
@@ -512,7 +505,7 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.decode_next()? else {
+        let Some(decoder) = self.decoder.decode_element()? else {
             return Ok(None);
         };
 
@@ -783,7 +776,7 @@ where
         self.decoder
             .decode_value()?
             .decode_sequence_hint(&hint, |tuple| {
-                visitor.visit_seq(TupleAccess::new(self.cx, tuple, hint.size))
+                visitor.visit_seq(SequenceAccess::new(self.cx, tuple))
             })
     }
 

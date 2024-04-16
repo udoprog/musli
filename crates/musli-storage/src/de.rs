@@ -380,7 +380,7 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeNext<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeElement<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -388,7 +388,7 @@ where
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }

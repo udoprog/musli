@@ -207,7 +207,7 @@ where
 
     #[inline]
     fn skip_sequence_remaining(mut self) -> Result<(), C::Error> {
-        if let Some(item) = self.decode_next()? {
+        if let Some(item) = self.decode_element()? {
             item.skip()?;
         }
 
@@ -799,7 +799,7 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeNext<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeElement<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -807,7 +807,7 @@ where
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn decode_element(&mut self) -> Result<Option<Self::DecodeElement<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }

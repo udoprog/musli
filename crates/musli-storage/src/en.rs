@@ -249,12 +249,13 @@ where
     fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
-        _: &SequenceHint,
+        hint: &SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
         StorageEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 

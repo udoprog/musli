@@ -15,10 +15,12 @@ use core::num::{
 use core::{fmt, marker};
 
 use crate::de::{
-    Decode, DecodeBytes, DecodeUnsized, DecodeUnsizedBytes, Decoder, SequenceDecoder, ValueVisitor,
-    VariantDecoder,
+    Decode, DecodeBytes, DecodePacked, DecodeUnsized, DecodeUnsizedBytes, Decoder, PackDecoder,
+    SequenceDecoder, ValueVisitor, VariantDecoder,
 };
-use crate::en::{Encode, EncodeBytes, Encoder, SequenceEncoder, VariantEncoder};
+use crate::en::{
+    Encode, EncodeBytes, EncodePacked, Encoder, PackEncoder, SequenceEncoder, VariantEncoder,
+};
 use crate::hint::SequenceHint;
 use crate::Context;
 
@@ -169,7 +171,7 @@ where
 
         encoder.encode_sequence_fn(&hint, |seq| {
             for value in self.iter() {
-                seq.encode_element()?.encode(value)?;
+                seq.push(value)?;
             }
 
             Ok(())
@@ -191,7 +193,7 @@ where
         decoder.decode_sequence(|seq| {
             let mut array = crate::fixed::FixedVec::new();
 
-            while let Some(item) = seq.decode_next()? {
+            while let Some(item) = seq.decode_element()? {
                 array.try_push(item.decode()?).map_err(cx.map())?;
             }
 
@@ -203,6 +205,47 @@ where
                         array.len()
                     ),
                 ));
+            }
+
+            Ok(array.into_inner())
+        })
+    }
+}
+
+impl<M, T, const N: usize> EncodePacked<M> for [T; N]
+where
+    T: Encode<M>,
+{
+    #[inline]
+    fn encode_packed<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder<Mode = M>,
+    {
+        encoder.encode_pack_fn(|seq| {
+            for value in self.iter() {
+                seq.push(value)?;
+            }
+
+            Ok(())
+        })
+    }
+}
+
+impl<'de, M, T, const N: usize> DecodePacked<'de, M> for [T; N]
+where
+    T: Decode<'de, M>,
+{
+    #[inline]
+    fn decode_packed<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = M>,
+    {
+        decoder.decode_pack(|pack| {
+            let mut array = crate::fixed::FixedVec::new();
+
+            while array.len() < N {
+                let item = pack.decode_next()?;
+                array.try_push(item.decode()?).map_err(cx.map())?;
             }
 
             Ok(array.into_inner())
