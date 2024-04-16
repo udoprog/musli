@@ -3,7 +3,7 @@ use core::fmt;
 use musli::en::{
     MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, TupleEncoder, VariantEncoder,
 };
-use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Encoder};
 
 use serde::ser::{self, Serialize};
@@ -201,7 +201,7 @@ where
 
     #[inline]
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        let hint = TupleHint::with_size(len);
+        let hint = SequenceHint::with_size(len);
         let encoder = self.encoder.encode_tuple(&hint)?;
         Ok(SerializeTuple::new(self.cx, encoder))
     }
@@ -212,7 +212,7 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        let hint = StructHint::with_size(len);
+        let hint = MapHint::with_size(len);
         let encoder = self.encoder.encode_struct(&hint)?;
         Ok(SerializeTupleStruct::new(self.cx, encoder))
     }
@@ -225,7 +225,7 @@ where
         variant_name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        let hint = TupleHint::with_size(len);
+        let hint = SequenceHint::with_size(len);
         let encoder = self.encoder.encode_tuple_variant(variant_name, &hint)?;
         Ok(SerializeTuple::new(self.cx, encoder))
     }
@@ -249,7 +249,7 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        let hint = StructHint::with_size(len);
+        let hint = MapHint::with_size(len);
         let encoder = self.encoder.encode_struct(&hint)?;
         Ok(SerializeStruct::new(self.cx, encoder))
     }
@@ -262,7 +262,7 @@ where
         variant_name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        let hint = StructHint::with_size(len);
+        let hint = MapHint::with_size(len);
         let encoder = self.encoder.encode_struct_variant(variant_name, &hint)?;
         Ok(SerializeStructVariant::new(self.cx, encoder))
     }

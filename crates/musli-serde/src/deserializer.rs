@@ -4,7 +4,7 @@ use musli::de::{
     Decoder, MapDecoder, MapEntriesDecoder, SequenceDecoder, SizeHint, TupleDecoder,
     VariantDecoder, Visitor,
 };
-use musli::hint::TupleHint;
+use musli::hint::SequenceHint;
 use musli::Context;
 use serde::de;
 
@@ -261,7 +261,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let hint = TupleHint::with_size(len);
+        let hint = SequenceHint::with_size(len);
 
         self.decoder.decode_tuple(&hint, |d| {
             visitor.visit_seq(TupleAccess::new(self.cx, d, hint.size))
@@ -780,7 +780,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let hint = TupleHint::with_size(len);
+        let hint = SequenceHint::with_size(len);
 
         self.decoder.decode_value()?.decode_tuple(&hint, |tuple| {
             visitor.visit_seq(TupleAccess::new(self.cx, tuple, hint.size))

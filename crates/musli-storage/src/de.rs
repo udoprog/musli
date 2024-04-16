@@ -7,7 +7,7 @@ use musli::de::{
     DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder,
     SequenceDecoder, SizeHint, TupleDecoder, ValueVisitor, VariantDecoder,
 };
-use musli::hint::{StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Decode};
 use musli_utils::{Options, Reader};
 
@@ -289,7 +289,7 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(mut self, _: &TupleHint, f: F) -> Result<O, C::Error>
+    fn decode_tuple<F, O>(mut self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
     {
@@ -318,7 +318,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
+    fn decode_struct<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
     {

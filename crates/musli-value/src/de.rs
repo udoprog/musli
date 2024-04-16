@@ -8,7 +8,7 @@ use musli::de::{
     PackDecoder, SequenceDecoder, SizeHint, Skip, TupleDecoder, VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
-use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
+use musli::hint::{MapHint, SequenceHint, UnsizedMapHint};
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_utils::reader::SliceReader;
@@ -296,7 +296,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_tuple<F, O>(self, _: &TupleHint, f: F) -> Result<O, C::Error>
+    fn decode_tuple<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
     {
@@ -326,7 +326,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
+    fn decode_struct<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
     {
@@ -337,7 +337,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_unsized_struct<F, O>(self, _: &UnsizedStructHint, f: F) -> Result<O, C::Error>
+    fn decode_unsized_struct<F, O>(self, _: &UnsizedMapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, C::Error>,
     {

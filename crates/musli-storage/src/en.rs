@@ -4,7 +4,7 @@ use musli::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
     TupleEncoder, VariantEncoder,
 };
-use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
 use musli_utils::{Options, Writer};
 
@@ -231,7 +231,7 @@ where
     }
 
     #[inline]
-    fn encode_tuple(self, _: &TupleHint) -> Result<Self::EncodeSequence, C::Error> {
+    fn encode_tuple(self, _: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
         // NB: A tuple has statically known fixed length.
         Ok(self)
     }
@@ -249,7 +249,7 @@ where
     }
 
     #[inline]
-    fn encode_struct(mut self, hint: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
+    fn encode_struct(mut self, hint: &MapHint) -> Result<Self::EncodeStruct, C::Error> {
         musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
@@ -263,7 +263,7 @@ where
     fn encode_tuple_variant<T>(
         mut self,
         tag: &T,
-        _: &TupleHint,
+        _: &SequenceHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
@@ -276,7 +276,7 @@ where
     fn encode_struct_variant<T>(
         mut self,
         tag: &T,
-        hint: &StructHint,
+        hint: &MapHint,
     ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,

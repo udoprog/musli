@@ -16,7 +16,10 @@ pub trait MapDecoder<'de>: Sized {
         Self: 'this;
 
     /// Get a size hint of known remaining elements.
-    fn size_hint(&self) -> SizeHint;
+    #[inline]
+    fn size_hint(&self) -> SizeHint {
+        SizeHint::Any
+    }
 
     /// Decode the next key. This returns `Ok(None)` where there are no more
     /// elements to decode.

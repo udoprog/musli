@@ -346,7 +346,7 @@ fn encode_variant(
         map_encoder_t,
         map_entry_encoder_t,
         variant_encoder_t,
-        struct_hint,
+        map_hint,
         ..
     } = b.tokens;
 
@@ -463,7 +463,7 @@ fn encode_variant(
             let content_tag = b.cx.ident("content_tag");
 
             encode = quote! {{
-                static #hint: #struct_hint = #struct_hint::with_size(2);
+                static #hint: #map_hint = #map_hint::with_size(2);
                 #build_hint
 
                 #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#struct_encoder| {
@@ -529,21 +529,19 @@ struct LengthTest {
 
 impl LengthTest {
     fn build(&self, b: &Build<'_>) -> (syn::Stmt, syn::Ident) {
-        let Tokens { struct_hint, .. } = b.tokens;
+        let Tokens { map_hint, .. } = b.tokens;
 
         match self.kind {
             LengthTestKind::Static => {
                 let hint = b.cx.ident("HINT");
                 let len = &self.expressions;
-                let item =
-                    syn::parse_quote!(static #hint: #struct_hint = #struct_hint::with_size(#len););
+                let item = syn::parse_quote!(static #hint: #map_hint = #map_hint::with_size(#len););
                 (item, hint)
             }
             LengthTestKind::Dynamic => {
                 let hint = b.cx.ident("hint");
                 let len = &self.expressions;
-                let item =
-                    syn::parse_quote!(let #hint: #struct_hint = #struct_hint::with_size(#len););
+                let item = syn::parse_quote!(let #hint: #map_hint = #map_hint::with_size(#len););
                 (item, hint)
             }
         }

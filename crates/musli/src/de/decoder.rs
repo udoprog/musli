@@ -3,7 +3,7 @@
 use core::fmt;
 
 use crate::expecting::{self, Expecting};
-use crate::hint::{StructHint, TupleHint, UnsizedStructHint};
+use crate::hint::{MapHint, SequenceHint, UnsizedMapHint};
 use crate::Context;
 
 use super::{
@@ -1257,7 +1257,7 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::{Context, Decode, Decoder};
     /// use musli::de::TupleDecoder;
-    /// use musli::hint::TupleHint;
+    /// use musli::hint::SequenceHint;
     /// # struct TupleStruct(String, u32);
     ///
     /// impl<'de, M> Decode<'de, M> for TupleStruct {
@@ -1265,7 +1265,7 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         static HINT: TupleHint = TupleHint::with_size(2);
+    ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         decoder.decode_tuple(&HINT, |tuple| {
     ///             Ok(Self(tuple.next()?, tuple.next()?))
@@ -1274,7 +1274,11 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_tuple<F, O>(self, hint: &TupleHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_tuple<F, O>(
+        self,
+        hint: &SequenceHint,
+        f: F,
+    ) -> Result<O, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, <Self::Cx as Context>::Error>,
     {
@@ -1357,7 +1361,7 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Decode a struct with a [`StructHint`] that might contain information
+    /// Decode a struct with a [`MapHint`] that might contain information
     /// about the structing being decode.
     ///
     /// # Examples
@@ -1379,10 +1383,10 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::{Context, Decode, Decoder};
     /// use musli::de::{MapDecoder, MapEntryDecoder};
-    /// use musli::hint::StructHint;
+    /// use musli::hint::MapHint;
     /// # struct Struct { string: String, integer: u32 }
     ///
-    /// static STRUCT_HINT: StructHint = StructHint::with_size(2);
+    /// static STRUCT_HINT: MapHint = MapHint::with_size(2);
     ///
     /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
@@ -1419,7 +1423,7 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_struct<F, O>(self, hint: &StructHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_struct<F, O>(self, hint: &MapHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, <Self::Cx as Context>::Error>,
     {
@@ -1439,14 +1443,14 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::{Context, Decode, Decoder};
     /// use musli::de::{MapDecoder, MapEntryDecoder};
-    /// use musli::hint::UnsizedStructHint;
+    /// use musli::hint::UnsizedMapHint;
     ///
     /// struct Struct {
     ///     string: String,
     ///     integer: u32,
     /// }
     ///
-    /// static STRUCT_HINT: UnsizedStructHint = UnsizedStructHint::new();
+    /// static STRUCT_HINT: UnsizedMapHint = UnsizedMapHint::new();
     ///
     /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
@@ -1484,7 +1488,7 @@ pub trait Decoder<'de>: Sized {
     /// ```
     fn decode_unsized_struct<F, O>(
         self,
-        hint: &UnsizedStructHint,
+        hint: &UnsizedMapHint,
         f: F,
     ) -> Result<O, <Self::Cx as Context>::Error>
     where

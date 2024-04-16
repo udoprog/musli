@@ -142,8 +142,8 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         skip,
         map_decoder_t,
         struct_field_decoder_t,
-        struct_hint,
-        unsized_struct_hint,
+        map_hint,
+        unsized_map_hint,
         variant_decoder_t,
         ..
     } = b.tokens;
@@ -481,7 +481,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 let #buffer_var = #decoder_t::decode_buffer(#decoder_var)?;
                 let #struct_var = #as_decoder_t::as_decoder(&#buffer_var)?;
 
-                static #struct_hint_static: #unsized_struct_hint = #unsized_struct_hint::new();
+                static #struct_hint_static: #unsized_map_hint = #unsized_map_hint::new();
 
                 let #variant_tag_var: #name_type = #decoder_t::decode_unsized_struct(#struct_var, &#struct_hint_static, |#struct_var| {
                     let #variant_decoder_var = loop {
@@ -662,7 +662,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 #output_enum
                 #outcome_enum
 
-                static #struct_hint_static: #struct_hint = #struct_hint::with_size(2);
+                static #struct_hint_static: #map_hint = #map_hint::with_size(2);
 
                 #enter
 
@@ -739,7 +739,7 @@ fn decode_tagged(
         skip_field,
         map_decoder_t,
         struct_field_decoder_t,
-        struct_hint,
+        map_hint,
         ..
     } = e.tokens;
 
@@ -997,7 +997,7 @@ fn decode_tagged(
 
         #enter
 
-        static #struct_hint_static: #struct_hint = #struct_hint::with_size(#fields_len);
+        static #struct_hint_static: #map_hint = #map_hint::with_size(#fields_len);
 
         #decoder_t::decode_struct(#decoder_var, &#struct_hint_static, move |#type_decoder_var| {
             while let #option_some(mut #struct_decoder_var) = #map_decoder_t::decode_entry(#type_decoder_var)? {

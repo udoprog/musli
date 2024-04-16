@@ -9,7 +9,7 @@ use musli::de::{
     PackDecoder, SequenceDecoder, SizeHint, Skip, TupleDecoder, ValueVisitor, VariantDecoder,
     Visitor,
 };
-use musli::hint::{StructHint, TupleHint, UnsizedStructHint};
+use musli::hint::{MapHint, SequenceHint, UnsizedMapHint};
 use musli::Context;
 use musli_storage::de::StorageDecoder;
 use musli_utils::int::continuation as c;
@@ -621,7 +621,7 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(mut self, hint: &TupleHint, f: F) -> Result<O, C::Error>
+    fn decode_tuple<F, O>(mut self, hint: &SequenceHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
     {
@@ -657,7 +657,7 @@ where
     }
 
     #[inline]
-    fn decode_struct<F, O>(self, _: &StructHint, f: F) -> Result<O, C::Error>
+    fn decode_struct<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
     {
@@ -668,7 +668,7 @@ where
     }
 
     #[inline]
-    fn decode_unsized_struct<F, O>(self, _: &UnsizedStructHint, f: F) -> Result<O, C::Error>
+    fn decode_unsized_struct<F, O>(self, _: &UnsizedMapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeUnsizedStruct) -> Result<O, C::Error>,
     {

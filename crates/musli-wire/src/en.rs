@@ -4,7 +4,7 @@ use musli::en::{
     Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
     TupleEncoder, VariantEncoder,
 };
-use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::{Buf, Context};
 use musli_storage::en::StorageEncoder;
 use musli_utils::writer::BufWriter;
@@ -299,7 +299,7 @@ where
     }
 
     #[inline]
-    fn encode_tuple(mut self, hint: &TupleHint) -> Result<Self::EncodeTuple, C::Error> {
+    fn encode_tuple(mut self, hint: &SequenceHint) -> Result<Self::EncodeTuple, C::Error> {
         self.encode_tuple_len(hint.size)?;
         Ok(self)
     }
@@ -316,7 +316,7 @@ where
     }
 
     #[inline]
-    fn encode_struct(mut self, hint: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
+    fn encode_struct(mut self, hint: &MapHint) -> Result<Self::EncodeStruct, C::Error> {
         let Some(len) = hint.size.checked_mul(2) else {
             return Err(self.cx.message("Struct length overflow"));
         };
@@ -342,7 +342,7 @@ where
     fn encode_tuple_variant<T>(
         mut self,
         tag: &T,
-        hint: &TupleHint,
+        hint: &SequenceHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
@@ -357,7 +357,7 @@ where
     fn encode_struct_variant<T>(
         mut self,
         tag: &T,
-        hint: &StructHint,
+        hint: &MapHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,

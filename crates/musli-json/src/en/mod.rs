@@ -16,7 +16,7 @@ use self::variant_encoder::JsonVariantEncoder;
 use core::fmt;
 
 use musli::en::{Encoder, SequenceEncoder};
-use musli::hint::{MapHint, SequenceHint, StructHint, TupleHint};
+use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Encode};
 use musli_utils::Writer;
 
@@ -280,7 +280,7 @@ where
     }
 
     #[inline]
-    fn encode_tuple(self, _: &TupleHint) -> Result<Self::EncodeTuple, C::Error> {
+    fn encode_tuple(self, _: &SequenceHint) -> Result<Self::EncodeTuple, C::Error> {
         JsonArrayEncoder::new(self.cx, self.writer)
     }
 
@@ -295,7 +295,7 @@ where
     }
 
     #[inline]
-    fn encode_struct(self, _: &StructHint) -> Result<Self::EncodeStruct, C::Error> {
+    fn encode_struct(self, _: &MapHint) -> Result<Self::EncodeStruct, C::Error> {
         JsonObjectEncoder::new(self.cx, self.writer)
     }
 
@@ -308,7 +308,7 @@ where
     fn encode_tuple_variant<T>(
         mut self,
         tag: &T,
-        _: &TupleHint,
+        _: &SequenceHint,
     ) -> Result<Self::EncodeTupleVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
@@ -323,7 +323,7 @@ where
     fn encode_struct_variant<T>(
         mut self,
         tag: &T,
-        _: &StructHint,
+        _: &MapHint,
     ) -> Result<Self::EncodeStructVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
