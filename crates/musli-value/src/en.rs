@@ -8,8 +8,7 @@ use alloc::vec::Vec;
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
 use musli::en::{
-    MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
-    VariantEncoder,
+    MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder, VariantEncoder,
 };
 #[cfg(feature = "alloc")]
 use musli::hint::{MapHint, SequenceHint};

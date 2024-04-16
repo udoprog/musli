@@ -72,7 +72,7 @@ where
         let actual = self.parser.peek(self.cx)?;
 
         match actual {
-            Token::OpenBrace => self.decode_unsized_map(|_| Ok(())),
+            Token::OpenBrace => self.decode_map(|_| Ok(())),
             Token::OpenBracket => self.decode_sequence(|_| Ok(())),
             Token::Null => self.parse_null(),
             Token::True => self.parse_true(),
@@ -121,10 +121,9 @@ where
     type DecodeSequence = JsonSequenceDecoder<'a, P, C>;
     type DecodeTuple = JsonSequenceDecoder<'a, P, C>;
     type DecodeMap = JsonObjectDecoder<'a, P, C>;
-    type DecodeUnsizedMap = JsonObjectDecoder<'a, P, C>;
+    type DecodeMapHint = JsonObjectDecoder<'a, P, C>;
     type DecodeMapEntries = JsonObjectDecoder<'a, P, C>;
     type DecodeSome = JsonDecoder<'a, P, C>;
-    type DecodeStruct = JsonObjectDecoder<'a, P, C>;
     type DecodeVariant = JsonVariantDecoder<'a, P, C>;
 
     #[inline]
@@ -415,9 +414,20 @@ where
     }
 
     #[inline]
-    fn decode_map<F, O>(self, hint: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+    {
+        let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
+        let output = f(&mut decoder)?;
+        decoder.skip_object_remaining()?;
+        Ok(output)
+    }
+
+    #[inline]
+    fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
     {
         let mut decoder = JsonObjectDecoder::new(self.cx, Some(hint.size), self.parser)?;
         let output = f(&mut decoder)?;
@@ -426,30 +436,8 @@ where
     }
 
     #[inline]
-    fn decode_unsized_map<F, O>(self, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedMap) -> Result<O, C::Error>,
-    {
-        let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
-        let output = f(&mut decoder)?;
-        decoder.skip_object_remaining()?;
-        Ok(output)
-    }
-
-    #[inline]
     fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
         JsonObjectDecoder::new(self.cx, None, self.parser)
-    }
-
-    #[inline]
-    fn decode_struct<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
-    {
-        let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
-        let output = f(&mut decoder)?;
-        decoder.skip_object_remaining()?;
-        Ok(output)
     }
 
     #[inline]
@@ -471,7 +459,7 @@ where
         let cx = self.cx;
 
         match self.parser.peek(cx)? {
-            Token::OpenBrace => self.decode_unsized_map(|decoder| visitor.visit_map(cx, decoder)),
+            Token::OpenBrace => self.decode_map(|decoder| visitor.visit_map(cx, decoder)),
             Token::OpenBracket => {
                 self.decode_sequence(|decoder| visitor.visit_sequence(cx, decoder))
             }

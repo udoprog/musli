@@ -378,7 +378,7 @@ macro_rules! map {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_unsized_map(|$access| {
+                decoder.decode_map(|$access| {
                     let mut out = $with_capacity;
 
                     while let Some((key, value)) = $access.entry()? {
@@ -402,7 +402,7 @@ macro_rules! map {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_unsized_map(|$access| {
+                decoder.decode_map(|$access| {
                     let mut out = $with_capacity;
 
                     while let Some(mut entry) = $access.decode_entry()? {

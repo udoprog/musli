@@ -224,9 +224,8 @@ where
     type DecodeSequence = RemainingWireDecoder<'a, R, OPT, C>;
     type DecodeTuple = RemainingWireDecoder<'a, R, OPT, C>;
     type DecodeMap = RemainingWireDecoder<'a, R, OPT, C>;
-    type DecodeUnsizedMap = RemainingWireDecoder<'a, R, OPT, C>;
+    type DecodeMapHint = RemainingWireDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = RemainingWireDecoder<'a, R, OPT, C>;
-    type DecodeStruct = RemainingWireDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
     #[inline]
@@ -510,38 +509,27 @@ where
     }
 
     #[inline]
-    fn decode_map<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
-    {
-        self.decode_unsized_map(f)
-    }
-
-    #[inline]
-    fn decode_unsized_map<F, O>(self, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedMap) -> Result<O, C::Error>,
     {
         let mut decoder = self.shared_decode_pair_sequence()?;
         let output = f(&mut decoder)?;
         decoder.skip_remaining_entries()?;
         Ok(output)
+    }
+
+    #[inline]
+    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+    {
+        self.decode_map(f)
     }
 
     #[inline]
     fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
         self.shared_decode_pair_sequence()
-    }
-
-    #[inline]
-    fn decode_struct<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
-    {
-        let mut decoder = self.shared_decode_pair_sequence()?;
-        let output = f(&mut decoder)?;
-        decoder.skip_remaining_entries()?;
-        Ok(output)
     }
 
     #[inline]

@@ -37,7 +37,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     };
 
     let body = match &e.data {
-        BuildData::Struct(st) => decode_struct(&cx, &e, st)?,
+        BuildData::Struct(st) => decode_map_hint(&cx, &e, st)?,
         BuildData::Enum(en) => decode_enum(&cx, &e, en)?,
     };
 
@@ -107,7 +107,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     })
 }
 
-fn decode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_map_hint(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Tokens { result_ok, .. } = e.tokens;
 
     let body = match st.packing {
@@ -480,7 +480,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 let #buffer_var = #decoder_t::decode_buffer(#decoder_var)?;
                 let #struct_var = #as_decoder_t::as_decoder(&#buffer_var)?;
 
-                let #variant_tag_var: #name_type = #decoder_t::decode_unsized_map(#struct_var, |#struct_var| {
+                let #variant_tag_var: #name_type = #decoder_t::decode_map(#struct_var, |#struct_var| {
                     let #variant_decoder_var = loop {
                         let #option_some(mut #entry_var) = #map_decoder_t::decode_entry(#struct_var)? else {
                             return #result_err(#context_t::missing_variant_field(#ctx_var, #type_name, &#tag_static));
@@ -663,7 +663,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
                 #enter
 
-                #decoder_t::decode_struct(#decoder_var, &#struct_hint_static, move |#struct_decoder_var| {
+                #decoder_t::decode_map_hint(#decoder_var, &#struct_hint_static, move |#struct_decoder_var| {
                     let mut #name_var = #option_none;
 
                     let #output_var = loop {
@@ -996,7 +996,7 @@ fn decode_tagged(
 
         static #struct_hint_static: #map_hint = #map_hint::with_size(#fields_len);
 
-        #decoder_t::decode_struct(#decoder_var, &#struct_hint_static, move |#type_decoder_var| {
+        #decoder_t::decode_map_hint(#decoder_var, &#struct_hint_static, move |#type_decoder_var| {
             while let #option_some(mut #struct_decoder_var) = #map_decoder_t::decode_entry(#type_decoder_var)? {
                 #field_alloc
 

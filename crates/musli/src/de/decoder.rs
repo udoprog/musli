@@ -36,14 +36,12 @@ pub trait Decoder<'de>: Sized {
     type DecodeSequence: SequenceDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_tuple`].
     type DecodeTuple: TupleDecoder<'de, Cx = Self::Cx>;
-    /// Decoder used by [`Decoder::decode_map`].
+    /// Decoder returned by [`Decoder::decode_map`].
     type DecodeMap: MapDecoder<'de, Cx = Self::Cx>;
-    /// Decoder returned by [`Decoder::decode_unsized_map`].
-    type DecodeUnsizedMap: MapDecoder<'de, Cx = Self::Cx>;
+    /// Decoder used by [`Decoder::decode_map_hint`].
+    type DecodeMapHint: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_map_entries`].
     type DecodeMapEntries: MapEntriesDecoder<'de, Cx = Self::Cx>;
-    /// Decoder returned by [`Decoder::decode_struct`].
-    type DecodeStruct: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_variant`].
     type DecodeVariant: VariantDecoder<'de, Cx = Self::Cx>;
 
@@ -175,7 +173,7 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         let mut buffer = decoder.decode_buffer()?;
     ///
-    ///         let discriminant = buffer.as_decoder()?.decode_unsized_map(|st| {
+    ///         let discriminant = buffer.as_decoder()?.decode_map(|st| {
     ///             loop {
     ///                 let Some(mut e) = st.decode_entry()? else {
     ///                     return Err(cx.missing_variant_tag("Enum"));
@@ -1288,28 +1286,9 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Decode a map using a simplified function.
-    ///
-    /// The length of the map must somehow be determined from the underlying
-    /// format.
+    /// Decode a map who's size is not known at compile time.
     ///
     /// # Examples
-    ///
-    /// Deriving an implementation:
-    ///
-    /// ```
-    /// use std::collections::HashMap;
-    ///
-    /// use musli::Decode;
-    ///
-    /// #[derive(Decode)]
-    /// #[musli(packed)]
-    /// struct MapStruct {
-    ///     data: HashMap<String, u32>,
-    /// }
-    /// ```
-    ///
-    /// Implementing manually:
     ///
     /// ```
     /// use std::collections::HashMap;
@@ -1323,7 +1302,7 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         decoder.decode_unsized_map(|map| {
+    ///         decoder.decode_map(|map| {
     ///             let mut data = HashMap::with_capacity(map.size_hint().or_default());
     ///
     ///             while let Some((key, value)) = map.entry()? {
@@ -1335,67 +1314,9 @@ pub trait Decoder<'de>: Sized {
     ///     }
     /// }
     /// ```
-    #[inline]
-    fn decode_map<F, O>(self, hint: &MapHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_map<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, <Self::Cx as Context>::Error>,
-    {
-        Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Map,
-            ExpectingWrapper::new(&self),
-        )))
-    }
-
-    /// Decode a map who's size is not known at compile time.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{MapDecoder, MapEntryDecoder};
-    ///
-    /// struct Struct {
-    ///     string: String,
-    ///     integer: u32,
-    /// }
-    ///
-    /// impl<'de, M> Decode<'de, M> for Struct {
-    ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
-    ///     where
-    ///         D: Decoder<'de>,
-    ///     {
-    ///         decoder.decode_unsized_map(|st| {
-    ///             let mut string = None;
-    ///             let mut integer = None;
-    ///
-    ///             while let Some(mut field) = st.decode_entry()? {
-    ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///                 let tag = field.decode_map_key()?.decode::<String>()?;
-    ///
-    ///                 match tag.as_str() {
-    ///                     "string" => {
-    ///                         string = Some(field.decode_map_value()?.decode()?);
-    ///                     }
-    ///                     "integer" => {
-    ///                         integer = Some(field.decode_map_value()?.decode()?);
-    ///                     }
-    ///                     tag => {
-    ///                         return Err(cx.invalid_field_tag("Struct", tag));
-    ///                     }
-    ///                 }
-    ///             }
-    ///
-    ///             Ok(Self {
-    ///                 string: string.ok_or_else(|| cx.expected_tag("Struct", "string"))?,
-    ///                 integer: integer.ok_or_else(|| cx.expected_tag("Struct", "integer"))?,
-    ///             })
-    ///         })
-    ///     }
-    /// }
-    /// ```
-    fn decode_unsized_map<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedMap) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::UnsizedStruct,
@@ -1403,29 +1324,18 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Simplified decoding a map of unknown length.
+    /// Decode a map using a simplified function.
     ///
     /// The length of the map must somehow be determined from the underlying
     /// format.
-    #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, <Self::Cx as Context>::Error>
-    where
-        Self: Sized,
-    {
-        Err(self.cx().message(expecting::unsupported_type(
-            &expecting::MapEntries,
-            ExpectingWrapper::new(&self),
-        )))
-    }
-
-    /// Decode a struct with a [`MapHint`] that might contain information
-    /// about the structing being decode.
     ///
     /// # Examples
     ///
-    /// Deriving an implementation:
+    /// Deriving an implementation from a struct:
     ///
     /// ```
+    /// use std::collections::HashMap;
+    ///
     /// use musli::Decode;
     ///
     /// #[derive(Decode)]
@@ -1441,16 +1351,20 @@ pub trait Decoder<'de>: Sized {
     /// use musli::{Context, Decode, Decoder};
     /// use musli::de::{MapDecoder, MapEntryDecoder};
     /// use musli::hint::MapHint;
-    /// # struct Struct { string: String, integer: u32 }
     ///
-    /// static STRUCT_HINT: MapHint = MapHint::with_size(2);
+    /// struct Struct {
+    ///     string: String,
+    ///     integer: u32,
+    /// }
     ///
     /// impl<'de, M> Decode<'de, M> for Struct {
     ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         decoder.decode_struct(&STRUCT_HINT, |st| {
+    ///         static HINT: MapHint = MapHint::with_size(2);
+    ///
+    ///         decoder.decode_map_hint(&HINT, |st| {
     ///             let mut string = None;
     ///             let mut integer = None;
     ///
@@ -1480,12 +1394,27 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_struct<F, O>(self, hint: &MapHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, <Self::Cx as Context>::Error>,
+        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Struct,
+            &expecting::Map,
+            ExpectingWrapper::new(&self),
+        )))
+    }
+
+    /// Simplified decoding a map of unknown length.
+    ///
+    /// The length of the map must somehow be determined from the underlying
+    /// format.
+    #[inline]
+    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, <Self::Cx as Context>::Error>
+    where
+        Self: Sized,
+    {
+        Err(self.cx().message(expecting::unsupported_type(
+            &expecting::MapEntries,
             ExpectingWrapper::new(&self),
         )))
     }

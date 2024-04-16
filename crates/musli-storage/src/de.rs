@@ -50,10 +50,9 @@ where
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeTuple = Self;
+    type DecodeMapHint = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMap = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeUnsizedMap = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeStruct = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
     fn cx(&self) -> &C {
@@ -298,17 +297,9 @@ where
     }
 
     #[inline]
-    fn decode_map<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
-    {
-        self.decode_unsized_map(f)
-    }
-
-    #[inline]
-    fn decode_unsized_map<F, O>(self, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedMap) -> Result<O, C::Error>,
     {
         let cx = self.cx;
         let mut decoder = LimitedStorageDecoder::new(self.cx, self.reader)?;
@@ -322,24 +313,16 @@ where
     }
 
     #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
-        LimitedStorageDecoder::new(self.cx, self.reader)
+    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+    {
+        self.decode_map(f)
     }
 
     #[inline]
-    fn decode_struct<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
-    {
-        let cx = self.cx;
-        let mut decoder = LimitedStorageDecoder::new(self.cx, self.reader)?;
-        let output = f(&mut decoder)?;
-
-        if decoder.remaining != 0 {
-            return Err(cx.message("Caller did not decode all available struct fields"));
-        }
-
-        Ok(output)
+    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
+        LimitedStorageDecoder::new(self.cx, self.reader)
     }
 
     #[inline]

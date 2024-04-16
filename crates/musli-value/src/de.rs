@@ -94,9 +94,8 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     type DecodeSequence = IterValueDecoder<'a, 'de, OPT, C>;
     type DecodeTuple = IterValueDecoder<'a, 'de, OPT, C>;
     type DecodeMap = IterValuePairsDecoder<'a, 'de, OPT, C>;
-    type DecodeUnsizedMap = IterValuePairsDecoder<'a, 'de, OPT, C>;
+    type DecodeMapHint = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeMapEntries = IterValuePairsDecoder<'a, 'de, OPT, C>;
-    type DecodeStruct = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeVariant = IterValueVariantDecoder<'a, 'de, OPT, C>;
 
     #[inline]
@@ -307,9 +306,20 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_map<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+    {
+        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
+            f(&mut IterValuePairsDecoder::new(self.cx, st))
+        })
+    }
+
+    #[cfg(feature = "alloc")]
+    #[inline]
+    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
     {
         ensure!(self, hint, ExpectedMap(hint), Value::Map(map) => {
             f(&mut IterValuePairsDecoder::new(self.cx, map))
@@ -318,31 +328,9 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_unsized_map<F, O>(self, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeUnsizedMap) -> Result<O, C::Error>,
-    {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
-            f(&mut IterValuePairsDecoder::new(self.cx, st))
-        })
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
     fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
         ensure!(self, hint, ExpectedMap(hint), Value::Map(map) => {
             Ok(IterValuePairsDecoder::new(self.cx, map))
-        })
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn decode_struct<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeStruct) -> Result<O, C::Error>,
-    {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
-            f(&mut IterValuePairsDecoder::new(self.cx, st))
         })
     }
 

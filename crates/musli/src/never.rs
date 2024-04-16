@@ -18,8 +18,8 @@ use crate::de::{
     ValueVisitor, VariantDecoder,
 };
 use crate::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder,
-    SequenceEncoder, VariantEncoder,
+    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
+    VariantEncoder,
 };
 use crate::{Buf, Context};
 
@@ -105,11 +105,10 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     type DecodePack = Self;
     type DecodeSequence = Self;
     type DecodeTuple = Self;
-    type DecodeMap = Self;
+    type DecodeMapHint = Self;
     type DecodeMapEntries = Self;
     type DecodeSome = Self;
-    type DecodeStruct = Self;
-    type DecodeUnsizedMap = Self;
+    type DecodeMap = Self;
     type DecodeVariant = Self;
     type __UseMusliDecoderAttributeMacro = ();
 

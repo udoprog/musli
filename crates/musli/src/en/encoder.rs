@@ -6,10 +6,7 @@ use crate::expecting::{self, Expecting};
 use crate::hint::{MapHint, SequenceHint};
 use crate::Context;
 
-use super::{
-    Encode, MapEncoder, MapEntriesEncoder, PackEncoder, SequenceEncoder,
-    VariantEncoder,
-};
+use super::{Encode, MapEncoder, MapEntriesEncoder, PackEncoder, SequenceEncoder, VariantEncoder};
 
 /// Trait governing how the encoder works.
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]

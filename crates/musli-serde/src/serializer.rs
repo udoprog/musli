@@ -1,8 +1,6 @@
 use core::fmt;
 
-use musli::en::{
-    MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, VariantEncoder,
-};
+use musli::en::{MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, VariantEncoder};
 use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Encoder};
 
