@@ -63,15 +63,15 @@ bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
 miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"]
 
 [dependencies]
-musli = { path = "../crates/musli", version = "0.0.113", default-features = false, optional = true, features = [] }
-musli-utils = { path = "../crates/musli-utils", version = "0.0.113", default-features = false, features = [] }
-musli-wire = { path = "../crates/musli-wire", version = "0.0.113", default-features = false, features = ["test"], optional = true }
-musli-descriptive = { path = "../crates/musli-descriptive", version = "0.0.113", default-features = false, features = ["test"], optional = true }
-musli-storage = { path = "../crates/musli-storage", version = "0.0.113", default-features = false, features = ["test"], optional = true }
-musli-json = { path = "../crates/musli-json", version = "0.0.113", default-features = false, features = ["test"], optional = true }
-musli-value = { path = "../crates/musli-value", version = "0.0.113", default-features = false, features = ["test"], optional = true }
-musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.0.113", default-features = false, features = [], optional = true }
-musli-macros = { path = "../crates/musli-macros", version = "0.0.113", features = ["test"] }
+musli = { path = "../crates/musli", version = "0.0.114", default-features = false, optional = true, features = [] }
+musli-utils = { path = "../crates/musli-utils", version = "0.0.114", default-features = false, features = [] }
+musli-wire = { path = "../crates/musli-wire", version = "0.0.114", default-features = false, features = ["test"], optional = true }
+musli-descriptive = { path = "../crates/musli-descriptive", version = "0.0.114", default-features = false, features = ["test"], optional = true }
+musli-storage = { path = "../crates/musli-storage", version = "0.0.114", default-features = false, features = ["test"], optional = true }
+musli-json = { path = "../crates/musli-json", version = "0.0.114", default-features = false, features = ["test"], optional = true }
+musli-value = { path = "../crates/musli-value", version = "0.0.114", default-features = false, features = ["test"], optional = true }
+musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.0.114", default-features = false, features = [], optional = true }
+musli-macros = { path = "../crates/musli-macros", version = "0.0.114", features = ["test"] }
 
 anyhow = "1.0.81"
 serde = { version = "1.0.197", default-features = false, optional = true, features = ["derive"] }
@@ -89,13 +89,13 @@ zerocopy = { version = "0.7.32", default-features = false, optional = true, feat
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 
 [dev-dependencies]
-musli = { path = "../crates/musli", version = "0.0.113", default-features = false, features = ["alloc"] }
-musli-serde = { path = "../crates/musli-serde", version = "0.0.113", default-features = false, features = ["alloc"] }
-musli-storage = { path = "../crates/musli-storage", version = "0.0.113", default-features = false, features = ["alloc", "test"] }
-musli-wire = { path = "../crates/musli-wire", version = "0.0.113", default-features = false, features = ["alloc", "test"] }
-musli-descriptive = { path = "../crates/musli-descriptive", version = "0.0.113", default-features = false, features = ["alloc", "test"] }
-musli-json = { path = "../crates/musli-json", version = "0.0.113", default-features = false, features = ["alloc", "test"] }
-musli-value = { path = "../crates/musli-value", version = "0.0.113", default-features = false, features = ["alloc", "test"] }
+musli = { path = "../crates/musli", version = "0.0.114", default-features = false, features = ["alloc"] }
+musli-serde = { path = "../crates/musli-serde", version = "0.0.114", default-features = false, features = ["alloc"] }
+musli-storage = { path = "../crates/musli-storage", version = "0.0.114", default-features = false, features = ["alloc", "test"] }
+musli-wire = { path = "../crates/musli-wire", version = "0.0.114", default-features = false, features = ["alloc", "test"] }
+musli-descriptive = { path = "../crates/musli-descriptive", version = "0.0.114", default-features = false, features = ["alloc", "test"] }
+musli-json = { path = "../crates/musli-json", version = "0.0.114", default-features = false, features = ["alloc", "test"] }
+musli-value = { path = "../crates/musli-value", version = "0.0.114", default-features = false, features = ["alloc", "test"] }
 serde = { version = "1.0.197", default-features = false, features = ["derive"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 trybuild = "1.0.90"

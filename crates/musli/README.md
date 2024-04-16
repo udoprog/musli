@@ -40,8 +40,8 @@ to use:
 
 ```toml
 [dependencies]
-musli = "0.0.113"
-musli-wire = "0.0.113"
+musli = "0.0.114"
+musli-wire = "0.0.114"
 ```
 
 <br>
@@ -150,7 +150,7 @@ impl<'de, M> Decode<'de, M> for MyType {
         decoder.decode_sequence(|seq| {
             let mut data = Vec::with_capacity(seq.size_hint().or_default());
 
-            while let Some(decoder) = seq.decode_next()? {
+            while let Some(decoder) = seq.try_decode_next()? {
                 data.push(decoder.decode()?);
             }
 
