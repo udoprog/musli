@@ -1251,7 +1251,7 @@ pub trait Decoder<'de>: Sized {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         decoder.decode_sequence_hint(&HINT, |tuple| {
-    ///             Ok(Self(tuple.next(cx)?, tuple.next(cx)?))
+    ///             Ok(Self(tuple.next()?, tuple.next()?))
     ///         })
     ///     }
     /// }
@@ -1285,7 +1285,7 @@ pub trait Decoder<'de>: Sized {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         decoder.decode_sequence_hint(&HINT, |tuple| {
-    ///             Ok(Self(tuple.next(cx)?, tuple.next(cx)?))
+    ///             Ok(Self(tuple.next()?, tuple.next()?))
     ///         })
     ///     }
     /// }
