@@ -1,7 +1,7 @@
 use core::fmt;
 
 use musli::en::{
-    MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, TupleEncoder, VariantEncoder,
+    MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Encoder};
@@ -35,12 +35,12 @@ where
     type Error = <E::Cx as Context>::Error;
 
     type SerializeSeq = SerializeSeq<'a, E::EncodeSequence>;
-    type SerializeTuple = SerializeTuple<'a, E::EncodeTuple>;
-    type SerializeTupleStruct = SerializeTupleStruct<'a, E::EncodeStruct>;
-    type SerializeTupleVariant = SerializeTuple<'a, E::EncodeTupleVariant>;
+    type SerializeTuple = SerializeTuple<'a, E::EncodeSequence>;
+    type SerializeTupleStruct = SerializeTupleStruct<'a, E::EncodeMap>;
+    type SerializeTupleVariant = SerializeTuple<'a, E::EncodeSequenceVariant>;
     type SerializeMap = SerializeMap<'a, E::EncodeMapEntries>;
-    type SerializeStruct = SerializeStruct<'a, E::EncodeStruct>;
-    type SerializeStructVariant = SerializeStructVariant<'a, E::EncodeStructVariant>;
+    type SerializeStruct = SerializeStruct<'a, E::EncodeMap>;
+    type SerializeStructVariant = SerializeStructVariant<'a, E::EncodeMapVariant>;
 
     #[inline]
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
@@ -202,7 +202,7 @@ where
     #[inline]
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         let hint = SequenceHint::with_size(len);
-        let encoder = self.encoder.encode_tuple(&hint)?;
+        let encoder = self.encoder.encode_sequence(&hint)?;
         Ok(SerializeTuple::new(self.cx, encoder))
     }
 
@@ -213,7 +213,7 @@ where
         len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         let hint = MapHint::with_size(len);
-        let encoder = self.encoder.encode_struct(&hint)?;
+        let encoder = self.encoder.encode_map(&hint)?;
         Ok(SerializeTupleStruct::new(self.cx, encoder))
     }
 
@@ -226,7 +226,7 @@ where
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         let hint = SequenceHint::with_size(len);
-        let encoder = self.encoder.encode_tuple_variant(variant_name, &hint)?;
+        let encoder = self.encoder.encode_sequence_variant(variant_name, &hint)?;
         Ok(SerializeTuple::new(self.cx, encoder))
     }
 
@@ -250,7 +250,7 @@ where
         len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
         let hint = MapHint::with_size(len);
-        let encoder = self.encoder.encode_struct(&hint)?;
+        let encoder = self.encoder.encode_map(&hint)?;
         Ok(SerializeStruct::new(self.cx, encoder))
     }
 
@@ -263,7 +263,7 @@ where
         len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
         let hint = MapHint::with_size(len);
-        let encoder = self.encoder.encode_struct_variant(variant_name, &hint)?;
+        let encoder = self.encoder.encode_map_variant(variant_name, &hint)?;
         Ok(SerializeStructVariant::new(self.cx, encoder))
     }
 
@@ -342,7 +342,7 @@ where
 
 pub struct SerializeTuple<'a, E>
 where
-    E: TupleEncoder,
+    E: SequenceEncoder,
 {
     cx: &'a E::Cx,
     encoder: E,
@@ -350,7 +350,7 @@ where
 
 impl<'a, E> SerializeTuple<'a, E>
 where
-    E: TupleEncoder,
+    E: SequenceEncoder,
 {
     fn new(cx: &'a E::Cx, encoder: E) -> Self {
         Self { cx, encoder }
@@ -360,7 +360,7 @@ where
 impl<'a, E> ser::SerializeTuple for SerializeTuple<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
-    E: TupleEncoder,
+    E: SequenceEncoder,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -370,21 +370,21 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.encode_tuple_field()?;
+        let encoder = self.encoder.encode_element()?;
         value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_tuple()
+        self.encoder.finish_sequence()
     }
 }
 
 impl<'a, E> ser::SerializeTupleVariant for SerializeTuple<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
-    E: TupleEncoder,
+    E: SequenceEncoder,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;

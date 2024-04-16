@@ -38,7 +38,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
     } = e.tokens;
 
     let body = match &e.data {
-        BuildData::Struct(st) => encode_struct(&cx, &e, st)?,
+        BuildData::Struct(st) => encode_map(&cx, &e, st)?,
         BuildData::Enum(en) => encode_enum(&cx, &e, en)?,
     };
 
@@ -85,7 +85,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 }
 
 /// Encode a struct.
-fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn encode_map(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         ctx_var,
         encoder_var,
@@ -144,7 +144,7 @@ fn encode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
                 #(#decls)*
                 #build_hint
 
-                let #output_var = #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
+                let #output_var = #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
                     #(#encoders)*
                     #result_ok(())
                 })?;
@@ -393,7 +393,7 @@ fn encode_variant(
                     encode = quote! {{
                         #build_hint
 
-                        #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
+                        #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result_ok(())
@@ -437,7 +437,7 @@ fn encode_variant(
             encode = quote! {{
                 #build_hint
 
-                #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#encoder_var| {
+                #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
                     static #tag_static: #static_type = #tag;
                     static #name_static: #static_type = #name;
                     #map_encoder_t::insert_entry(#encoder_var, #tag_static, #name_static)?;
@@ -466,7 +466,7 @@ fn encode_variant(
                 static #hint: #map_hint = #map_hint::with_size(2);
                 #build_hint
 
-                #encoder_t::encode_struct_fn(#encoder_var, &#hint, move |#struct_encoder| {
+                #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#struct_encoder| {
                     static #tag_static: #static_type = #tag;
                     static #name_static: #static_type = #name;
                     static #content_static: #static_type = #content;
@@ -479,7 +479,7 @@ fn encode_variant(
 
                         let #content_struct = #map_entry_encoder_t::encode_map_value(#pair)?;
 
-                        #encoder_t::encode_struct_fn(#content_struct, &#inner_hint, move |#encoder_var| {
+                        #encoder_t::encode_map_fn(#content_struct, &#inner_hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result_ok(())

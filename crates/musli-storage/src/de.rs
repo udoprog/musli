@@ -298,7 +298,7 @@ where
     }
 
     #[inline]
-    fn decode_map<F, O>(self, hint: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
     {

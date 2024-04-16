@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
 use musli::en::{
-    MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder, TupleEncoder,
+    MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
     VariantEncoder,
 };
 #[cfg(feature = "alloc")]
@@ -91,19 +91,15 @@ where
     #[cfg(feature = "alloc")]
     type EncodeSequence = SequenceValueEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
-    type EncodeTuple = SequenceValueEncoder<'a, OPT, O, C>;
-    #[cfg(feature = "alloc")]
     type EncodeMap = MapValueEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
     type EncodeMapEntries = MapValueEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
-    type EncodeStruct = MapValueEncoder<'a, OPT, O, C>;
-    #[cfg(feature = "alloc")]
     type EncodeVariant = VariantValueEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
-    type EncodeTupleVariant = VariantSequenceEncoder<'a, OPT, O, C>;
+    type EncodeSequenceVariant = VariantSequenceEncoder<'a, OPT, O, C>;
     #[cfg(feature = "alloc")]
-    type EncodeStructVariant = VariantStructEncoder<'a, OPT, O, C>;
+    type EncodeMapVariant = VariantStructEncoder<'a, OPT, O, C>;
 
     #[inline]
     fn cx(&self) -> &C {
@@ -311,12 +307,6 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_tuple(self, _: &SequenceHint) -> Result<Self::EncodeTuple, C::Error> {
-        Ok(SequenceValueEncoder::new(self.cx, self.output))
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
     fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
@@ -324,12 +314,6 @@ where
     #[cfg(feature = "alloc")]
     #[inline]
     fn encode_map_entries(self, _: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
-        Ok(MapValueEncoder::new(self.cx, self.output))
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn encode_struct(self, _: &MapHint) -> Result<Self::EncodeStruct, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
@@ -354,11 +338,11 @@ where
 
     #[inline]
     #[cfg(feature = "alloc")]
-    fn encode_tuple_variant<T>(
+    fn encode_sequence_variant<T>(
         self,
         tag: &T,
         hint: &SequenceHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -375,11 +359,11 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn encode_struct_variant<T>(
+    fn encode_map_variant<T>(
         self,
         tag: &T,
         hint: &MapHint,
-    ) -> Result<Self::EncodeStructVariant, C::Error>
+    ) -> Result<Self::EncodeMapVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -493,30 +477,6 @@ where
         let buf = self.writer.into_inner();
         self.output.write(Value::Bytes(buf.as_slice().into()));
         Ok(())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> TupleEncoder for SequenceValueEncoder<'a, OPT, O, C>
-where
-    O: ValueOutput,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-
-    type EncodeTupleField<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        SequenceEncoder::encode_element(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::finish_sequence(self)
     }
 }
 
@@ -754,30 +714,6 @@ where
             Value::Sequence(self.values),
         ))));
         Ok(())
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> TupleEncoder for VariantSequenceEncoder<'a, OPT, O, C>
-where
-    O: ValueOutput,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-
-    type EncodeTupleField<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        SequenceEncoder::encode_element(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::finish_sequence(self)
     }
 }
 

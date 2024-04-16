@@ -32,10 +32,6 @@ mod sequence_encoder;
 #[doc(inline)]
 pub use self::sequence_encoder::SequenceEncoder;
 
-mod tuple_encoder;
-#[doc(inline)]
-pub use self::tuple_encoder::TupleEncoder;
-
 mod pack_encoder;
 #[doc(inline)]
 pub use self::pack_encoder::PackEncoder;

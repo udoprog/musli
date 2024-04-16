@@ -1,6 +1,6 @@
 use core::mem::take;
 
-use musli::en::{PackEncoder, SequenceEncoder, TupleEncoder};
+use musli::en::{PackEncoder, SequenceEncoder};
 use musli::Context;
 use musli_utils::Writer;
 
@@ -81,28 +81,6 @@ where
 
     #[inline]
     fn finish_pack(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::finish_sequence(self)
-    }
-}
-
-impl<'a, W, C> TupleEncoder for JsonArrayEncoder<'a, W, C>
-where
-    W: Writer,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeTupleField<'this> = JsonEncoder<'a, W::Mut<'this>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        SequenceEncoder::encode_element(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
         SequenceEncoder::finish_sequence(self)
     }
 }

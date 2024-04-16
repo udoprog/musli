@@ -41,13 +41,11 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
     ("EncodeSome", Extra::None),
     ("EncodePack", Extra::None),
     ("EncodeSequence", Extra::None),
-    ("EncodeTuple", Extra::None),
     ("EncodeMap", Extra::None),
     ("EncodeMapEntries", Extra::None),
-    ("EncodeStruct", Extra::None),
     ("EncodeVariant", Extra::None),
-    ("EncodeTupleVariant", Extra::None),
-    ("EncodeStructVariant", Extra::None),
+    ("EncodeSequenceVariant", Extra::None),
+    ("EncodeMapVariant", Extra::None),
 ];
 
 pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[

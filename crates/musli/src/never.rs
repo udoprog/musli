@@ -18,8 +18,8 @@ use crate::de::{
     ValueVisitor, VariantDecoder,
 };
 use crate::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
-    TupleEncoder, VariantEncoder,
+    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder,
+    SequenceEncoder, VariantEncoder,
 };
 use crate::{Buf, Context};
 
@@ -288,13 +288,11 @@ impl<C: ?Sized + Context, O: 'static> Encoder for Never<O, C> {
     type EncodePack = Self;
     type EncodeSome = Self;
     type EncodeSequence = Self;
-    type EncodeTuple = Self;
     type EncodeMap = Self;
     type EncodeMapEntries = Self;
-    type EncodeStruct = Self;
     type EncodeVariant = Self;
-    type EncodeTupleVariant = Self;
-    type EncodeStructVariant = Self;
+    type EncodeSequenceVariant = Self;
+    type EncodeMapVariant = Self;
     type __UseMusliEncoderAttributeMacro = ();
 
     #[inline]
@@ -372,22 +370,6 @@ impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
 
     #[inline]
     fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
-        match self._never {}
-    }
-}
-
-impl<O: 'static, C: ?Sized + Context> TupleEncoder for Never<O, C> {
-    type Cx = C;
-    type Ok = O;
-    type EncodeTupleField<'this> = Self where Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }

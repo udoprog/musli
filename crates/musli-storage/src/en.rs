@@ -1,8 +1,8 @@
 use core::fmt;
 
 use musli::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
-    TupleEncoder, VariantEncoder,
+    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder,
+    SequenceEncoder, VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
@@ -36,13 +36,11 @@ where
     type EncodePack = StorageEncoder<'a, W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
-    type EncodeTuple = Self;
     type EncodeMap = Self;
     type EncodeMapEntries = Self;
-    type EncodeStruct = Self;
     type EncodeVariant = Self;
-    type EncodeTupleVariant = Self;
-    type EncodeStructVariant = Self;
+    type EncodeSequenceVariant = Self;
+    type EncodeMapVariant = Self;
 
     #[inline]
     fn cx(&self) -> &Self::Cx {
@@ -231,12 +229,6 @@ where
     }
 
     #[inline]
-    fn encode_tuple(self, _: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
-        // NB: A tuple has statically known fixed length.
-        Ok(self)
-    }
-
-    #[inline]
     fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
@@ -249,22 +241,16 @@ where
     }
 
     #[inline]
-    fn encode_struct(mut self, hint: &MapHint) -> Result<Self::EncodeStruct, C::Error> {
-        musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
-        Ok(self)
-    }
-
-    #[inline]
     fn encode_variant(self) -> Result<Self::EncodeVariant, C::Error> {
         Ok(self)
     }
 
     #[inline]
-    fn encode_tuple_variant<T>(
+    fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
         _: &SequenceHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -273,11 +259,11 @@ where
     }
 
     #[inline]
-    fn encode_struct_variant<T>(
+    fn encode_map_variant<T>(
         mut self,
         tag: &T,
         hint: &MapHint,
-    ) -> Result<Self::EncodeStructVariant, C::Error>
+    ) -> Result<Self::EncodeMapVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
@@ -323,26 +309,6 @@ where
 
     #[inline]
     fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
-        PackEncoder::finish_pack(self)
-    }
-}
-
-impl<'a, W, const OPT: Options, C> TupleEncoder for StorageEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeTupleField<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        PackEncoder::encode_packed(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
         PackEncoder::finish_pack(self)
     }
 }

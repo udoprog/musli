@@ -1,8 +1,8 @@
 use core::fmt;
 
 use musli::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
-    TupleEncoder, VariantEncoder,
+    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder,
+    SequenceEncoder, VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::{Buf, Context};
@@ -46,7 +46,7 @@ where
     }
 
     #[inline]
-    fn encode_tuple_len(&mut self, len: usize) -> Result<(), C::Error> {
+    fn encode_sequence_len(&mut self, len: usize) -> Result<(), C::Error> {
         let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
         self.writer.write_byte(self.cx, tag.byte())?;
 
@@ -90,13 +90,11 @@ where
     type EncodePack = WirePackEncoder<'a, W, C::Buf<'a>, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
-    type EncodeTuple = Self;
     type EncodeMap = Self;
     type EncodeMapEntries = Self;
-    type EncodeStruct = Self;
     type EncodeVariant = Self;
-    type EncodeTupleVariant = Self;
-    type EncodeStructVariant = Self;
+    type EncodeSequenceVariant = Self;
+    type EncodeMapVariant = Self;
 
     #[inline]
     fn cx(&self) -> &Self::Cx {
@@ -284,23 +282,7 @@ where
 
     #[inline]
     fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, hint.size);
-        self.writer.write_byte(self.cx, tag.byte())?;
-
-        if !embedded {
-            musli_utils::int::encode_usize::<_, _, OPT>(
-                self.cx,
-                self.writer.borrow_mut(),
-                hint.size,
-            )?;
-        }
-
-        Ok(self)
-    }
-
-    #[inline]
-    fn encode_tuple(mut self, hint: &SequenceHint) -> Result<Self::EncodeTuple, C::Error> {
-        self.encode_tuple_len(hint.size)?;
+        self.encode_sequence_len(hint.size)?;
         Ok(self)
     }
 
@@ -316,22 +298,6 @@ where
     }
 
     #[inline]
-    fn encode_struct(mut self, hint: &MapHint) -> Result<Self::EncodeStruct, C::Error> {
-        let Some(len) = hint.size.checked_mul(2) else {
-            return Err(self.cx.message("Struct length overflow"));
-        };
-
-        let (tag, embedded) = Tag::with_len(Kind::Sequence, len);
-        self.writer.write_byte(self.cx, tag.byte())?;
-
-        if !embedded {
-            musli_utils::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
-        }
-
-        Ok(self)
-    }
-
-    #[inline]
     fn encode_variant(mut self) -> Result<Self::EncodeVariant, C::Error> {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
@@ -339,33 +305,33 @@ where
     }
 
     #[inline]
-    fn encode_tuple_variant<T>(
+    fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
         hint: &SequenceHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
         WireEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        self.encode_tuple(hint)
+        self.encode_sequence(hint)
     }
 
     #[inline]
-    fn encode_struct_variant<T>(
+    fn encode_map_variant<T>(
         mut self,
         tag: &T,
         hint: &MapHint,
-    ) -> Result<Self::EncodeTupleVariant, C::Error>
+    ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
     {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
         WireEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        self.encode_struct(hint)
+        self.encode_map(hint)
     }
 }
 
@@ -410,26 +376,6 @@ where
     #[inline]
     fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         Ok(())
-    }
-}
-
-impl<'a, W, const OPT: Options, C> TupleEncoder for WireEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodeTupleField<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_tuple_field(&mut self) -> Result<Self::EncodeTupleField<'_>, C::Error> {
-        SequenceEncoder::encode_element(self)
-    }
-
-    #[inline]
-    fn finish_tuple(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::finish_sequence(self)
     }
 }
 

@@ -2,7 +2,7 @@
 
 use crate::compat::Packed;
 use crate::de::{Decode, Decoder, PackDecoder, TupleDecoder};
-use crate::en::{Encode, Encoder, PackEncoder, TupleEncoder};
+use crate::en::{Encode, Encoder, PackEncoder, SequenceEncoder};
 use crate::hint::SequenceHint;
 
 macro_rules! count {
@@ -53,10 +53,10 @@ macro_rules! declare {
             {
                 static HINT: SequenceHint = SequenceHint::with_size(count!($ident0 $($ident)*));
 
-                encoder.encode_tuple_fn(&HINT, |tuple| {
+                encoder.encode_sequence_fn(&HINT, |tuple| {
                     let ($ident0, $($ident),*) = self;
-                    tuple.encode_tuple_field()?.encode($ident0)?;
-                    $(tuple.encode_tuple_field()?.encode($ident)?;)*
+                    tuple.encode_element()?.encode($ident0)?;
+                    $(tuple.encode_element()?.encode($ident)?;)*
                     Ok(())
                 })
             }
