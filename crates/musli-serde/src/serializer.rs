@@ -327,7 +327,7 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.encode_element()?;
+        let encoder = self.encoder.encode_next()?;
         value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }

@@ -36,10 +36,6 @@ mod sequence_encoder;
 #[doc(inline)]
 pub use self::sequence_encoder::SequenceEncoder;
 
-mod pack_encoder;
-#[doc(inline)]
-pub use self::pack_encoder::PackEncoder;
-
 mod map_encoder;
 #[doc(inline)]
 pub use self::map_encoder::MapEncoder;

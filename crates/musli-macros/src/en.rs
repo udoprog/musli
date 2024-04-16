@@ -190,7 +190,7 @@ fn insert_fields<'st>(
 
     let Tokens {
         context_t,
-        pack_encoder_t,
+        sequence_encoder_t,
         result_ok,
 
         map_encoder_t,
@@ -257,7 +257,7 @@ fn insert_fields<'st>(
             Packing::Packed => {
                 encode = quote! {
                     #enter
-                    let #sequence_decoder_next_var = #pack_encoder_t::encode_packed(#pack_var)?;
+                    let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(#pack_var)?;
                     #encode_path(#access, #ctx_var, #sequence_decoder_next_var)?;
                     #leave
                 };

@@ -19,7 +19,7 @@ macro_rules! implement {
                 static HINT: SequenceHint = SequenceHint::with_size($count);
 
                 encoder.encode_sequence_fn(&HINT, |tuple| {
-                    $(tuple.encode_element()?.encode(&self.$field)?;)*
+                    $(tuple.encode_next()?.encode(&self.$field)?;)*
                     Ok(())
                 })
             }
@@ -55,7 +55,7 @@ macro_rules! implement_new {
                 static HINT: SequenceHint = SequenceHint::with_size($count);
 
                 encoder.encode_sequence_fn(&HINT, |tuple| {
-                    $(tuple.encode_element()?.encode(self.$field())?;)*
+                    $(tuple.encode_next()?.encode(self.$field())?;)*
                     Ok(())
                 })
             }

@@ -1,7 +1,7 @@
 use core::fmt;
 
 use musli::en::{
-    Encoder, EntriesEncoder, EntryEncoder, MapEncoder, PackEncoder, SequenceEncoder, VariantEncoder,
+    Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::{Buf, Context, Encode};
@@ -324,7 +324,7 @@ where
     }
 }
 
-impl<'a, W, B, const OPT: Options, C> PackEncoder for SelfPackEncoder<'a, W, B, OPT, C>
+impl<'a, W, B, const OPT: Options, C> SequenceEncoder for SelfPackEncoder<'a, W, B, OPT, C>
 where
     W: Writer,
     B: Buf,
@@ -332,15 +332,15 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodePacked<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, &mut self.buffer))
     }
 
     #[inline]
-    fn finish_pack(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Bytes, buffer.len())?;
         self.writer.write_buffer(self.cx, buffer)?;
@@ -355,10 +355,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeElement<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 

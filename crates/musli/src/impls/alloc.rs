@@ -24,8 +24,8 @@ use crate::de::{
     ValueVisitor,
 };
 use crate::en::{
-    Encode, EncodeBytes, EncodePacked, Encoder, EntryEncoder, MapEncoder, PackEncoder,
-    SequenceEncoder, TraceEncode,
+    Encode, EncodeBytes, EncodePacked, Encoder, EntryEncoder, MapEncoder, SequenceEncoder,
+    TraceEncode,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::internal::size_hint;

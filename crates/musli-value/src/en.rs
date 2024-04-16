@@ -7,9 +7,7 @@ use alloc::vec::Vec;
 
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
-use musli::en::{
-    EntriesEncoder, EntryEncoder, MapEncoder, PackEncoder, SequenceEncoder, VariantEncoder,
-};
+use musli::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
 #[cfg(feature = "alloc")]
 use musli::hint::{MapHint, SequenceHint};
 #[cfg(feature = "alloc")]
@@ -407,12 +405,12 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeElement<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
+    type EncodeNext<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.values))
     }
 
@@ -454,7 +452,7 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> PackEncoder for PackValueEncoder<'a, OPT, O, C>
+impl<'a, const OPT: Options, O, C> SequenceEncoder for PackValueEncoder<'a, OPT, O, C>
 where
     O: ValueOutput,
     C: ?Sized + Context,
@@ -462,17 +460,17 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodePacked<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a>>, OPT, C>
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a>>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, &mut self.writer))
     }
 
     #[inline]
-    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         let buf = self.writer.into_inner();
         self.output.write(Value::Bytes(buf.as_slice().into()));
         Ok(())
@@ -697,12 +695,12 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeElement<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
+    type EncodeNext<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.values))
     }
 

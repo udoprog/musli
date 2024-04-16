@@ -1,7 +1,7 @@
 //! Implementations for variously lengthed tuples.
 
 use crate::de::{Decode, DecodePacked, Decoder, PackDecoder, SequenceDecoder};
-use crate::en::{Encode, EncodePacked, Encoder, PackEncoder, SequenceEncoder};
+use crate::en::{Encode, EncodePacked, Encoder, SequenceEncoder};
 use crate::hint::SequenceHint;
 
 macro_rules! count {
@@ -54,8 +54,8 @@ macro_rules! declare {
 
                 encoder.encode_sequence_fn(&HINT, |tuple| {
                     let ($ident0, $($ident),*) = self;
-                    tuple.encode_element()?.encode($ident0)?;
-                    $(tuple.encode_element()?.encode($ident)?;)*
+                    tuple.encode_next()?.encode($ident0)?;
+                    $(tuple.encode_next()?.encode($ident)?;)*
                     Ok(())
                 })
             }
@@ -93,8 +93,8 @@ macro_rules! declare {
             {
                 let ($ident0, $($ident),*) = self;
                 encoder.encode_pack_fn(|pack| {
-                    pack.encode_packed()?.encode($ident0)?;
-                    $(pack.encode_packed()?.encode($ident)?;)*
+                    pack.encode_next()?.encode($ident0)?;
+                    $(pack.encode_next()?.encode($ident)?;)*
                     Ok(())
                 })
             }

@@ -1,8 +1,7 @@
 use core::fmt;
 
 use musli::en::{
-    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, PackEncoder, SequenceEncoder,
-    VariantEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::{Buf, Context};
@@ -58,13 +57,13 @@ where
     }
 }
 
-pub struct WirePackEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
+pub struct WireSequenceEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
     cx: &'a C,
     writer: W,
     buffer: BufWriter<B>,
 }
 
-impl<'a, W, B, const OPT: Options, C: ?Sized> WirePackEncoder<'a, W, B, OPT, C> {
+impl<'a, W, B, const OPT: Options, C: ?Sized> WireSequenceEncoder<'a, W, B, OPT, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(cx: &'a C, writer: W, buffer: B) -> Self {
@@ -87,7 +86,7 @@ where
     type Ok = ();
     type Mode = C::Mode;
     type WithContext<'this, U> = WireEncoder<'this, W, OPT, U> where U: 'this + Context;
-    type EncodePack = WirePackEncoder<'a, W, C::Buf<'a>, OPT, C>;
+    type EncodePack = WireSequenceEncoder<'a, W, C::Buf<'a>, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -135,7 +134,7 @@ where
             return Err(self.cx.message("Failed to allocate pack buffer"));
         };
 
-        Ok(WirePackEncoder::new(self.cx, self.writer, buf))
+        Ok(WireSequenceEncoder::new(self.cx, self.writer, buf))
     }
 
     #[inline]
@@ -335,7 +334,7 @@ where
     }
 }
 
-impl<'a, W, B, const OPT: Options, C> PackEncoder for WirePackEncoder<'a, W, B, OPT, C>
+impl<'a, W, B, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<'a, W, B, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
@@ -343,15 +342,15 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodePacked<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this, B: Buf;
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this, B: Buf;
 
     #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, &mut self.buffer))
     }
 
     #[inline]
-    fn finish_pack(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), buffer.len())?;
         self.writer.write_buffer(self.cx, buffer)?;
@@ -366,10 +365,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeElement<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = WireEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(WireEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 

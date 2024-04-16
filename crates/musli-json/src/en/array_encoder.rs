@@ -1,6 +1,6 @@
 use core::mem::take;
 
-use musli::en::{PackEncoder, SequenceEncoder};
+use musli::en::SequenceEncoder;
 use musli::Context;
 use musli_utils::Writer;
 
@@ -44,12 +44,12 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeElement<'this> = JsonEncoder<'a, W::Mut<'this>, C>
+    type EncodeNext<'this> = JsonEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         if !take(&mut self.first) {
             self.writer.write_byte(self.cx, b',')?;
         }
@@ -60,27 +60,5 @@ where
     #[inline]
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_bytes(self.cx, self.end)
-    }
-}
-
-impl<'a, W, C> PackEncoder for JsonArrayEncoder<'a, W, C>
-where
-    W: Writer,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodePacked<'this> = JsonEncoder<'a, W::Mut<'this>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
-        SequenceEncoder::encode_element(self)
-    }
-
-    #[inline]
-    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
-        SequenceEncoder::finish_sequence(self)
     }
 }

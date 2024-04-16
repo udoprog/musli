@@ -27,7 +27,7 @@ use crate::mode::DefaultMode;
 ///
 /// ```
 /// use musli::{Encode, Encoder};
-/// use musli::en::PackEncoder;
+/// use musli::en::SequenceEncoder;
 ///
 /// struct PackedType {
 ///     data: (u32, u32),
@@ -41,7 +41,7 @@ use crate::mode::DefaultMode;
 ///         let mut pack = encoder.encode_pack()?;
 ///         pack.push(&self.data.0);
 ///         pack.push(&self.data.1);
-///         pack.finish_pack()
+///         pack.finish_sequence()
 ///     }
 /// }
 /// ```

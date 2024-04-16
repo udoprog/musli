@@ -18,8 +18,7 @@ use crate::de::{
     VariantDecoder,
 };
 use crate::en::{
-    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, PackEncoder, SequenceEncoder,
-    VariantEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
 use crate::{Buf, Context};
 
@@ -331,29 +330,13 @@ where
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> PackEncoder for Never<O, C> {
-    type Cx = C;
-    type Ok = O;
-    type EncodePacked<'this> = Self where Self: 'this;
-
-    #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
-        match self._never {}
-    }
-}
-
 impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeElement<'this> = Self where Self: 'this;
+    type EncodeNext<'this> = Self where Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         match self._never {}
     }
 

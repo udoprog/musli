@@ -540,7 +540,7 @@ impl<M> Encode<M> for Value {
 
                 encoder.encode_sequence_fn(&hint, |sequence| {
                     for value in values {
-                        sequence.encode_element()?.encode(value)?;
+                        sequence.encode_next()?.encode(value)?;
                     }
 
                     Ok(())

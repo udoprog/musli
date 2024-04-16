@@ -1,8 +1,7 @@
 use core::fmt;
 
 use musli::en::{
-    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, PackEncoder, SequenceEncoder,
-    VariantEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
@@ -274,26 +273,6 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> PackEncoder for StorageEncoder<'a, W, OPT, C>
-where
-    C: ?Sized + Context,
-    W: Writer,
-{
-    type Cx = C;
-    type Ok = ();
-    type EncodePacked<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn encode_packed(&mut self) -> Result<Self::EncodePacked<'_>, C::Error> {
-        Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
-    }
-
-    #[inline]
-    fn finish_pack(self) -> Result<Self::Ok, C::Error> {
-        Ok(())
-    }
-}
-
 impl<'a, W, const OPT: Options, C> SequenceEncoder for StorageEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
@@ -301,16 +280,16 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeElement<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, C::Error> {
-        PackEncoder::encode_packed(self)
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
+        Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
     fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
-        PackEncoder::finish_pack(self)
+        Ok(())
     }
 }
 

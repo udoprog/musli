@@ -9,7 +9,7 @@ pub trait SequenceEncoder {
     /// Result type of the encoder.
     type Ok;
     /// The encoder returned when advancing the sequence encoder.
-    type EncodeElement<'this>: Encoder<
+    type EncodeNext<'this>: Encoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = <Self::Cx as Context>::Error,
@@ -20,7 +20,7 @@ pub trait SequenceEncoder {
 
     /// Return encoder for the next element.
     #[must_use = "Encoders must be consumed"]
-    fn encode_element(&mut self) -> Result<Self::EncodeElement<'_>, <Self::Cx as Context>::Error>;
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, <Self::Cx as Context>::Error>;
 
     /// Finish encoding the sequence.
     fn finish_sequence(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
@@ -31,7 +31,7 @@ pub trait SequenceEncoder {
     where
         T: Encode<<Self::Cx as Context>::Mode>,
     {
-        self.encode_element()?.encode(value)?;
+        self.encode_next()?.encode(value)?;
         Ok(())
     }
 }

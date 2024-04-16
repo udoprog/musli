@@ -18,9 +18,7 @@ use crate::de::{
     Decode, DecodeBytes, DecodePacked, DecodeUnsized, DecodeUnsizedBytes, Decoder, PackDecoder,
     SequenceDecoder, ValueVisitor, VariantDecoder,
 };
-use crate::en::{
-    Encode, EncodeBytes, EncodePacked, Encoder, PackEncoder, SequenceEncoder, VariantEncoder,
-};
+use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder, SequenceEncoder, VariantEncoder};
 use crate::hint::SequenceHint;
 use crate::Context;
 
@@ -417,7 +415,7 @@ where
 
             for value in self {
                 cx.enter_sequence_index(index);
-                seq.encode_element()?.encode(value)?;
+                seq.encode_next()?.encode(value)?;
                 cx.leave_sequence_index();
                 index = index.wrapping_add(index);
             }

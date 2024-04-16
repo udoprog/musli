@@ -6,7 +6,7 @@ use crate::expecting::{self, Expecting};
 use crate::hint::{MapHint, SequenceHint};
 use crate::Context;
 
-use super::{Encode, EntriesEncoder, MapEncoder, PackEncoder, SequenceEncoder, VariantEncoder};
+use super::{Encode, EntriesEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
 
 /// Trait governing how the encoder works.
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]
@@ -26,7 +26,7 @@ pub trait Encoder: Sized {
     where
         U: 'this + Context;
     /// A simple pack that packs a sequence of elements.
-    type EncodePack: PackEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodePack: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Encoder returned when encoding an optional value which is present.
     type EncodeSome: Encoder<Cx = Self::Cx, Ok = Self::Ok, Error = Self::Error, Mode = Self::Mode>;
     /// The type of a sequence encoder.
@@ -1052,7 +1052,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::PackEncoder;
+    /// use musli::en::SequenceEncoder;
     ///
     /// struct PackedStruct {
     ///     field: u32,
@@ -1065,9 +1065,9 @@ pub trait Encoder: Sized {
     ///         E: Encoder,
     ///     {
     ///         let mut pack = encoder.encode_pack()?;
-    ///         pack.encode_packed()?.encode(self.field)?;
-    ///         pack.encode_packed()?.encode(self.data)?;
-    ///         pack.finish_pack()
+    ///         pack.encode_next()?.encode(self.field)?;
+    ///         pack.encode_next()?.encode(self.data)?;
+    ///         pack.finish_sequence()
     ///     }
     /// }
     /// ```
@@ -1085,7 +1085,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::PackEncoder;
+    /// use musli::en::SequenceEncoder;
     ///
     /// struct PackedStruct {
     ///     field: u32,
@@ -1098,8 +1098,8 @@ pub trait Encoder: Sized {
     ///         E: Encoder,
     ///     {
     ///         encoder.encode_pack_fn(|pack| {
-    ///             pack.encode_packed()?.encode(self.field)?;
-    ///             pack.encode_packed()?.encode(&self.data)?;
+    ///             pack.encode_next()?.encode(self.field)?;
+    ///             pack.encode_next()?.encode(&self.data)?;
     ///             Ok(())
     ///         })
     ///     }
@@ -1112,7 +1112,7 @@ pub trait Encoder: Sized {
     {
         let mut pack = self.encode_pack()?;
         f(&mut pack)?;
-        pack.finish_pack()
+        pack.finish_sequence()
     }
 
     /// Encode a sequence with a known length `len`.
@@ -1180,8 +1180,8 @@ pub trait Encoder: Sized {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         let mut tuple = encoder.encode_sequence(&HINT)?;
-    ///         tuple.encode_element()?.encode(self.0)?;
-    ///         tuple.encode_element()?.encode(&self.1)?;
+    ///         tuple.encode_next()?.encode(self.0)?;
+    ///         tuple.encode_next()?.encode(&self.1)?;
     ///         tuple.finish_sequence()
     ///     }
     /// }
@@ -1242,8 +1242,8 @@ pub trait Encoder: Sized {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
     ///         encoder.encode_sequence_fn(&HINT, |tuple| {
-    ///             tuple.encode_element()?.encode(self.0)?;
-    ///             tuple.encode_element()?.encode(&self.1)?;
+    ///             tuple.encode_next()?.encode(self.0)?;
+    ///             tuple.encode_next()?.encode(&self.1)?;
     ///             Ok(())
     ///         })
     ///     }
