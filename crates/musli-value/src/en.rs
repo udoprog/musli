@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use musli::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
 use musli::en::{
-    MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder, VariantEncoder,
+    EntriesEncoder, EntryEncoder, MapEncoder, PackEncoder, SequenceEncoder, VariantEncoder,
 };
 #[cfg(feature = "alloc")]
 use musli::hint::{MapHint, SequenceHint};
@@ -330,7 +330,7 @@ where
     {
         let mut variant = self.encode_variant()?;
         variant.encode_tag()?.encode(tag)?;
-        variant.encode_value()?.encode_unit()?;
+        variant.encode_data()?.encode_unit()?;
         variant.finish_variant()?;
         Ok(())
     }
@@ -507,12 +507,12 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntry<'this> = PairValueEncoder<'this, OPT, C>
+    type EncodeEntry<'this> = PairValueEncoder<'this, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(PairValueEncoder::new(self.cx, &mut self.values))
     }
 
@@ -524,22 +524,22 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> MapEntriesEncoder for MapValueEncoder<'a, OPT, O, C>
+impl<'a, const OPT: Options, O, C> EntriesEncoder for MapValueEncoder<'a, OPT, O, C>
 where
     O: ValueOutput,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntryKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeEntryKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeMapEntryValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeEntryValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_map_entry_key(&mut self) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
+    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         self.values.push((Value::Unit, Value::Unit));
 
         let Some((key, _)) = self.values.last_mut() else {
@@ -550,7 +550,7 @@ where
     }
 
     #[inline]
-    fn encode_map_entry_value(&mut self) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
+    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         let Some((_, value)) = self.values.last_mut() else {
             return Err(self.cx.message("Pair has not been encoded"));
         };
@@ -559,7 +559,7 @@ where
     }
 
     #[inline]
-    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entries(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Map(self.values));
         Ok(())
     }
@@ -586,29 +586,29 @@ impl<'a, const OPT: Options, C: ?Sized> PairValueEncoder<'a, OPT, C> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, C> MapEntryEncoder for PairValueEncoder<'a, OPT, C>
+impl<'a, const OPT: Options, C> EntryEncoder for PairValueEncoder<'a, OPT, C>
 where
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeMapValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C> where Self: 'this;
+    type EncodeValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_key(&mut self) -> Result<Self::EncodeMapKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.pair.0))
     }
 
     #[inline]
-    fn encode_map_value(&mut self) -> Result<Self::EncodeMapValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.pair.1))
     }
 
     #[inline]
-    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         self.output.push(self.pair);
         Ok(())
     }
@@ -645,7 +645,7 @@ where
     type EncodeTag<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeData<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
 
@@ -655,7 +655,7 @@ where
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.pair.1))
     }
 
@@ -747,12 +747,12 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeMapEntry<'this> = PairValueEncoder<'this, OPT, C>
+    type EncodeEntry<'this> = PairValueEncoder<'this, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(PairValueEncoder::new(self.cx, &mut self.fields))
     }
 

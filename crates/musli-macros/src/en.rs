@@ -242,11 +242,11 @@ fn insert_fields<'st>(
                 encode = quote! {
                     #enter
 
-                    #map_encoder_t::encode_map_entry_fn(#encoder_var, move |#pair_encoder_var| {
+                    #map_encoder_t::encode_entry_fn(#encoder_var, move |#pair_encoder_var| {
                         static #field_name_static: #name_type = #name;
-                        let #field_encoder_var = #map_entry_encoder_t::encode_map_key(#pair_encoder_var)?;
+                        let #field_encoder_var = #map_entry_encoder_t::encode_key(#pair_encoder_var)?;
                         #encode_t_encode(&#field_name_static, #ctx_var, #field_encoder_var)?;
-                        let #value_encoder_var = #map_entry_encoder_t::encode_map_value(#pair_encoder_var)?;
+                        let #value_encoder_var = #map_entry_encoder_t::encode_value(#pair_encoder_var)?;
                         #encode_path(#access, #ctx_var, #value_encoder_var)?;
                         #result_ok(())
                     })?;
@@ -414,7 +414,7 @@ fn encode_variant(
 
                         #encode_t_encode(&#name_static, #ctx_var, #tag_encoder)?;
 
-                        let #encoder_var = #variant_encoder_t::encode_value(#variant_encoder)?;
+                        let #encoder_var = #variant_encoder_t::encode_data(#variant_encoder)?;
                         #encode;
                         #result_ok(())
                     })?
@@ -473,11 +473,11 @@ fn encode_variant(
 
                     #map_encoder_t::insert_entry(#struct_encoder, #tag_static, #name_static)?;
 
-                    #map_encoder_t::encode_map_entry_fn(#struct_encoder, move |#pair| {
-                        let #content_tag = #map_entry_encoder_t::encode_map_key(#pair)?;
+                    #map_encoder_t::encode_entry_fn(#struct_encoder, move |#pair| {
+                        let #content_tag = #map_entry_encoder_t::encode_key(#pair)?;
                         #encode_t_encode(&#content_static, #ctx_var, #content_tag)?;
 
-                        let #content_struct = #map_entry_encoder_t::encode_map_value(#pair)?;
+                        let #content_struct = #map_entry_encoder_t::encode_value(#pair)?;
 
                         #encoder_t::encode_map_fn(#content_struct, &#inner_hint, move |#encoder_var| {
                             #(#decls)*

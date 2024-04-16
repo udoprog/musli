@@ -119,7 +119,7 @@ where
     type DecodeBuffer = musli_value::AsValueDecoder<'a, BUFFER_OPTIONS, C>;
     type DecodePack = JsonSequenceDecoder<'a, P, C>;
     type DecodeSequence = JsonSequenceDecoder<'a, P, C>;
-    type DecodeTuple = JsonSequenceDecoder<'a, P, C>;
+    type DecodeSequenceHint = JsonSequenceDecoder<'a, P, C>;
     type DecodeMap = JsonObjectDecoder<'a, P, C>;
     type DecodeMapHint = JsonObjectDecoder<'a, P, C>;
     type DecodeMapEntries = JsonObjectDecoder<'a, P, C>;
@@ -403,9 +403,9 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, C::Error>
+    fn decode_sequence_hint<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, Some(hint.size), self.parser)?;
         let output = f(&mut decoder)?;

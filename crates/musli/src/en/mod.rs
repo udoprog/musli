@@ -40,13 +40,13 @@ mod map_encoder;
 #[doc(inline)]
 pub use self::map_encoder::MapEncoder;
 
-mod map_entry_encoder;
+mod entry_encoder;
 #[doc(inline)]
-pub use self::map_entry_encoder::MapEntryEncoder;
+pub use self::entry_encoder::EntryEncoder;
 
-mod map_entries_encoder;
+mod entries_encoder;
 #[doc(inline)]
-pub use self::map_entries_encoder::MapEntriesEncoder;
+pub use self::entries_encoder::EntriesEncoder;
 
 mod variant_encoder;
 #[doc(inline)]

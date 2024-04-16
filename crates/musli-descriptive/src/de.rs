@@ -5,9 +5,8 @@ use core::mem::take;
 use alloc::vec::Vec;
 
 use musli::de::{
-    Decode, DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, NumberVisitor,
-    PackDecoder, SequenceDecoder, SizeHint, Skip, TupleDecoder, ValueVisitor, VariantDecoder,
-    Visitor,
+    Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, NumberVisitor,
+    PackDecoder, SequenceDecoder, SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::Context;
@@ -50,18 +49,6 @@ where
         }
 
         Ok(())
-    }
-}
-
-pub struct SelfTupleDecoder<'a, R, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
-    reader: R,
-}
-
-impl<'a, R, const OPT: Options, C: ?Sized> SelfTupleDecoder<'a, R, OPT, C> {
-    #[inline]
-    pub(crate) fn new(cx: &'a C, reader: R) -> Self {
-        Self { cx, reader }
     }
 }
 
@@ -230,12 +217,12 @@ where
     #[inline]
     fn skip_map_remaining(mut self) -> Result<(), C::Error> {
         loop {
-            let Some(key) = self.decode_map_entry_key()? else {
+            let Some(key) = self.decode_entry_key()? else {
                 break;
             };
 
             key.skip()?;
-            self.decode_map_entry_value()?.skip()?;
+            self.decode_entry_value()?.skip()?;
         }
 
         Ok(())
@@ -257,7 +244,7 @@ where
     type DecodePack = SelfDecoder<'a, Limit<R>, OPT, C>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingSelfDecoder<'a, R, OPT, C>;
-    type DecodeTuple = SelfTupleDecoder<'a, R, OPT, C>;
+    type DecodeSequenceHint = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeMap = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeMapHint = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = RemainingSelfDecoder<'a, R, OPT, C>;
@@ -620,23 +607,11 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(mut self, hint: &SequenceHint, f: F) -> Result<O, C::Error>
+    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
     {
-        let pos = self.cx.mark();
-        let actual = self.decode_prefix(Kind::Sequence, pos)?;
-
-        if hint.size != actual {
-            return Err(self.cx.message(format_args!(
-                "Tuple length {} did not match actual {actual}",
-                hint.size
-            )));
-        }
-
-        let mut decoder = SelfTupleDecoder::new(self.cx, self.reader);
-        let output = f(&mut decoder)?;
-        Ok(output)
+        self.decode_sequence(f)
     }
 
     #[inline]
@@ -818,20 +793,6 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> TupleDecoder<'de> for SelfTupleDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeNext<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        Ok(SelfDecoder::new(self.cx, self.reader.borrow_mut()))
-    }
-}
-
 impl<'a, 'de, R, const OPT: Options, C> SequenceDecoder<'de> for RemainingSelfDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
@@ -895,22 +856,21 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> MapEntriesDecoder<'de>
-    for RemainingSelfDecoder<'a, R, OPT, C>
+impl<'a, 'de, R, const OPT: Options, C> EntriesDecoder<'de> for RemainingSelfDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeMapEntryKey<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntryKey<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type DecodeMapEntryValue<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntryValue<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn decode_map_entry_key(&mut self) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -920,33 +880,33 @@ where
     }
 
     #[inline]
-    fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
         Ok(SelfDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<(), <Self::Cx as Context>::Error> {
+    fn end_entries(self) -> Result<(), <Self::Cx as Context>::Error> {
         self.skip_map_remaining()?;
         Ok(())
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> MapEntryDecoder<'de> for SelfDecoder<'a, R, OPT, C>
+impl<'a, 'de, R, const OPT: Options, C> EntryDecoder<'de> for SelfDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeMapKey<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeMapValue = Self;
+    type DecodeKey<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeValue = Self;
 
     #[inline]
-    fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, C::Error> {
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(SelfDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
+    fn decode_value(self) -> Result<Self::DecodeValue, C::Error> {
         Ok(self)
     }
 }

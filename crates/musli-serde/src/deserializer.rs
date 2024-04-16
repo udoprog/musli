@@ -1,8 +1,7 @@
 use core::fmt;
 
 use musli::de::{
-    Decoder, MapDecoder, MapEntriesDecoder, SequenceDecoder, SizeHint, TupleDecoder,
-    VariantDecoder, Visitor,
+    Decoder, EntriesDecoder, MapDecoder, SequenceDecoder, SizeHint, VariantDecoder, Visitor,
 };
 use musli::hint::SequenceHint;
 use musli::Context;
@@ -263,7 +262,7 @@ where
     {
         let hint = SequenceHint::with_size(len);
 
-        self.decoder.decode_tuple(&hint, |d| {
+        self.decoder.decode_sequence_hint(&hint, |d| {
             visitor.visit_seq(TupleAccess::new(self.cx, d, hint.size))
         })
     }
@@ -288,7 +287,7 @@ where
     {
         let mut decoder = self.decoder.decode_map_entries()?;
         let output = visitor.visit_map(MapAccess::new(self.cx, &mut decoder))?;
-        decoder.end_map_entries()?;
+        decoder.end_entries()?;
         Ok(output)
     }
 
@@ -304,7 +303,7 @@ where
     {
         let mut decoder = self.decoder.decode_map_entries()?;
         let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder))?;
-        decoder.end_map_entries()?;
+        decoder.end_entries()?;
         Ok(output)
     }
 
@@ -342,7 +341,7 @@ where
 
 struct TupleAccess<'de, 'a, D>
 where
-    D: TupleDecoder<'de>,
+    D: SequenceDecoder<'de>,
 {
     cx: &'a D::Cx,
     decoder: &'a mut D,
@@ -351,7 +350,7 @@ where
 
 impl<'de, 'a, D> TupleAccess<'de, 'a, D>
 where
-    D: TupleDecoder<'de>,
+    D: SequenceDecoder<'de>,
 {
     fn new(cx: &'a D::Cx, decoder: &'a mut D, len: usize) -> Self {
         TupleAccess {
@@ -364,7 +363,7 @@ where
 
 impl<'de, 'a, D> de::SeqAccess<'de> for TupleAccess<'de, 'a, D>
 where
-    D: TupleDecoder<'de>,
+    D: SequenceDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
 {
     type Error = <D::Cx as Context>::Error;
@@ -374,13 +373,12 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        if self.remaining == 0 {
+        let Some(decoder) = self.decoder.decode_next()? else {
             return Ok(None);
-        }
+        };
 
         self.remaining -= 1;
 
-        let decoder = self.decoder.decode_next()?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(Some(output))
     }
@@ -392,7 +390,7 @@ where
 }
 struct StructAccess<'de, 'a, D>
 where
-    D: MapEntriesDecoder<'de>,
+    D: EntriesDecoder<'de>,
 {
     cx: &'a D::Cx,
     decoder: &'a mut D,
@@ -400,7 +398,7 @@ where
 
 impl<'de, 'a, D> StructAccess<'de, 'a, D>
 where
-    D: MapEntriesDecoder<'de>,
+    D: EntriesDecoder<'de>,
 {
     #[inline]
     fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
@@ -410,7 +408,7 @@ where
 
 impl<'de, 'a, D> de::MapAccess<'de> for StructAccess<'de, 'a, D>
 where
-    D: MapEntriesDecoder<'de>,
+    D: EntriesDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
 {
     type Error = <D::Cx as Context>::Error;
@@ -420,7 +418,7 @@ where
     where
         K: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.decode_map_entry_key()? else {
+        let Some(decoder) = self.decoder.decode_entry_key()? else {
             return Ok(None);
         };
 
@@ -433,7 +431,7 @@ where
     where
         V: de::DeserializeSeed<'de>,
     {
-        let decoder = self.decoder.decode_map_entry_value()?;
+        let decoder = self.decoder.decode_entry_value()?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(output)
     }
@@ -533,7 +531,7 @@ where
 
 struct MapAccess<'de, 'a, D: ?Sized>
 where
-    D: MapEntriesDecoder<'de>,
+    D: EntriesDecoder<'de>,
 {
     cx: &'a D::Cx,
     decoder: &'a mut D,
@@ -541,7 +539,7 @@ where
 
 impl<'de, 'a, D: ?Sized> MapAccess<'de, 'a, D>
 where
-    D: MapEntriesDecoder<'de>,
+    D: EntriesDecoder<'de>,
 {
     fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
         Self { cx, decoder }
@@ -550,7 +548,7 @@ where
 
 impl<'de, 'a, D: ?Sized> de::MapAccess<'de> for MapAccess<'de, 'a, D>
 where
-    D: MapEntriesDecoder<'de>,
+    D: EntriesDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
 {
     type Error = <D::Cx as Context>::Error;
@@ -560,7 +558,7 @@ where
     where
         K: de::DeserializeSeed<'de>,
     {
-        let Some(decoder) = self.decoder.decode_map_entry_key()? else {
+        let Some(decoder) = self.decoder.decode_entry_key()? else {
             return Ok(None);
         };
 
@@ -573,7 +571,7 @@ where
     where
         V: de::DeserializeSeed<'de>,
     {
-        let decoder = self.decoder.decode_map_entry_value()?;
+        let decoder = self.decoder.decode_entry_value()?;
         let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
         Ok(output)
     }
@@ -782,9 +780,11 @@ where
     {
         let hint = SequenceHint::with_size(len);
 
-        self.decoder.decode_value()?.decode_tuple(&hint, |tuple| {
-            visitor.visit_seq(TupleAccess::new(self.cx, tuple, hint.size))
-        })
+        self.decoder
+            .decode_value()?
+            .decode_sequence_hint(&hint, |tuple| {
+                visitor.visit_seq(TupleAccess::new(self.cx, tuple, hint.size))
+            })
     }
 
     #[inline]
@@ -799,7 +799,7 @@ where
         let decoder = self.decoder.decode_value()?;
         let mut st = decoder.decode_map_entries()?;
         let value = visitor.visit_map(StructAccess::new(self.cx, &mut st))?;
-        st.end_map_entries()?;
+        st.end_entries()?;
         Ok(value)
     }
 }
@@ -984,7 +984,7 @@ where
         let value = self
             .visitor
             .visit_map(MapAccess::new(cx, &mut map_decoder))?;
-        map_decoder.end_map_entries()?;
+        map_decoder.end_entries()?;
         Ok(value)
     }
 

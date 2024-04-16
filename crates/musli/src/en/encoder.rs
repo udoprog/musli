@@ -6,7 +6,7 @@ use crate::expecting::{self, Expecting};
 use crate::hint::{MapHint, SequenceHint};
 use crate::Context;
 
-use super::{Encode, MapEncoder, MapEntriesEncoder, PackEncoder, SequenceEncoder, VariantEncoder};
+use super::{Encode, EntriesEncoder, MapEncoder, PackEncoder, SequenceEncoder, VariantEncoder};
 
 /// Trait governing how the encoder works.
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]
@@ -34,7 +34,7 @@ pub trait Encoder: Sized {
     /// The type of a map encoder.
     type EncodeMap: MapEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Streaming encoder for map pairs.
-    type EncodeMapEntries: MapEntriesEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeMapEntries: EntriesEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Encoder for a struct variant.
     type EncodeVariant: VariantEncoder<Cx = Self::Cx, Ok = Self::Ok>;
     /// Specialized encoder for a tuple variant.
@@ -1358,7 +1358,7 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::MapEntriesEncoder;
+    /// use musli::en::EntriesEncoder;
     /// use musli::hint::MapHint;
     ///
     /// struct Struct {
@@ -1379,9 +1379,9 @@ pub trait Encoder: Sized {
     ///         m.insert_entry("name", &self.name)?;
     ///
     ///         // Key and value encoding as a stream.
-    ///         m.encode_map_entry_key()?.encode("age")?;
-    ///         m.encode_map_entry_value()?.encode(self.age)?;
-    ///         m.finish_map_entries()
+    ///         m.encode_entry_key()?.encode("age")?;
+    ///         m.encode_entry_value()?.encode(self.age)?;
+    ///         m.finish_entries()
     ///     }
     /// }
     /// ```
@@ -1438,7 +1438,7 @@ pub trait Encoder: Sized {
     ///
     ///                 variant.encode_tag()?.encode_string("TupleVariant")?;
     ///
-    ///                 let mut tuple = variant.encode_value()?.encode_sequence(&HINT)?;
+    ///                 let mut tuple = variant.encode_data()?.encode_sequence(&HINT)?;
     ///                 tuple.push(data)?;
     ///                 tuple.finish_sequence()?;
     ///
@@ -1449,7 +1449,7 @@ pub trait Encoder: Sized {
     ///
     ///                 variant.encode_tag()?.encode_string("StructVariant")?;
     ///
-    ///                 let mut st = variant.encode_value()?.encode_map(&HINT)?;
+    ///                 let mut st = variant.encode_data()?.encode_map(&HINT)?;
     ///                 st.insert_entry("data", data)?;
     ///                 st.insert_entry("age", age)?;
     ///                 st.finish_map()?;
@@ -1501,7 +1501,7 @@ pub trait Encoder: Sized {
     ///                 encoder.encode_variant_fn(|variant| {
     ///                     variant.encode_tag()?.encode("TupleVariant")?;
     ///
-    ///                     variant.encode_value()?.encode_sequence_fn(&HINT, |tuple| {
+    ///                     variant.encode_data()?.encode_sequence_fn(&HINT, |tuple| {
     ///                         tuple.push(data)?;
     ///                         Ok(())
     ///                     })?;
@@ -1515,7 +1515,7 @@ pub trait Encoder: Sized {
     ///
     ///                     variant.encode_tag()?.encode("variant3")?;
     ///
-    ///                     variant.encode_value()?.encode_map_fn(&HINT, |st| {
+    ///                     variant.encode_data()?.encode_map_fn(&HINT, |st| {
     ///                         st.insert_entry("data", data)?;
     ///                         st.insert_entry("age", age)?;
     ///                         Ok(())
@@ -1580,7 +1580,7 @@ pub trait Encoder: Sized {
     {
         self.encode_variant_fn(|variant| {
             variant.encode_tag()?.encode(tag)?;
-            variant.encode_value()?.encode_unit()?;
+            variant.encode_data()?.encode_unit()?;
             Ok(())
         })
     }

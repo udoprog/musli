@@ -1,4 +1,4 @@
-use musli::de::MapEntryDecoder;
+use musli::de::EntryDecoder;
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -17,24 +17,24 @@ impl<'a, P, C: ?Sized> JsonObjectPairDecoder<'a, P, C> {
     }
 }
 
-impl<'a, 'de, P, C> MapEntryDecoder<'de> for JsonObjectPairDecoder<'a, P, C>
+impl<'a, 'de, P, C> EntryDecoder<'de> for JsonObjectPairDecoder<'a, P, C>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeMapKey<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
+    type DecodeKey<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeMapValue = JsonDecoder<'a, P, C>;
+    type DecodeValue = JsonDecoder<'a, P, C>;
 
     #[inline]
-    fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, C::Error> {
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.cx, self.parser.borrow_mut()))
     }
 
     #[inline]
-    fn decode_map_value(mut self) -> Result<Self::DecodeMapValue, C::Error> {
+    fn decode_value(mut self) -> Result<Self::DecodeValue, C::Error> {
         let actual = self.parser.peek(self.cx)?;
 
         if !matches!(actual, Token::Colon) {

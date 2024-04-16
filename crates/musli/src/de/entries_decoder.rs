@@ -9,12 +9,12 @@ use super::{Decoder, SizeHint};
 ///
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
-#[must_use = "Must call end_map_entries to complete decoding"]
-pub trait MapEntriesDecoder<'de>: Sized {
+#[must_use = "Must call end_entries to complete decoding"]
+pub trait EntriesDecoder<'de>: Sized {
     /// Context associated with the decoder.
     type Cx: ?Sized + Context;
     /// The decoder to use for a tuple field index.
-    type DecodeMapEntryKey<'this>: Decoder<
+    type DecodeEntryKey<'this>: Decoder<
         'de,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
@@ -23,7 +23,7 @@ pub trait MapEntriesDecoder<'de>: Sized {
     where
         Self: 'this;
     /// The decoder to use for a tuple field value.
-    type DecodeMapEntryValue<'this>: Decoder<
+    type DecodeEntryValue<'this>: Decoder<
         'de,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
@@ -43,16 +43,16 @@ pub trait MapEntriesDecoder<'de>: Sized {
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "Decoders must be consumed"]
-    fn decode_map_entry_key(
+    fn decode_entry_key(
         &mut self,
-    ) -> Result<Option<Self::DecodeMapEntryKey<'_>>, <Self::Cx as Context>::Error>;
+    ) -> Result<Option<Self::DecodeEntryKey<'_>>, <Self::Cx as Context>::Error>;
 
     /// Decode the value in the map.
     #[must_use = "Decoders must be consumed"]
-    fn decode_map_entry_value(
+    fn decode_entry_value(
         &mut self,
-    ) -> Result<Self::DecodeMapEntryValue<'_>, <Self::Cx as Context>::Error>;
+    ) -> Result<Self::DecodeEntryValue<'_>, <Self::Cx as Context>::Error>;
 
     /// End entries decoding.
-    fn end_map_entries(self) -> Result<(), <Self::Cx as Context>::Error>;
+    fn end_entries(self) -> Result<(), <Self::Cx as Context>::Error>;
 }

@@ -1,6 +1,6 @@
 use core::fmt;
 
-use musli::en::{MapEncoder, MapEntriesEncoder, MapEntryEncoder, SequenceEncoder, VariantEncoder};
+use musli::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
 use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Encoder};
 
@@ -287,12 +287,12 @@ where
     E: Encoder,
     T: ?Sized + Serialize,
     F: FnOnce(
-        <E::EncodeVariant as VariantEncoder>::EncodeValue<'_>,
+        <E::EncodeVariant as VariantEncoder>::EncodeData<'_>,
     ) -> Result<O, <E::Cx as Context>::Error>,
 {
     let mut variant = encoder.encode_variant()?;
     variant_tag.serialize(Serializer::new(cx, variant.encode_tag()?))?;
-    let output = f(variant.encode_value()?)?;
+    let output = f(variant.encode_data()?)?;
     variant.finish_variant()?;
     Ok(output)
 }
@@ -436,9 +436,9 @@ where
     where
         T: ser::Serialize,
     {
-        self.encoder.encode_map_entry_fn(|field| {
-            field.encode_map_key()?.encode(self.field)?;
-            value.serialize(Serializer::new(self.cx, field.encode_map_value()?))?;
+        self.encoder.encode_entry_fn(|field| {
+            field.encode_key()?.encode(self.field)?;
+            value.serialize(Serializer::new(self.cx, field.encode_value()?))?;
             Ok(())
         })?;
 
@@ -453,7 +453,7 @@ where
 
 pub struct SerializeMap<'a, E>
 where
-    E: MapEntriesEncoder,
+    E: EntriesEncoder,
 {
     cx: &'a E::Cx,
     encoder: E,
@@ -461,7 +461,7 @@ where
 
 impl<'a, E> SerializeMap<'a, E>
 where
-    E: MapEntriesEncoder,
+    E: EntriesEncoder,
 {
     fn new(cx: &'a E::Cx, encoder: E) -> Self {
         Self { cx, encoder }
@@ -471,7 +471,7 @@ where
 impl<'a, E> ser::SerializeMap for SerializeMap<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
-    E: MapEntriesEncoder,
+    E: EntriesEncoder,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -481,7 +481,7 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.encode_map_entry_key()?;
+        let encoder = self.encoder.encode_entry_key()?;
         key.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
@@ -491,14 +491,14 @@ where
     where
         T: ser::Serialize,
     {
-        let encoder = self.encoder.encode_map_entry_value()?;
+        let encoder = self.encoder.encode_entry_value()?;
         value.serialize(Serializer::new(self.cx, encoder))?;
         Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_map_entries()
+        self.encoder.finish_entries()
     }
 }
 
@@ -536,10 +536,10 @@ where
     where
         T: ser::Serialize,
     {
-        let mut field = self.encoder.encode_map_entry()?;
-        field.encode_map_key()?.encode(key)?;
-        value.serialize(Serializer::new(self.cx, field.encode_map_value()?))?;
-        field.finish_map_entry()?;
+        let mut field = self.encoder.encode_entry()?;
+        field.encode_key()?.encode(key)?;
+        value.serialize(Serializer::new(self.cx, field.encode_value()?))?;
+        field.finish_entry()?;
         Ok(())
     }
 
@@ -583,9 +583,9 @@ where
     where
         T: ser::Serialize,
     {
-        self.encoder.encode_map_entry_fn(|field| {
-            field.encode_map_key()?.encode(key)?;
-            value.serialize(Serializer::new(self.cx, field.encode_map_value()?))?;
+        self.encoder.encode_entry_fn(|field| {
+            field.encode_key()?.encode(key)?;
+            value.serialize(Serializer::new(self.cx, field.encode_value()?))?;
             Ok(())
         })?;
 

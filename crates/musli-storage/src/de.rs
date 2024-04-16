@@ -4,8 +4,8 @@ use core::fmt;
 use alloc::vec::Vec;
 
 use musli::de::{
-    DecodeUnsized, Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, PackDecoder,
-    SequenceDecoder, SizeHint, TupleDecoder, ValueVisitor, VariantDecoder,
+    DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, PackDecoder, SequenceDecoder,
+    SizeHint, ValueVisitor, VariantDecoder,
 };
 use musli::hint::{MapHint, SequenceHint};
 use musli::{Context, Decode};
@@ -49,7 +49,7 @@ where
     type DecodePack = Self;
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeTuple = Self;
+    type DecodeSequenceHint = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMapHint = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMap = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = LimitedStorageDecoder<'a, R, OPT, C>;
@@ -289,11 +289,11 @@ where
     }
 
     #[inline]
-    fn decode_tuple<F, O>(mut self, _: &SequenceHint, f: F) -> Result<O, C::Error>
+    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
     {
-        f(&mut self)
+        self.decode_sequence(f)
     }
 
     #[inline]
@@ -348,20 +348,6 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> TupleDecoder<'de>
-    for StorageDecoder<'a, R, OPT, C>
-where
-    R: Reader<'de>,
-{
-    type Cx = C;
-    type DecodeNext<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        PackDecoder::decode_next(self)
-    }
-}
-
 impl<'a, 'de, R, const OPT: Options, C> LimitedStorageDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,
@@ -370,6 +356,7 @@ where
     #[inline]
     fn new(cx: &'a C, mut reader: R) -> Result<Self, C::Error> {
         let remaining = musli_utils::int::decode_usize::<_, _, OPT>(cx, reader.borrow_mut())?;
+
         Ok(Self {
             cx,
             reader,
@@ -450,37 +437,37 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> MapEntryDecoder<'de>
+impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> EntryDecoder<'de>
     for StorageDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeMapKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeMapValue = Self;
+    type DecodeKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeValue = Self;
 
     #[inline]
-    fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, C::Error> {
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
+    fn decode_value(self) -> Result<Self::DecodeValue, C::Error> {
         Ok(self)
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> MapEntriesDecoder<'de>
+impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> EntriesDecoder<'de>
     for LimitedStorageDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeMapEntryKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeMapEntryValue<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeEntryKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeEntryValue<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn decode_map_entry_key(&mut self) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -490,12 +477,12 @@ where
     }
 
     #[inline]
-    fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<(), C::Error> {
+    fn end_entries(self) -> Result<(), C::Error> {
         if self.remaining != 0 {
             return Err(self
                 .cx

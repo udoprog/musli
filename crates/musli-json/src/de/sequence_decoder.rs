@@ -1,6 +1,6 @@
 use core::mem;
 
-use musli::de::{Decoder, PackDecoder, SequenceDecoder, SizeHint, TupleDecoder};
+use musli::de::{Decoder, PackDecoder, SequenceDecoder, SizeHint};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -132,21 +132,5 @@ where
         }
 
         Ok(JsonDecoder::new(self.cx, self.parser.borrow_mut()))
-    }
-}
-
-impl<'a, 'de, P, C> TupleDecoder<'de> for JsonSequenceDecoder<'a, P, C>
-where
-    P: Parser<'de>,
-    C: ?Sized + Context,
-{
-    type Cx = C;
-    type DecodeNext<'this> = JsonDecoder<'a, P::Mut<'this>, C>
-    where
-        Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        PackDecoder::decode_next(self)
     }
 }

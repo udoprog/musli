@@ -1,6 +1,6 @@
 use core::mem::{replace, take};
 
-use musli::de::{Decoder, MapDecoder, MapEntriesDecoder, MapEntryDecoder, SizeHint};
+use musli::de::{Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SizeHint};
 use musli::Context;
 
 use crate::parser::{Parser, Token};
@@ -93,8 +93,8 @@ where
         }
 
         while let Some(mut entry) = self.decode_entry()? {
-            entry.decode_map_key()?.skip()?;
-            entry.decode_map_value()?.skip()?;
+            entry.decode_key()?.skip()?;
+            entry.decode_value()?.skip()?;
         }
 
         let actual = self.parser.peek(self.cx)?;
@@ -155,19 +155,19 @@ where
     }
 }
 
-impl<'a, 'de, P, C> MapEntriesDecoder<'de> for JsonObjectDecoder<'a, P, C>
+impl<'a, 'de, P, C> EntriesDecoder<'de> for JsonObjectDecoder<'a, P, C>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeMapEntryKey<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
+    type DecodeEntryKey<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeMapEntryValue<'this> = JsonDecoder<'a, P::Mut<'this>, C> where Self: 'this;
+    type DecodeEntryValue<'this> = JsonDecoder<'a, P::Mut<'this>, C> where Self: 'this;
 
     #[inline]
-    fn decode_map_entry_key(&mut self) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         if !self.parse_map_key()? {
             return Ok(None);
         }
@@ -176,7 +176,7 @@ where
     }
 
     #[inline]
-    fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
         let actual = self.parser.peek(self.cx)?;
 
         if !matches!(actual, Token::Colon) {
@@ -190,7 +190,7 @@ where
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<(), C::Error> {
+    fn end_entries(self) -> Result<(), C::Error> {
         self.skip_object_remaining()
     }
 }

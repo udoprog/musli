@@ -52,13 +52,13 @@ mod map_decoder;
 #[doc(inline)]
 pub use self::map_decoder::MapDecoder;
 
-mod map_entries_decoder;
+mod entries_decoder;
 #[doc(inline)]
-pub use self::map_entries_decoder::MapEntriesDecoder;
+pub use self::entries_decoder::EntriesDecoder;
 
-mod map_entry_decoder;
+mod entry_decoder;
 #[doc(inline)]
-pub use self::map_entry_decoder::MapEntryDecoder;
+pub use self::entry_decoder::EntryDecoder;
 
 mod number_visitor;
 #[doc(inline)]
@@ -67,10 +67,6 @@ pub use self::number_visitor::NumberVisitor;
 mod pack_decoder;
 #[doc(inline)]
 pub use self::pack_decoder::PackDecoder;
-
-mod tuple_decoder;
-#[doc(inline)]
-pub use self::tuple_decoder::TupleDecoder;
 
 mod sequence_decoder;
 #[doc(inline)]

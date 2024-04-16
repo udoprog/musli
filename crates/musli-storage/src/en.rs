@@ -1,7 +1,7 @@
 use core::fmt;
 
 use musli::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, PackEncoder, SequenceEncoder,
     VariantEncoder,
 };
 use musli::hint::{MapHint, SequenceHint};
@@ -320,10 +320,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntry<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntry<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
@@ -333,54 +333,54 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEntryEncoder for StorageEncoder<'a, W, OPT, C>
+impl<'a, W, const OPT: Options, C> EntryEncoder for StorageEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeMapValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_key(&mut self) -> Result<Self::EncodeMapKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn encode_map_value(&mut self) -> Result<Self::EncodeMapValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEntriesEncoder for StorageEncoder<'a, W, OPT, C>
+impl<'a, W, const OPT: Options, C> EntriesEncoder for StorageEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeMapEntryKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeMapEntryValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntryKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntryValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
-    fn encode_map_entry_key(&mut self) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
+    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn encode_map_entry_value(&mut self) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
+    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entries(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
@@ -393,7 +393,7 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeTag<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeData<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
@@ -401,7 +401,7 @@ where
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 

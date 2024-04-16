@@ -13,12 +13,12 @@ use core::marker;
 use crate::no_std::ToOwned;
 
 use crate::de::{
-    AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, MapDecoder, MapEntriesDecoder,
-    MapEntryDecoder, NumberVisitor, PackDecoder, SequenceDecoder, SizeHint, TupleDecoder,
-    ValueVisitor, VariantDecoder,
+    AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
+    MapDecoder, NumberVisitor, PackDecoder, SequenceDecoder, SizeHint, ValueVisitor,
+    VariantDecoder,
 };
 use crate::en::{
-    Encode, Encoder, MapEncoder, MapEntriesEncoder, MapEntryEncoder, PackEncoder, SequenceEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, PackEncoder, SequenceEncoder,
     VariantEncoder,
 };
 use crate::{Buf, Context};
@@ -104,7 +104,7 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     type DecodeBuffer = Self;
     type DecodePack = Self;
     type DecodeSequence = Self;
-    type DecodeTuple = Self;
+    type DecodeSequenceHint = Self;
     type DecodeMapHint = Self;
     type DecodeMapEntries = Self;
     type DecodeSome = Self;
@@ -167,23 +167,23 @@ impl<C: ?Sized + Context> AsDecoder for Never<(), C> {
     }
 }
 
-impl<'de, C: ?Sized + Context> MapEntriesDecoder<'de> for Never<(), C> {
+impl<'de, C: ?Sized + Context> EntriesDecoder<'de> for Never<(), C> {
     type Cx = C;
-    type DecodeMapEntryKey<'this> = Self where Self: 'this;
-    type DecodeMapEntryValue<'this> = Self where Self: 'this;
+    type DecodeEntryKey<'this> = Self where Self: 'this;
+    type DecodeEntryValue<'this> = Self where Self: 'this;
 
     #[inline]
-    fn decode_map_entry_key(&mut self) -> Result<Option<Self::DecodeMapEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn decode_map_entry_value(&mut self) -> Result<Self::DecodeMapEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn end_map_entries(self) -> Result<(), C::Error> {
+    fn end_entries(self) -> Result<(), C::Error> {
         match self._never {}
     }
 }
@@ -227,18 +227,18 @@ impl<'de, C: ?Sized + Context> MapDecoder<'de> for Never<(), C> {
     }
 }
 
-impl<'de, C: ?Sized + Context> MapEntryDecoder<'de> for Never<(), C> {
+impl<'de, C: ?Sized + Context> EntryDecoder<'de> for Never<(), C> {
     type Cx = C;
-    type DecodeMapKey<'this> = Self where Self: 'this;
-    type DecodeMapValue = Self;
+    type DecodeKey<'this> = Self where Self: 'this;
+    type DecodeValue = Self;
 
     #[inline]
-    fn decode_map_key(&mut self) -> Result<Self::DecodeMapKey<'_>, C::Error> {
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn decode_map_value(self) -> Result<Self::DecodeMapValue, C::Error> {
+    fn decode_value(self) -> Result<Self::DecodeValue, C::Error> {
         match self._never {}
     }
 }
@@ -259,16 +259,6 @@ impl<'de, C: ?Sized + Context> SequenceDecoder<'de> for Never<(), C> {
 }
 
 impl<'de, C: ?Sized + Context> PackDecoder<'de> for Never<(), C> {
-    type Cx = C;
-    type DecodeNext<'this> = Self where Self: 'this;
-
-    #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
-        match self._never {}
-    }
-}
-
-impl<'de, C: ?Sized + Context> TupleDecoder<'de> for Never<(), C> {
     type Cx = C;
     type DecodeNext<'this> = Self where Self: 'this;
 
@@ -376,10 +366,10 @@ impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
 impl<O: 'static, C: ?Sized + Context> MapEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeMapEntry<'this> = Self where Self: 'this;
+    type EncodeEntry<'this> = Self where Self: 'this;
 
     #[inline]
-    fn encode_map_entry(&mut self) -> Result<Self::EncodeMapEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         match self._never {}
     }
 
@@ -388,46 +378,46 @@ impl<O: 'static, C: ?Sized + Context> MapEncoder for Never<O, C> {
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> MapEntryEncoder for Never<O, C> {
+impl<O: 'static, C: ?Sized + Context> EntryEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeMapKey<'this> = Self where Self: 'this;
-    type EncodeMapValue<'this> = Self where Self: 'this;
+    type EncodeKey<'this> = Self where Self: 'this;
+    type EncodeValue<'this> = Self where Self: 'this;
 
     #[inline]
-    fn encode_map_key(&mut self) -> Result<Self::EncodeMapKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn encode_map_value(&mut self) -> Result<Self::EncodeMapValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn finish_map_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> MapEntriesEncoder for Never<O, C> {
+impl<O: 'static, C: ?Sized + Context> EntriesEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeMapEntryKey<'this> = Self where Self: 'this;
-    type EncodeMapEntryValue<'this> = Self where Self: 'this;
+    type EncodeEntryKey<'this> = Self where Self: 'this;
+    type EncodeEntryValue<'this> = Self where Self: 'this;
 
     #[inline]
-    fn encode_map_entry_key(&mut self) -> Result<Self::EncodeMapEntryKey<'_>, C::Error> {
+    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn encode_map_entry_value(&mut self) -> Result<Self::EncodeMapEntryValue<'_>, C::Error> {
+    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn finish_map_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entries(self) -> Result<Self::Ok, C::Error> {
         match self._never {}
     }
 }
@@ -436,7 +426,7 @@ impl<O: 'static, C: ?Sized + Context> VariantEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
     type EncodeTag<'this> = Self where Self: 'this;
-    type EncodeValue<'this> = Self where Self: 'this;
+    type EncodeData<'this> = Self where Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
@@ -444,7 +434,7 @@ impl<O: 'static, C: ?Sized + Context> VariantEncoder for Never<O, C> {
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         match self._never {}
     }
 

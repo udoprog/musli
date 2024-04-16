@@ -7,9 +7,8 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::Context;
 
 use super::{
-    AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, MapDecoder, MapEntriesDecoder,
-    NumberVisitor, PackDecoder, SequenceDecoder, Skip, TupleDecoder, ValueVisitor, VariantDecoder,
-    Visitor,
+    AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, EntriesDecoder, MapDecoder,
+    NumberVisitor, PackDecoder, SequenceDecoder, Skip, ValueVisitor, VariantDecoder, Visitor,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -34,14 +33,14 @@ pub trait Decoder<'de>: Sized {
     type DecodePack: PackDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_sequence`].
     type DecodeSequence: SequenceDecoder<'de, Cx = Self::Cx>;
-    /// Decoder used by [`Decoder::decode_tuple`].
-    type DecodeTuple: TupleDecoder<'de, Cx = Self::Cx>;
+    /// Decoder returned by [`Decoder::decode_sequence_hint`].
+    type DecodeSequenceHint: SequenceDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_map`].
     type DecodeMap: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_map_hint`].
     type DecodeMapHint: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_map_entries`].
-    type DecodeMapEntries: MapEntriesDecoder<'de, Cx = Self::Cx>;
+    type DecodeMapEntries: EntriesDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_variant`].
     type DecodeVariant: VariantDecoder<'de, Cx = Self::Cx>;
 
@@ -153,7 +152,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{AsDecoder, MapDecoder, MapEntryDecoder};
+    /// use musli::de::{AsDecoder, MapDecoder, EntryDecoder};
     ///
     /// #[derive(Decode)]
     /// struct Person {
@@ -179,12 +178,12 @@ pub trait Decoder<'de>: Sized {
     ///                     return Err(cx.missing_variant_tag("Enum"));
     ///                 };
     ///
-    ///                 let found = e.decode_map_key()?.decode_string(musli::utils::visit_owned_fn("a string that is 'type'", |string: &str| {
+    ///                 let found = e.decode_key()?.decode_string(musli::utils::visit_owned_fn("a string that is 'type'", |string: &str| {
     ///                     Ok(string == "type")
     ///                 }))?;
     ///
     ///                 if found {
-    ///                     break Ok(e.decode_map_value()?.decode()?);
+    ///                     break Ok(e.decode_value()?.decode()?);
     ///                 }
     ///             }
     ///         })?;
@@ -1184,7 +1183,7 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Decode a sequence using a closure which is easier to get right.
+    /// Decode a sequence.
     ///
     /// # Examples
     ///
@@ -1226,22 +1225,8 @@ pub trait Decoder<'de>: Sized {
     ///     }
     /// }
     /// ```
-    #[inline]
-    fn decode_sequence<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
-    where
-        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, <Self::Cx as Context>::Error>,
-    {
-        Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Sequence,
-            ExpectingWrapper::new(&self),
-        )))
-    }
-
-    /// Decode a fixed-length sequence of elements of length `len`.
     ///
-    /// # Examples
-    ///
-    /// Deriving an implementation:
+    /// Deriving an implementation for a tuple:
     ///
     /// ```
     /// use musli::Decode;
@@ -1254,7 +1239,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::TupleDecoder;
+    /// use musli::de::SequenceDecoder;
     /// use musli::hint::SequenceHint;
     /// # struct TupleStruct(String, u32);
     ///
@@ -1265,23 +1250,57 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         static HINT: SequenceHint = SequenceHint::with_size(2);
     ///
-    ///         decoder.decode_tuple(&HINT, |tuple| {
-    ///             Ok(Self(tuple.next()?, tuple.next()?))
+    ///         decoder.decode_sequence_hint(&HINT, |tuple| {
+    ///             Ok(Self(tuple.next_required(cx)?, tuple.next_required(cx)?))
     ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_tuple<F, O>(
+    fn decode_sequence<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    where
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, <Self::Cx as Context>::Error>,
+    {
+        Err(self.cx().message(expecting::unsupported_type(
+            &expecting::Sequence,
+            ExpectingWrapper::new(&self),
+        )))
+    }
+
+    /// Decode a sequence with a `hint` indicating its expected characteristics.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Decode, Decoder};
+    /// use musli::de::SequenceDecoder;
+    /// use musli::hint::SequenceHint;
+    /// # struct TupleStruct(String, u32);
+    ///
+    /// impl<'de, M> Decode<'de, M> for TupleStruct {
+    ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    ///     where
+    ///         D: Decoder<'de>,
+    ///     {
+    ///         static HINT: SequenceHint = SequenceHint::with_size(2);
+    ///
+    ///         decoder.decode_sequence_hint(&HINT, |tuple| {
+    ///             Ok(Self(tuple.next_required(cx)?, tuple.next_required(cx)?))
+    ///         })
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn decode_sequence_hint<F, O>(
         self,
         hint: &SequenceHint,
         f: F,
     ) -> Result<O, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::DecodeTuple) -> Result<O, <Self::Cx as Context>::Error>,
+        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Tuple,
+            &expecting::Sequence,
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1294,7 +1313,7 @@ pub trait Decoder<'de>: Sized {
     /// use std::collections::HashMap;
     ///
     /// use musli::{Decode, Decoder};
-    /// use musli::de::{MapDecoder, MapEntryDecoder};
+    /// use musli::de::{MapDecoder, EntryDecoder};
     /// # struct MapStruct { data: HashMap<String, u32> }
     ///
     /// impl<'de, M> Decode<'de, M> for MapStruct {
@@ -1349,7 +1368,7 @@ pub trait Decoder<'de>: Sized {
     ///
     /// ```
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::{MapDecoder, MapEntryDecoder};
+    /// use musli::de::{MapDecoder, EntryDecoder};
     /// use musli::hint::MapHint;
     ///
     /// struct Struct {
@@ -1370,14 +1389,14 @@ pub trait Decoder<'de>: Sized {
     ///
     ///             while let Some(mut field) = st.decode_entry()? {
     ///                 // Note: to avoid allocating `decode_string` needs to be used with a visitor.
-    ///                 let tag = field.decode_map_key()?.decode::<String>()?;
+    ///                 let tag = field.decode_key()?.decode::<String>()?;
     ///
     ///                 match tag.as_str() {
     ///                     "string" => {
-    ///                         string = Some(field.decode_map_value()?.decode()?);
+    ///                         string = Some(field.decode_value()?.decode()?);
     ///                     }
     ///                     "integer" => {
-    ///                         integer = Some(field.decode_map_value()?.decode()?);
+    ///                         integer = Some(field.decode_value()?.decode()?);
     ///                     }
     ///                     tag => {
     ///                         return Err(cx.invalid_field_tag("Struct", tag));
