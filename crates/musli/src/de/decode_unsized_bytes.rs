@@ -1,4 +1,3 @@
-use crate::mode::DefaultMode;
 use crate::Context;
 
 use super::Decoder;
@@ -14,7 +13,7 @@ use super::Decoder;
 /// would demand an exact reference to data from the decoded source.
 ///
 /// [`DecodeUnsized`]: super::DecodeUnsized
-pub trait DecodeUnsizedBytes<'de, M = DefaultMode> {
+pub trait DecodeUnsizedBytes<'de, M> {
     /// Decode the given input using a closure as visitor.
     fn decode_unsized_bytes<D, F, O>(
         cx: &D::Cx,

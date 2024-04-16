@@ -213,7 +213,8 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn rt<T>(value: T) -> T
         where
-            T: ::musli::en::Encode + ::musli::de::DecodeOwned + ::core::fmt::Debug + ::core::cmp::PartialEq,
+            T: ::musli::en::Encode<::musli::mode::DefaultMode> + ::musli::de::DecodeOwned<::musli::mode::DefaultMode>,
+            T: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
             const ENCODING: crate::Encoding = crate::Encoding::new();
@@ -296,8 +297,10 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
         where
-            T: ::musli::en::Encode + ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: ::musli::de::Decode<'de> + ::core::fmt::Debug + ::core::cmp::PartialEq,
+            T: ::musli::en::Encode<::musli::mode::DefaultMode>,
+            T: ::core::fmt::Debug + ::core::cmp::PartialEq,
+            U: ::musli::de::Decode<'de, ::musli::mode::DefaultMode>,
+            U: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
             const ENCODING: crate::Encoding = crate::Encoding::new();
@@ -364,7 +367,7 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn to_vec<T>(value: T) -> ::alloc::vec::Vec<u8>
         where
-            T: ::musli::en::Encode,
+            T: ::musli::en::Encode<::musli::mode::DefaultMode>,
         {
             const WHAT: &str = $what;
             const ENCODING: crate::Encoding = crate::Encoding::new();

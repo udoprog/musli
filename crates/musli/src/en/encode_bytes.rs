@@ -1,5 +1,4 @@
 use crate::en::Encoder;
-use crate::mode::DefaultMode;
 
 /// Trait governing how a type is encoded as bytes.
 ///
@@ -39,7 +38,7 @@ use crate::mode::DefaultMode;
 ///     }
 /// }
 /// ```
-pub trait EncodeBytes<M = DefaultMode> {
+pub trait EncodeBytes<M> {
     /// Encode the given output as bytes.
     fn encode_bytes<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where

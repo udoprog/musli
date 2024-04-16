@@ -59,9 +59,8 @@ type:
 ```rust
 use musli_descriptive::Encoding;
 use musli::{Encode, Decode};
-use musli::mode::DefaultMode;
 
-const CONFIG: Encoding<DefaultMode> = Encoding::new();
+const CONFIG: Encoding = Encoding::new();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Struct<'a> {

@@ -1,4 +1,3 @@
-use crate::mode::DefaultMode;
 use crate::Context;
 
 use super::Decoder;
@@ -9,7 +8,7 @@ use super::Decoder;
 /// internal allocating to properly decode. Simply using the `Decode`
 /// implementation would restrict it to only be used through `&'de str` which
 /// would demand an exact reference to data from the decoded source.
-pub trait DecodeUnsized<'de, M = DefaultMode> {
+pub trait DecodeUnsized<'de, M> {
     /// Decode the given input using a closure as visitor.
     fn decode_unsized<D, F, O>(
         cx: &D::Cx,

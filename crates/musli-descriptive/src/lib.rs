@@ -57,9 +57,8 @@
 //! ```rust
 //! use musli_descriptive::Encoding;
 //! use musli::{Encode, Decode};
-//! use musli::mode::DefaultMode;
 //!
-//! const CONFIG: Encoding<DefaultMode> = Encoding::new();
+//! const CONFIG: Encoding = Encoding::new();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Struct<'a> {
@@ -131,7 +130,7 @@ pub use self::encoding::to_vec;
 #[doc(inline)]
 pub use self::encoding::to_writer;
 #[doc(inline)]
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding, DEFAULT_OPTIONS};
 #[doc(inline)]
 pub use self::error::Error;
 #[cfg(feature = "test")]

@@ -91,7 +91,7 @@ const OPTIONS: Options = options::new()
     .with_byte_order(ByteOrder::NATIVE)
     .build();
 
-const ENCODING: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
+const ENCODING: Encoding<OPTIONS> = Encoding::new().with_options();
 
 #[derive(Encode, Decode)]
 #[musli(packed)]
@@ -298,9 +298,8 @@ Below is a simple example of how we can use two modes to provide two
 completely different formats using a single struct:
 
 ```rust
-use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
-use musli_json::Encoding;
+use musli_json::{DEFAULT_OPTIONS, Encoding};
 
 enum Alt {}
 
@@ -312,8 +311,8 @@ struct Word<'a> {
     teineigo: bool,
 }
 
-const CONFIG: Encoding<DefaultMode> = Encoding::new();
-const ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
+const CONFIG: Encoding = Encoding::new();
+const ALT_CONFIG: Encoding<DEFAULT_OPTIONS, Alt> = Encoding::new().with_mode();
 
 let word = Word {
     text: "あります",

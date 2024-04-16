@@ -313,7 +313,7 @@ pub trait Context {
     ///
     /// Here `name` is `"field"` and `tag` is `"string"`.
     ///
-    /// ```rust
+    /// ```
     /// use musli::{Decode, Encode};
     ///
     /// #[derive(Decode, Encode)]
@@ -343,7 +343,7 @@ pub trait Context {
     ///
     /// Here `index` is `0` and `name` is `"string"`.
     ///
-    /// ```rust
+    /// ```
     /// use musli::{Decode, Encode};
     ///
     /// #[derive(Decode, Encode)]
@@ -383,7 +383,7 @@ pub trait Context {
     ///
     /// Here `name` is `"field"` and `tag` is `"string"`.
     ///
-    /// ```rust
+    /// ```
     /// use musli::{Decode, Encode};
     ///
     /// #[derive(Decode, Encode)]

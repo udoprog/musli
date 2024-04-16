@@ -11,18 +11,19 @@
 //! ```
 
 use musli::de::DecodeOwned;
+use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 
 pub(crate) fn encode<T>(changes: &T) -> tests::storage::Result<Vec<u8>>
 where
-    T: Encode,
+    T: Encode<DefaultMode>,
 {
     tests::storage::to_vec(changes)
 }
 
 pub(crate) fn decode<T>(buf: &[u8]) -> tests::storage::Result<T>
 where
-    T: DecodeOwned,
+    T: DecodeOwned<DefaultMode>,
 {
     tests::storage::from_slice(buf)
 }

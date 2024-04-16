@@ -98,24 +98,23 @@ where
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = DefaultMode, const OPT: Options = DEFAULT_OPTIONS> {
+pub struct Encoding<const OPT: Options = DEFAULT_OPTIONS, M = DefaultMode> {
     _marker: marker::PhantomData<M>,
 }
 
-impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
+impl Encoding<DEFAULT_OPTIONS, DefaultMode> {
     /// Construct a new [`Encoding`] instance with the [`DEFAULT_OPTIONS`]
     /// configuration.
     ///
     /// You can modify this using the available factory methods:
     ///
-    /// ```rust
+    /// ```
     /// use musli::{Encode, Decode};
-    /// use musli::mode::DefaultMode;
     /// use musli_utils::options::{self, Options, Integer};
     /// use musli_wire::Encoding;
     ///
     /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
-    /// const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
+    /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
     /// struct Struct<'a> {
@@ -144,27 +143,36 @@ impl Encoding<DefaultMode, DEFAULT_OPTIONS> {
     }
 }
 
-impl<M, const OPT: Options> Encoding<M, OPT> {
+impl<const OPT: Options, M> Encoding<OPT, M> {
     /// Change the mode of the encoding.
-    pub const fn with_mode<T>(self) -> Encoding<T, OPT> {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_wire::{DEFAULT_OPTIONS, Encoding};
+    ///
+    /// enum Custom {}
+    ///
+    /// const CONFIG: Encoding<DEFAULT_OPTIONS, Custom> = Encoding::new().with_mode();
+    /// ```
+    pub const fn with_mode<T>(self) -> Encoding<OPT, T> {
         Encoding {
             _marker: marker::PhantomData,
         }
     }
 
-    /// Modify the flavor of the current encoding into `U`.
+    /// Change the options of the encoding.
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// use musli::mode::DefaultMode;
+    /// ```
     /// use musli_utils::options::{self, Options, Integer};
     /// use musli_wire::Encoding;
     ///
     /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
-    /// const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
+    /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
     /// ```
-    pub const fn with_options<const U: Options>(self) -> Encoding<M, U> {
+    pub const fn with_options<const U: Options>(self) -> Encoding<U, M> {
         Encoding {
             _marker: marker::PhantomData,
         }
@@ -178,11 +186,11 @@ impl<M, const OPT: Options> Encoding<M, OPT> {
     musli_utils::encoding_from_slice_impls!(M);
 }
 
-impl<M, const OPT: Options> Clone for Encoding<M, OPT> {
+impl<const OPT: Options, M> Clone for Encoding<OPT, M> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<M, const OPT: Options> Copy for Encoding<M, OPT> {}
+impl<const OPT: Options, M> Copy for Encoding<OPT, M> {}
