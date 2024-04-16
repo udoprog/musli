@@ -32,24 +32,24 @@ pub use self::value::{AsValueDecoder, Value};
 pub use error::Error;
 
 use en::ValueEncoder;
-use musli::mode::DefaultMode;
+use musli::mode::Binary;
 use musli::{Decode, Encode};
 use musli_utils::Options;
 
-const DEFAULT_OPTIONS: Options = musli_utils::options::new().build();
+const OPTIONS: Options = musli_utils::options::new().build();
 
 /// Encode something that implements [Encode] into a [Value].
 pub fn encode<T>(value: T) -> Result<Value, Error>
 where
-    T: Encode<DefaultMode>,
+    T: Encode<Binary>,
 {
     use musli::en::Encoder;
 
     let mut output = Value::Unit;
 
     musli_utils::allocator::with(|alloc| {
-        let cx = musli_utils::context::Same::<_, DefaultMode, Error>::new(&alloc);
-        ValueEncoder::<DEFAULT_OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
+        let cx = musli_utils::context::Same::<_, Binary, Error>::new(&alloc);
+        ValueEncoder::<OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
         Ok(output)
     })
 }
@@ -57,13 +57,13 @@ where
 /// Decode a [Value] into a type which implements [Decode].
 pub fn decode<'de, T>(value: &'de Value) -> Result<T, Error>
 where
-    T: Decode<'de, DefaultMode>,
+    T: Decode<'de, Binary>,
 {
     use musli::de::Decoder;
 
     musli_utils::allocator::with(|alloc| {
-        let cx = musli_utils::context::Same::<_, DefaultMode, Error>::new(&alloc);
-        value.decoder::<DEFAULT_OPTIONS, _>(&cx).decode()
+        let cx = musli_utils::context::Same::<_, Binary, Error>::new(&alloc);
+        value.decoder::<OPTIONS, _>(&cx).decode()
     })
 }
 
@@ -77,5 +77,5 @@ where
     use musli::de::Decoder;
 
     cx.clear();
-    value.decoder::<DEFAULT_OPTIONS, _>(cx).decode()
+    value.decoder::<OPTIONS, _>(cx).decode()
 }

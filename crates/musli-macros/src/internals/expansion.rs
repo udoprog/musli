@@ -21,7 +21,7 @@ impl<'a> Expansion<'a> {
             },
             Expansion::Default => Mode {
                 ident: None,
-                mode_path: ModePath::Path(&tokens.default_mode),
+                mode_path: ModePath::Path(&tokens.binary_mode),
                 tokens,
                 only,
             },
@@ -49,7 +49,7 @@ impl<'a> Expansion<'a> {
                 let path = syn::Path::from(mode_ident.clone());
                 (generics, path)
             }
-            Expansion::Default => (generics, tokens.default_mode.clone()),
+            Expansion::Default => (generics, tokens.binary_mode.clone()),
             Expansion::Moded { mode_ident } => (generics, mode_ident.clone()),
         }
     }

@@ -7,21 +7,21 @@
 #[cfg(feature = "std")]
 use musli::{Buf, Context};
 
-/// Wrap a type so that it implements [Reader] and [Writer].
-///
-/// [Reader]: crate::reader::Reader
-/// [Writer]: crate::writer::Writer
+/// Wrap a type so that it implements [`Reader`] and [`Writer`].
 ///
 /// See [`wrap()`].
+///
+/// [`Reader`]: crate::reader::Reader
+/// [`Writer`]: crate::writer::Writer
 pub struct Wrap<T> {
     #[cfg_attr(not(feature = "std"), allow(unused))]
     inner: T,
 }
 
-/// Wrap a type so that it implements [Reader] and [Writer].
+/// Wrap a type so that it implements [`Reader`] and [`Writer`].
 ///
-/// [Reader]: crate::reader::Reader
-/// [Writer]: crate::writer::Writer
+/// [`Reader`]: crate::reader::Reader
+/// [`Writer`]: crate::writer::Writer
 pub fn wrap<T>(inner: T) -> Wrap<T> {
     Wrap { inner }
 }

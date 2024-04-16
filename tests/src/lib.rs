@@ -61,8 +61,7 @@ pub mod json {
 #[track_caller]
 pub fn musli_value_rt<T>(expected: T)
 where
-    T: musli::Encode<musli::mode::DefaultMode>
-        + for<'de> musli::Decode<'de, musli::mode::DefaultMode>,
+    T: musli::Encode<musli::mode::Binary> + for<'de> musli::Decode<'de, musli::mode::Binary>,
     T: PartialEq + core::fmt::Debug,
 {
     let value: ::musli_value::Value =

@@ -39,10 +39,10 @@ pub trait Writer {
     ///
     /// We want to avoid recursive types, which will blow up the compiler. And
     /// the above is a typical example of when that can go wrong. This ensures
-    /// that each call to `borrow_mut` dereferences the [Reader] at each step to
+    /// that each call to `borrow_mut` dereferences the [`Reader`] at each step to
     /// avoid constructing a large muted type, like `&mut &mut &mut VecWriter`.
     ///
-    /// [Reader]: crate::reader::Reader
+    /// [`Reader`]: crate::reader::Reader
     type Mut<'this>: Writer
     where
         Self: 'this;

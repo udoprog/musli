@@ -6,7 +6,7 @@ use musli_utils::{Options, Reader, Writer};
 
 use crate::tag::{Kind, Tag, DATA_MASK};
 
-/// Governs how usize lengths are encoded into a [Writer].
+/// Governs how usize lengths are encoded into a [`Writer`].
 #[inline]
 pub(crate) fn encode_length<C, W, const OPT: Options>(
     cx: &C,
@@ -47,7 +47,7 @@ where
     }
 }
 
-/// Governs how usize lengths are decoded from a [Reader].
+/// Governs how usize lengths are decoded from a [`Reader`].
 #[inline]
 pub(crate) fn decode_length<'de, C, R, const OPT: Options>(
     cx: &C,
@@ -100,7 +100,7 @@ where
     }
 }
 
-/// Governs how unsigned integers are encoded into a [Writer].
+/// Governs how unsigned integers are encoded into a [`Writer`].
 #[inline]
 pub(crate) fn encode_unsigned<C, W, T, const OPT: Options>(
     cx: &C,
@@ -129,7 +129,7 @@ where
     }
 }
 
-/// Governs how unsigned integers are decoded from a [Reader].
+/// Governs how unsigned integers are decoded from a [`Reader`].
 #[inline]
 pub(crate) fn decode_unsigned<'de, C, R, T, const OPT: Options>(
     cx: &C,
@@ -166,7 +166,7 @@ where
     }
 }
 
-/// Governs how signed integers are encoded into a [Writer].
+/// Governs how signed integers are encoded into a [`Writer`].
 #[inline]
 pub(crate) fn encode_signed<C, W, T, const OPT: Options>(
     cx: &C,
@@ -183,7 +183,7 @@ where
     encode_unsigned::<C, W, T::Unsigned, OPT>(cx, writer, value)
 }
 
-/// Governs how signed integers are decoded from a [Reader].
+/// Governs how signed integers are decoded from a [`Reader`].
 #[inline]
 pub(crate) fn decode_signed<'de, C, R, T, const OPT: Options>(
     cx: &C,

@@ -4,14 +4,14 @@
 //!
 //! Common utilities shared by [Müsli] encodings.
 //!
-//! The [Reader] and [Writer] traits are defined in here which determined the
-//! types that can be used in collaboration with [Müsli].
+//! The [`Reader`] and [`Writer`] traits are defined in here which determined
+//! the types that can be used in collaboration with [Müsli].
 //!
 //! Please refer to <https://docs.rs/musli> for documentation.
 //!
 //! [Müsli]: <https://docs.rs/musli>
-//! [Reader]: https://docs.rs/musli-utils/latest/musli-utils/reader/trait.Reader.html
-//! [Writer]: https://docs.rs/musli-utils/latest/musli-utils/writer/trait.Writer.html
+//! [`Reader`]: https://docs.rs/musli-utils/latest/musli-utils/reader/trait.Reader.html
+//! [`Writer`]: https://docs.rs/musli-utils/latest/musli-utils/writer/trait.Writer.html
 
 #![deny(missing_docs)]
 #![no_std]

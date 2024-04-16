@@ -35,7 +35,7 @@ impl fmt::Display for SliceUnderflow {
 /// Trait governing how a source of bytes is read.
 ///
 /// This requires the reader to be able to hand out contiguous references to the
-/// byte source through [Reader::read_bytes].
+/// byte source through [`Reader::read_bytes`].
 pub trait Reader<'de> {
     /// Type borrowed from self.
     ///
@@ -43,8 +43,8 @@ pub trait Reader<'de> {
     ///
     /// We want to avoid recursive types, which will blow up the compiler. And
     /// the above is a typical example of when that can go wrong. This ensures
-    /// that each call to `borrow_mut` dereferences the [Reader] at each step to
-    /// avoid constructing a large muted type, like `&mut &mut &mut
+    /// that each call to `borrow_mut` dereferences the [`Reader`] at each step
+    /// to avoid constructing a large muted type, like `&mut &mut &mut
     /// SliceReader<'de>`.
     type Mut<'this>: Reader<'de>
     where
@@ -257,7 +257,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 }
 
-/// An efficient [Reader] wrapper around a slice.
+/// An efficient [`Reader`] wrapper around a slice.
 pub struct SliceReader<'de> {
     range: Range<*const u8>,
     _marker: marker::PhantomData<&'de [u8]>,

@@ -2,7 +2,7 @@
 
 use core::fmt::Debug;
 
-use musli::mode::DefaultMode;
+use musli::mode::Binary;
 use musli::{Decode, Encode};
 
 musli_utils::test_fns!("descriptive", #[musli_value]);
@@ -12,8 +12,8 @@ musli_utils::test_fns!("descriptive", #[musli_value]);
 #[track_caller]
 pub fn transcode<T, O>(value: T) -> O
 where
-    T: Debug + PartialEq + Encode<DefaultMode>,
-    O: for<'de> Decode<'de, DefaultMode>,
+    T: Debug + PartialEq + Encode<Binary>,
+    O: for<'de> Decode<'de, Binary>,
 {
     let out = crate::to_vec(&value).expect("failed to encode");
     let mut buf = out.as_slice();
