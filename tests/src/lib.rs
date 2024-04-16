@@ -61,7 +61,9 @@ pub mod json {
 #[track_caller]
 pub fn musli_value_rt<T>(expected: T)
 where
-    T: musli::Encode + for<'de> musli::Decode<'de> + PartialEq + core::fmt::Debug,
+    T: musli::Encode<musli::mode::DefaultMode>
+        + for<'de> musli::Decode<'de, musli::mode::DefaultMode>,
+    T: PartialEq + core::fmt::Debug,
 {
     let value: ::musli_value::Value =
         ::musli_value::encode(&expected).expect("value: Encoding should succeed");

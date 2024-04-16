@@ -65,7 +65,7 @@
 //! use musli_storage::Encoding;
 //!
 //! const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
-//! const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
+//! const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Struct<'a> {
@@ -126,7 +126,7 @@ pub use self::encoding::to_vec;
 #[doc(inline)]
 pub use self::encoding::to_writer;
 #[doc(inline)]
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding, DEFAULT_OPTIONS};
 #[doc(inline)]
 pub use self::error::Error;
 #[cfg(feature = "test")]

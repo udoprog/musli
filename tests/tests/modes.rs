@@ -1,4 +1,3 @@
-use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 use musli_json::Encoding;
 
@@ -12,7 +11,7 @@ struct Word<'a> {
     teineigo: bool,
 }
 
-const CONFIG: Encoding<DefaultMode> = Encoding::new();
+const CONFIG: Encoding = Encoding::new();
 const ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
 
 #[test]

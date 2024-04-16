@@ -67,7 +67,7 @@ use musli_utils::options::{self, Options, Integer};
 use musli_storage::Encoding;
 
 const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
-const CONFIG: Encoding<DefaultMode, OPTIONS> = Encoding::new().with_options();
+const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Struct<'a> {

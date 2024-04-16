@@ -1,5 +1,4 @@
 use crate::de::Decoder;
-use crate::mode::DefaultMode;
 use crate::Context;
 
 /// Trait governing how a type is decoded as a packed value.
@@ -47,7 +46,7 @@ use crate::Context;
 ///     }
 /// }
 /// ```
-pub trait DecodePacked<'de, M = DefaultMode>: Sized {
+pub trait DecodePacked<'de, M>: Sized {
     /// Decode the given input as bytes.
     fn decode_packed<D>(cx: &D::Cx, decoder: D) -> Result<Self, <D::Cx as Context>::Error>
     where

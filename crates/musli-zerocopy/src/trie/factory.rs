@@ -98,7 +98,7 @@ impl<T, F: Flavor> Builder<T, F> {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use musli_zerocopy::{trie, OwnedBuf};
     ///
     /// let mut buf = OwnedBuf::new();
@@ -213,7 +213,7 @@ impl<T, F: Flavor> Builder<T, F> {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use musli_zerocopy::{trie, OwnedBuf};
     ///
     /// let mut buf = OwnedBuf::new();

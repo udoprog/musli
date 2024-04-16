@@ -1,5 +1,4 @@
 use crate::en::Encoder;
-use crate::mode::DefaultMode;
 
 /// Trait governing how a type is encoded as a packed value.
 ///
@@ -45,7 +44,7 @@ use crate::mode::DefaultMode;
 ///     }
 /// }
 /// ```
-pub trait EncodePacked<M = DefaultMode> {
+pub trait EncodePacked<M> {
     /// Encode the given output as bytes.
     fn encode_packed<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where

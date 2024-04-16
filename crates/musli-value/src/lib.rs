@@ -41,7 +41,7 @@ const DEFAULT_OPTIONS: Options = musli_utils::options::new().build();
 /// Encode something that implements [Encode] into a [Value].
 pub fn encode<T>(value: T) -> Result<Value, Error>
 where
-    T: Encode,
+    T: Encode<DefaultMode>,
 {
     use musli::en::Encoder;
 
@@ -57,7 +57,7 @@ where
 /// Decode a [Value] into a type which implements [Decode].
 pub fn decode<'de, T>(value: &'de Value) -> Result<T, Error>
 where
-    T: Decode<'de>,
+    T: Decode<'de, DefaultMode>,
 {
     use musli::de::Decoder;
 

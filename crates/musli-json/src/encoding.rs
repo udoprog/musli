@@ -119,7 +119,7 @@ impl Encoding<DefaultMode> {
     ///
     /// You can modify this using the available factory methods:
     ///
-    /// ```rust
+    /// ```
     /// use musli_json::Encoding;
     /// use musli::{Encode, Decode};
     ///
@@ -159,6 +159,16 @@ impl Encoding<DefaultMode> {
 
 impl<M> Encoding<M> {
     /// Change the mode of the encoding.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_json::Encoding;
+    ///
+    /// enum Custom {}
+    ///
+    /// const CONFIG: Encoding<Custom> = Encoding::new().with_mode();
+    /// ```
     pub const fn with_mode<T>(self) -> Encoding<T> {
         Encoding {
             _marker: marker::PhantomData,

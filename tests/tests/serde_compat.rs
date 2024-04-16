@@ -8,6 +8,7 @@ use std::fmt;
 
 use bstr::BStr;
 use musli::de::DecodeOwned;
+use musli::mode::DefaultMode;
 use musli::{Decode, Encode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -31,7 +32,13 @@ mod musli_value {
     #[track_caller]
     pub(super) fn random<T>(module: &str)
     where
-        T: Eq + fmt::Debug + Generate + Encode + DecodeOwned + Serialize + DeserializeOwned,
+        T: Eq
+            + fmt::Debug
+            + Generate
+            + Encode<DefaultMode>
+            + DecodeOwned<DefaultMode>
+            + Serialize
+            + DeserializeOwned,
     {
         guided(module, <T as Generate>::generate);
     }
@@ -39,7 +46,12 @@ mod musli_value {
     #[track_caller]
     pub(super) fn guided<T>(module: &str, value: fn(&mut Rng) -> T)
     where
-        T: Eq + fmt::Debug + Encode + DecodeOwned + Serialize + DeserializeOwned,
+        T: Eq
+            + fmt::Debug
+            + Encode<DefaultMode>
+            + DecodeOwned<DefaultMode>
+            + Serialize
+            + DeserializeOwned,
     {
         macro_rules! do_try {
             ($expr:expr, $msg:expr) => {
@@ -98,7 +110,8 @@ macro_rules! tester {
             #[track_caller]
             pub(super) fn random<T>(module: &str)
             where
-                T: Eq + fmt::Debug + Generate + Encode + DecodeOwned + Serialize + DeserializeOwned,
+                T: Encode<DefaultMode> + DecodeOwned<DefaultMode>,
+                T: Eq + fmt::Debug + Generate + Serialize + DeserializeOwned,
             {
                 guided(module, <T as Generate>::generate);
             }
@@ -106,7 +119,8 @@ macro_rules! tester {
             #[track_caller]
             pub(super) fn guided<T>(module: &str, value: fn(&mut Rng) -> T)
             where
-                T: Eq + fmt::Debug + Encode + DecodeOwned + Serialize + DeserializeOwned,
+                T: Encode<DefaultMode> + DecodeOwned<DefaultMode>,
+                T: Eq + fmt::Debug + Serialize + DeserializeOwned,
             {
                 macro_rules! do_try {
                     ($expr:expr, $msg:expr) => {

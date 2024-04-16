@@ -1,5 +1,4 @@
 use crate::en::Encoder;
-use crate::mode::DefaultMode;
 use crate::Context;
 
 pub use musli_macros::Encode;
@@ -39,7 +38,7 @@ pub use musli_macros::Encode;
 ///     }
 /// }
 /// ```
-pub trait Encode<M = DefaultMode> {
+pub trait Encode<M> {
     /// Encode the given output.
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, <E::Cx as Context>::Error>
     where
@@ -54,7 +53,7 @@ pub trait Encode<M = DefaultMode> {
 ///
 /// [`HashMap<K, V>`]: std::collections::HashMap
 /// [`fmt::Display`]: std::fmt::Display
-pub trait TraceEncode<M = DefaultMode> {
+pub trait TraceEncode<M> {
     /// Encode the given output.
     fn trace_encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, <E::Cx as Context>::Error>
     where
