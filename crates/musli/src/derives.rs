@@ -940,7 +940,7 @@
 //!
 //! #### `#[musli(trace)]`
 //!
-//! This causes the field to use the [`TraceDecode`] / [`TraceEncode`] when
+//! This causes the field to use the [`DecodeTrace`] / [`EncodeTrace`] when
 //! encoding the field. This is left optional for types where enabling tracing
 //! for the field requires extra traits to be implemented, such as `HashMap<K,
 //! V>` where we'd need `K` to implement `fmt::Display`.
@@ -1047,13 +1047,13 @@
 //! [`Decoder::decode_buffer`]: crate::Decoder::decode_buffer
 //! [`Decoder::decode_variant`]: crate::Decoder::decode_variant
 //! [`Decoder`]: crate::Decoder
+//! [`DecodeTrace`]: crate::de::DecodeTrace
 //! [`Encode`]: crate::Encode
 //! [`EncodeBytes`]: crate::en::EncodeBytes
 //! [`EncodePacked`]: crate::en::EncodePacked
 //! [`Encoder::encode_variant`]: crate::Encoder::encode_variant
 //! [`Encoder`]: crate::Encoder
-//! [`TraceDecode`]: crate::de::TraceDecode
-//! [`TraceEncode`]: crate::en::TraceEncode
+//! [`EncodeTrace`]: crate::en::EncodeTrace
 //! [default mode]: crate::mode::Binary
 
 // Parts of this documentation

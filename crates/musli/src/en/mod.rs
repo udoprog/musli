@@ -6,7 +6,7 @@
 //! also comes with a derive allowing you to derive high performance encoding
 //! associated with native Rust types.
 //!
-//! ```rust
+//! ```
 //! use musli::Encode;
 //!
 //! #[derive(Encode)]
@@ -18,7 +18,11 @@
 
 mod encode;
 #[doc(inline)]
-pub use self::encode::{Encode, TraceEncode};
+pub use self::encode::Encode;
+
+mod encode_trace;
+#[doc(inline)]
+pub use self::encode_trace::EncodeTrace;
 
 mod encode_bytes;
 #[doc(inline)]

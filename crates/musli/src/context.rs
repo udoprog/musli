@@ -43,7 +43,7 @@ pub trait Context {
     fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
-        D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
+        D: Decoder<'de, Cx = Self, Mode = Self::Mode, Error = Self::Error>,
     {
         T::decode(self, decoder)
     }
@@ -53,7 +53,7 @@ pub trait Context {
     fn decode_unsized<'de, T, D, F, O>(&self, decoder: D, f: F) -> Result<O, Self::Error>
     where
         T: ?Sized + DecodeUnsized<'de, Self::Mode>,
-        D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
+        D: Decoder<'de, Cx = Self, Mode = Self::Mode, Error = Self::Error>,
         F: FnOnce(&T) -> Result<O, D::Error>,
     {
         T::decode_unsized(self, decoder, f)
@@ -63,7 +63,7 @@ pub trait Context {
     fn decode_bytes<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
     where
         T: DecodeBytes<'de, Self::Mode>,
-        D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
+        D: Decoder<'de, Cx = Self, Mode = Self::Mode, Error = Self::Error>,
     {
         T::decode_bytes(self, decoder)
     }
@@ -73,7 +73,7 @@ pub trait Context {
     fn decode_unsized_bytes<'de, T, D, F, O>(&self, decoder: D, f: F) -> Result<O, Self::Error>
     where
         T: ?Sized + DecodeUnsizedBytes<'de, Self::Mode>,
-        D: Decoder<'de, Cx = Self, Mode = Self::Mode>,
+        D: Decoder<'de, Cx = Self, Mode = Self::Mode, Error = Self::Error>,
         F: FnOnce(&T) -> Result<O, D::Error>,
     {
         T::decode_unsized_bytes(self, decoder, f)

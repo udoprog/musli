@@ -68,8 +68,8 @@ impl Tokens {
             skip_field: path(span, prefix, ["__priv", "skip_field"]),
             skip: path(span, prefix, ["__priv", "skip"]),
             struct_field_decoder_t: path(span, prefix, ["de", "EntryDecoder"]),
-            trace_decode_t: path(span, prefix, ["de", "TraceDecode"]),
-            trace_encode_t: path(span, prefix, ["en", "TraceEncode"]),
+            trace_decode_t: path(span, prefix, ["de", "DecodeTrace"]),
+            trace_encode_t: path(span, prefix, ["en", "EncodeTrace"]),
             variant_decoder_t: path(span, prefix, ["de", "VariantDecoder"]),
             variant_encoder_t: path(span, prefix, ["en", "VariantEncoder"]),
         }

@@ -19,7 +19,7 @@
 //! also suitable for dynamically translating to and from different wire formats
 //! such as JSON without having access to the data model.
 //!
-//! ```rust
+//! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
@@ -54,7 +54,7 @@
 //! To configure the behavior of the wire format you can use the [`Encoding`]
 //! type:
 //!
-//! ```rust
+//! ```
 //! use musli_descriptive::Encoding;
 //! use musli::{Encode, Decode};
 //!
