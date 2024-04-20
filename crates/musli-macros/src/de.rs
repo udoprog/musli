@@ -152,7 +152,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         return Err(());
     }
 
-    let type_name = &en.name;
+    let type_name = en.name;
 
     // Trying to decode an uninhabitable type.
     if en.variants.is_empty() {
@@ -220,9 +220,9 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
             for v in &en.variants {
                 let (pat, variant) =
-                    name_variant(b, v.span, v.index, &v.name, v.pattern, &output_type);
+                    unsized_arm(b, v.span, v.index, &v.name, v.pattern, &output_type);
 
-                output_arms.push((v, OutputArm { pat, cond: None }, &variant.name));
+                output_arms.push((v, OutputArm { pat, cond: None }, &v.name));
                 variants.push(variant);
             }
 
@@ -278,6 +278,47 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     }
 
     match en.enum_tagging {
+        EnumTagging::Empty => {
+            let mut arms = Vec::new();
+
+            for v in &en.variants {
+                let path = &v.st.path;
+                let pat = output_arm(v.pattern, &v.name, &binding_var);
+                arms.push(quote!(#pat => #result_ok(#path {})));
+            }
+
+            match en.fallback {
+                Some(ident) => {
+                    arms.push(quote!(_ => #result_ok(Self::#ident {})));
+                }
+                None => {
+                    arms.push(quote!(#value_var => #result_err(#context_t::invalid_variant_tag(#ctx_var, #type_name, &#value_var))));
+                }
+            }
+
+            match en.name_method {
+                NameMethod::Value => {
+                    let decode_t_decode = &b.decode_t_decode;
+                    let name_type = &en.name_type;
+
+                    Ok(quote! {{
+                        let #value_var: #name_type = #decode_t_decode(#ctx_var, #decoder_var)?;
+
+                        match #value_var { #(#arms,)* }
+                    }})
+                }
+                NameMethod::Unsized(method) => {
+                    let method = method.as_method_name();
+                    let visit_type = &en.name_type;
+
+                    Ok(quote! {
+                        #decoder_t::#method(#decoder_var, |#value_var: &#visit_type| {
+                            match #value_var { #(#arms,)* }
+                        })
+                    })
+                }
+            }
+        }
         EnumTagging::Default => {
             let arms = output_arms.iter().flat_map(|(v, pat, tag_value)| {
                 let name = &v.st.name;
@@ -881,15 +922,15 @@ fn decode_tagged(
             name_type = st.name_type.clone();
         }
         NameMethod::Unsized(method) => {
-            let mut outputs = Vec::new();
             let output_type =
                 e.cx.type_with_span("TagVisitorOutput", e.input.ident.span());
 
+            let mut outputs = Vec::with_capacity(fields_with.len());
             let mut name_arms = Vec::with_capacity(fields_with.len());
 
             for (f, decode, trace) in fields_with {
                 let (name_pat, name_variant) =
-                    name_variant(e, f.span, f.index, &f.name, f.pattern, &output_type);
+                    unsized_arm(e, f.span, f.index, &f.name, f.pattern, &output_type);
 
                 outputs.push(name_variant);
                 name_arms.push((name_pat, decode, trace));
@@ -1201,7 +1242,7 @@ pub(crate) fn build_reference(expr: syn::Expr) -> syn::Expr {
     })
 }
 
-fn name_variant<'a>(
+fn unsized_arm<'a>(
     e: &Build<'_>,
     span: Span,
     index: usize,

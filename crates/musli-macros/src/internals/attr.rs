@@ -50,12 +50,13 @@ struct OneOf<T> {
     any: T,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub(crate) enum EnumTagging<'a> {
     /// Use the default tagging method, as provided by the encoder-specific
     /// method.
-    #[default]
     Default,
+    /// Only the tag is encoded.
+    Empty,
     /// The type is internally tagged by the field given by the expression.
     Internal { tag: &'a syn::Expr },
     /// An enumerator is adjacently tagged.
@@ -241,15 +242,13 @@ impl TypeAttr {
     }
 
     /// Indicates the state of enum tagging.
-    pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> EnumTagging<'_> {
-        let Some((_, tag)) = self.tag(mode) else {
-            return EnumTagging::Default;
-        };
+    pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
+        let (_, tag) = self.tag(mode)?;
 
-        match self.content(mode) {
+        Some(match self.content(mode) {
             Some((_, content)) => EnumTagging::Adjacent { tag, content },
             _ => EnumTagging::Internal { tag },
-        }
+        })
     }
 
     /// Get the configured crate, or fallback to default.

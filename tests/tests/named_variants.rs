@@ -38,35 +38,23 @@ enum ScreamingKebabCase {
 
 #[test]
 fn test_name_all() {
-    tests::rt!(
-        full,
-        PascalCase::VariantName,
-        json = r#"{"VariantName":{}}"#,
-    );
+    tests::rt!(full, PascalCase::VariantName, json = r#""VariantName""#,);
 
-    tests::rt!(full, CamelCase::VariantName, json = r#"{"variantName":{}}"#,);
+    tests::rt!(full, CamelCase::VariantName, json = r#""variantName""#,);
 
-    tests::rt!(
-        full,
-        SnakeCase::VariantName,
-        json = r#"{"variant_name":{}}"#,
-    );
+    tests::rt!(full, SnakeCase::VariantName, json = r#""variant_name""#,);
 
     tests::rt!(
         full,
         ScreamingSnakeCase::VariantName,
-        json = r#"{"VARIANT_NAME":{}}"#,
+        json = r#""VARIANT_NAME""#,
     );
 
-    tests::rt!(
-        full,
-        KebabCase::VariantName,
-        json = r#"{"variant-name":{}}"#,
-    );
+    tests::rt!(full, KebabCase::VariantName, json = r#""variant-name""#,);
 
     tests::rt!(
         full,
         ScreamingKebabCase::VariantName,
-        json = r#"{"VARIANT-NAME":{}}"#,
+        json = r#""VARIANT-NAME""#,
     );
 }

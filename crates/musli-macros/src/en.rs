@@ -362,6 +362,16 @@ fn encode_variant(
     let mut encode;
 
     match en.enum_tagging {
+        EnumTagging::Empty => {
+            let static_type = en.static_type();
+            let encode_t_encode = &b.encode_t_encode;
+            let name = &v.name;
+
+            encode = quote! {{
+                static #name_static: #static_type = #name;
+                #encode_t_encode(&#name_static, #ctx_var, #encoder_var)?
+            }};
+        }
         EnumTagging::Default => {
             match v.st.packing {
                 Packing::Transparent => {

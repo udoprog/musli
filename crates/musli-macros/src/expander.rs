@@ -71,7 +71,7 @@ pub(crate) struct VariantData<'a> {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum StructKind {
-    Indexed,
+    Indexed(usize),
     Named,
 }
 
@@ -125,9 +125,9 @@ impl<'a> Expander<'a> {
                 name: syn::LitStr::new(&input.ident.to_string(), input.ident.span()),
                 fields: fields(&cx, &st.fields),
                 kind: match &st.fields {
+                    syn::Fields::Unit => StructKind::Indexed(0),
+                    syn::Fields::Unnamed(f) => StructKind::Indexed(f.unnamed.len()),
                     syn::Fields::Named(..) => StructKind::Named,
-                    syn::Fields::Unnamed(..) => StructKind::Indexed,
-                    syn::Fields::Unit => StructKind::Indexed,
                 },
             }),
             syn::Data::Enum(en) => {
@@ -143,9 +143,9 @@ impl<'a> Expander<'a> {
                         ident: &variant.ident,
                         fields: fields(&cx, &variant.fields),
                         kind: match &variant.fields {
+                            syn::Fields::Unit => StructKind::Indexed(0),
+                            syn::Fields::Unnamed(f) => StructKind::Indexed(f.unnamed.len()),
                             syn::Fields::Named(..) => StructKind::Named,
-                            syn::Fields::Unnamed(..) => StructKind::Indexed,
-                            syn::Fields::Unit => StructKind::Indexed,
                         },
                     });
 

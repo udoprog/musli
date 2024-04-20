@@ -26,28 +26,28 @@ fn enum_default() {
         upgrade_stable,
         Enum::Variant1,
         EnumDefault::Fallback,
-        json = r#"{"0":{}}"#,
+        json = r#"0"#,
     );
 
     tests::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant2,
         EnumDefault::Fallback,
-        json = r#"{"1":{}}"#,
+        json = r#"1"#,
     );
 
     tests::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant3,
         EnumDefault::Fallback,
-        json = r#"{"2":{}}"#,
+        json = r#"2"#,
     );
 
     tests::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant4,
         EnumDefault::Variant4,
-        json = r#"{"3":{}}"#,
+        json = r#"3"#,
     );
 }
 
@@ -67,27 +67,27 @@ fn enum_pattern() {
         upgrade_stable,
         Enum::Variant1,
         EnumPattern::Variant1,
-        json = r#"{"0":{}}"#,
+        json = r#"0"#,
     );
 
     tests::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant2,
         EnumPattern::Fallback,
-        json = r#"{"1":{}}"#,
+        json = r#"1"#,
     );
 
     tests::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant3,
         EnumPattern::Fallback,
-        json = r#"{"2":{}}"#,
+        json = r#"2"#,
     );
 
     tests::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant4,
         EnumPattern::Variant4,
-        json = r#"{"3":{}}"#,
+        json = r#"3"#,
     );
 }

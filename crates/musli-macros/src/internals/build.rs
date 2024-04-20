@@ -263,7 +263,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         .unwrap_or_default();
 
     let (name_all, name_type, name_method) = match data.kind {
-        StructKind::Indexed if e.type_attr.is_name_type_ambiguous(mode) => {
+        StructKind::Indexed(..) if e.type_attr.is_name_type_ambiguous(mode) => {
             let name_all = NameAll::Index;
             (name_all, name_all.ty(), NameMethod::Value)
         }
@@ -304,9 +304,33 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
 
-    let enum_tagging = e.type_attr.enum_tagging(mode);
-
     let packing_span = e.type_attr.packing(mode);
+
+    let enum_tagging = match e.type_attr.enum_tagging(mode) {
+        Some(enum_tagging) => enum_tagging,
+        None => {
+            if data
+                .variants
+                .iter()
+                .all(|v| matches!(v.kind, StructKind::Indexed(0)))
+            {
+                EnumTagging::Empty
+            } else {
+                EnumTagging::Default
+            }
+        }
+    };
+
+    if !matches!(enum_tagging, EnumTagging::Default | EnumTagging::Empty) {
+        match packing_span {
+            Some((_, Packing::Tagged)) => (),
+            Some(&(span, packing)) => {
+                e.cx.error_span(span, format_args!("#[{ATTR}({packing})] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
+                return Err(());
+            }
+            _ => (),
+        }
+    }
 
     let enum_packing = e
         .type_attr
@@ -320,17 +344,6 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         e.type_attr.name_all(mode),
         e.type_attr.name_method(mode),
     );
-
-    if !matches!(enum_tagging, EnumTagging::Default) {
-        match packing_span {
-            Some((_, Packing::Tagged)) => (),
-            Some(&(span, packing)) => {
-                e.cx.error_span(span, format_args!("#[{ATTR}({packing})] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
-                return Err(());
-            }
-            _ => (),
-        }
-    }
 
     for v in &data.variants {
         variants.push(setup_variant(e, mode, v, &mut fallback)?);
@@ -367,7 +380,7 @@ fn setup_variant<'a>(
         .unwrap_or_default();
 
     let (name_all, name_type, name_method) = match data.kind {
-        StructKind::Indexed if data.attr.is_name_type_ambiguous(mode) => {
+        StructKind::Indexed(..) if data.attr.is_name_type_ambiguous(mode) => {
             let name_all = NameAll::Index;
             (name_all, name_all.ty(), NameMethod::Value)
         }
