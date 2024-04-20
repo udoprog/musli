@@ -13,7 +13,7 @@ use std::io;
 
 use musli::de::{Decode, Decoder};
 use musli::en::{Encode, Encoder};
-use musli::mode::Binary;
+use musli::mode::Text;
 use musli::Context;
 use musli_utils::{FixedBytes, Writer};
 
@@ -31,7 +31,7 @@ pub const DEFAULT: Encoding = Encoding::new();
 pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: Writer,
-    T: ?Sized + Encode<Binary>,
+    T: ?Sized + Encode<Text>,
 {
     DEFAULT.encode(writer, value)
 }
@@ -43,7 +43,7 @@ where
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: io::Write,
-    T: ?Sized + Encode<Binary>,
+    T: ?Sized + Encode<Text>,
 {
     DEFAULT.to_writer(writer, value)
 }
@@ -53,7 +53,7 @@ where
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
 where
-    T: ?Sized + Encode<Binary>,
+    T: ?Sized + Encode<Text>,
 {
     DEFAULT.to_vec(value)
 }
@@ -63,7 +63,7 @@ where
 #[inline]
 pub fn to_string<T>(value: &T) -> Result<String, Error>
 where
-    T: ?Sized + Encode<Binary>,
+    T: ?Sized + Encode<Text>,
 {
     DEFAULT.to_string(value)
 }
@@ -73,7 +73,7 @@ where
 #[inline]
 pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, Error>
 where
-    T: ?Sized + Encode<Binary>,
+    T: ?Sized + Encode<Text>,
 {
     DEFAULT.to_fixed_bytes::<N, _>(value)
 }
@@ -84,7 +84,7 @@ where
 pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
 where
     R: Parser<'de>,
-    T: Decode<'de, Binary>,
+    T: Decode<'de, Text>,
 {
     DEFAULT.decode(reader)
 }
@@ -94,7 +94,7 @@ where
 #[inline]
 pub fn from_str<'de, T>(string: &'de str) -> Result<T, Error>
 where
-    T: Decode<'de, Binary>,
+    T: Decode<'de, Text>,
 {
     DEFAULT.from_str(string)
 }
@@ -104,17 +104,17 @@ where
 #[inline]
 pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
 where
-    T: Decode<'de, Binary>,
+    T: Decode<'de, Text>,
 {
     DEFAULT.from_slice(bytes)
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = Binary> {
+pub struct Encoding<M = Text> {
     _marker: marker::PhantomData<M>,
 }
 
-impl Encoding<Binary> {
+impl Encoding<Text> {
     /// Construct a new [`Encoding`].
     ///
     /// You can modify this using the available factory methods:

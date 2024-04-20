@@ -26,7 +26,7 @@ impl<const N: usize> Typed<N> {
     }
 }
 
-musli_utils::test_fns!("wire");
+musli_utils::test_fns!("wire", musli::mode::Binary);
 
 /// Encode a type as one and decode as another.
 #[inline(never)]

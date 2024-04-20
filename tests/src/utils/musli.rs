@@ -3,7 +3,7 @@
 pub mod musli_json {
     use alloc::vec::Vec;
 
-    use musli::mode::Binary;
+    use musli::mode::Text;
     use musli::{Decode, Encode};
     use musli_json::Encoding;
     use musli_json::Error;
@@ -20,7 +20,7 @@ pub mod musli_json {
 
     pub fn encode<'buf, T>(buffer: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
-        T: Encode<Binary>,
+        T: Encode<Text>,
     {
         ENCODING.encode(&mut *buffer, value)?;
         Ok(buffer)
@@ -28,7 +28,7 @@ pub mod musli_json {
 
     pub fn decode<'buf, T>(buffer: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, Binary>,
+        T: Decode<'buf, Text>,
     {
         ENCODING.from_slice(buffer)
     }

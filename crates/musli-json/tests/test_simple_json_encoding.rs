@@ -4,16 +4,12 @@ use musli::{Decode, Encode};
 use musli_json::Encoding;
 use rand::prelude::*;
 
-// M marker indicating that some attributes should only apply when we're
-// decoding in a JSON mode.
-mod my_modes {
-    pub(crate) enum Json {}
-}
+pub(crate) enum Json {}
 
-const CONFIG: Encoding<my_modes::Json> = Encoding::new().with_mode();
+const CONFIG: Encoding<Json> = Encoding::new().with_mode();
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(mode = my_modes::Json, name_all = "name")]
+#[musli(mode = Json, name_all = "name")]
 struct SimpleJsonStruct<'a> {
     name: &'a str,
     age: f32,

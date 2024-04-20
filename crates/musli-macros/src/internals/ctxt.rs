@@ -1,14 +1,14 @@
 use std::cell::RefCell;
-#[cfg(not(feature = "verbose"))]
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::fmt::{self, Write};
 
 use proc_macro2::Span;
 
+use super::attr::{ModeIdent, ModeKind};
+
 struct Inner {
     b1: String,
-    modes: HashSet<syn::Path>,
+    modes: HashMap<ModeKind, ModeIdent>,
     errors: Vec<syn::Error>,
     #[cfg(not(feature = "verbose"))]
     names: HashMap<String, usize>,
@@ -26,7 +26,7 @@ impl Ctxt {
         Self {
             inner: RefCell::new(Inner {
                 b1: String::new(),
-                modes: HashSet::new(),
+                modes: HashMap::new(),
                 errors: Vec::new(),
                 #[cfg(not(feature = "verbose"))]
                 names: HashMap::new(),
@@ -37,8 +37,11 @@ impl Ctxt {
     }
 
     /// Register a new mode.
-    pub(crate) fn register_mode(&self, mode: syn::Path) {
-        self.inner.borrow_mut().modes.insert(mode);
+    pub(crate) fn register_mode(&self, mode: ModeIdent) {
+        self.inner
+            .borrow_mut()
+            .modes
+            .insert(mode.kind.clone(), mode);
     }
 
     /// Test if context contains errors.
@@ -67,9 +70,9 @@ impl Ctxt {
         std::mem::take(&mut self.inner.borrow_mut().errors)
     }
 
-    /// Get all "extra" modes specified.
-    pub(crate) fn modes(&self) -> Vec<syn::Path> {
-        self.inner.borrow().modes.iter().cloned().collect()
+    /// Get all extra modes specified.
+    pub(crate) fn modes(&self) -> Vec<ModeIdent> {
+        self.inner.borrow().modes.values().cloned().collect()
     }
 
     pub(crate) fn reset(&self) {

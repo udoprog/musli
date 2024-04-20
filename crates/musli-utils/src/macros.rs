@@ -206,14 +206,14 @@ macro_rules! test_include_if {
 #[macro_export]
 #[allow(clippy::crate_in_macro_def)]
 macro_rules! test_fns {
-    ($what:expr $(, $(#[$option:ident])*)?) => {
+    ($what:expr, $mode:ty $(, $(#[$option:ident])*)?) => {
         /// Roundtrip encode the given value.
         #[doc(hidden)]
         #[track_caller]
         #[cfg(feature = "test")]
         pub fn rt<T>(value: T) -> T
         where
-            T: ::musli::en::Encode<::musli::mode::Binary> + ::musli::de::DecodeOwned<::musli::mode::Binary>,
+            T: ::musli::en::Encode<$mode> + ::musli::de::DecodeOwned<$mode>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
@@ -297,9 +297,9 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
         where
-            T: ::musli::en::Encode<::musli::mode::Binary>,
+            T: ::musli::en::Encode<$mode>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: ::musli::de::Decode<'de, ::musli::mode::Binary>,
+            U: ::musli::de::Decode<'de, $mode>,
             U: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
@@ -367,7 +367,7 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn to_vec<T>(value: T) -> ::alloc::vec::Vec<u8>
         where
-            T: ::musli::en::Encode<::musli::mode::Binary>,
+            T: ::musli::en::Encode<$mode>,
         {
             const WHAT: &str = $what;
             const ENCODING: crate::Encoding = crate::Encoding::new();
