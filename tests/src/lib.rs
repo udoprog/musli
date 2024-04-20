@@ -168,6 +168,17 @@ macro_rules! upgrade_stable {
 
 #[macro_export]
 #[doc(hidden)]
+macro_rules! upgrade_stable_no_text {
+    ($call:path) => {
+        #[cfg(feature = "musli-wire")]
+        $call!(musli_wire);
+        #[cfg(feature = "musli-descriptive")]
+        $call!(musli_descriptive);
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
 macro_rules! full {
     ($call:path) => {
         #[cfg(feature = "musli-storage")]

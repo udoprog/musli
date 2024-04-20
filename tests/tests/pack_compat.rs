@@ -26,25 +26,25 @@ struct PackedCompat<const N: usize, const L: usize> {
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct IgnoreLarge<const N: usize> {
     prefix: u32,
-    #[musli(name = 1)]
+    #[musli(mode = Binary, name = 1)]
     small: Packed<N>,
-    #[musli(name = 3)]
+    #[musli(mode = Binary, name = 3)]
     suffix: u32,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct IgnoreSmall<const L: usize> {
     prefix: u32,
-    #[musli(name = 2)]
+    #[musli(mode = Binary, name = 2)]
     large: Packed<L>,
-    #[musli(name = 3)]
+    #[musli(mode = Binary, name = 3)]
     suffix: u32,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct IgnoreBoth {
     prefix: u32,
-    #[musli(name = 3)]
+    #[musli(mode = Binary, name = 3)]
     suffix: u32,
 }
 

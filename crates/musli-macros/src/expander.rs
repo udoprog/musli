@@ -56,6 +56,7 @@ pub(crate) struct StructData<'a> {
     pub(crate) span: Span,
     pub(crate) name: syn::LitStr,
     pub(crate) fields: Vec<FieldData<'a>>,
+    pub(crate) kind: StructKind,
 }
 
 pub(crate) struct VariantData<'a> {
@@ -65,6 +66,13 @@ pub(crate) struct VariantData<'a> {
     pub(crate) attr: attr::VariantAttr,
     pub(crate) ident: &'a syn::Ident,
     pub(crate) fields: Vec<FieldData<'a>>,
+    pub(crate) kind: StructKind,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum StructKind {
+    Indexed,
+    Named,
 }
 
 pub(crate) struct EnumData<'a> {
@@ -116,6 +124,11 @@ impl<'a> Expander<'a> {
                 span: Span::call_site(),
                 name: syn::LitStr::new(&input.ident.to_string(), input.ident.span()),
                 fields: fields(&cx, &st.fields),
+                kind: match &st.fields {
+                    syn::Fields::Named(..) => StructKind::Named,
+                    syn::Fields::Unnamed(..) => StructKind::Indexed,
+                    syn::Fields::Unit => StructKind::Indexed,
+                },
             }),
             syn::Data::Enum(en) => {
                 let variants = en
@@ -129,6 +142,11 @@ impl<'a> Expander<'a> {
                         attr: attr::variant_attrs(&cx, &variant.attrs),
                         ident: &variant.ident,
                         fields: fields(&cx, &variant.fields),
+                        kind: match &variant.fields {
+                            syn::Fields::Named(..) => StructKind::Named,
+                            syn::Fields::Unnamed(..) => StructKind::Indexed,
+                            syn::Fields::Unit => StructKind::Indexed,
+                        },
                     });
 
                 Data::Enum(EnumData {

@@ -53,13 +53,13 @@ fn indexed() {
             tests::rt! {
                 descriptive,
                 Indexed::Variant1 { variant1: 10 },
-                json = r#"{"11":22,"0":10}"#
+                json = r#"{"11":22,"variant1":10}"#
             };
 
             tests::rt! {
                 descriptive,
                 Indexed::Variant2 { variant2: 20 },
-                json = r#"{"11":33,"0":20}"#
+                json = r#"{"11":33,"variant2":20}"#
             };
 
             #[derive(Debug, PartialEq, Encode, Decode)]
@@ -74,13 +74,13 @@ fn indexed() {
             tests::rt! {
                 descriptive,
                 IndexedBounds::Variant1 { variant1: 10 },
-                json = format!(r#"{{"11":{},"0":10}}"#, <$ty>::MAX)
+                json = format!(r#"{{"11":{},"variant1":10}}"#, <$ty>::MAX)
             };
 
             tests::rt! {
                 descriptive,
                 IndexedBounds::Variant2 { variant2: 20 },
-                json = format!(r#"{{"11":{},"0":20}}"#, <$ty>::MIN)
+                json = format!(r#"{{"11":{},"variant2":20}}"#, <$ty>::MIN)
             };
         }};
     }

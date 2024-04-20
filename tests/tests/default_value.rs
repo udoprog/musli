@@ -83,7 +83,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
             age: None,
             country: COUNTRY
         },
-        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+        json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
@@ -98,7 +98,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
             age: None,
             country: COUNTRY
         },
-        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+        json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
@@ -113,7 +113,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
             age: 0,
             country: COUNTRY
         },
-        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+        json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
@@ -128,7 +128,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
             age: 180,
             country: COUNTRY
         },
-        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+        json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
@@ -143,7 +143,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
             age: 170,
             country: COUNTRY
         },
-        json = format!(r#"{{"0":{NAME:?},"1":170,"2":{COUNTRY:?}}}"#),
+        json = format!(r#"{{"name":{NAME:?},"age":170,"country":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
@@ -158,7 +158,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
             age: 0,
             country: COUNTRY
         },
-        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+        json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
@@ -173,7 +173,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
             age: 0,
             country: COUNTRY
         },
-        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+        json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
     tests::assert_decode_eq!(
@@ -188,7 +188,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
             age: 180,
             country: COUNTRY
         },
-        json = format!(r#"{{"0":{NAME:?},"2":{COUNTRY:?}}}"#),
+        json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
     Ok(())

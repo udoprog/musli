@@ -22,7 +22,7 @@ fn container() {
             vec_deque: VecDeque::from([0, 1, 2, 3]),
             boxed: Box::from([0, 1, 2, 3]),
         },
-        json = r#"{"0":[0,1,2,3],"1":[0,1,2,3],"2":[0,1,2,3]}"#
+        json = r#"{"vec":[0,1,2,3],"vec_deque":[0,1,2,3],"boxed":[0,1,2,3]}"#
     );
 }
 

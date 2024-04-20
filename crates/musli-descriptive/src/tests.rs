@@ -3,6 +3,7 @@ use musli::{Decode, Encode};
 use crate::tag::{Kind, Tag, MAX_INLINE_LEN};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 struct From<const N: usize> {
     #[musli(name = 0)]
     prefix: Option<u32>,
@@ -13,6 +14,7 @@ struct From<const N: usize> {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 struct To {
     #[musli(name = 0)]
     prefix: Option<u32>,

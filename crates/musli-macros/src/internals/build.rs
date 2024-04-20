@@ -6,10 +6,11 @@ use syn::Token;
 
 use crate::de::{build_call, build_reference};
 use crate::expander::{
-    self, Data, EnumData, Expander, FieldData, NameMethod, StructData, UnsizedMethod, VariantData,
+    self, Data, EnumData, Expander, FieldData, NameMethod, StructData, StructKind, UnsizedMethod,
+    VariantData,
 };
 
-use super::attr::{EnumTagging, FieldEncoding, Packing};
+use super::attr::{EnumTagging, FieldEncoding, ModeKind, Packing};
 use super::name::NameAll;
 use super::tokens::Tokens;
 use super::ATTR;
@@ -264,11 +265,18 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         .map(|&(_, p)| p)
         .unwrap_or_default();
 
-    let (name_all, name_type, name_method) = split_name(
-        e.type_attr.name_type(mode),
-        e.type_attr.name_all(mode),
-        e.type_attr.name_method(mode),
-    );
+    let (name_all, name_type, name_method) = match data.kind {
+        StructKind::Indexed if e.type_attr.is_name_type_ambiguous(mode) => {
+            let name_all = NameAll::Index;
+            (name_all, name_all.ty(), NameMethod::Value)
+        }
+        _ => split_name(
+            mode.kind,
+            e.type_attr.name_type(mode),
+            e.type_attr.name_all(mode),
+            e.type_attr.name_method(mode),
+        ),
+    };
 
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
 
@@ -310,6 +318,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         .unwrap_or_default();
 
     let (_, name_type, name_method) = split_name(
+        mode.kind,
         e.type_attr.name_type(mode),
         e.type_attr.name_all(mode),
         e.type_attr.name_method(mode),
@@ -360,21 +369,27 @@ fn setup_variant<'a>(
         .map(|&(_, v)| v)
         .unwrap_or_default();
 
-    let (name_all, name_type, name_method) = split_name(
-        data.attr.name_type(mode),
-        data.attr.name_all(mode),
-        data.attr.name_method(mode),
+    let (name_all, name_type, name_method) = match data.kind {
+        StructKind::Indexed if data.attr.is_name_type_ambiguous(mode) => {
+            let name_all = NameAll::Index;
+            (name_all, name_all.ty(), NameMethod::Value)
+        }
+        _ => split_name(
+            mode.kind,
+            data.attr.name_type(mode),
+            data.attr.name_all(mode),
+            data.attr.name_method(mode),
+        ),
+    };
+
+    let (type_name_all, _, _) = split_name(
+        mode.kind,
+        e.type_attr.name_type(mode),
+        e.type_attr.name_all(mode),
+        e.type_attr.name_method(mode),
     );
 
-    let name = expander::expand_name(
-        data,
-        mode,
-        e.type_attr
-            .name_all(mode)
-            .map(|&(_, v)| v)
-            .unwrap_or_default(),
-        Some(data.ident),
-    )?;
+    let name = expander::expand_name(data, mode, type_name_all, Some(data.ident))?;
 
     let pattern = data.attr.pattern(mode).map(|(_, p)| p);
 
@@ -552,15 +567,18 @@ fn setup_field<'a>(
 }
 
 fn split_name(
+    kind: Option<&ModeKind>,
     name_type: Option<&(Span, syn::Type)>,
     name_all: Option<&(Span, NameAll)>,
     name_method: Option<&(Span, NameMethod)>,
 ) -> (NameAll, syn::Type, NameMethod) {
+    let kind_name_all = kind.and_then(ModeKind::default_name_all);
+
     let name_all = name_all.map(|&(_, v)| v);
     let name_method = name_method.map(|&(_, v)| v);
 
     let Some((_, name_type)) = name_type else {
-        let name_all = name_all.unwrap_or_default();
+        let name_all = name_all.or(kind_name_all).unwrap_or_default();
         let name_method = name_method.unwrap_or_else(|| name_all.name_method());
         return (name_all, name_all.ty(), name_method);
     };
