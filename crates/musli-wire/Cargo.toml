@@ -1,6 +1,6 @@
 [package]
 name = "musli-wire"
-version = "0.0.115"
+version = "0.0.116"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
 rust-version = "1.76"
@@ -27,7 +27,7 @@ test = []
 simdutf8 = ["dep:simdutf8"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.115", default-features = false }
-musli-utils = { path = "../musli-utils", version = "0.0.115", default-features = false }
-musli-storage = { path = "../musli-storage", version = "0.0.115", default-features = false }
+musli = { path = "../musli", version = "0.0.116", default-features = false }
+musli-utils = { path = "../musli-utils", version = "0.0.116", default-features = false }
+musli-storage = { path = "../musli-storage", version = "0.0.116", default-features = false }
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
