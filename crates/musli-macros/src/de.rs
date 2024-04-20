@@ -70,8 +70,6 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         ..
     } = e.tokens;
 
-    let (mut generics, mode_ident) = e.expansion.as_impl_generics(generics, e.tokens);
-
     if !e.bounds.is_empty() && !e.decode_bounds.is_empty() {
         generics.make_where_clause().predicates.extend(
             e.bounds
@@ -89,6 +87,8 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     if cfg!(not(feature = "verbose")) {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
+
+    let mode_ident = e.expansion.mode_path(e.tokens).as_path();
 
     Ok(quote! {
         const _: () = {

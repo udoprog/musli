@@ -186,12 +186,7 @@ impl<'a> Expander<'a> {
         self.cx.into_errors()
     }
 
-    fn setup_builds<'b>(
-        &'b self,
-        modes: &'b [ModeIdent],
-        #[allow(unused)] mode_ident: &'b syn::Ident,
-        only: Only,
-    ) -> Result<Vec<Build<'b>>> {
+    fn setup_builds<'b>(&'b self, modes: &'b [ModeIdent], only: Only) -> Result<Vec<Build<'b>>> {
         let mut builds = Vec::new();
 
         let mut missing = BTreeMap::new();
@@ -205,7 +200,7 @@ impl<'a> Expander<'a> {
 
             builds.push(crate::internals::build::setup(
                 self,
-                Expansion::Moded { mode_ident },
+                Expansion { mode_ident },
                 only,
             )?);
         }
@@ -213,7 +208,7 @@ impl<'a> Expander<'a> {
         for (_, mode_ident) in missing {
             builds.push(crate::internals::build::setup(
                 self,
-                Expansion::Moded { mode_ident },
+                Expansion { mode_ident },
                 only,
             )?);
         }
@@ -224,9 +219,7 @@ impl<'a> Expander<'a> {
     /// Expand Encode implementation.
     pub(crate) fn expand_encode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
-        let mode_ident = syn::Ident::new("M", Span::call_site());
-
-        let builds = self.setup_builds(&modes, &mode_ident, Only::Encode)?;
+        let builds = self.setup_builds(&modes, Only::Encode)?;
 
         let mut out = TokenStream::new();
 
@@ -240,9 +233,7 @@ impl<'a> Expander<'a> {
     /// Expand Decode implementation.
     pub(crate) fn expand_decode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
-        let mode_ident = syn::Ident::new("M", Span::call_site());
-
-        let builds = self.setup_builds(&modes, &mode_ident, Only::Decode)?;
+        let builds = self.setup_builds(&modes, Only::Decode)?;
 
         let mut out = TokenStream::new();
 

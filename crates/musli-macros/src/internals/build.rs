@@ -25,8 +25,6 @@ pub(crate) struct Build<'a> {
     pub(crate) expansion: Expansion<'a>,
     pub(crate) data: BuildData<'a>,
     pub(crate) decode_t_decode: syn::Path,
-    #[allow(unused)]
-    pub(crate) decode_t_visit: syn::Path,
     pub(crate) encode_t_encode: syn::Path,
     pub(crate) enum_tagging_span: Option<Span>,
 }
@@ -249,7 +247,6 @@ pub(crate) fn setup<'a>(
         expansion,
         data,
         decode_t_decode: mode.decode_t_decode(FieldEncoding::Default),
-        decode_t_visit: mode.decode_t_visit(),
         encode_t_encode: mode.encode_t_encode(FieldEncoding::Default),
         enum_tagging_span: e.type_attr.enum_tagging_span(mode),
     })

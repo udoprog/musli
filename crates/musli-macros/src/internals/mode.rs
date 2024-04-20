@@ -86,25 +86,6 @@ impl<'a> Mode<'a> {
 
         decode_t
     }
-
-    /// Construct a typed visit call.
-    pub(crate) fn decode_t_visit(&self) -> syn::Path {
-        let mut decode_t = self.tokens.decode_t.clone();
-        let name = "visit";
-
-        if let Some(segment) = decode_t.segments.last_mut() {
-            add_mode_argument(&self.mode_path, segment);
-        }
-
-        decode_t
-            .segments
-            .push(syn::PathSegment::from(syn::Ident::new(
-                name,
-                decode_t.span(),
-            )));
-
-        decode_t
-    }
 }
 
 fn add_mode_argument(moded_ident: &ModePath<'_>, last: &mut syn::PathSegment) {

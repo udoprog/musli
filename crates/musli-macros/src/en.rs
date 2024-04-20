@@ -46,9 +46,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         return Err(());
     }
 
-    let (mut impl_generics, mode_ident) = e
-        .expansion
-        .as_impl_generics(e.input.generics.clone(), e.tokens);
+    let mut impl_generics = e.input.generics.clone();
 
     if !e.bounds.is_empty() {
         let where_clause = impl_generics.make_where_clause();
@@ -66,6 +64,8 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
     if cfg!(not(feature = "verbose")) {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
+
+    let mode_ident = e.expansion.mode_path(e.tokens).as_path();
 
     Ok(quote! {
         const _: () = {
