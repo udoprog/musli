@@ -4,6 +4,7 @@
 use crate::de::{Decode, DecodeBytes, DecodePacked, Decoder};
 use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder};
 use crate::hint::SequenceHint;
+use crate::mode::{Binary, Text};
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///
@@ -59,7 +60,10 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
 ///     field: Vec<u8>,
 /// }
 ///
-/// impl<'de, M> Decode<'de, M> for Struct {
+/// impl<'de, M> Decode<'de, M> for Struct
+/// where
+///     Bytes<Vec<u8>>: Decode<'de, M>
+/// {
 ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de, Mode = M>,
@@ -73,9 +77,10 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
 /// }
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
-#[musli(crate, bound = {T: EncodeBytes<M>}, decode_bound = {T: DecodeBytes<'de, M>})]
+#[musli(crate, transparent)]
+#[musli(mode = Binary, bound = {T: EncodeBytes<Binary>}, decode_bound = {T: DecodeBytes<'de, Binary>})]
+#[musli(mode = Text, bound = {T: EncodeBytes<Text>}, decode_bound = {T: DecodeBytes<'de, Text>})]
 #[repr(transparent)]
-#[musli(transparent)]
 pub struct Bytes<T>(#[musli(bytes)] pub T);
 
 impl<T> AsRef<[u8]> for Bytes<T>
@@ -113,7 +118,10 @@ where
 ///     field2: u32,
 /// }
 ///
-/// impl<'de, M> Decode<'de, M> for Struct {
+/// impl<'de, M> Decode<'de, M> for Struct
+/// where
+///     Packed<(u8, u32)>: Decode<'de, M>
+/// {
 ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de, Mode = M>,
@@ -128,7 +136,8 @@ where
 /// }
 /// ```
 #[derive(Encode, Decode)]
-#[musli(crate, bound = {T: EncodePacked<M>}, decode_bound = {T: DecodePacked<'de, M>})]
+#[musli(crate, transparent)]
+#[musli(mode = Binary, bound = {T: EncodePacked<Binary>}, decode_bound = {T: DecodePacked<'de, Binary>})]
+#[musli(mode = Text, bound = {T: EncodePacked<Text>}, decode_bound = {T: DecodePacked<'de, Text>})]
 #[repr(transparent)]
-#[musli(transparent)]
 pub struct Packed<T>(#[musli(packed)] pub T);

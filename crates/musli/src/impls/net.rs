@@ -1,16 +1,28 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::str::FromStr;
 
+use crate::context::Context;
 use crate::de::{Decode, Decoder, SequenceDecoder, VariantDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder, VariantEncoder};
+use crate::mode::{Binary, Text};
 
 #[derive(Encode, Decode)]
 #[musli(crate)]
+#[musli(mode = Text, name_all = "kebab-case")]
 enum IpAddrTag {
     Ipv4,
     Ipv6,
 }
 
-impl<M> Encode<M> for Ipv4Addr {
+#[derive(Encode, Decode)]
+#[musli(crate)]
+#[musli(mode = Text, name_all = "kebab-case")]
+enum SocketAddrTag {
+    V4,
+    V6,
+}
+
+impl Encode<Binary> for Ipv4Addr {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -20,7 +32,17 @@ impl<M> Encode<M> for Ipv4Addr {
     }
 }
 
-impl<'de, M> Decode<'de, M> for Ipv4Addr {
+impl Encode<Text> for Ipv4Addr {
+    #[inline]
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder,
+    {
+        encoder.collect_string(self)
+    }
+}
+
+impl<'de> Decode<'de, Binary> for Ipv4Addr {
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -30,17 +52,37 @@ impl<'de, M> Decode<'de, M> for Ipv4Addr {
     }
 }
 
-impl<M> Encode<M> for Ipv6Addr {
+impl<'de> Decode<'de, Text> for Ipv4Addr {
+    #[inline]
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        decoder.decode_unsized(|string: &str| Ipv4Addr::from_str(string).map_err(cx.map()))
+    }
+}
+
+impl Encode<Binary> for Ipv6Addr {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = Binary>,
     {
         encoder.encode_array(&self.octets())
     }
 }
 
-impl<'de, M> Decode<'de, M> for Ipv6Addr {
+impl Encode<Text> for Ipv6Addr {
+    #[inline]
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder<Mode = Text>,
+    {
+        encoder.collect_string(self)
+    }
+}
+
+impl<'de> Decode<'de, Binary> for Ipv6Addr {
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -50,11 +92,26 @@ impl<'de, M> Decode<'de, M> for Ipv6Addr {
     }
 }
 
-impl<M> Encode<M> for IpAddr {
+impl<'de> Decode<'de, Text> for Ipv6Addr {
+    #[inline]
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        decoder.decode_unsized(|string: &str| Ipv6Addr::from_str(string).map_err(cx.map()))
+    }
+}
+
+impl<M> Encode<M> for IpAddr
+where
+    IpAddrTag: Encode<M>,
+    Ipv4Addr: Encode<M>,
+    Ipv6Addr: Encode<M>,
+{
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = M>,
     {
         let variant = encoder.encode_variant()?;
 
@@ -65,11 +122,16 @@ impl<M> Encode<M> for IpAddr {
     }
 }
 
-impl<'de, M> Decode<'de, M> for IpAddr {
+impl<'de, M> Decode<'de, M> for IpAddr
+where
+    IpAddrTag: Decode<'de, M>,
+    Ipv4Addr: Decode<'de, M>,
+    Ipv6Addr: Decode<'de, M>,
+{
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de>,
+        D: Decoder<'de, Mode = M>,
     {
         decoder.decode_variant(|variant| {
             let tag = variant.decode_tag()?.decode()?;
@@ -82,11 +144,11 @@ impl<'de, M> Decode<'de, M> for IpAddr {
     }
 }
 
-impl<M> Encode<M> for SocketAddrV4 {
+impl Encode<Binary> for SocketAddrV4 {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = Binary>,
     {
         encoder.encode_pack_fn(|pack| {
             pack.push(self.ip())?;
@@ -96,21 +158,41 @@ impl<M> Encode<M> for SocketAddrV4 {
     }
 }
 
-impl<'de, M> Decode<'de, M> for SocketAddrV4 {
+impl Encode<Text> for SocketAddrV4 {
+    #[inline]
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder<Mode = Text>,
+    {
+        encoder.collect_string(self)
+    }
+}
+
+impl<'de> Decode<'de, Binary> for SocketAddrV4 {
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de>,
+        D: Decoder<'de, Mode = Binary>,
     {
         decoder.decode_pack(|p| Ok(SocketAddrV4::new(p.next()?, p.next()?)))
     }
 }
 
-impl<M> Encode<M> for SocketAddrV6 {
+impl<'de> Decode<'de, Text> for SocketAddrV4 {
+    #[inline]
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        decoder.decode_unsized(|string: &str| SocketAddrV4::from_str(string).map_err(cx.map()))
+    }
+}
+
+impl Encode<Binary> for SocketAddrV6 {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = Binary>,
     {
         encoder.encode_pack_fn(|pack| {
             pack.push(self.ip())?;
@@ -122,28 +204,46 @@ impl<M> Encode<M> for SocketAddrV6 {
     }
 }
 
-impl<'de, M> Decode<'de, M> for SocketAddrV6 {
+impl Encode<Text> for SocketAddrV6 {
+    #[inline]
+    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder<Mode = Text>,
+    {
+        encoder.collect_string(self)
+    }
+}
+
+impl<'de> Decode<'de, Binary> for SocketAddrV6 {
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de>,
+        D: Decoder<'de, Mode = Binary>,
     {
         decoder.decode_pack(|p| Ok(Self::new(p.next()?, p.next()?, p.next()?, p.next()?)))
     }
 }
 
-#[derive(Encode, Decode)]
-#[musli(crate)]
-enum SocketAddrTag {
-    V4,
-    V6,
+impl<'de> Decode<'de, Text> for SocketAddrV6 {
+    #[inline]
+    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de>,
+    {
+        decoder.decode_unsized(|string: &str| SocketAddrV6::from_str(string).map_err(cx.map()))
+    }
 }
 
-impl<M> Encode<M> for SocketAddr {
+impl<M> Encode<M> for SocketAddr
+where
+    SocketAddrTag: Encode<M>,
+    SocketAddrV4: Encode<M>,
+    SocketAddrV6: Encode<M>,
+{
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = M>,
     {
         let variant = encoder.encode_variant()?;
 
@@ -154,11 +254,16 @@ impl<M> Encode<M> for SocketAddr {
     }
 }
 
-impl<'de, M> Decode<'de, M> for SocketAddr {
+impl<'de, M> Decode<'de, M> for SocketAddr
+where
+    SocketAddrTag: Decode<'de, M>,
+    SocketAddrV4: Decode<'de, M>,
+    SocketAddrV6: Decode<'de, M>,
+{
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de>,
+        D: Decoder<'de, Mode = M>,
     {
         decoder.decode_variant(|variant| {
             let tag = variant.decode_tag()?.decode()?;
@@ -168,5 +273,19 @@ impl<'de, M> Decode<'de, M> for SocketAddr {
                 SocketAddrTag::V6 => Self::V6(variant.decode_value()?.decode()?),
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Decode, Encode};
+
+    use std::net::{IpAddr, SocketAddr};
+
+    #[derive(Encode, Decode)]
+    #[musli(crate)]
+    struct Container {
+        ip_addr: IpAddr,
+        sock_addr: SocketAddr,
     }
 }

@@ -529,6 +529,7 @@ impl<T, U, M> Encode<M> for Result<T, U>
 where
     T: Encode<M>,
     U: Encode<M>,
+    ResultTag: Encode<M>,
 {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -548,6 +549,7 @@ impl<'de, M, T, U> Decode<'de, M> for Result<T, U>
 where
     T: Decode<'de, M>,
     U: Decode<'de, M>,
+    ResultTag: Decode<'de, M>,
 {
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>

@@ -6,8 +6,14 @@ use super::mode::ModePath;
 
 #[derive(Clone, Copy)]
 pub(crate) enum Expansion<'a> {
-    Generic { mode_ident: &'a syn::Ident },
-    Moded { mode_ident: &'a ModeIdent },
+    // TODO: Should this be removed or made to work?
+    #[allow(unused)]
+    Generic {
+        mode_ident: &'a syn::Ident,
+    },
+    Moded {
+        mode_ident: &'a ModeIdent,
+    },
 }
 
 impl<'a> Expansion<'a> {
