@@ -3,6 +3,13 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV
 use crate::de::{Decode, Decoder, SequenceDecoder, VariantDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder, VariantEncoder};
 
+#[derive(Encode, Decode)]
+#[musli(crate)]
+enum IpAddrTag {
+    Ipv4,
+    Ipv6,
+}
+
 impl<M> Encode<M> for Ipv4Addr {
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -41,13 +48,6 @@ impl<'de, M> Decode<'de, M> for Ipv6Addr {
     {
         decoder.decode_array::<16>().map(Ipv6Addr::from)
     }
-}
-
-#[derive(Encode, Decode)]
-#[musli(crate)]
-enum IpAddrTag {
-    Ipv4,
-    Ipv6,
 }
 
 impl<M> Encode<M> for IpAddr {

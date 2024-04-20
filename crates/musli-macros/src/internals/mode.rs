@@ -1,31 +1,40 @@
 //! Helper for determining the mode we're currently in.
 
+use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
 
-use super::attr::FieldEncoding;
+use super::attr::{FieldEncoding, ModeKind};
 use super::tokens::Tokens;
 use super::Only;
 
 #[derive(Clone, Copy)]
 pub(crate) enum ModePath<'a> {
     Ident(&'a syn::Ident),
-    Path(&'a syn::Path),
+    Musli(&'a syn::Path, &'a syn::Ident),
 }
 
 impl ModePath<'_> {
     pub(crate) fn as_path(self) -> syn::Path {
         match self {
             ModePath::Ident(ident) => syn::Path::from(ident.clone()),
-            ModePath::Path(path) => path.clone(),
+            ModePath::Musli(base, ident) => {
+                let mut path = base.clone();
+                path.segments.push(syn::PathSegment::from(syn::Ident::new(
+                    "mode",
+                    Span::call_site(),
+                )));
+                path.segments.push(syn::PathSegment::from(ident.clone()));
+                path
+            }
         }
     }
 }
 
 #[derive(Clone, Copy)]
 pub(crate) struct Mode<'a> {
-    pub(crate) ident: Option<&'a syn::Path>,
+    pub(crate) kind: Option<&'a ModeKind>,
     pub(crate) mode_path: ModePath<'a>,
     pub(crate) tokens: &'a Tokens,
     pub(crate) only: Only,

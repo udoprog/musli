@@ -8,7 +8,7 @@ use std::fmt;
 
 use bstr::BStr;
 use musli::de::DecodeOwned;
-use musli::mode::Binary;
+use musli::mode::{Binary, Text};
 use musli::{Decode, Encode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -98,14 +98,14 @@ mod musli_value {
 }
 
 macro_rules! tester {
-    ($module:ident $(,)?) => {
+    ($module:ident, $mode:ty $(,)?) => {
         mod $module {
             use super::*;
 
             #[track_caller]
             pub(super) fn random<T>(module: &str)
             where
-                T: Encode<Binary> + DecodeOwned<Binary>,
+                T: Encode<$mode> + DecodeOwned<$mode>,
                 T: Eq + fmt::Debug + Generate + Serialize + DeserializeOwned,
             {
                 guided(module, <T as Generate>::generate);
@@ -114,7 +114,7 @@ macro_rules! tester {
             #[track_caller]
             pub(super) fn guided<T>(module: &str, value: fn(&mut Rng) -> T)
             where
-                T: Encode<Binary> + DecodeOwned<Binary>,
+                T: Encode<$mode> + DecodeOwned<$mode>,
                 T: Eq + fmt::Debug + Serialize + DeserializeOwned,
             {
                 macro_rules! do_try {
@@ -181,10 +181,10 @@ macro_rules! tester {
     };
 }
 
-tester!(musli_storage);
-tester!(musli_wire);
-tester!(musli_descriptive);
-tester!(musli_json);
+tester!(musli_storage, Binary);
+tester!(musli_wire, Binary);
+tester!(musli_descriptive, Binary);
+tester!(musli_json, Text);
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
 #[generate(crate)]

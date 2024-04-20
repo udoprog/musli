@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
+
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
-use crate::internals::attr::{self, TypeAttr};
+use crate::internals::attr::{self, ModeIdent, ModeKind, TypeAttr};
 use crate::internals::build::Build;
 use crate::internals::name::NameAll;
 use crate::internals::tokens::Tokens;
@@ -83,6 +85,7 @@ pub(crate) struct Expander<'a> {
     pub(crate) type_attr: TypeAttr,
     pub(crate) data: Data<'a>,
     pub(crate) tokens: Tokens,
+    pub(crate) default: Vec<ModeIdent>,
 }
 
 impl<'a> Expander<'a> {
@@ -139,12 +142,24 @@ impl<'a> Expander<'a> {
 
         let prefix = type_attr.crate_or_default();
 
+        let default = vec![
+            ModeIdent {
+                kind: ModeKind::Binary,
+                ident: syn::Ident::new("Binary", Span::call_site()),
+            },
+            ModeIdent {
+                kind: ModeKind::Text,
+                ident: syn::Ident::new("Text", Span::call_site()),
+            },
+        ];
+
         Self {
             input,
             cx,
             type_attr,
             data,
-            tokens: Tokens::new(input.ident.span(), &prefix),
+            tokens: Tokens::new(input.ident.span(), prefix),
+            default,
         }
     }
 
@@ -155,11 +170,17 @@ impl<'a> Expander<'a> {
 
     fn setup_builds<'b>(
         &'b self,
-        modes: &'b [syn::Path],
+        modes: &'b [ModeIdent],
         mode_ident: &'b syn::Ident,
         only: Only,
     ) -> Result<Vec<Build<'b>>> {
         let mut builds = Vec::new();
+
+        let mut missing = BTreeMap::new();
+
+        for default in &self.default {
+            missing.insert(&default.kind, default);
+        }
 
         if modes.is_empty() {
             builds.push(crate::internals::build::setup(
@@ -169,6 +190,8 @@ impl<'a> Expander<'a> {
             )?);
         } else {
             for mode_ident in modes {
+                missing.remove(&mode_ident.kind);
+
                 builds.push(crate::internals::build::setup(
                     self,
                     Expansion::Moded { mode_ident },
@@ -176,11 +199,13 @@ impl<'a> Expander<'a> {
                 )?);
             }
 
-            builds.push(crate::internals::build::setup(
-                self,
-                Expansion::Default,
-                only,
-            )?);
+            for (_, mode_ident) in missing {
+                builds.push(crate::internals::build::setup(
+                    self,
+                    Expansion::Moded { mode_ident },
+                    only,
+                )?);
+            }
         }
 
         Ok(builds)

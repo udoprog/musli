@@ -3,6 +3,7 @@ use std::fmt;
 use std::mem;
 
 use proc_macro2::Span;
+use syn::meta::ParseNestedMeta;
 use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Token;
@@ -12,6 +13,19 @@ use crate::expander::UnsizedMethod;
 use crate::internals::name::NameAll;
 use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) enum ModeKind {
+    Binary,
+    Text,
+    Custom(Box<str>),
+}
+
+#[derive(Clone)]
+pub(crate) struct ModeIdent {
+    pub(crate) ident: syn::Ident,
+    pub(crate) kind: ModeKind,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum Only {
@@ -94,7 +108,7 @@ macro_rules! layer {
         #[derive(Default)]
         pub(crate) struct $attr {
             root: $layer,
-            modes: HashMap<syn::Path, $layer>,
+            modes: HashMap<ModeKind, $layer>,
         }
 
         impl $attr {
@@ -103,7 +117,7 @@ macro_rules! layer {
                 A: Copy + Fn(&$layer) -> Option<&O>,
                 O: ?Sized,
             {
-                if let Some(value) = mode.ident.and_then(|m| self.modes.get(m).and_then(access)) {
+                if let Some(value) = mode.kind.and_then(|m| self.modes.get(m).and_then(access)) {
                     Some(value)
                 } else {
                     access(&self.root)
@@ -243,14 +257,14 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
         }
 
         let mut new = TypeLayerNew::default();
-        let mut mode = None::<syn::Path>;
+        let mut mode = None;
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
             // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
-                mode = Some(meta.input.parse()?);
+                mode = Some(parse_mode(&meta)?);
                 return Ok(());
             }
 
@@ -357,8 +371,9 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
         let attr = match mode {
             Some(mode) => {
-                cx.register_mode(mode.clone());
-                attr.modes.entry(mode).or_default()
+                let modes = attr.modes.entry(mode.kind.clone()).or_default();
+                cx.register_mode(mode);
+                modes
             }
             None => &mut attr.root,
         };
@@ -457,14 +472,14 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
         }
 
         let mut new = VariantLayerNew::default();
-        let mut mode = None::<syn::Path>;
+        let mut mode = None;
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
             // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
-                mode = Some(meta.input.parse()?);
+                mode = Some(parse_mode(&meta)?);
                 return Ok(());
             }
 
@@ -559,8 +574,9 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
         let attr = match mode {
             Some(mode) => {
-                cx.register_mode(mode.clone());
-                attr.modes.entry(mode).or_default()
+                let out = attr.modes.entry(mode.kind.clone()).or_default();
+                cx.register_mode(mode);
+                out
             }
             None => &mut attr.root,
         };
@@ -640,14 +656,14 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
         }
 
         let mut new = FieldNew::default();
-        let mut mode = None::<syn::Path>;
+        let mut mode = None;
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
             // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
-                mode = Some(meta.input.parse()?);
+                mode = Some(parse_mode(&meta)?);
                 return Ok(());
             }
 
@@ -773,8 +789,9 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 
         let attr = match mode {
             Some(mode) => {
-                cx.register_mode(mode.clone());
-                attr.modes.entry(mode).or_default()
+                let out = attr.modes.entry(mode.kind.clone()).or_default();
+                cx.register_mode(mode);
+                out
             }
             None => &mut attr.root,
         };
@@ -783,4 +800,17 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
     }
 
     attr
+}
+
+fn parse_mode(meta: &ParseNestedMeta<'_>) -> syn::Result<ModeIdent> {
+    let ident: syn::Ident = meta.input.parse()?;
+    let s = ident.to_string();
+
+    let kind = match s.as_str() {
+        "Binary" => ModeKind::Binary,
+        "Text" => ModeKind::Text,
+        other => ModeKind::Custom(other.into()),
+    };
+
+    Ok(ModeIdent { ident, kind })
 }

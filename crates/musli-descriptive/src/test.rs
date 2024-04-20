@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use musli::mode::Binary;
 use musli::{Decode, Encode};
 
-musli_utils::test_fns!("descriptive", #[musli_value]);
+musli_utils::test_fns!("descriptive", musli::mode::Binary, #[musli_value]);
 
 /// Encode a type as one and decode as another.
 #[inline(never)]
