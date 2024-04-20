@@ -41,6 +41,7 @@ miri! {
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode))]
+#[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 #[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(feature = "zerocopy", derive(AsBytes, FromBytes, FromZeroes))]

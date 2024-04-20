@@ -171,7 +171,7 @@ impl<'a> Expander<'a> {
     fn setup_builds<'b>(
         &'b self,
         modes: &'b [ModeIdent],
-        mode_ident: &'b syn::Ident,
+        #[allow(unused)] mode_ident: &'b syn::Ident,
         only: Only,
     ) -> Result<Vec<Build<'b>>> {
         let mut builds = Vec::new();
@@ -182,30 +182,22 @@ impl<'a> Expander<'a> {
             missing.insert(&default.kind, default);
         }
 
-        if modes.is_empty() {
+        for mode_ident in modes {
+            missing.remove(&mode_ident.kind);
+
             builds.push(crate::internals::build::setup(
                 self,
-                Expansion::Generic { mode_ident },
+                Expansion::Moded { mode_ident },
                 only,
             )?);
-        } else {
-            for mode_ident in modes {
-                missing.remove(&mode_ident.kind);
+        }
 
-                builds.push(crate::internals::build::setup(
-                    self,
-                    Expansion::Moded { mode_ident },
-                    only,
-                )?);
-            }
-
-            for (_, mode_ident) in missing {
-                builds.push(crate::internals::build::setup(
-                    self,
-                    Expansion::Moded { mode_ident },
-                    only,
-                )?);
-            }
+        for (_, mode_ident) in missing {
+            builds.push(crate::internals::build::setup(
+                self,
+                Expansion::Moded { mode_ident },
+                only,
+            )?);
         }
 
         Ok(builds)

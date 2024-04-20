@@ -366,15 +366,17 @@
 //! the given parameter implements the necessary bounds.
 //!
 //! `#[musli(bound = {..})]` applies to all implementations while
-//! `#[musli(decode_bound = {..})]` only applies to the [`Decode`] implementation.
-//! The latter allows for using the decode lifetime parameter (which defaults to
-//! `'de`).
+//! `#[musli(decode_bound = {..})]` only applies to the [`Decode`]
+//! implementation. The latter allows for using the decode lifetime parameter
+//! (which defaults to `'de`).
 //!
 //! ```
 //! use musli::{Decode, Encode};
+//! use musli::mode::{Binary, Text};
 //!
 //! #[derive(Clone, Debug, PartialEq, Encode, Decode)]
-//! #[musli(bound = {T: Encode<M>}, decode_bound = {T: Decode<'de, M>})]
+//! #[musli(mode = Binary, bound = {T: Encode<Binary>}, decode_bound = {T: Decode<'de, Binary>})]
+//! #[musli(mode = Text, bound = {T: Encode<Text>}, decode_bound = {T: Decode<'de, Text>})]
 //! pub struct GenericWithBound<T> {
 //!     value: T,
 //! }

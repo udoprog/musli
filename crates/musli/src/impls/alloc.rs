@@ -560,7 +560,7 @@ macro_rules! smart_pointer {
 
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-            impl<'de, M> Decode<'de, M> for $ty<Path> {
+            impl<'de, M> Decode<'de, M> for $ty<Path> where PlatformTag: Decode<'de, M> {
                 #[inline]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
@@ -572,7 +572,7 @@ macro_rules! smart_pointer {
 
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-            impl<'de, M> Decode<'de, M> for $ty<OsStr> {
+            impl<'de, M> Decode<'de, M> for $ty<OsStr> where PlatformTag: Decode<'de, M> {
                 #[inline]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
@@ -589,12 +589,15 @@ smart_pointer!(Box, Arc, Rc);
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-impl<M> Encode<M> for OsStr {
+impl<M> Encode<M> for OsStr
+where
+    PlatformTag: Encode<M>,
+{
     #[cfg(unix)]
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = M>,
     {
         use std::os::unix::ffi::OsStrExt;
 
@@ -611,7 +614,7 @@ impl<M> Encode<M> for OsStr {
     #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = M>,
     {
         use std::os::windows::ffi::OsStrExt;
 
@@ -639,11 +642,14 @@ impl<M> Encode<M> for OsStr {
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-impl<M> Encode<M> for OsString {
+impl<M> Encode<M> for OsString
+where
+    PlatformTag: Encode<M>,
+{
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = M>,
     {
         encoder.encode(self.as_os_str())
     }
@@ -651,11 +657,14 @@ impl<M> Encode<M> for OsString {
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-impl<'de, M> Decode<'de, M> for OsString {
+impl<'de, M> Decode<'de, M> for OsString
+where
+    PlatformTag: Decode<'de, M>,
+{
     #[inline]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de>,
+        D: Decoder<'de, Mode = M>,
     {
         use crate::de::VariantDecoder;
 
@@ -714,11 +723,14 @@ impl<'de, M> Decode<'de, M> for OsString {
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-impl<M> Encode<M> for Path {
+impl<M> Encode<M> for Path
+where
+    PlatformTag: Encode<M>,
+{
     #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = M>,
     {
         self.as_os_str().encode(cx, encoder)
     }
@@ -726,11 +738,14 @@ impl<M> Encode<M> for Path {
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-impl<M> Encode<M> for PathBuf {
+impl<M> Encode<M> for PathBuf
+where
+    PlatformTag: Encode<M>,
+{
     #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
-        E: Encoder,
+        E: Encoder<Mode = M>,
     {
         self.as_path().encode(cx, encoder)
     }
@@ -738,11 +753,14 @@ impl<M> Encode<M> for PathBuf {
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-impl<'de, M> Decode<'de, M> for PathBuf {
+impl<'de, M> Decode<'de, M> for PathBuf
+where
+    PlatformTag: Decode<'de, M>,
+{
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de>,
+        D: Decoder<'de, Mode = M>,
     {
         Ok(PathBuf::from(decoder.decode::<OsString>()?))
     }

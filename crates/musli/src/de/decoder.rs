@@ -153,6 +153,7 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::{Context, Decode, Decoder};
     /// use musli::de::{AsDecoder, MapDecoder, EntryDecoder};
+    /// use musli::mode::Binary;
     ///
     /// #[derive(Decode)]
     /// struct Person {
@@ -165,10 +166,10 @@ pub trait Decoder<'de>: Sized {
     ///     Person(Person),
     /// }
     ///
-    /// impl<'de, M> Decode<'de, M> for Enum {
+    /// impl<'de> Decode<'de, Binary> for Enum {
     ///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     ///     where
-    ///         D: Decoder<'de>,
+    ///         D: Decoder<'de, Mode = Binary>,
     ///     {
     ///         let mut buffer = decoder.decode_buffer()?;
     ///
@@ -178,9 +179,9 @@ pub trait Decoder<'de>: Sized {
     ///                     return Err(cx.missing_variant_tag("Enum"));
     ///                 };
     ///
-    ///                 let found = e.decode_key()?.decode_string(musli::utils::visit_owned_fn("a string that is 'type'", |string: &str| {
+    ///                 let found = e.decode_key()?.decode_unsized(|string: &str| {
     ///                     Ok(string == "type")
-    ///                 }))?;
+    ///                 })?;
     ///
     ///                 if found {
     ///                     break Ok(e.decode_value()?.decode()?);
