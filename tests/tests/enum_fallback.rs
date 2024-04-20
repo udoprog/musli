@@ -3,6 +3,7 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 pub enum Enum {
     Variant1,
     Variant2,
@@ -11,6 +12,7 @@ pub enum Enum {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 pub enum EnumDefault {
     #[musli(name = 3)]
     Variant4,
@@ -50,6 +52,7 @@ fn enum_default() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 pub enum EnumPattern {
     Variant1,
     #[musli(pattern = 1..=2)]

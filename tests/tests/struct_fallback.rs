@@ -12,7 +12,8 @@ pub struct Struct {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct StructRename {
-    #[musli(name = 3)]
+    #[musli(mode = Binary, name = 3)]
+    #[musli(mode = Text, name = "field4")]
     field4: u32,
 }
 
@@ -27,11 +28,12 @@ fn struct_rename() {
             field4: 17,
         },
         StructRename { field4: 17 },
-        json = r#"{"0":11,"1":13,"2":15,"3":17}"#,
+        json = r#"{"field1":11,"field2":13,"field3":15,"field4":17}"#,
     );
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 pub struct StructPattern {
     field1: u32,
     #[musli(pattern = 1..=2)]
@@ -43,7 +45,7 @@ pub struct StructPattern {
 #[test]
 fn struct_pattern() {
     tests::assert_decode_eq!(
-        upgrade_stable,
+        upgrade_stable_no_text,
         Struct {
             field1: 0,
             field2: 1,
@@ -54,7 +56,6 @@ fn struct_pattern() {
             field1: 0,
             field2: 2,
             field4: 3
-        },
-        json = r#"{"0":0,"1":1,"2":2,"3":3}"#,
+        }
     );
 }

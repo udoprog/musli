@@ -24,6 +24,7 @@ const ENUM2: OtherEnum = OtherEnum::Variant2 { field: 10 };
 const ENUM3: OtherEnum = OtherEnum::Variant3(10);
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 pub struct SimpleStructFrom {
     pub field: String,
     pub interior: u32,
@@ -39,6 +40,7 @@ pub struct SimpleStructTo {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 pub struct SimpleStructEnum {
     #[musli(name = 4)]
     pub value: OtherEnum,

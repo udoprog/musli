@@ -45,7 +45,7 @@ fn trace_no_std() {
         if let Some(error) = cx.errors().next() {
             assert_eq!(
                 error.to_string(),
-                ".values[Hello]: Invalid numeric (at bytes 15-16)"
+                ".values[Hello]: Invalid numeric (at bytes 19-20)"
             );
             return;
         }

@@ -52,16 +52,16 @@ pub enum UntaggedVariants {
 /// Enums may contain packed variants.
 #[test]
 fn untagged_variants() {
-    tests::rt!(full, UntaggedVariants::Empty, json = r#"{"0":[]}"#);
+    tests::rt!(full, UntaggedVariants::Empty, json = r#"{"Empty":[]}"#);
     tests::rt!(
         full,
         UntaggedVariants::Tuple(42, 84),
-        json = r#"{"1":[42,84]}"#
+        json = r#"{"Tuple":[42,84]}"#
     );
     tests::rt!(
         full,
         UntaggedVariants::Struct { a: 42, b: 84 },
-        json = r#"{"2":[42,84]}"#
+        json = r#"{"Struct":[42,84]}"#
     );
 }
 

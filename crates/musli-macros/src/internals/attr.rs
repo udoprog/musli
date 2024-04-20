@@ -21,6 +21,16 @@ pub(crate) enum ModeKind {
     Custom(Box<str>),
 }
 
+impl ModeKind {
+    pub(crate) fn default_name_all(&self) -> Option<NameAll> {
+        match self {
+            ModeKind::Binary => Some(NameAll::Index),
+            ModeKind::Text => Some(NameAll::Name),
+            ModeKind::Custom(_) => None,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct ModeIdent {
     pub(crate) ident: syn::Ident,
@@ -218,6 +228,12 @@ layer! {
 }
 
 impl TypeAttr {
+    pub(crate) fn is_name_type_ambiguous(&self, mode: Mode<'_>) -> bool {
+        self.name_type(mode).is_none()
+            && self.name_all(mode).is_none()
+            && self.name_method(mode).is_none()
+    }
+
     pub(crate) fn enum_tagging_span(&self, mode: Mode<'_>) -> Option<Span> {
         let tag = self.tag(mode);
         let content = self.content(mode);
@@ -459,6 +475,14 @@ layer! {
         /// `#[musli(default)]`.
         default_variant: (),
         @multiple
+    }
+}
+
+impl VariantAttr {
+    pub(crate) fn is_name_type_ambiguous(&self, mode: Mode<'_>) -> bool {
+        self.name_type(mode).is_none()
+            && self.name_all(mode).is_none()
+            && self.name_method(mode).is_none()
     }
 }
 

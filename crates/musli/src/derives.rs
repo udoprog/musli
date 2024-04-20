@@ -61,9 +61,7 @@
 //!
 //! ```ignore
 //! # use musli::{Encode, Decode};
-//! # enum Json {}
 //! # #[derive(Encode, Decode)]
-//! # #[musli(mode = Json, name_all = "name")]
 //! # struct Person<'a> { name: &'a str, age: u32 }
 //! use musli_json::Encoding;
 //!
@@ -99,16 +97,16 @@
 //!
 //! The attributes only apply to the given `mode`.
 //!
-//! The `Person` struct below uses string field names when the `Json` mode is
-//! enabled, otherwise it uses default numerical field names.
+//! The `Person` struct below uses string field names by default when the `Text`
+//! mode is enabled, but we can change this behavior only for that particular
+//! mode like this:
 //!
 //! ```
 //! use musli::{Encode, Decode};
-//!
-//! enum Json {}
+//! use musli::mode::Text;
 //!
 //! #[derive(Encode, Decode)]
-//! #[musli(mode = Json, name_all = "name")]
+//! #[musli(mode = Text, name_type = usize)]
 //! struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
@@ -461,7 +459,7 @@
 //! enum Enum {
 //!     Variant1,
 //!     Variant2,
-//!     #[musli(pattern = 2..=4)]
+//!     #[musli(mode = Binary, pattern = 2..=4)]
 //!     Deprecated,
 //! }
 //! ```
@@ -725,7 +723,7 @@
 //! struct Struct {
 //!     field1: u32,
 //!     field2: u32,
-//!     #[musli(pattern = 2..=4)]
+//!     #[musli(mode = Binary, pattern = 2..=4)]
 //!     other: u32,
 //! }
 //! ```

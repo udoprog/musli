@@ -20,7 +20,7 @@ fn skip_serializing_if_outer() {
             flag: false,
             inner: Some(SkipSerializeInner),
         },
-        json = r#"{"0":false,"1":{}}"#,
+        json = r#"{"flag":false,"inner":{}}"#,
     );
 
     tests::rt!(
@@ -29,6 +29,6 @@ fn skip_serializing_if_outer() {
             flag: false,
             inner: None,
         },
-        json = r#"{"0":false}"#,
+        json = r#"{"flag":false}"#,
     );
 }

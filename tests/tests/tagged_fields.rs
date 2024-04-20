@@ -10,10 +10,12 @@ pub struct StructFrom {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct StructTo {
-    #[musli(name = 1)]
-    number: u32,
-    #[musli(name = 0)]
-    string: String,
+    #[musli(mode = Binary, name = 1)]
+    #[musli(mode = Text, name = "number")]
+    string: u32,
+    #[musli(mode = Binary, name = 0)]
+    #[musli(mode = Text, name = "string")]
+    number: String,
 }
 
 #[test]
@@ -29,8 +31,8 @@ fn struct_renamed() {
     let to = tests::rt!(
         full,
         StructTo {
-            number: 42,
-            string: String::from("a string"),
+            string: 42,
+            number: String::from("a string"),
         }
     );
 
