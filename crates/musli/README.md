@@ -12,7 +12,7 @@ Rust, in the same vein as [`serde`].
 
 It provides a set of [formats](#formats), each with its own well-documented
 set of features and tradeoffs. Every byte-oriented serialization method
-(including [`musli-json`]) has full `#[no_std]` support with or without
+(including [`musli::json`]) has full `#[no_std]` support with or without
 `alloc`. And a particularly neat component providing low-level refreshingly
 simple [zero-copy serialization][zerocopy].
 
@@ -40,8 +40,7 @@ to use:
 
 ```toml
 [dependencies]
-musli = "0.0.117"
-musli-wire = "0.0.117"
+musli = { version = "0.0.117", features = ["storage"] }
 ```
 
 <br>
@@ -179,11 +178,11 @@ The available formats and their capabilities are:
 
 | | `reorder` | `missing` | `unknown` | `self` |
 |-|-|-|-|-|
-| [`musli-storage`] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
-| [`musli-storage`]                    | ✔ | ✔ | ✗ | ✗ |
-| [`musli-wire`]                       | ✔ | ✔ | ✔ | ✗ |
-| [`musli-descriptive`]                | ✔ | ✔ | ✔ | ✔ |
-| [`musli-json`][`musli-json`][^json]  | ✔ | ✔ | ✔ | ✔ |
+| [`musli::storage`] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
+| [`musli::storage`]                    | ✔ | ✔ | ✗ | ✗ |
+| [`musli::wire`]                       | ✔ | ✔ | ✔ | ✗ |
+| [`musli::descriptive`]                | ✔ | ✔ | ✔ | ✔ |
+| [`musli::json`][^json]                | ✔ | ✔ | ✔ | ✔ |
 
 `reorder` determines whether fields must occur in exactly the order in which
 they are specified in their type. Reordering fields in such a type would
@@ -210,8 +209,8 @@ also allows for type-coercions to be performed, so that a signed number can
 be correctly read as an unsigned number if it fits in the destination type.
 
 For every feature you drop, the format becomes more compact and efficient.
-[`musli-storage`] using `#[musli(packed)]` for example is roughly as compact
-as [`bincode`] while [`musli-wire`] is comparable in size to something like
+[`musli::storage`] using `#[musli(packed)]` for example is roughly as compact
+as [`bincode`] while [`musli::wire`] is comparable in size to something like
 [`protobuf`]. All formats are primarily byte-oriented, but some might
 perform [bit packing] if the benefits are obvious.
 
@@ -224,7 +223,7 @@ to support it. Luckily, the implementation is also quite good!
 ## Upgrade stability
 
 The following is an example of *full upgrade stability* using
-[`musli-wire`]. `Version1` can be decoded from an instance of `Version2`
+[`musli::wire`]. `Version1` can be decoded from an instance of `Version2`
 because it understands how to skip fields which are part of `Version2`.
 We're also explicitly adding `#[musli(name = ..)]` to the fields to ensure
 that they don't change in case they are re-ordered.
@@ -234,45 +233,46 @@ use musli::{Encode, Decode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Version1 {
-    #[musli(name = 0)]
+    #[musli(mode = Binary, name = 0)]
     name: String,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Version2 {
-    #[musli(name = 0)]
+    #[musli(mode = Binary, name = 0)]
     name: String,
-    #[musli(default, name = 1)]
+    #[musli(mode = Binary, name = 1)]
+    #[musli(default)]
     age: Option<u32>,
 }
 
-let version2 = musli_wire::to_vec(&Version2 {
+let version2 = musli::wire::to_vec(&Version2 {
     name: String::from("Aristotle"),
     age: Some(62),
 })?;
 
-let version1: Version1 = musli_wire::decode(version2.as_slice())?;
+let version1: Version1 = musli::wire::decode(version2.as_slice())?;
 ```
 
 The following is an example of *partial upgrade stability* using
-[`musli-storage`] on the same data models. Note how `Version2` can be
+[`musli::storage`] on the same data models. Note how `Version2` can be
 decoded from `Version1` but *not* the other way around making it suitable
 for on-disk storage where the schema can evolve from older to newer
 versions.
 
 ```rust
-let version2 = musli_storage::to_vec(&Version2 {
+let version2 = musli::storage::to_vec(&Version2 {
     name: String::from("Aristotle"),
     age: Some(62),
 })?;
 
-assert!(musli_storage::decode::<_, Version1>(version2.as_slice()).is_err());
+assert!(musli::storage::decode::<_, Version1>(version2.as_slice()).is_err());
 
-let version1 = musli_storage::to_vec(&Version1 {
+let version1 = musli::storage::to_vec(&Version1 {
     name: String::from("Aristotle"),
 })?;
 
-let version2: Version2 = musli_storage::decode(version1.as_slice())?;
+let version2: Version2 = musli::storage::decode(version1.as_slice())?;
 ```
 
 <br>
@@ -299,7 +299,7 @@ completely different formats using a single struct:
 
 ```rust
 use musli::{Decode, Encode};
-use musli_json::{OPTIONS, Encoding};
+use musli::json::Encoding;
 
 enum Alt {}
 
@@ -312,7 +312,7 @@ struct Word<'a> {
 }
 
 const CONFIG: Encoding = Encoding::new();
-const ALT_CONFIG: Encoding<OPTIONS, Alt> = Encoding::new().with_mode();
+const ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
 
 let word = Word {
     text: "あります",
@@ -340,7 +340,7 @@ used:
   the default `Reader` impl for `&[u8]` does. Since it can perform most of
   the necessary comparisons directly on the pointers.
 
-* Some unsafety related to UTF-8 handling in `musli_json`, because we check
+* Some unsafety related to UTF-8 handling in `musli::json`, because we check
   UTF-8 validity internally ourselves (like `serde_json`).
 
 * `FixedBytes<N>`, which is a stack-based container that can operate over
@@ -358,19 +358,19 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 
 <br>
 
+[`Binary`]: https://docs.rs/musli/latest/musli/mode/enum.Binary.html
 [`bincode`]: https://docs.rs/bincode
 [`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
 [`Decoder`]: https://docs.rs/musli/latest/musli/trait.Decoder.html
-[`Binary`]: https://docs.rs/musli/latest/musli/mode/enum.Binary.html
-[`derives`]: https://docs.rs/musli/latest/musli/derives/
+[`derives`]: https://docs.rs/musli/latest/musli/help/derives/index.html
 [`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
 [`Encoder`]: https://docs.rs/musli/latest/musli/trait.Encoder.html
-[`musli-descriptive`]: https://docs.rs/musli-descriptive
-[`musli-json`]: https://docs.rs/musli-json
-[`musli-serde`]: https://docs.rs/musli-serde
-[`musli-storage`]: https://docs.rs/musli-storage
-[`musli-value`]: https://docs.rs/musli-value
-[`musli-wire`]: https://docs.rs/musli-wire
+[`musli-serde`]: https://docs.rs/musli/latest/musli/serde/index.html
+[`musli-value`]: https://docs.rs/musli/latest/musli/value/index.html
+[`musli::descriptive`]: https://docs.rs/musli/latest/musli/descriptive/index.html
+[`musli::json`]: https://docs.rs/musli/latest/musli/json/index.html
+[`musli::storage`]: https://docs.rs/musli/latest/musli/storage/index.html
+[`musli::wire`]: https://docs.rs/musli/latest/musli/wire/index.html
 [`protobuf`]: https://developers.google.com/protocol-buffers
 [`serde`]: https://serde.rs
 [`simdutf8`]: https://docs.rs/simdutf8
@@ -378,7 +378,7 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [benchmarks]: https://udoprog.github.io/musli/benchmarks/
 [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
 [detailed tracing]: https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html
-[musli-name-type]: https://docs.rs/musli/latest/musli/derives/index.html#musliname_type--
+[musli-name-type]: https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type--
 [no-std and no-alloc]: https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs
 [scoped allocations]: https://docs.rs/musli-allocator
 [size comparisons]: https://udoprog.github.io/musli/benchmarks/#size-comparisons

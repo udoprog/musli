@@ -19,6 +19,10 @@ pub struct SkipSerializeUntagged {
     after: u32,
 }
 
+#[derive(Debug, PartialEq, Eq, Decode)]
+#[musli(packed)]
+struct Unpacked(u32, u32);
+
 #[test]
 fn skip_serialize() {
     tests::rt!(
@@ -31,15 +35,13 @@ fn skip_serialize() {
         json = r#"[1,2,3]"#,
     );
 
-    let out = tests::wire::transcode::<_, Unpacked>(SkipSerializeUntagged {
-        before: 1,
-        skipped: None,
-        after: 3,
-    });
-
-    assert_eq!(out, Unpacked(1, 3));
-
-    #[derive(Debug, PartialEq, Eq, Decode)]
-    #[musli(packed)]
-    struct Unpacked(u32, u32);
+    tests::assert_decode_eq! {
+        full,
+        SkipSerializeUntagged {
+            before: 1,
+            skipped: None,
+            after: 3,
+        },
+        Unpacked(1, 3),
+    };
 }

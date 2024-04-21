@@ -4,9 +4,9 @@
 
 use core::alloc::GlobalAlloc;
 
+use musli::allocator::{Stack, StackBuffer};
+use musli::context::StackContext;
 use musli::{Decode, Encode};
-use musli_utils::allocator::{Stack, StackBuffer};
-use musli_utils::context::StackContext;
 
 struct Allocator;
 
@@ -57,7 +57,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let alloc = Stack::new(&mut buf);
     let cx = StackContext::new(&alloc);
 
-    let encoding = musli_json::Encoding::new();
+    let encoding = musli::json::Encoding::new();
 
     let mut buf = [0u8; 1024];
 

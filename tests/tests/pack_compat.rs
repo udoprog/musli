@@ -118,6 +118,6 @@ fn test_length<const N: usize, const L: usize>() {
 
 #[test]
 fn test_lengths() {
-    test_length::<{ tests::wire::tag::MAX_INLINE_LEN - 4 }, 256>();
-    test_length::<{ tests::descriptive::tag::MAX_INLINE_LEN - 4 }, 256>();
+    test_length::<{ musli::wire::MAX_INLINE_LEN - 4 }, 256>();
+    test_length::<{ musli::descriptive::MAX_INLINE_LEN - 4 }, 256>();
 }

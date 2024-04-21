@@ -3,10 +3,10 @@
 pub mod musli_json {
     use alloc::vec::Vec;
 
+    use musli::json::Encoding;
+    use musli::json::Error;
     use musli::mode::Text;
     use musli::{Decode, Encode};
-    use musli_json::Encoding;
-    use musli_json::Error;
 
     const ENCODING: Encoding = Encoding::new();
 
@@ -39,9 +39,9 @@ pub mod musli_json {
 pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
+    use musli::options::{self, Integer, Options};
+    use musli::storage::{Encoding, Error};
     use musli::{Decode, Encode};
-    use musli_storage::{Encoding, Error};
-    use musli_utils::options::{self, Integer, Options};
 
     use crate::mode::Packed;
 
@@ -78,9 +78,9 @@ pub mod musli_storage {
     use alloc::vec::Vec;
 
     use musli::mode::Binary;
+    use musli::options::{self, Options};
+    use musli::storage::{Encoding, Error};
     use musli::{Decode, Encode};
-    use musli_storage::{Encoding, Error};
-    use musli_utils::options::{self, Options};
 
     const OPTIONS: Options = options::new().build();
     const ENCODING: Encoding<OPTIONS> = Encoding::new().with_options();
@@ -115,9 +115,9 @@ pub mod musli_wire {
     use alloc::vec::Vec;
 
     use musli::mode::Binary;
+    use musli::wire::Encoding;
+    use musli::wire::Error;
     use musli::{Decode, Encode};
-    use musli_wire::Encoding;
-    use musli_wire::Error;
 
     const ENCODING: Encoding = Encoding::new();
 
@@ -150,10 +150,10 @@ pub mod musli_wire {
 pub mod musli_descriptive {
     use crate::no_alloc::Bytes;
 
+    use musli::descriptive::Encoding;
+    use musli::descriptive::Error;
     use musli::mode::Binary;
     use musli::{Decode, Encode};
-    use musli_descriptive::Encoding;
-    use musli_descriptive::Error;
 
     const ENCODING: Encoding = Encoding::new();
 
@@ -185,21 +185,21 @@ pub mod musli_descriptive {
 #[crate::benchmarker(as_bytes_disabled)]
 pub mod musli_value {
     use musli::mode::Binary;
+    use musli::value::Value;
     use musli::{Decode, Encode};
-    use musli_value::Value;
 
-    pub fn encode<T>(value: &T) -> Result<Value, musli_value::Error>
+    pub fn encode<T>(value: &T) -> Result<Value, musli::value::Error>
     where
         T: Encode<Binary>,
     {
-        musli_value::encode(value)
+        musli::value::encode(value)
     }
 
-    pub fn decode<T>(buf: &Value) -> Result<T, musli_value::Error>
+    pub fn decode<T>(buf: &Value) -> Result<T, musli::value::Error>
     where
         for<'a> T: Decode<'a, Binary>,
     {
-        musli_value::decode(buf)
+        musli::value::decode(buf)
     }
 }
 

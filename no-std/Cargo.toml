@@ -4,9 +4,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-musli = { path = "../crates/musli", default-features = false }
-musli-json = { path = "../crates/musli-json", default-features = false, features = ["parse-full"] }
-musli-utils = { path = "../crates/musli-utils", default-features = false }
+musli = { path = "../crates/musli", default-features = false, features = ["json", "parse-full"] }
 
 [target.'cfg(unix)'.dependencies]
 compiler_builtins = { git = "https://github.com/rust-lang/compiler-builtins", features = ["mem"] }

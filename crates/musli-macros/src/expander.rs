@@ -46,7 +46,6 @@ impl NameMethod {
 pub(crate) struct FieldData<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
-    pub(crate) name: Option<syn::LitStr>,
     pub(crate) attr: attr::Field,
     pub(crate) ident: Option<&'a syn::Ident>,
     pub(crate) ty: &'a syn::Type,
@@ -105,10 +104,6 @@ impl<'a> Expander<'a> {
                 .map(|(index, field)| FieldData {
                     span: field.span(),
                     index,
-                    name: field
-                        .ident
-                        .as_ref()
-                        .map(|ident| syn::LitStr::new(&ident.to_string(), ident.span())),
                     attr: attr::field_attrs(cx, &field.attrs),
                     ident: field.ident.as_ref(),
                     ty: &field.ty,
@@ -253,8 +248,6 @@ pub(crate) trait Taggable {
     fn name(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)>;
     /// The index of the taggable item.
     fn index(&self) -> usize;
-    /// The string name of the taggable item.
-    fn literal_name(&self) -> Option<&syn::LitStr>;
 }
 
 /// Expand the given configuration to the appropriate tag expression.
@@ -304,10 +297,6 @@ impl Taggable for FieldData<'_> {
     fn index(&self) -> usize {
         self.index
     }
-
-    fn literal_name(&self) -> Option<&syn::LitStr> {
-        self.name.as_ref()
-    }
 }
 
 impl Taggable for VariantData<'_> {
@@ -321,9 +310,5 @@ impl Taggable for VariantData<'_> {
 
     fn index(&self) -> usize {
         self.index
-    }
-
-    fn literal_name(&self) -> Option<&syn::LitStr> {
-        Some(&self.name)
     }
 }

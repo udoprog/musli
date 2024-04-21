@@ -213,7 +213,7 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: self.never_type(argument, extra, kind)?,
+                path: self.never_type(&attr.crate_path, argument, extra, kind)?,
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
@@ -240,7 +240,7 @@ impl Types {
                         fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
                         where
                             T: ?Sized + #crate_path::de::DecodeUnsized<'de, Self::Mode>,
-                            F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::context::Context>::Error>
+                            F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::Context>::Error>
                         {
                             self.cx.decode_unsized(self, f)
                         }
@@ -252,7 +252,7 @@ impl Types {
                         fn decode_unsized_bytes<T, F, O>(self, f: F) -> Result<O, Self::Error>
                         where
                             T: ?Sized + #crate_path::de::DecodeUnsizedBytes<'de, Self::Mode>,
-                            F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::context::Context>::Error>
+                            F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::Context>::Error>
                         {
                             self.cx.decode_unsized_bytes(self, f)
                         }
@@ -267,11 +267,11 @@ impl Types {
 
             match extra {
                 Extra::Mode => {
-                    ty = syn::parse_quote!(<Self::Cx as #crate_path::context::Context>::Mode);
+                    ty = syn::parse_quote!(<Self::Cx as #crate_path::Context>::Mode);
                     generics = syn::Generics::default();
                 }
                 Extra::Error => {
-                    ty = syn::parse_quote!(<Self::Cx as #crate_path::context::Context>::Error);
+                    ty = syn::parse_quote!(<Self::Cx as #crate_path::Context>::Error);
                     generics = syn::Generics::default();
                 }
                 Extra::Context => {
@@ -299,7 +299,7 @@ impl Types {
 
                     ty = syn::Type::Path(syn::TypePath {
                         qself: None,
-                        path: self.never_type(argument, extra, kind)?,
+                        path: self.never_type(&attr.crate_path, argument, extra, kind)?,
                     });
 
                     let mut where_clause = syn::WhereClause {
@@ -307,9 +307,9 @@ impl Types {
                         predicates: Punctuated::default(),
                     };
 
-                    where_clause.predicates.push(
-                        syn::parse_quote!(#u_param: #this_lifetime + #crate_path::context::Context),
-                    );
+                    where_clause
+                        .predicates
+                        .push(syn::parse_quote!(#u_param: #this_lifetime + #crate_path::Context));
 
                     generics = syn::Generics {
                         lt_token: Some(<Token![<]>::default()),
@@ -321,7 +321,7 @@ impl Types {
                 _ => {
                     ty = syn::Type::Path(syn::TypePath {
                         qself: None,
-                        path: self.never_type(argument, extra, kind)?,
+                        path: self.never_type(&attr.crate_path, argument, extra, kind)?,
                     });
 
                     generics = syn::Generics::default();
@@ -365,21 +365,15 @@ impl Types {
 
     fn never_type(
         &self,
+        crate_path: &syn::Path,
         argument: Option<&str>,
         extra: Extra,
         kind: Kind,
     ) -> syn::Result<syn::Path> {
-        let mut never = syn::Path {
-            leading_colon: None,
-            segments: Punctuated::default(),
-        };
+        let mut never = crate_path.clone();
 
         never.segments.push(syn::PathSegment::from(syn::Ident::new(
-            "musli",
-            Span::call_site(),
-        )));
-        never.segments.push(syn::PathSegment::from(syn::Ident::new(
-            "never",
+            "__priv",
             Span::call_site(),
         )));
 

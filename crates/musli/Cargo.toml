@@ -21,9 +21,31 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
 [features]
 default = ["std", "alloc"]
-std = []
-alloc = []
-verbose = ["musli-macros/verbose"]
+std = ["musli-core/std", "lexical?/std", "serde?/std", "simdutf8?/std"]
+alloc = ["musli-core/alloc"]
+verbose = ["musli-core/verbose"]
+storage = []
+wire = []
+descriptive = ["value"]
+json = ["value", "dep:lexical", "dep:itoa", "dep:ryu"]
+parse-full = []
+value = []
+serde = ["dep:serde"]
+
+test = []
 
 [dependencies]
-musli-macros = { version = "=0.0.117", path = "../musli-macros" }
+musli-core = { version = "=0.0.117", path = "../musli-core", default-features = false }
+
+simdutf8 = { version = "0.1.4", optional = true, default-features = false }
+itoa = { version = "1.0.10", optional = true }
+ryu = { version = "1.0.17", optional = true }
+lexical = { version = "6.1.1", optional = true, default-features = false, features = ["parse-floats"] }
+serde = { version = "1.0.198", optional = true }
+
+[dev-dependencies]
+rand = "0.8.5"
+serde = { version = "1.0.198", features = ["derive"] }
+url = { version = "2.5.0", features = ["serde"] }
+
+musli = { path = ".", features = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"] }

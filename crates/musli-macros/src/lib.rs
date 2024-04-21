@@ -23,7 +23,7 @@ mod internals;
 mod test;
 mod types;
 
-/// Please refer to the main [musli `derives` documentation](https://docs.rs/musli/latest/musli/derives/).
+/// Please refer to the main [musli `derives` documentation](https://docs.rs/musli/latest/musli/help/derives/).
 #[proc_macro_derive(Encode, attributes(musli))]
 pub fn derive_encode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
@@ -45,7 +45,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Please refer to the main [musli `derives` documentation](https://docs.rs/musli/latest/musli/derives/).
+/// Please refer to the main [musli `derives` documentation](https://docs.rs/musli/latest/musli/help/derives/).
 #[proc_macro_derive(Decode, attributes(musli))]
 pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);

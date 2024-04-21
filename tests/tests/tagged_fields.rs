@@ -36,7 +36,7 @@ fn struct_renamed() {
         }
     );
 
-    let out = tests::wire::to_vec(&from).expect("failed to encode");
-    let value: StructTo = tests::wire::decode(out.as_slice()).expect("failed to decode");
+    let out = musli::wire::to_vec(&from).expect("failed to encode");
+    let value: StructTo = musli::wire::decode(out.as_slice()).expect("failed to decode");
     assert_eq!(value, to);
 }

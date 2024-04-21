@@ -37,26 +37,6 @@ pub mod utils;
 pub use self::aligned_buf::AlignedBuf;
 mod aligned_buf;
 
-#[cfg(feature = "musli-storage")]
-pub mod storage {
-    pub use musli_storage::*;
-}
-
-#[cfg(feature = "musli-wire")]
-pub mod wire {
-    pub use musli_wire::*;
-}
-
-#[cfg(feature = "musli-descriptive")]
-pub mod descriptive {
-    pub use musli_descriptive::*;
-}
-
-#[cfg(feature = "musli-json")]
-pub mod json {
-    pub use musli_json::*;
-}
-
 #[cfg(feature = "musli-value")]
 #[track_caller]
 pub fn musli_value_rt<T>(expected: T)
@@ -64,9 +44,9 @@ where
     T: musli::Encode<musli::mode::Binary> + for<'de> musli::Decode<'de, musli::mode::Binary>,
     T: PartialEq + core::fmt::Debug,
 {
-    let value: ::musli_value::Value =
-        ::musli_value::encode(&expected).expect("value: Encoding should succeed");
-    let actual: T = ::musli_value::decode(&value).expect("value: Decoding should succeed");
+    let value: ::musli::value::Value =
+        ::musli::value::encode(&expected).expect("value: Encoding should succeed");
+    let actual: T = ::musli::value::decode(&value).expect("value: Decoding should succeed");
     assert_eq!(
         actual, expected,
         "value: roundtripped value does not match expected"
@@ -83,7 +63,7 @@ macro_rules! rt {
         macro_rules! rt {
             ($name:ident) => {{
                 assert_eq!(
-                    ::$name::test::rt($expr), expected,
+                    musli::$name::test::rt($expr), expected,
                     "{}: roundtripped value does not match expected",
                     stringify!($name),
                 );
@@ -112,7 +92,7 @@ macro_rules! assert_decode_eq {
 
         macro_rules! decode {
             ($name:ident) => {{
-                ::$name::test::decode($expr, &mut bytes, &$expected);
+                ::musli::$name::test::decode($expr, &mut bytes, &$expected);
             }}
         }
 
@@ -129,7 +109,7 @@ macro_rules! extra {
     ($expr:expr, json = $json_expected:expr $(, $($tt:tt)*)?) => {{
         #[cfg(feature = "musli-json")]
         {
-            let json = ::musli_json::test::to_vec($expr);
+            let json = ::musli::json::test::to_vec($expr);
             let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
 
             assert_eq!(
@@ -147,9 +127,19 @@ macro_rules! extra {
 macro_rules! descriptive {
     ($call:path) => {
         #[cfg(feature = "musli-descriptive")]
-        $call!(musli_descriptive);
+        $call!(descriptive);
         #[cfg(feature = "musli-json")]
-        $call!(musli_json);
+        $call!(json);
+    };
+}
+
+/// TODO: Deprecate this in favor of only using [`upgrade_stable`].
+#[macro_export]
+#[doc(hidden)]
+macro_rules! wire_only {
+    ($call:path) => {
+        #[cfg(feature = "musli-wire")]
+        $call!(wire);
     };
 }
 
@@ -158,11 +148,11 @@ macro_rules! descriptive {
 macro_rules! upgrade_stable {
     ($call:path) => {
         #[cfg(feature = "musli-wire")]
-        $call!(musli_wire);
+        $call!(wire);
         #[cfg(feature = "musli-descriptive")]
-        $call!(musli_descriptive);
+        $call!(descriptive);
         #[cfg(feature = "musli-json")]
-        $call!(musli_json);
+        $call!(json);
     };
 }
 
@@ -171,9 +161,9 @@ macro_rules! upgrade_stable {
 macro_rules! upgrade_stable_no_text {
     ($call:path) => {
         #[cfg(feature = "musli-wire")]
-        $call!(musli_wire);
+        $call!(wire);
         #[cfg(feature = "musli-descriptive")]
-        $call!(musli_descriptive);
+        $call!(descriptive);
     };
 }
 
@@ -182,13 +172,13 @@ macro_rules! upgrade_stable_no_text {
 macro_rules! full {
     ($call:path) => {
         #[cfg(feature = "musli-storage")]
-        $call!(musli_storage);
+        $call!(storage);
         #[cfg(feature = "musli-wire")]
-        $call!(musli_wire);
+        $call!(wire);
         #[cfg(feature = "musli-descriptive")]
-        $call!(musli_descriptive);
+        $call!(descriptive);
         #[cfg(feature = "musli-json")]
-        $call!(musli_json);
+        $call!(json);
     };
 }
 
@@ -197,11 +187,11 @@ macro_rules! full {
 macro_rules! no_json {
     ($call:path) => {
         #[cfg(feature = "musli-storage")]
-        $call!(musli_storage);
+        $call!(storage);
         #[cfg(feature = "musli-wire")]
-        $call!(musli_wire);
+        $call!(wire);
         #[cfg(feature = "musli-descriptive")]
-        $call!(musli_descriptive);
+        $call!(descriptive);
     };
 }
 

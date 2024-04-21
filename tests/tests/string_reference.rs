@@ -12,12 +12,12 @@ struct StructWithStr<'a> {
 
 #[test]
 fn string_reference() -> Result<()> {
-    let data = tests::wire::to_vec(&StructWithStr {
+    let data = musli::wire::to_vec(&StructWithStr {
         name: "Jane Doe",
         age: 42,
     })?;
 
-    let with_str: StructWithStr<'_> = tests::wire::decode(data.as_slice())?;
+    let with_str: StructWithStr<'_> = musli::wire::decode(data.as_slice())?;
     assert_eq!(with_str.name, "Jane Doe");
     assert_eq!(with_str.age, 42);
     Ok(())
