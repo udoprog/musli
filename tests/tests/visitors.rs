@@ -41,19 +41,19 @@ impl<'de, M> Decode<'de, M> for BytesReference<'de> {
 
 #[test]
 fn bytes_reference() {
-    let value = musli_value::Value::Bytes(vec![0, 1, 2, 3]);
+    let value = musli::value::Value::Bytes(vec![0, 1, 2, 3]);
 
     assert_eq!(
-        musli_value::decode::<BytesReference>(&value).unwrap(),
+        musli::value::decode::<BytesReference>(&value).unwrap(),
         BytesReference {
             data: &[0, 1, 2, 3]
         }
     );
 
-    let value = musli_value::Value::Number(42u32.into());
+    let value = musli::value::Value::Number(42u32.into());
 
     assert_eq!(
-        musli_value::decode::<BytesReference>(&value)
+        musli::value::decode::<BytesReference>(&value)
             .unwrap_err()
             .to_string(),
         "Value buffer expected bytes, but found u32"
@@ -98,17 +98,17 @@ impl<'de, M> Decode<'de, M> for StringReference<'de> {
 
 #[test]
 fn string_reference() {
-    let value = musli_value::Value::String(String::from("Hello!"));
+    let value = musli::value::Value::String(String::from("Hello!"));
 
     assert_eq!(
-        musli_value::decode::<StringReference>(&value).unwrap(),
+        musli::value::decode::<StringReference>(&value).unwrap(),
         StringReference { data: "Hello!" }
     );
 
-    let value = musli_value::Value::Number(42u32.into());
+    let value = musli::value::Value::Number(42u32.into());
 
     assert_eq!(
-        musli_value::decode::<StringReference>(&value)
+        musli::value::decode::<StringReference>(&value)
             .unwrap_err()
             .to_string(),
         "Value buffer expected string, but found u32"
@@ -126,21 +126,16 @@ impl<'de, M> Decode<'de, M> for OwnedFn {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_string(musli::utils::visit_owned_fn(
-            "A string variant for Enum",
-            |variant: &str| match variant {
-                "A" => Ok(OwnedFn::A),
-                "B" => Ok(OwnedFn::A),
-                other => {
-                    Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}")))
-                }
-            },
-        ))
+        decoder.decode_unsized(|variant: &str| match variant {
+            "A" => Ok(OwnedFn::A),
+            "B" => Ok(OwnedFn::A),
+            other => Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}"))),
+        })
     }
 }
 
 #[test]
 fn owned_fn() {
-    let value = musli_value::Value::String("A".to_string());
-    assert_eq!(musli_value::decode::<OwnedFn>(&value).unwrap(), OwnedFn::A);
+    let value = musli::value::Value::String("A".to_string());
+    assert_eq!(musli::value::decode::<OwnedFn>(&value).unwrap(), OwnedFn::A);
 }

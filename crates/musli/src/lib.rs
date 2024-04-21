@@ -9,7 +9,7 @@
 //!
 //! It provides a set of [formats](#formats), each with its own well-documented
 //! set of features and tradeoffs. Every byte-oriented serialization method
-//! (including [`musli-json`]) has full `#[no_std]` support with or without
+//! (including [`musli::json`]) has full `#[no_std]` support with or without
 //! `alloc`. And a particularly neat component providing low-level refreshingly
 //! simple [zero-copy serialization][zerocopy].
 //!
@@ -37,8 +37,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! musli = "0.0.117"
-//! musli-wire = "0.0.117"
+//! musli = { version = "0.0.117", features = ["storage"] }
 //! ```
 //!
 //! <br>
@@ -82,12 +81,12 @@
 //! As an example of this, these two functions both produce the same assembly
 //! (built with `--release`):
 //!
-//! ```ignore
+//! ```
 //! # use musli::{Decode, Encode};
 //! # use musli::mode::Binary;
-//! # use musli_storage::encoding::Encoding;
-//! # use musli_storage::options::{self, Options, Integer, ByteOrder};
-//! # type Result<T, E = musli_storage::Error> = core::result::Result<T, E>;
+//! # use musli::options::{self, Options, Integer, ByteOrder};
+//! # use musli::storage::Encoding;
+//! # type Result<T, E = musli::storage::Error> = core::result::Result<T, E>;
 //! const OPTIONS: Options = options::new()
 //!     .with_integer(Integer::Fixed)
 //!     .with_byte_order(ByteOrder::NATIVE)
@@ -181,11 +180,11 @@
 //!
 //! | | `reorder` | `missing` | `unknown` | `self` |
 //! |-|-|-|-|-|
-//! | [`musli-storage`] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
-//! | [`musli-storage`]                    | ✔ | ✔ | ✗ | ✗ |
-//! | [`musli-wire`]                       | ✔ | ✔ | ✔ | ✗ |
-//! | [`musli-descriptive`]                | ✔ | ✔ | ✔ | ✔ |
-//! | [`musli-json`][`musli-json`][^json]  | ✔ | ✔ | ✔ | ✔ |
+//! | [`musli::storage`] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
+//! | [`musli::storage`]                    | ✔ | ✔ | ✗ | ✗ |
+//! | [`musli::wire`]                       | ✔ | ✔ | ✔ | ✗ |
+//! | [`musli::descriptive`]                | ✔ | ✔ | ✔ | ✔ |
+//! | [`musli::json`][^json]                | ✔ | ✔ | ✔ | ✔ |
 //!
 //! `reorder` determines whether fields must occur in exactly the order in which
 //! they are specified in their type. Reordering fields in such a type would
@@ -212,8 +211,8 @@
 //! be correctly read as an unsigned number if it fits in the destination type.
 //!
 //! For every feature you drop, the format becomes more compact and efficient.
-//! [`musli-storage`] using `#[musli(packed)]` for example is roughly as compact
-//! as [`bincode`] while [`musli-wire`] is comparable in size to something like
+//! [`musli::storage`] using `#[musli(packed)]` for example is roughly as compact
+//! as [`bincode`] while [`musli::wire`] is comparable in size to something like
 //! [`protobuf`]. All formats are primarily byte-oriented, but some might
 //! perform [bit packing] if the benefits are obvious.
 //!
@@ -226,61 +225,63 @@
 //! ## Upgrade stability
 //!
 //! The following is an example of *full upgrade stability* using
-//! [`musli-wire`]. `Version1` can be decoded from an instance of `Version2`
+//! [`musli::wire`]. `Version1` can be decoded from an instance of `Version2`
 //! because it understands how to skip fields which are part of `Version2`.
 //! We're also explicitly adding `#[musli(name = ..)]` to the fields to ensure
 //! that they don't change in case they are re-ordered.
 //!
-//! ```ignore
+//! ```
 //! use musli::{Encode, Decode};
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Version1 {
-//!     #[musli(name = 0)]
+//!     #[musli(mode = Binary, name = 0)]
 //!     name: String,
 //! }
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Version2 {
-//!     #[musli(name = 0)]
+//!     #[musli(mode = Binary, name = 0)]
 //!     name: String,
-//!     #[musli(default, name = 1)]
+//!     #[musli(mode = Binary, name = 1)]
+//!     #[musli(default)]
 //!     age: Option<u32>,
 //! }
 //!
-//! let version2 = musli_wire::to_vec(&Version2 {
+//! let version2 = musli::wire::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
 //!
-//! let version1: Version1 = musli_wire::decode(version2.as_slice())?;
+//! let version1: Version1 = musli::wire::decode(version2.as_slice())?;
+//! # Ok::<_, musli::wire::Error>(())
 //! ```
 //!
 //! The following is an example of *partial upgrade stability* using
-//! [`musli-storage`] on the same data models. Note how `Version2` can be
+//! [`musli::storage`] on the same data models. Note how `Version2` can be
 //! decoded from `Version1` but *not* the other way around making it suitable
 //! for on-disk storage where the schema can evolve from older to newer
 //! versions.
 //!
-//! ```ignore
+//! ```
 //! # use musli::{Encode, Decode};
 //! # #[derive(Debug, PartialEq, Encode, Decode)]
 //! # struct Version1 { name: String }
 //! # #[derive(Debug, PartialEq, Encode, Decode)]
 //! # struct Version2 { name: String, #[musli(default)] age: Option<u32> }
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let version2 = musli_storage::to_vec(&Version2 {
+//! let version2 = musli::storage::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(62),
 //! })?;
 //!
-//! assert!(musli_storage::decode::<_, Version1>(version2.as_slice()).is_err());
+//! assert!(musli::storage::decode::<_, Version1>(version2.as_slice()).is_err());
 //!
-//! let version1 = musli_storage::to_vec(&Version1 {
+//! let version1 = musli::storage::to_vec(&Version1 {
 //!     name: String::from("Aristotle"),
 //! })?;
 //!
-//! let version2: Version2 = musli_storage::decode(version1.as_slice())?;
+//! let version2: Version2 = musli::storage::decode(version1.as_slice())?;
 //! # Ok(()) }
 //! ```
 //!
@@ -306,9 +307,9 @@
 //! Below is a simple example of how we can use two modes to provide two
 //! completely different formats using a single struct:
 //!
-//! ```ignore
+//! ```
 //! use musli::{Decode, Encode};
-//! use musli_json::{OPTIONS, Encoding};
+//! use musli::json::Encoding;
 //!
 //! enum Alt {}
 //!
@@ -321,7 +322,7 @@
 //! }
 //!
 //! const CONFIG: Encoding = Encoding::new();
-//! const ALT_CONFIG: Encoding<OPTIONS, Alt> = Encoding::new().with_mode();
+//! const ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
 //!
 //! let word = Word {
 //!     text: "あります",
@@ -333,6 +334,7 @@
 //!
 //! let out = ALT_CONFIG.to_string(&word)?;
 //! assert_eq!(out, r#"["あります",true]"#);
+//! # Ok::<_, musli::json::Error>(())
 //! ```
 //!
 //! <br>
@@ -349,7 +351,7 @@
 //!   the default `Reader` impl for `&[u8]` does. Since it can perform most of
 //!   the necessary comparisons directly on the pointers.
 //!
-//! * Some unsafety related to UTF-8 handling in `musli_json`, because we check
+//! * Some unsafety related to UTF-8 handling in `musli::json`, because we check
 //!   UTF-8 validity internally ourselves (like `serde_json`).
 //!
 //! * `FixedBytes<N>`, which is a stack-based container that can operate over
@@ -367,19 +369,19 @@
 //!
 //! <br>
 //!
+//! [`Binary`]: https://docs.rs/musli/latest/musli/mode/enum.Binary.html
 //! [`bincode`]: https://docs.rs/bincode
 //! [`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
 //! [`Decoder`]: https://docs.rs/musli/latest/musli/trait.Decoder.html
-//! [`Binary`]: https://docs.rs/musli/latest/musli/mode/enum.Binary.html
-//! [`derives`]: https://docs.rs/musli/latest/musli/derives/
+//! [`derives`]: https://docs.rs/musli/latest/musli/help/derives/index.html
 //! [`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
 //! [`Encoder`]: https://docs.rs/musli/latest/musli/trait.Encoder.html
-//! [`musli-descriptive`]: https://docs.rs/musli-descriptive
-//! [`musli-json`]: https://docs.rs/musli-json
-//! [`musli-serde`]: https://docs.rs/musli-serde
-//! [`musli-storage`]: https://docs.rs/musli-storage
-//! [`musli-value`]: https://docs.rs/musli-value
-//! [`musli-wire`]: https://docs.rs/musli-wire
+//! [`musli-serde`]: https://docs.rs/musli/latest/musli/serde/index.html
+//! [`musli-value`]: https://docs.rs/musli/latest/musli/value/index.html
+//! [`musli::descriptive`]: https://docs.rs/musli/latest/musli/descriptive/index.html
+//! [`musli::json`]: https://docs.rs/musli/latest/musli/json/index.html
+//! [`musli::storage`]: https://docs.rs/musli/latest/musli/storage/index.html
+//! [`musli::wire`]: https://docs.rs/musli/latest/musli/wire/index.html
 //! [`protobuf`]: https://developers.google.com/protocol-buffers
 //! [`serde`]: https://serde.rs
 //! [`simdutf8`]: https://docs.rs/simdutf8
@@ -387,7 +389,7 @@
 //! [benchmarks]: https://udoprog.github.io/musli/benchmarks/
 //! [bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
 //! [detailed tracing]: https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html
-//! [musli-name-type]: https://docs.rs/musli/latest/musli/derives/index.html#musliname_type--
+//! [musli-name-type]: https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type--
 //! [no-std and no-alloc]: https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs
 //! [scoped allocations]: https://docs.rs/musli-allocator
 //! [size comparisons]: https://udoprog.github.io/musli/benchmarks/#size-comparisons
@@ -395,6 +397,7 @@
 //! [zerocopy]: https://docs.rs/musli-zerocopy
 
 #![deny(missing_docs)]
+#![allow(clippy::module_inception)]
 #![no_std]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 
@@ -404,222 +407,67 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[macro_use]
+mod macros;
+
+pub mod help;
+
+#[doc(inline)]
+pub use musli_core::de;
+#[doc(inline)]
+pub use musli_core::en;
+#[doc(inline)]
+pub use musli_core::hint;
+#[doc(inline)]
+pub use musli_core::mode;
+#[doc(inline)]
+pub use musli_core::no_std;
+#[doc(inline)]
+pub use musli_core::{decoder, encoder, visitor};
+
+#[doc(inline)]
+pub use musli_core::{Allocator, Buf, Context, Decode, Decoder, Encode, Encoder, StdError};
+
+#[doc(hidden)]
+pub use musli_core::__priv;
+#[macro_use]
+
+pub mod allocator;
+pub mod descriptive;
+pub mod json;
+pub mod serde;
+pub mod storage;
+pub mod value;
+pub mod wire;
+
 pub mod context;
-#[doc(inline)]
-pub use self::context::Context;
-
-mod allocator;
-#[doc(inline)]
-pub use self::allocator::Allocator;
-
-pub mod buf;
-#[doc(inline)]
-pub use self::buf::Buf;
 
 pub mod compat;
-pub mod de;
-pub mod derives;
-pub mod en;
-mod expecting;
-mod fixed;
-pub mod hint;
-mod impls;
-mod internal;
-pub mod mode;
-#[doc(hidden)]
-pub mod never;
-#[cfg(not(feature = "alloc"))]
-mod no_std;
-#[cfg(feature = "alloc")]
-#[path = "std.rs"]
-mod no_std;
-pub mod utils;
 
+pub mod fixed;
 #[doc(inline)]
-pub use self::de::{Decode, Decoder};
+pub use self::fixed::FixedBytes;
+
+#[macro_use]
+pub mod options;
 #[doc(inline)]
-pub use self::en::{Encode, Encoder};
+pub use self::options::Options;
 
-/// This is an attribute macro that must be used when implementing a
-/// [`Encoder`].
-///
-/// It is required to use because a [`Encoder`] implementation might introduce
-/// new associated types in the future, and this [not yet supported] on a
-/// language level in Rust. So this attribute macro polyfills any missing types
-/// automatically.
-///
-/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
-///
-/// # Examples
-///
-/// ```
-/// use std::fmt;
-///
-/// use musli::Context;
-/// use musli::en::{Encoder, Encode};
-///
-/// struct MyEncoder<'a, C: ?Sized> {
-///     value: &'a mut Option<u32>,
-///     cx: &'a C,
-/// }
-///
-/// #[musli::encoder]
-/// impl<C: ?Sized + Context> Encoder for MyEncoder<'_, C> {
-///     type Cx = C;
-///     type Ok = ();
-///
-///     fn cx(&self) -> &C {
-///         self.cx
-///     }
-///
-///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(f, "32-bit unsigned integers")
-///     }
-///
-///     fn encode<T>(self, value: T) -> Result<Self::Ok, C::Error>
-///     where
-///         T: Encode<Self::Mode>,
-///     {
-///         value.encode(self.cx, self)
-///     }
-///
-///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
-///         *self.value = Some(value);
-///         Ok(())
-///     }
-/// }
-/// ```
+pub mod buf;
+
+pub mod reader;
 #[doc(inline)]
-pub use musli_macros::encoder;
+pub use self::reader::Reader;
 
-/// This is an attribute macro that must be used when implementing a
-/// [`Decoder`].
-///
-/// It is required to use because a [`Decoder`] implementation might introduce
-/// new associated types in the future, and this is [not yet supported] on a
-/// language level in Rust. So this attribute macro polyfills any missing types
-/// automatically.
-///
-/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
-///
-/// # Examples
-///
-/// ```
-/// use std::fmt;
-///
-/// use musli::Context;
-/// use musli::de::{Decoder, Decode};
-///
-/// struct MyDecoder<'a, C: ?Sized> {
-///     cx: &'a C,
-/// }
-///
-/// #[musli::decoder]
-/// impl<'de, C: ?Sized + Context> Decoder<'de> for MyDecoder<'_, C> {
-///     type Cx = C;
-///
-///     fn cx(&self) -> &C {
-///         self.cx
-///     }
-///
-///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(f, "32-bit unsigned integers")
-///     }
-///
-///     fn decode_u32(self) -> Result<u32, Self::Error> {
-///         Ok(42)
-///     }
-/// }
-/// ```
+pub mod wrap;
+
+pub mod writer;
 #[doc(inline)]
-pub use musli_macros::decoder;
+pub use self::writer::Writer;
 
-/// This is an attribute macro that must be used when implementing a
-/// [`Visitor`].
-///
-/// It is required to use because a [`Visitor`] implementation might introduce
-/// new associated types in the future, and this is [not yet supported] on a
-/// language level in Rust. So this attribute macro polyfills any missing types
-/// automatically.
-///
-/// [not yet supported]:
-///     https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
-/// [`Visitor`]: crate::de::Visitor
-///
-/// # Examples
-///
-/// ```
-/// use std::fmt;
-///
-/// use musli::Context;
-/// use musli::de::Visitor;
-///
-/// struct AnyVisitor;
-///
-/// #[musli::visitor]
-/// impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
-///     type Ok = ();
-///
-///     #[inline]
-///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(
-///             f,
-///             "value that can be decoded into dynamic container"
-///         )
-///     }
-/// }
-/// ```
-#[doc(inline)]
-pub use musli_macros::visitor;
+mod int;
+mod str;
 
-/// Internal implementation details of musli.
-///
-/// Using these directly is not supported.
-#[doc(hidden)]
-pub mod __priv {
-    use crate::buf::Buf;
-    use crate::context::Context;
-    use crate::de::{Decoder, EntryDecoder};
-
-    pub use ::core::fmt;
-    pub use ::core::option::Option;
-    pub use ::core::result::Result;
-
-    #[inline(always)]
-    pub fn write<O, T>(out: &mut O, value: T) -> Result<(), crate::buf::Error>
-    where
-        O: ?Sized + Buf,
-        T: fmt::Debug,
-    {
-        ::core::write!(out, "{value:?}")
-    }
-
-    #[inline(always)]
-    pub fn default<T>() -> T
-    where
-        T: ::core::default::Default,
-    {
-        ::core::default::Default::default()
-    }
-
-    /// Note that this returns `true` if skipping was unsupported.
-    #[inline(always)]
-    pub fn skip<'de, D>(decoder: D) -> Result<bool, D::Error>
-    where
-        D: Decoder<'de>,
-    {
-        Ok(decoder.try_skip()?.is_unsupported())
-    }
-
-    /// Note that this returns `true` if skipping was unsupported.
-    #[inline(always)]
-    pub fn skip_field<'de, D>(decoder: D) -> Result<bool, <D::Cx as Context>::Error>
-    where
-        D: EntryDecoder<'de>,
-    {
-        skip(decoder.decode_value()?)
-    }
-
-    pub use Option::{None, Some};
-    pub use Result::{Err, Ok};
-}
+#[cfg_attr(feature = "std", path = "system/std.rs")]
+#[cfg_attr(not(feature = "std"), path = "system/no_std.rs")]
+mod system;

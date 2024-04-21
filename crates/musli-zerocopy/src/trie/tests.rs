@@ -75,7 +75,6 @@ fn trie_problem() -> Result<(), Error> {
 
     assert_eq!(trie.get(&buf, "食べなかった")?, Some(&[1][..]));
     assert_eq!(trie.get(&buf, "食べない")?, Some(&[2][..]));
-    std::dbg!(trie.debug(&buf));
     Ok(())
 }
 

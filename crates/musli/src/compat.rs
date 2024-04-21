@@ -1,5 +1,8 @@
-//! Wrapper types which ensures that a given field is encoded or decoded as a
-//! certain kind of value.
+//! Wrapper types for tweaking how something is encoded.
+//!
+//! Note that most types in this module have an attribute equivalent:
+//! * [`Bytes`] corresponds to using `#[musli(bytes)]` on a field.
+//! * [`Packed`] corresponds to using `#[musli(packed)]` on a field.
 
 use crate::de::{Decode, DecodeBytes, DecodePacked, Decoder};
 use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder};
@@ -42,13 +45,19 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
     }
 }
 
-/// Ensures that the given value `T` is encoded as bytes.
+/// Treat `T` as if its bytes.
 ///
-/// This is useful for values which have a generic implementation to be encoded
-/// as a sequence, such as [`Vec`] and [`VecDeque`].
+/// This corresponds to the "Bytes" type in the [data model of Müsli] and is the
+/// equivalent of using [`#[musli(bytes)]`][bytes] on a field.
+///
+/// This is only implemented for type where the default behavior is not to pack
+/// the value already, this applies to types which implements [`EncodeBytes`]
+/// and [`DecodeBytes`].
 ///
 /// [`Vec`]: alloc::vec::Vec
 /// [`VecDeque`]: alloc::collections::VecDeque
+/// [bytes]: crate::help::derives
+/// [data model of Müsli]: crate::help::data_model
 ///
 /// # Examples
 ///
@@ -105,7 +114,15 @@ where
 
 /// Treat `T` as if its packed.
 ///
-/// This is for example implemented for tuples.
+/// This corresponds to the "Bytes" type in the [data model of Müsli]. It
+/// encodes any [`Encode`] / [`Decode`] type "on after another" and is the
+/// equivalent of using [`#[musli(packed)]`][packed] on a field.
+///
+/// This is only implemented for type where the default behavior is not to pack
+/// the value already, this applies to types which implements [`EncodePacked`]
+/// and [`DecodePacked`].
+///
+/// [packed]: crate::help::derives
 ///
 /// # Examples
 ///

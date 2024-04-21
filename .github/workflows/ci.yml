@@ -13,7 +13,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    needs: each_package
+    needs: features
     strategy:
       fail-fast: false
       matrix:
@@ -27,14 +27,14 @@ jobs:
       if: matrix.rust != 'stable'
     - run: cargo build --all-targets
       if: matrix.rust == 'stable'
-    - run: cargo test --all-targets --features test
+    - run: cargo test --all-targets
       if: matrix.rust == 'stable'
     - run: cargo test --doc
       if: matrix.rust == 'stable'
 
   tests_clippy:
     runs-on: ubuntu-latest
-    needs: each_package
+    needs: features
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -42,7 +42,7 @@ jobs:
 
   no_std:
     runs-on: windows-latest
-    needs: each_package
+    needs: features
     strategy:
       fail-fast: false
       matrix:
@@ -54,7 +54,7 @@ jobs:
       - run: cargo +nightly run -p no-std --example no-std-${{matrix.example}}
 
   fuzz:
-    needs: [test, tests_clippy, each_package, recursive]
+    needs: [test, tests_clippy, features, recursive]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -63,7 +63,7 @@ jobs:
     - run: cargo run --release -p tests --features test --bin fuzz -- --random
 
   miri:
-    needs: [test, tests_clippy, each_package, recursive]
+    needs: [test, tests_clippy, features, recursive]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -74,41 +74,46 @@ jobs:
     - run: cargo miri run -p tests --features test --bin fuzz
     - run: cargo miri run -p tests --features test --bin fuzz -- --random
 
-  each_package:
+  no_default_features:
     needs: [rustfmt, clippy]
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package:
-        - musli
-        - musli-allocator
-        - musli-utils
-        - musli-storage
-        - musli-descriptive
-        - musli-wire
-        - musli-json
-        - musli-value
-        - musli-serde
     env:
       RUSTFLAGS: -D warnings
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo build -p ${{matrix.package}} --no-default-features
-    - run: cargo build -p ${{matrix.package}} --no-default-features --features alloc
-    - run: cargo build -p ${{matrix.package}} --no-default-features --features std
-    - run: cargo build -p ${{matrix.package}} --no-default-features --features simdutf8
-      if: matrix.package == 'musli-storage' || matrix.package == 'musli-wire' || matrix.package == 'musli-descriptive' || matrix.package == 'musli-json'
-    - run: cargo build -p ${{matrix.package}} --no-default-features --features parse-full
-      if: matrix.package == 'musli-json'
+    - run: cargo build -p musli --no-default-features
+
+  features:
+    needs: [no_default_features, rustfmt, clippy]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        base:
+        - storage
+        - descriptive
+        - wire
+        - json
+        - value
+        - serde
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cargo build -p musli --no-default-features --features ${{matrix.base}}
+    - run: cargo build -p musli --no-default-features --features ${{matrix.base}},alloc
+    - run: cargo build -p musli --no-default-features --features ${{matrix.base}},std
+    - run: cargo build -p musli --no-default-features --features ${{matrix.base}},simdutf8
+    - run: cargo build -p musli --no-default-features --features ${{matrix.base}},parse-full
 
   recursive:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo build --release -p tests --test recursive_models --features test
+    - run: cargo build --release -p tests --test recursive_models
 
   clippy:
     runs-on: ubuntu-latest
@@ -117,7 +122,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@1.76
       with:
         components: clippy
-    - run: cargo clippy --all-targets --features test -- -D warnings
+    - run: cargo clippy --all-targets -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest

@@ -53,7 +53,9 @@ fn main() -> Result<()> {
     let mut filter = Vec::new();
     let mut seed = tests::RNG_SEED;
     let mut alignment = ALIGNMENT;
+    #[allow(unused)]
     let mut verbose = false;
+    #[allow(unused)]
     let mut save = false;
 
     while let Some(arg) = it.next() {

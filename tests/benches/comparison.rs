@@ -61,9 +61,10 @@ fn criterion_benchmark(c: &mut Criterion) {
                         frameworks.push(utils::$framework::new());
                     }
 
-                    for (index, (value, framework)) in
-                        values.iter().zip(&mut frameworks).enumerate()
-                    {
+                    #[allow(unused_variables)]
+                    let mut index = 0;
+
+                    for (value, framework) in values.iter().zip(&mut frameworks) {
                         let mut state = framework.state();
                         state.reset($size_hint, value);
                         let mut out = state.encode(value).expect("encoding should success");
@@ -79,6 +80,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                             stringify!($framework),
                             stringify!($name)
                         );
+
+                        index += 1;
                     }
                 }};
             }

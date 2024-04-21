@@ -1,11 +1,10 @@
+use musli::json::Encoding;
 use musli::{Decode, Encode};
-use musli_json::Encoding;
 
 enum Alt {}
 
 #[derive(Decode, Encode)]
 #[musli(mode = Alt, packed)]
-#[musli(name_all = "name")]
 struct Word<'a> {
     text: &'a str,
     teineigo: bool,

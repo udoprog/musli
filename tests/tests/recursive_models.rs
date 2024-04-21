@@ -14,18 +14,18 @@ use musli::de::DecodeOwned;
 use musli::mode::Binary;
 use musli::{Decode, Encode};
 
-pub(crate) fn encode<T>(changes: &T) -> tests::storage::Result<Vec<u8>>
+pub(crate) fn encode<T>(changes: &T) -> musli::storage::Result<Vec<u8>>
 where
     T: Encode<Binary>,
 {
-    tests::storage::to_vec(changes)
+    musli::storage::to_vec(changes)
 }
 
-pub(crate) fn decode<T>(buf: &[u8]) -> tests::storage::Result<T>
+pub(crate) fn decode<T>(buf: &[u8]) -> musli::storage::Result<T>
 where
     T: DecodeOwned<Binary>,
 {
-    tests::storage::from_slice(buf)
+    musli::storage::from_slice(buf)
 }
 
 #[test]

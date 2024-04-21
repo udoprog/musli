@@ -16,17 +16,17 @@ use tests::generate::{Generate, Rng};
 
 #[derive(Encode)]
 #[musli(transparent)]
-struct EncodeSerde<'a, T>(#[musli(with = musli_serde)] &'a T)
+struct EncodeSerde<'a, T>(#[musli(with = musli::serde)] &'a T)
 where
     T: Serialize;
 
 #[derive(Decode)]
 #[musli(transparent)]
-struct DecodeSerde<T>(#[musli(with = musli_serde)] T)
+struct DecodeSerde<T>(#[musli(with = musli::serde)] T)
 where
     T: DeserializeOwned;
 
-mod musli_value {
+mod value {
     use super::*;
 
     #[track_caller]
@@ -78,15 +78,15 @@ mod musli_value {
         let mut rng = tests::rng_with_seed(RNG_SEED);
         let value1 = value(&mut rng);
 
-        let encoded1 = do_try!(::musli_value::encode(&value1), "Encode musli");
+        let encoded1 = do_try!(::musli::value::encode(&value1), "Encode musli");
 
-        let value2: T = do_try!(::musli_value::decode(&encoded1), "Decode musli");
+        let value2: T = do_try!(::musli::value::decode(&encoded1), "Decode musli");
         assert_eq!(value1, value2, "Musli decoding is incorrect");
 
-        let encoded2 = do_try!(::musli_value::encode(EncodeSerde(&value1)), "Encode serde");
+        let encoded2 = do_try!(::musli::value::encode(EncodeSerde(&value1)), "Encode serde");
 
         let DecodeSerde(value3) =
-            do_try!(::musli_value::decode(&encoded2), "Decode serde", encoded2);
+            do_try!(::musli::value::decode(&encoded2), "Decode serde", encoded2);
 
         assert_eq! {
             value1,
@@ -147,12 +147,15 @@ macro_rules! tester {
                 let mut rng = tests::rng_with_seed(RNG_SEED);
                 let value1 = value(&mut rng);
 
-                let bytes1 = do_try!(::$module::to_vec(&value1), "Encode musli");
+                let bytes1 = do_try!(::musli::$module::to_vec(&value1), "Encode musli");
 
-                let value2: T = do_try!(::$module::from_slice(&bytes1), "Decode musli");
+                let value2: T = do_try!(::musli::$module::from_slice(&bytes1), "Decode musli");
                 assert_eq!(value1, value2, "Musli decoding is incorrect");
 
-                let bytes2 = do_try!(::$module::to_vec(&EncodeSerde(&value1)), "Encode serde");
+                let bytes2 = do_try!(
+                    ::musli::$module::to_vec(&EncodeSerde(&value1)),
+                    "Encode serde"
+                );
 
                 // TODO: Do we want serialization to be compatible?
                 // assert! {
@@ -162,8 +165,11 @@ macro_rules! tester {
                 //     BStr::new(&bytes2),
                 // };
 
-                let DecodeSerde(value3) =
-                    do_try!(::$module::from_slice(&bytes2), "Decode serde", bytes2);
+                let DecodeSerde(value3) = do_try!(
+                    ::musli::$module::from_slice(&bytes2),
+                    "Decode serde",
+                    bytes2
+                );
 
                 assert_eq! {
                     value1,
@@ -174,17 +180,17 @@ macro_rules! tester {
 
                 // TODO: Do we want serialization to be compatible?
                 // let value4: T =
-                //     ::$module::from_slice(&bytes2).expect("Decode musli from serde-encoded bytes");
+                //     ::musli::$module::from_slice(&bytes2).expect("Decode musli from serde-encoded bytes");
                 // assert_eq!(&value1, &value4, "Serde to musli roundtrip is incorrect");
             }
         }
     };
 }
 
-tester!(musli_storage, Binary);
-tester!(musli_wire, Binary);
-tester!(musli_descriptive, Binary);
-tester!(musli_json, Text);
+tester!(storage, Binary);
+tester!(wire, Binary);
+tester!(descriptive, Binary);
+tester!(json, Text);
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
 #[generate(crate)]
@@ -268,25 +274,25 @@ macro_rules! build_test {
 
 #[test]
 fn musli_storage() {
-    build_test!(musli_storage);
+    build_test!(storage);
 }
 
 #[test]
 fn musli_wire() {
-    build_test!(musli_wire);
+    build_test!(wire);
 }
 
 #[test]
 fn musli_descriptive() {
-    build_test!(musli_descriptive);
+    build_test!(descriptive);
 }
 
 #[test]
 fn musli_json() {
-    build_test!(musli_json);
+    build_test!(json);
 }
 
 #[test]
 fn musli_value() {
-    build_test!(musli_value);
+    build_test!(value);
 }
