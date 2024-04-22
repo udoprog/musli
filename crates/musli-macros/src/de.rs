@@ -37,7 +37,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     };
 
     let body = match &e.data {
-        BuildData::Struct(st) => decode_map_hint(&cx, &e, st)?,
+        BuildData::Struct(st) => decode_struct(&cx, &e, st)?,
         BuildData::Enum(en) => decode_enum(&cx, &e, en)?,
     };
 
@@ -107,7 +107,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     })
 }
 
-fn decode_map_hint(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Tokens { result_ok, .. } = e.tokens;
 
     let body = match st.packing {
