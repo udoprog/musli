@@ -25,7 +25,7 @@ musli-storage = ["musli/storage"]
 musli-json = ["musli/json"]
 musli-value = ["musli/value"]
 musli-zerocopy = ["dep:musli-zerocopy"]
-test = ["std", "simdutf8", "musli/test", "musli/serde", "musli-wire", "musli-storage", "musli-descriptive", "musli-json", "musli-value"]
+test = ["simdutf8", "musli-wire", "musli-storage", "musli-descriptive", "musli-json", "musli-value"]
 # skips rt benchmarks
 no-rt = []
 
@@ -82,13 +82,7 @@ zerocopy = { version = "0.7.32", default-features = false, optional = true, feat
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 
 [dev-dependencies]
-tests = { path = ".", features = ["test"] }
-
-musli = { path = "../crates/musli", version = "0.0.117", default-features = false, features = ["alloc", "test"] }
-serde = { version = "1.0.197", default-features = false, features = ["derive"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
-trybuild = "1.0.90"
-bstr = "1.9.1"
 
 [[bench]]
 name = "comparison"

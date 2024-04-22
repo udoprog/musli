@@ -408,7 +408,11 @@ extern crate alloc;
 extern crate std;
 
 #[macro_use]
-mod macros;
+#[doc(hidden)]
+pub mod macros;
+
+#[cfg(test)]
+mod tests;
 
 pub mod help;
 

@@ -7,7 +7,7 @@ use crate::reader::Reader;
 use crate::writer::Writer;
 
 /// Trait that encodes common behaviors of unsigned numbers.
-pub trait Unsigned:
+pub(crate) trait Unsigned:
     Copy
     + Shr<u32, Output = Self>
     + Shl<u32, Output = Self>
@@ -59,7 +59,7 @@ pub trait Unsigned:
 }
 
 /// Helper trait for performing I/O over [Unsigned] types.
-pub trait UnsignedOps: Unsigned {
+pub(crate) trait UnsignedOps: Unsigned {
     /// Write the current byte array to the given writer in little-endian
     /// encoding.
     fn write_bytes<C, W>(self, cx: &C, writer: W, byte_order: ByteOrder) -> Result<(), C::Error>
@@ -75,7 +75,7 @@ pub trait UnsignedOps: Unsigned {
 }
 
 /// Trait that encodes common behaviors of signed numbers.
-pub trait Signed:
+pub(crate) trait Signed:
     Copy
     + Neg<Output = Self>
     + Shr<u32, Output = Self>

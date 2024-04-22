@@ -1,19 +1,16 @@
-#[allow(unused)]
 use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use tests::generate::Generate;
 use tests::models::*;
-#[allow(unused)]
 use tests::utils;
+use tests::Generate;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rng = tests::rng();
 
     macro_rules! for_each {
         ($name:ident, $call:ident) => {{
-            #[allow(unused)]
             macro_rules! inner {
                 ($framework:ident) => {{
                     tests::if_supported! {
@@ -30,10 +27,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     macro_rules! group {
         ($group_name:expr, $name:ident, $it:ident) => {{
-            #[allow(unused)]
             let mut g = c.benchmark_group($group_name);
 
-            #[allow(unused)]
             macro_rules! inner {
                 ($framework:ident) => {{
                     tests::if_supported! {
@@ -88,7 +83,6 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             for_each!($name, check);
 
-            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     let mut frameworks = Vec::with_capacity(values.len());
@@ -109,7 +103,6 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             group!(concat!("enc/", stringify!($name)), $name, it);
 
-            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     let mut frameworks = Vec::with_capacity(values.len());
@@ -141,7 +134,6 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             group!(concat!("dec/", stringify!($name)), $name, it);
 
-            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     let mut frameworks = Vec::with_capacity(values.len());

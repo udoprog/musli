@@ -121,6 +121,5 @@ pub use self::error::Error;
 
 /// The maximum length that can be inlined in the tag without adding additional
 /// data to the wire format.
-#[cfg(feature = "test")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
-pub const MAX_INLINE_LEN: usize = (self::tag::DATA_MASK - 1) as usize;
+#[cfg(test)]
+pub(crate) const MAX_INLINE_LEN: usize = (self::tag::DATA_MASK - 1) as usize;
