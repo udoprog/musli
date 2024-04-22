@@ -44,8 +44,11 @@ lexical = { version = "6.1.1", optional = true, default-features = false, featur
 serde = { version = "1.0.198", optional = true }
 
 [dev-dependencies]
+musli = { path = ".", features = ["test", "storage", "wire", "descriptive", "json", "parse-full", "value", "serde"] }
+tests = { path = "../../tests" }
+
 rand = "0.8.5"
 serde = { version = "1.0.198", features = ["derive"] }
 url = { version = "2.5.0", features = ["serde"] }
-
-musli = { path = ".", features = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"] }
+trybuild = "1.0.90"
+bstr = "1.9.1"

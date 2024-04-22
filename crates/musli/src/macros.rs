@@ -386,3 +386,127 @@ macro_rules! test_fns {
         }
     }
 }
+
+#[cfg(all(feature = "test", feature = "alloc"))]
+#[doc(hidden)]
+pub mod support {
+    use crate::mode::Binary;
+    use crate::value::{self, Value};
+    use crate::{Decode, Encode};
+
+    pub use alloc::vec::Vec;
+
+    #[track_caller]
+    pub fn musli_value_rt<T>(expected: T)
+    where
+        T: Encode<Binary> + for<'de> Decode<'de, Binary>,
+        T: PartialEq + core::fmt::Debug,
+    {
+        let value: Value = value::encode(&expected).expect("value: Encoding should succeed");
+        let actual: T = value::decode(&value).expect("value: Decoding should succeed");
+        assert_eq!(
+            actual, expected,
+            "value: roundtripped value does not match expected"
+        );
+    }
+}
+
+/// Roundtrip the given expression through all supported formats.
+#[cfg(feature = "test")]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! rt {
+    ($what:ident, $expr:expr $(, $($extra:tt)*)?) => {{
+        let expected = $expr;
+
+        macro_rules! rt {
+            ($name:ident) => {{
+                assert_eq!(
+                    musli::$name::test::rt($expr), expected,
+                    "{}: roundtripped value does not match expected",
+                    stringify!($name),
+                );
+            }}
+        }
+
+        $crate::test_matrix!($what, rt);
+        $crate::macros::support::musli_value_rt($expr);
+        $crate::extra!($expr $(, $($extra)*)*);
+        expected
+    }};
+}
+
+/// This is used to test when there is a decode assymmetry, such as the decoded
+/// value does not match the encoded one due to things such as skipped fields.
+#[cfg(feature = "test")]
+#[macro_export]
+macro_rules! assert_decode_eq {
+    ($what:ident, $expr:expr, $expected:expr $(, $($extra:tt)*)?) => {{
+        let mut bytes = $crate::macros::support::Vec::<u8>::new();
+
+        macro_rules! decode {
+            ($name:ident) => {{
+                $crate::$name::test::decode($expr, &mut bytes, &$expected);
+            }}
+        }
+
+        $crate::test_matrix!($what, decode);
+        $crate::extra!($expr $(, $($extra)*)*);
+    }};
+}
+
+#[cfg(feature = "test")]
+#[macro_export]
+macro_rules! extra {
+    ($expr:expr $(,)?) => {};
+
+    ($expr:expr, json = $json_expected:expr $(, $($tt:tt)*)?) => {{
+        let json = $crate::json::test::to_vec($expr);
+        let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
+
+        assert_eq!(
+            string, $json_expected,
+            "json: encoded json does not match expected value"
+        );
+
+        $crate::extra!($expr $(, $($tt)*)*);
+    }};
+}
+
+#[cfg(feature = "test")]
+#[macro_export]
+macro_rules! test_matrix {
+    (full, $call:path) => {
+        $call!(storage);
+        $call!(wire);
+        $call!(descriptive);
+        $call!(json);
+    };
+
+    (no_json, $call:path) => {
+        $call!(storage);
+        $call!(wire);
+        $call!(descriptive);
+    };
+
+    (descriptive, $call:path) => {
+        $call!(descriptive);
+        $call!(json);
+    };
+
+    // TODO: Deprecate this in favor of only using `upgrade_stable`.
+    (wire_only, $call:path) => {
+        $call!(wire);
+    };
+
+    (upgrade_stable, $call:path) => {
+        $call!(wire);
+        $call!(descriptive);
+        $call!(json);
+    };
+
+    (upgrade_stable_no_text, $call:path) => {
+        $call!(wire);
+        $call!(descriptive);
+    };
+}

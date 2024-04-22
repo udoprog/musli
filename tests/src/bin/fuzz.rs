@@ -2,23 +2,20 @@
 
 use std::env;
 use std::fmt;
-#[allow(unused)]
 use std::fs;
-#[allow(unused)]
 use std::hint::black_box;
 use std::io::Write;
 use std::mem::align_of;
 use std::path::{Path, PathBuf};
-#[allow(unused)]
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
-use tests::generate::{self, Generate};
+use tests::generate;
 use tests::models;
 use tests::models::*;
-#[allow(unused)]
 use tests::utils;
 use tests::AlignedBuf;
+use tests::Generate;
 
 const ALIGNMENT: usize = align_of::<u128>();
 
@@ -38,7 +35,6 @@ tests::miri! {
 }
 
 fn main() -> Result<()> {
-    #[allow(unused)]
     let root = env::var_os("CARGO_MANIFEST_DIR")
         .map(|path| PathBuf::from(path).join("..").join(".."))
         .unwrap_or_else(|| PathBuf::from("."));
@@ -46,16 +42,12 @@ fn main() -> Result<()> {
     let mut it = std::env::args().skip(1);
 
     let mut iter = ITER;
-    #[allow(unused)]
     let mut random = false;
-    #[allow(unused)]
     let mut size = false;
     let mut filter = Vec::new();
     let mut seed = tests::RNG_SEED;
     let mut alignment = ALIGNMENT;
-    #[allow(unused)]
     let mut verbose = false;
-    #[allow(unused)]
     let mut save = false;
 
     while let Some(arg) = it.next() {
@@ -142,7 +134,6 @@ fn main() -> Result<()> {
         }
     }
 
-    #[allow(unused)]
     let condition = move |name: &str| {
         if filter.is_empty() {
             return true;
@@ -169,7 +160,6 @@ fn main() -> Result<()> {
         }
     }
 
-    #[allow(unused)]
     macro_rules! random {
         // musli value is not a bytes-oriented encoding.
         (musli_value $($tt:tt)*) => {
@@ -234,10 +224,8 @@ fn main() -> Result<()> {
         }};
     }
 
-    #[allow(unused_mut)]
     let mut size_sets = Vec::<SizeSet>::new();
 
-    #[allow(unused)]
     macro_rules! size {
         // musli value is not a bytes-oriented encoding.
         (musli_value $($tt:tt)*) => {};
@@ -276,7 +264,6 @@ fn main() -> Result<()> {
         }};
     }
 
-    #[allow(unused)]
     macro_rules! run {
         ($framework:ident, $name:ident, $ty:ty, $size_hint:expr) => {{
             tests::if_supported! {
@@ -302,7 +289,6 @@ fn main() -> Result<()> {
                             let mut state = buf.state();
                             state.reset($size_hint, var);
 
-                            #[allow(unused_mut)]
                             let mut out = match state.encode(var) {
                                 Ok(value) => value,
                                 Err(error) => {
@@ -384,7 +370,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[allow(unused)]
 fn save_decode<W>(
     o: &mut W,
     root: &Path,
