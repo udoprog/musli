@@ -182,7 +182,7 @@ The available formats and their capabilities are:
 | [`musli::storage`]                    | ✔ | ✔ | ✗ | ✗ |
 | [`musli::wire`]                       | ✔ | ✔ | ✔ | ✗ |
 | [`musli::descriptive`]                | ✔ | ✔ | ✔ | ✔ |
-| [`musli::json`][^json]                | ✔ | ✔ | ✔ | ✔ |
+| [`musli::json`] [^json]               | ✔ | ✔ | ✔ | ✔ |
 
 `reorder` determines whether fields must occur in exactly the order in which
 they are specified in their type. Reordering fields in such a type would
@@ -358,29 +358,29 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 
 <br>
 
-[`Binary`]: https://docs.rs/musli/latest/musli/mode/enum.Binary.html
-[`bincode`]: https://docs.rs/bincode
-[`Decode`]: https://docs.rs/musli/latest/musli/de/trait.Decode.html
-[`Decoder`]: https://docs.rs/musli/latest/musli/trait.Decoder.html
-[`derives`]: https://docs.rs/musli/latest/musli/help/derives/index.html
-[`Encode`]: https://docs.rs/musli/latest/musli/en/trait.Encode.html
-[`Encoder`]: https://docs.rs/musli/latest/musli/trait.Encoder.html
-[`musli-serde`]: https://docs.rs/musli/latest/musli/serde/index.html
-[`musli-value`]: https://docs.rs/musli/latest/musli/value/index.html
-[`musli::descriptive`]: https://docs.rs/musli/latest/musli/descriptive/index.html
-[`musli::json`]: https://docs.rs/musli/latest/musli/json/index.html
-[`musli::storage`]: https://docs.rs/musli/latest/musli/storage/index.html
-[`musli::wire`]: https://docs.rs/musli/latest/musli/wire/index.html
-[`protobuf`]: https://developers.google.com/protocol-buffers
-[`serde`]: https://serde.rs
-[`simdutf8`]: https://docs.rs/simdutf8
-[`tests`]: https://github.com/udoprog/musli/tree/main/tests
-[benchmarks]: https://udoprog.github.io/musli/benchmarks/
-[bit packing]: https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs
-[detailed tracing]: https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html
-[musli-name-type]: https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type--
-[no-std and no-alloc]: https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs
-[scoped allocations]: https://docs.rs/musli-allocator
-[size comparisons]: https://udoprog.github.io/musli/benchmarks/#size-comparisons
-[when decoding collections]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq
-[zerocopy]: https://docs.rs/musli-zerocopy
+[`Binary`]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
+[`bincode`]: <https://docs.rs/bincode>
+[`Decode`]: <https://docs.rs/musli/latest/musli/de/trait.Decode.html>
+[`Decoder`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html>
+[`derives`]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
+[`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
+[`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
+[`musli-serde`]: <https://docs.rs/musli/latest/musli/serde/index.html>
+[`musli-value`]: <https://docs.rs/musli/latest/musli/value/index.html>
+[`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/index.html>
+[`musli::json`]: <https://docs.rs/musli/latest/musli/json/index.html>
+[`musli::storage`]: <https://docs.rs/musli/latest/musli/storage/index.html>
+[`musli::wire`]: <https://docs.rs/musli/latest/musli/wire/index.html>
+[`protobuf`]: <https://developers.google.com/protocol-buffers>
+[`serde`]: <https://serde.rs>
+[`simdutf8`]: <https://docs.rs/simdutf8>
+[`tests`]: <https://github.com/udoprog/musli/tree/main/tests>
+[benchmarks]: <https://udoprog.github.io/musli/benchmarks/>
+[bit packing]: <https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs>
+[detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
+[musli-name-type]: <https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type-->
+[no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs>
+[scoped allocations]: <https://docs.rs/musli-allocator>
+[size comparisons]: <https://udoprog.github.io/musli/benchmarks/#size-comparisons>
+[when decoding collections]: <https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq>
+[zerocopy]: <https://docs.rs/musli-zerocopy>
