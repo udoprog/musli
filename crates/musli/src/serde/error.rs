@@ -22,7 +22,7 @@ impl SerdeError {
             SerdeError::Captured => None,
             #[cfg(not(feature = "alloc"))]
             SerdeError::Custom => {
-                Some(cx.message("Error in musli-serde (enable alloc for details)"))
+                Some(cx.message("Error in musli::serde (enable alloc for details)"))
             }
             #[cfg(feature = "alloc")]
             SerdeError::Custom(message) => Some(cx.message(message)),
@@ -32,7 +32,7 @@ impl SerdeError {
 
 impl fmt::Display for SerdeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Error in musli-serde")
+        write!(f, "Error in musli::serde")
     }
 }
 

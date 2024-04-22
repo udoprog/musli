@@ -26,7 +26,7 @@ simple [zero-copy serialization][zerocopy].
 * See [benchmarks] and [size comparisons] to learn about the performance of
   this framework.
 * See [`tests`] to learn how this library is tested.
-* See [`musli-serde`] for seamless compatibility with [`serde`]. You might
+* See [`musli::serde`] for seamless compatibility with [`serde`]. You might
   also be interested to learn how [Müsli is different][different].
 
 [different]: #müsli-is-different-from-serde
@@ -365,10 +365,10 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [`derives`]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
 [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
-[`musli-serde`]: <https://docs.rs/musli/latest/musli/serde/index.html>
 [`musli-value`]: <https://docs.rs/musli/latest/musli/value/index.html>
 [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/index.html>
 [`musli::json`]: <https://docs.rs/musli/latest/musli/json/index.html>
+[`musli::serde`]: <https://docs.rs/musli/latest/musli/serde/index.html>
 [`musli::storage`]: <https://docs.rs/musli/latest/musli/storage/index.html>
 [`musli::wire`]: <https://docs.rs/musli/latest/musli/wire/index.html>
 [`protobuf`]: <https://developers.google.com/protocol-buffers>
