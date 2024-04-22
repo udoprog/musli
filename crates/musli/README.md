@@ -40,7 +40,7 @@ to use:
 
 ```toml
 [dependencies]
-musli = { version = "0.0.117", features = ["storage"] }
+musli = { version = "0.0.118", features = ["storage"] }
 ```
 
 <br>
@@ -376,7 +376,7 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [`simdutf8`]: <https://docs.rs/simdutf8>
 [`tests`]: <https://github.com/udoprog/musli/tree/main/tests>
 [benchmarks]: <https://udoprog.github.io/musli/benchmarks/>
-[bit packing]: <https://github.com/udoprog/musli/blob/main/crates/musli-descriptive/src/tag.rs>
+[bit packing]: <https://github.com/udoprog/musli/blob/main/crates/musli/src/descriptive/tag.rs>
 [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
 [musli-name-type]: <https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type-->
 [no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs>

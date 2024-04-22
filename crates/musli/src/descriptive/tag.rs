@@ -1,4 +1,4 @@
-//! Type flags available for `musli-wire`.
+//! Type flags available for `musli::descriptive`.
 
 #![allow(clippy::unusual_byte_groupings)]
 
