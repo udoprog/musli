@@ -422,7 +422,7 @@ macro_rules! rt {
         macro_rules! rt {
             ($name:ident) => {{
                 assert_eq!(
-                    musli::$name::test::rt($expr), expected,
+                    $crate::$name::test::rt($expr), expected,
                     "{}: roundtripped value does not match expected",
                     stringify!($name),
                 );

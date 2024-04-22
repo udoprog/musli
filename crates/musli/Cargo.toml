@@ -32,7 +32,7 @@ parse-full = []
 value = []
 serde = ["dep:serde"]
 
-test = []
+test = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"]
 
 [dependencies]
 musli-core = { version = "=0.0.118", path = "../musli-core", default-features = false }
@@ -44,7 +44,7 @@ lexical = { version = "6.1.1", optional = true, default-features = false, featur
 serde = { version = "1.0.198", optional = true }
 
 [dev-dependencies]
-musli = { path = ".", features = ["test", "storage", "wire", "descriptive", "json", "parse-full", "value", "serde"] }
+musli = { path = ".", features = ["test"] }
 tests = { path = "../../tests" }
 
 rand = "0.8.5"

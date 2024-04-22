@@ -3,6 +3,7 @@
 use crate::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(crate)]
 pub struct Inner;
 
 #[derive(Debug, PartialEq, Encode, Decode)]

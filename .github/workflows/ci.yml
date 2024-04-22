@@ -23,13 +23,13 @@ jobs:
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{matrix.rust}}
-    - run: cargo build
+    - run: cargo build -p musli --all-features
       if: matrix.rust != 'stable'
-    - run: cargo build --all-targets
+    - run: cargo build --all-targets --features test
       if: matrix.rust == 'stable'
-    - run: cargo test --all-targets
+    - run: cargo test --all-targets --features test
       if: matrix.rust == 'stable'
-    - run: cargo test --doc
+    - run: cargo test --doc --features test
       if: matrix.rust == 'stable'
 
   tests_clippy:

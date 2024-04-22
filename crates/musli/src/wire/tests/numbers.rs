@@ -5,6 +5,7 @@ use crate::wire::test::Typed;
 use crate::{Decode, Encode};
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode)]
+#[musli(crate)]
 struct StructWithNumbers {
     a: i16,
     b: i32,
@@ -14,7 +15,7 @@ struct StructWithNumbers {
 }
 
 #[derive(Debug, Clone, PartialEq, Decode)]
-#[musli(packed)]
+#[musli(crate, packed)]
 struct Unpacked {
     count: Tag,
     #[musli(packed)]
@@ -39,8 +40,8 @@ fn signed_unpacked() {
         e: 10000000000,
     };
 
-    let out = musli::wire::to_vec(&out).expect("failed to encode");
-    let unpacked: Unpacked = musli::storage::decode(out.as_slice()).expect("failed to decode");
+    let out = crate::wire::to_vec(&out).expect("failed to encode");
+    let unpacked: Unpacked = crate::storage::decode(out.as_slice()).expect("failed to decode");
 
     assert_eq! {
         unpacked,

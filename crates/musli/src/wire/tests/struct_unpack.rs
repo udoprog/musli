@@ -58,13 +58,13 @@ fn named_struct_unpack() {
 
 #[test]
 fn indexed_struct_unpack() {
-    let out = musli::wire::to_vec(&Indexed {
+    let out = crate::wire::to_vec(&Indexed {
         string: String::from("foo"),
         number: 42,
     })
     .expect("failed to encode");
 
-    let unpacked: Unpacked = musli::storage::decode(out.as_slice()).expect("failed to decode");
+    let unpacked: Unpacked = crate::storage::decode(out.as_slice()).expect("failed to decode");
 
     assert_eq!(
         unpacked,
