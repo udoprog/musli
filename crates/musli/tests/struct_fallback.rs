@@ -3,33 +3,12 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
 pub struct Struct {
     field1: u32,
     field2: u32,
     field3: u32,
     field4: u32,
-}
-
-#[derive(Debug, PartialEq, Encode, Decode)]
-pub struct StructRename {
-    #[musli(mode = Binary, name = 3)]
-    #[musli(mode = Text, name = "field4")]
-    field4: u32,
-}
-
-#[test]
-fn struct_rename() {
-    musli::assert_decode_eq!(
-        upgrade_stable,
-        Struct {
-            field1: 11,
-            field2: 13,
-            field3: 15,
-            field4: 17,
-        },
-        StructRename { field4: 17 },
-        json = r#"{"field1":11,"field2":13,"field3":15,"field4":17}"#,
-    );
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -45,7 +24,7 @@ pub struct StructPattern {
 #[test]
 fn struct_pattern() {
     musli::assert_decode_eq!(
-        upgrade_stable_no_text,
+        upgrade_stable,
         Struct {
             field1: 0,
             field2: 1,
@@ -57,5 +36,27 @@ fn struct_pattern() {
             field2: 2,
             field4: 3
         }
+    );
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name_type = usize)]
+pub struct StructRename {
+    #[musli(name = 3)]
+    field4: u32,
+}
+
+#[test]
+fn struct_rename() {
+    musli::assert_decode_eq!(
+        upgrade_stable,
+        Struct {
+            field1: 11,
+            field2: 13,
+            field3: 15,
+            field4: 17,
+        },
+        StructRename { field4: 17 },
+        json = r#"{"0":11,"1":13,"2":15,"3":17}"#,
     );
 }

@@ -46,7 +46,7 @@ where
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct SimpleStructTo {
-    pub field4: String,
+    pub field: String,
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -99,7 +99,7 @@ fn skip_to_single() {
     macro_rules! test_case {
         ($ty:ty) => {
             musli::assert_decode_eq! {
-                upgrade_stable_no_text,
+                upgrade_stable,
                 SimpleStructFrom {
                     field: String::from("Aristotle"),
                     interior: 42,
@@ -109,7 +109,7 @@ fn skip_to_single() {
                     other_enum: ENUM1,
                 },
                 SimpleStructTo {
-                    field4: String::from("Aristotle"),
+                    field: String::from("Aristotle"),
                 },
             };
         };

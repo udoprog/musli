@@ -508,9 +508,4 @@ macro_rules! test_matrix {
         $call!(descriptive);
         $call!(json);
     };
-
-    (upgrade_stable_no_text, $call:path) => {
-        $call!(wire);
-        $call!(descriptive);
-    };
 }
