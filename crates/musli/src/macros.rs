@@ -499,6 +499,10 @@ macro_rules! test_matrix {
         $call!(wire);
     };
 
+    (json, $call:path) => {
+        $call!(json);
+    };
+
     (upgrade_stable, $call:path) => {
         $call!(wire);
         $call!(descriptive);
