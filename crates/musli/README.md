@@ -12,9 +12,9 @@ Rust, in the same vein as [`serde`].
 
 It provides a set of [formats](#formats), each with its own well-documented
 set of features and tradeoffs. Every byte-oriented serialization method
-(including [`musli::json`]) has full `#[no_std]` support with or without
-`alloc`. And a particularly neat component providing low-level refreshingly
-simple [zero-copy serialization][zerocopy].
+including escaped formats like [`musli::json`] has full `#[no_std]` support
+with or without `alloc`. And a particularly neat component providing
+low-level refreshingly simple [zero-copy serialization][zerocopy].
 
 [^1]: As in Müsli should be able to do everything you need and more.
 
