@@ -85,7 +85,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 }
 
 /// Encode a struct.
-fn encode_map(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn encode_map(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         ctx_var,
         encoder_var,
@@ -97,12 +97,12 @@ fn encode_map(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
         encoder_t,
         result_ok,
         ..
-    } = e.tokens;
+    } = b.tokens;
 
-    let pack_var = e.cx.ident("pack");
-    let output_var = e.cx.ident("output");
+    let pack_var = b.cx.ident("pack");
+    let output_var = b.cx.ident("output");
 
-    let (encoders, tests) = insert_fields(cx, e, st, &pack_var)?;
+    let (encoders, tests) = insert_fields(cx, b, st, &pack_var)?;
 
     let type_name = &st.name;
 
@@ -117,13 +117,7 @@ fn encode_map(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
 
     match st.packing {
         Packing::Transparent => {
-            let f = match &st.unskipped_fields[..] {
-                [f] => f,
-                _ => {
-                    e.transparent_diagnostics(st.span, &st.unskipped_fields);
-                    return Err(());
-                }
-            };
+            let f = &st.unskipped_fields[0];
 
             let access = &f.self_access;
             let encode_path = &f.encode_path.1;
@@ -137,7 +131,7 @@ fn encode_map(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
         }
         Packing::Tagged => {
             let decls = tests.iter().map(|t| &t.decl);
-            let (build_hint, hint) = length_test(st.unskipped_fields.len(), &tests).build(e);
+            let (build_hint, hint) = length_test(st.unskipped_fields.len(), &tests).build(b);
 
             encode = quote! {{
                 #enter
@@ -178,7 +172,7 @@ struct FieldTest<'st> {
 
 fn insert_fields<'st>(
     cx: &Ctxt<'_>,
-    e: &Build<'_>,
+    b: &Build<'_>,
     st: &'st Body<'_>,
     pack_var: &syn::Ident,
 ) -> Result<(Vec<TokenStream>, Vec<FieldTest<'st>>)> {
@@ -196,15 +190,15 @@ fn insert_fields<'st>(
         map_encoder_t,
         map_entry_encoder_t,
         ..
-    } = e.tokens;
+    } = b.tokens;
 
-    let encode_t_encode = &e.encode_t_encode;
+    let encode_t_encode = &b.encode_t_encode;
 
-    let sequence_decoder_next_var = e.cx.ident("sequence_decoder_next");
-    let pair_encoder_var = e.cx.ident("pair_encoder");
-    let field_encoder_var = e.cx.ident("field_encoder");
-    let value_encoder_var = e.cx.ident("value_encoder");
-    let field_name_static = e.cx.ident("FIELD_NAME");
+    let sequence_decoder_next_var = b.cx.ident("sequence_decoder_next");
+    let pair_encoder_var = b.cx.ident("pair_encoder");
+    let field_encoder_var = b.cx.ident("field_encoder");
+    let value_encoder_var = b.cx.ident("value_encoder");
+    let field_name_static = b.cx.ident("FIELD_NAME");
 
     let mut encoders = Vec::with_capacity(st.all_fields.len());
     let mut tests = Vec::with_capacity(st.all_fields.len());
@@ -287,7 +281,7 @@ fn insert_fields<'st>(
 }
 
 /// Encode an internally tagged enum.
-fn encode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum<'_>) -> Result<TokenStream> {
+fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum<'_>) -> Result<TokenStream> {
     let Ctxt { ctx_var, .. } = *cx;
 
     let Tokens {
@@ -295,19 +289,19 @@ fn encode_enum(cx: &Ctxt<'_>, e: &Build<'_>, en: &Enum<'_>) -> Result<TokenStrea
         result_ok,
         result_err,
         ..
-    } = e.tokens;
+    } = b.tokens;
 
     let type_name = en.name;
 
     if let Some(&(span, Packing::Transparent)) = en.packing_span {
-        e.encode_transparent_enum_diagnostics(span);
+        b.encode_transparent_enum_diagnostics(span);
         return Err(());
     }
 
     let mut variants = Vec::with_capacity(en.variants.len());
 
     for v in &en.variants {
-        let Ok((pattern, encode)) = encode_variant(cx, e, en, v) else {
+        let Ok((pattern, encode)) = encode_variant(cx, b, en, v) else {
             continue;
         };
 
@@ -375,10 +369,7 @@ fn encode_variant(
         EnumTagging::Default => {
             match v.st.packing {
                 Packing::Transparent => {
-                    let [f] = &v.st.unskipped_fields[..] else {
-                        b.transparent_diagnostics(v.span, &v.st.unskipped_fields);
-                        return Err(());
-                    };
+                    let f = &v.st.unskipped_fields[0];
 
                     let encode_path = &f.encode_path.1;
                     let var = &f.self_access;

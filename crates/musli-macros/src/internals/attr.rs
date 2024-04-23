@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt;
 use std::mem;
 
 use proc_macro2::Span;
@@ -31,7 +30,7 @@ impl ModeKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct ModeIdent {
     pub(crate) ident: syn::Ident,
     pub(crate) kind: ModeKind,
@@ -73,16 +72,6 @@ pub enum Packing {
     Tagged,
     Packed,
     Transparent,
-}
-
-impl fmt::Display for Packing {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Packing::Tagged => write!(f, "tagged"),
-            Packing::Packed => write!(f, "packed"),
-            Packing::Transparent => write!(f, "transparent"),
-        }
-    }
 }
 
 macro_rules! merge {

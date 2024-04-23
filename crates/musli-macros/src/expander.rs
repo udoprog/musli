@@ -72,6 +72,7 @@ pub(crate) struct VariantData<'a> {
 pub(crate) enum StructKind {
     Indexed(usize),
     Named,
+    Empty,
 }
 
 pub(crate) struct EnumData<'a> {
@@ -120,7 +121,7 @@ impl<'a> Expander<'a> {
                 name: syn::LitStr::new(&input.ident.to_string(), input.ident.span()),
                 fields: fields(&cx, &st.fields),
                 kind: match &st.fields {
-                    syn::Fields::Unit => StructKind::Indexed(0),
+                    syn::Fields::Unit => StructKind::Empty,
                     syn::Fields::Unnamed(f) => StructKind::Indexed(f.unnamed.len()),
                     syn::Fields::Named(..) => StructKind::Named,
                 },
@@ -138,7 +139,7 @@ impl<'a> Expander<'a> {
                         ident: &variant.ident,
                         fields: fields(&cx, &variant.fields),
                         kind: match &variant.fields {
-                            syn::Fields::Unit => StructKind::Indexed(0),
+                            syn::Fields::Unit => StructKind::Empty,
                             syn::Fields::Unnamed(f) => StructKind::Indexed(f.unnamed.len()),
                             syn::Fields::Named(..) => StructKind::Named,
                         },
@@ -256,10 +257,10 @@ pub(crate) fn expand_name(
     mode: Mode<'_>,
     name_all: NameAll,
     ident: Option<&syn::Ident>,
-) -> Result<syn::Expr> {
+) -> syn::Expr {
     let lit = 'out: {
         if let Some((_, rename)) = taggable.name(mode) {
-            return Ok(rename.clone());
+            return rename.clone();
         }
 
         if let (Some(ident), name_all) = (ident, name_all) {
@@ -271,12 +272,10 @@ pub(crate) fn expand_name(
         usize_suffixed(taggable.index(), taggable.span()).into()
     };
 
-    let tag = syn::Expr::Lit(syn::ExprLit {
+    syn::Expr::Lit(syn::ExprLit {
         attrs: Vec::new(),
         lit,
-    });
-
-    Ok(tag)
+    })
 }
 
 /// Ensure that the given integer is usize-suffixed so that it is treated as the

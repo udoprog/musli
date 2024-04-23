@@ -75,7 +75,7 @@ fn skip_to_empty() {
     macro_rules! test_case {
         ($ty:ty) => {
             musli::assert_decode_eq! {
-                upgrade_stable_no_text,
+                upgrade_stable,
                 SimpleStructFrom {
                     field: String::from("Aristotle"),
                     interior: 42,
@@ -126,7 +126,7 @@ fn skip_to_enum() {
         ($ty:ty) => {
             for expected in [ENUM1, ENUM2, ENUM3] {
                 musli::assert_decode_eq! {
-                    upgrade_stable_no_text,
+                    upgrade_stable,
                     SimpleStructFrom {
                         field: String::from("Aristotle"),
                         interior: 42,

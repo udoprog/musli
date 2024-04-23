@@ -57,24 +57,6 @@ impl Build<'_> {
         );
     }
 
-    /// Emit diagnostics for a transparent encode / decode that failed because
-    /// the wrong number of fields existed.
-    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[Rc<Field>]) {
-        if fields.is_empty() {
-            self.cx.error_span(
-                span,
-                format_args!("#[{ATTR}(transparent)] types must have a single unskipped field"),
-            );
-        } else {
-            self.cx.error_span(
-                span,
-                format_args!(
-                    "#[{ATTR}(transparent)] can only be used on types which have a single field",
-                ),
-            );
-        }
-    }
-
     /// Validate encode attributes.
     pub(crate) fn validate_encode(&self) -> Result<()> {
         self.validate()
@@ -121,10 +103,17 @@ pub(crate) struct Body<'a> {
     pub(crate) name_method: NameMethod,
     pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing: Packing,
+    pub(crate) kind: StructKind,
     pub(crate) path: syn::Path,
 }
 
 impl Body<'_> {
+    pub(crate) fn validate(&self, cx: &Ctxt) {
+        if self.packing == Packing::Transparent && !matches!(&self.unskipped_fields[..], [_]) {
+            cx.transparent_diagnostics(self.span, &self.unskipped_fields);
+        }
+    }
+
     pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
         match self.name_format_with {
             Some((_, path)) => build_call(path, [build_reference(value.clone())]),
@@ -230,13 +219,17 @@ pub(crate) fn setup<'a>(
     let mode = expansion.as_mode(&e.tokens, only);
 
     let data = match &e.data {
-        Data::Struct(data) => BuildData::Struct(setup_struct(e, mode, data)?),
-        Data::Enum(data) => BuildData::Enum(setup_enum(e, mode, data)?),
+        Data::Struct(data) => BuildData::Struct(setup_struct(e, mode, data)),
+        Data::Enum(data) => BuildData::Enum(setup_enum(e, mode, data)),
         Data::Union => {
             e.cx.error_span(e.input.ident.span(), "musli: not supported for unions");
             return Err(());
         }
     };
+
+    if e.cx.has_errors() {
+        return Err(());
+    }
 
     Ok(Build {
         input: e.input,
@@ -252,7 +245,7 @@ pub(crate) fn setup<'a>(
     })
 }
 
-fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -> Result<Body<'a>> {
+fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -> Body<'a> {
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
@@ -278,7 +271,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
 
     for f in &data.fields {
-        let field = Rc::new(setup_field(e, mode, f, name_all, packing, None)?);
+        let field = Rc::new(setup_field(e, mode, f, name_all, packing, None));
 
         if field.skip.is_none() {
             unskipped_fields.push(field.clone());
@@ -287,7 +280,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         all_fields.push(field);
     }
 
-    Ok(Body {
+    let body = Body {
         span: data.span,
         name: &data.name,
         unskipped_fields,
@@ -296,11 +289,15 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         name_method,
         name_format_with: e.type_attr.name_format_with(mode),
         packing,
+        kind: data.kind,
         path,
-    })
+    };
+
+    body.validate(&e.cx);
+    body
 }
 
-fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Result<Enum<'a>> {
+fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Enum<'a> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
 
@@ -312,7 +309,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
             if data
                 .variants
                 .iter()
-                .all(|v| matches!(v.kind, StructKind::Indexed(0)))
+                .all(|v| matches!(v.kind, StructKind::Indexed(0) | StructKind::Empty))
             {
                 EnumTagging::Empty
             } else {
@@ -324,9 +321,11 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
     if !matches!(enum_tagging, EnumTagging::Default | EnumTagging::Empty) {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
-            Some(&(span, packing)) => {
-                e.cx.error_span(span, format_args!("#[{ATTR}({packing})] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
-                return Err(());
+            Some(&(span, Packing::Packed)) => {
+                e.cx.error_span(span, format_args!("#[{ATTR}(packed)] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
+            }
+            Some(&(span, Packing::Transparent)) => {
+                e.cx.error_span(span, format_args!("#[{ATTR}(transparent)] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
             }
             _ => (),
         }
@@ -346,10 +345,10 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
     );
 
     for v in &data.variants {
-        variants.push(setup_variant(e, mode, v, &mut fallback)?);
+        variants.push(setup_variant(e, mode, v, &mut fallback));
     }
 
-    Ok(Enum {
+    Enum {
         span: data.span,
         name: &data.name,
         enum_tagging,
@@ -360,7 +359,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Re
         name_method,
         name_format_with: e.type_attr.name_format_with(mode),
         packing_span,
-    })
+    }
 }
 
 fn setup_variant<'a>(
@@ -368,7 +367,7 @@ fn setup_variant<'a>(
     mode: Mode<'_>,
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
-) -> Result<Variant<'a>> {
+) -> Variant<'a> {
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
@@ -399,7 +398,7 @@ fn setup_variant<'a>(
         e.type_attr.name_method(mode),
     );
 
-    let name = expander::expand_name(data, mode, type_name_all, Some(data.ident))?;
+    let name = expander::expand_name(data, mode, type_name_all, Some(data.ident));
 
     let pattern = data.attr.pattern(mode).map(|(_, p)| p);
 
@@ -432,7 +431,7 @@ fn setup_variant<'a>(
             name_all,
             variant_packing,
             Some(&mut patterns),
-        )?);
+        ));
 
         if field.skip.is_none() {
             unskipped_fields.push(field.clone());
@@ -441,24 +440,29 @@ fn setup_variant<'a>(
         all_fields.push(field);
     }
 
-    Ok(Variant {
+    let st = Body {
+        span: data.span,
+        name: &data.name,
+        unskipped_fields,
+        all_fields,
+        packing: variant_packing,
+        kind: data.kind,
+        name_type,
+        name_method,
+        name_format_with: data.attr.name_format_with(mode),
+        path,
+    };
+
+    st.validate(&e.cx);
+
+    Variant {
         span: data.span,
         index: data.index,
         name,
         pattern,
         patterns,
-        st: Body {
-            span: data.span,
-            name: &data.name,
-            unskipped_fields,
-            all_fields,
-            packing: variant_packing,
-            name_type,
-            name_method,
-            name_format_with: data.attr.name_format_with(mode),
-            path,
-        },
-    })
+        st,
+    }
 }
 
 fn setup_field<'a>(
@@ -468,11 +472,11 @@ fn setup_field<'a>(
     name_all: NameAll,
     packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
-) -> Result<Field<'a>> {
+) -> Field<'a> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data.attr.decode_path_expanded(mode, data.span);
 
-    let name = expander::expand_name(data, mode, name_all, data.ident)?;
+    let name = expander::expand_name(data, mode, name_all, data.ident);
     let pattern = data.attr.pattern(mode).map(|(_, p)| p);
 
     let skip = data.attr.skip(mode).map(|&(s, ())| s);
@@ -558,7 +562,7 @@ fn setup_field<'a>(
         }
     };
 
-    Ok(Field {
+    Field {
         span: data.span,
         index: data.index,
         encode_path,
@@ -573,7 +577,7 @@ fn setup_field<'a>(
         packing,
         var,
         ty: data.ty,
-    })
+    }
 }
 
 fn split_name(

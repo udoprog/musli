@@ -4,7 +4,7 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
 
-use crate::expander::NameMethod;
+use crate::expander::{NameMethod, StructKind};
 use crate::internals::apply;
 use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
@@ -107,13 +107,14 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     })
 }
 
-fn decode_struct(cx: &Ctxt<'_>, e: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
-    let Tokens { result_ok, .. } = e.tokens;
+fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+    let Tokens { result_ok, .. } = b.tokens;
 
-    let body = match st.packing {
-        Packing::Tagged => decode_tagged(cx, e, st, None)?,
-        Packing::Packed => decode_packed(cx, e, st)?,
-        Packing::Transparent => decode_transparent(cx, e, st)?,
+    let body = match (st.kind, st.packing) {
+        (_, Packing::Transparent) => decode_transparent(cx, b, st)?,
+        (_, Packing::Packed) => decode_packed(cx, b, st)?,
+        (StructKind::Empty, _) => decode_empty(cx, b, st)?,
+        (_, Packing::Tagged) => decode_tagged(cx, b, st, None)?,
     };
 
     Ok(quote!(#result_ok({ #body })))
@@ -728,7 +729,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
 fn decode_variant(
     cx: &Ctxt<'_>,
-    e: &Build,
+    b: &Build,
     v: &Variant<'_>,
     decoder_var: &Ident,
     variant_tag: &Ident,
@@ -739,11 +740,54 @@ fn decode_variant(
         ..*cx
     };
 
-    Ok(match v.st.packing {
-        Packing::Tagged => decode_tagged(&cx, e, &v.st, Some(variant_tag))?,
-        Packing::Packed => decode_packed(&cx, e, &v.st)?,
-        Packing::Transparent => decode_transparent(&cx, e, &v.st)?,
+    Ok(match (v.st.kind, v.st.packing) {
+        (_, Packing::Transparent) => decode_transparent(&cx, b, &v.st)?,
+        (_, Packing::Packed) => decode_packed(&cx, b, &v.st)?,
+        (StructKind::Empty, _) => decode_empty(&cx, b, &v.st)?,
+        (_, Packing::Tagged) => decode_tagged(&cx, b, &v.st, Some(variant_tag))?,
     })
+}
+
+/// Decode something empty.
+fn decode_empty(cx: &Ctxt, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+    let Ctxt {
+        ctx_var,
+        decoder_var,
+        ..
+    } = *cx;
+
+    let Tokens {
+        context_t,
+        decoder_t,
+        result_ok,
+        map_hint,
+        ..
+    } = b.tokens;
+
+    let Body { path, name, .. } = st;
+
+    let output_var = b.cx.ident("output");
+    let struct_hint_static = b.cx.ident("STRUCT_HINT");
+
+    let enter = (cx.trace && cx.trace_body).then(|| {
+        quote! {
+            #context_t::enter_struct(#ctx_var, #name);
+        }
+    });
+
+    let leave = (cx.trace && cx.trace_body).then(|| {
+        quote! {
+            #context_t::leave_struct(#ctx_var);
+        }
+    });
+
+    Ok(quote! {{
+        #enter
+        static #struct_hint_static: #map_hint = #map_hint::with_size(0);
+        let #output_var = #decoder_t::decode_map_hint(#decoder_var, &#struct_hint_static, |_| #result_ok(()))?;
+        #leave
+        #path
+    }})
 }
 
 /// Decode something tagged.
@@ -752,7 +796,7 @@ fn decode_variant(
 /// decoded.
 fn decode_tagged(
     cx: &Ctxt,
-    e: &Build<'_>,
+    b: &Build<'_>,
     st: &Body<'_>,
     variant_tag: Option<&Ident>,
 ) -> Result<TokenStream> {
@@ -779,14 +823,14 @@ fn decode_tagged(
         struct_field_decoder_t,
         map_hint,
         ..
-    } = e.tokens;
+    } = b.tokens;
 
-    let field_alloc_var = e.cx.ident("field_alloc");
-    let struct_decoder_var = e.cx.ident("struct_decoder");
-    let struct_hint_static = e.cx.ident("STRUCT_HINT");
-    let type_decoder_var = e.cx.ident("type_decoder");
-    let value_var = e.cx.ident("value");
-    let binding_var = e.cx.ident("value");
+    let field_alloc_var = b.cx.ident("field_alloc");
+    let struct_decoder_var = b.cx.ident("struct_decoder");
+    let struct_hint_static = b.cx.ident("STRUCT_HINT");
+    let type_decoder_var = b.cx.ident("type_decoder");
+    let value_var = b.cx.ident("value");
+    let binding_var = b.cx.ident("value");
 
     let type_name = &st.name;
 
@@ -913,7 +957,7 @@ fn decode_tagged(
 
             field_alloc = None;
 
-            let decode_t_decode = &e.decode_t_decode;
+            let decode_t_decode = &b.decode_t_decode;
 
             decode_tag = quote! {
                 #decode_t_decode(#ctx_var, #struct_decoder_var)?
@@ -923,14 +967,14 @@ fn decode_tagged(
         }
         NameMethod::Unsized(method) => {
             let output_type =
-                e.cx.type_with_span("TagVisitorOutput", e.input.ident.span());
+                b.cx.type_with_span("TagVisitorOutput", b.input.ident.span());
 
             let mut outputs = Vec::with_capacity(fields_with.len());
             let mut name_arms = Vec::with_capacity(fields_with.len());
 
             for (f, decode, trace) in fields_with {
                 let (name_pat, name_variant) =
-                    unsized_arm(e, f.span, f.index, &f.name, f.pattern, &output_type);
+                    unsized_arm(b, f.span, f.index, &f.name, f.pattern, &output_type);
 
                 outputs.push(name_variant);
                 name_arms.push((name_pat, decode, trace));
@@ -1056,24 +1100,21 @@ fn decode_tagged(
 }
 
 /// Decode a transparent value.
-fn decode_transparent(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenStream> {
+fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         decoder_var,
         ctx_var,
         ..
     } = *cx;
 
-    let [f] = &st_.unskipped_fields[..] else {
-        e.transparent_diagnostics(st_.span, &st_.unskipped_fields);
-        return Err(());
-    };
+    let output_var = b.cx.ident("output");
 
-    let output_var = e.cx.ident("output");
+    let Tokens { context_t, .. } = b.tokens;
 
-    let Tokens { context_t, .. } = e.tokens;
+    let f = &st.unskipped_fields[0];
 
-    let type_name = &st_.name;
-    let path = &st_.path;
+    let type_name = &st.name;
+    let path = &st.path;
     let decode_path = &f.decode_path.1;
     let member = &f.member;
 
@@ -1102,7 +1143,7 @@ fn decode_transparent(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<To
 }
 
 /// Decode something packed.
-fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenStream> {
+fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_>, st_: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         decoder_var,
         ctx_var,
@@ -1114,17 +1155,17 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
         decoder_t,
         pack_decoder_t,
         ..
-    } = e.tokens;
+    } = b.tokens;
 
     let type_name = &st_.name;
-    let output_var = e.cx.ident("output");
-    let field_decoder = e.cx.ident("field_decoder");
+    let output_var = b.cx.ident("output");
+    let field_decoder = b.cx.ident("field_decoder");
 
     let mut assign = Vec::new();
 
     for f in &st_.unskipped_fields {
         if let Some((span, _)) = f.default_attr {
-            e.packed_default_diagnostics(span);
+            b.packed_default_diagnostics(span);
         }
 
         let (_, decode_path) = &f.decode_path;
@@ -1153,7 +1194,7 @@ fn decode_packed(cx: &Ctxt<'_>, e: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
         }
     });
 
-    let pack = e.cx.ident("pack");
+    let pack = b.cx.ident("pack");
     let assign = apply::iter(assign, &pack);
     let path = &st_.path;
 
@@ -1243,14 +1284,14 @@ pub(crate) fn build_reference(expr: syn::Expr) -> syn::Expr {
 }
 
 fn unsized_arm<'a>(
-    e: &Build<'_>,
+    b: &Build<'_>,
     span: Span,
     index: usize,
     name: &'a syn::Expr,
     pattern: Option<&'a syn::Pat>,
     output: &Ident,
 ) -> (syn::Pat, NameVariant<'a>) {
-    let variant = e.cx.type_with_span(format_args!("Variant{}", index), span);
+    let variant = b.cx.type_with_span(format_args!("Variant{}", index), span);
 
     let mut path = syn::Path::from(output.clone());
     path.segments.push(syn::PathSegment::from(variant.clone()));
@@ -1262,7 +1303,7 @@ fn unsized_arm<'a>(
         pattern,
     };
 
-    let option_some = &e.tokens.option_some;
+    let option_some = &b.tokens.option_some;
     (syn::parse_quote!(#option_some(#path)), output)
 }
 
