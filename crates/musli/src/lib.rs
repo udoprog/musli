@@ -558,7 +558,7 @@ pub use musli_core::decoder;
 pub use musli_core::visitor;
 
 #[doc(inline)]
-pub use musli_core::{Allocator, Buf, Context, Decode, Decoder, Encode, Encoder, StdError};
+pub use musli_core::{Allocator, Buf, Context, Decode, Decoder, Encode, Encoder};
 
 #[doc(hidden)]
 pub use musli_core::__priv;

@@ -1,5 +1,11 @@
-// TODO: Make use of core::abort intrinsics when they are available.
-#[allow(clippy::empty_loop)]
+extern "C" {
+    /// Abort the program in no-std environments.
+    ///
+    /// This has to be implemented by the caller, and is used for unrecoverable
+    /// and unusual errors. Such as when a reference count is overflowing.
+    fn __musli_abort() -> !;
+}
+
 pub(crate) fn abort() -> ! {
-    loop {}
+    unsafe { __musli_abort() }
 }

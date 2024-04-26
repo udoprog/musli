@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
-use crate::StdError;
+use crate::no_std;
 
 /// Error raised during descriptive encoding.
 #[derive(Debug)]
@@ -25,7 +25,7 @@ enum ErrorImpl {
     #[cfg(feature = "alloc")]
     Message(Box<str>),
     #[cfg(feature = "alloc")]
-    Custom(Box<dyn 'static + Send + Sync + StdError>),
+    Custom(Box<dyn 'static + Send + Sync + no_std::Error>),
     #[cfg(not(feature = "alloc"))]
     Empty,
 }
@@ -59,7 +59,7 @@ impl crate::context::Error for Error {
     #[allow(unused_variables)]
     fn custom<T>(error: T) -> Self
     where
-        T: 'static + Send + Sync + StdError,
+        T: 'static + Send + Sync + no_std::Error,
     {
         Self {
             #[cfg(feature = "alloc")]

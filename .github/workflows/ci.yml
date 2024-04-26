@@ -41,17 +41,18 @@ jobs:
     - run: cargo run -p tools -- clippy -- -D warnings
 
   no_std:
-    runs-on: windows-latest
+    runs-on: ${{matrix.os}}
     needs: features
     strategy:
       fail-fast: false
       matrix:
+        os: ['windows-latest', 'ubuntu-latest']
         example: ['json']
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo build
-      - run: cargo +nightly run -p no-std --example no-std-${{matrix.example}}
+      - run: cargo +nightly run -p no-std --example ${{matrix.example}}
 
   fuzz:
     needs: [test, tests_clippy, features, recursive]

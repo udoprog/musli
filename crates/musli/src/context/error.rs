@@ -7,7 +7,7 @@
 
 use core::fmt;
 
-use crate::context::StdError;
+use crate::no_std;
 
 #[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
@@ -17,7 +17,7 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     /// Construct a custom error.
     fn custom<T>(error: T) -> Self
     where
-        T: 'static + Send + Sync + StdError;
+        T: 'static + Send + Sync + no_std::Error;
 
     /// Collect an error from something that can be displayed.
     ///

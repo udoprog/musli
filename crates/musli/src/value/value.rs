@@ -7,10 +7,11 @@ use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use crate::de::{AsDecoder, Decode, Decoder, NumberVisitor, Visitor};
+use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 #[cfg(feature = "alloc")]
 use crate::de::{
-    EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
+    EntryDecoder, MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, ValueVisitor,
+    VariantDecoder,
 };
 use crate::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
@@ -436,8 +437,10 @@ impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, str> for StringVisitor {
     }
 }
 
+#[cfg(feature = "alloc")]
 struct ValueNumberVisitor;
 
+#[cfg(feature = "alloc")]
 impl<'de, C: ?Sized + Context> NumberVisitor<'de, C> for ValueNumberVisitor {
     type Ok = Value;
 
