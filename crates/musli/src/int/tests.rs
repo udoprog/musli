@@ -36,7 +36,7 @@ fn test_continuation_encoding() {
     where
         T: PartialEq<T> + fmt::Debug + Unsigned,
     {
-        default_allocator!(|alloc| {
+        crate::default_allocator!(|alloc| {
             let mut out = Vec::new();
             let cx = crate::context::Ignore::marker(&alloc);
             c::encode(&cx, &mut out, expected).unwrap();
@@ -55,7 +55,7 @@ fn test_continuation_encoding() {
     where
         T: Unsigned,
     {
-        default_allocator!(|alloc| {
+        crate::default_allocator!(|alloc| {
             let mut out = Vec::new();
             let cx = crate::context::Same::marker(&alloc);
             c::encode(&cx, crate::wrap::wrap(&mut out), value).unwrap();

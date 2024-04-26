@@ -1,9 +1,7 @@
-use musli_core::Context;
-
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
 use crate::int::{Signed, Unsigned};
-use crate::{Reader, Writer};
+use crate::{Context, Reader, Writer};
 
 use super::tag::{Kind, NumberKind, Tag};
 

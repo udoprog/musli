@@ -9,9 +9,8 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use musli_core::{Buf, Context};
-
 use crate::writer::Writer;
+use crate::{Buf, Context};
 
 /// A fixed-size bytes storage which keeps track of how much has been
 /// initialized.

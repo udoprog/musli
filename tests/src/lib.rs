@@ -9,7 +9,7 @@ extern crate std;
 /// Default random seed to use.
 pub const RNG_SEED: u64 = 2718281828459045235;
 
-pub use musli_macros::benchmarker;
+pub use tests_macros::benchmarker;
 
 #[macro_export]
 macro_rules! miri {

@@ -7,7 +7,7 @@
 use core::fmt;
 use core::mem::take;
 
-use musli_core::{Buf, Context};
+use crate::{Buf, Context};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;

@@ -64,7 +64,7 @@ miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-s
 [dependencies]
 musli = { path = "../crates/musli", version = "0.0.119", default-features = false, optional = true, features = [] }
 musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.0.119", default-features = false, features = [], optional = true }
-musli-macros = { path = "../crates/musli-macros", version = "0.0.119", features = ["test"] }
+tests-macros = { path = "../tests-macros" }
 
 anyhow = "1.0.81"
 serde = { version = "1.0.197", default-features = false, optional = true, features = ["derive"] }

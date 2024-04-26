@@ -22,10 +22,10 @@ pub use self::value::{AsValueDecoder, Value};
 #[doc(inline)]
 pub use error::Error;
 
-use crate::Options;
-use en::ValueEncoder;
-use musli_core::mode::Binary;
-use musli_core::{Decode, Encode};
+use crate::default_allocator;
+use crate::mode::Binary;
+use crate::value::en::ValueEncoder;
+use crate::{Decode, Encode, Options};
 
 const OPTIONS: Options = crate::options::new().build();
 
@@ -34,7 +34,7 @@ pub fn encode<T>(value: T) -> Result<Value, Error>
 where
     T: Encode<Binary>,
 {
-    use musli_core::en::Encoder;
+    use crate::en::Encoder;
 
     let mut output = Value::Unit;
 
@@ -50,7 +50,7 @@ pub fn decode<'de, T>(value: &'de Value) -> Result<T, Error>
 where
     T: Decode<'de, Binary>,
 {
-    use musli_core::de::Decoder;
+    use crate::de::Decoder;
 
     default_allocator!(|alloc| {
         let cx = crate::context::Same::<_, Binary, Error>::new(&alloc);
@@ -62,10 +62,10 @@ where
 /// context.
 pub fn decode_with<'de, C, T>(cx: &C, value: &'de Value) -> Result<T, C::Error>
 where
-    C: ?Sized + musli_core::Context,
+    C: ?Sized + crate::Context,
     T: Decode<'de, C::Mode>,
 {
-    use musli_core::de::Decoder;
+    use crate::de::Decoder;
 
     cx.clear();
     value.decoder::<OPTIONS, _>(cx).decode()

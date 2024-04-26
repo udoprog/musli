@@ -1,7 +1,6 @@
-use musli_core::{Buf, Context};
-
 use crate::json::error::ErrorMessage;
 use crate::json::parser::{Parser, StringReference, Token};
+use crate::{Buf, Context};
 
 use lexical::parse_float_options::JSON;
 

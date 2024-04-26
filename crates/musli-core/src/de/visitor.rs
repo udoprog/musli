@@ -24,7 +24,7 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     type Number: NumberVisitor<'de, C, Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::visitor]`][crate::visitor] attribute
+    /// should be using the [`#[musli::visitor]`][musli::visitor] attribute
     /// macro when implementing [`Visitor`].
     #[doc(hidden)]
     type __UseMusliVisitorAttributeMacro;

@@ -20,7 +20,6 @@ proc-macro = true
 path = "src/lib.rs"
 
 [features]
-test = []
 verbose = []
 
 [dependencies]

@@ -1,8 +1,7 @@
 use core::fmt;
 
-use crate::Writer;
-use musli_core::en::{Encode, Encoder};
-use musli_core::Context;
+use crate::en::{Encode, Encoder};
+use crate::{Context, Writer};
 
 pub(crate) struct JsonObjectKeyEncoder<'a, W, C: ?Sized> {
     cx: &'a C,
@@ -27,7 +26,7 @@ macro_rules! format_integer {
     }};
 }
 
-#[musli_core::encoder(crate)]
+#[crate::encoder(crate)]
 impl<'a, W, C> Encoder for JsonObjectKeyEncoder<'a, W, C>
 where
     W: Writer,

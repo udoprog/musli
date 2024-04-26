@@ -10,70 +10,55 @@
 
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::needless_late_init)]
+#![allow(missing_docs)]
 
-use proc_macro::TokenStream;
-
-#[cfg(feature = "test")]
-mod benchmarker;
 mod de;
 mod en;
 mod expander;
 mod internals;
-#[cfg(feature = "test")]
-mod test;
 mod types;
 
-/// Please refer to the main [musli `derives` documentation](https://docs.rs/musli/latest/musli/help/derives/).
-#[proc_macro_derive(Encode, attributes(musli))]
-pub fn derive_encode(input: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(input as syn::DeriveInput);
-    let expander = expander::Expander::new(&input);
+use proc_macro::TokenStream;
 
-    let dump = std::env::var("MUSLI_DUMP_ENCODE").ok();
+const CRATE_DEFAULT: &str = "musli";
+
+#[proc_macro_derive(Encode, attributes(musli))]
+pub fn musli_derive_encode(input: TokenStream) -> TokenStream {
+    derive_encode(input, CRATE_DEFAULT)
+}
+
+#[proc_macro_derive(Decode, attributes(musli))]
+pub fn musli_derive_decode(input: TokenStream) -> TokenStream {
+    derive_decode(input, CRATE_DEFAULT)
+}
+
+fn derive_encode(input: TokenStream, crate_default: &str) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    let expander = expander::Expander::new(&input, crate_default);
 
     match expander.expand_encode() {
-        Ok(tokens) => {
-            if let Some((dump, out)) = dump.as_ref().and_then(|d| d.split_once('=')) {
-                if input.ident.to_string().contains(dump) {
-                    let _ = std::fs::write(out, format!("{}", tokens));
-                }
-            }
-
-            tokens.into()
-        }
+        Ok(tokens) => tokens.into(),
         Err(()) => to_compile_errors(expander.into_errors()).into(),
     }
 }
 
-/// Please refer to the main [musli `derives` documentation](https://docs.rs/musli/latest/musli/help/derives/).
-#[proc_macro_derive(Decode, attributes(musli))]
-pub fn derive_decode(input: TokenStream) -> TokenStream {
+fn derive_decode(input: TokenStream, crate_default: &str) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
-    let expander = expander::Expander::new(&input);
-
-    let dump = std::env::var("MUSLI_DUMP_DECODE").ok();
+    let expander = expander::Expander::new(&input, crate_default);
 
     match expander.expand_decode() {
-        Ok(tokens) => {
-            if let Some((dump, out)) = dump.as_ref().and_then(|d| d.split_once('=')) {
-                if input.ident.to_string().contains(dump) {
-                    let _ = std::fs::write(out, format!("{}", tokens));
-                }
-            }
-
-            tokens.into()
-        }
+        Ok(tokens) => tokens.into(),
         Err(()) => to_compile_errors(expander.into_errors()).into(),
     }
 }
 
-/// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
+        CRATE_DEFAULT,
         &attr,
         "decoder",
         types::DECODER_TYPES,
@@ -87,13 +72,13 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-/// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
+        CRATE_DEFAULT,
         &attr,
         "encoder",
         types::ENCODER_TYPES,
@@ -107,13 +92,13 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-/// Please refer to the main [musli documentation](https://docs.rs/musli/).
 #[proc_macro_attribute]
 pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
+        CRATE_DEFAULT,
         &attr,
         "visitor",
         types::VISITOR_TYPES,
@@ -135,36 +120,4 @@ fn to_compile_errors(errors: Vec<syn::Error>) -> proc_macro2::TokenStream {
     }
 
     output
-}
-
-#[cfg(feature = "test")]
-#[proc_macro_derive(Generate, attributes(generate))]
-pub fn derive_generate(input: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(input as syn::DeriveInput);
-
-    let mut cx = test::Ctxt::default();
-
-    if let Ok(stream) = test::expand(&mut cx, input) {
-        return stream.into();
-    }
-
-    let mut stream = proc_macro2::TokenStream::default();
-
-    for error in cx.errors {
-        stream.extend(error.to_compile_error());
-    }
-
-    stream.into()
-}
-
-#[cfg(feature = "test")]
-#[proc_macro_attribute]
-pub fn benchmarker(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attrs = syn::parse_macro_input!(attr as benchmarker::Attributes);
-    let input = syn::parse_macro_input!(input as benchmarker::Benchmarker);
-
-    match input.expand(&attrs) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
 }

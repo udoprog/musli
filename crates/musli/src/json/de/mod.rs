@@ -25,16 +25,16 @@ use core::str;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-#[cfg(feature = "value")]
-use crate::options;
-#[cfg(feature = "value")]
-use crate::Options;
-use musli_core::de::{
+use crate::de::{
     Decode, DecodeUnsized, Decoder, NumberVisitor, SequenceDecoder, SizeHint, Skip, ValueVisitor,
     Visitor,
 };
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::Context;
+use crate::hint::{MapHint, SequenceHint};
+#[cfg(feature = "value")]
+use crate::options;
+use crate::Context;
+#[cfg(feature = "value")]
+use crate::Options;
 
 #[cfg(not(feature = "parse-full"))]
 use super::parser::integer::{
@@ -105,7 +105,7 @@ where
     }
 }
 
-#[musli_core::decoder(crate)]
+#[crate::decoder(crate)]
 impl<'a, 'de, P, C> Decoder<'de> for JsonDecoder<'a, P, C>
 where
     P: Parser<'de>,

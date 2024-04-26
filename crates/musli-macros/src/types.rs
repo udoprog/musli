@@ -82,7 +82,7 @@ pub(super) enum Kind {
 }
 
 pub(super) struct Attr {
-    crate_path: syn::Path,
+    crate_path: Option<syn::Path>,
 }
 
 impl Parse for Attr {
@@ -110,11 +110,6 @@ impl Parse for Attr {
             }
         }
 
-        let crate_path = match crate_path {
-            Some(crate_path) => crate_path,
-            None => syn::parse_quote!(::musli),
-        };
-
         Ok(Self { crate_path })
     }
 }
@@ -135,6 +130,7 @@ impl Types {
     /// Expand encoder types.
     pub(crate) fn expand(
         mut self,
+        default_crate: &str,
         attr: &Attr,
         what: &str,
         types: &[(&str, Extra)],
@@ -143,7 +139,15 @@ impl Types {
         hint: &str,
         kind: Kind,
     ) -> syn::Result<TokenStream> {
-        let crate_path = &attr.crate_path;
+        let default_crate_path;
+
+        let crate_path = match &attr.crate_path {
+            Some(path) => path,
+            None => {
+                default_crate_path = ident_path(syn::Ident::new(default_crate, Span::call_site()));
+                &default_crate_path
+            }
+        };
 
         let mut missing = types
             .iter()
@@ -213,7 +217,7 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: self.never_type(&attr.crate_path, argument, extra, kind)?,
+                path: self.never_type(crate_path, argument, extra, kind)?,
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
@@ -299,7 +303,7 @@ impl Types {
 
                     ty = syn::Type::Path(syn::TypePath {
                         qself: None,
-                        path: self.never_type(&attr.crate_path, argument, extra, kind)?,
+                        path: self.never_type(crate_path, argument, extra, kind)?,
                     });
 
                     let mut where_clause = syn::WhereClause {
@@ -321,7 +325,7 @@ impl Types {
                 _ => {
                     ty = syn::Type::Path(syn::TypePath {
                         qself: None,
-                        path: self.never_type(&attr.crate_path, argument, extra, kind)?,
+                        path: self.never_type(crate_path, argument, extra, kind)?,
                     });
 
                     generics = syn::Generics::default();

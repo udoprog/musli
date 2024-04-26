@@ -1,9 +1,5 @@
 use super::Decoder;
 
-/// Please refer to the main [musli documentation](https://docs.rs/musli).
-#[doc(inline)]
-pub use musli_macros::Decode;
-
 /// Trait governing how types are decoded.
 ///
 /// This is typically implemented automatically using the [`Decode` derive].
@@ -19,7 +15,7 @@ pub use musli_macros::Decode;
 /// struct MyType {
 ///     data: [u8; 128],
 /// }
-/// ````
+/// ```
 ///
 /// Implementing manually:
 ///

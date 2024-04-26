@@ -4,18 +4,17 @@ use core::mem::take;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use musli_core::de::{
+use crate::de::{
     Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, NumberVisitor,
     SequenceDecoder, SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
 };
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::Context;
-
+use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
 #[cfg(feature = "value")]
 use crate::options;
 use crate::reader::Limit;
 use crate::storage::de::StorageDecoder;
+use crate::Context;
 use crate::{Options, Reader};
 
 use super::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
@@ -215,7 +214,7 @@ where
     }
 }
 
-#[musli_core::decoder(crate)]
+#[crate::decoder(crate)]
 impl<'a, 'de, R, const OPT: Options, C> Decoder<'de> for SelfDecoder<'a, R, OPT, C>
 where
     R: Reader<'de>,

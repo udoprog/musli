@@ -43,7 +43,7 @@ pub trait Encoder: Sized {
     type EncodeMapVariant: MapEncoder<Cx = Self::Cx, Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::encoder]`][crate::encoder] attribute
+    /// should be using the [`#[musli::encoder]`][musli::encoder] attribute
     /// macro when implementing [`Encoder`].
     #[doc(hidden)]
     type __UseMusliEncoderAttributeMacro;

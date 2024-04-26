@@ -58,6 +58,9 @@ mod never;
 /// language level in Rust. So this attribute macro polyfills any missing types
 /// automatically.
 ///
+/// Note that using derives directly from `musli_core` requires you to use the
+/// `#[musli_core::encoder(crate = musli_core)]` attribute.
+///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
 ///
 /// # Examples
@@ -65,15 +68,15 @@ mod never;
 /// ```
 /// use std::fmt;
 ///
-/// use musli::Context;
-/// use musli::en::{Encoder, Encode};
+/// use musli_core::Context;
+/// use musli_core::en::{Encoder, Encode};
 ///
 /// struct MyEncoder<'a, C: ?Sized> {
 ///     value: &'a mut Option<u32>,
 ///     cx: &'a C,
 /// }
 ///
-/// #[musli::encoder]
+/// #[musli_core::encoder(crate = musli_core)]
 /// impl<C: ?Sized + Context> Encoder for MyEncoder<'_, C> {
 ///     type Cx = C;
 ///     type Ok = ();
@@ -110,6 +113,9 @@ pub use musli_macros::encoder;
 /// language level in Rust. So this attribute macro polyfills any missing types
 /// automatically.
 ///
+/// Note that using derives directly from `musli_core` requires you to use the
+/// `#[musli_core::decoder(crate = musli_core)]` attribute.
+///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
 ///
 /// # Examples
@@ -117,14 +123,14 @@ pub use musli_macros::encoder;
 /// ```
 /// use std::fmt;
 ///
-/// use musli::Context;
-/// use musli::de::{Decoder, Decode};
+/// use musli_core::Context;
+/// use musli_core::de::{Decoder, Decode};
 ///
 /// struct MyDecoder<'a, C: ?Sized> {
 ///     cx: &'a C,
 /// }
 ///
-/// #[musli::decoder]
+/// #[musli_core::decoder(crate = musli_core)]
 /// impl<'de, C: ?Sized + Context> Decoder<'de> for MyDecoder<'_, C> {
 ///     type Cx = C;
 ///
@@ -152,8 +158,10 @@ pub use musli_macros::decoder;
 /// language level in Rust. So this attribute macro polyfills any missing types
 /// automatically.
 ///
-/// [not yet supported]:
-///     https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+/// Note that using derives directly from `musli_core` requires you to use the
+/// `#[musli_core::visitor(crate = musli_core)]` attribute.
+///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
 /// [`Visitor`]: crate::de::Visitor
 ///
 /// # Examples
@@ -161,12 +169,12 @@ pub use musli_macros::decoder;
 /// ```
 /// use std::fmt;
 ///
-/// use musli::Context;
-/// use musli::de::Visitor;
+/// use musli_core::Context;
+/// use musli_core::de::Visitor;
 ///
 /// struct AnyVisitor;
 ///
-/// #[musli::visitor]
+/// #[musli_core::visitor(crate = musli_core)]
 /// impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 ///     type Ok = ();
 ///

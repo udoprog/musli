@@ -20,7 +20,7 @@ use crate::en::Encoder;
 ///     #[musli(packed)]
 ///     data: (u32, u32),
 /// }
-/// ````
+/// ```
 ///
 /// Implementing manually:
 ///

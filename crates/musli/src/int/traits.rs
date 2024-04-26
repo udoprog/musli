@@ -1,10 +1,7 @@
 use core::ops::{BitAnd, BitXor, Neg, Shl, Shr};
 
-use musli_core::Context;
-
 use crate::options::ByteOrder;
-use crate::reader::Reader;
-use crate::writer::Writer;
+use crate::{Context, Reader, Writer};
 
 /// Trait that encodes common behaviors of unsigned numbers.
 pub(crate) trait Unsigned:

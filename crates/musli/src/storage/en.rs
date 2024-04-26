@@ -1,11 +1,10 @@
 use core::fmt;
 
-use crate::{Options, Writer};
-use musli_core::en::{
+use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::Context;
+use crate::hint::{MapHint, SequenceHint};
+use crate::{Context, Options, Writer};
 
 /// A vaery simple encoder suitable for storage encoding.
 pub struct StorageEncoder<'a, W, const OPT: Options, C: ?Sized> {
@@ -21,7 +20,7 @@ impl<'a, W, const OPT: Options, C: ?Sized> StorageEncoder<'a, W, OPT, C> {
     }
 }
 
-#[musli_core::encoder(crate)]
+#[crate::encoder(crate)]
 impl<'a, W, const OPT: Options, C> Encoder for StorageEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,

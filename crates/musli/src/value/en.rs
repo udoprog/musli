@@ -5,20 +5,18 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use musli_core::en::{Encode, Encoder};
+use crate::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
-use musli_core::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
+use crate::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
 #[cfg(feature = "alloc")]
-use musli_core::hint::{MapHint, SequenceHint};
-#[cfg(feature = "alloc")]
-use musli_core::Buf;
-use musli_core::Context;
-
+use crate::hint::{MapHint, SequenceHint};
 #[cfg(feature = "alloc")]
 use crate::storage::en::StorageEncoder;
 #[cfg(feature = "alloc")]
 use crate::writer::BufWriter;
-use crate::Options;
+#[cfg(feature = "alloc")]
+use crate::Buf;
+use crate::{Context, Options};
 
 use super::value::{Number, Value};
 
@@ -71,7 +69,7 @@ impl<'a, const OPT: Options, O, C: ?Sized> ValueEncoder<'a, OPT, O, C> {
     }
 }
 
-#[musli_core::encoder(crate)]
+#[crate::encoder(crate)]
 impl<'a, const OPT: Options, O, C> Encoder for ValueEncoder<'a, OPT, O, C>
 where
     O: ValueOutput,

@@ -1,8 +1,7 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use musli_core::{Buf, Context};
-
 use crate::json::parser::{Parser, SliceParser};
+use crate::{Buf, Context};
 
 // Copied and adapter form the serde-json project under the MIT and Apache 2.0
 // license.

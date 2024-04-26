@@ -1,9 +1,8 @@
 use core::mem;
 
-use musli_core::de::{Decoder, SequenceDecoder, SizeHint};
-use musli_core::Context;
-
+use crate::de::{Decoder, SequenceDecoder, SizeHint};
 use crate::json::parser::{Parser, Token};
+use crate::Context;
 
 use super::JsonDecoder;
 

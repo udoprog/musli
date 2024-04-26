@@ -407,7 +407,6 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[macro_use]
 #[doc(hidden)]
 pub mod macros;
 
@@ -416,25 +415,153 @@ mod tests;
 
 pub mod help;
 
-#[doc(inline)]
-pub use musli_core::de;
-#[doc(inline)]
-pub use musli_core::en;
+pub mod de;
+pub mod en;
+
 #[doc(inline)]
 pub use musli_core::hint;
 #[doc(inline)]
 pub use musli_core::mode;
 #[doc(inline)]
 pub use musli_core::no_std;
+
+/// This is an attribute macro that must be used when implementing a
+/// [`Encoder`].
+///
+/// It is required to use because a [`Encoder`] implementation might introduce
+/// new associated types in the future, and this [not yet supported] on a
+/// language level in Rust. So this attribute macro polyfills any missing types
+/// automatically.
+///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::en::{Encoder, Encode};
+///
+/// struct MyEncoder<'a, C: ?Sized> {
+///     value: &'a mut Option<u32>,
+///     cx: &'a C,
+/// }
+///
+/// #[musli::encoder]
+/// impl<C: ?Sized + Context> Encoder for MyEncoder<'_, C> {
+///     type Cx = C;
+///     type Ok = ();
+///
+///     fn cx(&self) -> &C {
+///         self.cx
+///     }
+///
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(f, "32-bit unsigned integers")
+///     }
+///
+///     fn encode<T>(self, value: T) -> Result<Self::Ok, C::Error>
+///     where
+///         T: Encode<Self::Mode>,
+///     {
+///         value.encode(self.cx, self)
+///     }
+///
+///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
+///         *self.value = Some(value);
+///         Ok(())
+///     }
+/// }
+/// ```
 #[doc(inline)]
-pub use musli_core::{decoder, encoder, visitor};
+pub use musli_core::encoder;
+
+/// This is an attribute macro that must be used when implementing a
+/// [`Decoder`].
+///
+/// It is required to use because a [`Decoder`] implementation might introduce
+/// new associated types in the future, and this is [not yet supported] on a
+/// language level in Rust. So this attribute macro polyfills any missing types
+/// automatically.
+///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::{Decoder, Decode};
+///
+/// struct MyDecoder<'a, C: ?Sized> {
+///     cx: &'a C,
+/// }
+///
+/// #[musli::decoder]
+/// impl<'de, C: ?Sized + Context> Decoder<'de> for MyDecoder<'_, C> {
+///     type Cx = C;
+///
+///     fn cx(&self) -> &C {
+///         self.cx
+///     }
+///
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(f, "32-bit unsigned integers")
+///     }
+///
+///     fn decode_u32(self) -> Result<u32, Self::Error> {
+///         Ok(42)
+///     }
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_core::decoder;
+
+/// This is an attribute macro that must be used when implementing a
+/// [`Visitor`].
+///
+/// It is required to use because a [`Visitor`] implementation might introduce
+/// new associated types in the future, and this is [not yet supported] on a
+/// language level in Rust. So this attribute macro polyfills any missing types
+/// automatically.
+///
+/// [not yet supported]:
+///     https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+/// [`Visitor`]: crate::de::Visitor
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::Visitor;
+///
+/// struct AnyVisitor;
+///
+/// #[musli::visitor]
+/// impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
+///     type Ok = ();
+///
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(
+///             f,
+///             "value that can be decoded into dynamic container"
+///         )
+///     }
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_core::visitor;
 
 #[doc(inline)]
 pub use musli_core::{Allocator, Buf, Context, Decode, Decoder, Encode, Encoder, StdError};
 
 #[doc(hidden)]
 pub use musli_core::__priv;
-#[macro_use]
 
 pub mod allocator;
 pub mod descriptive;
@@ -452,7 +579,6 @@ pub mod fixed;
 #[doc(inline)]
 pub use self::fixed::FixedBytes;
 
-#[macro_use]
 pub mod options;
 #[doc(inline)]
 pub use self::options::Options;

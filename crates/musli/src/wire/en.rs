@@ -1,13 +1,12 @@
 use core::fmt;
 
-use musli_core::en::{
+use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::{Buf, Context};
-
+use crate::hint::{MapHint, SequenceHint};
 use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
+use crate::{Buf, Context};
 use crate::{Options, Writer};
 
 use super::tag::{Kind, Tag};
@@ -76,7 +75,7 @@ impl<'a, W, B, const OPT: Options, C: ?Sized> WireSequenceEncoder<'a, W, B, OPT,
     }
 }
 
-#[musli_core::encoder(crate)]
+#[crate::encoder(crate)]
 impl<'a, W, const OPT: Options, C> Encoder for WireEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,

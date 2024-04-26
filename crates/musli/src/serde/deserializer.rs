@@ -1,11 +1,12 @@
 use core::fmt;
 
-use musli_core::de::{
+use serde::de;
+
+use crate::de::{
     Decoder, EntriesDecoder, MapDecoder, SequenceDecoder, SizeHint, VariantDecoder, Visitor,
 };
-use musli_core::hint::SequenceHint;
-use musli_core::Context;
-use serde::de;
+use crate::hint::SequenceHint;
+use crate::Context;
 
 #[cfg(feature = "alloc")]
 use alloc::string::String;
@@ -446,7 +447,7 @@ impl<V> BytesVisitor<V> {
     }
 }
 
-impl<'de, C, V> musli_core::de::ValueVisitor<'de, C, [u8]> for BytesVisitor<V>
+impl<'de, C, V> crate::de::ValueVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
     C: ?Sized + Context,
     C::Error: de::Error,
@@ -580,7 +581,7 @@ impl<V> StringVisitor<V> {
     }
 }
 
-impl<'de, C, V> musli_core::de::ValueVisitor<'de, C, str> for StringVisitor<V>
+impl<'de, C, V> crate::de::ValueVisitor<'de, C, str> for StringVisitor<V>
 where
     C: ?Sized + Context,
     C::Error: de::Error,
@@ -620,7 +621,7 @@ impl<V> AnyNumberVisitor<V> {
     }
 }
 
-impl<'de, C, V> musli_core::de::NumberVisitor<'de, C> for AnyNumberVisitor<V>
+impl<'de, C, V> crate::de::NumberVisitor<'de, C> for AnyNumberVisitor<V>
 where
     C: ?Sized + Context,
     C::Error: de::Error,
@@ -826,7 +827,7 @@ impl<V> AnyVisitor<V> {
     }
 }
 
-#[musli_core::visitor(crate)]
+#[crate::visitor(crate)]
 impl<'de, C, V> Visitor<'de, C> for AnyVisitor<V>
 where
     C: ?Sized + Context,

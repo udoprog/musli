@@ -6,86 +6,94 @@
 //! itself. This also comes with a derive allowing you to derive high
 //! performance decoding associated with native Rust types.
 //!
+//! Note that using derives directly from `musli_core` requires you to use the
+//! `#[musli(crate = musli_core)]` attribute.
+//!
+//! # Examples
+//!
 //! ```
-//! use musli::Decode;
+//! use musli_core::Decode;
 //!
 //! #[derive(Decode)]
+//! #[musli(crate = musli_core)]
 //! pub struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
 //! }
 //! ```
 
-mod skip;
+/// Derive which automatically implements the [`Decode` trait].
+///
+/// See the [`derives` module] for detailed documentation.
+///
+/// [`derives` module]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
+/// [`Decode` trait]: trait@Decode
+///
+/// # Examples
+///
+/// ```
+/// use musli::Decode;
+///
+/// #[derive(Decode)]
+/// struct MyType {
+///     data: [u8; 128],
+/// }
+/// ```
 #[doc(inline)]
-pub use self::skip::Skip;
-
-mod size_hint;
-#[doc(inline)]
-pub use self::size_hint::SizeHint;
+pub use musli_macros::Decode;
 
 mod as_decoder;
-#[doc(inline)]
 pub use self::as_decoder::AsDecoder;
 
 mod decode;
-#[doc(inline)]
 pub use self::decode::Decode;
 
-mod decode_trace;
-#[doc(inline)]
-pub use self::decode_trace::DecodeTrace;
-
-mod decode_unsized;
-#[doc(inline)]
-pub use self::decode_unsized::DecodeUnsized;
-
-mod decode_unsized_bytes;
-#[doc(inline)]
-pub use self::decode_unsized_bytes::DecodeUnsizedBytes;
-
 mod decode_bytes;
-#[doc(inline)]
 pub use self::decode_bytes::DecodeBytes;
 
 mod decode_packed;
-#[doc(inline)]
 pub use self::decode_packed::DecodePacked;
 
+mod decode_trace;
+pub use self::decode_trace::DecodeTrace;
+
+mod decode_unsized;
+pub use self::decode_unsized::DecodeUnsized;
+
+mod decode_unsized_bytes;
+pub use self::decode_unsized_bytes::DecodeUnsizedBytes;
+
 mod decoder;
-#[doc(inline)]
 pub use self::decoder::Decoder;
 
-mod map_decoder;
-#[doc(inline)]
-pub use self::map_decoder::MapDecoder;
-
 mod entries_decoder;
-#[doc(inline)]
 pub use self::entries_decoder::EntriesDecoder;
 
 mod entry_decoder;
-#[doc(inline)]
 pub use self::entry_decoder::EntryDecoder;
 
+mod map_decoder;
+pub use self::map_decoder::MapDecoder;
+
 mod number_visitor;
-#[doc(inline)]
 pub use self::number_visitor::NumberVisitor;
 
 mod sequence_decoder;
-#[doc(inline)]
 pub use self::sequence_decoder::SequenceDecoder;
 
+mod size_hint;
+pub use self::size_hint::SizeHint;
+
+mod skip;
+pub use self::skip::Skip;
+
 mod value_visitor;
-#[doc(inline)]
 pub use self::value_visitor::ValueVisitor;
 
 mod variant_decoder;
-#[doc(inline)]
 pub use self::variant_decoder::VariantDecoder;
 
 mod visitor;
-#[doc(inline)]
 pub use self::visitor::Visitor;
 
 /// Decode to an owned value.

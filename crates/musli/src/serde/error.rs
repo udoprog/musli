@@ -1,6 +1,6 @@
 use core::fmt;
 
-use musli_core::Context;
+use crate::Context;
 
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;

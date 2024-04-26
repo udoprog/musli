@@ -4,17 +4,15 @@ use core::mem::take;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use musli_core::de::{
+use crate::de::{
     Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
     SizeHint, Skip, ValueVisitor, VariantDecoder,
 };
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::Context;
-
+use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
 use crate::reader::Limit;
 use crate::storage::de::StorageDecoder;
-use crate::{Options, Reader};
+use crate::{Context, Options, Reader};
 
 use super::tag::{Kind, Tag};
 
@@ -204,7 +202,7 @@ where
     }
 }
 
-#[musli_core::decoder(crate)]
+#[crate::decoder(crate)]
 impl<'a, 'de, R, const OPT: Options, C> Decoder<'de> for WireDecoder<'a, R, OPT, C>
 where
     C: ?Sized + Context,

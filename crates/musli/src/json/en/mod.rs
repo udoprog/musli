@@ -15,10 +15,9 @@ use self::variant_encoder::JsonVariantEncoder;
 
 use core::fmt;
 
-use crate::Writer;
-use musli_core::en::{Encoder, SequenceEncoder};
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::{Context, Encode};
+use crate::en::{Encoder, SequenceEncoder};
+use crate::hint::{MapHint, SequenceHint};
+use crate::{Context, Encode, Writer};
 
 /// A JSON encoder for Müsli.
 pub(crate) struct JsonEncoder<'a, W, C: ?Sized> {
@@ -34,7 +33,7 @@ impl<'a, W, C: ?Sized> JsonEncoder<'a, W, C> {
     }
 }
 
-#[musli_core::encoder(crate)]
+#[crate::encoder(crate)]
 impl<'a, C, W> Encoder for JsonEncoder<'a, W, C>
 where
     W: Writer,

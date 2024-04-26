@@ -3,10 +3,9 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::ops::Range;
 
-use musli_core::{Allocator, Context};
-
 use crate::buf::{self, BufString};
 use crate::fixed::FixedVec;
+use crate::{Allocator, Context};
 
 use super::access::{Access, Shared};
 use super::rich_error::{RichError, Step};

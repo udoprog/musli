@@ -5,8 +5,8 @@ use core::ptr::NonNull;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use musli_core::buf::Error;
-use musli_core::{Allocator, Buf};
+use crate::buf::Error;
+use crate::{Allocator, Buf};
 
 /// Buffer used in combination with an [`Allocator`].
 pub struct System {

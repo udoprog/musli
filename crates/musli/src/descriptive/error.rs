@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
-use musli_core::StdError;
+use crate::StdError;
 
 /// Error raised during descriptive encoding.
 #[derive(Debug)]

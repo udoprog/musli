@@ -3,7 +3,7 @@ use std::fmt::{self, Write};
 use std::string::String;
 use std::vec::Vec;
 
-use musli_core::{Allocator, Buf};
+use crate::{Allocator, Buf};
 
 use super::{Header, HeaderId, Stack, StackBuffer, State};
 

@@ -49,7 +49,6 @@ mod parser;
 #[cfg(feature = "test")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
 #[doc(hidden)]
-#[macro_use]
 pub mod test;
 
 /// Convenient result alias for use with `musli::json`.

@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 use rand::distributions::Distribution;
 use rand::distributions::Standard;
 
-pub use musli_macros::Generate;
+pub use tests_macros::Generate;
 
 #[cfg(feature = "alloc")]
 use alloc::collections::{BTreeMap, BTreeSet};

@@ -1,3 +1,3 @@
 //! Helpers for writing tests.
 
-test_fns!("descriptive", musli_core::mode::Binary, #[musli_value]);
+crate::test_fns!("descriptive", crate::mode::Binary, #[musli_value]);

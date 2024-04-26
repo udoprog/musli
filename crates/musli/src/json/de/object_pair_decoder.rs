@@ -1,7 +1,6 @@
-use musli_core::de::EntryDecoder;
-use musli_core::Context;
-
+use crate::de::EntryDecoder;
 use crate::json::parser::{Parser, Token};
+use crate::Context;
 
 use super::{JsonDecoder, JsonKeyDecoder};
 

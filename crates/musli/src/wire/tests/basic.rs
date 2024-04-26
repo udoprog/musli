@@ -1,7 +1,6 @@
-use musli_core::{Decode, Encode};
-
 use crate::wire::tag::{Kind, Tag};
 use crate::wire::MAX_INLINE_LEN;
+use crate::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(crate, name_type = usize)]

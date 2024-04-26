@@ -1,7 +1,7 @@
 use core::fmt;
 
 #[cfg(feature = "alloc")]
-use musli_core::de::SizeHint;
+use crate::de::SizeHint;
 
 /// A type hint.
 #[derive(Debug, Clone, Copy)]
