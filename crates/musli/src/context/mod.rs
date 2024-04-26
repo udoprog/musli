@@ -18,7 +18,8 @@ use core::marker::PhantomData;
 
 use crate::buf::{self, BufString};
 use crate::mode::Binary;
-use crate::{Allocator, Context, StdError};
+use crate::no_std;
+use crate::{Allocator, Context};
 
 #[cfg(feature = "alloc")]
 pub use self::system_context::SystemContext;
@@ -99,7 +100,7 @@ where
     #[inline]
     fn custom<T>(&self, message: T) -> Self::Error
     where
-        T: 'static + Send + Sync + StdError,
+        T: 'static + Send + Sync + no_std::Error,
     {
         E::custom(message)
     }
@@ -276,7 +277,7 @@ where
     #[inline]
     fn custom<T>(&self, error: T) -> ErrorMarker
     where
-        T: 'static + Send + Sync + StdError,
+        T: 'static + Send + Sync + no_std::Error,
     {
         // SAFETY: We're restricting access to the context, so that this is
         // safe.

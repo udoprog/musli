@@ -618,6 +618,7 @@ trait FromNumber: Sized {
 
     fn from_number(number: &Number) -> Result<Self, ErrorMessage>;
 
+    #[cfg(feature = "alloc")]
     fn parse_number(string: &str) -> Option<Self>;
 }
 
@@ -655,6 +656,7 @@ macro_rules! integer_from {
             }
 
             #[inline]
+            #[cfg(feature = "alloc")]
             fn parse_number(string: &str) -> Option<Self> {
                 string.parse().ok()
             }
@@ -696,6 +698,7 @@ macro_rules! float_from {
             }
 
             #[inline]
+            #[cfg(feature = "alloc")]
             fn parse_number(string: &str) -> Option<Self> {
                 string.parse().ok()
             }

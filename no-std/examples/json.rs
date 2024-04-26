@@ -27,6 +27,10 @@ static ALLOCATOR: Allocator = Allocator;
 #[link(name = "msvcrt")]
 extern "C" {}
 
+#[cfg(unix)]
+#[link(name = "c")]
+extern "C" {}
+
 #[alloc_error_handler]
 fn err_handler(_: core::alloc::Layout) -> ! {
     core::intrinsics::abort();
@@ -44,6 +48,12 @@ extern "C" fn eh_personality() {}
 #[cfg(unix)]
 #[no_mangle]
 pub extern "C" fn _Unwind_Resume() {}
+
+// This needs to be implemented since core::intrinsics::abort is not stable.
+#[no_mangle]
+extern "C" fn __musli_abort() -> ! {
+    core::intrinsics::abort();
+}
 
 #[derive(Debug, Encode, Decode)]
 struct Value<'a> {

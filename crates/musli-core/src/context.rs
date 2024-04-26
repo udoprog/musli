@@ -4,17 +4,8 @@ use core::fmt;
 use core::str;
 
 use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
+use crate::no_std;
 use crate::{Buf, Decode, Decoder};
-
-#[cfg(feature = "std")]
-pub use std::error::Error as StdError;
-
-/// Standard error trait used when the `std` feature is not enabled.
-#[cfg(not(feature = "std"))]
-pub trait StdError: fmt::Debug + fmt::Display {}
-
-#[cfg(not(feature = "std"))]
-impl<T> StdError for T where T: fmt::Debug + fmt::Display {}
 
 /// Provides ergonomic access to the serialization context.
 ///
@@ -92,7 +83,7 @@ pub trait Context {
     /// Generate a map function which maps an error using the `custom` function.
     fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
     where
-        T: 'static + Send + Sync + StdError,
+        T: 'static + Send + Sync + no_std::Error,
     {
         move |error| self.custom(error)
     }
@@ -102,7 +93,7 @@ pub trait Context {
     /// reporting error-like things out from the context.
     fn custom<T>(&self, error: T) -> Self::Error
     where
-        T: 'static + Send + Sync + StdError;
+        T: 'static + Send + Sync + no_std::Error;
 
     /// Generate a map function which maps an error using the `message` function.
     fn map_message<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
@@ -139,7 +130,7 @@ pub trait Context {
     #[inline(always)]
     fn marked_custom<T>(&self, mark: Self::Mark, message: T) -> Self::Error
     where
-        T: 'static + Send + Sync + StdError,
+        T: 'static + Send + Sync + no_std::Error,
     {
         self.custom(message)
     }

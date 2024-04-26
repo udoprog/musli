@@ -103,7 +103,8 @@ use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
 use crate::buf::{self, BufString};
-use crate::{Context, Decoder, Encoder, StdError};
+use crate::no_std;
+use crate::{Context, Decoder, Encoder};
 
 struct SerdeContext<'a, C>
 where
@@ -154,7 +155,7 @@ where
     #[inline]
     fn custom<T>(&self, error: T) -> Self::Error
     where
-        T: 'static + Send + Sync + StdError,
+        T: 'static + Send + Sync + no_std::Error,
     {
         *self.error.borrow_mut() = Some(self.inner.custom(error));
         error::SerdeError::Captured

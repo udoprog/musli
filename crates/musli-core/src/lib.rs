@@ -18,7 +18,7 @@ extern crate std;
 
 mod context;
 #[doc(inline)]
-pub use self::context::{Context, StdError};
+pub use self::context::Context;
 
 mod allocator;
 #[doc(inline)]
@@ -38,11 +38,6 @@ pub use self::en::{Encode, Encoder};
 
 pub mod hint;
 pub mod mode;
-
-#[cfg(not(feature = "alloc"))]
-pub mod no_std;
-#[cfg(feature = "alloc")]
-#[path = "std.rs"]
 pub mod no_std;
 
 mod expecting;
