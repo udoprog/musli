@@ -1,8 +1,7 @@
 use core::mem::take;
 
-use crate::Writer;
-use musli_core::en::SequenceEncoder;
-use musli_core::Context;
+use crate::en::SequenceEncoder;
+use crate::{Context, Writer};
 
 use super::JsonEncoder;
 

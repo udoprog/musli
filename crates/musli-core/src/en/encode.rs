@@ -1,7 +1,5 @@
 use crate::en::Encoder;
 
-pub use musli_macros::Encode;
-
 /// Trait governing how types are encoded.
 ///
 /// This is typically implemented automatically using the [`Encode` derive].
@@ -17,7 +15,7 @@ pub use musli_macros::Encode;
 /// struct MyType {
 ///     data: [u8; 128],
 /// }
-/// ````
+/// ```
 ///
 /// Implementing manually:
 ///

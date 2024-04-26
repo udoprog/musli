@@ -1,7 +1,7 @@
 use core::fmt;
 
-use musli_core::de::{Decode, DecodeUnsized, Decoder, SizeHint, Skip, ValueVisitor, Visitor};
-use musli_core::Context;
+use crate::de::{Decode, DecodeUnsized, Decoder, SizeHint, Skip, ValueVisitor, Visitor};
+use crate::Context;
 
 use super::super::parser::{Parser, Token};
 use super::{JsonDecoder, KeySignedVisitor, KeyUnsignedVisitor, StringReference};
@@ -39,7 +39,7 @@ where
     }
 }
 
-#[musli_core::decoder(crate)]
+#[crate::decoder(crate)]
 impl<'a, 'de, P, C> Decoder<'de> for JsonKeyDecoder<'a, P, C>
 where
     P: Parser<'de>,

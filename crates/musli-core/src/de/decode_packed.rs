@@ -20,7 +20,7 @@ use super::Decoder;
 ///     #[musli(packed)]
 ///     data: (u32, u32),
 /// }
-/// ````
+/// ```
 ///
 /// Implementing manually:
 ///

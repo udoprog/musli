@@ -10,8 +10,8 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use musli_core::buf::Error;
-use musli_core::{Allocator, Buf};
+use crate::buf::Error;
+use crate::{Allocator, Buf};
 
 use super::DEFAULT_STACK_BUFFER;
 

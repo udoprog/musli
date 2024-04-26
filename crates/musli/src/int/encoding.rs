@@ -1,11 +1,7 @@
-use musli_core::Context;
-
 use crate::int::continuation as c;
 use crate::int::zigzag as zig;
 use crate::int::{Signed, Unsigned, UnsignedOps};
-use crate::options::Options;
-use crate::reader::Reader;
-use crate::writer::Writer;
+use crate::{Context, Options, Reader, Writer};
 
 /// Governs how unsigned integers are encoded into a [`Writer`].
 #[inline]

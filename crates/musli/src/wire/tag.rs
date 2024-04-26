@@ -6,7 +6,7 @@ use core::fmt;
 use core::mem;
 
 #[cfg(feature = "test")]
-use musli_core::{Decode, Encode};
+use crate::{Decode, Encode};
 
 /// Data masked into the data type.
 pub(crate) const DATA_MASK: u8 = 0b00_111111;

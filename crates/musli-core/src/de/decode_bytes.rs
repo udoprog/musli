@@ -17,7 +17,7 @@ use super::Decoder;
 ///     #[musli(bytes)]
 ///     data: [u8; 128],
 /// }
-/// ````
+/// ```
 ///
 /// Implementing manually:
 ///

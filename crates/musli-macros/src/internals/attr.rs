@@ -241,14 +241,14 @@ impl TypeAttr {
     }
 
     /// Get the configured crate, or fallback to default.
-    pub(crate) fn crate_or_default(&self) -> syn::Path {
+    pub(crate) fn crate_or_default(&self, default: &str) -> syn::Path {
         if let Some((_, krate)) = self.root.krate.any.as_ref() {
-            krate.clone()
-        } else {
-            let mut path = syn::Path::from(syn::Ident::new(ATTR, Span::call_site()));
-            path.leading_colon = Some(<Token![::]>::default());
-            path
+            return krate.clone();
         }
+
+        let mut path = syn::Path::from(syn::Ident::new(default, Span::call_site()));
+        path.leading_colon = Some(<Token![::]>::default());
+        path
     }
 }
 

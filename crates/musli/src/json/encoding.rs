@@ -11,11 +11,11 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::io;
 
-use crate::{FixedBytes, Writer};
-use musli_core::de::{Decode, Decoder};
-use musli_core::en::{Encode, Encoder};
-use musli_core::mode::Text;
-use musli_core::Context;
+use crate::de::{Decode, Decoder};
+use crate::default_allocator;
+use crate::en::{Encode, Encoder};
+use crate::mode::Text;
+use crate::{Context, FixedBytes, Writer};
 
 use super::de::JsonDecoder;
 use super::en::JsonEncoder;

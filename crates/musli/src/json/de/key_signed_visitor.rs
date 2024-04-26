@@ -1,11 +1,10 @@
 use core::fmt;
 use core::marker;
 
-use musli_core::de::ValueVisitor;
-use musli_core::Context;
-
+use crate::de::ValueVisitor;
 use crate::json::parser::integer::Signed;
 use crate::json::parser::SliceParser;
+use crate::Context;
 
 use super::parse_signed;
 

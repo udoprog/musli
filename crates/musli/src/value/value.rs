@@ -7,17 +7,15 @@ use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use musli_core::de::{AsDecoder, Decode, Decoder, NumberVisitor, Visitor};
+use crate::de::{AsDecoder, Decode, Decoder, NumberVisitor, Visitor};
 #[cfg(feature = "alloc")]
-use musli_core::de::{
+use crate::de::{
     EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
 };
-use musli_core::en::{Encode, Encoder};
+use crate::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
-use musli_core::en::{MapEncoder, SequenceEncoder, VariantEncoder};
-use musli_core::Context;
-
-use crate::Options;
+use crate::en::{MapEncoder, SequenceEncoder, VariantEncoder};
+use crate::{Context, Options};
 
 use super::de::ValueDecoder;
 use super::type_hint::{NumberHint, TypeHint};
@@ -207,7 +205,7 @@ impl Number {
 
 struct AnyVisitor;
 
-#[musli_core::visitor(crate)]
+#[crate::visitor(crate)]
 impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     type Ok = Value;
     #[cfg(feature = "alloc")]
@@ -535,7 +533,7 @@ impl<M> Encode<M> for Value {
             Value::String(string) => encoder.encode_string(string),
             #[cfg(feature = "alloc")]
             Value::Sequence(values) => {
-                use musli_core::hint::SequenceHint;
+                use crate::hint::SequenceHint;
 
                 let hint = SequenceHint::with_size(values.len());
 
@@ -549,7 +547,7 @@ impl<M> Encode<M> for Value {
             }
             #[cfg(feature = "alloc")]
             Value::Map(values) => {
-                use musli_core::hint::MapHint;
+                use crate::hint::MapHint;
 
                 let hint = MapHint::with_size(values.len());
 

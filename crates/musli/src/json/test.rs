@@ -1,3 +1,3 @@
 //! Helpers for writing tests.
 
-crate::test_fns!("json", ::musli_core::mode::Text);
+crate::test_fns!("json", crate::mode::Text);

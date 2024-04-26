@@ -4,7 +4,7 @@
 //! adapter around an I/O type to work with musli.
 
 #[cfg(feature = "std")]
-use musli_core::{Buf, Context};
+use crate::{Buf, Context};
 
 /// Wrap a type so that it implements [`Reader`] and [`Writer`].
 ///

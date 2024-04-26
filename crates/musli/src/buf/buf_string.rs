@@ -2,9 +2,8 @@ use core::fmt::{self, Write};
 use core::ops::Deref;
 use core::str;
 
-use musli_core::{Buf, Context};
-
 use crate::fixed::CapacityError;
+use crate::{Buf, Context};
 
 /// Wrapper around a [`Buf`], guaranteed to be a valid utf-8 string.
 pub struct BufString<B> {

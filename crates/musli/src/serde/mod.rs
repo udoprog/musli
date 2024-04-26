@@ -97,13 +97,13 @@ mod serializer;
 use core::cell::RefCell;
 use core::fmt;
 
-use musli_core::{Context, Decoder, Encoder, StdError};
 use serde::{Deserialize, Serialize};
 
 use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
 use crate::buf::{self, BufString};
+use crate::{Context, Decoder, Encoder, StdError};
 
 struct SerdeContext<'a, C>
 where

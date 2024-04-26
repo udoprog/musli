@@ -1,16 +1,16 @@
 #![cfg(feature = "std")]
 
 use alloc::format;
-use musli_core::mode::Binary;
 
 use crate::context;
 use crate::json::error::Error;
 use crate::json::parser::integer::{parse_signed_full, parse_unsigned_full};
 use crate::json::parser::SliceParser;
+use crate::mode::Binary;
 
 #[test]
 fn test_decode_exponent() {
-    default_allocator!(|alloc| {
+    crate::default_allocator!(|alloc| {
         let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {
@@ -47,7 +47,7 @@ fn test_decode_exponent() {
 
 #[test]
 fn test_decode_unsigned() {
-    default_allocator!(|alloc| {
+    crate::default_allocator!(|alloc| {
         let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {
@@ -115,7 +115,7 @@ fn test_decode_unsigned() {
 
 #[test]
 fn test_decode_signed() {
-    default_allocator!(|alloc| {
+    crate::default_allocator!(|alloc| {
         let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {

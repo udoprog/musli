@@ -1,8 +1,8 @@
 use core::fmt;
 
-use musli_core::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::{Context, Encoder};
+use crate::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
+use crate::hint::{MapHint, SequenceHint};
+use crate::{Context, Encoder};
 
 use serde::ser::{self, Serialize};
 

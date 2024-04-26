@@ -26,7 +26,7 @@ alloc = []
 verbose = ["musli-macros/verbose"]
 
 [dependencies]
-musli-macros = { version = "=0.0.119", path = "../musli-macros" }
+musli-macros = { version = "=0.0.119", path = "../musli-macros", features = [] }
 
 [dev-dependencies]
 musli = { version = "=0.0.119", path = "../musli" }

@@ -5,7 +5,7 @@
 use core::fmt;
 use core::mem;
 
-use musli_core::{Decode, Decoder};
+use crate::{Decode, Decoder};
 
 /// Variant corresponding to marks.
 #[derive(Debug)]

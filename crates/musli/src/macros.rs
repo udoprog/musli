@@ -212,7 +212,7 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn rt<T>(value: T) -> T
         where
-            T: ::musli_core::en::Encode<$mode> + ::musli_core::de::DecodeOwned<$mode>,
+            T: $crate::en::Encode<$mode> + $crate::de::DecodeOwned<$mode>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
@@ -239,7 +239,7 @@ macro_rules! test_fns {
                 }
             }
 
-            default_allocator!(|alloc| {
+            $crate::default_allocator!(|alloc| {
                 let mut cx = $crate::context::SystemContext::new(&alloc);
                 cx.include_type();
 
@@ -295,9 +295,9 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
         where
-            T: ::musli_core::en::Encode<$mode>,
+            T: $crate::en::Encode<$mode>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: ::musli_core::de::Decode<'de, $mode>,
+            U: $crate::de::Decode<'de, $mode>,
             U: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
@@ -324,7 +324,7 @@ macro_rules! test_fns {
                 }
             }
 
-            default_allocator!(|alloc| {
+            $crate::default_allocator!(|alloc| {
                 let mut cx = $crate::context::SystemContext::new(&alloc);
                 cx.include_type();
 
@@ -364,14 +364,14 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn to_vec<T>(value: T) -> ::alloc::vec::Vec<u8>
         where
-            T: ::musli_core::en::Encode<$mode>,
+            T: $crate::en::Encode<$mode>,
         {
             const WHAT: &str = $what;
             const ENCODING: super::Encoding = super::Encoding::new();
 
             use ::core::any::type_name;
 
-            default_allocator!(|alloc| {
+            $crate::default_allocator!(|alloc| {
                 let mut cx = $crate::context::SystemContext::new(alloc);
                 cx.include_type();
 

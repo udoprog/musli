@@ -1,6 +1,5 @@
-use crate::Writer;
-use musli_core::en::VariantEncoder;
-use musli_core::Context;
+use crate::en::VariantEncoder;
+use crate::{Context, Writer};
 
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 

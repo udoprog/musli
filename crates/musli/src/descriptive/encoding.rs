@@ -7,12 +7,11 @@ use core::marker;
 #[cfg(feature = "std")]
 use std::io;
 
-use musli_core::de::Decode;
-use musli_core::en::Encode;
-use musli_core::mode::Binary;
-use musli_core::Context;
-
+use crate::de::Decode;
+use crate::en::Encode;
+use crate::mode::Binary;
 use crate::options;
+use crate::Context;
 use crate::{FixedBytes, Options, Reader, Writer};
 
 use super::de::SelfDecoder;

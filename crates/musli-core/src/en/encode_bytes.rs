@@ -17,7 +17,7 @@ use crate::en::Encoder;
 ///     #[musli(bytes)]
 ///     data: [u8; 128],
 /// }
-/// ````
+/// ```
 ///
 /// Implementing manually:
 ///

@@ -45,7 +45,7 @@ pub trait Decoder<'de>: Sized {
     type DecodeVariant: VariantDecoder<'de, Cx = Self::Cx>;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::decoder]`][crate::decoder] attribute
+    /// should be using the [`#[musli::decoder]`][musli::decoder] attribute
     /// macro when implementing [`Decoder`].
     #[doc(hidden)]
     type __UseMusliDecoderAttributeMacro;

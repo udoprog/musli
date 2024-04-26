@@ -36,6 +36,7 @@ test = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"
 
 [dependencies]
 musli-core = { version = "=0.0.119", path = "../musli-core", default-features = false }
+musli-macros = { version = "=0.0.119", path = "../musli-macros", default-features = false }
 
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 itoa = { version = "1.0.10", optional = true }

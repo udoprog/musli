@@ -97,7 +97,7 @@ pub(crate) struct Expander<'a> {
 }
 
 impl<'a> Expander<'a> {
-    pub(crate) fn new(input: &'a syn::DeriveInput) -> Self {
+    pub(crate) fn new(input: &'a syn::DeriveInput, default_crate: &str) -> Self {
         fn fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Vec<FieldData<'a>> {
             fields
                 .iter()
@@ -154,7 +154,7 @@ impl<'a> Expander<'a> {
             syn::Data::Union(..) => Data::Union,
         };
 
-        let prefix = type_attr.crate_or_default();
+        let prefix = type_attr.crate_or_default(default_crate);
 
         let default = vec![
             ModeIdent {

@@ -16,10 +16,9 @@ use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
-use musli_core::mode::Binary;
-use musli_core::{Allocator, Context, StdError};
-
 use crate::buf::{self, BufString};
+use crate::mode::Binary;
+use crate::{Allocator, Context, StdError};
 
 #[cfg(feature = "alloc")]
 pub use self::system_context::SystemContext;

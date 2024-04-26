@@ -1,8 +1,7 @@
-use musli_core::de::NumberVisitor;
-use musli_core::{Buf, Context};
-
+use crate::de::NumberVisitor;
 use crate::json::parser::integer::decode_signed_full;
 use crate::json::parser::{string, StringReference, Token};
+use crate::{Buf, Context};
 
 mod private {
     pub trait Sealed {}

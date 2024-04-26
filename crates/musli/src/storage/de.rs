@@ -3,13 +3,12 @@ use core::fmt;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use crate::{Options, Reader};
-use musli_core::de::{
+use crate::de::{
     DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint,
     ValueVisitor, VariantDecoder,
 };
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::{Context, Decode};
+use crate::hint::{MapHint, SequenceHint};
+use crate::{Context, Decode, Options, Reader};
 
 /// A very simple decoder suitable for storage decoding.
 pub struct StorageDecoder<'a, R, const OPT: Options, C: ?Sized> {
@@ -36,7 +35,7 @@ pub struct LimitedStorageDecoder<'a, R, const OPT: Options, C: ?Sized> {
     reader: R,
 }
 
-#[musli_core::decoder(crate)]
+#[crate::decoder(crate)]
 impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> Decoder<'de>
     for StorageDecoder<'a, R, OPT, C>
 where

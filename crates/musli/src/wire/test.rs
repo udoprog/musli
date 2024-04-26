@@ -2,7 +2,7 @@
 
 use core::fmt::Debug;
 
-use musli_core::{Decode, Encode};
+use crate::{Decode, Encode};
 
 use super::tag::Tag;
 
@@ -26,4 +26,4 @@ impl<const N: usize> Typed<N> {
     }
 }
 
-crate::test_fns!("wire", musli_core::mode::Binary);
+crate::test_fns!("wire", crate::mode::Binary);

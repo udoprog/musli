@@ -1,7 +1,7 @@
 use core::fmt::Arguments;
 
-use musli_core::buf::Error;
-use musli_core::{Allocator, Buf};
+use crate::buf::Error;
+use crate::{Allocator, Buf};
 
 /// An empty buffer.
 pub struct EmptyBuf;

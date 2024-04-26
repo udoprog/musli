@@ -8,11 +8,9 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::io;
 
-use musli_core::mode::Binary;
-use musli_core::{Context, Decode, Encode};
-
+use crate::mode::Binary;
 use crate::options;
-use crate::{FixedBytes, Options, Reader, Writer};
+use crate::{Context, Decode, Encode, FixedBytes, Options, Reader, Writer};
 
 use super::de::WireDecoder;
 use super::en::WireEncoder;

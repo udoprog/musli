@@ -7,8 +7,8 @@ use core::ops::Range;
 use core::ptr;
 use core::slice;
 
-use musli_core::de::ValueVisitor;
-use musli_core::Context;
+use crate::de::ValueVisitor;
+use crate::Context;
 
 /// Trait governing how a source of bytes is read.
 ///

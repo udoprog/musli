@@ -1,7 +1,6 @@
-use musli_core::Context;
-
 use crate::json::error::IntegerError;
 use crate::json::parser::Parser;
+use crate::Context;
 
 use self::traits::FromUnsigned;
 pub(crate) use self::traits::{Float, Signed, Unsigned};

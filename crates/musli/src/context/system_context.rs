@@ -6,12 +6,12 @@ use core::ops::Range;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use musli_core::{Allocator, Context};
+use crate::buf::{self, BufString};
+use crate::{Allocator, Context};
 
 use super::access::{self, Access};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
-use crate::buf::{self, BufString};
 
 type BufTriplet<E> = (Vec<Step<String>>, Range<usize>, E);
 

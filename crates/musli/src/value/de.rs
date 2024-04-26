@@ -2,18 +2,16 @@ use core::fmt;
 use core::slice;
 
 #[cfg(feature = "alloc")]
-use musli_core::de::ValueVisitor;
-use musli_core::de::{
+use crate::de::ValueVisitor;
+use crate::de::{
     AsDecoder, Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
     SequenceDecoder, SizeHint, Skip, VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
-use musli_core::hint::{MapHint, SequenceHint};
-use musli_core::Context;
-
+use crate::hint::{MapHint, SequenceHint};
 use crate::reader::SliceReader;
 use crate::storage::de::StorageDecoder;
-use crate::Options;
+use crate::{Context, Options};
 
 use super::error::ErrorMessage;
 use super::type_hint::{NumberHint, TypeHint};
@@ -81,7 +79,7 @@ macro_rules! ensure {
     };
 }
 
-#[musli_core::decoder(crate)]
+#[crate::decoder(crate)]
 impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     for ValueDecoder<'a, 'de, OPT, C>
 {
