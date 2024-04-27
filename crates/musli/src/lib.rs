@@ -413,6 +413,9 @@ pub mod macros;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "json")]
+mod dec2flt;
+
 pub mod help;
 
 pub mod de;

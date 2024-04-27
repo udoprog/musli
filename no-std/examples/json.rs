@@ -2,26 +2,9 @@
 #![allow(internal_features)]
 #![feature(alloc_error_handler, start, core_intrinsics, lang_items, link_cfg)]
 
-use core::alloc::GlobalAlloc;
-
 use musli::allocator::{Stack, StackBuffer};
 use musli::context::StackContext;
 use musli::{Decode, Encode};
-
-struct Allocator;
-
-unsafe impl GlobalAlloc for Allocator {
-    unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
-        core::intrinsics::abort();
-    }
-
-    unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
-        core::intrinsics::abort();
-    }
-}
-
-#[global_allocator]
-static ALLOCATOR: Allocator = Allocator;
 
 #[cfg(all(windows, target_env = "msvc"))]
 #[link(name = "msvcrt")]

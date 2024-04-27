@@ -2,10 +2,6 @@ use crate::json::error::ErrorMessage;
 use crate::json::parser::{Parser, StringReference, Token};
 use crate::{Buf, Context};
 
-use lexical::parse_float_options::JSON;
-
-const FORMAT: u128 = lexical::format::STANDARD;
-
 /// An efficient [`Parser`] wrapper around a slice.
 pub(crate) struct SliceParser<'de> {
     pub(crate) slice: &'de [u8],
@@ -129,14 +125,8 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: ?Sized + Context,
     {
-        let (value, read) = match lexical::parse_partial_with_options::<f32, _, FORMAT>(
-            &self.slice[self.index..],
-            &JSON,
-        ) {
-            Ok(out) => out,
-            Err(error) => {
-                return Err(cx.custom(ErrorMessage::ParseFloat(error)));
-            }
+        let Some((value, read)) = crate::dec2flt::dec2flt(&self.slice[self.index..]) else {
+            return Err(cx.custom(ErrorMessage::ParseFloat));
         };
 
         self.index += read;
@@ -148,14 +138,8 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: ?Sized + Context,
     {
-        let (value, read) = match lexical::parse_partial_with_options::<f64, _, FORMAT>(
-            &self.slice[self.index..],
-            &JSON,
-        ) {
-            Ok(out) => out,
-            Err(error) => {
-                return Err(cx.custom(ErrorMessage::ParseFloat(error)));
-            }
+        let Some((value, read)) = crate::dec2flt::dec2flt(&self.slice[self.index..]) else {
+            return Err(cx.custom(ErrorMessage::ParseFloat));
         };
 
         self.index += read;

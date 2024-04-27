@@ -67,27 +67,21 @@ impl crate::context::Error for Error {
 #[derive(Debug)]
 #[non_exhaustive]
 pub(crate) enum ErrorMessage {
-    ParseFloat(lexical::Error),
+    ParseFloat,
 }
 
 impl fmt::Display for ErrorMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorMessage::ParseFloat(error) => {
-                write!(f, "Expected float, got {error}")
+            ErrorMessage::ParseFloat => {
+                write!(f, "Illegal float encountered")
             }
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for ErrorMessage {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            ErrorMessage::ParseFloat(error) => Some(error),
-        }
-    }
-}
+impl std::error::Error for ErrorMessage {}
 
 #[derive(Debug)]
 #[non_exhaustive]
