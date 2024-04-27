@@ -62,8 +62,8 @@ bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
 miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"]
 
 [dependencies]
-musli = { path = "../crates/musli", version = "0.0.119", default-features = false, optional = true, features = [] }
-musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.0.119", default-features = false, features = [], optional = true }
+musli = { path = "../crates/musli", version = "0.0.120", default-features = false, optional = true, features = [] }
+musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.0.120", default-features = false, features = [], optional = true }
 tests-macros = { path = "../tests-macros" }
 
 anyhow = "1.0.81"
