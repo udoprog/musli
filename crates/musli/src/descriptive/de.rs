@@ -290,7 +290,7 @@ where
     }
 
     #[inline]
-    fn decode_unit(self) -> Result<(), C::Error> {
+    fn decode_empty(self) -> Result<(), C::Error> {
         self.skip()
     }
 
@@ -726,7 +726,7 @@ where
             Kind::Bytes => {
                 let hint = tag
                     .data()
-                    .map(|d| SizeHint::Exact(d as usize))
+                    .map(|d| SizeHint::exact(d as usize))
                     .unwrap_or_default();
                 let visitor = visitor.visit_bytes(cx, hint)?;
                 self.decode_bytes(visitor)
@@ -734,7 +734,7 @@ where
             Kind::String => {
                 let hint = tag
                     .data()
-                    .map(|d| SizeHint::Exact(d as usize))
+                    .map(|d| SizeHint::exact(d as usize))
                     .unwrap_or_default();
                 let visitor = visitor.visit_string(cx, hint)?;
                 self.decode_string(visitor)
@@ -754,8 +754,8 @@ where
                     visitor.visit_char(cx, value)
                 }
                 Mark::Unit => {
-                    self.decode_unit()?;
-                    visitor.visit_unit(cx)
+                    self.decode_empty()?;
+                    visitor.visit_empty(cx)
                 }
                 mark => Err(cx.message(format_args!("Unsupported mark {mark:?}"))),
             },
@@ -793,7 +793,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]
@@ -833,7 +833,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]

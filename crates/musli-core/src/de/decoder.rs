@@ -229,15 +229,15 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         decoder.decode_unit()?;
+    ///         decoder.decode_empty()?;
     ///         Ok(UnitType)
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_unit(self) -> Result<(), <Self::Cx as Context>::Error> {
+    fn decode_empty(self) -> Result<(), <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Unit,
+            &expecting::Empty,
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1263,7 +1263,7 @@ pub trait Decoder<'de>: Sized {
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Sequence,
+            &expecting::UnsizedSequence,
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1301,7 +1301,7 @@ pub trait Decoder<'de>: Sized {
         F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Sequence,
+            &expecting::SequenceWith(hint.size_hint()),
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1339,7 +1339,7 @@ pub trait Decoder<'de>: Sized {
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::UnsizedStruct,
+            &expecting::UnsizedMap,
             ExpectingWrapper::new(&self),
         )))
     }

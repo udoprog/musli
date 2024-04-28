@@ -171,7 +171,7 @@ where
     {
         match self.parser.peek(self.cx)? {
             Token::String => {
-                let visitor = visitor.visit_string(self.cx, SizeHint::Any)?;
+                let visitor = visitor.visit_string(self.cx, SizeHint::any())?;
                 self.decode_string(visitor)
             }
             Token::Number => {

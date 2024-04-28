@@ -100,14 +100,14 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         encoder.encode_unit()
+    ///         encoder.encode_empty()
     ///     }
     /// }
     /// ```
     #[inline]
-    fn encode_unit(self) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
+    fn encode_empty(self) -> Result<Self::Ok, <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Unit,
+            &expecting::Empty,
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1192,7 +1192,7 @@ pub trait Encoder: Sized {
         hint: &SequenceHint,
     ) -> Result<Self::EncodeSequence, <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Sequence,
+            &expecting::SequenceWith(hint.size_hint()),
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1391,7 +1391,7 @@ pub trait Encoder: Sized {
         hint: &MapHint,
     ) -> Result<Self::EncodeMapEntries, <Self::Cx as Context>::Error> {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::MapPairs,
+            &expecting::MapWith(hint.size_hint()),
             ExpectingWrapper::new(&self),
         )))
     }
@@ -1580,7 +1580,7 @@ pub trait Encoder: Sized {
     {
         self.encode_variant_fn(|variant| {
             variant.encode_tag()?.encode(tag)?;
-            variant.encode_data()?.encode_unit()?;
+            variant.encode_data()?.encode_empty()?;
             Ok(())
         })
     }
@@ -1694,7 +1694,7 @@ pub trait Encoder: Sized {
         T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
     {
         Err(self.cx().message(expecting::unsupported_type(
-            &expecting::StructVariant,
+            &expecting::MapVariant,
             ExpectingWrapper::new(&self),
         )))
     }

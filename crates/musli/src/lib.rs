@@ -20,6 +20,7 @@
 //! ## Overview
 //!
 //! * See [`derives`] to learn how to implement [`Encode`] and [`Decode`].
+//! * See [`data_model`] to learn about the abstract data model of Müsli.
 //! * See [benchmarks] and [size comparisons] to learn about the performance of
 //!   this framework.
 //! * See [`tests`] to learn how this library is tested.
@@ -119,47 +120,38 @@
 //!
 //! ## Müsli is different from [`serde`]
 //!
-//! * We make use of GATs to provide tighter abstractions. GATs were not
-//!   available when serde was designed.
-//! * When decoding or encoding we operate by the principle that most things
-//!   return either return a [`Decoder`] or [`Encoder`]. This means for example
-//!   that field names are not restricted to be strings or indexes, but can be
-//!   renamed to [completely arbitrary types][musli-name-type].
-//! * We make less use of the Visitor pattern in certain instances where it's
-//!   deemed unnecessary, such as [when decoding collections]. The result is
-//!   usually cleaner decode implementations like below.
-//! * We make use of [*moded encoding*](#Modes) allowing the same struct to be
-//!   encoded in many different ways.
-//! * We support [detailed tracing] when decoding for rich diagnostics.
-//! * Müsli was designed to support [no-std and no-alloc] environments from the
-//!   ground up without compromising on features using a safe and efficient
-//!   [scoped allocations].
+//! **Müsli's data model does not speak Rust**. There are no
+//! `serialize_struct_variant` methods which provides metadata about the type
+//! being serialized. The [`Encoder`] and [`Decoder`] traits are agnostic on
+//! this. Compatibility with Rust types is entirely handled using the [`Encode`]
+//! and [`Decode`] derives in combination with [modes](#Modes).
 //!
-//! ```
-//! use musli::Context;
-//! use musli::de::{Decode, Decoder, SequenceDecoder};
+//! **We use GATs** to provide easier to use abstractions. GATs were not
+//! available when serde was designed.
 //!
-//! struct MyType {
-//!     data: Vec<String>,
-//! }
+//! **Everything is a [`Decoder`] or [`Encoder`]**. Field names are therefore
+//! not limited to be strings or indexes, but can be named to [arbitrary
+//! types][musli-name-type] if needed.
 //!
-//! impl<'de, M> Decode<'de, M> for MyType {
-//!     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
-//!     where
-//!         D: Decoder<'de, Mode = M>,
-//!     {
-//!         decoder.decode_sequence(|seq| {
-//!             let mut data = Vec::with_capacity(seq.size_hint().or_default());
+//! **Visitor are only used when needed**. `serde` [completely uses visitors]
+//! when deserializing and the corresponding method is treated as a "hint" to
+//! the underlying format. The deserializer is then free to call any method on
+//! the visitor depending on what the underlying format actually contains. In
+//! Müsli, we swap this around. If the caller wants to decode an arbitrary type
+//! it calls [`decode_any`]. The format can then either signal the appropriate
+//! underlying type or call [`Visitor::visit_unknown`] telling the implementer
+//! that it does not have access to type information.
 //!
-//!             while let Some(decoder) = seq.try_decode_next()? {
-//!                 data.push(decoder.decode()?);
-//!             }
+//! **We've invented [*moded encoding*](#Modes)** allowing the same Rust types
+//! to be encoded in many different ways with much greater control over how
+//! things encoded. By default we include the [`Binary`] and [`Text`] modes
+//! providing sensible defaults for binary and text-based formats.
 //!
-//!             Ok(Self { data })
-//!         })
-//!     }
-//! }
-//! ```
+//! **Müsli fully supports [no-std and no-alloc]** from the ground up without
+//! compromising on features using safe and efficient [scoped allocations].
+//!
+//! **We support [detailed tracing]** when decoding for much improved
+//! diagnostics of *where* something went wrong.
 //!
 //! <br>
 //!
@@ -371,6 +363,8 @@
 //!
 //! [`Binary`]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
 //! [`bincode`]: <https://docs.rs/bincode>
+//! [`data_model`]: <https://docs.rs/musli/latest/musli/help/data_model/index.html>
+//! [`decode_any`]: https://docs.rs/musli/latest/musli/trait.Decoder.html#method.decode_any
 //! [`Decode`]: <https://docs.rs/musli/latest/musli/de/trait.Decode.html>
 //! [`Decoder`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html>
 //! [`derives`]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
@@ -386,14 +380,16 @@
 //! [`serde`]: <https://serde.rs>
 //! [`simdutf8`]: <https://docs.rs/simdutf8>
 //! [`tests`]: <https://github.com/udoprog/musli/tree/main/tests>
+//! [`Text`]: <https://docs.rs/musli/latest/musli/mode/enum.Text.html>
+//! [`Visitor::visit_unknown`]: https://docs.rs/musli/latest/musli/de/trait.Visitor.html#method.visit_unknown
 //! [benchmarks]: <https://udoprog.github.io/musli/benchmarks/>
 //! [bit packing]: <https://github.com/udoprog/musli/blob/main/crates/musli/src/descriptive/tag.rs>
+//! [completely uses visitors]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_u32
 //! [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
 //! [musli-name-type]: <https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type-->
 //! [no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs>
 //! [scoped allocations]: <https://docs.rs/musli-allocator>
 //! [size comparisons]: <https://udoprog.github.io/musli/benchmarks/#size-comparisons>
-//! [when decoding collections]: <https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_seq>
 //! [zerocopy]: <https://docs.rs/musli-zerocopy>
 
 #![deny(missing_docs)]

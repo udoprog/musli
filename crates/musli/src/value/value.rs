@@ -85,13 +85,13 @@ impl Value {
             Value::Char(..) => TypeHint::Char,
             Value::Number(number) => TypeHint::Number(number.type_hint()),
             #[cfg(feature = "alloc")]
-            Value::Bytes(bytes) => TypeHint::Bytes(SizeHint::Exact(bytes.len())),
+            Value::Bytes(bytes) => TypeHint::Bytes(SizeHint::exact(bytes.len())),
             #[cfg(feature = "alloc")]
-            Value::String(string) => TypeHint::String(SizeHint::Exact(string.len())),
+            Value::String(string) => TypeHint::String(SizeHint::exact(string.len())),
             #[cfg(feature = "alloc")]
-            Value::Sequence(sequence) => TypeHint::Sequence(SizeHint::Exact(sequence.len())),
+            Value::Sequence(sequence) => TypeHint::Sequence(SizeHint::exact(sequence.len())),
             #[cfg(feature = "alloc")]
-            Value::Map(map) => TypeHint::Map(SizeHint::Exact(map.len())),
+            Value::Map(map) => TypeHint::Map(SizeHint::exact(map.len())),
             #[cfg(feature = "alloc")]
             Value::Variant(..) => TypeHint::Variant,
             #[cfg(feature = "alloc")]
@@ -222,7 +222,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     }
 
     #[inline]
-    fn visit_unit(self, _: &C) -> Result<Self::Ok, C::Error> {
+    fn visit_empty(self, _: &C) -> Result<Self::Ok, C::Error> {
         Ok(Value::Unit)
     }
 
@@ -526,7 +526,7 @@ impl<M> Encode<M> for Value {
         E: Encoder<Mode = M>,
     {
         match self {
-            Value::Unit => encoder.encode_unit(),
+            Value::Unit => encoder.encode_empty(),
             Value::Bool(b) => encoder.encode_bool(*b),
             Value::Char(c) => encoder.encode_char(*c),
             Value::Number(n) => encoder.encode(n),

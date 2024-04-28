@@ -148,7 +148,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[inline]
-    fn decode_unit(self) -> Result<(), C::Error> {
+    fn decode_empty(self) -> Result<(), C::Error> {
         ensure!(self, hint, ExpectedUnit(hint), Value::Unit => Ok(()))
     }
 
@@ -350,7 +350,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
         V: Visitor<'de, Self::Cx>,
     {
         match self.value {
-            Value::Unit => visitor.visit_unit(self.cx),
+            Value::Unit => visitor.visit_empty(self.cx),
             Value::Bool(value) => visitor.visit_bool(self.cx, *value),
             Value::Char(value) => visitor.visit_char(self.cx, *value),
             Value::Number(number) => match number {
@@ -371,12 +371,12 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
             },
             #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => {
-                let visitor = visitor.visit_bytes(self.cx, SizeHint::Exact(bytes.len()))?;
+                let visitor = visitor.visit_bytes(self.cx, SizeHint::exact(bytes.len()))?;
                 visitor.visit_borrowed(self.cx, bytes)
             }
             #[cfg(feature = "alloc")]
             Value::String(string) => {
-                let visitor = visitor.visit_string(self.cx, SizeHint::Exact(string.len()))?;
+                let visitor = visitor.visit_string(self.cx, SizeHint::exact(string.len()))?;
                 visitor.visit_borrowed(self.cx, string)
             }
             #[cfg(feature = "alloc")]

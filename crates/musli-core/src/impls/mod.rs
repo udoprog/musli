@@ -37,7 +37,7 @@ impl<M> Encode<M> for () {
     where
         E: Encoder,
     {
-        encoder.encode_unit()
+        encoder.encode_empty()
     }
 }
 
@@ -47,7 +47,7 @@ impl<'de, M> Decode<'de, M> for () {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unit()
+        decoder.decode_empty()
     }
 }
 
@@ -57,7 +57,7 @@ impl<T, M> Encode<M> for marker::PhantomData<T> {
     where
         E: Encoder,
     {
-        encoder.encode_unit()
+        encoder.encode_empty()
     }
 }
 
@@ -67,7 +67,7 @@ impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T> {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unit()?;
+        decoder.decode_empty()?;
         Ok(marker::PhantomData)
     }
 }

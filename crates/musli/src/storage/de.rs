@@ -89,7 +89,7 @@ where
     }
 
     #[inline]
-    fn decode_unit(mut self) -> Result<(), C::Error> {
+    fn decode_empty(mut self) -> Result<(), C::Error> {
         let mark = self.cx.mark();
         let count = crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
 
@@ -390,7 +390,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]
@@ -428,7 +428,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]

@@ -183,7 +183,7 @@ where
     }
 
     #[inline]
-    fn decode_unit(self) -> Result<(), C::Error> {
+    fn decode_empty(self) -> Result<(), C::Error> {
         self.skip()
     }
 
@@ -464,7 +464,7 @@ where
                 self.decode_sequence(|decoder| visitor.visit_sequence(cx, decoder))
             }
             Token::String => {
-                let visitor = visitor.visit_string(cx, SizeHint::Any)?;
+                let visitor = visitor.visit_string(cx, SizeHint::any())?;
                 self.decode_string(visitor)
             }
             Token::Number => {
@@ -473,7 +473,7 @@ where
             }
             Token::Null => {
                 self.parse_null()?;
-                visitor.visit_unit(cx)
+                visitor.visit_empty(cx)
             }
             Token::True => {
                 self.parse_true()?;

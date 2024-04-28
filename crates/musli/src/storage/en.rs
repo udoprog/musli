@@ -67,7 +67,7 @@ where
     }
 
     #[inline]
-    fn encode_unit(self) -> Result<Self::Ok, C::Error> {
+    fn encode_empty(self) -> Result<Self::Ok, C::Error> {
         static HINT: SequenceHint = SequenceHint::with_size(0);
         self.encode_sequence_fn(&HINT, |_| Ok(()))
     }

@@ -33,11 +33,11 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     /// expecting to decode some specific kind of value.
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
-    /// Indicates that the visited type is a `unit`.
+    /// Indicates that the visited type is empty.
     #[inline]
-    fn visit_unit(self, cx: &C) -> Result<Self::Ok, C::Error> {
+    fn visit_empty(self, cx: &C) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
-            &expecting::Unit,
+            &expecting::Empty,
             ExpectingWrapper::new(&self),
         )))
     }
@@ -241,6 +241,12 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     }
 
     /// Indicates that the visited type is a number.
+    ///
+    /// This in contrast to the type-specific numbers does not have a well-known
+    /// and specified underlying type.
+    ///
+    /// This happens in formats like JSON where the number is represented as an
+    /// untyped sequence of bytes.
     #[inline]
     fn visit_number(self, cx: &C) -> Result<Self::Number, C::Error> {
         Err(cx.message(expecting::unsupported_type(
@@ -257,6 +263,15 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
+            ExpectingWrapper::new(&self),
+        )))
+    }
+
+    /// Indicates that the encoding does not support dynamic types.
+    #[inline]
+    fn visit_unknown<D>(self, cx: &D::Cx, decoder: D) -> Result<Self::Ok, D::Error> {
+        Err(cx.message(expecting::unsupported_type(
+            &expecting::Any,
             ExpectingWrapper::new(&self),
         )))
     }

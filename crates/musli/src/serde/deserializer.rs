@@ -218,7 +218,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.decoder.decode_unit()?;
+        self.decoder.decode_empty()?;
         visitor.visit_unit()
     }
 
@@ -231,7 +231,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        self.decoder.decode_unit()?;
+        self.decoder.decode_empty()?;
         visitor.visit_unit()
     }
 
@@ -516,10 +516,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
-        match self.decoder.size_hint() {
-            SizeHint::Exact(n) => Some(n),
-            _ => None,
-        }
+        self.decoder.size_hint().into_option()
     }
 }
 
@@ -756,7 +753,7 @@ where
 
     #[inline]
     fn unit_variant(self) -> Result<(), Self::Error> {
-        self.decoder.decode_value()?.decode_unit()
+        self.decoder.decode_value()?.decode_empty()
     }
 
     #[inline]
@@ -846,7 +843,7 @@ where
     }
 
     #[inline]
-    fn visit_unit(self, _: &C) -> Result<Self::Ok, C::Error> {
+    fn visit_empty(self, _: &C) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_unit()
     }
 

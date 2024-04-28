@@ -268,7 +268,7 @@ where
     }
 
     #[inline]
-    fn decode_unit(self) -> Result<(), C::Error> {
+    fn decode_empty(self) -> Result<(), C::Error> {
         self.skip()
     }
 
@@ -561,7 +561,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]
@@ -620,7 +620,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]
