@@ -32,12 +32,6 @@ extern "C" fn eh_personality() {}
 #[no_mangle]
 pub extern "C" fn _Unwind_Resume() {}
 
-// This needs to be implemented since core::intrinsics::abort is not stable.
-#[no_mangle]
-extern "C" fn __musli_abort() -> ! {
-    core::intrinsics::abort();
-}
-
 #[derive(Debug, Encode, Decode)]
 struct Value<'a> {
     name: &'a str,

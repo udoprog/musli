@@ -425,8 +425,6 @@ pub mod en;
 pub use musli_core::hint;
 #[doc(inline)]
 pub use musli_core::mode;
-#[doc(inline)]
-pub use musli_core::no_std;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`Encoder`].
@@ -598,9 +596,7 @@ pub mod writer;
 #[doc(inline)]
 pub use self::writer::Writer;
 
+pub mod no_std;
+
 mod int;
 mod str;
-
-#[cfg_attr(feature = "std", path = "system/std.rs")]
-#[cfg_attr(not(feature = "std"), path = "system/no_std.rs")]
-mod system;
