@@ -15,16 +15,16 @@ concurrency:
 jobs:
   msrv:
     runs-on: ubuntu-latest
-    needs: features
+    needs: musli_feature
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.82
+    - uses: dtolnay/rust-toolchain@1.85
     - uses: Swatinem/rust-cache@v2
     - run: cargo build -p musli --features test
 
   test:
     runs-on: ubuntu-latest
-    needs: features
+    needs: musli_feature
     strategy:
       fail-fast: false
       matrix:
@@ -40,7 +40,7 @@ jobs:
 
   loom:
     runs-on: ubuntu-latest
-    needs: features
+    needs: musli_feature
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -D warnings
-    needs: features
+    needs: musli_feature
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -D warnings
-    needs: features
+    needs: musli_feature
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -73,7 +73,7 @@ jobs:
 
   no_std:
     runs-on: ${{matrix.os}}
-    needs: features
+    needs: musli_feature
     strategy:
       fail-fast: false
       matrix:
@@ -99,7 +99,7 @@ jobs:
     - run: cargo build --tests --all-features
 
   fuzz:
-    needs: [msrv, test, loom, tools_clippy, tools_check, features, recursive]
+    needs: [msrv, test, loom, tools_clippy, tools_check, musli_feature, recursive]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -110,7 +110,7 @@ jobs:
     - run: cargo run --release -p tests --features test -- --all --iter 3
 
   miri:
-    needs: [msrv, test, tools_clippy, tools_check, features, recursive]
+    needs: [msrv, test, tools_clippy, tools_check, musli_feature, recursive]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -133,7 +133,7 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - run: cargo build -p musli --no-default-features
 
-  features:
+  musli_feature:
     needs: [no_default_features, rustfmt, clippy]
     runs-on: ubuntu-latest
     strategy:
@@ -157,6 +157,29 @@ jobs:
     - run: cargo check -p musli --no-default-features --features ${{matrix.base}},std
     - run: cargo check -p musli --no-default-features --features ${{matrix.base}},simdutf8
     - run: cargo check -p musli --no-default-features --features ${{matrix.base}},parse-full
+
+  musli_web_feature:
+    needs: [rustfmt, clippy]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+        - json
+        - api
+        - yew021
+        - ws
+        - ws,axum08
+        - axum08
+        - axum-core05
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cargo build -p musli-web --no-default-features --features ${{matrix.features}}
+    - run: cargo build -p musli-web --no-default-features --features ${{matrix.features}},alloc
+    - run: cargo build -p musli-web --no-default-features --features ${{matrix.features}},std
 
   recursive:
     runs-on: ubuntu-latest

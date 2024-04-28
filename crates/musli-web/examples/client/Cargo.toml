@@ -1,0 +1,13 @@
+[package]
+name = "ws-client-example"
+edition = "2024"
+publish = false
+
+[dependencies]
+musli-web = { path = "../..", features = ["yew021"] }
+api = { package = "ws-api-example", path = "../api" }
+
+yew = { version = "0.21.0", features = ["csr"] }
+log = "0.4.27"
+wasm-logger = "0.2.0"
+web-sys = "0.3.77"

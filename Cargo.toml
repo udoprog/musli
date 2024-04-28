@@ -9,8 +9,12 @@ members = [
     "tests",
     "tests-macros",
     "tools",
-    "no-std"
+    "no-std",
+    "crates/musli-web/examples/server",
+    "crates/musli-web/examples/client",
+    "crates/musli-web/examples/api",
 ]
+
 default-members = [
     "crates/*",
     "asm",
