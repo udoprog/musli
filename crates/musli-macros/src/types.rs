@@ -72,7 +72,6 @@ pub(super) const DECODER_FNS: &[(&str, Fn)] = &[
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("String", Extra::Visitor(Ty::Str)),
     ("Bytes", Extra::Visitor(Ty::Bytes)),
-    ("Number", Extra::None),
 ];
 
 #[derive(Clone, Copy)]

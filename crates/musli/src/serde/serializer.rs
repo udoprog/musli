@@ -136,12 +136,12 @@ where
 
     #[inline]
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_unit()
+        self.encoder.encode_empty()
     }
 
     #[inline]
     fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_unit()
+        self.encoder.encode_empty()
     }
 
     #[inline]
@@ -152,7 +152,7 @@ where
         variant_name: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
         encode_variant(self.cx, self.encoder, variant_name, |encoder| {
-            encoder.encode_unit()
+            encoder.encode_empty()
         })
     }
 

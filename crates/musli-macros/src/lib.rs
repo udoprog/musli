@@ -22,11 +22,45 @@ use proc_macro::TokenStream;
 
 const CRATE_DEFAULT: &str = "musli";
 
+/// Derive which automatically implements the [`Encode` trait].
+///
+/// See the [`derives` module] for detailed documentation.
+///
+/// [`derives` module]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
+/// [`Encode` trait]: <https://docs.rs/musli/latest/musli/trait.Encode.html>
+///
+/// # Examples
+///
+/// ```
+/// use musli::Encode;
+///
+/// #[derive(Encode)]
+/// struct MyType {
+///     data: [u8; 128],
+/// }
+/// ```
 #[proc_macro_derive(Encode, attributes(musli))]
 pub fn musli_derive_encode(input: TokenStream) -> TokenStream {
     derive_encode(input, CRATE_DEFAULT)
 }
 
+/// Derive which automatically implements the [`Decode` trait].
+///
+/// See the [`derives` module] for detailed documentation.
+///
+/// [`derives` module]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
+/// [`Decode` trait]: <https://docs.rs/musli/latest/musli/trait.Decode.html>
+///
+/// # Examples
+///
+/// ```
+/// use musli::Decode;
+///
+/// #[derive(Decode)]
+/// struct MyType {
+///     data: [u8; 128],
+/// }
+/// ```
 #[proc_macro_derive(Decode, attributes(musli))]
 pub fn musli_derive_decode(input: TokenStream) -> TokenStream {
     derive_decode(input, CRATE_DEFAULT)

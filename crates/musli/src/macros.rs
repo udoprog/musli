@@ -439,6 +439,7 @@ macro_rules! rt {
 /// This is used to test when there is a decode assymmetry, such as the decoded
 /// value does not match the encoded one due to things such as skipped fields.
 #[cfg(feature = "test")]
+#[doc(hidden)]
 #[macro_export]
 macro_rules! assert_decode_eq {
     ($what:ident, $expr:expr, $expected:expr $(, $($extra:tt)*)?) => {{
@@ -457,6 +458,7 @@ macro_rules! assert_decode_eq {
 
 #[cfg(feature = "test")]
 #[macro_export]
+#[doc(hidden)]
 macro_rules! extra {
     ($expr:expr $(,)?) => {};
 
@@ -474,6 +476,7 @@ macro_rules! extra {
 }
 
 #[cfg(feature = "test")]
+#[doc(hidden)]
 #[macro_export]
 macro_rules! test_matrix {
     (full, $call:path) => {

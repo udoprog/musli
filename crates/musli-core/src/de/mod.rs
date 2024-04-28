@@ -22,24 +22,6 @@
 //! }
 //! ```
 
-/// Derive which automatically implements the [`Decode` trait].
-///
-/// See the [`derives` module] for detailed documentation.
-///
-/// [`derives` module]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
-/// [`Decode` trait]: trait@Decode
-///
-/// # Examples
-///
-/// ```
-/// use musli::Decode;
-///
-/// #[derive(Decode)]
-/// struct MyType {
-///     data: [u8; 128],
-/// }
-/// ```
-#[doc(inline)]
 pub use musli_macros::Decode;
 
 mod as_decoder;
@@ -75,9 +57,6 @@ pub use self::entry_decoder::EntryDecoder;
 mod map_decoder;
 pub use self::map_decoder::MapDecoder;
 
-mod number_visitor;
-pub use self::number_visitor::NumberVisitor;
-
 mod sequence_decoder;
 pub use self::sequence_decoder::SequenceDecoder;
 
@@ -87,8 +66,8 @@ pub use self::size_hint::SizeHint;
 mod skip;
 pub use self::skip::Skip;
 
-mod value_visitor;
-pub use self::value_visitor::ValueVisitor;
+mod unsized_visitor;
+pub use self::unsized_visitor::UnsizedVisitor;
 
 mod variant_decoder;
 pub use self::variant_decoder::VariantDecoder;

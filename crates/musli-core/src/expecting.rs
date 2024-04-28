@@ -114,6 +114,9 @@ expect_with! {
 }
 
 expect! {
+    pub(crate) Any("a dynamic value");
+    pub(crate) Empty("empty");
+    pub(crate) Option("option");
     pub(crate) Pack("pack");
     pub(crate) Bool("boolean");
     pub(crate) Char("character");
@@ -138,13 +141,10 @@ expect! {
     pub(crate) Array("array");
     pub(crate) Map("map");
     pub(crate) MapEntries("map entries");
-    pub(crate) Option("option");
-    pub(crate) Sequence("sequence");
-    pub(crate) Unit("unit");
-    pub(crate) UnsizedStruct("unsized struct");
-    pub(crate) Variant("variant");
+    pub(crate) UnsizedMap("unsized map");
+    pub(crate) MapVariant("map variant");
+    pub(crate) UnsizedSequence("unsized sequence");
     pub(crate) SequenceVariant("sequence variant");
-    pub(crate) StructVariant("struct variant");
+    pub(crate) Variant("variant");
     pub(crate) AnyValue("a value");
-    pub(crate) MapPairs("map pairs");
 }

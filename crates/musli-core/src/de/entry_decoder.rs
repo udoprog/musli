@@ -26,7 +26,7 @@ pub trait EntryDecoder<'de> {
     /// Get a size hint for the size of the map being decoded.
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Any
+        SizeHint::any()
     }
 
     /// Return the decoder for the first value in the pair.

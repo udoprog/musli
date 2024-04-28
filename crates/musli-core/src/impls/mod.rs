@@ -16,7 +16,7 @@ use core::{fmt, marker};
 
 use crate::de::{
     Decode, DecodeBytes, DecodePacked, DecodeUnsized, DecodeUnsizedBytes, Decoder, SequenceDecoder,
-    ValueVisitor, VariantDecoder,
+    UnsizedVisitor, VariantDecoder,
 };
 use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder, SequenceEncoder, VariantEncoder};
 use crate::hint::SequenceHint;
@@ -37,7 +37,7 @@ impl<M> Encode<M> for () {
     where
         E: Encoder,
     {
-        encoder.encode_unit()
+        encoder.encode_empty()
     }
 }
 
@@ -47,7 +47,7 @@ impl<'de, M> Decode<'de, M> for () {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unit()
+        decoder.decode_empty()
     }
 }
 
@@ -57,7 +57,7 @@ impl<T, M> Encode<M> for marker::PhantomData<T> {
     where
         E: Encoder,
     {
-        encoder.encode_unit()
+        encoder.encode_empty()
     }
 }
 
@@ -67,7 +67,7 @@ impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T> {
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unit()?;
+        decoder.decode_empty()?;
         Ok(marker::PhantomData)
     }
 }
@@ -348,7 +348,7 @@ impl<'de, M> Decode<'de, M> for &'de str {
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, str> for Visitor
+        impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
             C: ?Sized + Context,
         {
@@ -378,7 +378,7 @@ impl<'de, M> DecodeUnsized<'de, M> for str {
     {
         struct Visitor<F>(F);
 
-        impl<'de, C, F, O> ValueVisitor<'de, C, str> for Visitor<F>
+        impl<'de, C, F, O> UnsizedVisitor<'de, C, str> for Visitor<F>
         where
             C: ?Sized + Context,
             F: FnOnce(&str) -> Result<O, C::Error>,
@@ -433,7 +433,7 @@ impl<'de, M> Decode<'de, M> for &'de [u8] {
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+        impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: ?Sized + Context,
         {
@@ -463,7 +463,7 @@ impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
     {
         struct Visitor<F>(F);
 
-        impl<'de, C, F, O> ValueVisitor<'de, C, [u8]> for Visitor<F>
+        impl<'de, C, F, O> UnsizedVisitor<'de, C, [u8]> for Visitor<F>
         where
             C: ?Sized + Context,
             F: FnOnce(&[u8]) -> Result<O, C::Error>,

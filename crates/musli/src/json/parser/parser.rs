@@ -1,4 +1,4 @@
-use crate::de::NumberVisitor;
+use crate::de::Visitor;
 use crate::json::parser::integer::decode_signed_full;
 use crate::json::parser::{string, StringReference, Token};
 use crate::{Buf, Context};
@@ -158,12 +158,12 @@ pub trait Parser<'de>: private::Sealed {
     }
 
     /// Parse an unknown number and try to coerce it into the best fit type
-    /// through [NumberVisitor].
+    /// through [Visitor].
     #[doc(hidden)]
     fn parse_number<C, V>(&mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: ?Sized + Context,
-        V: NumberVisitor<'de, C>,
+        V: Visitor<'de, C>,
     {
         let signed = decode_signed_full::<i128, _, _>(cx, self)?;
 

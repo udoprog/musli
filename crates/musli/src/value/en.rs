@@ -124,7 +124,7 @@ where
     }
 
     #[inline]
-    fn encode_unit(self) -> Result<Self::Ok, C::Error> {
+    fn encode_empty(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 
@@ -327,7 +327,7 @@ where
     {
         let mut variant = self.encode_variant()?;
         variant.encode_tag()?.encode(tag)?;
-        variant.encode_data()?.encode_unit()?;
+        variant.encode_data()?.encode_empty()?;
         variant.finish_variant()?;
         Ok(())
     }

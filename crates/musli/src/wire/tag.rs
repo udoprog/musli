@@ -50,10 +50,12 @@ pub(crate) struct Tag {
 impl Tag {
     /// Construct a new tag through an unchecked constructor.
     ///
-    /// `data` must not be equal to or larger than [MAX_INLINE_LEN], or else it
-    /// could corrupt the payload.
+    /// The `data` argument must fit within the numerical bounds specified by
+    /// [`DATA_MASK`].
     #[inline]
     pub(crate) const fn new(kind: Kind, data: u8) -> Self {
+        debug_assert!(data <= DATA_MASK, "Data must fit in DATA_MASK");
+
         Self {
             repr: kind as u8 | data,
         }

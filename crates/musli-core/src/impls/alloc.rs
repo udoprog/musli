@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 
 use crate::de::{
     Decode, DecodeBytes, DecodeTrace, Decoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    ValueVisitor,
+    UnsizedVisitor,
 };
 use crate::en::{
     Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntryEncoder, MapEncoder,
@@ -52,7 +52,7 @@ impl<'de, M> Decode<'de, M> for String {
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, str> for Visitor
+        impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
             C: ?Sized + Context,
         {
@@ -134,7 +134,7 @@ macro_rules! cow {
             {
                 struct Visitor;
 
-                impl<'de, C> ValueVisitor<'de, C, $source> for Visitor
+                impl<'de, C> UnsizedVisitor<'de, C, $source> for Visitor
                 where
                     C: ?Sized + Context,
                 {
@@ -476,7 +476,7 @@ impl<'de, M> Decode<'de, M> for CString {
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+        impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: ?Sized + Context,
         {
@@ -687,7 +687,7 @@ where
 
                     struct Visitor;
 
-                    impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+                    impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
                     where
                         C: ?Sized + Context,
                     {
@@ -794,7 +794,7 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+        impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: ?Sized + Context,
         {

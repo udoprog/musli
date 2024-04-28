@@ -96,7 +96,7 @@ where
     }
 
     #[inline]
-    fn encode_unit(mut self) -> Result<Self::Ok, C::Error> {
+    fn encode_empty(mut self) -> Result<Self::Ok, C::Error> {
         self.writer
             .write_byte(self.cx, Tag::from_mark(Mark::Unit).byte())?;
         Ok(())
@@ -290,7 +290,7 @@ where
     {
         let mut variant = self.encode_variant()?;
         variant.encode_tag()?.encode(tag)?;
-        variant.encode_data()?.encode_unit()?;
+        variant.encode_data()?.encode_empty()?;
         VariantEncoder::finish_variant(variant)?;
         Ok(())
     }

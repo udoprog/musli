@@ -1,9 +1,7 @@
 use core::fmt;
 
-/// A length hint.
 #[derive(Default, Debug, Clone, Copy)]
-#[non_exhaustive]
-pub enum SizeHint {
+enum SizeHintKind {
     /// The length isn't known.
     #[default]
     Any,
@@ -11,49 +9,93 @@ pub enum SizeHint {
     Exact(usize),
 }
 
+/// A length hint.
+#[derive(Default, Debug, Clone, Copy)]
+#[non_exhaustive]
+pub struct SizeHint {
+    kind: SizeHintKind,
+}
+
 impl SizeHint {
+    /// Construct a size hint of unknown size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::de::SizeHint;
+    ///
+    /// let hint = SizeHint::any();
+    /// assert_eq!(hint.or_default(), 0);
+    /// ```
+    #[inline]
+    pub const fn any() -> Self {
+        SizeHint {
+            kind: SizeHintKind::Any,
+        }
+    }
+
+    /// Construct an exactly sized hint.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::de::SizeHint;
+    ///
+    /// let hint = SizeHint::exact(16);
+    /// assert_eq!(hint.or_default(), 16);
+    /// ```
+    #[inline]
+    pub const fn exact(length: usize) -> Self {
+        SizeHint {
+            kind: SizeHintKind::Exact(length),
+        }
+    }
+
     /// Get a size hint or a default value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::de::SizeHint;
+    ///
+    /// let hint = SizeHint::any();
+    /// assert_eq!(hint.or_default(), 0);
+    /// ```
     pub fn or_default(self) -> usize {
-        match self {
-            SizeHint::Any => 0,
-            SizeHint::Exact(n) => n,
+        match self.kind {
+            SizeHintKind::Any => 0,
+            SizeHintKind::Exact(n) => n,
         }
     }
 }
 
 impl From<Option<usize>> for SizeHint {
     fn from(value: Option<usize>) -> Self {
-        match value {
-            Some(n) => SizeHint::Exact(n),
-            None => SizeHint::Any,
-        }
+        let kind = match value {
+            Some(n) => SizeHintKind::Exact(n),
+            None => SizeHintKind::Any,
+        };
+
+        SizeHint { kind }
     }
 }
 
 impl fmt::Display for SizeHint {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SizeHint::Any => write!(f, "unknown length"),
-            SizeHint::Exact(length) => write!(f, "{length} items"),
+        match self.kind {
+            SizeHintKind::Any => write!(f, "unknown length"),
+            SizeHintKind::Exact(length) => write!(f, "{length} items"),
         }
     }
 }
 
 impl SizeHint {
-    /// Coerce into a size hint.
-    pub fn size_hint(self) -> usize {
-        match self {
-            SizeHint::Any => 0,
-            SizeHint::Exact(len) => len,
-        }
-    }
-
     /// Coerce into an `Option`.
     pub fn into_option(self) -> Option<usize> {
-        match self {
-            SizeHint::Any => None,
-            SizeHint::Exact(len) => Some(len),
+        match self.kind {
+            SizeHintKind::Any => None,
+            SizeHintKind::Exact(len) => Some(len),
         }
     }
 }

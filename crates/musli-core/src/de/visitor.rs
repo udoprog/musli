@@ -4,9 +4,7 @@ use core::marker::PhantomData;
 use crate::expecting::{self, Expecting};
 use crate::Context;
 
-use super::{
-    Decoder, MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
-};
+use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder};
 
 /// Visitor capable of decoding any type into a value [`Visitor::Ok`].
 ///
@@ -17,11 +15,9 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     /// The value produced by the visitor.
     type Ok;
     /// String decoder to use.
-    type String: ValueVisitor<'de, C, str, Ok = Self::Ok>;
+    type String: UnsizedVisitor<'de, C, str, Ok = Self::Ok>;
     /// Bytes decoder to use.
-    type Bytes: ValueVisitor<'de, C, [u8], Ok = Self::Ok>;
-    /// Number decoder to use.
-    type Number: NumberVisitor<'de, C, Ok = Self::Ok>;
+    type Bytes: UnsizedVisitor<'de, C, [u8], Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::visitor]`][musli::visitor] attribute
@@ -33,11 +29,11 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     /// expecting to decode some specific kind of value.
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
-    /// Indicates that the visited type is a `unit`.
+    /// Indicates that the visited type is empty.
     #[inline]
-    fn visit_unit(self, cx: &C) -> Result<Self::Ok, C::Error> {
+    fn visit_empty(self, cx: &C) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::unsupported_type(
-            &expecting::Unit,
+            &expecting::Empty,
             ExpectingWrapper::new(&self),
         )))
     }
@@ -240,15 +236,6 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Indicates that the visited type is a number.
-    #[inline]
-    fn visit_number(self, cx: &C) -> Result<Self::Number, C::Error> {
-        Err(cx.message(expecting::unsupported_type(
-            &expecting::Number,
-            ExpectingWrapper::new(&self),
-        )))
-    }
-
     /// Indicates that the visited type is a variant.
     #[inline]
     fn visit_variant<D>(self, cx: &C, _: &mut D) -> Result<Self::Ok, C::Error>
@@ -257,6 +244,18 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Variant,
+            ExpectingWrapper::new(&self),
+        )))
+    }
+
+    /// Indicates that the encoding does not support dynamic types.
+    #[inline]
+    fn visit_unknown<D>(self, cx: &D::Cx, _: D) -> Result<Self::Ok, D::Error>
+    where
+        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode>,
+    {
+        Err(cx.message(expecting::unsupported_type(
+            &expecting::Any,
             ExpectingWrapper::new(&self),
         )))
     }

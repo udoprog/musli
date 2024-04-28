@@ -122,7 +122,7 @@ where
     }
 
     #[inline]
-    fn encode_unit(mut self) -> Result<Self::Ok, C::Error> {
+    fn encode_empty(mut self) -> Result<Self::Ok, C::Error> {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())

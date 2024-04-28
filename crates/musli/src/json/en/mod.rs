@@ -80,7 +80,7 @@ where
     }
 
     #[inline]
-    fn encode_unit(mut self) -> Result<Self::Ok, C::Error> {
+    fn encode_empty(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_bytes(self.cx, b"null")
     }
 
@@ -263,7 +263,7 @@ where
 
     #[inline]
     fn encode_none(self) -> Result<Self::Ok, C::Error> {
-        self.encode_unit()
+        self.encode_empty()
     }
 
     #[inline]

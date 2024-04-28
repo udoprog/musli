@@ -1,13 +1,13 @@
-//! Trait fills.
-//!
-//! This will replace the following traits in `#[no_std]` environments:
+//! Trait fills for `#[no_std]` environments.
 //!
 //! * [`ToOwned`] - if the `alloc` feature is enabled, this is an alias for
 //!   `alloc::borrow::ToOwned`.
 //! * [`Error`] - if the `std` feature is enabled, this is an alias for
 //!   `std::error::Error`. If the `std` feature is disabled, this is a trait
 //!   which is implemented for everything that implements [`Debug`] and
-//!   [`Display`].
+//!   [`Display`]. Note that this means that enabling the `std` feature might
+//!   cause code that is designed carelessly to break due to no longer
+//!   implementing the trait.
 //!
 //! [`Debug`]: core::fmt::Debug
 //! [`Display`]: core::fmt::Display

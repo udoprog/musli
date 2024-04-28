@@ -21,11 +21,10 @@ impl Access {
         }
 
         if state == isize::MIN {
-            crate::system::abort();
+            crate::no_std::abort("access state overflowed");
         }
 
         self.state.set(state - 1);
-
         Shared { access: self }
     }
 
@@ -38,7 +37,7 @@ impl Access {
         }
 
         if state == isize::MIN {
-            crate::system::abort();
+            crate::no_std::abort("access state overflowed");
         }
 
         self.state.set(1);

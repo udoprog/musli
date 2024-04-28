@@ -9,8 +9,5 @@ pub(crate) fn cautious<S>(hint: S) -> usize
 where
     SizeHint: From<S>,
 {
-    match SizeHint::from(hint) {
-        SizeHint::Any => 0,
-        SizeHint::Exact(n) => n.min(4096),
-    }
+    SizeHint::from(hint).or_default().min(4096)
 }

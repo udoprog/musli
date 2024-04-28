@@ -19,7 +19,7 @@ pub trait SequenceDecoder<'de>: Sized {
     /// Get a size hint of known remaining elements.
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Any
+        SizeHint::any()
     }
 
     /// Return decoder to decode the next element.

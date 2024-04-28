@@ -5,8 +5,8 @@ use core::mem::take;
 use alloc::vec::Vec;
 
 use crate::de::{
-    Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, NumberVisitor,
-    SequenceDecoder, SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
+    Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
+    SizeHint, Skip, UnsizedVisitor, VariantDecoder, Visitor,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
@@ -290,7 +290,7 @@ where
     }
 
     #[inline]
-    fn decode_unit(self) -> Result<(), C::Error> {
+    fn decode_empty(self) -> Result<(), C::Error> {
         self.skip()
     }
 
@@ -327,7 +327,7 @@ where
     #[inline]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         let pos = self.cx.mark();
         let len = self.decode_prefix(Kind::Bytes, pos)?;
@@ -337,14 +337,14 @@ where
     #[inline]
     fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str>,
     {
         struct Visitor<V>(V);
 
-        impl<'de, C, V> ValueVisitor<'de, C, [u8]> for Visitor<V>
+        impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
             C: ?Sized + Context,
-            V: ValueVisitor<'de, C, str>,
+            V: UnsizedVisitor<'de, C, str>,
         {
             type Ok = V::Ok;
 
@@ -422,7 +422,7 @@ where
     #[inline]
     fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: NumberVisitor<'de, C>,
+        V: Visitor<'de, C>,
     {
         let cx = self.cx;
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
@@ -726,7 +726,7 @@ where
             Kind::Bytes => {
                 let hint = tag
                     .data()
-                    .map(|d| SizeHint::Exact(d as usize))
+                    .map(|d| SizeHint::exact(d as usize))
                     .unwrap_or_default();
                 let visitor = visitor.visit_bytes(cx, hint)?;
                 self.decode_bytes(visitor)
@@ -734,7 +734,7 @@ where
             Kind::String => {
                 let hint = tag
                     .data()
-                    .map(|d| SizeHint::Exact(d as usize))
+                    .map(|d| SizeHint::exact(d as usize))
                     .unwrap_or_default();
                 let visitor = visitor.visit_string(cx, hint)?;
                 self.decode_string(visitor)
@@ -754,8 +754,8 @@ where
                     visitor.visit_char(cx, value)
                 }
                 Mark::Unit => {
-                    self.decode_unit()?;
-                    visitor.visit_unit(cx)
+                    self.decode_empty()?;
+                    visitor.visit_empty(cx)
                 }
                 mark => Err(cx.message(format_args!("Unsupported mark {mark:?}"))),
             },
@@ -793,7 +793,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]
@@ -833,7 +833,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]

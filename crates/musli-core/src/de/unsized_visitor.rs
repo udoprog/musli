@@ -6,23 +6,27 @@ use crate::expecting::{self, Expecting};
 use crate::no_std::ToOwned;
 use crate::Context;
 
-/// A visitor for data where it might be possible to borrow it without copying
-/// from the underlying [Decoder].
+/// A visitor for data where we might need to borrow without copying from the
+/// underlying [`Decoder`].
 ///
-/// A visitor is required with [Decoder::decode_bytes] and
-/// [Decoder::decode_string] because the caller doesn't know if the encoding
+/// A visitor is needed with [`Decoder::decode_bytes`] and
+/// [`Decoder::decode_string`] because the caller doesn't know if the encoding
 /// format is capable of producing references to the underlying data directly or
-/// if it needs to be processed.
+/// if it needs to be processed first.
+///
+/// If all you want is to decode a value by reference, use the
+/// [`Decoder::decode_unsized`] method.
 ///
 /// By requiring a visitor we ensure that the caller has to handle both
-/// scenarios, even if one involves erroring. A type like
-/// [Cow][std::borrow::Cow] is an example of a type which can comfortably handle
-/// both.
+/// scenarios, even if one involves erroring. A type like [Cow] is an example of
+/// a type which can comfortably handle both.
 ///
-/// [Decoder]: crate::de::Decoder
-/// [Decoder::decode_bytes]: crate::de::Decoder::decode_bytes
-/// [Decoder::decode_string]: crate::de::Decoder::decode_string
-pub trait ValueVisitor<'de, C: ?Sized + Context, T>: Sized
+/// [Cow]: std::borrow::Cow
+/// [`Decoder`]: crate::de::Decoder
+/// [`Decoder::decode_bytes`]: crate::de::Decoder::decode_bytes
+/// [`Decoder::decode_string`]: crate::de::Decoder::decode_string
+/// [`Decoder::decode_unsized`]: crate::de::Decoder::decode_unsized
+pub trait UnsizedVisitor<'de, C: ?Sized + Context, T>: Sized
 where
     T: ?Sized + ToOwned,
 {
@@ -73,7 +77,7 @@ impl<'a, T, C: ?Sized, U: ?Sized> ExpectingWrapper<'a, T, C, U> {
 
 impl<'a, 'de, T, C, U> Expecting for ExpectingWrapper<'a, T, C, U>
 where
-    T: ValueVisitor<'de, C, U>,
+    T: UnsizedVisitor<'de, C, U>,
     C: ?Sized + Context,
     U: ?Sized + ToOwned,
 {

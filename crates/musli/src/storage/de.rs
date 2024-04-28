@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use crate::de::{
     DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint,
-    ValueVisitor, VariantDecoder,
+    UnsizedVisitor, VariantDecoder,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::{Context, Decode, Options, Reader};
@@ -89,7 +89,7 @@ where
     }
 
     #[inline]
-    fn decode_unit(mut self) -> Result<(), C::Error> {
+    fn decode_empty(mut self) -> Result<(), C::Error> {
         let mark = self.cx.mark();
         let count = crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
 
@@ -118,7 +118,7 @@ where
     #[inline]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         let len = crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
         self.reader.read_bytes(self.cx, len, visitor)
@@ -127,14 +127,14 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str>,
     {
         struct Visitor<V>(V);
 
-        impl<'de, C, V> ValueVisitor<'de, C, [u8]> for Visitor<V>
+        impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
             C: ?Sized + Context,
-            V: ValueVisitor<'de, C, str>,
+            V: UnsizedVisitor<'de, C, str>,
         {
             type Ok = V::Ok;
 
@@ -390,7 +390,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]
@@ -428,7 +428,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
-        SizeHint::Exact(self.remaining)
+        SizeHint::exact(self.remaining)
     }
 
     #[inline]

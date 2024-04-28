@@ -2,7 +2,7 @@ use core::fmt;
 use core::slice;
 
 #[cfg(feature = "alloc")]
-use crate::de::ValueVisitor;
+use crate::de::UnsizedVisitor;
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
     SequenceDecoder, SizeHint, Skip, VariantDecoder, Visitor,
@@ -148,7 +148,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[inline]
-    fn decode_unit(self) -> Result<(), C::Error> {
+    fn decode_empty(self) -> Result<(), C::Error> {
         ensure!(self, hint, ExpectedUnit(hint), Value::Unit => Ok(()))
     }
 
@@ -244,7 +244,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
             visitor.visit_borrowed(self.cx, bytes)
@@ -255,7 +255,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str>,
     {
         ensure!(self, hint, ExpectedString(hint), Value::String(string) => {
             visitor.visit_borrowed(self.cx, string)
@@ -350,7 +350,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
         V: Visitor<'de, Self::Cx>,
     {
         match self.value {
-            Value::Unit => visitor.visit_unit(self.cx),
+            Value::Unit => visitor.visit_empty(self.cx),
             Value::Bool(value) => visitor.visit_bool(self.cx, *value),
             Value::Char(value) => visitor.visit_char(self.cx, *value),
             Value::Number(number) => match number {
@@ -371,12 +371,12 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
             },
             #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => {
-                let visitor = visitor.visit_bytes(self.cx, SizeHint::Exact(bytes.len()))?;
+                let visitor = visitor.visit_bytes(self.cx, SizeHint::exact(bytes.len()))?;
                 visitor.visit_borrowed(self.cx, bytes)
             }
             #[cfg(feature = "alloc")]
             Value::String(string) => {
-                let visitor = visitor.visit_string(self.cx, SizeHint::Exact(string.len()))?;
+                let visitor = visitor.visit_string(self.cx, SizeHint::exact(string.len()))?;
                 visitor.visit_borrowed(self.cx, string)
             }
             #[cfg(feature = "alloc")]
