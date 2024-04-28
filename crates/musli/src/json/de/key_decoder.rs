@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::de::{Decode, DecodeUnsized, Decoder, SizeHint, Skip, ValueVisitor, Visitor};
+use crate::de::{Decode, DecodeUnsized, Decoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::Context;
 
 use super::super::parser::{Parser, Token};
@@ -26,7 +26,7 @@ where
     #[inline]
     fn decode_escaped_bytes<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         let Some(mut scratch) = self.cx.alloc() else {
             return Err(self.cx.message("Failed to allocate scratch buffer"));
@@ -159,7 +159,7 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str>,
     {
         JsonDecoder::new(self.cx, self.parser).decode_string(visitor)
     }

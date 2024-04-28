@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 
 use crate::de::{
     Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
+    SizeHint, Skip, UnsizedVisitor, VariantDecoder, Visitor,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
@@ -327,7 +327,7 @@ where
     #[inline]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         let pos = self.cx.mark();
         let len = self.decode_prefix(Kind::Bytes, pos)?;
@@ -337,14 +337,14 @@ where
     #[inline]
     fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str>,
     {
         struct Visitor<V>(V);
 
-        impl<'de, C, V> ValueVisitor<'de, C, [u8]> for Visitor<V>
+        impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
             C: ?Sized + Context,
-            V: ValueVisitor<'de, C, str>,
+            V: UnsizedVisitor<'de, C, str>,
         {
             type Ok = V::Ok;
 

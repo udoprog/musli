@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 #[cfg(feature = "alloc")]
 use crate::de::{
-    EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
+    EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
 };
 use crate::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
@@ -385,7 +385,7 @@ impl<'de, M> Decode<'de, M> for Value {
 struct BytesVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, [u8]> for BytesVisitor {
+impl<'de, C: ?Sized + Context> UnsizedVisitor<'de, C, [u8]> for BytesVisitor {
     type Ok = Value;
 
     #[inline]
@@ -409,7 +409,7 @@ impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, [u8]> for BytesVisitor {
 struct StringVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, str> for StringVisitor {
+impl<'de, C: ?Sized + Context> UnsizedVisitor<'de, C, str> for StringVisitor {
     type Ok = Value;
 
     #[inline]

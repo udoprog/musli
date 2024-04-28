@@ -1,7 +1,7 @@
 use core::fmt;
 use core::marker;
 
-use crate::de::ValueVisitor;
+use crate::de::UnsizedVisitor;
 use crate::json::parser::integer::Unsigned;
 use crate::json::parser::SliceParser;
 use crate::Context;
@@ -20,7 +20,7 @@ impl<T> KeyUnsignedVisitor<T> {
     }
 }
 
-impl<'de, C, T> ValueVisitor<'de, C, [u8]> for KeyUnsignedVisitor<T>
+impl<'de, C, T> UnsizedVisitor<'de, C, [u8]> for KeyUnsignedVisitor<T>
 where
     C: ?Sized + Context,
     T: Unsigned,

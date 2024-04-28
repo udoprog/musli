@@ -26,7 +26,7 @@ use core::str;
 use alloc::vec::Vec;
 
 use crate::de::{
-    Decode, DecodeUnsized, Decoder, SequenceDecoder, SizeHint, Skip, ValueVisitor, Visitor,
+    Decode, DecodeUnsized, Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor,
 };
 use crate::hint::{MapHint, SequenceHint};
 #[cfg(feature = "value")]
@@ -331,7 +331,7 @@ where
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         let cx = self.cx;
 
@@ -349,7 +349,7 @@ where
     #[inline]
     fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str>,
     {
         let Some(mut scratch) = self.cx.alloc() else {
             return Err(self.cx.message("Failed to allocate scratch buffer"));

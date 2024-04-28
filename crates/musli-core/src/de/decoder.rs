@@ -8,7 +8,7 @@ use crate::Context;
 
 use super::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, EntriesDecoder, MapDecoder,
-    SequenceDecoder, Skip, ValueVisitor, VariantDecoder, Visitor,
+    SequenceDecoder, Skip, UnsizedVisitor, VariantDecoder, Visitor,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -961,7 +961,7 @@ pub trait Decoder<'de>: Sized {
     /// use std::fmt;
     ///
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::ValueVisitor;
+    /// use musli::de::UnsizedVisitor;
     /// # struct BytesReference<'de> { data: &'de [u8] }
     ///
     /// impl<'de, M> Decode<'de, M> for BytesReference<'de> {
@@ -972,7 +972,7 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         struct Visitor;
     ///
-    ///         impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+    ///         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
     ///         where
     ///             C: ?Sized + Context,
     ///         {
@@ -998,7 +998,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, <Self::Cx as Context>::Error>
     where
-        V: ValueVisitor<'de, Self::Cx, [u8]>,
+        V: UnsizedVisitor<'de, Self::Cx, [u8]>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Bytes,
@@ -1028,7 +1028,7 @@ pub trait Decoder<'de>: Sized {
     /// use std::fmt;
     ///
     /// use musli::{Context, Decode, Decoder};
-    /// use musli::de::ValueVisitor;
+    /// use musli::de::UnsizedVisitor;
     /// # struct StringReference<'de> { data: &'de str }
     ///
     /// impl<'de, M> Decode<'de, M> for StringReference<'de> {
@@ -1039,7 +1039,7 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         struct Visitor;
     ///
-    ///         impl<'de, C> ValueVisitor<'de, C, str> for Visitor
+    ///         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
     ///         where
     ///             C: ?Sized + Context,
     ///         {
@@ -1065,7 +1065,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, <Self::Cx as Context>::Error>
     where
-        V: ValueVisitor<'de, Self::Cx, str>,
+        V: UnsizedVisitor<'de, Self::Cx, str>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::String,

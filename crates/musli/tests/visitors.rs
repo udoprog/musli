@@ -1,6 +1,6 @@
 use std::fmt;
 
-use musli::de::ValueVisitor;
+use musli::de::UnsizedVisitor;
 use musli::{Context, Decode, Decoder};
 
 #[derive(Debug, PartialEq)]
@@ -16,7 +16,7 @@ impl<'de, M> Decode<'de, M> for BytesReference<'de> {
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, [u8]> for Visitor
+        impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: ?Sized + Context,
         {
@@ -73,7 +73,7 @@ impl<'de, M> Decode<'de, M> for StringReference<'de> {
     {
         struct Visitor;
 
-        impl<'de, C> ValueVisitor<'de, C, str> for Visitor
+        impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
             C: ?Sized + Context,
         {

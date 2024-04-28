@@ -447,7 +447,7 @@ impl<V> BytesVisitor<V> {
     }
 }
 
-impl<'de, C, V> crate::de::ValueVisitor<'de, C, [u8]> for BytesVisitor<V>
+impl<'de, C, V> crate::de::UnsizedVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
     C: ?Sized + Context,
     C::Error: de::Error,
@@ -578,7 +578,7 @@ impl<V> StringVisitor<V> {
     }
 }
 
-impl<'de, C, V> crate::de::ValueVisitor<'de, C, str> for StringVisitor<V>
+impl<'de, C, V> crate::de::UnsizedVisitor<'de, C, str> for StringVisitor<V>
 where
     C: ?Sized + Context,
     C::Error: de::Error,

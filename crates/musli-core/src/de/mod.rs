@@ -84,8 +84,8 @@ pub use self::size_hint::SizeHint;
 mod skip;
 pub use self::skip::Skip;
 
-mod value_visitor;
-pub use self::value_visitor::ValueVisitor;
+mod unsized_visitor;
+pub use self::unsized_visitor::UnsizedVisitor;
 
 mod variant_decoder;
 pub use self::variant_decoder::VariantDecoder;

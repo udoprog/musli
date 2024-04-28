@@ -14,7 +14,7 @@ use crate::no_std::ToOwned;
 
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
-    MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
+    MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
 };
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
@@ -299,7 +299,7 @@ impl<C: ?Sized + Context, O: 'static> Encoder for Never<O, C> {
     }
 }
 
-impl<'de, C, O: 'static, T> ValueVisitor<'de, C, T> for Never<O, T>
+impl<'de, C, O: 'static, T> UnsizedVisitor<'de, C, T> for Never<O, T>
 where
     C: ?Sized + Context,
     T: ?Sized + ToOwned,

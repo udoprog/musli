@@ -2,7 +2,7 @@ use core::fmt;
 use core::slice;
 
 #[cfg(feature = "alloc")]
-use crate::de::ValueVisitor;
+use crate::de::UnsizedVisitor;
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
     SequenceDecoder, SizeHint, Skip, VariantDecoder, Visitor,
@@ -244,7 +244,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
             visitor.visit_borrowed(self.cx, bytes)
@@ -255,7 +255,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: ValueVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str>,
     {
         ensure!(self, hint, ExpectedString(hint), Value::String(string) => {
             visitor.visit_borrowed(self.cx, string)

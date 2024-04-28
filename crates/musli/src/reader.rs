@@ -7,7 +7,7 @@ use core::ops::Range;
 use core::ptr;
 use core::slice;
 
-use crate::de::ValueVisitor;
+use crate::de::UnsizedVisitor;
 use crate::Context;
 
 /// Trait governing how a source of bytes is read.
@@ -49,7 +49,7 @@ pub trait Reader<'de> {
     {
         struct Visitor<'a>(&'a mut [u8]);
 
-        impl<'a, 'de, C> ValueVisitor<'de, C, [u8]> for Visitor<'a>
+        impl<'a, 'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor<'a>
         where
             C: ?Sized + Context,
         {
@@ -79,7 +79,7 @@ pub trait Reader<'de> {
     fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: ?Sized + Context,
-        V: ValueVisitor<'de, C, [u8]>;
+        V: UnsizedVisitor<'de, C, [u8]>;
 
     /// Read a single byte.
     #[inline]
@@ -99,7 +99,7 @@ pub trait Reader<'de> {
     {
         struct Visitor<const N: usize>([u8; N]);
 
-        impl<'de, const N: usize, C> ValueVisitor<'de, C, [u8]> for Visitor<N>
+        impl<'de, const N: usize, C> UnsizedVisitor<'de, C, [u8]> for Visitor<N>
         where
             C: ?Sized + Context,
         {
@@ -184,7 +184,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: ?Sized + Context,
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         if self.len() < n {
             return Err(cx.message("Buffer underflow"));
@@ -325,7 +325,7 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: ?Sized + Context,
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
 
@@ -443,7 +443,7 @@ where
     fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: ?Sized + Context,
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         self.bounds_check(cx, n)?;
         self.reader.read_bytes(cx, n, visitor)
@@ -510,7 +510,7 @@ where
     fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
         C: ?Sized + Context,
-        V: ValueVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8]>,
     {
         (**self).read_bytes(cx, n, visitor)
     }

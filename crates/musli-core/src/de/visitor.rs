@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use crate::expecting::{self, Expecting};
 use crate::Context;
 
-use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder};
+use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder};
 
 /// Visitor capable of decoding any type into a value [`Visitor::Ok`].
 ///
@@ -15,9 +15,9 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     /// The value produced by the visitor.
     type Ok;
     /// String decoder to use.
-    type String: ValueVisitor<'de, C, str, Ok = Self::Ok>;
+    type String: UnsizedVisitor<'de, C, str, Ok = Self::Ok>;
     /// Bytes decoder to use.
-    type Bytes: ValueVisitor<'de, C, [u8], Ok = Self::Ok>;
+    type Bytes: UnsizedVisitor<'de, C, [u8], Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::visitor]`][musli::visitor] attribute

@@ -20,5 +20,5 @@
 pub use musli_core::de::{
     AsDecoder, Decode, DecodeBytes, DecodeOwned, DecodePacked, DecodeTrace, DecodeUnsized,
     DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
+    SizeHint, Skip, UnsizedVisitor, VariantDecoder, Visitor,
 };
