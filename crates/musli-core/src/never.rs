@@ -14,7 +14,7 @@ use crate::no_std::ToOwned;
 
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
-    MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
+    MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
 };
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
@@ -295,14 +295,6 @@ impl<C: ?Sized + Context, O: 'static> Encoder for Never<O, C> {
     where
         T: Encode<Self::Mode>,
     {
-        match self._never {}
-    }
-}
-
-impl<'de, O, C: ?Sized + Context> NumberVisitor<'de, C> for Never<O> {
-    type Ok = O;
-
-    fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}
     }
 }

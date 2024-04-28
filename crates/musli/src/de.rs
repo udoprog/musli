@@ -19,6 +19,6 @@
 #[doc(inline)]
 pub use musli_core::de::{
     AsDecoder, Decode, DecodeBytes, DecodeOwned, DecodePacked, DecodeTrace, DecodeUnsized,
-    DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, NumberVisitor,
-    SequenceDecoder, SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
+    DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
+    SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
 };

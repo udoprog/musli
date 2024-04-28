@@ -5,8 +5,8 @@ use core::mem::take;
 use alloc::vec::Vec;
 
 use crate::de::{
-    Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, NumberVisitor,
-    SequenceDecoder, SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
+    Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
+    SizeHint, Skip, ValueVisitor, VariantDecoder, Visitor,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
@@ -422,7 +422,7 @@ where
     #[inline]
     fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
-        V: NumberVisitor<'de, C>,
+        V: Visitor<'de, C>,
     {
         let cx = self.cx;
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);

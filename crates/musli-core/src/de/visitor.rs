@@ -4,9 +4,7 @@ use core::marker::PhantomData;
 use crate::expecting::{self, Expecting};
 use crate::Context;
 
-use super::{
-    Decoder, MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
-};
+use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder};
 
 /// Visitor capable of decoding any type into a value [`Visitor::Ok`].
 ///
@@ -20,8 +18,6 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
     type String: ValueVisitor<'de, C, str, Ok = Self::Ok>;
     /// Bytes decoder to use.
     type Bytes: ValueVisitor<'de, C, [u8], Ok = Self::Ok>;
-    /// Number decoder to use.
-    type Number: NumberVisitor<'de, C, Ok = Self::Ok>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::visitor]`][musli::visitor] attribute
@@ -240,21 +236,6 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
         )))
     }
 
-    /// Indicates that the visited type is a number.
-    ///
-    /// This in contrast to the type-specific numbers does not have a well-known
-    /// and specified underlying type.
-    ///
-    /// This happens in formats like JSON where the number is represented as an
-    /// untyped sequence of bytes.
-    #[inline]
-    fn visit_number(self, cx: &C) -> Result<Self::Number, C::Error> {
-        Err(cx.message(expecting::unsupported_type(
-            &expecting::Number,
-            ExpectingWrapper::new(&self),
-        )))
-    }
-
     /// Indicates that the visited type is a variant.
     #[inline]
     fn visit_variant<D>(self, cx: &C, _: &mut D) -> Result<Self::Ok, C::Error>
@@ -269,7 +250,10 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
 
     /// Indicates that the encoding does not support dynamic types.
     #[inline]
-    fn visit_unknown<D>(self, cx: &D::Cx, decoder: D) -> Result<Self::Ok, D::Error> {
+    fn visit_unknown<D>(self, cx: &D::Cx, _: D) -> Result<Self::Ok, D::Error>
+    where
+        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode>,
+    {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Any,
             ExpectingWrapper::new(&self),

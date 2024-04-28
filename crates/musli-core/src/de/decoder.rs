@@ -8,7 +8,7 @@ use crate::Context;
 
 use super::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, EntriesDecoder, MapDecoder,
-    NumberVisitor, SequenceDecoder, Skip, ValueVisitor, VariantDecoder, Visitor,
+    SequenceDecoder, Skip, ValueVisitor, VariantDecoder, Visitor,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -898,19 +898,6 @@ pub trait Decoder<'de>: Sized {
         )))
     }
 
-    /// Decode an unknown number using a visitor that can handle arbitrary
-    /// precision numbers.
-    #[inline]
-    fn decode_number<V>(self, visitor: V) -> Result<V::Ok, <Self::Cx as Context>::Error>
-    where
-        V: NumberVisitor<'de, Self::Cx>,
-    {
-        Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Number,
-            ExpectingWrapper::new(&self),
-        )))
-    }
-
     /// Decode a fixed-length array.
     ///
     /// # Examples
@@ -1477,6 +1464,18 @@ pub trait Decoder<'de>: Sized {
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Variant,
+            ExpectingWrapper::new(&self),
+        )))
+    }
+
+    /// Decode an unknown number using a visitor.
+    #[inline]
+    fn decode_number<V>(self, visitor: V) -> Result<V::Ok, <Self::Cx as Context>::Error>
+    where
+        V: Visitor<'de, Self::Cx>,
+    {
+        Err(self.cx().message(expecting::unsupported_type(
+            &expecting::Number,
             ExpectingWrapper::new(&self),
         )))
     }

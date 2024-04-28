@@ -75,9 +75,6 @@ pub use self::entry_decoder::EntryDecoder;
 mod map_decoder;
 pub use self::map_decoder::MapDecoder;
 
-mod number_visitor;
-pub use self::number_visitor::NumberVisitor;
-
 mod sequence_decoder;
 pub use self::sequence_decoder::SequenceDecoder;
 

@@ -608,125 +608,6 @@ where
     }
 }
 
-struct AnyNumberVisitor<V> {
-    visitor: V,
-}
-
-impl<V> AnyNumberVisitor<V> {
-    fn new(visitor: V) -> Self {
-        Self { visitor }
-    }
-}
-
-impl<'de, C, V> crate::de::NumberVisitor<'de, C> for AnyNumberVisitor<V>
-where
-    C: ?Sized + Context,
-    C::Error: de::Error,
-    V: de::Visitor<'de>,
-{
-    type Ok = V::Value;
-
-    #[inline]
-    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.visitor.expecting(f)
-    }
-
-    #[inline]
-    fn visit_u8(self, _: &C, v: u8) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_u8(v)
-    }
-
-    #[inline]
-    fn visit_u16(self, _: &C, v: u16) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_u16(v)
-    }
-
-    #[inline]
-    fn visit_u32(self, _: &C, v: u32) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_u32(v)
-    }
-
-    #[inline]
-    fn visit_u64(self, _: &C, v: u64) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_u64(v)
-    }
-
-    #[inline]
-    fn visit_u128(self, _: &C, v: u128) -> Result<Self::Ok, C::Error> {
-        // Serde's 128-bit support is very broken, so just try to avoid it if we can.
-        // See: https://github.com/serde-rs/serde/issues/2576
-        if let Ok(v) = u64::try_from(v) {
-            return self.visitor.visit_u64(v);
-        }
-
-        self.visitor.visit_u128(v)
-    }
-
-    #[inline]
-    fn visit_i8(self, _: &C, v: i8) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_i8(v)
-    }
-
-    #[inline]
-    fn visit_i16(self, _: &C, v: i16) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_i16(v)
-    }
-
-    #[inline]
-    fn visit_i32(self, _: &C, v: i32) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_i32(v)
-    }
-
-    #[inline]
-    fn visit_i64(self, _: &C, v: i64) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_i64(v)
-    }
-
-    #[inline]
-    fn visit_i128(self, _: &C, v: i128) -> Result<Self::Ok, C::Error> {
-        // Serde's 128-bit support is very broken, so just try to avoid it if we can.
-        // See: https://github.com/serde-rs/serde/issues/2576
-        if let Ok(v) = i64::try_from(v) {
-            return self.visitor.visit_i64(v);
-        }
-
-        self.visitor.visit_i128(v)
-    }
-
-    #[inline]
-    fn visit_f32(self, _: &C, v: f32) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_f32(v)
-    }
-
-    #[inline]
-    fn visit_f64(self, _: &C, v: f64) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_f64(v)
-    }
-
-    #[inline]
-    fn visit_usize(self, cx: &C, v: usize) -> Result<Self::Ok, C::Error> {
-        if let Some(value) = unsigned_value(self.visitor, v)? {
-            return Ok(value);
-        }
-
-        Err(cx.message(format_args!("Unsupported usize value {v}")))
-    }
-
-    #[inline]
-    fn visit_isize(self, cx: &C, v: isize) -> Result<Self::Ok, C::Error> {
-        if let Some(value) = signed_value(self.visitor, v)? {
-            return Ok(value);
-        }
-
-        Err(cx.message(format_args!("Unsupported isize value {v}")))
-    }
-
-    #[inline]
-    fn visit_bytes(self, _: &C, v: &'de [u8]) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_bytes(v)
-    }
-}
-
 struct EnumAccess<'de, 'a, D>
 where
     D: VariantDecoder<'de>,
@@ -835,7 +716,6 @@ where
 
     type String = StringVisitor<V>;
     type Bytes = BytesVisitor<V>;
-    type Number = AnyNumberVisitor<V>;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -987,11 +867,6 @@ where
     #[inline]
     fn visit_bytes(self, _: &C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
         Ok(BytesVisitor::new(self.visitor))
-    }
-
-    #[inline]
-    fn visit_number(self, _: &C) -> Result<Self::Number, C::Error> {
-        Ok(AnyNumberVisitor::new(self.visitor))
     }
 }
 

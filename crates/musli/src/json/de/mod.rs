@@ -26,8 +26,7 @@ use core::str;
 use alloc::vec::Vec;
 
 use crate::de::{
-    Decode, DecodeUnsized, Decoder, NumberVisitor, SequenceDecoder, SizeHint, Skip, ValueVisitor,
-    Visitor,
+    Decode, DecodeUnsized, Decoder, SequenceDecoder, SizeHint, Skip, ValueVisitor, Visitor,
 };
 use crate::hint::{MapHint, SequenceHint};
 #[cfg(feature = "value")]
@@ -328,14 +327,6 @@ where
         })
     }
 
-    #[inline]
-    fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
-    where
-        V: NumberVisitor<'de, C>,
-    {
-        self.parser.parse_number(self.cx, visitor)
-    }
-
     #[cfg(feature = "alloc")]
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
@@ -452,6 +443,14 @@ where
     }
 
     #[inline]
+    fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
+    where
+        V: Visitor<'de, C>,
+    {
+        self.parser.parse_number(self.cx, visitor)
+    }
+
+    #[inline]
     fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: Visitor<'de, C>,
@@ -467,10 +466,7 @@ where
                 let visitor = visitor.visit_string(cx, SizeHint::any())?;
                 self.decode_string(visitor)
             }
-            Token::Number => {
-                let visitor = visitor.visit_number(cx)?;
-                self.decode_number(visitor)
-            }
+            Token::Number => self.decode_number(visitor),
             Token::Null => {
                 self.parse_null()?;
                 visitor.visit_empty(cx)

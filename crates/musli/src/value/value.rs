@@ -10,8 +10,7 @@ use alloc::vec::Vec;
 use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 #[cfg(feature = "alloc")]
 use crate::de::{
-    EntryDecoder, MapDecoder, NumberVisitor, SequenceDecoder, SizeHint, ValueVisitor,
-    VariantDecoder,
+    EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, ValueVisitor, VariantDecoder,
 };
 use crate::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
@@ -213,8 +212,6 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     type String = StringVisitor;
     #[cfg(feature = "alloc")]
     type Bytes = BytesVisitor;
-    #[cfg(feature = "alloc")]
-    type Number = ValueNumberVisitor;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -364,12 +361,6 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_number(self, _: &C) -> Result<Self::Number, C::Error> {
-        Ok(ValueNumberVisitor)
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
     fn visit_variant<D>(self, _: &C, variant: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: VariantDecoder<'de, Cx = C>,
@@ -434,89 +425,6 @@ impl<'de, C: ?Sized + Context> ValueVisitor<'de, C, str> for StringVisitor {
     #[inline]
     fn visit_ref(self, _: &C, string: &str) -> Result<Self::Ok, C::Error> {
         Ok(Value::String(string.to_owned()))
-    }
-}
-
-#[cfg(feature = "alloc")]
-struct ValueNumberVisitor;
-
-#[cfg(feature = "alloc")]
-impl<'de, C: ?Sized + Context> NumberVisitor<'de, C> for ValueNumberVisitor {
-    type Ok = Value;
-
-    #[inline]
-    fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "any supported number")
-    }
-
-    #[inline]
-    fn visit_u8(self, _: &C, value: u8) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::U8(value)))
-    }
-
-    #[inline]
-    fn visit_u16(self, _: &C, value: u16) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::U16(value)))
-    }
-
-    #[inline]
-    fn visit_u32(self, _: &C, value: u32) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::U32(value)))
-    }
-
-    #[inline]
-    fn visit_u64(self, _: &C, value: u64) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::U64(value)))
-    }
-
-    #[inline]
-    fn visit_u128(self, _: &C, value: u128) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::U128(value)))
-    }
-
-    #[inline]
-    fn visit_i8(self, _: &C, value: i8) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::I8(value)))
-    }
-
-    #[inline]
-    fn visit_i16(self, _: &C, value: i16) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::I16(value)))
-    }
-
-    #[inline]
-    fn visit_i32(self, _: &C, value: i32) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::I32(value)))
-    }
-
-    #[inline]
-    fn visit_i64(self, _: &C, value: i64) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::I64(value)))
-    }
-
-    #[inline]
-    fn visit_i128(self, _: &C, value: i128) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::I128(value)))
-    }
-
-    #[inline]
-    fn visit_f32(self, _: &C, value: f32) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::F32(value)))
-    }
-
-    #[inline]
-    fn visit_f64(self, _: &C, value: f64) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::F64(value)))
-    }
-
-    #[inline]
-    fn visit_usize(self, _: &C, value: usize) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::Usize(value)))
-    }
-
-    #[inline]
-    fn visit_isize(self, _: &C, value: isize) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Number(Number::Isize(value)))
     }
 }
 

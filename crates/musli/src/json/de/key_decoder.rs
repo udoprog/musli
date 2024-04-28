@@ -174,10 +174,7 @@ where
                 let visitor = visitor.visit_string(self.cx, SizeHint::any())?;
                 self.decode_string(visitor)
             }
-            Token::Number => {
-                let visitor = visitor.visit_number(self.cx)?;
-                self.decode_number(visitor)
-            }
+            Token::Number => self.decode_number(visitor),
             token => Err(self
                 .cx
                 .message(format_args!("Unsupported key type {token:?}"))),
