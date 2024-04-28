@@ -116,6 +116,6 @@ pub use self::encoding::to_vec;
 #[doc(inline)]
 pub use self::encoding::to_writer;
 #[doc(inline)]
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding, OPTIONS};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, Encoding, DEFAULT, OPTIONS};
 #[doc(inline)]
 pub use self::error::Error;

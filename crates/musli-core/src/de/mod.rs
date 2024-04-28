@@ -22,24 +22,6 @@
 //! }
 //! ```
 
-/// Derive which automatically implements the [`Decode` trait].
-///
-/// See the [`derives` module] for detailed documentation.
-///
-/// [`derives` module]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
-/// [`Decode` trait]: trait@Decode
-///
-/// # Examples
-///
-/// ```
-/// use musli::Decode;
-///
-/// #[derive(Decode)]
-/// struct MyType {
-///     data: [u8; 128],
-/// }
-/// ```
-#[doc(inline)]
 pub use musli_macros::Decode;
 
 mod as_decoder;

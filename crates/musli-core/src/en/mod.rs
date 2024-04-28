@@ -22,24 +22,6 @@
 //! }
 //! ```
 
-/// Derive which automatically implements the [`Encode` trait].
-///
-/// See the [`derives` module] for detailed documentation.
-///
-/// [`derives` module]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
-/// [`Encode` trait]: trait@Encode
-///
-/// # Examples
-///
-/// ```
-/// use musli::Encode;
-///
-/// #[derive(Encode)]
-/// struct MyType {
-///     data: [u8; 128],
-/// }
-/// ```
-#[doc(inline)]
 pub use musli_macros::Encode;
 
 mod encode;
