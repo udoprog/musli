@@ -34,26 +34,14 @@ pub(crate) trait Unsigned:
     fn as_byte(self) -> u8;
 
     /// Test if this value is smaller than the specified byte.
-    #[cfg(any(feature = "storage", feature = "wire", feature = "descriptive"))]
+    #[cfg(feature = "wire")]
     fn is_smaller_than(self, byte: u8) -> bool;
 
     /// Test if value is zero.
     fn is_zero(self) -> bool;
 
-    /// Perform a shift-right operation.
-    #[cfg(any(feature = "storage", feature = "wire", feature = "descriptive"))]
-    fn checked_shr(self, value: u32) -> Option<Self>;
-
-    /// Perform a shift-left operation.
-    #[cfg(any(feature = "storage", feature = "wire", feature = "descriptive"))]
-    fn checked_shl(self, value: u32) -> Option<Self>;
-
     /// Perform a wrapping shift-left operation.
     fn wrapping_shl(self, value: u32) -> Self;
-
-    /// Perform a checked addition.
-    #[cfg(any(feature = "storage", feature = "wire", feature = "descriptive"))]
-    fn checked_add(self, value: Self) -> Option<Self>;
 
     /// Perform a wrapping addition.
     fn wrapping_add(self, value: Self) -> Self;
@@ -128,7 +116,7 @@ macro_rules! implement {
             }
 
             #[inline]
-            #[cfg(any(feature = "storage", feature = "wire", feature = "descriptive"))]
+            #[cfg(feature = "wire")]
             fn is_smaller_than(self, b: u8) -> bool {
                 self < b as $unsigned
             }
@@ -139,26 +127,8 @@ macro_rules! implement {
             }
 
             #[inline]
-            #[cfg(any(feature = "storage", feature = "wire", feature = "descriptive"))]
-            fn checked_shr(self, value: u32) -> Option<Self> {
-                <$unsigned>::checked_shr(self, value)
-            }
-
-            #[inline]
-            #[cfg(any(feature = "storage", feature = "wire", feature = "descriptive"))]
-            fn checked_shl(self, value: u32) -> Option<Self> {
-                <$unsigned>::checked_shl(self, value)
-            }
-
-            #[inline]
             fn wrapping_shl(self, value: u32) -> Self {
                 <$unsigned>::wrapping_shl(self, value)
-            }
-
-            #[inline]
-            #[cfg(any(feature = "storage", feature = "wire", feature = "descriptive"))]
-            fn checked_add(self, value: Self) -> Option<Self> {
-                <$unsigned>::checked_add(self, value)
             }
 
             #[inline]

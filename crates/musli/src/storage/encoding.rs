@@ -179,7 +179,6 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
         StorageEncoder::<_, OPT, _>::new,
         StorageDecoder::<_, OPT, _>::new
     );
-    crate::encoding_from_slice_impls!(M);
 }
 
 impl<const OPT: Options, M> Clone for Encoding<OPT, M> {

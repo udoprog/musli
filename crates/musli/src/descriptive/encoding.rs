@@ -177,7 +177,6 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
         SelfEncoder::<_, OPT, _>::new,
         SelfDecoder::<_, OPT, _>::new
     );
-    crate::encoding_from_slice_impls!(M);
 }
 
 impl<const OPT: Options, M> Clone for Encoding<OPT, M> {
