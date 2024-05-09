@@ -107,41 +107,6 @@ macro_rules! encode_with_extensions {
 /// Generate all public encoding helpers.
 #[doc(hidden)]
 #[macro_export]
-macro_rules! encoding_from_slice_impls {
-    ($mode:ident) => {
-        /// Decode the given type `T` from the given slice using the current
-        /// configuration.
-        #[inline]
-        pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
-        where
-            T: Decode<'de, $mode>,
-        {
-            $crate::default_allocator!(|alloc| {
-                let cx = $crate::context::Same::new(alloc);
-                self.from_slice_with(&cx, bytes)
-            })
-        }
-
-        /// Decode the given type `T` from the given slice using the current
-        /// configuration.
-        ///
-        /// This is the same as [`Encoding::from_slice`], but allows for using a
-        /// configurable [`Context`].
-        #[inline]
-        pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
-        where
-            C: ?Sized + Context<Mode = $mode>,
-            T: Decode<'de, $mode>,
-        {
-            let reader = $crate::reader::SliceReader::new(bytes);
-            self.decode_with(cx, reader)
-        }
-    };
-}
-
-/// Generate all public encoding helpers.
-#[doc(hidden)]
-#[macro_export]
 macro_rules! encoding_impls {
     ($mode:ident, $encoder_new:path, $decoder_new:path) => {
         /// Encode the given value to the given [`Writer`] using the current
@@ -188,6 +153,58 @@ macro_rules! encoding_impls {
                 let cx = $crate::context::Same::new(alloc);
                 self.decode_with(&cx, reader)
             })
+        }
+
+        /// Decode the given type `T` from the given slice using the current
+        /// configuration.
+        #[inline]
+        pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
+        where
+            T: Decode<'de, $mode>,
+        {
+            $crate::default_allocator!(|alloc| {
+                let cx = $crate::context::Same::new(alloc);
+                self.from_slice_with(&cx, bytes)
+            })
+        }
+
+        /// Decode the given type `T` from the given slice using the current
+        /// configuration.
+        ///
+        /// This is the same as [`Encoding::from_slice`], but allows for using a
+        /// configurable [`Context`].
+        #[inline]
+        pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
+        where
+            C: ?Sized + Context<Mode = $mode>,
+            T: Decode<'de, $mode>,
+        {
+            let reader = $crate::reader::SliceReader::new(bytes);
+            self.decode_with(cx, reader)
+        }
+
+        /// Decode the given type `T` from the given string using the current
+        /// configuration.
+        #[inline]
+        pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, Error>
+        where
+            T: Decode<'de, M>,
+        {
+            self.from_slice(string.as_bytes())
+        }
+
+        /// Decode the given type `T` from the given string using the current
+        /// configuration.
+        ///
+        /// This is the same as [`Encoding::from_str`] but allows for using a
+        /// configurable [`Context`].
+        #[inline]
+        pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
+        where
+            C: ?Sized + Context<Mode = M>,
+            T: Decode<'de, M>,
+        {
+            self.from_slice_with(cx, string.as_bytes())
         }
 
         $crate::encode_with_extensions!($mode);

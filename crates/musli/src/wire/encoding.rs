@@ -182,7 +182,6 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
         WireEncoder::<_, OPT, _>::new,
         WireDecoder::<_, OPT, _>::new
     );
-    crate::encoding_from_slice_impls!(M);
 }
 
 impl<const OPT: Options, M> Clone for Encoding<OPT, M> {
