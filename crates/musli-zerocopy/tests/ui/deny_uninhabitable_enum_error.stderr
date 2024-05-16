@@ -17,3 +17,18 @@ warning: unreachable expression
   |
   = note: `#[warn(unreachable_code)]` on by default
   = note: this warning originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0004]: non-exhaustive patterns: type `&Uninhabitable` is non-empty
+ --> tests/ui/deny_uninhabitable_enum_error.rs:3:41
+  |
+3 | #[derive(Debug, Clone, Copy, PartialEq, ZeroCopy)]
+  |                                         ^^^^^^^^
+  |
+note: `Uninhabitable` defined here
+ --> tests/ui/deny_uninhabitable_enum_error.rs:5:6
+  |
+5 | enum Uninhabitable {}
+  |      ^^^^^^^^^^^^^
+  = note: the matched value is of type `&Uninhabitable`
+  = note: references are always considered inhabited
+  = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)

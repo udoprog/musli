@@ -27,14 +27,11 @@ where
 /// Decode an unsigned value from the specified reader using the configuration
 /// passed in through `F`.
 #[inline]
-pub fn decode_unsigned<'de, C, R, T: UnsignedOps, const OPT: Options>(
-    cx: &C,
-    reader: R,
-) -> Result<T, C::Error>
+pub fn decode_unsigned<'de, C, R, T, const OPT: Options>(cx: &C, reader: R) -> Result<T, C::Error>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
-    T: Unsigned,
+    T: UnsignedOps,
 {
     match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => c::decode(cx, reader),

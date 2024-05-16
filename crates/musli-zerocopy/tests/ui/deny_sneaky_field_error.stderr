@@ -42,10 +42,6 @@ help: use `_` to explicitly ignore each field
    |
 28 | struct SneakyUnnamed(u32, _);
    |                         +++
-help: use `..` to ignore all fields
-   |
-25 | #[derive(..)]
-   |          ~~
 
 error[E0063]: missing field `1` in initializer of `SneakyUnnamed`
   --> tests/ui/deny_sneaky_field_error.rs:25:10
@@ -113,10 +109,6 @@ help: use `_` to explicitly ignore each field
    |
 48 |     Unnamed(u32, _)
    |                +++
-help: use `..` to ignore all fields
-   |
-44 | #[derive(..)]
-   |          ~~
 
 error: pattern requires `..` due to inaccessible fields
   --> tests/ui/deny_sneaky_field_error.rs:44:10
@@ -125,10 +117,6 @@ error: pattern requires `..` due to inaccessible fields
    |          ^^^^^^^^
    |
    = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: ignore the inaccessible and unused fields
-   |
-44 | #[derive(ZeroCopy, ..)]
-   |                  ++++
 
 error[E0063]: missing field `1` in initializer of `SneakyEnumUnnamed`
   --> tests/ui/deny_sneaky_field_error.rs:44:10
@@ -153,10 +141,6 @@ error: pattern requires `..` due to inaccessible fields
    |          ^^^^^^^^
    |
    = note: this error originates in the derive macro `ZeroCopy` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: ignore the inaccessible and unused fields
-   |
-51 | #[derive(ZeroCopy { .. })]
-   |                   ++++++
 
 error[E0063]: missing field `sneaky_field` in initializer of `SneakyEnumUnit`
   --> tests/ui/deny_sneaky_field_error.rs:51:10

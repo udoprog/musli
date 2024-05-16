@@ -34,18 +34,25 @@ use crate::{DefaultSize, ZeroCopy};
 #[derive(ZeroCopy)]
 #[zero_copy(crate, bounds = {O: ZeroCopy, L: ZeroCopy})]
 #[repr(C, packed)]
-pub struct Packed<T: ?Sized, O: Size = DefaultSize, L: Size = DefaultSize, E: ByteOrder = Native> {
+pub struct Packed<T, O = DefaultSize, L = DefaultSize, E = Native>
+where
+    T: ?Sized,
+    O: Size,
+    L: Size,
+    E: ByteOrder,
+{
     offset: O,
     len: L,
     #[zero_copy(ignore)]
     _marker: PhantomData<(E, T)>,
 }
 
-impl<T, O: Size, L: Size, E: ByteOrder> Slice for Packed<[T], O, L, E>
+impl<T, O, L, E> Slice for Packed<[T], O, L, E>
 where
     T: ZeroCopy,
-    O: TryFrom<usize>,
-    L: TryFrom<usize>,
+    O: Size + TryFrom<usize>,
+    L: Size + TryFrom<usize>,
+    E: ByteOrder,
 {
     type Item = T;
     type ItemRef = Ref<T, E, usize>;
@@ -107,9 +114,12 @@ where
     }
 }
 
-impl<T, O: Size, L: Size, E: ByteOrder> Packed<[T], O, L, E>
+impl<T, O, L, E> Packed<[T], O, L, E>
 where
     T: ZeroCopy,
+    O: Size,
+    L: Size,
+    E: ByteOrder,
 {
     /// Construct a packed slice from a reference.
     #[inline]
@@ -339,11 +349,12 @@ where
     }
 }
 
-impl<T, O, L, E: ByteOrder> Load for Packed<[T], O, L, E>
+impl<T, O, L, E> Load for Packed<[T], O, L, E>
 where
     T: ZeroCopy,
     O: Size,
     L: Size,
+    E: ByteOrder,
 {
     type Target = [T];
 
@@ -356,10 +367,11 @@ where
     }
 }
 
-impl<T, O, L, E: ByteOrder> Clone for Packed<[T], O, L, E>
+impl<T, O, L, E> Clone for Packed<[T], O, L, E>
 where
     O: Size,
     L: Size,
+    E: ByteOrder,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -367,9 +379,10 @@ where
     }
 }
 
-impl<T, O, L, E: ByteOrder> Copy for Packed<[T], O, L, E>
+impl<T, O, L, E> Copy for Packed<[T], O, L, E>
 where
     O: Size,
     L: Size,
+    E: ByteOrder,
 {
 }

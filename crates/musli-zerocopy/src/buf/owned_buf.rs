@@ -47,6 +47,13 @@ pub struct OwnedBuf<E: ByteOrder = Native, O: Size = DefaultSize> {
     _marker: PhantomData<(E, O)>,
 }
 
+impl Default for OwnedBuf {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OwnedBuf {
     /// Construct a new empty buffer with the default alignment.
     ///
@@ -703,9 +710,9 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, E, O>
+    pub fn store_unsized<T>(&mut self, value: &T) -> Ref<T, E, O>
     where
-        T: UnsizedZeroCopy,
+        T: ?Sized + UnsizedZeroCopy,
     {
         unsafe {
             let size = size_of_val(value);
@@ -1273,9 +1280,9 @@ impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
     }
 
     #[inline]
-    fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
+    fn store_unsized<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
     where
-        T: UnsizedZeroCopy,
+        T: ?Sized + UnsizedZeroCopy,
     {
         OwnedBuf::store_unsized(self, value)
     }

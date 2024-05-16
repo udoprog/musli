@@ -34,7 +34,11 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// let mut buf = SliceMut::new(&mut buf);
 /// buf.store(&Custom { field: 10 });
 /// ```
-pub struct SliceMut<'a, E: ByteOrder = Native, O: Size = DefaultSize> {
+pub struct SliceMut<'a, E = Native, O = DefaultSize>
+where
+    E: ByteOrder,
+    O: Size,
+{
     /// Base data pointer.
     data: NonNull<u8>,
     /// The initialized length of the buffer.
@@ -94,7 +98,11 @@ impl<'a> SliceMut<'a> {
     }
 }
 
-impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
+impl<'a, E, O> SliceMut<'a, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     /// Modify the buffer to utilize the specified pointer size when inserting
     /// references.
     ///
@@ -639,9 +647,9 @@ impl<'a, E: ByteOrder, O: Size> SliceMut<'a, E, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, E, O>
+    pub fn store_unsized<T>(&mut self, value: &T) -> Ref<T, E, O>
     where
-        T: UnsizedZeroCopy,
+        T: ?Sized + UnsizedZeroCopy,
     {
         unsafe {
             let size = size_of_val(value);
@@ -891,7 +899,11 @@ unsafe impl<'a> Send for SliceMut<'a> {}
 /// unaliased.
 unsafe impl<'a> Sync for SliceMut<'a> {}
 
-impl<'a, E: ByteOrder, O: Size> Deref for SliceMut<'a, E, O> {
+impl<'a, E, O> Deref for SliceMut<'a, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     type Target = Buf;
 
     #[inline]
@@ -900,14 +912,22 @@ impl<'a, E: ByteOrder, O: Size> Deref for SliceMut<'a, E, O> {
     }
 }
 
-impl<'a, E: ByteOrder, O: Size> DerefMut for SliceMut<'a, E, O> {
+impl<'a, E, O> DerefMut for SliceMut<'a, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         Buf::new_mut(self.as_mut_slice())
     }
 }
 
-impl<'a, E: ByteOrder, O: Size> AsRef<Buf> for SliceMut<'a, E, O> {
+impl<'a, E, O> AsRef<Buf> for SliceMut<'a, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     /// Trivial `AsRef<Buf>` implementation for `SliceMut<O>`.
     ///
     /// # Examples
@@ -930,7 +950,11 @@ impl<'a, E: ByteOrder, O: Size> AsRef<Buf> for SliceMut<'a, E, O> {
     }
 }
 
-impl<'a, E: ByteOrder, O: Size> AsMut<Buf> for SliceMut<'a, E, O> {
+impl<'a, E, O> AsMut<Buf> for SliceMut<'a, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     /// Trivial `AsMut<Buf>` implementation for `SliceMut<O>`.
     ///
     /// # Examples
@@ -954,14 +978,22 @@ impl<'a, E: ByteOrder, O: Size> AsMut<Buf> for SliceMut<'a, E, O> {
     }
 }
 
-impl<'a, E: ByteOrder, O: Size> Borrow<Buf> for SliceMut<'a, E, O> {
+impl<'a, E, O> Borrow<Buf> for SliceMut<'a, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     #[inline]
     fn borrow(&self) -> &Buf {
         self.as_ref()
     }
 }
 
-impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
+impl<'a, E, O> StoreBuf for SliceMut<'a, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     type ByteOrder = E;
     type Size = O;
 
@@ -978,9 +1010,9 @@ impl<'a, E: ByteOrder, O: Size> StoreBuf for SliceMut<'a, E, O> {
     }
 
     #[inline]
-    fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
+    fn store_unsized<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
     where
-        T: UnsizedZeroCopy,
+        T: ?Sized + UnsizedZeroCopy,
     {
         SliceMut::store_unsized(self, value)
     }
