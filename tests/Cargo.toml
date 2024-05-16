@@ -30,6 +30,7 @@ test = ["simdutf8", "musli-wire", "musli-storage", "musli-descriptive", "musli-j
 no-rt = []
 
 no-usize = []
+no-float = []
 no-cstring = []
 no-map = []
 no-set = []

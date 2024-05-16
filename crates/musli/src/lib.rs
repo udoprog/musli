@@ -394,6 +394,7 @@
 
 #![deny(missing_docs)]
 #![allow(clippy::module_inception)]
+#![allow(unexpected_cfgs)]
 #![no_std]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 

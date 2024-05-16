@@ -44,6 +44,8 @@
 //!   functions.
 //! * [`swiss`] is a port of the [`hashbrown` crate] which is a Google
 //!   SwissTable implementation.
+//! * [`trie`] is an implementation of a prefix-trie, which supports efficient
+//!   multi-value byte-prefixed lookups.
 //!
 //! Finally if you're interested in the performance of `musli-zerocopy` you
 //! should go to [`benchmarks`]. I will be extending this suite with more
@@ -514,6 +516,7 @@
 //! [`requested()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
 //! [`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
 //! [`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
+//! [`trie`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trie/index.html
 //! [`with_byte_order::<E>()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_byte_order
 //! [`ZeroCopy`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.ZeroCopy.html
 //! [derive]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
@@ -522,6 +525,7 @@
 #![no_std]
 #![allow(clippy::module_inception)]
 #![allow(clippy::enum_variant_names)]
+#![allow(unexpected_cfgs)]
 #![deny(missing_docs)]
 #![cfg_attr(all(rune_nightly), feature(repr128))]
 #![cfg_attr(all(rune_nightly), allow(incomplete_features))]

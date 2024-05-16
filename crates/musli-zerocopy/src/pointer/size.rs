@@ -7,19 +7,15 @@ use crate::traits::ZeroCopy;
 /// The default [`Size`] to use.
 pub type DefaultSize = u32;
 
-#[cfg(not(any(
-    target_pointer_width = "32",
-    target_pointer_width = "64",
-    target_pointer_width = "128"
-)))]
-compile_error!("musli-zerocopy is only supported on 32, 64, or 128-bit platforms");
+#[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64",)))]
+compile_error!("musli-zerocopy is only supported on 32, 64-bit platforms");
 
 mod sealed {
     pub trait Sealed {}
     impl Sealed for u8 {}
     impl Sealed for u16 {}
     impl Sealed for u32 {}
-    #[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
+    #[cfg(target_pointer_width = "64")]
     impl Sealed for u64 {}
     impl Sealed for usize {}
 }
@@ -149,6 +145,6 @@ macro_rules! impl_size {
 impl_size!(u8, core::convert::identity);
 impl_size!(u16, E::swap_u16);
 impl_size!(u32, E::swap_u32);
-#[cfg(any(target_pointer_width = "64", target_pointer_width = "128"))]
+#[cfg(target_pointer_width = "64")]
 impl_size!(u64, E::swap_u64);
 impl_size!(usize, core::convert::identity);

@@ -83,6 +83,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             for_each!($name, check);
 
+            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     let mut frameworks = Vec::with_capacity(values.len());
@@ -103,6 +104,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             group!(concat!("enc/", stringify!($name)), $name, it);
 
+            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     let mut frameworks = Vec::with_capacity(values.len());
@@ -134,6 +136,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             group!(concat!("dec/", stringify!($name)), $name, it);
 
+            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     let mut frameworks = Vec::with_capacity(values.len());

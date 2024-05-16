@@ -304,7 +304,7 @@ impl<M> Encoding<M> {
         JsonDecoder::new(cx, SliceParser::new(bytes)).decode()
     }
 
-    crate::encode_with_extensions!(M);
+    crate::encode_with_extensions!(M, json);
 }
 
 impl<M> Clone for Encoding<M> {

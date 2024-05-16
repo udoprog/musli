@@ -2,9 +2,35 @@
 #[doc(hidden)]
 #[macro_export]
 macro_rules! encode_with_extensions {
-    ($mode:ident) => {
+    ($mode:ident, $what:ident) => {
         /// Encode the given value to the given [`Writer`] using the current
         /// configuration.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let mut data = Vec::new();
+        ///
+        /// ENCODING.encode(&mut data, &Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice(&data[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[inline]
         pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), Error>
         where
@@ -19,6 +45,32 @@ macro_rules! encode_with_extensions {
 
         /// Encode the given value to the given [Write][io::Write] using the current
         /// configuration.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let mut data = Vec::new();
+        ///
+        /// ENCODING.to_writer(&mut data, &Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice(&data[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[cfg(feature = "std")]
         #[inline]
         pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), Error>
@@ -32,6 +84,37 @@ macro_rules! encode_with_extensions {
 
         /// Encode the given value to the given [Write][io::Write] using the current
         /// configuration and context `C`.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        /// use musli::allocator::System;
+        /// use musli::context::Same;
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let alloc = System::new();
+        /// let cx = Same::new(&alloc);
+        ///
+        /// let mut data = Vec::new();
+        ///
+        /// ENCODING.to_writer_with(&cx, &mut data, &Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[cfg(feature = "std")]
         #[inline]
         pub fn to_writer_with<C, W, T>(self, cx: &C, write: W, value: &T) -> Result<(), C::Error>
@@ -45,7 +128,32 @@ macro_rules! encode_with_extensions {
         }
 
         /// Encode the given value to a [`Vec`] using the current configuration.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let data = ENCODING.to_vec(&Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice(&data[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn to_vec<T>(self, value: &T) -> Result<Vec<u8>, Error>
         where
@@ -60,7 +168,37 @@ macro_rules! encode_with_extensions {
         ///
         /// This is the same as [`Encoding::to_vec`], but allows for using a
         /// configurable [`Context`].
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        /// use musli::allocator::System;
+        /// use musli::context::Same;
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let alloc = System::new();
+        /// let cx = Same::new(&alloc);
+        ///
+        /// let data = ENCODING.to_vec_with(&cx, &Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn to_vec_with<C, T>(self, cx: &C, value: &T) -> Result<Vec<u8>, C::Error>
         where
@@ -74,6 +212,30 @@ macro_rules! encode_with_extensions {
 
         /// Encode the given value to a fixed-size bytes using the current
         /// configuration.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode, FixedBytes};
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let data: FixedBytes<128> = ENCODING.to_fixed_bytes(&Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice(&data[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[inline]
         pub fn to_fixed_bytes<const N: usize, T>(self, value: &T) -> Result<FixedBytes<N>, Error>
         where
@@ -87,6 +249,35 @@ macro_rules! encode_with_extensions {
 
         /// Encode the given value to a fixed-size bytes using the current
         /// configuration.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode, FixedBytes};
+        /// use musli::allocator::System;
+        /// use musli::context::Same;
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let alloc = System::new();
+        /// let cx = Same::new(&alloc);
+        ///
+        /// let data: FixedBytes<128> = ENCODING.to_fixed_bytes_with(&cx, &Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[inline]
         pub fn to_fixed_bytes_with<C, const N: usize, T>(
             self,
@@ -108,12 +299,38 @@ macro_rules! encode_with_extensions {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! encoding_impls {
-    ($mode:ident, $encoder_new:path, $decoder_new:path) => {
+    ($mode:ident, $what:ident, $encoder_new:path, $decoder_new:path) => {
         /// Encode the given value to the given [`Writer`] using the current
         /// configuration.
         ///
         /// This is the same as [`Encoding::encode`] but allows for using a
         /// configurable [`Context`].
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::Encode;
+        /// use musli::allocator::System;
+        /// use musli::context::Same;
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let alloc = System::new();
+        /// let cx = Same::new(&alloc);
+        ///
+        /// let mut buf = Vec::new();
+        ///
+        /// ENCODING.encode_with(&cx, &mut buf, &Person { name: "Alice".to_string(), age: 35 })?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[inline]
         pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
         where
@@ -130,6 +347,36 @@ macro_rules! encoding_impls {
         ///
         /// This is the same as [`Encoding::decode`] but allows for using a
         /// configurable [`Context`].
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        /// use musli::allocator::System;
+        /// use musli::context::Same;
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let alloc = System::new();
+        /// let cx = Same::new(&alloc);
+        ///
+        /// let buf = ENCODING.to_vec_with(&cx, &Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let mut slice = &buf[..];
+        /// let person: Person = ENCODING.decode_with(&cx, &mut slice)?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[inline]
         pub fn decode_with<'de, C, R, T>(self, cx: &C, reader: R) -> Result<T, C::Error>
         where
@@ -143,6 +390,31 @@ macro_rules! encoding_impls {
 
         /// Decode the given type `T` from the given [`Reader`] using the
         /// current configuration.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let data = ENCODING.to_vec(&Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let mut slice = &data[..];
+        /// let person: Person = ENCODING.decode(&mut slice)?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[inline]
         pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
@@ -157,6 +429,30 @@ macro_rules! encoding_impls {
 
         /// Decode the given type `T` from the given slice using the current
         /// configuration.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let data = ENCODING.to_vec(&Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice(&data[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[inline]
         pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
         where
@@ -173,6 +469,35 @@ macro_rules! encoding_impls {
         ///
         /// This is the same as [`Encoding::from_slice`], but allows for using a
         /// configurable [`Context`].
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        /// use musli::allocator::System;
+        /// use musli::context::Same;
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let alloc = System::new();
+        /// let cx = Same::new(&alloc);
+        ///
+        /// let buf = ENCODING.to_vec_with(&cx, &Person {
+        ///     name: "Alice".to_string(),
+        ///     age: 35,
+        /// })?;
+        ///
+        /// let person: Person = ENCODING.from_slice_with(&cx, &buf[..])?;
+        /// # Ok::<(), Error>(())
+        /// ```
         #[inline]
         pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
@@ -185,6 +510,9 @@ macro_rules! encoding_impls {
 
         /// Decode the given type `T` from the given string using the current
         /// configuration.
+        ///
+        /// This is an alias over [`Encoding::from_slice`] for convenience. See
+        /// its documentation for more.
         #[inline]
         pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, Error>
         where
@@ -198,6 +526,9 @@ macro_rules! encoding_impls {
         ///
         /// This is the same as [`Encoding::from_str`] but allows for using a
         /// configurable [`Context`].
+        ///
+        /// This is an alias over [`Encoding::from_slice_with`] for convenience.
+        /// See its documentation for more.
         #[inline]
         pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
         where
@@ -207,7 +538,7 @@ macro_rules! encoding_impls {
             self.from_slice_with(cx, string.as_bytes())
         }
 
-        $crate::encode_with_extensions!($mode);
+        $crate::encode_with_extensions!($mode, $what);
     };
 }
 
