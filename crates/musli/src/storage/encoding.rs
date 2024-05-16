@@ -176,6 +176,7 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
 
     crate::encoding_impls!(
         M,
+        storage,
         StorageEncoder::<_, OPT, _>::new,
         StorageDecoder::<_, OPT, _>::new
     );

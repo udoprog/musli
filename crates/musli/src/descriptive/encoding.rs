@@ -174,6 +174,7 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
 
     crate::encoding_impls!(
         M,
+        descriptive,
         SelfEncoder::<_, OPT, _>::new,
         SelfDecoder::<_, OPT, _>::new
     );

@@ -32,6 +32,16 @@ jobs:
     - run: cargo test --doc --features test
       if: matrix.rust == 'stable'
 
+  unexpected_lints:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: sed -i '/#!\[allow(unexpected_cfgs)\]/d' crates/*/src/lib.rs tests/src/lib.rs
+      - run: cargo check --all-features --all-targets
+        env:
+          RUSTFLAGS: -D warnings --check-cfg=cfg(rune_nightly,doc_cfg) -F unexpected_cfgs
+
   tests_clippy:
     runs-on: ubuntu-latest
     needs: features

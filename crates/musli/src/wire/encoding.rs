@@ -179,6 +179,7 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
 
     crate::encoding_impls!(
         M,
+        wire,
         WireEncoder::<_, OPT, _>::new,
         WireDecoder::<_, OPT, _>::new
     );
